@@ -24,3 +24,18 @@ While FamilyFi is stopped or cannot reach UniFi, the gateway keeps the last appl
 Release images run `prisma migrate deploy` on start. Local `make dev` does the same (`migrate deploy` plus `prisma generate`) before Next listens, so a new column cannot 500 login or Settings until the process is restarted. They do not run `prisma migrate dev`.
 
 Published GHCR tags are `linux/amd64` (`v*` git tags via Actions). Until a tag exists, use `make docker-dev-up`. The entrypoint does not need a `.env` file when `DEFAULT_PASSWORD`, `SESSION_SECRET`, and `APP_ENCRYPTION_KEY` are already in the process environment.
+
+## Releases
+
+`package.json` is `0.1.0`. Publish that version with an annotated git tag that matches semver, then push the tag. Do not use `v0.1`; the release workflow’s Docker tags need a full `MAJOR.MINOR.PATCH`.
+
+```bash
+git checkout main
+git pull
+git tag -a v0.1.0 -m "FamilyFi 0.1.0"
+git push origin v0.1.0
+```
+
+Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml): linux/amd64 image to `ghcr.io/nberardi/familyfi` (`0.1.0`, `0.1`, and `latest`) and a GitHub Release with generated notes. After the first package appears, link it to the repository in GitHub Packages if GHCR is not yet public.
+
+Bump `package.json` (and `openapi/familyfi.v1.yaml` `info.version`) before a later tag so Settings, the sign-in screen, and `GET /api/v1/health` show the same number as the image tag.

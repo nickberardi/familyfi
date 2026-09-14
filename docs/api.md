@@ -10,7 +10,7 @@ Normal payloads never return password hashes, `DEFAULT_PASSWORD`, raw UniFi keys
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/v1/health` | No secrets |
+| GET | `/api/v1/health` | No secrets; includes `version` from `package.json` |
 | POST | `/api/v1/auth/login` | Cookie session or native bearer |
 | POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for native |
 | GET | `/api/v1/auth/session` | Current principal |

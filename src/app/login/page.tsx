@@ -1,4 +1,5 @@
 import { SignInForm } from "@/components/SignInForm";
+import { appVersionLabel } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,9 @@ export default function LoginPage() {
       <div className="flex w-full max-w-[400px] flex-col gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-[26px] font-bold tracking-tight">FamilyFi</h1>
-          <p className="text-[14px] leading-5 text-[var(--ff-muted)]">Sign in to manage the household.</p>
+          <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
+            {appVersionLabel()} · Sign in to manage the household.
+          </p>
         </div>
         <SignInForm />
         <p className="text-[14px] leading-5 text-[var(--ff-muted)]">

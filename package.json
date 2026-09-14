@@ -13,9 +13,9 @@
     "start": "node scripts/with-env.mjs next start --port 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:browser": "playwright test",
+    "test": "vitest run --config tests/vitest.config.ts",
+    "test:integration": "vitest run --config tests/vitest.integration.config.ts",
+    "test:browser": "playwright test --config tests/playwright.config.ts",
     "test-api": "node scripts/check-openapi.mjs",
     "spike": "node scripts/with-env.mjs tsx scripts/spike/index.ts",
     "postinstall": "prisma generate"
@@ -68,7 +68,10 @@
       "@prisma/engines",
       "core-js",
       "esbuild",
-      "prisma",
+      "prisma"
+    ],
+    "neverBuiltDependencies": [
+      "sharp",
       "unrs-resolver"
     ]
   }

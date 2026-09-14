@@ -56,7 +56,7 @@ make docker-logs   # look for username: admin and the recovery password
 
 Open http://localhost:7001 (override with `APP_PORT`). Default `DB_MODE` is `bundled` (Compose starts PostgreSQL). For an existing server, set `DB_MODE=external` and the `DB_*` values.
 
-After a GHCR release:
+After a GHCR release (`git tag -a v0.1.0` then `git push origin v0.1.0`; see [docs/operations.md](docs/operations.md)):
 
 ```bash
 cp .env.example .env

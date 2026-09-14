@@ -1,8 +1,12 @@
 import { readFileSync, existsSync } from "node:fs";
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-if (existsSync(".env")) {
-  for (const raw of readFileSync(".env", "utf8").split(/\r?\n/)) {
+const repoRoot = path.resolve(__dirname, "..");
+const envPath = path.join(repoRoot, ".env");
+
+if (existsSync(envPath)) {
+  for (const raw of readFileSync(envPath, "utf8").split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
     const eq = line.indexOf("=");
@@ -23,7 +27,8 @@ const port = process.env.PLAYWRIGHT_PORT || "3100";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${port}`;
 
 export default defineConfig({
-  testDir: "./tests/browser",
+  testDir: "./browser",
+  outputDir: path.join(repoRoot, "test-results"),
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -38,6 +43,7 @@ export default defineConfig({
   webServer: process.env.CI
     ? {
         command: `node scripts/with-env.mjs next start --port ${port}`,
+        cwd: repoRoot,
         url: `${baseURL}/api/v1/health`,
         reuseExistingServer: false,
         timeout: 180_000,
