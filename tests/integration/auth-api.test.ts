@@ -50,9 +50,10 @@ describe("auth and accounts API", () => {
 
   it("serves non-secret health", async () => {
     const response = await getHealth();
-    const body = (await response.json()) as { status: string; db: string };
+    const body = (await response.json()) as { status: string; db: string; version: string };
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
+    expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
     expect(JSON.stringify(body)).not.toMatch(/password|ciphertext|DEFAULT_PASSWORD/i);
   });
 

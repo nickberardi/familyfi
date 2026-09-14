@@ -14,6 +14,7 @@ import {
 } from "@/lib/settings-copy";
 import { relativeSweep } from "@/lib/sync-copy";
 import type { Group } from "@/lib/types";
+import { appVersionLabel } from "@/lib/version";
 
 const TIMEZONES = [
   "America/New_York",
@@ -499,6 +500,25 @@ export default function SettingsPage() {
               Add
             </button>
           </form>
+        </section>
+
+        <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
+          <div className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-[15px] text-[14px] font-semibold">About</div>
+          <div className="flex items-center gap-3 px-[18px] py-2.5">
+            <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">Version</div>
+            <div className="min-w-0 flex-1 text-right font-mono text-[14px]">{appVersionLabel()}</div>
+          </div>
+          <div
+            className="flex items-center gap-3 px-[18px] py-2.5"
+            style={{ borderTop: "1px solid rgba(60,60,67,.12)" }}
+          >
+            <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">License</div>
+            <div className="min-w-0 flex-1 text-right text-[14px]">Business Source License 1.1</div>
+          </div>
+          <p className="border-t border-[rgba(60,60,67,.12)] px-[18px] py-3 text-[14px] leading-5 text-[var(--ff-muted)]">
+            FamilyFi {appVersionLabel()}. One household UniFi network. Report bugs on GitHub with credentials and IPs
+            removed.
+          </p>
         </section>
       </div>
 

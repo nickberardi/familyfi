@@ -46,7 +46,7 @@ paths:
                 $ref: "#/components/schemas/Health"
               examples:
                 ok:
-                  value: { status: ok, db: ok, revision: 0 }
+                  value: { status: ok, db: ok, version: "0.1.0", revision: 0 }
         "503":
           description: Application is up but the database is not.
           content:
@@ -953,7 +953,7 @@ components:
     Health:
       type: object
       additionalProperties: false
-      required: [status, db]
+      required: [status, db, version]
       properties:
         status:
           type: string
@@ -961,6 +961,9 @@ components:
         db:
           type: string
           enum: [ok, error, unconfigured]
+        version:
+          type: string
+          description: Application semver from package.json (no leading v).
         revision:
           type: integer
           minimum: 0

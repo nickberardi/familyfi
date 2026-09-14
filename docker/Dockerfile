@@ -1,7 +1,7 @@
 FROM node:26-bookworm-slim AS deps
 WORKDIR /app
 RUN npm install -g pnpm@10.15.1
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
+COPY package.json pnpm-lock.yaml prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/print-database-url.mjs ./scripts/print-database-url.mjs
 RUN pnpm install --frozen-lockfile

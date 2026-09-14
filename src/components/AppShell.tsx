@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { initials } from "@/lib/display";
 import { noMembersAttention } from "@/lib/sync-copy";
+import { appVersionLabel } from "@/lib/version";
 import { useAppData } from "./AppDataProvider";
 
 const NAV = [
@@ -76,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-none px-2.5">
           <div className="text-[15px] font-bold tracking-tight">FamilyFi</div>
           <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">
-            {unifi?.configured ? "Household gateway" : "Setup needed"}
+            {appVersionLabel()} · {unifi?.configured ? "Household gateway" : "Setup needed"}
           </div>
         </div>
         <nav className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">

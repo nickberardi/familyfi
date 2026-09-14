@@ -14,6 +14,7 @@ test("sign-in and household pages", async ({ page }) => {
   test.skip(!password, "DEFAULT_PASSWORD is required for browser tests");
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "FamilyFi" })).toBeVisible();
+  await expect(page.getByText(/v0\.\d+\.\d+/)).toBeVisible();
   const usernameBox = page.getByLabel("Username");
   await expect(usernameBox).toHaveCSS("font-size", "16px");
 
@@ -34,4 +35,9 @@ test("sign-in and household pages", async ({ page }) => {
   }
   await expect(page).toHaveURL(/\/reference/);
   await expect(page.getByRole("heading", { name: "API" })).toBeVisible();
+
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByText("About")).toBeVisible();
+  await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
 });
