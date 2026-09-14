@@ -1,0 +1,29 @@
+{
+  "count": 3,
+  "offset": 0,
+  "limit": 200,
+  "totalCount": 3,
+  "data": [
+    {
+      "id": "44444444-4444-4444-8444-444444444441",
+      "name": "redacted",
+      "type": "WIRELESS",
+      "ipAddress": "192.0.2.20",
+      "macAddress": "02:00:00:00:00:01"
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444442",
+      "name": "redacted",
+      "type": "WIRED",
+      "ipAddress": "198.51.100.20",
+      "macAddress": "02:00:00:00:00:02"
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444443",
+      "name": "redacted",
+      "type": "WIRELESS",
+      "ipAddress": "192.0.2.30",
+      "macAddress": "02:00:00:00:00:03"
+    }
+  ]
+}

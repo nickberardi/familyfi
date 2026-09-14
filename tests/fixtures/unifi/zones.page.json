@@ -1,0 +1,26 @@
+{
+  "count": 3,
+  "offset": 0,
+  "limit": 200,
+  "totalCount": 3,
+  "data": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "name": "Internal",
+      "networkIds": ["22222222-2222-4222-8222-222222222222"],
+      "metadata": { "origin": "SYSTEM_DEFINED" }
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333334",
+      "name": "IoT",
+      "networkIds": ["22222222-2222-4222-8222-222222222223"],
+      "metadata": { "origin": "USER_DEFINED" }
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333335",
+      "name": "External",
+      "networkIds": [],
+      "metadata": { "origin": "SYSTEM_DEFINED" }
+    }
+  ]
+}

@@ -4,7 +4,9 @@ services:
     ports:
       - "${APP_PORT:-7001}:3000"
     env_file:
-      - .env
+      - ../.env
+    volumes:
+      - ../.env:/app/.env
     environment:
       NODE_ENV: production
       PORT: "3000"

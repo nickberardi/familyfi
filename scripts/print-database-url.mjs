@@ -30,7 +30,7 @@ export function loadDotEnv() {
   if (!fs.existsSync(envPath)) return;
   const parsed = parseEnvFile(fs.readFileSync(envPath, "utf8"));
   for (const [key, value] of Object.entries(parsed)) {
-    if (process.env[key] === undefined) process.env[key] = value;
+    if (process.env[key] === undefined || process.env[key] === "") process.env[key] = value;
   }
 }
 

@@ -1,0 +1,20 @@
+{
+  "count": 1,
+  "offset": 0,
+  "limit": 200,
+  "totalCount": 1,
+  "data": [
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "index": 10,
+      "name": "Allow LAN DNS",
+      "enabled": true,
+      "loggingEnabled": false,
+      "action": { "type": "ALLOW" },
+      "ipProtocolScope": { "ipVersion": "IPV4_AND_IPV6" },
+      "source": { "zoneId": "33333333-3333-4333-8333-333333333333" },
+      "destination": { "zoneId": "33333333-3333-4333-8333-333333333335" },
+      "metadata": { "origin": "USER_DEFINED" }
+    }
+  ]
+}

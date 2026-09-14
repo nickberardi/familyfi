@@ -2,22 +2,29 @@ SHELL := /bin/bash
 PNPM ?= npx --yes pnpm@10.15.1
 DB_MODE ?= bundled
 FAMILYFI_IMAGE ?= ghcr.io/nberardi/familyfi:latest
-COMPOSE := docker compose -f docker-compose.yml
+COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.yml
 ifeq ($(DB_MODE),bundled)
-COMPOSE += -f docker-compose.bundled.yml
+COMPOSE += -f docker/docker-compose.bundled.yml
 endif
 WITH_ENV := node scripts/with-env.mjs
 
 .PHONY: setup dev test test-api spike lint typecheck build \
-	docker-build docker-dev-up docker-up docker-down docker-logs db-dev
+	docker-build docker-dev-up docker-up docker-down docker-logs db-dev secrets
 
 setup:
 	corepack enable >/dev/null 2>&1 || true
 	$(PNPM) install
-	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set DEFAULT_PASSWORD, SESSION_SECRET, APP_ENCRYPTION_KEY, and DB_PASSWORD"; fi
+	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set DB_PASSWORD"; fi
+	node scripts/validate-env.mjs
 	@if command -v docker >/dev/null 2>&1; then \
-		docker compose -f docker-compose.dev-db.yml up -d; \
-		$(WITH_ENV) ./node_modules/.bin/prisma migrate deploy; \
+		docker compose -p familyfi --env-file .env -f docker/docker-compose.dev-db.yml up -d --wait; \
+		i=0; \
+		until $(WITH_ENV) ./node_modules/.bin/prisma migrate deploy; do \
+			i=$$((i + 1)); \
+			if [ "$$i" -ge 20 ]; then echo "database was not ready for migrations after 40s" >&2; exit 1; fi; \
+			echo "waiting for PostgreSQL…"; \
+			sleep 2; \
+		done; \
 	else \
 		echo "Docker is not available. Start PostgreSQL yourself, then run: make db-migrate"; \
 	fi
@@ -27,6 +34,7 @@ db-migrate:
 	$(WITH_ENV) ./node_modules/.bin/prisma migrate deploy
 
 dev:
+	node scripts/ensure-dev-port.mjs 3000
 	$(PNPM) dev
 
 test:
@@ -36,7 +44,7 @@ test-api:
 	$(PNPM) test-api
 
 spike:
-	$(PNPM) spike
+	$(PNPM) spike -- $(SPIKE_ARGS)
 
 lint:
 	$(PNPM) lint
@@ -48,10 +56,10 @@ build:
 	$(PNPM) build
 
 docker-build:
-	docker build -t familyfi:dev .
+	docker build -f docker/Dockerfile -t familyfi:dev .
 
 docker-dev-up:
-	FAMILYFI_IMAGE=familyfi:dev $(COMPOSE) -f docker-compose.dev.yml up -d --build
+	FAMILYFI_IMAGE=familyfi:dev $(COMPOSE) -f docker/docker-compose.dev.yml up -d --build
 
 docker-up:
 	FAMILYFI_IMAGE=$(FAMILYFI_IMAGE) $(COMPOSE) up -d
@@ -63,4 +71,7 @@ docker-logs:
 	$(COMPOSE) logs -f
 
 db-dev:
-	docker compose -f docker-compose.dev-db.yml up -d
+	docker compose -p familyfi --env-file .env -f docker/docker-compose.dev-db.yml up -d --wait
+
+secrets:
+	node scripts/gen-secrets.mjs

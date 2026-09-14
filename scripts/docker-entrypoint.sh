@@ -17,4 +17,4 @@ until node scripts/wait-for-db.mjs; do
 done
 
 ./node_modules/.bin/prisma migrate deploy
-exec node server.js
+exec node scripts/with-env.mjs node server.js

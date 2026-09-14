@@ -1,0 +1,20 @@
+{
+  "name": "FamilyFi Spike Internal Devices",
+  "description": "FamilyFi managed internet block.",
+  "enabled": true,
+  "loggingEnabled": false,
+  "action": { "type": "BLOCK" },
+  "ipProtocolScope": { "ipVersion": "IPV4_AND_IPV6" },
+  "source": {
+    "zoneId": "33333333-3333-4333-8333-333333333333",
+    "trafficFilter": {
+      "type": "MAC_ADDRESS",
+      "macAddressFilter": {
+        "macAddresses": ["02:00:00:00:00:01", "02:00:00:00:00:03"]
+      }
+    }
+  },
+  "destination": {
+    "zoneId": "33333333-3333-4333-8333-333333333335"
+  }
+}

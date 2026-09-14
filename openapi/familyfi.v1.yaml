@@ -6,7 +6,7 @@ info:
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
     enforcement only. This revision specifies health and authentication.
-    Remaining household routes will be added in the backend phase.
+    Groups, devices, accounts, UniFi settings, and sync are specified here.
   license:
     name: License undecided
     identifier: UNLICENSED
@@ -18,6 +18,16 @@ tags:
     description: Deployment health and readiness
   - name: Auth
     description: Recovery admin and personal adult sessions
+  - name: Accounts
+    description: Personal adult administration; recovery admin is permanent
+  - name: Settings
+    description: Household timezone and UniFi connection
+  - name: Groups
+    description: Family and Things
+  - name: Devices
+    description: Assigned and quarantined devices
+  - name: Sync
+    description: Reconciliation and per-action change status
 paths:
   /api/v1/health:
     get:
@@ -85,6 +95,8 @@ paths:
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /api/v1/auth/logout:
     post:
       operationId: logout
@@ -130,6 +142,768 @@ paths:
                 $ref: "#/components/schemas/SessionResponse"
         "401":
           $ref: "#/components/responses/Error"
+  /api/v1/accounts:
+    get:
+      operationId: listAccounts
+      tags: [Accounts]
+      summary: List recovery and personal accounts
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Accounts without password hashes
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [accounts]
+                properties:
+                  accounts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Account" }
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createAccount
+      tags: [Accounts]
+      summary: Create a personal adult account
+      description: Username cannot be admin. groupId must be an adult Family group.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [account, change]
+                properties:
+                  account: { $ref: "#/components/schemas/Account" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/accounts/{id}:
+    get:
+      operationId: getAccount
+      tags: [Accounts]
+      summary: Get an account
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200":
+          description: Account
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [account]
+                properties:
+                  account: { $ref: "#/components/schemas/Account" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateAccount
+      tags: [Accounts]
+      summary: Update a personal account
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [account, change]
+                properties:
+                  account: { $ref: "#/components/schemas/Account" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteAccount
+      tags: [Accounts]
+      summary: Delete a personal account
+      description: Revokes that account's sessions. Recovery admin cannot be deleted.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok, change]
+                properties:
+                  ok: { type: boolean, const: true }
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/accounts/{id}/password:
+    put:
+      operationId: updateAccountPassword
+      tags: [Accounts]
+      summary: Set a personal account password
+      description: Revokes existing sessions for that account. Recovery admin uses DEFAULT_PASSWORD.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [account, change]
+                properties:
+                  account: { $ref: "#/components/schemas/Account" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/settings/household:
+    get:
+      operationId: getHousehold
+      tags: [Settings]
+      summary: Household timezone
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Household settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [household]
+                properties:
+                  household:
+                    $ref: "#/components/schemas/Household"
+        "401":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateHousehold
+      tags: [Settings]
+      summary: Update timezone
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [timezone]
+              properties:
+                timezone: { type: string, example: America/New_York }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [household, change]
+                properties:
+                  household: { $ref: "#/components/schemas/Household" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/settings/unifi:
+    get:
+      operationId: getUnifiSettings
+      tags: [Settings]
+      summary: Masked UniFi connection
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Never returns the raw API key
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [unifi]
+                properties:
+                  unifi: { $ref: "#/components/schemas/UnifiSettings" }
+        "401":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateUnifiSettings
+      tags: [Settings]
+      summary: Validate and save UniFi credentials or managed networks
+      description: |
+        Probes UniFi before saving a new key. Failure preserves the previous key.
+        After a key exists, PUT may send only manageAllNetworks / managedNetworkIds.
+        Discovery and quarantine only watch those UniFi networks (VLANs).
+        manageAllNetworks true watches every network on the site.
+        An empty allowlist with manageAllNetworks false watches none.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UnifiSettingsWrite" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [unifi, change]
+                properties:
+                  unifi: { $ref: "#/components/schemas/UnifiSettings" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/settings/unifi/test:
+    post:
+      operationId: testUnifiSettings
+      tags: [Settings]
+      summary: Probe UniFi without saving
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UnifiProbeRequest" }
+      responses:
+        "200":
+          description: Reachable
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok, applicationVersion, site, siteCount, networks]
+                properties:
+                  ok: { type: boolean, const: true }
+                  applicationVersion: { type: string }
+                  site:
+                    type: object
+                    additionalProperties: false
+                    required: [id, name]
+                    properties:
+                      id: { type: string }
+                      name: { type: string }
+                  siteCount: { type: integer }
+                  networks:
+                    type: array
+                    items: { $ref: "#/components/schemas/UnifiNetwork" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups:
+    get:
+      operationId: listGroups
+      tags: [Groups]
+      summary: List Family and Things groups
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [groups]
+                properties:
+                  groups:
+                    type: array
+                    items: { $ref: "#/components/schemas/Group" }
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createGroup
+      tags: [Groups]
+      summary: Create a group
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}:
+    get:
+      operationId: getGroup
+      tags: [Groups]
+      summary: Get a group
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/GroupId" }]
+      responses:
+        "200":
+          description: Group
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateGroup
+      tags: [Groups]
+      summary: Update a group
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GroupUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteGroup
+      tags: [Groups]
+      summary: Delete a group
+      description: Devices in the group become quarantined.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok, change]
+                properties:
+                  ok: { type: boolean, const: true }
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/schedule:
+    put:
+      operationId: updateGroupSchedule
+      tags: [Groups]
+      summary: Set recurring bedtime
+      description: Persisted to UniFi policy schedule. Does not toggle enabled at window edges.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Schedule" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/pause:
+    post:
+      operationId: pauseGroup
+      tags: [Groups]
+      summary: Pause schedule enforcement
+      description: Sets UniFi policy enabled false. Omit until for an indefinite pause.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Paused
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/resume:
+    post:
+      operationId: resumeGroup
+      tags: [Groups]
+      summary: Resume UniFi schedule
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/extend:
+    post:
+      operationId: extendGroupPause
+      tags: [Groups]
+      summary: Extend a timed pause
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Extended
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/devices:
+    get:
+      operationId: listDevices
+      tags: [Devices]
+      summary: List devices
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: assignment
+          in: query
+          schema:
+            type: string
+            enum: [assigned, quarantined]
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [devices]
+                properties:
+                  devices:
+                    type: array
+                    items: { $ref: "#/components/schemas/Device" }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/devices/{mac}:
+    get:
+      operationId: getDevice
+      tags: [Devices]
+      summary: Get a device
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Mac" }]
+      responses:
+        "200":
+          description: Device
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [device]
+                properties:
+                  device: { $ref: "#/components/schemas/Device" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/devices/{mac}/assignment:
+    put:
+      operationId: assignDevice
+      tags: [Devices]
+      summary: Assign a device or return it to quarantine
+      description: groupId null quarantines the device.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Mac" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [groupId]
+              properties:
+                groupId:
+                  type: [string, "null"]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [device, change]
+                properties:
+                  device: { $ref: "#/components/schemas/Device" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/sync:
+    get:
+      operationId: getSync
+      tags: [Sync]
+      summary: Latest reconciliation
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Sync status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncStatus" }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/sync/retry:
+    post:
+      operationId: retrySync
+      tags: [Sync]
+      summary: Queue another reconciliation
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [change]
+                properties:
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/changes/{id}:
+    get:
+      operationId: getChange
+      tags: [Sync]
+      summary: Poll a mutation
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Change
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [change]
+                properties:
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     cookieAuth:
@@ -147,6 +921,21 @@ components:
       in: header
       required: false
       description: Required for cookie-authenticated mutations. Must match familyfi_csrf.
+      schema: { type: string }
+    AccountId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    GroupId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    Mac:
+      name: mac
+      in: path
+      required: true
       schema: { type: string }
   responses:
     Error:
@@ -166,10 +955,13 @@ components:
           enum: [ok, degraded]
         db:
           type: string
-          enum: [ok, error]
+          enum: [ok, error, unconfigured]
         revision:
           type: integer
           minimum: 0
+        error:
+          type: string
+          description: Present when status is degraded due to configuration, not secrets.
     LoginRequest:
       type: object
       additionalProperties: false
@@ -218,6 +1010,192 @@ components:
       properties:
         session:
           $ref: "#/components/schemas/Session"
+    Account:
+      type: object
+      additionalProperties: false
+      required: [id, username, displayName, kind, isAdmin, recovery]
+      properties:
+        id: { type: string }
+        username: { type: string }
+        displayName: { type: string }
+        kind: { type: string, enum: [recovery, personal] }
+        isAdmin: { type: boolean }
+        groupId: { type: [string, "null"] }
+        recovery: { type: boolean }
+    AccountCreate:
+      type: object
+      additionalProperties: false
+      required: [username, displayName, password, groupId]
+      properties:
+        username: { type: string, minLength: 2 }
+        displayName: { type: string }
+        password: { type: string, minLength: 8 }
+        groupId: { type: string }
+        isAdmin: { type: boolean }
+    AccountUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        displayName: { type: string }
+        groupId: { type: string }
+        isAdmin: { type: boolean }
+    Household:
+      type: object
+      additionalProperties: false
+      required: [timezone, revision]
+      properties:
+        timezone: { type: string }
+        revision: { type: integer, minimum: 0 }
+    UnifiSettings:
+      type: object
+      additionalProperties: false
+      required: [configured, connectionStatus, tlsInsecure, manageAllNetworks, managedNetworkIds, networks]
+      properties:
+        configured: { type: boolean }
+        mode: { type: [string, "null"] }
+        baseUrl: { type: [string, "null"] }
+        consoleId: { type: [string, "null"] }
+        siteId: { type: [string, "null"] }
+        apiKeyMasked: { type: [string, "null"] }
+        tlsInsecure: { type: boolean }
+        manageAllNetworks: { type: boolean }
+        managedNetworkIds:
+          type: array
+          items: { type: string }
+        networks:
+          type: array
+          items: { $ref: "#/components/schemas/UnifiNetwork" }
+        connectionStatus: { type: string }
+        connectionError: { type: [string, "null"] }
+    UnifiNetwork:
+      type: object
+      additionalProperties: false
+      required: [id, name, vlanId]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        vlanId: { type: integer }
+        zoneId: { type: [string, "null"] }
+    UnifiProbeRequest:
+      type: object
+      additionalProperties: false
+      required: [apiKey]
+      properties:
+        apiKey: { type: string, minLength: 8 }
+        baseUrl: { type: string }
+        consoleId: { type: string }
+        siteId: { type: string }
+        tlsInsecure: { type: boolean }
+    UnifiSettingsWrite:
+      type: object
+      additionalProperties: false
+      properties:
+        apiKey: { type: string, minLength: 8 }
+        baseUrl: { type: string }
+        consoleId: { type: string }
+        siteId: { type: string }
+        tlsInsecure: { type: boolean }
+        manageAllNetworks: { type: boolean }
+        managedNetworkIds:
+          type: array
+          items: { type: string }
+    Schedule:
+      type: object
+      additionalProperties: false
+      required: [enabled, days, start, end]
+      properties:
+        enabled: { type: boolean }
+        days:
+          type: array
+          items: { type: integer, minimum: 0, maximum: 6 }
+        start: { type: [string, "null"] }
+        end: { type: [string, "null"] }
+    Suspension:
+      type: object
+      additionalProperties: false
+      required: [active, until]
+      properties:
+        active: { type: boolean }
+        until: { type: [string, "null"], format: date-time }
+    Group:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, protected, deviceCount, schedule, suspension, access]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [family, things] }
+        name: { type: string }
+        monogram: { type: [string, "null"] }
+        familyRole: { type: [string, "null"], enum: [child, teen, adult] }
+        protected: { type: boolean }
+        deviceCount: { type: integer, minimum: 0 }
+        schedule: { $ref: "#/components/schemas/Schedule" }
+        suspension: { $ref: "#/components/schemas/Suspension" }
+        access: { type: string, enum: [available, blocked, paused, protected] }
+    GroupCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, name]
+      properties:
+        kind: { type: string, enum: [family, things] }
+        name: { type: string }
+        monogram: { type: string, maxLength: 4 }
+        familyRole: { type: string, enum: [child, teen, adult] }
+        protected: { type: boolean }
+    GroupUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        monogram: { type: [string, "null"] }
+        familyRole: { type: [string, "null"], enum: [child, teen, adult] }
+        protected: { type: boolean }
+    Device:
+      type: object
+      additionalProperties: false
+      required: [mac, assignment, unresolved, inScope]
+      properties:
+        mac: { type: string }
+        hostname: { type: [string, "null"] }
+        ip: { type: [string, "null"] }
+        networkId: { type: [string, "null"] }
+        zoneId: { type: [string, "null"] }
+        groupId: { type: [string, "null"] }
+        assignment: { type: string, enum: [assigned, quarantined] }
+        lastSeenAt: { type: [string, "null"], format: date-time }
+        unresolved: { type: boolean }
+        inScope: { type: boolean }
+    Change:
+      type: object
+      additionalProperties: false
+      required: [id, revision, status, scope]
+      properties:
+        id: { type: string }
+        revision: { type: integer }
+        appliedRevision: { type: [integer, "null"] }
+        status: { type: string, enum: [pending, applied, partial, failed, superseded] }
+        scope: { type: string }
+        deviceMac: { type: [string, "null"] }
+        error: { type: [string, "null"] }
+        updatedAt: { type: string, format: date-time }
+    SyncStatus:
+      type: object
+      additionalProperties: false
+      required: [revision, connectionStatus]
+      properties:
+        revision: { type: integer }
+        connectionStatus: { type: string }
+        lastRun:
+          type: [object, "null"]
+          additionalProperties: false
+          properties:
+            id: { type: string }
+            status: { type: string }
+            requestedRevision: { type: integer }
+            appliedRevision: { type: [integer, "null"] }
+            startedAt: { type: string, format: date-time }
+            finishedAt: { type: [string, "null"], format: date-time }
+            error: { type: [string, "null"] }
     Error:
       type: object
       additionalProperties: false

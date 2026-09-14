@@ -6,7 +6,7 @@ The first client is a responsive web/PWA. The same documented `/api/v1` API is r
 
 ## Status
 
-Phase 0 scaffold: Next.js, PostgreSQL, recovery-admin authentication, OpenAPI for health/auth, Docker/Make paths, and GitHub Actions. Live UniFi enforcement is a Phase 1 gate and is not implemented yet.
+Phase 1 live gate: MAC internet **block when enabled** and **restore when paused** are proven on the household gateway; the spike policy was deleted. Phase 2 backend (groups, devices, accounts, encrypted UniFi key, schedule/`enabled` reconciliation) is in `/api/v1`; the Settings/home UI is Phase 3.
 
 ## Requirements
 
@@ -19,12 +19,12 @@ Phase 0 scaffold: Next.js, PostgreSQL, recovery-admin authentication, OpenAPI fo
 
 ```bash
 cp .env.example .env
-# Set DEFAULT_PASSWORD, SESSION_SECRET, APP_ENCRYPTION_KEY, and DB_PASSWORD.
+# Set DB_PASSWORD. Recovery password and crypto secrets are generated on setup.
 make setup
 make dev
 ```
 
-Open http://localhost:3000 and sign in as `admin` with `DEFAULT_PASSWORD`.
+Open http://localhost:3000 and sign in as `admin` with the recovery password printed in the server log.
 
 `DEFAULT_PASSWORD` is the permanent recovery credential. Changing the environment value takes effect on the next `admin` sign-in. Personal adult accounts replace everyday use of `admin`; they do not remove it.
 
@@ -32,7 +32,8 @@ Open http://localhost:3000 and sign in as `admin` with `DEFAULT_PASSWORD`.
 
 ```bash
 cp .env.example .env
-# Set DEFAULT_PASSWORD, SESSION_SECRET, APP_ENCRYPTION_KEY, and DB credentials.
+# Set DB_PASSWORD.
+# DEFAULT_PASSWORD, SESSION_SECRET, and APP_ENCRYPTION_KEY are generated on first setup if omitted.
 # Default DB_MODE=bundled. For an existing server: DB_MODE=external and its DB_* values.
 make docker-dev-up   # until a GHCR image exists
 # Open http://localhost:7001
@@ -50,7 +51,7 @@ After a GHCR release, `make docker-up` pulls `ghcr.io/nberardi/familyfi`.
 | `make dev` | Next.js on port 3000 |
 | `make test` | Unit and contract tests |
 | `make test-api` | OpenAPI lint |
-| `make spike` | UniFi integration spike CLI (Phase 1) |
+| `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
 | `make lint` / `make typecheck` / `make build` | Checks and production build |
 | `make docker-build` | Build `familyfi:dev` |
 | `make docker-dev-up` | Locally built image, selected database mode |
@@ -66,6 +67,7 @@ After a GHCR release, `make docker-up` pulls `ghcr.io/nberardi/familyfi`.
 - [API](docs/api.md) and [`openapi/familyfi.v1.yaml`](openapi/familyfi.v1.yaml)
 - [Design review](docs/design-review.md)
 - [Plan](docs/plan.md)
+- [Spike results](docs/spike/RESULTS.md) and [operator checklist](docs/spike/OPERATOR.md)
 - [Licensing](docs/licensing.md)
 
 Private design references in `designs/` are local-only and are excluded from Git and Docker builds.

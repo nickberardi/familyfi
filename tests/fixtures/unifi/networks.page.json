@@ -1,0 +1,38 @@
+{
+  "count": 2,
+  "offset": 0,
+  "limit": 200,
+  "totalCount": 2,
+  "data": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "redacted",
+      "default": true,
+      "enabled": true,
+      "management": "GATEWAY",
+      "vlanId": 1,
+      "zoneId": "33333333-3333-4333-8333-333333333333",
+      "internetAccessEnabled": true,
+      "ipv4Configuration": {
+        "hostIpAddress": "192.0.2.1",
+        "prefixLength": 24,
+        "autoScaleEnabled": false
+      }
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222223",
+      "name": "redacted",
+      "default": false,
+      "enabled": true,
+      "management": "GATEWAY",
+      "vlanId": 20,
+      "zoneId": "33333333-3333-4333-8333-333333333334",
+      "internetAccessEnabled": true,
+      "ipv4Configuration": {
+        "hostIpAddress": "198.51.100.1",
+        "prefixLength": 24,
+        "autoScaleEnabled": false
+      }
+    }
+  ]
+}

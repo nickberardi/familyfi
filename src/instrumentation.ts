@@ -1,11 +1,18 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const { loadEnv } = await import("./server/env");
+  if (process.env.NEXT_PHASE) return;
+  if (process.env.npm_lifecycle_event === "build") return;
+  const { ConfigurationError, loadEnv } = await import("./server/env");
+  let settings;
   try {
-    loadEnv();
-  } catch {
+    settings = loadEnv();
+  } catch (error) {
+    const detail = error instanceof ConfigurationError ? error.issues.join("\n") : String(error);
+    console.error("FamilyFi is missing required settings in .env:\n" + detail);
     return;
   }
+  const { logRecoveryAdmin } = await import("./server/startup-banner");
+  logRecoveryAdmin(settings.DEFAULT_PASSWORD);
   const { ensureRecoveryAccount } = await import("./server/auth");
   const { startReconciliation } = await import("./server/reconciliation");
   try {

@@ -15,20 +15,30 @@ export function SignInForm() {
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password, client: "browser" }),
-      });
-      const data = (await response.json()) as { error?: { message: string } };
+      let response: Response;
+      try {
+        response = await fetch("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ username, password, client: "browser" }),
+        });
+      } catch {
+        setError("Could not reach FamilyFi.");
+        return;
+      }
+      let data: { error?: { message: string } } | null = null;
+      try {
+        data = (await response.json()) as { error?: { message: string } };
+      } catch {
+        setError("FamilyFi could not complete sign-in. Check the server log.");
+        return;
+      }
       if (!response.ok) {
         setError(data.error?.message || "Could not sign in.");
         return;
       }
       router.replace("/family");
       router.refresh();
-    } catch {
-      setError("Could not reach FamilyFi.");
     } finally {
       setPending(false);
     }

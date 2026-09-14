@@ -58,6 +58,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: docker/Dockerfile
           push: false
           tags: familyfi:ci
           cache-from: type=gha

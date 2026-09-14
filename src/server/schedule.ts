@@ -82,6 +82,8 @@ export function isDesiredBlocked(input: {
   now: Date;
   timezone: string;
 }): boolean {
+  // UI/API desired state. UniFi enforces the recurring window via policy schedule;
+  // Pause is policy enabled=false, not this function flipping a flag at bedtime edges.
   if (input.protected) return false;
   if (isSuspended(input.suspension, input.now)) return false;
   return inRecurringWindow(input.now, input.schedule, input.timezone);

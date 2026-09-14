@@ -12,7 +12,7 @@ import {
   sessionCookieOptions,
   toPublicSession,
 } from "@/server/auth";
-import { clientIp, jsonError } from "@/server/http";
+import { clientIp, jsonCaughtError, jsonError } from "@/server/http";
 
 const Body = z.object({
   username: z.string(),
@@ -36,32 +36,36 @@ export async function POST(request: Request) {
     return jsonError(400, "invalid_request", "Username and password are required.");
   }
 
-  const result = await authenticate(parsed.data.username, parsed.data.password, clientIp(request));
-  if (!result.ok) return jsonError(result.status, result.code, result.message);
+  try {
+    const result = await authenticate(parsed.data.username, parsed.data.password, clientIp(request));
+    if (!result.ok) return jsonError(result.status, result.code, result.message);
 
-  const native = parsed.data.client === "native";
-  const issued = await createSession({
-    accountId: result.account.id,
-    username: result.account.username,
-    kind: native ? SessionKind.bearer : SessionKind.cookie,
-    userAgent: request.headers.get("user-agent"),
-  });
-
-  const body = {
-    session: toPublicSession({
+    const native = parsed.data.client === "native";
+    const issued = await createSession({
+      accountId: result.account.id,
       username: result.account.username,
-      expiresAt: issued.expiresAt,
-      account: result.account,
-    }),
-    ...(native ? { token: issued.raw, tokenType: "Bearer" as const } : {}),
-  };
+      kind: native ? SessionKind.bearer : SessionKind.cookie,
+      userAgent: request.headers.get("user-agent"),
+    });
 
-  const response = NextResponse.json(body);
-  if (!native) {
-    const maxAge = Math.floor((issued.expiresAt.getTime() - Date.now()) / 1000);
-    const secure = requestIsHttps(request);
-    response.cookies.set(SESSION_COOKIE, issued.raw, sessionCookieOptions(maxAge, secure));
-    response.cookies.set(CSRF_COOKIE, issued.csrf, csrfCookieOptions(maxAge, secure));
+    const body = {
+      session: toPublicSession({
+        username: result.account.username,
+        expiresAt: issued.expiresAt,
+        account: result.account,
+      }),
+      ...(native ? { token: issued.raw, tokenType: "Bearer" as const } : {}),
+    };
+
+    const response = NextResponse.json(body);
+    if (!native) {
+      const maxAge = Math.floor((issued.expiresAt.getTime() - Date.now()) / 1000);
+      const secure = requestIsHttps(request);
+      response.cookies.set(SESSION_COOKIE, issued.raw, sessionCookieOptions(maxAge, secure));
+      response.cookies.set(CSRF_COOKIE, issued.csrf, csrfCookieOptions(maxAge, secure));
+    }
+    return response;
+  } catch (error) {
+    return jsonCaughtError(error);
   }
-  return response;
 }

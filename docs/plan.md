@@ -103,11 +103,12 @@ prisma/           # PostgreSQL schema and committed migrations
 openapi/          # versioned API specification
 tests/            # unit/integration/contract/browser tests and sanitized fixtures
 scripts/          # spike, verification, operational scripts
+docker/           # Dockerfile and Compose files (build context remains repo root)
 docs/             # architecture, setup, operations, API use, spike results
 public/           # distributable application assets only
 ```
 
-Keep standard root entry points/configuration: README, Makefile, Dockerfile, Compose files, package manifests/lockfile, framework/tool configuration, `.gitignore`, `.dockerignore`, and `.env.example`. During scaffolding, place planning and extended documentation under `docs/`. Avoid a monorepo, separate mobile backend, unnecessary abstractions, and miscellaneous generated root files.
+Keep standard root entry points/configuration: README, Makefile, package manifests/lockfile, framework/tool configuration, `.gitignore`, `.dockerignore`, and `.env.example`. Dockerfile and Compose files live under `docker/`. During scaffolding, place planning and extended documentation under `docs/`. Avoid a monorepo, separate mobile backend, unnecessary abstractions, and miscellaneous generated root files.
 
 ## New GitHub repository and licensing
 
@@ -132,12 +133,12 @@ Phone and desktop browsers share the application container; a future native clie
 Create at scaffold time:
 
 - `Makefile` — setup, development, verification, spike, and container commands.
-- `Dockerfile` — multi-stage dependency installation, Prisma generation, Next.js build, and production runtime.
-- `docker-compose.yml` — application using a released GHCR image and common configuration.
+- `docker/Dockerfile` — multi-stage dependency installation, Prisma generation, Next.js build, and production runtime. Image builds use repository root as context (`docker build -f docker/Dockerfile .`); `.dockerignore` stays at the repo root for that reason.
+- `docker/docker-compose.yml` — application using a released GHCR image and common configuration.
 - A bundled-PostgreSQL Compose override, selected by the default Make run path, with health check and persistent named volume. External database mode must not start that service.
 - An explicit development build/Compose path for locally built images.
 - `scripts/docker-entrypoint.sh` — validate settings, wait for database readiness with bounded retries, run `prisma migrate deploy`, and start the application. Do not run development migrations on deployed startup.
-- `.env.example`, `.gitignore`, and `.dockerignore`.
+- `.env.example`, `.gitignore`, and root `.dockerignore`.
 
 Expose `DB_MODE=bundled|external`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and documented SSL settings such as `DB_SSL_MODE` and CA configuration where required. Safely derive Prisma's `DATABASE_URL` from these settings, including URL-encoding credentials, avoiding competing sources of truth. Users must not need to edit Compose YAML to select an external server. Bundled mode uses its service hostname and configured database/user/password; external mode uses the supplied host and has no dependency on a bundled-service health check.
 
@@ -209,11 +210,13 @@ blocked = !group.protected
 
 Quarantined devices are desired-blocked independently of group schedules. Assignment removes quarantine enforcement and applies the destination group's state. Reassignment updates both old and new policy membership, including moves to protected groups. Deleting a group returns its devices to quarantine; make that consequence explicit in the UI/API.
 
-- **Pause:** activate suspension with optional expiry, removing the group's schedule block after reconciliation. Preserve the recurring schedule.
-- **Resume:** clear suspension and evaluate the stored schedule. Do not enable a schedule explicitly disabled in its editor. During bedtime this can block internet; outside bedtime it leaves access available.
-- **Extend:** prolong an active suspension. For a duration extension, add to the later of the existing finite expiry and now, never shortening it. An indefinite suspension already has no expiry.
-- **Schedule enabled:** determines whether a recurring schedule is configured to run. Suspension is a separate temporary override. A group without an enabled schedule is unblocked and needs no Pause action.
-- **Protected:** overrides group schedule blocking. Reject actions that bypass protection; present controls consistently as unavailable. Protection does not transfer with a device reassigned elsewhere.
+The `blocked` formula is for UI/API desired state. UniFi enforces bedtime with the policy `schedule`; FamilyFi does not flip `enabled` at window start/end.
+
+- **Pause:** set group suspension and PUT app-owned policies `enabled: false`. Preserve the UniFi `schedule`. Internet is available from FamilyFi's perspective.
+- **Resume:** clear suspension and PUT `enabled: true`. The UniFi schedule remains; during bedtime this can block internet; outside bedtime it leaves access available. Do not enable a schedule explicitly disabled in its editor (those policies should have `schedule: null` and no block).
+- **Extend:** prolong an active suspension (`enabled` stays false). For a duration extension, add to the later of the existing finite expiry and now, never shortening it. An indefinite suspension already has no expiry. The only clock-driven UniFi write for schedules is PUT `enabled: true` when a finite `until` is reached (reconciliation interval, not a separate cron).
+- **Schedule enabled:** determines whether a recurring UniFi schedule is configured. Suspension is a separate temporary override via `enabled`. A group without an enabled schedule is unblocked and needs no Pause action.
+- **Protected:** overrides group schedule blocking. Reject actions that bypass protection; present controls consistently as unavailable. Protection does not transfer with a device reassigned elsewhere. Protected groups have no FamilyFi block policies.
 
 Days identify the local day a window starts: Monday 21:30–06:45 continues into Tuesday morning. Use an IANA household timezone, half-open windows (start inclusive/end exclusive), and absolute suspension-expiry timestamps. Reject equal start/end times and enabled schedules with no selected days. Evaluate windows in local wall time across DST: skipped local times do not occur and repeated local times are evaluated both times. Document/test overnight, week-boundary, expiry, and DST behavior.
 
@@ -234,11 +237,12 @@ Use documented v1 paths relative to the selected integration base:
 | Update/toggle | `GET /v1/sites/{siteId}/firewall/policies/{id}`, then `PUT` the complete documented update payload |
 | Delete | `DELETE /v1/sites/{siteId}/firewall/policies/{id}` |
 
-- In the referenced schema, PATCH accepts only `loggingEnabled`; use PUT for `enabled`. Build the complete update request, preserving required settings, rather than blindly echoing read-only GET fields.
-- Never call the ordering PUT endpoint. Preserve pre-existing administrator policies' configuration and relative order when adding/removing app policies.
-- Standardize names on `fam-` with stable installation/scope identifiers. Establish ownership using recorded IDs and durable creation evidence, never a prefix alone. Never mutate rules the application cannot establish it created.
+- In the referenced schema, PATCH accepts only `loggingEnabled`; use PUT for `enabled` (UniFi policy Pause). Build the complete update request, preserving required settings, rather than blindly echoing read-only GET fields.
+- Persist recurring bedtime on the policy `schedule` (`EVERY_WEEK` / `EVERY_DAY`; `null` if the group has no enabled schedule). Do not toggle `enabled` at bedtime edges. Pause/Resume is `enabled: false` / `true`. Timed Pause/Extend is `enabled: false` until expiry, then `enabled: true`.
+- Never call the ordering PUT endpoint. `GET` ordering on Network 10.6 requires `sourceFirewallZoneId`. Preserve pre-existing administrator policies' configuration and relative order when adding/removing app policies.
+- Standardize UniFi policy names on a `FamilyFi ` prefix with descriptive titles (for example `FamilyFi Betsy's Internet Access`, `FamilyFi Quarantine Internal Devices`). Establish ownership using recorded IDs and durable creation evidence, never a prefix alone. Never mutate rules the application cannot establish it created.
 - Do not use client BLOCK actions, undocumented v2 calls, or LAN ACL blocks as substitute enforcement.
-- Prove `BLOCK` or `REJECT` behavior; prefer `REJECT` if suitable on the gateway. Match source zone plus the documented `MAC_ADDRESS` traffic filter with explicit membership; target External/WAN to preserve LAN access.
+- Live action is firewall `BLOCK` (not `REJECT`, not client BLOCK). Match source zone plus the documented `MAC_ADDRESS` traffic filter with explicit membership; target External/WAN to preserve LAN access.
 - Prove `IPV4_AND_IPV6` or separate policies per IP version as needed. Never claim full protection when an enabled IP version fails or remains unverified.
 - Client-to-network mapping is a spike deliverable; do not assume client details contain `networkId`. Use documented network data and zone `networkIds` for network-to-zone mapping and record the exact supported client mapping.
 - One source zone per policy: reconcile per `(group, source zone[, ipVersion])`, with separate quarantine policies per zone/IP scope. Prove multiple-MAC membership; document any required policy splitting before backend enforcement work.
@@ -258,7 +262,7 @@ Against a real gateway and explicitly selected test devices:
 1. List sites/networks/zones/clients/policies and record versions/connection mode.
 2. Snapshot pre-existing policies and relative ordering; map test clients to source zones.
 3. Record baseline internet and LAN access from the affected clients.
-4. Create recorded `fam-` policies matching only test MACs to External. Verify internet loss for new and already-established traffic, while LAN and unrelated clients retain access.
+4. Create recorded `FamilyFi ` policies matching only test MACs to External. Verify internet loss for new and already-established traffic, while LAN and unrelated clients retain access.
 5. PUT the complete payload with `enabled: false`; verify restoration.
 6. Test multiple MACs, IPv4/IPv6 where available, and coexistence with administrator rules without reordering. Record limitations and untested cases.
 7. Remove spike-created policies, including cleanup after failures. Verify administrator configuration/relative order remains unchanged. Preserve recovery information if cleanup fails.
@@ -276,9 +280,9 @@ Build a server-only UniFi client with documented pagination (limit at most 200),
 Serialize startup, interval, parent-action, and retry runs. Use a database-backed lock or equivalent ownership mechanism to prevent overlapping writers, including container replacement. Coalesce queued work toward the latest revision without marking superseded actions as successfully applied.
 
 1. Read desired revision, groups, assignments, and connection identity.
-2. Refresh clients and relevant network/zone data. Preserve offline assignments and last-known valid mappings; persist newly discovered devices as quarantined.
-3. Compute schedules/suspensions/protection and quarantine membership. Track unresolved devices explicitly. Failed/incomplete discovery or unresolved zones are not empty assignment sets.
-4. Reconcile complete MAC membership and enabled state. Handle both sides of reassignment, quarantine release, zone changes, and protection changes. Never report assignment success while stale policies still block that MAC.
+2. Refresh clients and relevant network/zone data **on household-managed UniFi networks only** (`manageAllNetworks` or `managedNetworkIds`). Do not ingest or quarantine MACs first seen on other VLANs. Preserve offline assignments and last-known valid mappings; persist newly discovered in-scope devices as quarantined.
+3. Derive UniFi payloads from protection, quarantine membership, group schedule, and suspension. Track unresolved devices explicitly. Failed/incomplete discovery or unresolved zones are not empty assignment sets. Do not recompute bedtime edges into `enabled`.
+4. Reconcile complete MAC membership, policy `schedule`, and `enabled` (Pause vs running). Clock-driven work is only: expire finite Pause/Extend (`enabled: true`), plus discovery/membership. Handle both sides of reassignment, quarantine release, zone changes, and protection changes. Never report assignment success while stale policies still block that MAC.
 5. Disable/remove obsolete policies only with proven ownership and a complete desired-state view. Group deletion transitions devices to quarantine.
 6. Read back relevant policy membership/settings and enabled state. Record per-scope outcomes against the revision. One successful zone is not whole-group success.
 7. Retry transient errors with backoff while retaining desired state. Recover durable write intents before issuing duplicate creates. If creation may have succeeded but ownership cannot be established, report an actionable unresolved operation; never adopt arbitrary prefix-matching policies.
@@ -321,9 +325,9 @@ Port available designs with the precedence above. Provide Family/Things lists/de
 
 ## Outage behavior and operations
 
-Accept that the application computes schedule transitions and suspension expiry. While FamilyFi is stopped or cannot reach UniFi, the gateway retains its last applied policies. Bedtime can start/end late, or suspension can outlast expiry. Startup reconciliation applies current desired state rather than replaying every missed transition.
+Accept that UniFi enforces recurring bedtime via policy `schedule` while FamilyFi is down. Pause stays off until FamilyFi PUTs `enabled: true` (indefinite Pause is fine; a timed Pause/Extend can outlast its expiry if FamilyFi is stopped). Quarantine/membership can lag until the next successful reconciliation. Startup reconciliation applies current desired state; it does not replay missed transitions.
 
-Document this limitation and show stale synchronization where appropriate. Native gateway scheduling is not required initially. Operations documentation covers recovery admin, encrypted-key/database backup and restore, external PostgreSQL/TLS, upgrades/migrations, and recovery from unresolved app policies. Do not promise restoration from desired state alone during outages.
+Document this limitation and show stale synchronization where appropriate. Operations documentation covers recovery admin, encrypted-key/database backup and restore, external PostgreSQL/TLS, upgrades/migrations, and recovery from unresolved app policies. Do not promise restoration from desired state alone during outages.
 
 ## Phase 4 — Verification and release readiness
 

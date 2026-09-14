@@ -1,3 +1,5 @@
+# Build-context ignore file. Image builds run from the repository root
+# (`docker build -f docker/Dockerfile .`). Compose files live in docker/.
 designs
 .git
 .github

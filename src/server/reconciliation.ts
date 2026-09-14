@@ -1,9 +1,52 @@
-import { prisma } from "./db";
+import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope } from "@prisma/client";
 import { randomToken } from "./crypto";
+import { prisma } from "./db";
 import { env } from "./env";
+import { normalizeMac } from "./mac";
+import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/spike";
+import { clientForHousehold, connectionIdentity } from "./unifi/connection";
+import { UnifiHttpError } from "./unifi/errors";
+import { policyFingerprint } from "./unifi/fingerprint";
+import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
+import { internetBlockPolicy, toPolicyUpdate } from "./unifi/payloads";
+import { networkInScope } from "./unifi/scope";
+import { planPolicies, plannedKey } from "./unifi/plan";
+import type { UnifiClient } from "./unifi/client";
+import type { FirewallPolicyWrite } from "./unifi/types";
 
 const INTERVAL_MS = 30_000;
 const LOCK_MS = 25_000;
+
+let queued = false;
+let pumping = false;
+let testClient: UnifiClient | undefined;
+
+export function setReconcileClientForTests(client?: UnifiClient) {
+  testClient = client;
+}
+
+export function requestReconcile() {
+  queued = true;
+  void pump();
+}
+
+async function pump() {
+  if (pumping) return;
+  pumping = true;
+  try {
+    while (queued) {
+      queued = false;
+      const owner = `${process.pid}:${randomToken(8)}`;
+      try {
+        await tick(owner);
+      } catch {
+        // Keep desired state; next interval retries.
+      }
+    }
+  } finally {
+    pumping = false;
+  }
+}
 
 async function acquireLock(owner: string): Promise<boolean> {
   const now = new Date();
@@ -27,16 +70,288 @@ async function acquireLock(owner: string): Promise<boolean> {
 
 async function tick(owner: string) {
   if (!(await acquireLock(owner))) return;
+  const now = new Date();
+  await prisma().group.updateMany({
+    where: { suspensionActive: true, suspensionUntil: { not: null, lte: now } },
+    data: { suspensionActive: false, suspensionUntil: null },
+  });
+
   const household = await prisma().household.findUnique({ where: { id: "default" } });
-  if (!household || household.connectionStatus === "unconfigured") return;
+  if (!household || household.connectionStatus === "unconfigured" || !household.unifiSiteId) return;
+
+  const revision = household.revision;
+  const run = await prisma().syncRun.create({
+    data: { requestedRevision: revision, status: ChangeStatus.pending },
+  });
+
+  try {
+    const client = testClient ?? clientForHousehold(household);
+    const identity = connectionIdentity(household);
+    const siteId = household.unifiSiteId;
+    const [zones, networks, clients, info] = await Promise.all([
+      client.listZones(siteId),
+      loadNetworkDetails(client, siteId),
+      client.listClients(siteId),
+      client.getInfo(),
+    ]);
+    void info;
+    const networkClientIds = await loadNetworkClientIds(client, siteId, networks);
+    const mappings = mapClientsToZones({ clients, networks, zones, networkClientIds });
+    const mappingByMac = new Map(
+      mappings.filter((item) => item.macAddress).map((item) => [item.macAddress, item]),
+    );
+    const external = selectExternalZone(zones);
+    if (!external) throw new Error("No External/WAN firewall zone was found.");
+    const scope = {
+      manageAllNetworks: household.unifiManageAllNetworks,
+      managedNetworkIds: household.unifiManagedNetworkIds,
+    };
+
+    for (const clientRow of clients) {
+      if (!clientRow.macAddress) continue;
+      const mac = normalizeMac(clientRow.macAddress);
+      const mapped = mappingByMac.get(mac);
+      const existing = await prisma().device.findUnique({ where: { mac } });
+      const zoneId = mapped?.sourceZoneId ?? existing?.zoneId ?? null;
+      const networkId = mapped?.networkId ?? existing?.networkId ?? null;
+      const seenOnManagedNetwork = networkInScope(scope, mapped?.networkId ?? null);
+      if (!existing && !seenOnManagedNetwork) continue;
+      await prisma().device.upsert({
+        where: { mac },
+        create: {
+          mac,
+          hostname: clientRow.name,
+          ip: clientRow.ipAddress,
+          networkId,
+          zoneId,
+          assignment: AssignmentState.quarantined,
+          lastSeenAt: now,
+        },
+        update: {
+          hostname: clientRow.name,
+          ip: clientRow.ipAddress,
+          networkId: mapped?.networkId ?? existing?.networkId ?? null,
+          zoneId: mapped?.sourceZoneId ?? existing?.zoneId ?? null,
+          lastSeenAt: now,
+        },
+      });
+    }
+
+    const [groups, devices, appPolicies] = await Promise.all([
+      prisma().group.findMany(),
+      prisma().device.findMany(),
+      prisma().appPolicy.findMany({ where: { connectionIdentity: identity, siteId } }),
+    ]);
+    const { policies: desired, retainOwners } = planPolicies({
+      installId: household.id,
+      now,
+      destinationZoneId: external.id,
+      zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
+      groups,
+      devices: devices.map((device) => ({
+        ...device,
+        inScope: networkInScope(scope, device.networkId),
+      })),
+    });
+    const desiredKeys = new Set(desired.map((item) => item.key));
+
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const planned of desired) {
+      const write = internetBlockPolicy({
+        name: planned.name,
+        sourceZoneId: planned.zoneId,
+        destinationZoneId: planned.destinationZoneId,
+        macAddresses: planned.macAddresses,
+        enabled: planned.enabled,
+        schedule: planned.schedule,
+      });
+      const fingerprint = policyFingerprint(write);
+      const existing = appPolicies.find(
+        (row) =>
+          plannedKey(row.ownerScope, row.groupId, row.zoneId) === planned.key && row.connectionIdentity === identity,
+      );
+      try {
+        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing);
+      } catch (error) {
+        failed += 1;
+        errors.push(error instanceof Error ? error.message : String(error));
+        if (existing) {
+          await prisma().appPolicy.update({
+            where: { id: existing.id },
+            data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision },
+          });
+        }
+      }
+    }
+
+    for (const row of appPolicies) {
+      const key = plannedKey(row.ownerScope, row.groupId, row.zoneId);
+      if (desiredKeys.has(key)) continue;
+      const owner = row.ownerScope === PolicyOwnerScope.quarantine ? "quarantine" : `group:${row.groupId}`;
+      if (retainOwners.has(owner)) continue;
+      if (!row.unifiPolicyId) {
+        await prisma().appPolicy.delete({ where: { id: row.id } });
+        continue;
+      }
+      try {
+        await client.deletePolicy(siteId, row.unifiPolicyId);
+        await prisma().appPolicy.delete({ where: { id: row.id } });
+      } catch (error) {
+        failed += 1;
+        errors.push(error instanceof Error ? error.message : String(error));
+        await prisma().appPolicy.update({
+          where: { id: row.id },
+          data: { lastError: errors[errors.length - 1] },
+        });
+      }
+    }
+
+    const status = failed === 0 ? ChangeStatus.applied : ChangeStatus.partial;
+    await prisma().syncRun.update({
+      where: { id: run.id },
+      data: {
+        status,
+        appliedRevision: revision,
+        finishedAt: new Date(),
+        error: errors[0],
+      },
+    });
+    await prisma().changeResult.updateMany({
+      where: { status: ChangeStatus.pending, requestedRevision: { lte: revision } },
+      data: {
+        status,
+        appliedRevision: revision,
+        error: errors[0],
+        syncRunId: run.id,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await prisma().syncRun.update({
+      where: { id: run.id },
+      data: { status: ChangeStatus.failed, finishedAt: new Date(), error: message },
+    });
+    await prisma().household.update({
+      where: { id: "default" },
+      data: { connectionStatus: "error", connectionError: message },
+    });
+    await prisma().changeResult.updateMany({
+      where: { status: ChangeStatus.pending, requestedRevision: { lte: revision } },
+      data: { status: ChangeStatus.failed, error: message, syncRunId: run.id },
+    });
+  }
+}
+
+async function applyDesiredPolicy(
+  client: UnifiClient,
+  siteId: string,
+  identity: string,
+  revision: number,
+  planned: { ownerScope: "group" | "quarantine"; groupId: string | null; zoneId: string; name: string },
+  write: FirewallPolicyWrite,
+  fingerprint: string,
+  existing:
+    | {
+        id: string;
+        unifiPolicyId: string | null;
+        desiredFingerprint: string;
+        lastError: string | null;
+      }
+    | undefined,
+) {
+  const scope = planned.ownerScope === "group" ? PolicyOwnerScope.group : PolicyOwnerScope.quarantine;
+  const appPolicyId = existing?.id;
+  const unifiPolicyId = existing?.unifiPolicyId;
+  if (existing && unifiPolicyId && existing.desiredFingerprint === fingerprint && !existing.lastError) {
+    await prisma().appPolicy.update({
+      where: { id: existing.id },
+      data: { desiredRevision: revision, observedFingerprint: fingerprint, lastError: null },
+    });
+    return;
+  }
+  if (unifiPolicyId) {
+    try {
+      const current = await client.getPolicy(siteId, unifiPolicyId);
+      const updated = await client.updatePolicy(siteId, unifiPolicyId, toPolicyUpdate(current, { ...write, schedule: write.schedule ?? null }));
+      const observed = {
+        unifiPolicyId: updated.id,
+        desiredFingerprint: fingerprint,
+        desiredRevision: revision,
+        observedEnabled: updated.enabled,
+        observedFingerprint: fingerprint,
+        lastError: null as string | null,
+      };
+      if (appPolicyId) {
+        await prisma().appPolicy.update({ where: { id: appPolicyId }, data: observed });
+      } else {
+        await prisma().appPolicy.create({
+          data: {
+            connectionIdentity: identity,
+            siteId,
+            ownerScope: scope,
+            groupId: planned.groupId,
+            zoneId: planned.zoneId,
+            ipVersion: IpVersion.dual,
+            ...observed,
+          },
+        });
+      }
+      return;
+    } catch (error) {
+      if (!(error instanceof UnifiHttpError) || error.status !== 404) throw error;
+    }
+  }
+
+  const operation = await prisma().policyOperation.create({
+    data: {
+      intent: PolicyOperationIntent.create,
+      connectionIdentity: identity,
+      siteId,
+      payloadFingerprint: fingerprint,
+      status: "pending",
+    },
+  });
+  const created = await client.createPolicy(siteId, write);
+  await prisma().policyOperation.update({
+    where: { id: operation.id },
+    data: { status: "applied", unifiPolicyId: created.id },
+  });
+  if (appPolicyId) {
+    await prisma().appPolicy.update({
+      where: { id: appPolicyId },
+      data: {
+        unifiPolicyId: created.id,
+        desiredFingerprint: fingerprint,
+        desiredRevision: revision,
+        observedEnabled: created.enabled,
+        observedFingerprint: fingerprint,
+        lastError: null,
+      },
+    });
+    return;
+  }
+  await prisma().appPolicy.create({
+    data: {
+      connectionIdentity: identity,
+      siteId,
+      unifiPolicyId: created.id,
+      ownerScope: scope,
+      groupId: planned.groupId,
+      zoneId: planned.zoneId,
+      ipVersion: IpVersion.dual,
+      desiredFingerprint: fingerprint,
+      desiredRevision: revision,
+      observedEnabled: created.enabled,
+      observedFingerprint: fingerprint,
+    },
+  });
 }
 
 export function startReconciliation() {
   env();
-  const owner = `${process.pid}:${randomToken(8)}`;
-  void tick(owner).catch(() => undefined);
-  const timer = setInterval(() => {
-    void tick(owner).catch(() => undefined);
-  }, INTERVAL_MS);
+  requestReconcile();
+  const timer = setInterval(() => requestReconcile(), INTERVAL_MS);
   timer.unref?.();
 }

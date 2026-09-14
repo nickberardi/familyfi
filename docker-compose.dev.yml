@@ -1,6 +1,0 @@
-services:
-  app:
-    image: familyfi:dev
-    build:
-      context: .
-      dockerfile: Dockerfile

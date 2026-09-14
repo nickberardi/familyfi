@@ -69,6 +69,9 @@ model Household {
   unifiKeyIv         Bytes?
   unifiKeyAuthTag    Bytes?
   unifiKeyLastFour   String?
+  unifiTlsInsecure   Boolean  @default(false)
+  unifiManageAllNetworks Boolean @default(false)
+  unifiManagedNetworkIds String[] @default([])
   connectionStatus   String   @default("unconfigured")
   connectionError    String?
   revision           Int      @default(0)

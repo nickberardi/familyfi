@@ -12,8 +12,9 @@ export default function LoginPage() {
         </div>
         <SignInForm />
         <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
-          Use username <span className="font-semibold text-[var(--ff-ink)]">admin</span> with the operator
-          recovery password, or a personal adult account. Sessions last 30 days on this browser.
+          Use username <span className="font-semibold text-[var(--ff-ink)]">admin</span> with the
+          recovery password from the FamilyFi server log, or a personal adult account. Sessions last
+          30 days on this browser.
         </p>
       </div>
     </main>
