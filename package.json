@@ -68,10 +68,7 @@
       "@prisma/engines",
       "core-js",
       "esbuild",
-      "prisma"
-    ],
-    "neverBuiltDependencies": [
-      "sharp",
+      "prisma",
       "unrs-resolver"
     ]
   }
