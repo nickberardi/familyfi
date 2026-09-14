@@ -5,11 +5,12 @@ info:
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
-    enforcement only. This revision specifies health and authentication.
-    Groups, devices, accounts, UniFi settings, and sync are specified here.
+    enforcement only. Signed-in operators can browse this specification under
+    System → API (`/reference`). Groups, devices, accounts, UniFi settings, and
+    sync are specified here.
   license:
-    name: License undecided
-    identifier: UNLICENSED
+    name: Business Source License 1.1
+    identifier: BUSL-1.1
 servers:
   - url: /
     description: Same origin as the FamilyFi application

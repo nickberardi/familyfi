@@ -34,3 +34,5 @@ Normal payloads never return password hashes, `DEFAULT_PASSWORD`, raw UniFi keys
 | GET | `/api/v1/changes/{id}` | Per-action status |
 
 Settings is in the web app: UniFi key replacement, managed VLANs, timezone (Gateway card), family roles, and adult logins.
+
+The signed-in **System → API** page (`/reference`) renders this OpenAPI file with Swagger UI. Try it out sends the session cookie and CSRF header. `GET /openapi` returns the YAML and requires a session.

@@ -1,0 +1,37 @@
+import { expect, test } from "@playwright/test";
+
+const password = process.env.DEFAULT_PASSWORD;
+const username = "admin";
+
+test.beforeAll(async ({ request }) => {
+  const health = await request.get("/api/v1/health");
+  if (!health.ok()) {
+    throw new Error(`FamilyFi is not reachable (${health.status()}). Start make dev or set PLAYWRIGHT_BASE_URL.`);
+  }
+});
+
+test("sign-in and household pages", async ({ page }) => {
+  test.skip(!password, "DEFAULT_PASSWORD is required for browser tests");
+  await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "FamilyFi" })).toBeVisible();
+  const usernameBox = page.getByLabel("Username");
+  await expect(usernameBox).toHaveCSS("font-size", "16px");
+
+  const login = await page.request.post("/api/v1/auth/login", {
+    data: { username, password, client: "browser" },
+  });
+  if (!login.ok()) {
+    const body = (await login.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(`login failed (${login.status()}): ${body.error?.message ?? "no error body"}`);
+  }
+  await page.goto("/family");
+  await expect(page).toHaveURL(/\/family/);
+  await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
+
+  for (const path of ["/things", "/schedules", "/devices", "/sync", "/settings", "/reference"]) {
+    await page.goto(path);
+    await expect(page.locator("body")).not.toContainText("Something went wrong");
+  }
+  await expect(page).toHaveURL(/\/reference/);
+  await expect(page.getByRole("heading", { name: "API" })).toBeVisible();
+});

@@ -44,10 +44,54 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
       - run: pnpm test-api
       - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
+      - run: pnpm test
+      - run: pnpm test:integration
       - run: pnpm build
+
+  browser:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: familyfi
+          POSTGRES_PASSWORD: familyfi-ci
+          POSTGRES_DB: familyfi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U familyfi -d familyfi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CI: "1"
+      DEFAULT_PASSWORD: ci-recovery-password
+      SESSION_SECRET: ci-only-session-secret-32chars!!
+      APP_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+      DB_MODE: external
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      DB_NAME: familyfi_test
+      DB_USER: familyfi
+      DB_PASSWORD: familyfi-ci
+      PLAYWRIGHT_PORT: "3100"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
+      - run: pnpm build
+      - run: pnpm exec playwright install chromium --with-deps
+      - run: pnpm test:browser
 
   container:
     runs-on: ubuntu-latest
@@ -60,6 +104,13 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: false
+          load: true
           tags: familyfi:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Image hygiene
+        run: sh scripts/check-image.sh familyfi:ci
+      - name: Container smoke
+        env:
+          FAMILYFI_IMAGE: familyfi:ci
+        run: sh scripts/container-smoke.sh

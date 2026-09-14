@@ -72,21 +72,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    reload()
-      .catch((err: Error) => {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) return;
-        setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const start = window.setTimeout(() => {
+      reload()
+        .catch((err: Error) => {
+          if (cancelled) return;
+          if (err instanceof ApiError && err.status === 401) return;
+          setError(err.message);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 0);
     const timer = setInterval(() => {
       void reload().catch(() => undefined);
     }, 15_000);
     return () => {
       cancelled = true;
+      window.clearTimeout(start);
       clearInterval(timer);
     };
   }, [reload]);

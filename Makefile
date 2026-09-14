@@ -8,8 +8,8 @@ COMPOSE += -f docker/docker-compose.bundled.yml
 endif
 WITH_ENV := node scripts/with-env.mjs
 
-.PHONY: setup dev test test-api spike lint typecheck build \
-	docker-build docker-dev-up docker-up docker-down docker-logs db-dev secrets
+.PHONY: setup dev test test-api test-integration test-browser spike lint typecheck build \
+	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev secrets
 
 setup:
 	corepack enable >/dev/null 2>&1 || true
@@ -39,9 +39,16 @@ dev:
 
 test:
 	$(PNPM) test
+	$(MAKE) test-integration
+
+test-integration:
+	DB_NAME=familyfi_test $(PNPM) test:integration
 
 test-api:
 	$(PNPM) test-api
+
+test-browser:
+	$(PNPM) test:browser
 
 spike:
 	$(PNPM) spike -- $(SPIKE_ARGS)
@@ -69,6 +76,11 @@ docker-down:
 
 docker-logs:
 	$(COMPOSE) logs -f
+
+docker-smoke:
+	$(MAKE) docker-build
+	FAMILYFI_IMAGE=familyfi:dev sh scripts/check-image.sh familyfi:dev
+	FAMILYFI_IMAGE=familyfi:dev sh scripts/container-smoke.sh
 
 db-dev:
 	docker compose -p familyfi --env-file .env -f docker/docker-compose.dev-db.yml up -d --wait

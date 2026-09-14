@@ -2,6 +2,7 @@
   "name": "familyfi",
   "version": "0.1.0",
   "private": true,
+  "license": "BUSL-1.1",
   "packageManager": "pnpm@10.15.1",
   "engines": {
     "node": ">=20"
@@ -12,7 +13,9 @@
     "start": "node scripts/with-env.mjs next start --port 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:browser": "playwright test",
     "test-api": "node scripts/check-openapi.mjs",
     "spike": "node scripts/with-env.mjs tsx scripts/spike/index.ts",
     "postinstall": "prisma generate"
@@ -23,15 +26,18 @@
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "swagger-ui-react": "^5.32.15",
     "undici": "^8.10.2",
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@redocly/cli": "^1.34.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/swagger-ui-react": "^5.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "prisma": "^6.16.2",

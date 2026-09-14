@@ -20,15 +20,27 @@ const LOCK_MS = 25_000;
 
 let queued = false;
 let pumping = false;
+let autoReconcile = true;
 let testClient: UnifiClient | undefined;
 
 export function setReconcileClientForTests(client?: UnifiClient) {
   testClient = client;
 }
 
+export function setAutoReconcileForTests(enabled: boolean) {
+  autoReconcile = enabled;
+}
+
 export function requestReconcile() {
+  if (!autoReconcile) return;
   queued = true;
   void pump();
+}
+
+/** Run one locked reconciliation pass. Used by integration tests. */
+export async function runReconcileOnce(): Promise<boolean> {
+  const owner = `${process.pid}:${randomToken(8)}`;
+  return tick(owner);
 }
 
 async function pump() {

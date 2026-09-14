@@ -27,6 +27,20 @@ describe("ensureSecrets", () => {
     expect(file).toContain(`APP_ENCRYPTION_KEY=${env.APP_ENCRYPTION_KEY}`);
   });
 
+  it("does not require a .env file when process env already has secrets", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
+    const envPath = path.join(dir, ".env");
+    const examplePath = path.join(dir, ".env.example");
+    const env: Record<string, string | undefined> = {
+      DEFAULT_PASSWORD: "recovery-pass",
+      SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
+      APP_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    };
+    const result = ensureSecrets({ envPath, examplePath, env });
+    expect(result.written).toEqual([]);
+    expect(result.created).toEqual([]);
+  });
+
   it("does not rotate valid secrets", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
     const envPath = path.join(dir, ".env");

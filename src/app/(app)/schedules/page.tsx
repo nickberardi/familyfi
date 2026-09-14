@@ -46,6 +46,15 @@ function kindTag(group: Group) {
 }
 
 function ScheduleRow({ group }: { group: Group }) {
+  return (
+    <ScheduleRowForm
+      key={`${group.id}:${group.schedule.enabled}:${group.schedule.start}:${group.schedule.end}:${group.schedule.days.join(",")}`}
+      group={group}
+    />
+  );
+}
+
+function ScheduleRowForm({ group }: { group: Group }) {
   const { mutate } = useAppData();
   const [enabled, setEnabled] = useState(group.schedule.enabled);
   const [start, setStart] = useState(asHm(group.schedule.start ?? "21:00"));
@@ -54,13 +63,6 @@ function ScheduleRow({ group }: { group: Group }) {
     group.schedule.days.length ? group.schedule.days : [0, 1, 2, 3, 4, 5, 6],
   );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setEnabled(group.schedule.enabled);
-    setStart(asHm(group.schedule.start ?? "21:00"));
-    setEnd(asHm(group.schedule.end ?? "07:00"));
-    setDays(group.schedule.days.length ? group.schedule.days : [0, 1, 2, 3, 4, 5, 6]);
-  }, [group.schedule.enabled, group.schedule.start, group.schedule.end, group.schedule.days.join(",")]);
 
   async function persist(next: { enabled: boolean; days: number[]; start: string; end: string }) {
     const startHm = asHm(next.start);

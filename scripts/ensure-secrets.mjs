@@ -63,7 +63,18 @@ export function ensureSecrets(options = {}) {
   const env = options.env ?? process.env;
   const created = [];
 
+  const processPassword = nonempty(env.DEFAULT_PASSWORD);
+  const processSession = nonempty(env.SESSION_SECRET);
+  const processKey = nonempty(env.APP_ENCRYPTION_KEY);
+  const processComplete =
+    isDefaultPasswordValid(processPassword) &&
+    isSessionSecretValid(processSession) &&
+    isEncryptionKeyValid(processKey);
+
   if (!fs.existsSync(envPath)) {
+    if (processComplete) {
+      return { created, written: [], envPath, defaultPassword: processPassword };
+    }
     if (!fs.existsSync(examplePath)) {
       throw new Error(`missing ${envPath} and ${examplePath}`);
     }

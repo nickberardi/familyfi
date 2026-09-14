@@ -52,3 +52,11 @@ export function prisma(): PrismaClient {
   }
   return globalForPrisma.prisma;
 }
+
+export async function disconnectPrismaForTests() {
+  if (globalForPrisma.prisma) {
+    await globalForPrisma.prisma.$disconnect();
+    globalForPrisma.prisma = undefined;
+  }
+  schemaChecked = false;
+}

@@ -1,6 +1,6 @@
 # Contributing
 
-This repository is private until licensing is decided. See [docs/licensing.md](docs/licensing.md).
+See [docs/licensing.md](docs/licensing.md) and [CLA.md](CLA.md). Sending a pull request accepts the CLA.
 
 Do not send patches that assume MIT/Apache terms, and do not commit `/designs/`, `.env` files, UniFi keys, or unsanitized household API responses.
 

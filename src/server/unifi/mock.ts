@@ -46,6 +46,10 @@ export function createMockUnifiState(partial: Partial<MockUnifiState> = {}): Moc
 
 export class MockUnifiClient implements UnifiClient {
   readonly calls: { method: string; path: string }[] = [];
+  /** Throw instead of creating. May inspect the write body. */
+  createError?: Error | ((body: FirewallPolicyWrite) => Error | undefined);
+  /** Persist the policy, then throw — interrupted create. */
+  throwAfterCreate = false;
 
   constructor(readonly state: MockUnifiState) {}
 
@@ -116,6 +120,8 @@ export class MockUnifiClient implements UnifiClient {
 
   async createPolicy(siteId: string, body: FirewallPolicyWrite): Promise<FirewallPolicy> {
     this.record("POST", `/v1/sites/${siteId}/firewall/policies`);
+    const failure = typeof this.createError === "function" ? this.createError(body) : this.createError;
+    if (failure) throw failure;
     const policy: FirewallPolicy = {
       ...body,
       id: randomUUID(),
@@ -124,6 +130,7 @@ export class MockUnifiClient implements UnifiClient {
     };
     this.state.policies.push(policy);
     this.state.ordering.afterSystemDefined.push(policy.id);
+    if (this.throwAfterCreate) throw new Error("interrupted after UniFi create");
     return policy;
   }
 

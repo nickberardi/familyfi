@@ -22,10 +22,10 @@ todos:
     status: pending
     content: 'Port available designs into responsive web/PWA flows using the agreed schedule and quarantine semantics'
   - id: phase4-verify
-    status: pending
+    status: completed
     content: 'Complete CI, API contract, integration, browser, container, and live enforcement verification'
   - id: public-release-readiness
-    status: pending
+    status: completed
     content: 'Choose open-source/commercial licensing and contribution terms before public release; verify clean distribution artifacts'
 name: FamilyFi
 overview: 'Build a single-household FamilyFi web/PWA backed by PostgreSQL and official UniFi enforcement. Family and Things share group-level controls; Pause suspends schedule enforcement and Resume restores it. Document the complete versioned API in OpenAPI for a future App Store app.'
@@ -112,7 +112,7 @@ Keep standard root entry points/configuration: README, Makefile, package manifes
 
 ## New GitHub repository and licensing
 
-Create a new GitHub repository during execution; none is assumed to exist. GitHub repositories, Actions, Containers, Releases, Issues, branch protection, and wikis are available to use where useful. Keep the repository private until explicit public-release/licensing decisions are settled.
+Create a new GitHub repository during execution; none is assumed to exist. GitHub repositories, Actions, Containers, Releases, Issues, branch protection, and wikis are available to use where useful. Keep the repository private until you choose to publish. Licensing is the Business Source License 1.1 in `LICENSE`, with a commercial alternative from the copyright holder. See [docs/licensing.md](licensing.md) and [CLA.md](../CLA.md). BSL is source-available, not OSI open source. Each version converts to GPL-3.0-or-later on its Change Date.
 
 - Configure Actions for linting, type checking, tests with PostgreSQL, OpenAPI validation/implementation contract checks, browser tests, production builds, and container smoke tests.
 - Publish versioned application images to GHCR and release notes to GitHub Releases. Document tags and supported image architectures; test the architectures advertised.
@@ -122,9 +122,9 @@ Create a new GitHub repository during execution; none is assumed to exist. GitHu
 - `.gitignore` must exclude `/designs/`, `.env` and local secret files, dependencies, build output, local database data/backups, logs, coverage, browser-test artifacts, and machine-specific temporary files. Retain `.env.example`, the package lockfile, migrations, OpenAPI source, and sanitized fixtures.
 - `.dockerignore` also excludes design references, secrets, local data, Git metadata, and unnecessary development artifacts. Verify neither the first commit nor release artifacts contain private references or real credentials.
 
-The intended licensing model is an open-source license plus an alternative paid commercial license. The exact open-source license, commercial terms, copyright ownership, and terms for outside contributions remain decisions before public release. Contribution terms must support offering contributed code under the intended commercial terms; do not silently choose a license or assume an ordinary contribution sign-off provides those rights.
+FamilyFi is licensed under the [Business Source License 1.1](../LICENSE). Copyright: Nick Berardi. Household self-hosting is allowed; selling or hosting it for third parties needs a commercial license. Contributions use [CLA.md](../CLA.md). This is not OSI open source; each version converts to GPL-3.0-or-later on the Change Date. See [docs/licensing.md](licensing.md).
 
-Commercial licensing offers alternative rights; it does not mean every commercial user must pay while complying with the open-source license. See the [GNU explanation of commercial exceptions](https://www.gnu.org/philosophy/selling-exceptions.en.html) and [Open Source Definition](https://opensource.org/osd). Include the selected license files and explanation before publication.
+Commercial licensing offers alternative rights for uses the Additional Use Grant does not cover. It does not mean every user must pay to run a single household. The [Open Source Definition](https://opensource.org/osd) is why BSL must not be labeled “open source.”
 
 ## Makefile, Docker, and PostgreSQL
 
@@ -321,6 +321,7 @@ Port available designs with the precedence above. Provide Family/Things lists/de
 - Quarantine is a desired block with separate enforcement status. Newly discovered devices are not shown as successfully blocked before readback.
 - Track each mutation's change/revision until applied, partial, failed, or superseded. Surface coverage gaps and actionable errors, never unrelated-sync success.
 - Desktop follows Web Design; phone follows Card System mobile/density specimens and responsive adaptation. Adapt sign-in to permanent recovery-admin and personal password accounts.
+- Signed-in System → API (`/reference`) renders `openapi/familyfi.v1.yaml` (Swagger UI). `GET /openapi` serves that file to a session.
 - Normal flows never show policy JSON, zone IDs, or UniFi rule editors.
 
 ## Outage behavior and operations
@@ -330,6 +331,8 @@ Accept that UniFi enforces recurring bedtime via policy `schedule` while FamilyF
 Document this limitation and show stale synchronization where appropriate. Operations documentation covers recovery admin, encrypted-key/database backup and restore, external PostgreSQL/TLS, upgrades/migrations, and recovery from unresolved app policies. Do not promise restoration from desired state alone during outages.
 
 ## Phase 4 — Verification and release readiness
+
+Evidence: [docs/verify/PHASE4.md](verify/PHASE4.md). Live operator steps: [docs/verify/LIVE.md](verify/LIVE.md). Public licensing remains [docs/licensing.md](licensing.md).
 
 Actions performs authoritative validation; Make targets provide corresponding local commands. Live verification uses a manually triggered, appropriately connected runner/client probe or operator checklist. Ordinary hosted CI is not assumed to reach household devices. Never expose live credentials to untrusted PR jobs.
 
@@ -352,4 +355,4 @@ Prioritize wrong contracts, foreign-policy mutations, auth/secret leaks, broken 
 
 A parent can deploy the GHCR image with bundled or external PostgreSQL, sign in with permanent recovery `admin` or an authorized personal adult account, configure UniFi in Settings, manage Family/Things and group protection, assign quarantined devices, set schedules, and Pause/Resume/Extend enforcement with action-specific confirmation or clear partial/failure states. Administrator policies remain untouched and outage limits are documented accurately.
 
-Every web/backend API, including auth, is documented and contract-checked in OpenAPI for the future App Store client. CI, reproducible containers, conventional repository hygiene, setup/operations documentation, and recorded live verification are complete. Public release additionally requires selected open-source/commercial license files and compatible contribution terms. The native client remains future work.
+Every web/backend API, including auth, is documented and contract-checked in OpenAPI for the future App Store client. CI, reproducible containers, conventional repository hygiene, setup/operations documentation, and recorded live verification are complete. The source is Business Source License 1.1 with a CLA for commercial relicensing; public GitHub visibility is optional. The native client remains future work.

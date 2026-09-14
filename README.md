@@ -6,7 +6,7 @@ The first client is a responsive web/PWA. The same documented `/api/v1` API is r
 
 ## Status
 
-Phase 1 live gate: MAC internet **block when enabled** and **restore when paused** are proven on the household gateway; the spike policy was deleted. Phase 2 backend (groups, devices, accounts, encrypted UniFi key, schedule/`enabled` reconciliation) is in `/api/v1`; the Settings/home UI is Phase 3.
+Phase 4 verification is in CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, Playwright, and container smoke. Live IPv4 MAC block/restore is recorded in [docs/spike/RESULTS.md](docs/spike/RESULTS.md). Licensed under the [Business Source License 1.1](LICENSE) ([docs/licensing.md](docs/licensing.md)).
 
 ## Requirements
 
@@ -49,22 +49,25 @@ After a GHCR release, `make docker-up` pulls `ghcr.io/nberardi/familyfi`.
 | --- | --- |
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate |
 | `make dev` | Next.js on port 3000 |
-| `make test` | Unit and contract tests |
-| `make test-api` | OpenAPI lint |
+| `make test` | Unit tests, then integration tests against `familyfi_test` |
+| `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database) |
+| `make test-api` | OpenAPI lint and route/method contract |
+| `make test-browser` | Playwright desktop/phone smoke (`DEFAULT_PASSWORD`, running app or CI webServer) |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
 | `make lint` / `make typecheck` / `make build` | Checks and production build |
 | `make docker-build` | Build `familyfi:dev` |
 | `make docker-dev-up` | Locally built image, selected database mode |
 | `make docker-up` | GHCR image, bundled PostgreSQL by default |
 | `make docker-down` | Stop without deleting volumes |
-| `make docker-logs` | Follow container logs |
+| `make docker-smoke` | Build `familyfi:dev`, reject `designs/` in the image, run health/login against bundled-style external Postgres |
 
 ## Documentation
 
 - [Setup](docs/setup.md)
 - [Architecture](docs/architecture.md)
 - [Operations](docs/operations.md)
-- [API](docs/api.md) and [`openapi/familyfi.v1.yaml`](openapi/familyfi.v1.yaml)
+- [API](docs/api.md), [`openapi/familyfi.v1.yaml`](openapi/familyfi.v1.yaml), and signed-in **System → API** (`/reference`)
+- [Phase 4 verification](docs/verify/PHASE4.md) and [live checklist](docs/verify/LIVE.md)
 - [Design review](docs/design-review.md)
 - [Plan](docs/plan.md)
 - [Spike results](docs/spike/RESULTS.md) and [operator checklist](docs/spike/OPERATOR.md)

@@ -25,6 +25,7 @@ const NAV = [
     items: [
       { href: "/sync", label: "Sync" },
       { href: "/settings", label: "Settings" },
+      { href: "/reference", label: "API" },
     ],
   },
 ];

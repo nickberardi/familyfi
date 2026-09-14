@@ -116,6 +116,10 @@ export function env(): AppEnv {
   return cached;
 }
 
+export function resetEnvCacheForTests() {
+  cached = undefined;
+}
+
 /** Live recovery password. Avoids a stale env() cache and Next inlining process.env.DEFAULT_PASSWORD. */
 export function recoveryPassword(): string {
   return (process.env["DEFAULT_PASSWORD"] ?? env().DEFAULT_PASSWORD).trim();

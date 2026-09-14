@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { api } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
 import { PageHeader } from "@/components/PageHeader";
@@ -49,31 +49,44 @@ export default function SettingsPage() {
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
 
+  const [unifiStamp, setUnifiStamp] = useState<string | null>(null);
+  const [timezoneStamp, setTimezoneStamp] = useState<string | null>(null);
+
   const family = groups.filter((group) => group.kind === "family");
   const personal = accounts.filter((account) => !account.recovery);
   const recovery = accounts.find((account) => account.recovery);
   const state = keyState(unifi);
   const facts = gatewayFacts(unifi);
   const lastCall = sync?.lastRun?.finishedAt ?? sync?.lastRun?.startedAt ?? null;
-
-  useEffect(() => {
-    if (!unifi) return;
-    setMode(unifi.consoleId ? "cloud" : "local");
-    setConsoleHost(consoleHostFromBaseUrl(unifi.baseUrl));
-    setConsoleId(unifi.consoleId ?? "");
-    setSiteId(unifi.siteId ?? "");
-    setTlsInsecure(unifi.tlsInsecure);
-    setManageAll(unifi.manageAllNetworks);
-    setManagedIds(unifi.managedNetworkIds);
-    if (!unifi.configured) {
+  const nextUnifiStamp = unifi
+    ? [
+        unifi.configured,
+        unifi.consoleId ?? "",
+        unifi.baseUrl ?? "",
+        unifi.siteId ?? "",
+        unifi.tlsInsecure,
+        unifi.manageAllNetworks,
+        unifi.managedNetworkIds.join(","),
+      ].join("|")
+    : null;
+  if (nextUnifiStamp && nextUnifiStamp !== unifiStamp) {
+    setUnifiStamp(nextUnifiStamp);
+    setMode(unifi?.consoleId ? "cloud" : "local");
+    setConsoleHost(consoleHostFromBaseUrl(unifi?.baseUrl ?? null));
+    setConsoleId(unifi?.consoleId ?? "");
+    setSiteId(unifi?.siteId ?? "");
+    setTlsInsecure(unifi?.tlsInsecure ?? true);
+    setManageAll(unifi?.manageAllNetworks ?? false);
+    setManagedIds(unifi?.managedNetworkIds ?? []);
+    if (unifi && !unifi.configured) {
       setPasting(true);
       setEditingGateway(true);
     }
-  }, [unifi]);
-
-  useEffect(() => {
-    if (household) setTimezone(household.timezone);
-  }, [household]);
+  }
+  if (household && household.timezone !== timezoneStamp) {
+    setTimezoneStamp(household.timezone);
+    setTimezone(household.timezone);
+  }
 
   function targetBody() {
     return mode === "local"

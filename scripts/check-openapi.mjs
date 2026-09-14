@@ -33,20 +33,29 @@ if (missing.length) {
 }
 
 const apiRoot = path.join(root, "src/app/api");
-const implemented = new Set();
-function walk(dir) {
+const HANDLERS = ["get", "post", "put", "patch", "delete"];
+
+function exportedMethods(file) {
+  const src = fs.readFileSync(file, "utf8");
+  return HANDLERS.filter((method) => new RegExp(`export async function ${method.toUpperCase()}\\b`).test(src));
+}
+
+const specPaths = new Set(Object.keys(spec.paths ?? {}));
+const implemented = new Map();
+function walkWithMethods(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const next = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(next);
+    if (entry.isDirectory()) walkWithMethods(next);
     else if (entry.name === "route.ts") {
       const rel = path.relative(path.join(root, "src/app"), next).replaceAll("\\", "/");
-      implemented.add(`/${rel.replace(/\/route\.ts$/, "").replace(/\[([^\]]+)\]/g, "{$1}")}`);
+      const apiPath = `/${rel.replace(/\/route\.ts$/, "").replace(/\[([^\]]+)\]/g, "{$1}")}`;
+      implemented.set(apiPath, exportedMethods(next));
     }
   }
 }
-walk(apiRoot);
-const specPaths = new Set(Object.keys(spec.paths ?? {}));
-const undocumented = [...implemented].filter((p) => !specPaths.has(p)).sort();
+walkWithMethods(apiRoot);
+
+const undocumented = [...implemented.keys()].filter((p) => !specPaths.has(p)).sort();
 const extra = [...specPaths].filter((p) => !implemented.has(p)).sort();
 if (undocumented.length) {
   console.error(`Implemented routes missing from OpenAPI: ${undocumented.join(", ")}`);
@@ -54,6 +63,32 @@ if (undocumented.length) {
 }
 if (extra.length) {
   console.error(`OpenAPI paths with no route handler: ${extra.join(", ")}`);
+  process.exit(1);
+}
+
+const methodDrift = [];
+for (const [apiPath, methods] of implemented) {
+  const documented = Object.keys(spec.paths[apiPath] ?? {}).filter((key) => HANDLERS.includes(key));
+  const missing = methods.filter((method) => !documented.includes(method));
+  const unused = documented.filter((method) => !methods.includes(method));
+  if (missing.length || unused.length) {
+    methodDrift.push(`${apiPath} impl=${methods.join("|") || "∅"} spec=${documented.join("|") || "∅"}`);
+  }
+}
+if (methodDrift.length) {
+  console.error(`OpenAPI method drift:\n${methodDrift.join("\n")}`);
+  process.exit(1);
+}
+
+const missingOpIds = [];
+for (const [apiPath, item] of Object.entries(spec.paths ?? {})) {
+  for (const method of HANDLERS) {
+    const op = item?.[method];
+    if (op && !op.operationId) missingOpIds.push(`${method.toUpperCase()} ${apiPath}`);
+  }
+}
+if (missingOpIds.length) {
+  console.error(`OpenAPI operations missing operationId: ${missingOpIds.join(", ")}`);
   process.exit(1);
 }
 
