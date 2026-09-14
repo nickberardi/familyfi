@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GroupKind {
+  family
+  things
+}
+
+enum FamilyRole {
+  child
+  teen
+  adult
+}
+
+enum AssignmentState {
+  assigned
+  quarantined
+}
+
+enum AccountKind {
+  recovery
+  personal
+}
+
+enum SessionKind {
+  cookie
+  bearer
+}
+
+enum PolicyOwnerScope {
+  group
+  quarantine
+}
+
+enum IpVersion {
+  ipv4
+  ipv6
+  dual
+}
+
+enum PolicyOperationIntent {
+  create
+  update
+  delete
+}
+
+enum ChangeStatus {
+  pending
+  applied
+  partial
+  failed
+  superseded
+}
+
+model Household {
+  id                 String   @id @default("default")
+  timezone           String   @default("America/New_York")
+  unifiMode          String?
+  unifiBaseUrl       String?
+  unifiConsoleId     String?
+  unifiSiteId        String?
+  unifiKeyCiphertext Bytes?
+  unifiKeyIv         Bytes?
+  unifiKeyAuthTag    Bytes?
+  unifiKeyLastFour   String?
+  connectionStatus   String   @default("unconfigured")
+  connectionError    String?
+  revision           Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Group {
+  id               String      @id @default(cuid())
+  kind             GroupKind
+  name             String
+  monogram         String?
+  familyRole       FamilyRole?
+  protected        Boolean     @default(false)
+  scheduleEnabled  Boolean     @default(false)
+  scheduleDays     Int[]       @default([])
+  scheduleStart    String?
+  scheduleEnd      String?
+  suspensionActive Boolean     @default(false)
+  suspensionUntil  DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  devices          Device[]
+  accounts         Account[]
+  appPolicies      AppPolicy[]
+}
+
+model Account {
+  id            String         @id @default(cuid())
+  username      String         @unique
+  displayName   String
+  kind          AccountKind
+  passwordHash  String?
+  isAdmin       Boolean        @default(true)
+  groupId       String?
+  group         Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  sessions      Session[]
+  loginAttempts LoginAttempt[]
+}
+
+model Session {
+  id        String      @id @default(cuid())
+  tokenHash String      @unique
+  kind      SessionKind
+  accountId String?
+  account   Account?    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  username  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  createdAt DateTime    @default(now())
+
+  @@index([username])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  username  String
+  ip        String
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([username, createdAt])
+  @@index([ip, createdAt])
+}
+
+model Device {
+  id         String           @id @default(cuid())
+  mac        String           @unique
+  hostname   String?
+  ip         String?
+  networkId  String?
+  zoneId     String?
+  groupId    String?
+  group      Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  assignment AssignmentState  @default(quarantined)
+  lastSeenAt DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+model AppPolicy {
+  id                  String           @id @default(cuid())
+  connectionIdentity  String
+  siteId              String
+  unifiPolicyId       String?          @unique
+  ownerScope          PolicyOwnerScope
+  groupId             String?
+  group               Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  zoneId              String
+  ipVersion           IpVersion
+  desiredFingerprint  String
+  desiredRevision     Int
+  observedEnabled     Boolean?
+  observedFingerprint String?
+  lastError           String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+}
+
+model PolicyOperation {
+  id                 String                 @id @default(cuid())
+  intent             PolicyOperationIntent
+  appPolicyId        String?
+  connectionIdentity String
+  siteId             String
+  payloadFingerprint String?
+  unifiPolicyId      String?
+  status             String                 @default("pending")
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+}
+
+model SyncRun {
+  id                String         @id @default(cuid())
+  requestedRevision Int
+  appliedRevision   Int?
+  status            ChangeStatus   @default(pending)
+  startedAt         DateTime       @default(now())
+  finishedAt        DateTime?
+  error             String?
+  changes           ChangeResult[]
+}
+
+model ChangeResult {
+  id                String       @id @default(cuid())
+  syncRunId         String?
+  syncRun           SyncRun?     @relation(fields: [syncRunId], references: [id], onDelete: SetNull)
+  requestedRevision Int
+  appliedRevision   Int?
+  status            ChangeStatus @default(pending)
+  scope             String
+  deviceMac         String?
+  error             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model ReconciliationLock {
+  id        String   @id @default("global")
+  owner     String
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --ff-ink: #1c1c1e;
+  --ff-muted: #3a3a3c;
+  --ff-page: #f5f5f7;
+  --ff-card: #ffffff;
+  --ff-line: #d2d2d7;
+  --ff-accent: #007aff;
+  --ff-accent-hover: #0066d6;
+  --ff-on: #248a3d;
+  --ff-paused: #c04c00;
+  --ff-danger: #c8100a;
+  --ff-mark: #2c2c2e;
+  --ff-now: #ff9500;
+  --ff-font: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+}
+
+html {
+  color: var(--ff-ink);
+  background: var(--ff-page);
+  font-family: var(--ff-font);
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ff-ink);
+  background: var(--ff-page);
+}
+
+* {
+  box-sizing: border-box;
+}

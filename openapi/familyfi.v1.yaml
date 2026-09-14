@@ -1,0 +1,232 @@
+openapi: 3.1.0
+info:
+  title: FamilyFi API
+  version: 0.1.0
+  description: |
+    Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
+    native client. Application state is desired configuration; UniFi is
+    enforcement only. This revision specifies health and authentication.
+    Remaining household routes will be added in the backend phase.
+  license:
+    name: License undecided
+    identifier: UNLICENSED
+servers:
+  - url: /
+    description: Same origin as the FamilyFi application
+tags:
+  - name: Health
+    description: Deployment health and readiness
+  - name: Auth
+    description: Recovery admin and personal adult sessions
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      tags: [Health]
+      summary: Deployment health
+      description: Minimal non-secret readiness. Does not expose credentials.
+      security: []
+      responses:
+        "200":
+          description: Application and database are reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+              examples:
+                ok:
+                  value: { status: ok, db: ok, revision: 0 }
+        "503":
+          description: Application is up but the database is not.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Sign in
+      description: |
+        Authenticate the recovery username `admin` against DEFAULT_PASSWORD,
+        or a personal adult account against its stored password hash.
+        Browser clients receive an httpOnly session cookie and a readable CSRF
+        cookie. Native clients set `client` to `native` and receive a bearer
+        token instead of cookies. Five failed attempts in 15 minutes for a
+        username or IP return 429. Sessions last 30 days unless revoked.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              browser:
+                value: { username: admin, password: "example-password", client: browser }
+              native:
+                value: { username: admin, password: "example-password", client: native }
+      responses:
+        "200":
+          description: Authenticated.
+          headers:
+            Set-Cookie:
+              description: Browser logins set familyfi_session (httpOnly) and familyfi_csrf.
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Sign out
+      description: |
+        Revokes the current session. Cookie clients must send header
+        `X-CSRF-Token` matching the `familyfi_csrf` cookie. Bearer clients
+        send `Authorization: Bearer`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "200":
+          description: Session revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, const: true }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/session:
+    get:
+      operationId: getSession
+      tags: [Auth]
+      summary: Current session
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller is authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: familyfi_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Revocable session token from POST /api/v1/auth/login with client=native.
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      description: Required for cookie-authenticated mutations. Must match familyfi_csrf.
+      schema: { type: string }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, db]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        db:
+          type: string
+          enum: [ok, error]
+        revision:
+          type: integer
+          minimum: 0
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+        client:
+          type: string
+          enum: [browser, native]
+          default: browser
+    Session:
+      type: object
+      additionalProperties: false
+      required: [username, displayName, kind, expiresAt]
+      properties:
+        username: { type: string }
+        displayName: { type: string }
+        kind:
+          type: string
+          enum: [recovery, personal]
+        expiresAt:
+          type: string
+          format: date-time
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [session]
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        token:
+          type: string
+          description: Present for native clients only.
+        tokenType:
+          type: string
+          enum: [Bearer]
+    SessionResponse:
+      type: object
+      additionalProperties: false
+      required: [session]
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }

@@ -1,0 +1,17 @@
+name: Feature
+description: Request a change that is not a bug
+title: "[feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: ask
+    attributes:
+      label: What do you want
+      description: Describe the household problem, not an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: out
+    attributes:
+      label: What this is not
+      description: Note anything that should stay out of scope (native app, per-device protection, email login).

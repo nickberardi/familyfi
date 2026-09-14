@@ -1,0 +1,16 @@
+{
+  "name": "FamilyFi",
+  "short_name": "FamilyFi",
+  "description": "Family internet controls for a UniFi gateway",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-familyfi}
+      POSTGRES_USER: ${DB_USER:-familyfi}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-familyfi}
+    volumes:
+      - familyfi-dev-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  familyfi-dev-postgres:

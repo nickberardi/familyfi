@@ -1,0 +1,12 @@
+services:
+  app:
+    image: ${FAMILYFI_IMAGE:-ghcr.io/nberardi/familyfi:latest}
+    ports:
+      - "${APP_PORT:-7001}:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    restart: unless-stopped
