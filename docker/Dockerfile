@@ -1,7 +1,7 @@
 FROM node:26-bookworm-slim AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN npm install -g pnpm@10.15.1
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
 COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
@@ -14,9 +14,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/.next/standalone ./
