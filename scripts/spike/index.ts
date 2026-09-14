@@ -41,7 +41,7 @@ Commands:
   status      show recorded spike policy ids
 
 Never commit keys, .live-state.json, or unsanitized household dumps.
-Live enforcement is not proven until docs/spike/RESULTS.md records client-side success.
+API success is not client proof; confirm internet and LAN on the test device.
 `;
 }
 

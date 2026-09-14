@@ -1,76 +1,125 @@
 # FamilyFi
 
-Family internet controls for a UniFi gateway. One deployment serves one household. Application state is desired configuration; app-owned UniFi firewall policies enforce it. Administrator-created policies are never modified, disabled, deleted, or reordered.
+[![License](https://img.shields.io/badge/license-BSL_1.1-green)](LICENSE)
+[![GitHub last commit](https://img.shields.io/github/last-commit/nberardi/familyfi)](https://github.com/nberardi/familyfi/commits)
+[![GitHub Stars](https://img.shields.io/github/stars/nberardi/familyfi)](https://github.com/nberardi/familyfi/stargazers)
 
-The first client is a responsive web/PWA. The same documented `/api/v1` API is reserved for a later native app.
+Family internet controls for a UniFi gateway. One deployment, one household.
 
-## Status
+UniFi gives you firewall policies and client lists, but bedtime, pause-for-homework, and “who owns this new iPad?” are still a pile of rules you have to remember. FamilyFi is the household layer: groups of people and things, schedules, and quarantined unknowns. It stores what you want, then enforces it with **app-owned** UniFi firewall policies. Your own policies are never modified, disabled, deleted, or reordered.
 
-Phase 4 verification is in CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, Playwright, and container smoke. Live IPv4 MAC block/restore is recorded in [docs/spike/RESULTS.md](docs/spike/RESULTS.md). Licensed under the [Business Source License 1.1](LICENSE) ([docs/licensing.md](docs/licensing.md)).
+The first client is a responsive web app / PWA. A native app is planned later against the same `/api/v1` API.
+
+**[Setup](docs/setup.md)** • **[Operations](docs/operations.md)** • **[API](docs/api.md)** • **[Licensing](docs/licensing.md)**
+
+## What it does
+
+### Family and Things
+
+Put devices into groups that match the house. **Family** groups are people (child, teen, or adult). **Things** are TVs, computers, smart-home kits — anything that is not a person. Every assigned device belongs to exactly one group. Protection is per group: a protected group is exempt from FamilyFi blocking (your UniFi rules still apply).
+
+### Bedtime schedules
+
+Each group can have a recurring internet window. FamilyFi writes that schedule onto the UniFi policy, so the gateway can start and end bedtime even if FamilyFi is briefly down. Pause is not a “cut the internet” button: it suspends schedule enforcement so internet is available from FamilyFi’s point of view. Resume puts the schedule back, which may still block if it is bedtime. Timed pause and extend are supported.
+
+### Unassigned devices
+
+New clients on the VLANs you opted in to manage show up as unassigned (quarantined in the API). FamilyFi discovers them on a short poll and can block them until you assign them. Devices on other VLANs are ignored. Immediate admission control is not promised: a brand-new MAC can have internet until the next successful sync.
+
+### One site, your key
+
+Paste a UniFi Network Integration API key in Settings. FamilyFi encrypts it at rest. It does not create UniFi Object Manager groups and does not issue or rotate keys — that stays in UniFi. Pick which networks (VLANs) it may watch.
 
 ## Requirements
 
-- Node.js 20+
-- pnpm 10 (`corepack enable` or `npx pnpm`)
-- PostgreSQL 16, either bundled in Compose or external
-- Docker, for container runs and the default development database
+- A UniFi console with the Network Integration API (local console URL or cloud connector)
+- Network access from the FamilyFi host to that API over HTTPS
+- Docker for the recommended install (app + bundled PostgreSQL 16), or Node.js 20+ and pnpm 10 if you run from source
+- A box on the LAN. Do not install FamilyFi on the UniFi gateway itself.
 
-## Quick start (development)
+Phones on the LAN should use the host’s LAN address, not `localhost`. HTTPS is required for a deployed PWA and for secure cookies in production.
+
+## Installation
+
+### Quick start (Docker)
+
+Until a published GHCR tag exists, build locally:
 
 ```bash
+git clone https://github.com/nberardi/familyfi.git
+cd familyfi
 cp .env.example .env
-# Set DB_PASSWORD. Recovery password and crypto secrets are generated on setup.
-make setup
-make dev
+# Set DB_PASSWORD. Recovery password and crypto secrets are generated on first setup if omitted.
+make docker-dev-up
+make docker-logs   # look for username: admin and the recovery password
 ```
 
-Open http://localhost:3000 and sign in as `admin` with the recovery password printed in the server log.
+Open http://localhost:7001 (override with `APP_PORT`). Default `DB_MODE` is `bundled` (Compose starts PostgreSQL). For an existing server, set `DB_MODE=external` and the `DB_*` values.
 
-`DEFAULT_PASSWORD` is the permanent recovery credential. Changing the environment value takes effect on the next `admin` sign-in. Personal adult accounts replace everyday use of `admin`; they do not remove it.
-
-## Docker
+After a GHCR release:
 
 ```bash
 cp .env.example .env
 # Set DB_PASSWORD.
-# DEFAULT_PASSWORD, SESSION_SECRET, and APP_ENCRYPTION_KEY are generated on first setup if omitted.
-# Default DB_MODE=bundled. For an existing server: DB_MODE=external and its DB_* values.
-make docker-dev-up   # until a GHCR image exists
-# Open http://localhost:7001
-make docker-logs
-make docker-down     # keeps database volumes
+make docker-up     # pulls ghcr.io/nberardi/familyfi
 ```
 
-After a GHCR release, `make docker-up` pulls `ghcr.io/nberardi/familyfi`.
+`make docker-down` stops containers and keeps database volumes.
 
-## Make targets
+### From source (development)
 
-| Target | Behavior |
-| --- | --- |
-| `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate |
-| `make dev` | Next.js on port 3000 |
-| `make test` | Unit tests, then integration tests against `familyfi_test` |
-| `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database) |
-| `make test-api` | OpenAPI lint and route/method contract |
-| `make test-browser` | Playwright desktop/phone smoke (`DEFAULT_PASSWORD`, running app or CI webServer) |
-| `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
-| `make lint` / `make typecheck` / `make build` | Checks and production build |
-| `make docker-build` | Build `familyfi:dev` |
-| `make docker-dev-up` | Locally built image, selected database mode |
-| `make docker-up` | GHCR image, bundled PostgreSQL by default |
-| `make docker-down` | Stop without deleting volumes |
-| `make docker-smoke` | Build `familyfi:dev`, reject `designs/` in the image, run health/login against bundled-style external Postgres |
+```bash
+cp .env.example .env
+# Set DB_PASSWORD.
+make setup
+make dev
+```
 
-## Documentation
+Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docker is available, then migrates. If Docker is not available, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`.
 
-- [Setup](docs/setup.md)
-- [Architecture](docs/architecture.md)
-- [Operations](docs/operations.md)
-- [API](docs/api.md), [`openapi/familyfi.v1.yaml`](openapi/familyfi.v1.yaml), and signed-in **System → API** (`/reference`)
-- [Phase 4 verification](docs/verify/PHASE4.md) and [live checklist](docs/verify/LIVE.md)
-- [Design review](docs/design-review.md)
-- [Plan](docs/plan.md)
-- [Spike results](docs/spike/RESULTS.md) and [operator checklist](docs/spike/OPERATOR.md)
-- [Licensing](docs/licensing.md)
+## First run
 
-Private design references in `designs/` are local-only and are excluded from Git and Docker builds.
+1. Sign in as **admin** with the recovery password printed in the server log (`make docker-logs` or the `make dev` terminal).
+2. In Settings, paste a UniFi Network Integration API key. For a local console with a private CA, enable insecure TLS. Choose **manage all networks** or a VLAN allowlist; the default is none until you pick.
+3. Align the household timezone with the UniFi console clock so bedtime windows match wall time.
+4. Assign devices to Family or Things groups and set schedules.
+
+`DEFAULT_PASSWORD` is the permanent recovery credential for username `admin`. Changing it in `.env` takes effect on the next `admin` sign-in. Create personal adult accounts for everyday use; they do not remove `admin`.
+
+Back up PostgreSQL and `APP_ENCRYPTION_KEY` together. Restoring the database without that key cannot decrypt the stored UniFi credential.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/licensing.md](docs/licensing.md). Sending a pull request accepts the contributor terms.
+
+Do not send patches that assume MIT/Apache terms. Do not commit `/designs/`, `.env` files, UniFi keys, or unsanitized household API responses. Report bugs via GitHub Issues; sanitize credentials and IPs before attaching logs.
+
+Agent and coding conventions live in [AGENTS.md](AGENTS.md).
+
+## License
+
+Business Source License 1.1. This is **source-available**, not OSI open source.
+
+**Licensor:** Nick Berardi
+
+**Licensed Work:** FamilyFi
+
+**Household use:** You may run it in production for **one household UniFi network** you or that household control, including self-hosted Docker/GHCR on that LAN.
+
+**Commercial use:** Selling, hosting, embedding, white-labeling, or offering FamilyFi (or a substantially similar product) to third parties — including MSP or multi-household service — needs a commercial license. Contact Nick Berardi.
+
+**Change Date:** Four years from publication of that version (see [LICENSE](LICENSE)).
+
+**Change License:** GNU GPL v3 or later
+
+Details: [docs/licensing.md](docs/licensing.md).
+
+## Support
+
+- Issues: [GitHub Issues](https://github.com/nberardi/familyfi/issues)
+- Security: [SECURITY.md](SECURITY.md)
+- Docs: [Setup](docs/setup.md), [Architecture](docs/architecture.md), [Operations](docs/operations.md), [API](docs/api.md)
+
+---
+
+FamilyFi is an independent project and is not affiliated with, endorsed by, or sponsored by Ubiquiti, Inc. Ubiquiti, UniFi, UDM, and Cloud Key are trademarks or registered trademarks of Ubiquiti, Inc.

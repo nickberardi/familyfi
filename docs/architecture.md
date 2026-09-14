@@ -38,9 +38,26 @@ Days identify the local weekday a window starts. Windows are half-open. Evaluati
 
 A database-backed lock serializes startup, interval (~30s), and mutation-triggered runs. Overlapping writers, including container replacement, must not apply stale revisions. Interval work is discovery, membership, and Extend expiry — not bedtime start/end. Until a UniFi key is saved in Settings, reconciliation is a no-op.
 
-## UniFi client (Phase 1)
+If a create may have succeeded but ownership cannot be proven, the app reports an unresolved operation instead of adopting arbitrary `FamilyFi ` prefix matches. Do not delete administrator rules to recover.
 
-`src/server/unifi` talks to the official Network Integration API (v10.4.57) with `X-API-KEY`. Pagination uses limit 200. Internet-block policies use firewall action `BLOCK` (live spike: better than `REJECT` on this gateway). Policy enable/disable is PUT of the full write body. The client refuses PUT on policy ordering. The spike CLI (`scripts/spike`) is the live gate; mocks and fixtures do not prove enforcement.
+## UniFi client
+
+`src/server/unifi` talks to the official Network Integration API (contract v10.4.57; live Network 10.6.106) with `X-API-KEY`. Pagination uses limit 200. Internet-block policies use firewall action `BLOCK` (live check: more effective than `REJECT` on this gateway). Policy enable/disable is PUT of the full write body. PATCH is logging-only. The client refuses PUT on policy ordering. `GET` ordering on this console requires `sourceFirewallZoneId`.
+
+Integration bases:
+
+- Local: `https://<console-ip>/proxy/network/integration` then `/v1/...`. A bare hostname is not an integration base.
+- Cloud: `https://api.ui.com/v1/connector/consoles/{consoleId}/proxy/network/integration` (not live-tested).
+
+Official client overview/details do not include `networkId`. Mapping:
+
+1. `GET /v1/sites/{siteId}/networks/{networkId}/references` `CLIENT` `referenceId`s
+2. Else match `client.ipAddress` to gateway network `ipv4Configuration.hostIpAddress` + `prefixLength` (and `additionalHostIpSubnets`)
+3. Zone via `network.zoneId` and/or `zone.networkIds`
+
+Destination zone: first of External, WAN, Internet (case-insensitive). Source: one policy per source zone. IP scope: `IPV4_AND_IPV6` with no protocol filter. IPv6 blocking, overnight UniFi scheduler windows, and a second concurrent MAC are unproven; do not claim dual-stack blocking.
+
+Mocks and fixtures do not prove enforcement. The spike CLI (`scripts/spike`) is for live gateway experiments; see [spike/OPERATOR.md](spike/OPERATOR.md).
 
 ## Secrets
 

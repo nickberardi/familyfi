@@ -17,10 +17,6 @@ Copy `.env.example` to `.env` and set:
 
 Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a temporary key; that path is not the application credential store.
 
-## UniFi spike (Phase 1)
-
-See [the spike operator checklist](spike/OPERATOR.md). Example local URL: `https://192.168.0.1/proxy/network/integration`. Optional CLI variables are commented in `.env.example`.
-
 ## Local development
 
 1. Install Node.js 20+ and pnpm 10.

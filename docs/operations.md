@@ -19,14 +19,8 @@ Users should not edit Compose YAML to pick a server.
 
 While FamilyFi is stopped or cannot reach UniFi, the gateway keeps the last applied policies **including UniFi policy schedules**. Recurring bedtime can still start and end. A timed Pause/Extend can outlast its expiry until FamilyFi PUTs `enabled: true`. New devices on **managed** VLANs can have internet until the next successful quarantine reconciliation. Unmanaged VLANs are never ingested. Startup reconciliation applies current desired state; it does not replay missed transitions.
 
-## Unresolved app policies
-
-If a create may have succeeded but ownership cannot be proven, later phases report an actionable unresolved operation instead of adopting arbitrary `FamilyFi ` prefix matches. Do not delete administrator rules to recover.
-
 ## Upgrades
 
 Release images run `prisma migrate deploy` on start. Local `make dev` does the same (`migrate deploy` plus `prisma generate`) before Next listens, so a new column cannot 500 login or Settings until the process is restarted. They do not run `prisma migrate dev`.
 
-Published GHCR tags are `linux/amd64` (`v*` git tags via Actions). Until a tag exists, use `make docker-dev-up`. `make docker-smoke` checks that images do not contain `/designs` or a baked `.env`. The entrypoint does not need a `.env` file when `DEFAULT_PASSWORD`, `SESSION_SECRET`, and `APP_ENCRYPTION_KEY` are already in the process environment.
-
-Integration tests use a separate PostgreSQL database named `familyfi_test`. They will create it if missing. They never truncate the development `familyfi` database.
+Published GHCR tags are `linux/amd64` (`v*` git tags via Actions). Until a tag exists, use `make docker-dev-up`. The entrypoint does not need a `.env` file when `DEFAULT_PASSWORD`, `SESSION_SECRET`, and `APP_ENCRYPTION_KEY` are already in the process environment.

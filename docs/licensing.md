@@ -18,10 +18,10 @@ A fork that you then sell is not allowed under the Additional Use Grant. Enforce
 
 ## Change date
 
-Each published version converts to **GNU GPL v3 or later** on the Change Date, or on the fourth anniversary of that version’s first public distribution under BSL, **whichever comes first**. The Change Date in `LICENSE` is four years from publication of that version. The GPL text is in [`licenses/GPL-3.0.txt`](../licenses/GPL-3.0.txt).
+Each published version converts to **GNU GPL v3 or later** on the Change Date, or on the fourth anniversary of that version’s first public distribution under BSL, **whichever comes first**. The Change Date in `LICENSE` is four years from publication of that version.
 
 After conversion, that version is open source copyleft: others may sell it if they follow the GPL. Newer BSL versions are not automatically converted.
 
 ## Contributions
 
-Outside contributions use [`CLA.md`](../CLA.md) so the Licensor can keep offering BSL plus a paid commercial license. BSD-style inbound patches are also compatible; MIT/Apache-only inbound is not enough for commercial relicensing.
+Outside contributions use the terms in [`CONTRIBUTING.md`](../CONTRIBUTING.md) so the Licensor can keep offering BSL plus a paid commercial license. BSD-style inbound patches are also compatible; MIT/Apache-only inbound is not enough for commercial relicensing.
