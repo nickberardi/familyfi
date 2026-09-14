@@ -25,9 +25,58 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
   color: var(--ff-ink);
   background: var(--ff-page);
+}
+
+.ff-sidebar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  body:has(.ff-shell) {
+    overflow: hidden;
+    height: 100%;
+  }
+
+  .ff-shell {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .ff-sidebar {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .ff-sidebar nav {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .ff-sidebar-end {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .ff-main {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0;
+    isolation: isolate;
+  }
 }
 
 * {

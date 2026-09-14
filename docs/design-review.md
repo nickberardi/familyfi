@@ -18,7 +18,7 @@ Prototype issues to replace:
 
 - Pause currently means “block internet now” and Resume toasts “back online”. Production Pause suspends schedule enforcement; Resume restores the schedule, which may still block during bedtime.
 - “House” as a destination becomes an ordinary Things group.
-- Unassigned devices are named **Quarantined devices** everywhere.
+- Unassigned devices are named **Unassigned** on Devices; the API still uses `quarantined`.
 - Member “app-owned policies” JSON/names are troubleshooting-only, not the parent Family view.
 - Protected groups must not expose controls that bypass protection.
 - Instant success toasts, sample keys (`ak_live_…`), and gateway facts are examples.

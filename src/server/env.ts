@@ -38,6 +38,11 @@ const ISSUE_BY_FIELD: Record<string, string> = {
   DB_MODE: "DB_MODE must be bundled or external.",
 };
 
+function read(source: Record<string, string | undefined>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === "string" ? value.trim() : undefined;
+}
+
 function parseEncryptionKey(value: string): Buffer {
   if (/^[0-9a-fA-F]{64}$/.test(value)) return Buffer.from(value, "hex");
   const buf = Buffer.from(value, "base64");
@@ -48,17 +53,17 @@ function parseEncryptionKey(value: string): Buffer {
 export function envIssues(source: Record<string, string | undefined> = process.env): string[] {
   const parsed = EnvSchema.safeParse({
     NODE_ENV: source.NODE_ENV,
-    DEFAULT_PASSWORD: source.DEFAULT_PASSWORD,
-    SESSION_SECRET: source.SESSION_SECRET,
-    APP_ENCRYPTION_KEY: source.APP_ENCRYPTION_KEY,
-    DB_MODE: source.DB_MODE || "bundled",
-    DB_HOST: source.DB_HOST,
-    DB_PORT: source.DB_PORT,
-    DB_NAME: source.DB_NAME,
-    DB_USER: source.DB_USER,
-    DB_PASSWORD: source.DB_PASSWORD,
-    DB_SSL_MODE: source.DB_SSL_MODE,
-    DB_SSL_ROOT_CERT: source.DB_SSL_ROOT_CERT,
+    DEFAULT_PASSWORD: read(source, "DEFAULT_PASSWORD"),
+    SESSION_SECRET: read(source, "SESSION_SECRET"),
+    APP_ENCRYPTION_KEY: read(source, "APP_ENCRYPTION_KEY"),
+    DB_MODE: read(source, "DB_MODE") || "bundled",
+    DB_HOST: read(source, "DB_HOST"),
+    DB_PORT: read(source, "DB_PORT"),
+    DB_NAME: read(source, "DB_NAME"),
+    DB_USER: read(source, "DB_USER"),
+    DB_PASSWORD: read(source, "DB_PASSWORD"),
+    DB_SSL_MODE: read(source, "DB_SSL_MODE"),
+    DB_SSL_ROOT_CERT: read(source, "DB_SSL_ROOT_CERT"),
   });
   const issues: string[] = [];
   const seen = new Set<string>();
@@ -75,7 +80,7 @@ export function envIssues(source: Record<string, string | undefined> = process.e
     }
   }
   try {
-    parseEncryptionKey(source.APP_ENCRYPTION_KEY ?? "");
+    parseEncryptionKey(read(source, "APP_ENCRYPTION_KEY") ?? "");
   } catch (error) {
     if (error instanceof ConfigurationError) error.issues.forEach(add);
     else add(ISSUE_BY_FIELD.APP_ENCRYPTION_KEY);
@@ -88,17 +93,17 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
   if (issues.length) throw new ConfigurationError(issues);
   const parsed = EnvSchema.parse({
     NODE_ENV: source.NODE_ENV,
-    DEFAULT_PASSWORD: source.DEFAULT_PASSWORD,
-    SESSION_SECRET: source.SESSION_SECRET,
-    APP_ENCRYPTION_KEY: source.APP_ENCRYPTION_KEY,
-    DB_MODE: source.DB_MODE || "bundled",
-    DB_HOST: source.DB_HOST,
-    DB_PORT: source.DB_PORT,
-    DB_NAME: source.DB_NAME,
-    DB_USER: source.DB_USER,
-    DB_PASSWORD: source.DB_PASSWORD,
-    DB_SSL_MODE: source.DB_SSL_MODE,
-    DB_SSL_ROOT_CERT: source.DB_SSL_ROOT_CERT,
+    DEFAULT_PASSWORD: read(source, "DEFAULT_PASSWORD"),
+    SESSION_SECRET: read(source, "SESSION_SECRET"),
+    APP_ENCRYPTION_KEY: read(source, "APP_ENCRYPTION_KEY"),
+    DB_MODE: read(source, "DB_MODE") || "bundled",
+    DB_HOST: read(source, "DB_HOST"),
+    DB_PORT: read(source, "DB_PORT"),
+    DB_NAME: read(source, "DB_NAME"),
+    DB_USER: read(source, "DB_USER"),
+    DB_PASSWORD: read(source, "DB_PASSWORD"),
+    DB_SSL_MODE: read(source, "DB_SSL_MODE"),
+    DB_SSL_ROOT_CERT: read(source, "DB_SSL_ROOT_CERT"),
   });
   parseEncryptionKey(parsed.APP_ENCRYPTION_KEY);
   const DATABASE_URL = buildDatabaseUrl(parsed);
@@ -109,6 +114,11 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
 export function env(): AppEnv {
   if (!cached) cached = loadEnv();
   return cached;
+}
+
+/** Live recovery password. Avoids a stale env() cache and Next inlining process.env.DEFAULT_PASSWORD. */
+export function recoveryPassword(): string {
+  return (process.env["DEFAULT_PASSWORD"] ?? env().DEFAULT_PASSWORD).trim();
 }
 
 export function encryptionKey(): Buffer {

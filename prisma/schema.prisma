@@ -72,6 +72,7 @@ model Household {
   unifiTlsInsecure   Boolean  @default(false)
   unifiManageAllNetworks Boolean @default(false)
   unifiManagedNetworkIds String[] @default([])
+  quarantineEnforced Boolean @default(true)
   connectionStatus   String   @default("unconfigured")
   connectionError    String?
   revision           Int      @default(0)

@@ -17,7 +17,7 @@ Normal payloads never return password hashes, `DEFAULT_PASSWORD`, raw UniFi keys
 | GET/POST | `/api/v1/accounts` | Personal adult accounts; recovery `admin` is listed and cannot be created here |
 | GET/PUT/DELETE | `/api/v1/accounts/{id}` | Recovery admin cannot be edited or deleted |
 | PUT | `/api/v1/accounts/{id}/password` | Revokes that account's sessions; recovery uses `.env` |
-| GET/PUT | `/api/v1/settings/household` | IANA timezone |
+| GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false is an emergency UniFi `enabled: false` on quarantine policies |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds` |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
@@ -29,10 +29,8 @@ Normal payloads never return password hashes, `DEFAULT_PASSWORD`, raw UniFi keys
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET | `/api/v1/devices/{mac}` | Includes `unresolved` when zone is unknown |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |
-| GET | `/api/v1/sync` | Latest reconciliation run |
+| GET | `/api/v1/sync` | Revision, last run, app-owned policy counts, recent changes |
 | POST | `/api/v1/sync/retry` | Enqueue another run |
 | GET | `/api/v1/changes/{id}` | Per-action status |
 
-## Not in this revision
-
-The Settings/home UI (Phase 3) is not built yet. Use `/api/v1` (or a REST client) for groups, devices, accounts, and UniFi setup.
+Settings is in the web app: UniFi key replacement, managed VLANs, timezone (Gateway card), family roles, and adult logins.

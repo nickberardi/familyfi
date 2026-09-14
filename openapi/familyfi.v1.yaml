@@ -327,7 +327,7 @@ paths:
     get:
       operationId: getHousehold
       tags: [Settings]
-      summary: Household timezone
+      summary: Household timezone and quarantine enforcement
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200":
@@ -346,7 +346,7 @@ paths:
     put:
       operationId: updateHousehold
       tags: [Settings]
-      summary: Update timezone
+      summary: Update timezone or quarantine enforcement
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       requestBody:
@@ -356,9 +356,13 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [timezone]
               properties:
                 timezone: { type: string, example: America/New_York }
+                quarantineEnforced:
+                  type: boolean
+                  description: |
+                    When false, app-owned quarantine policies are PUT enabled false (emergency override).
+                    Assignment is unchanged. When true, unassigned in-scope MACs are blocked again.
       responses:
         "200":
           description: Updated
@@ -435,7 +439,7 @@ paths:
     post:
       operationId: testUnifiSettings
       tags: [Settings]
-      summary: Probe UniFi without saving
+      summary: Probe UniFi without saving; omit apiKey to test the stored key
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       requestBody:
@@ -1042,10 +1046,15 @@ components:
     Household:
       type: object
       additionalProperties: false
-      required: [timezone, revision]
+      required: [timezone, revision, quarantineEnforced, quarantineObservedEnabled, quarantinePolicyCount]
       properties:
         timezone: { type: string }
         revision: { type: integer, minimum: 0 }
+        quarantineEnforced: { type: boolean }
+        quarantineObservedEnabled:
+          type: [boolean, "null"]
+          description: Live UniFi enabled flag across app-owned quarantine policies. True if any is enabled.
+        quarantinePolicyCount: { type: integer, minimum: 0 }
     UnifiSettings:
       type: object
       additionalProperties: false
@@ -1079,7 +1088,6 @@ components:
     UnifiProbeRequest:
       type: object
       additionalProperties: false
-      required: [apiKey]
       properties:
         apiKey: { type: string, minLength: 8 }
         baseUrl: { type: string }
@@ -1168,7 +1176,7 @@ components:
     Change:
       type: object
       additionalProperties: false
-      required: [id, revision, status, scope]
+      required: [id, revision, status, scope, updatedAt]
       properties:
         id: { type: string }
         revision: { type: integer }
@@ -1181,10 +1189,23 @@ components:
     SyncStatus:
       type: object
       additionalProperties: false
-      required: [revision, connectionStatus]
+      required: [revision, connectionStatus, appPolicyCount, failingCount, changes, issues]
       properties:
         revision: { type: integer }
         connectionStatus: { type: string }
+        appPolicyCount: { type: integer }
+        failingCount: { type: integer }
+        issues:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [groupId, groupName, kind, message]
+            properties:
+              groupId: { type: string }
+              groupName: { type: string }
+              kind: { type: string, enum: [no_members, unresolved_zone, missing_policy] }
+              message: { type: string }
         lastRun:
           type: [object, "null"]
           additionalProperties: false
@@ -1196,6 +1217,9 @@ components:
             startedAt: { type: string, format: date-time }
             finishedAt: { type: [string, "null"], format: date-time }
             error: { type: [string, "null"] }
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/Change" }
     Error:
       type: object
       additionalProperties: false

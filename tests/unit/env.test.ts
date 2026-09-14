@@ -26,4 +26,9 @@ describe("environment validation", () => {
     expect(loaded.DEFAULT_PASSWORD).toBe("recovery-pass");
     expect(loaded.DATABASE_URL).toContain("db-pass");
   });
+
+  it("trims DEFAULT_PASSWORD from the environment", () => {
+    const loaded = loadEnv({ ...valid, DEFAULT_PASSWORD: "  recovery-pass  " });
+    expect(loaded.DEFAULT_PASSWORD).toBe("recovery-pass");
+  });
 });

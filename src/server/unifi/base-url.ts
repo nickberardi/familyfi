@@ -1,6 +1,5 @@
+import { LOCAL_INTEGRATION_PATH } from "@/lib/unifi-host";
 import { UnifiConfigError } from "./errors";
-
-const LOCAL_INTEGRATION_PATH = "/proxy/network/integration";
 
 export function resolveIntegrationBase(input: { baseUrl?: string; consoleId?: string }): string {
   const baseUrl = input.baseUrl?.trim();

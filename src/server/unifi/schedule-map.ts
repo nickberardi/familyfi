@@ -32,8 +32,9 @@ export function unifiPolicyEnabled(input: {
   protected: boolean;
   suspension: Suspension;
   now: Date;
+  quarantineEnforced?: boolean;
 }): boolean {
-  if (input.ownerScope === "quarantine") return true;
+  if (input.ownerScope === "quarantine") return input.quarantineEnforced !== false;
   if (input.protected) return false;
   return !isSuspended(input.suspension, input.now);
 }

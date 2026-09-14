@@ -26,7 +26,7 @@ See [the spike operator checklist](spike/OPERATOR.md). Example local URL: `https
 1. Install Node.js 20+ and pnpm 10.
 2. Install Docker if you want `make setup` to start PostgreSQL for you.
 3. `cp .env.example .env` and set `DB_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. Watch the server log for `username: admin` and `password:`.
-4. `make setup` then `make dev`. Setup waits until PostgreSQL is accepting connections before migrating; the first start can take a few extra seconds. If port 3000 is already taken, `make dev` asks whether to kill that process.
+4. `make setup` then `make dev`. `make dev` waits for PostgreSQL, applies pending Prisma migrations, regenerates the database client, then starts Next. The first start can take a few extra seconds. If port 3000 is already taken, `make dev` asks whether to kill that process.
 5. Open http://localhost:3000 and sign in as `admin`.
 
 `make setup` will not overwrite an existing `.env`.

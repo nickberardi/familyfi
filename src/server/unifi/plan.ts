@@ -49,6 +49,7 @@ export function planPolicies(input: {
   zoneNames?: Record<string, string>;
   groups: PlanGroup[];
   devices: PlanDevice[];
+  quarantineEnforced?: boolean;
 }): { policies: PlannedPolicy[]; retainOwners: Set<string> } {
   const groups = new Map(input.groups.map((group) => [group.id, group]));
   const buckets = new Map<string, { owner: string; zoneId: string; macs: string[] }>();
@@ -87,7 +88,7 @@ export function planPolicies(input: {
         zoneId: bucket.zoneId,
         destinationZoneId: input.destinationZoneId,
         macAddresses: bucket.macs,
-        enabled: true,
+        enabled: input.quarantineEnforced !== false,
         name: quarantinePolicyName(input.zoneNames?.[bucket.zoneId] ?? bucket.zoneId),
       });
       continue;

@@ -10,6 +10,7 @@ import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
 import { internetBlockPolicy, toPolicyUpdate } from "./unifi/payloads";
 import { networkInScope } from "./unifi/scope";
+import { coverageIssues, isWriteFailure } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicyWrite } from "./unifi/types";
@@ -38,13 +39,19 @@ async function pump() {
       queued = false;
       const owner = `${process.pid}:${randomToken(8)}`;
       try {
-        await tick(owner);
+        const ran = await tick(owner);
+        if (!ran) {
+          queued = true;
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
       } catch {
-        // Keep desired state; next interval retries.
+        queued = true;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   } finally {
     pumping = false;
+    if (queued) void pump();
   }
 }
 
@@ -68,8 +75,16 @@ async function acquireLock(owner: string): Promise<boolean> {
   return updated.count === 1;
 }
 
-async function tick(owner: string) {
-  if (!(await acquireLock(owner))) return;
+async function releaseLock(owner: string) {
+  await prisma().reconciliationLock.updateMany({
+    where: { id: "global", owner },
+    data: { expiresAt: new Date(0) },
+  });
+}
+
+async function tick(owner: string): Promise<boolean> {
+  if (!(await acquireLock(owner))) return false;
+  try {
   const now = new Date();
   await prisma().group.updateMany({
     where: { suspensionActive: true, suspensionUntil: { not: null, lte: now } },
@@ -77,7 +92,7 @@ async function tick(owner: string) {
   });
 
   const household = await prisma().household.findUnique({ where: { id: "default" } });
-  if (!household || household.connectionStatus === "unconfigured" || !household.unifiSiteId) return;
+  if (!household || household.connectionStatus === "unconfigured" || !household.unifiSiteId) return true;
 
   const revision = household.revision;
   const run = await prisma().syncRun.create({
@@ -152,6 +167,7 @@ async function tick(owner: string) {
         ...device,
         inScope: networkInScope(scope, device.networkId),
       })),
+      quarantineEnforced: household.quarantineEnforced,
     });
     const desiredKeys = new Set(desired.map((item) => item.key));
 
@@ -182,6 +198,20 @@ async function tick(owner: string) {
             where: { id: existing.id },
             data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision },
           });
+        } else {
+          await prisma().appPolicy.create({
+            data: {
+              connectionIdentity: identity,
+              siteId,
+              ownerScope: planned.ownerScope === "group" ? PolicyOwnerScope.group : PolicyOwnerScope.quarantine,
+              groupId: planned.groupId,
+              zoneId: planned.zoneId,
+              ipVersion: IpVersion.dual,
+              desiredFingerprint: fingerprint,
+              desiredRevision: revision,
+              lastError: errors[errors.length - 1],
+            },
+          });
         }
       }
     }
@@ -206,6 +236,20 @@ async function tick(owner: string) {
           data: { lastError: errors[errors.length - 1] },
         });
       }
+    }
+
+    const livePolicies = await prisma().appPolicy.findMany({ where: { connectionIdentity: identity, siteId } });
+    const issues = coverageIssues({
+      groups,
+      devices: devices.map((device) => ({
+        ...device,
+        inScope: networkInScope(scope, device.networkId),
+      })),
+      policies: livePolicies,
+    });
+    for (const issue of issues.filter(isWriteFailure)) {
+      failed += 1;
+      errors.push(issue.message);
     }
 
     const status = failed === 0 ? ChangeStatus.applied : ChangeStatus.partial;
@@ -241,6 +285,10 @@ async function tick(owner: string) {
       where: { status: ChangeStatus.pending, requestedRevision: { lte: revision } },
       data: { status: ChangeStatus.failed, error: message, syncRunId: run.id },
     });
+  }
+  return true;
+  } finally {
+    await releaseLock(owner);
   }
 }
 

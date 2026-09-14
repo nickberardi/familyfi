@@ -7,18 +7,11 @@ import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type Public
 import { loadNetworkDetails } from "./unifi/spike";
 import type { Household } from "@prisma/client";
 
-export async function testUnifiConnection(input: {
-  apiKey: string;
-  baseUrl?: string;
-  consoleId?: string;
-  siteId?: string;
-  tlsInsecure?: boolean;
-}) {
-  const client = probeClient(input);
+async function probeWithClient(client: ReturnType<typeof probeClient>, siteId?: string) {
   const [info, sites] = await Promise.all([client.getInfo(), client.listSites()]);
   if (sites.length === 0) throw new UnifiConfigError("UniFi returned no sites.");
-  const site = input.siteId
-    ? sites.find((item) => item.id === input.siteId)
+  const site = siteId
+    ? sites.find((item) => item.id === siteId)
     : sites.length === 1
       ? sites[0]
       : undefined;
@@ -35,6 +28,24 @@ export async function testUnifiConnection(input: {
     siteCount: sites.length,
     networks: networks.map(publicUnifiNetwork),
   };
+}
+
+export async function testUnifiConnection(input: {
+  apiKey: string;
+  baseUrl?: string;
+  consoleId?: string;
+  siteId?: string;
+  tlsInsecure?: boolean;
+}) {
+  return probeWithClient(probeClient(input), input.siteId);
+}
+
+export async function testStoredUnifiConnection() {
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  if (!household.unifiKeyLastFour) {
+    throw new UnifiConfigError("Save a UniFi API key first.");
+  }
+  return probeWithClient(clientForHousehold(household), household.unifiSiteId ?? undefined);
 }
 
 export async function listSiteNetworks(household: Household): Promise<PublicUnifiNetwork[]> {

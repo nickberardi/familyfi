@@ -25,4 +25,4 @@ If a create may have succeeded but ownership cannot be proven, later phases repo
 
 ## Upgrades
 
-Release images run `prisma migrate deploy` on start. They do not run development migrations.
+Release images run `prisma migrate deploy` on start. Local `make dev` does the same (`migrate deploy` plus `prisma generate`) before Next listens, so a new column cannot 500 login or Settings until the process is restarted. They do not run `prisma migrate dev`.

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { applyDatabaseUrl } from "./print-database-url.mjs";
 import { ensureSecrets } from "./ensure-secrets.mjs";
 import { assertEnv } from "./env-issues.mjs";
+import { prepareDatabase, shouldPrepareDatabase } from "./prepare-database.mjs";
 
 applyDatabaseUrl();
 const result = ensureSecrets();
@@ -15,6 +16,15 @@ const [command, ...args] = process.argv.slice(2);
 if (!command) {
   console.error("usage: node scripts/with-env.mjs <command> [...args]");
   process.exit(1);
+}
+
+if (shouldPrepareDatabase(command, args)) {
+  try {
+    prepareDatabase();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 }
 
 const childEnv = { ...process.env };

@@ -106,7 +106,7 @@ describe("UniFi schedule mapping", () => {
     expect(toUnifiSchedule({ enabled: false, days: [], start: "21:00", end: "07:00" })).toBeUndefined();
   });
 
-  it("pauses with enabled false and leaves quarantine always enabled", () => {
+  it("pauses with enabled false and leaves quarantine on unless overridden", () => {
     const now = new Date("2026-09-14T18:00:00Z");
     expect(
       unifiPolicyEnabled({
@@ -124,6 +124,15 @@ describe("UniFi schedule mapping", () => {
         now,
       }),
     ).toBe(true);
+    expect(
+      unifiPolicyEnabled({
+        ownerScope: "quarantine",
+        protected: false,
+        suspension: { active: false, until: null },
+        now,
+        quarantineEnforced: false,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -260,6 +269,21 @@ describe("planPolicies", () => {
     expect(policies.every((policy) => policy.destinationZoneId === destinationZoneId)).toBe(true);
     expect(policies.find((policy) => policy.zoneId === "z1")?.name).toBe("FamilyFi Quarantine Internal Devices");
     expect(policies.find((policy) => policy.zoneId === "z2")?.name).toBe("FamilyFi Quarantine IoT Devices");
+  });
+
+  it("disables quarantine policies when enforcement is off", () => {
+    const { policies } = planPolicies({
+      installId: "default",
+      now,
+      destinationZoneId,
+      zoneNames: { z1: "Internal" },
+      groups: [child],
+      quarantineEnforced: false,
+      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.quarantined, groupId: null, zoneId: "z1" }],
+    });
+    expect(policies).toHaveLength(1);
+    expect(policies[0]?.ownerScope).toBe("quarantine");
+    expect(policies[0]?.enabled).toBe(false);
   });
 
   it("skips protected groups and keeps bedtime schedule while Pause sets enabled false", () => {

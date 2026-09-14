@@ -40,7 +40,7 @@ FamilyFi provides family internet controls on top of a UniFi gateway. One deploy
 - **Family:** groups representing real people, with child, teen, or adult roles.
 - **Things:** arbitrary device groups such as TV, Computer, and Smart home.
 - Each assigned device belongs to exactly one Family or Things group. There is no third grouping type. If the design's “House” destination is retained, implement it as an ordinary Things group.
-- Unassigned devices are consistently called **Quarantined devices** in the UI, API, documentation, and tests. Discover and block them through polling, initially about every 30 seconds. They may have internet before discovery and enforcement; immediate network admission control is not promised.
+- Unassigned devices are consistently called **Quarantined devices** in the API, documentation, and tests. The Devices UI calls them **Unassigned**. Discover and block them through polling, initially about every 30 seconds. They may have internet before discovery and enforcement; immediate network admission control is not promised.
 - Protection belongs to the group, whether Family or Things. Protected groups are exempt from FamilyFi blocking. Per-device protection is future work.
 - **Pause suspends schedule enforcement and makes internet available from FamilyFi's perspective. Resume restores scheduled enforcement**, which may allow or block internet according to the current time. Pause is not a manual internet-block command.
 - A timed Pause automatically resumes the schedule at expiry. Extend prolongs that suspension. An indefinite Pause lasts until Resume.
@@ -137,7 +137,7 @@ Create at scaffold time:
 - `docker/docker-compose.yml` — application using a released GHCR image and common configuration.
 - A bundled-PostgreSQL Compose override, selected by the default Make run path, with health check and persistent named volume. External database mode must not start that service.
 - An explicit development build/Compose path for locally built images.
-- `scripts/docker-entrypoint.sh` — validate settings, wait for database readiness with bounded retries, run `prisma migrate deploy`, and start the application. Do not run development migrations on deployed startup.
+- `scripts/docker-entrypoint.sh` — validate settings, wait for database readiness with bounded retries, run `prisma migrate deploy`, and start the application. Do not run development migrations on deployed startup. Local `scripts/with-env.mjs` does the same `migrate deploy` (plus `prisma generate`) before Next so a long-running `make dev` process cannot serve an old generated client against a new schema.
 - `.env.example`, `.gitignore`, and root `.dockerignore`.
 
 Expose `DB_MODE=bundled|external`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and documented SSL settings such as `DB_SSL_MODE` and CA configuration where required. Safely derive Prisma's `DATABASE_URL` from these settings, including URL-encoding credentials, avoiding competing sources of truth. Users must not need to edit Compose YAML to select an external server. Bundled mode uses its service hostname and configured database/user/password; external mode uses the supplied host and has no dependency on a bundled-service health check.
@@ -147,7 +147,7 @@ The application listens on container port 3000; publish `7001:3000` by default. 
 | Target | Behavior |
 | --- | --- |
 | `make setup` | Install with pnpm; create `.env` only if missing; prepare the chosen development database and apply migrations |
-| `make dev` | Local Next.js with hot reload |
+| `make dev` | Local Next.js with hot reload; applies `prisma migrate deploy` and regenerates the client before Next listens |
 | `make test` | Unit/integration tests against an isolated test database |
 | `make test-api` | OpenAPI validation and API contract checks |
 | `make spike` | UniFi integration spike CLI |
@@ -190,7 +190,7 @@ Before the first GHCR release, use `make docker-dev-up`. Never overwrite an exis
 
 Desired configuration lives in PostgreSQL; UniFi is enforcement only.
 
-- **Household:** timezone, UniFi connection identity (base URL or console ID, site ID), encrypted key, configuration revision, and connection status.
+- **Household:** UniFi connection identity (base URL or console ID, site ID), IANA timezone (gateway setting in Settings; stored on the household row), encrypted key, configuration revision, and connection status.
 - **Group:** `kind: family|things`, name/identity presentation, Family role where applicable, `protected`, schedule `{enabled, days[], start, end}`, and suspension `{active, until?}`. Both kinds share control semantics.
 - **Account/Session:** recovery and personal adult identities, credentials as applicable, permissions, expiry/revocation, and personal-account relationship to a Family group. Never return credential hashes.
 - **Device:** canonical lowercase unique MAC, nullable `groupId`, assignment state `assigned|quarantined`, last hostname/IP/networkId/zoneId, and last-seen time. Null group means quarantined; enforce consistency with assignment state. Offline devices retain assignments and last known mapping.
@@ -304,8 +304,8 @@ Initial inventory (specify each concrete route individually):
 | Groups | `GET/POST /api/v1/groups`, `GET/PUT/DELETE /api/v1/groups/{id}`; Family/Things, roles, identity, protection, counts, desired/observed state |
 | Schedules | `PUT /api/v1/groups/{id}/schedule`, `POST /api/v1/groups/{id}/pause`, `POST /api/v1/groups/{id}/resume`, `POST /api/v1/groups/{id}/extend` |
 | Devices | `GET /api/v1/devices`, `GET /api/v1/devices/{mac}`, `PUT /api/v1/devices/{mac}/assignment`; assigned/quarantined filters independent of connected/offline state |
-| Sync | `GET /api/v1/sync`, `POST /api/v1/sync/retry`, `GET /api/v1/changes/{id}`; troubleshooting and action-specific outcomes |
-| Settings | `GET/PUT /api/v1/settings/household`, `GET/PUT /api/v1/settings/unifi`, `POST /api/v1/settings/unifi/test`; timezone, masked connection settings, validated credential changes |
+| Sync | `GET /api/v1/sync`, `POST /api/v1/sync/retry`, `GET /api/v1/changes/{id}`; app-owned policy counts, change log, Reconcile now |
+| Settings | `GET/PUT /api/v1/settings/household`, `GET/PUT /api/v1/settings/unifi`, `POST /api/v1/settings/unifi/test` (omit `apiKey` to probe the stored key); timezone lives with Gateway in the UI; masked connection, family roles, adult logins |
 | Health | `GET /api/v1/health`; minimal non-secret deployment health/readiness |
 
 Document assignment removal as a transition to quarantine. Normal payloads never expose credentials, raw firewall JSON, or rule editors; troubleshooting uses safe summaries and affected group/device details.
@@ -314,7 +314,7 @@ Actions validates the specification and runs implementation contract checks agai
 
 ## Phase 3 — Responsive web/PWA
 
-Port available designs with the precedence above. Provide Family/Things lists/details, schedules and Pause/Resume/Extend, group protection, assignment/reassignment, quarantine review, troubleshooting/retry, household/admin management, sign-in, and UniFi setup/key replacement.
+Port available designs with the precedence above. Provide Family/Things lists/details, schedules and Pause/Resume/Extend, group protection, assignment/reassignment, Devices (including unassigned + quarantine override), troubleshooting/retry, household/admin management, sign-in, and UniFi setup/key replacement.
 
 - Share Family/Things control semantics and component anatomy. No per-device protection UI.
 - Show schedule suspension and internet state separately. During bedtime, Pause requests access and Resume restores blocking; outside bedtime Resume can leave access available.

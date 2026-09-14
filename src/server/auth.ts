@@ -1,9 +1,11 @@
 import { hash, verify } from "@node-rs/argon2";
 import { cookies } from "next/headers";
 import { AccountKind, SessionKind } from "@prisma/client";
+import { cookieValue } from "@/lib/cookie";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
-import { env } from "./env";
+import { recoveryPassword } from "./env";
+import { originAllowed } from "./origin";
 import {
   CSRF_COOKIE,
   CSRF_HEADER,
@@ -53,6 +55,9 @@ export async function ensureRecoveryAccount() {
       isAdmin: true,
     },
   });
+}
+
+export async function ensureHousehold() {
   await prisma().household.upsert({
     where: { id: "default" },
     update: {},
@@ -61,13 +66,15 @@ export async function ensureRecoveryAccount() {
 }
 
 export function requestIsHttps(request: Request): boolean {
-  const proto = request.headers.get("x-forwarded-proto");
-  if (proto) return proto.split(",")[0]?.trim() === "https";
   try {
-    return new URL(request.url).protocol === "https:";
+    if (new URL(request.url).protocol === "https:") return true;
   } catch {
-    return false;
+    // ignore malformed URLs
   }
+  const proto = request.headers.get("x-forwarded-proto");
+  const forwarded = request.headers.get("x-forwarded-host") || request.headers.get("forwarded");
+  if (!proto || !forwarded) return false;
+  return proto.split(",")[0]?.trim() === "https";
 }
 
 export function cookieOptions(maxAgeSeconds: number, secure: boolean) {
@@ -135,7 +142,8 @@ export async function authenticate(usernameRaw: string, password: string, ip: st
 
   let valid = false;
   if (username === RECOVERY_USERNAME) {
-    valid = safeEqual(password, env().DEFAULT_PASSWORD);
+    const expected = recoveryPassword();
+    valid = expected.length === password.length && safeEqual(password, expected);
   } else if (account?.passwordHash && account.kind === AccountKind.personal) {
     valid = await verifyPassword(account.passwordHash, password);
   }
@@ -175,8 +183,15 @@ export async function readSessionFromRequest(request: Request) {
   if (header?.toLowerCase().startsWith("bearer ")) {
     raw = header.slice(7).trim();
   } else {
-    const jar = await cookies();
-    raw = jar.get(SESSION_COOKIE)?.value;
+    raw = cookieValue(request.headers.get("cookie"), SESSION_COOKIE);
+    if (!raw) {
+      try {
+        const jar = await cookies();
+        raw = jar.get(SESSION_COOKIE)?.value;
+      } catch {
+        raw = undefined;
+      }
+    }
   }
   if (!raw) return null;
   const session = await prisma().session.findUnique({
@@ -206,15 +221,7 @@ export async function requireSession(request: Request) {
   return { session, error: null };
 }
 
-export function originAllowed(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-}
+export { originAllowed };
 
 export async function requireCsrf(request: Request) {
   if (!originAllowed(request)) {
@@ -223,8 +230,14 @@ export async function requireCsrf(request: Request) {
   if (request.headers.get("authorization")?.toLowerCase().startsWith("bearer ")) {
     return null;
   }
-  const jar = await cookies();
-  const cookie = jar.get(CSRF_COOKIE)?.value;
+  let cookie = cookieValue(request.headers.get("cookie"), CSRF_COOKIE);
+  if (!cookie) {
+    try {
+      cookie = (await cookies()).get(CSRF_COOKIE)?.value;
+    } catch {
+      cookie = undefined;
+    }
+  }
   const header = request.headers.get(CSRF_HEADER);
   if (!cookie || !header || !safeEqual(cookie, header)) {
     return jsonError(403, "csrf", "Missing or invalid CSRF token.");

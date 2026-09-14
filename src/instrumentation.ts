@@ -13,10 +13,11 @@ export async function register() {
   }
   const { logRecoveryAdmin } = await import("./server/startup-banner");
   logRecoveryAdmin(settings.DEFAULT_PASSWORD);
-  const { ensureRecoveryAccount } = await import("./server/auth");
+  const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
   const { startReconciliation } = await import("./server/reconciliation");
   try {
     await ensureRecoveryAccount();
+    await ensureHousehold();
   } catch {
     // Database may not be up yet during `next build` or a local start.
   }
