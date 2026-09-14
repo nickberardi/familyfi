@@ -1,10 +1,15 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { env } from "./env";
 import { missingClientFields, modelFieldsFromPrismaSchema } from "./prisma-schema";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+export function createPrismaClient(url: string): PrismaClient {
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+}
 
 export class SchemaMismatchError extends Error {
   constructor(message: string) {
@@ -48,7 +53,7 @@ export function prisma(): PrismaClient {
     schemaChecked = true;
   }
   if (!globalForPrisma.prisma) {
-    globalForPrisma.prisma = new PrismaClient();
+    globalForPrisma.prisma = createPrismaClient(env().DATABASE_URL);
   }
   return globalForPrisma.prisma;
 }
