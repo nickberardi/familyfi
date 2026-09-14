@@ -39,5 +39,5 @@ test("sign-in and household pages", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByText("About")).toBeVisible();
-  await expect(page.getByText(/v0\.\d+\.\d+/)).toBeVisible();
+  await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
 });
