@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { PrismaClient } from "@prisma/client";
 import { buildDatabaseUrl } from "@/server/database-url";
+import { createPrismaClient } from "@/server/db";
 import { resetEnvCacheForTests } from "@/server/env";
 
 export const TEST_DB_NAME = "familyfi_test";
@@ -72,7 +72,7 @@ export async function ensureTestDatabase() {
     DB_SSL_MODE: process.env.DB_SSL_MODE,
     DB_SSL_ROOT_CERT: process.env.DB_SSL_ROOT_CERT,
   });
-  const admin = new PrismaClient({ datasources: { db: { url: adminUrl } } });
+  const admin = createPrismaClient(adminUrl);
   try {
     await admin.$connect();
   } catch (error) {

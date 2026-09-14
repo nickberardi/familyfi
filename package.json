@@ -5,7 +5,7 @@
   "license": "BUSL-1.1",
   "packageManager": "pnpm@10.15.1",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   },
   "scripts": {
     "dev": "node scripts/with-env.mjs next dev --port 3000",
@@ -22,8 +22,10 @@
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
-    "@prisma/client": "^6.19.3",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "next": "16.3.5",
+    "pg": "^8.23.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "swagger-ui-react": "^5.32.15",
@@ -35,12 +37,13 @@
     "@redocly/cli": "^2.52.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^26",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/swagger-ui-react": "^5.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
-    "prisma": "^6.19.3",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5",
