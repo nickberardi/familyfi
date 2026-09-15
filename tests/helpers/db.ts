@@ -55,6 +55,7 @@ export async function createFamilyGroup(name = "Betsy", role: FamilyRole = Famil
       kind: GroupKind.family,
       name,
       familyRole: role,
+      mode: "scheduled",
       scheduleEnabled: true,
       scheduleDays: [1, 2, 3, 4, 5],
       scheduleStart: "21:30",

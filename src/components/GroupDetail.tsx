@@ -162,7 +162,15 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
                 if (action.onClick) {
                   return (
                     <button key={action.label} type="button" className={className} onClick={action.onClick}>
-                      {action.label === "Pause" ? "Pause schedule" : action.label === "Resume" ? "Resume schedule" : action.label}
+                      {action.label === "Pause"
+                        ? group.mode === "always"
+                          ? "Pause"
+                          : "Pause schedule"
+                        : action.label === "Resume"
+                          ? group.mode === "always"
+                            ? "Resume"
+                            : "Resume schedule"
+                          : action.label}
                     </button>
                   );
                 }
@@ -177,10 +185,10 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         {members.length === 0 ? (
           <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
             No devices assigned.
-            {group.schedule.enabled ? (
+            {group.mode === "always" || group.schedule.enabled ? (
               <>
                 {" "}
-                Bedtime cannot apply on UniFi until you{" "}
+                {group.mode === "always" ? "Always On" : "Bedtime"} cannot apply on UniFi until you{" "}
                 <Link href={`/devices?assign=${id}`} className="font-semibold text-[var(--ff-accent)]">
                   assign a device
                 </Link>

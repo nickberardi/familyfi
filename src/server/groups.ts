@@ -1,18 +1,26 @@
-import { FamilyRole, GroupKind } from "@prisma/client";
+import { FamilyRole, GroupKind, GroupMode } from "@prisma/client";
 import { isDesiredBlocked, isSuspended, type Schedule, type Suspension } from "./schedule";
 
-export function groupAccess(group: {
-  protected: boolean;
-  scheduleEnabled: boolean;
-  scheduleDays: number[];
-  scheduleStart: string | null;
-  scheduleEnd: string | null;
-  suspensionActive: boolean;
-  suspensionUntil: Date | null;
-}, now: Date, timezone: string) {
+export type GroupAccess = "available" | "blocked" | "paused" | "protected" | "always_on";
+
+export function groupAccess(
+  group: {
+    protected: boolean;
+    mode: GroupMode;
+    scheduleEnabled: boolean;
+    scheduleDays: number[];
+    scheduleStart: string | null;
+    scheduleEnd: string | null;
+    suspensionActive: boolean;
+    suspensionUntil: Date | null;
+  },
+  now: Date,
+  timezone: string,
+): GroupAccess {
   if (group.protected) return "protected";
   const suspension: Suspension = { active: group.suspensionActive, until: group.suspensionUntil };
   if (isSuspended(suspension, now)) return "paused";
+  if (group.mode === "always") return "always_on";
   const schedule: Schedule = {
     enabled: group.scheduleEnabled && Boolean(group.scheduleStart && group.scheduleEnd),
     days: group.scheduleDays,
@@ -31,6 +39,7 @@ export function publicGroup(
     monogram: string | null;
     familyRole: FamilyRole | null;
     protected: boolean;
+    mode: GroupMode;
     scheduleEnabled: boolean;
     scheduleDays: number[];
     scheduleStart: string | null;
@@ -49,9 +58,10 @@ export function publicGroup(
     monogram: group.monogram,
     familyRole: group.familyRole,
     protected: group.protected,
+    mode: group.mode,
     deviceCount: group._count?.devices ?? 0,
     schedule: {
-      enabled: group.scheduleEnabled,
+      enabled: group.mode === "scheduled" && group.scheduleEnabled,
       days: group.scheduleDays,
       start: group.scheduleStart,
       end: group.scheduleEnd,

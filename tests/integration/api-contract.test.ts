@@ -156,6 +156,36 @@ describe("v1 API contracts", () => {
     expect(device.groupId).toBeNull();
   });
 
+  it("pauses an Always group without schedule", async () => {
+    const auth = await signedIn();
+    const created = await createGroup(
+      request("/api/v1/groups", {
+        method: "POST",
+        auth,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "family", name: "Always Kid", familyRole: "child" }),
+      }),
+    );
+    expect(created.status).toBe(201);
+    const groupBody = (await created.json()) as { group: { id: string; mode: string; access: string } };
+    expect(groupBody.group.mode).toBe("always");
+    expect(groupBody.group.access).toBe("always_on");
+
+    const paused = await pause(
+      request(`/api/v1/groups/${groupBody.group.id}/pause`, {
+        method: "POST",
+        auth,
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
+      { params: Promise.resolve({ id: groupBody.group.id }) },
+    );
+    expect(paused.status).toBe(200);
+    const pausedBody = (await paused.json()) as { group: { access: string; mode: string } };
+    expect(pausedBody.group.access).toBe("paused");
+    expect(pausedBody.group.mode).toBe("always");
+  });
+
   it("rejects pause on a protected group", async () => {
     const auth = await signedIn();
     const created = await createGroup(

@@ -1,4 +1,4 @@
-export type GroupAccess = "available" | "blocked" | "paused" | "protected";
+export type GroupAccess = "available" | "blocked" | "paused" | "protected" | "always_on";
 
 export type Group = {
   id: string;
@@ -7,6 +7,7 @@ export type Group = {
   monogram: string | null;
   familyRole: "child" | "teen" | "adult" | null;
   protected: boolean;
+  mode: "always" | "scheduled";
   deviceCount: number;
   schedule: { enabled: boolean; days: number[]; start: string | null; end: string | null };
   suspension: { active: boolean; until: string | null };

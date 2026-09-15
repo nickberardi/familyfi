@@ -39,6 +39,7 @@ export async function PUT(request: Request, ctx: Ctx) {
     const group = await prisma().group.update({
       where: { id },
       data: {
+        mode: parsed.data.enabled ? "scheduled" : "always",
         scheduleEnabled: parsed.data.enabled,
         scheduleDays: parsed.data.days,
         scheduleStart: parsed.data.start,

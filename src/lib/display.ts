@@ -3,7 +3,8 @@ import type { Group } from "./types";
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export function accessLabel(access: string): string {
-  if (access === "paused") return "Schedule paused";
+  if (access === "paused") return "Paused";
+  if (access === "always_on") return "Always on · Internet blocked";
   if (access === "blocked") return "Internet blocked (bedtime)";
   if (access === "protected") return "Protected — FamilyFi does not block";
   return "Internet available";
@@ -11,7 +12,7 @@ export function accessLabel(access: string): string {
 
 export function accessColor(access: string): string {
   if (access === "paused") return "var(--ff-paused)";
-  if (access === "blocked") return "var(--ff-danger)";
+  if (access === "always_on" || access === "blocked") return "var(--ff-danger)";
   if (access === "protected") return "var(--ff-muted)";
   return "var(--ff-on)";
 }
@@ -110,7 +111,8 @@ export function dayCaption(days: number[]): string {
   return unique.map((day) => WEEKDAYS[day] ?? "").filter(Boolean).join(", ");
 }
 
-export function scheduleCaption(group: Pick<Group, "kind" | "schedule">): string {
+export function scheduleCaption(group: Pick<Group, "kind" | "mode" | "schedule">): string {
+  if (group.mode === "always") return "always on";
   const { enabled, days, start, end } = group.schedule;
   if (!enabled || !start || !end) return "no schedule";
   const word = group.kind === "family" ? "off" : "off";
@@ -118,8 +120,10 @@ export function scheduleCaption(group: Pick<Group, "kind" | "schedule">): string
 }
 
 export function cardNoteLine(group: Group): string {
-  if (group.deviceCount === 0 && group.schedule.enabled) {
-    return "No devices · bedtime cannot apply on UniFi until you assign one";
+  if (group.deviceCount === 0 && (group.mode === "always" || group.schedule.enabled)) {
+    return group.mode === "always"
+      ? "No devices · Always On cannot apply on UniFi until you assign one"
+      : "No devices · bedtime cannot apply on UniFi until you assign one";
   }
   const devices = `${group.deviceCount} ${group.deviceCount === 1 ? "device" : "devices"}`;
   return `${devices} · ${scheduleCaption(group)}`;
@@ -132,6 +136,7 @@ export function cardStateLabel(group: Group, timezone: string): string {
     if (group.suspension.until) return `Paused until ${formatClock(new Date(group.suspension.until), timezone)}`;
     return "Paused until you resume";
   }
+  if (group.access === "always_on") return "Always on · Internet blocked";
   if (group.access === "blocked") return "Bedtime active · Internet blocked";
   return "Internet available";
 }
@@ -139,6 +144,7 @@ export function cardStateLabel(group: Group, timezone: string): string {
 export function canPauseGroup(group: Group): boolean {
   if (group.protected) return false;
   if (group.kind === "family" && group.familyRole === "adult") return false;
+  if (group.mode === "always") return true;
   return group.schedule.enabled && Boolean(group.schedule.start && group.schedule.end);
 }
 
