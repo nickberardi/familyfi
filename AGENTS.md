@@ -57,8 +57,8 @@ UniFi integration: official Network Integration API with `X-API-KEY`. Local base
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
 | `make lint` / `make typecheck` / `make build` | Checks and production build |
 | `make docker-build` | Build `familyfi:dev` |
-| `make docker-dev-up` | Locally built image, selected database mode |
-| `make docker-up` | GHCR image, bundled PostgreSQL by default |
+| `make docker-dev-up` | Locally built image plus Compose PostgreSQL |
+| `make docker-up` | GHCR image plus Compose PostgreSQL |
 | `make docker-down` | Stop without deleting volumes |
 | `make docker-smoke` | Build `familyfi:dev`, reject `designs/` in the image, run health/login against bundled-style external Postgres |
 

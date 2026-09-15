@@ -36,7 +36,7 @@ until docker exec "$db" pg_isready -U familyfi -d familyfi >/dev/null 2>&1; do
 done
 
 run_app() {
-  docker run -d --name "$app" --network "$network" -p "${host_port}:3000" \
+  docker run -d --name "$app" --network "$network" -p "${host_port}:7001" \
     -e NODE_ENV=production \
     -e DEFAULT_PASSWORD="$admin_password" \
     -e SESSION_SECRET="$session_secret" \

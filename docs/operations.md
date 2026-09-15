@@ -10,8 +10,10 @@ Back up PostgreSQL and `APP_ENCRYPTION_KEY` together (it lives in `.env` after f
 
 ## Database modes
 
-- `DB_MODE=bundled`: Compose starts PostgreSQL with a named volume. The database port is not published on the host.
-- `DB_MODE=external`: the application uses `DB_HOST` and related settings. Bundled PostgreSQL is not started and is not a health-check dependency.
+`make docker-up` and `make docker-dev-up` use `docker/docker-compose.yml`, which starts the app and PostgreSQL together. The database uses a named volume and is not published on the host. The app container is pointed at the `db` service.
+
+- `DB_MODE=bundled` (default): the app expects Compose-managed PostgreSQL (`DB_HOST=db` in that stack).
+- `DB_MODE=external`: the app uses `DB_HOST` and related settings for a server you already run (CI, container smoke, or `make setup` / `make db-dev`).
 
 Users should not edit Compose YAML to pick a server.
 

@@ -1,11 +1,7 @@
 SHELL := /bin/bash
 PNPM ?= npx --yes pnpm@10.15.1
-DB_MODE ?= bundled
 FAMILYFI_IMAGE ?= ghcr.io/nberardi/familyfi:latest
 COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.yml
-ifeq ($(DB_MODE),bundled)
-COMPOSE += -f docker/docker-compose.bundled.yml
-endif
 WITH_ENV := node scripts/with-env.mjs
 
 .PHONY: setup dev test test-api test-integration test-browser spike lint typecheck build \
