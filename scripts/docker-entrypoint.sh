@@ -1,6 +1,16 @@
 #!/bin/sh
 set -eu
 
+DATA_DIR="${FAMILYFI_DATA_DIR:-/data}"
+export FAMILYFI_DATA_DIR="$DATA_DIR"
+export FAMILYFI_ENV_PATH="${FAMILYFI_ENV_PATH:-$DATA_DIR/.env}"
+
+if [ "$(id -u)" = "0" ]; then
+  mkdir -p "$DATA_DIR"
+  chown -R familyfi:familyfi "$DATA_DIR"
+  exec gosu familyfi "$0" "$@"
+fi
+
 cd /app
 node scripts/validate-env.mjs
 DATABASE_URL="$(node scripts/print-database-url.mjs)"

@@ -76,13 +76,15 @@ describe("ensureSecrets", () => {
   });
 });
 
-  it("refuses to mint APP_ENCRYPTION_KEY in production", () => {
+  it("writes secrets under FAMILYFI_DATA_DIR", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
-    const envPath = path.join(dir, ".env");
+    const dataDir = path.join(dir, "data");
     const examplePath = path.join(dir, ".env.example");
     writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
-    writeFileSync(envPath, "DEFAULT_PASSWORD=recovery-pass\nSESSION_SECRET=abcdefghijklmnopqrstuvwxyz012345\n");
-    const env: Record<string, string | undefined> = { NODE_ENV: "production" };
-    expect(() => ensureSecrets({ envPath, examplePath, env })).toThrow(/APP_ENCRYPTION_KEY/);
+    const env: Record<string, string | undefined> = { FAMILYFI_DATA_DIR: dataDir };
+    const result = ensureSecrets({ examplePath, env });
+    expect(result.envPath).toBe(path.join(dataDir, ".env"));
+    expect(result.written).toEqual(["DEFAULT_PASSWORD", "SESSION_SECRET", "APP_ENCRYPTION_KEY"]);
+    expect(readFileSync(result.envPath, "utf8")).toContain(`APP_ENCRYPTION_KEY=${env.APP_ENCRYPTION_KEY}`);
   });
 

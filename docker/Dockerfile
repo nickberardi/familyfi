@@ -17,7 +17,7 @@ ENV PORT=7001
 ENV HOSTNAME=0.0.0.0
 # Prisma engines need OpenSSL present to pick the right binary (avoids openssl-1.1.x warn).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl ca-certificates gosu \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
@@ -30,7 +30,10 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/openapi ./openapi
 COPY --from=build /app/.env.example ./.env.example
 COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh && groupadd --system familyfi && useradd --system --gid familyfi familyfi && chown -R familyfi:familyfi /app
-USER familyfi
+RUN chmod +x /app/docker-entrypoint.sh \
+  && groupadd --system familyfi \
+  && useradd --system --gid familyfi --home-dir /app familyfi \
+  && mkdir -p /data \
+  && chown -R familyfi:familyfi /app /data
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

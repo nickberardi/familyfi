@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseEnvFile } from "./print-database-url.mjs";
+import { parseEnvFile, resolveEnvPath } from "./print-database-url.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -32,10 +32,6 @@ export function generateEncryptionKey() {
   return randomBytes(32).toString("hex");
 }
 
-export function isProductionEnv(env = process.env) {
-  return (env.NODE_ENV ?? "").trim() === "production";
-}
-
 function nonempty(value) {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : "";
 }
@@ -62,9 +58,9 @@ export function recoveryAdminBanner(password) {
 }
 
 export function ensureSecrets(options = {}) {
-  const envPath = options.envPath ?? path.join(root, ".env");
-  const examplePath = options.examplePath ?? path.join(root, ".env.example");
   const env = options.env ?? process.env;
+  const envPath = options.envPath ?? resolveEnvPath(env);
+  const examplePath = options.examplePath ?? path.join(root, ".env.example");
   const created = [];
 
   const processPassword = nonempty(env.DEFAULT_PASSWORD);
@@ -82,6 +78,7 @@ export function ensureSecrets(options = {}) {
     if (!fs.existsSync(examplePath)) {
       throw new Error(`missing ${envPath} and ${examplePath}`);
     }
+    fs.mkdirSync(path.dirname(envPath), { recursive: true });
     fs.copyFileSync(examplePath, envPath);
     created.push(".env");
   }
@@ -109,11 +106,6 @@ export function ensureSecrets(options = {}) {
 
   let key = current("APP_ENCRYPTION_KEY");
   if (!isEncryptionKeyValid(key)) {
-    if (isProductionEnv(env)) {
-      throw new Error(
-        "APP_ENCRYPTION_KEY is missing or invalid in production. Set a stable 64-hex (or 32-byte base64) APP_ENCRYPTION_KEY in the container environment and keep it with the database. Auto-generating a new key would make stored UniFi credentials undecryptable.",
-      );
-    }
     key = generateEncryptionKey();
     contents = setEnvFileKey(contents, "APP_ENCRYPTION_KEY", key);
     written.push("APP_ENCRYPTION_KEY");

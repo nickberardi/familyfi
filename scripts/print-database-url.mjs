@@ -25,8 +25,17 @@ export function parseEnvFile(contents) {
   return out;
 }
 
+/** Prefer FAMILYFI_ENV_PATH, else FAMILYFI_DATA_DIR/.env, else repo-root .env. */
+export function resolveEnvPath(env = /** @type {Record<string, string | undefined>} */ (process.env), rootDir = root) {
+  const explicit = typeof env.FAMILYFI_ENV_PATH === "string" ? env.FAMILYFI_ENV_PATH.trim() : "";
+  if (explicit) return path.resolve(explicit);
+  const dataDir = typeof env.FAMILYFI_DATA_DIR === "string" ? env.FAMILYFI_DATA_DIR.trim() : "";
+  if (dataDir) return path.join(path.resolve(dataDir), ".env");
+  return path.join(rootDir, ".env");
+}
+
 export function loadDotEnv() {
-  const envPath = path.join(root, ".env");
+  const envPath = resolveEnvPath();
   if (!fs.existsSync(envPath)) return;
   const parsed = parseEnvFile(fs.readFileSync(envPath, "utf8"));
   for (const [key, value] of Object.entries(parsed)) {
