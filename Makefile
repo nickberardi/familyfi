@@ -62,9 +62,13 @@ docker-build:
 	docker build -f docker/Dockerfile -t familyfi:dev .
 
 docker-dev-up:
+	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set DB_PASSWORD"; fi
+	node scripts/validate-env.mjs
 	FAMILYFI_IMAGE=familyfi:dev $(COMPOSE) -f docker/docker-compose.dev.yml up -d --build
 
 docker-up:
+	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set DB_PASSWORD"; fi
+	node scripts/validate-env.mjs
 	FAMILYFI_IMAGE=$(FAMILYFI_IMAGE) $(COMPOSE) up -d
 
 docker-down:

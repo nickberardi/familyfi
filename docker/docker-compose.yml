@@ -20,14 +20,14 @@ services:
     image: ${FAMILYFI_IMAGE:-ghcr.io/nickberardi/familyfi:latest}
     ports:
       - "${APP_PORT:-7001}:7001"
-    env_file:
-      - ../.env
-    volumes:
-      - ../.env:/app/.env
     environment:
       NODE_ENV: production
       PORT: "7001"
       HOSTNAME: 0.0.0.0
+      DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:?Set DEFAULT_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Set APP_ENCRYPTION_KEY in .env}
+      DB_MODE: bundled
       DB_HOST: db
       DB_PORT: ${POSTGRES_PORT:-5432}
       DB_NAME: ${POSTGRES_DB:-familyfi}
