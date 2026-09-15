@@ -14,7 +14,8 @@ import type { Group } from "@/lib/types";
 const FIELD = "rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]";
 
 function GroupEditForm({ group }: { group: Group }) {
-  const { mutate, busy } = useAppData();
+  const { mutate, busy, accounts } = useAppData();
+  const lockedRole = Boolean(accounts.find((account) => !account.recovery && account.groupId === group.id));
   const [name, setName] = useState(group.name);
   const [familyRole, setFamilyRole] = useState<"child" | "teen" | "adult">(group.familyRole ?? "child");
   const [monogram, setMonogram] = useState(group.monogram ?? "");
@@ -62,10 +63,19 @@ function GroupEditForm({ group }: { group: Group }) {
             <select
               className={FIELD}
               value={familyRole}
-              onChange={(e) => setFamilyRole(e.target.value as "child" | "teen" | "adult")}
+              disabled={lockedRole && familyRole === "adult"}
+              onChange={(e) => {
+                const role = e.target.value as "child" | "teen" | "adult";
+                if (lockedRole && role !== "adult") return;
+                setFamilyRole(role);
+              }}
             >
-              <option value="child">Child</option>
-              <option value="teen">Teen</option>
+              <option value="child" disabled={lockedRole}>
+                Child
+              </option>
+              <option value="teen" disabled={lockedRole}>
+                Teen
+              </option>
               <option value="adult">Adult</option>
             </select>
           </label>

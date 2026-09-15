@@ -70,7 +70,7 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
   const yBefore = (await editHeading.boundingBox())?.y;
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
-  await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toBeVisible();
+  await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
   expect((await editHeading.boundingBox())?.y).toBe(yBefore);
 
   await page.getByLabel(/Protected/).check();
@@ -112,12 +112,14 @@ test("device assignment updates immediately", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Devices" })).toBeVisible();
   await expect(page.getByText("Loading household…")).toHaveCount(0);
   const select = page.locator("select").first();
-  test.skip((await select.count()) === 0, "No devices in this household");
+  await expect(select, "UNIFI_MOCK household must seed devices in CI").toHaveCount(1);
   const current = await select.inputValue();
   const groups = await page.request.get("/api/v1/groups");
+  expect(groups.ok()).toBeTruthy();
   const body = (await groups.json()) as { groups: { id: string; name: string }[] };
   const target = body.groups.find((group) => group.id !== current) ?? body.groups[0];
-  if (!target) test.skip(true, "No groups to assign");
-  await select.selectOption(target.id);
-  await expect(select).toHaveValue(target.id);
+  expect(target, "UNIFI_MOCK household must seed groups in CI").toBeTruthy();
+  await select.selectOption(target!.id);
+  await expect(select).toHaveValue(target!.id);
+  await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
 });

@@ -1,4 +1,4 @@
-import type { Device, Group } from "@/lib/types";
+import type { Account, Device, Group, UnifiSettings } from "@/lib/types";
 
 export type HouseholdLists = {
   groups: Group[];
@@ -18,6 +18,8 @@ export type MutationPayload = {
   group?: Group;
   device?: Device;
   household?: HouseholdPublic;
+  account?: Account;
+  unifi?: UnifiSettings;
   removedGroupId?: string;
 };
 
