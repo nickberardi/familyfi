@@ -27,6 +27,10 @@ Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a te
 
 `make setup` will not overwrite an existing `.env`.
 
+### Dummy household (no UniFi console)
+
+Set `UNIFI_MOCK=1` in `.env` and restart `make dev`. The app fakes the Network Integration API with synthetic fixtures, seeds a small household (Pat / Betsy / Sam / Living Room, three devices), and encrypts the dummy key `mock-unifi-key` so Settings looks connected. Sign in as `admin` or `pat` (same `DEFAULT_PASSWORD`). Use this for UI work (adding a user, jittery buttons, layout). Turn the flag off before pointing at a real gateway. Mocks do not prove firewall enforcement.
+
 If Docker is unavailable, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`.
 
 Phones on the LAN should use the host's LAN address, not `localhost`. HTTPS is required for a deployed PWA and for secure cookies in production.
@@ -45,3 +49,5 @@ Email magic links and self-serve email reset from the sign-in prototype are not 
 ## UniFi connection (application)
 
 Paste the Network Integration API key in Settings (`PUT /api/v1/settings/unifi`). The app encrypts it with `APP_ENCRYPTION_KEY`. For a local console with a private CA, send `tlsInsecure: true`. Choose `manageAllNetworks: true` or `managedNetworkIds: ["…"]` so discovery/quarantine only watch those VLANs; the default is none until you pick. The spike CLI env key is not used by the running app.
+
+With `UNIFI_MOCK=1` (never in production), Settings Test/Save talk to the in-process mock. A dummy key of at least 8 characters is enough; the seeded household already uses `mock-unifi-key` and `https://127.0.0.1/proxy/network/integration`.

@@ -18,6 +18,7 @@ Human-facing product docs live in [README.md](README.md) and `docs/`. This file 
 - Never modify, disable, delete, or reorder administrator-created policies. Never call the UniFi policy ordering PUT. Own policies by recorded IDs and creation evidence, not a `FamilyFi ` name prefix alone.
 - All UniFi calls are server-side. Do not put keys or UniFi clients in the browser.
 - Do not create UniFi Object Manager groups. Operators paste an Integration API key in Settings; FamilyFi encrypts it with `APP_ENCRYPTION_KEY`.
+- `UNIFI_MOCK=1` is local-only dummy UniFi plus a seeded household for UI work. Never treat it as enforcement. It is ignored when `NODE_ENV=production`.
 - Pause suspends schedule enforcement (`enabled: false` on app-owned policies, schedule preserved). Resume is `enabled: true`; bedtime may still block. Recurring bedtime is the UniFi policy `schedule`, not clock-driven enable/disable at window edges.
 - Protection is per group. Do not expose controls that bypass protection.
 - Unassigned devices are **quarantined** in the API and tests; the Devices UI may say **Unassigned**. Discovery and quarantine only include clients on managed VLANs.

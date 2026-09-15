@@ -1,8 +1,10 @@
 import { PolicyOwnerScope, type Household } from "@prisma/client";
 import { decryptSecret } from "../crypto";
+import { unifiMockEnabled } from "../env";
 import { UnifiConfigError } from "./errors";
 import { HttpUnifiClient, type UnifiClient } from "./client";
 import { resolveIntegrationBase } from "./base-url";
+import { getSharedDevMockClient } from "./dev-mock";
 
 export function connectionIdentity(household: Household): string {
   const site = household.unifiSiteId ?? "site";
@@ -16,6 +18,7 @@ export function clientForHousehold(household: Household): UnifiClient {
   if (!household.unifiKeyCiphertext || !household.unifiKeyIv || !household.unifiKeyAuthTag) {
     throw new UnifiConfigError("UniFi is not configured.");
   }
+  if (unifiMockEnabled()) return getSharedDevMockClient();
   const apiKey = decryptSecret({
     ciphertext: Buffer.from(household.unifiKeyCiphertext),
     iv: Buffer.from(household.unifiKeyIv),
@@ -35,6 +38,7 @@ export function probeClient(input: {
   consoleId?: string;
   tlsInsecure?: boolean;
 }): UnifiClient {
+  if (unifiMockEnabled()) return getSharedDevMockClient();
   resolveIntegrationBase({ baseUrl: input.baseUrl, consoleId: input.consoleId });
   return new HttpUnifiClient({
     apiKey: input.apiKey,

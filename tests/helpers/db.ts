@@ -2,6 +2,7 @@ import { AssignmentState, GroupKind, FamilyRole } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { ensureHousehold, ensureRecoveryAccount } from "@/server/auth";
 import { setAutoReconcileForTests, setReconcileClientForTests } from "@/server/reconciliation";
+import { resetDevMockClientForTests } from "@/server/unifi/dev-mock";
 
 export const SITE_ID = "11111111-1111-4111-8111-111111111111";
 export const INTERNAL_ZONE = "33333333-3333-4333-8333-333333333333";
@@ -13,6 +14,7 @@ export const IOT_NETWORK = "22222222-2222-4222-8222-222222222223";
 export async function resetDatabase() {
   setAutoReconcileForTests(false);
   setReconcileClientForTests(undefined);
+  resetDevMockClientForTests();
   const db = prisma();
   await db.changeResult.deleteMany();
   await db.syncRun.deleteMany();

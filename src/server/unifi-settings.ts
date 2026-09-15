@@ -1,5 +1,6 @@
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
+import { unifiMockEnabled } from "./env";
 import { UnifiConfigError } from "./unifi/errors";
 import { clientForHousehold, connectionIdentity, probeClient } from "./unifi/connection";
 import { enqueueChange } from "./changes";
@@ -66,6 +67,10 @@ export async function saveUnifiConnection(input: {
 }) {
   const probed = await testUnifiConnection(input);
   const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const scopedInput =
+    unifiMockEnabled() && input.manageAllNetworks === undefined && input.managedNetworkIds === undefined
+      ? { ...input, manageAllNetworks: true }
+      : input;
   const nextIdentity = input.consoleId
     ? `cloud:${input.consoleId}:${probed.site.id}`
     : `local:${input.baseUrl}:${probed.site.id}`;
@@ -87,7 +92,7 @@ export async function saveUnifiConnection(input: {
     }
   }
   const known = new Set(probed.networks.map((network) => network.id));
-  const scope = resolveAndValidateScope(input, household, known);
+  const scope = resolveAndValidateScope(scopedInput, household, known);
   const secret = encryptSecret(input.apiKey);
   await prisma().household.update({
     where: { id: "default" },

@@ -2,6 +2,15 @@ export { resolveIntegrationBase, localIntegrationUrlExample } from "./base-url";
 export { HttpUnifiClient, type UnifiClient } from "./client";
 export { UnifiConfigError, UnifiHttpError, UnifiTimeoutError } from "./errors";
 export { MockUnifiClient, createMockUnifiState } from "./mock";
+export {
+  createFixtureUnifiClient,
+  createFixtureUnifiState,
+  getSharedDevMockClient,
+  resetDevMockClientForTests,
+  DEV_MOCK_API_KEY,
+  DEV_MOCK_BASE_URL,
+  DEV_MOCK_SITE_ID,
+} from "./dev-mock";
 export { mapClientsToZones, selectExternalZone, groupMacsBySourceZone } from "./mapping";
 export { internetBlockPolicy, spikePolicyName, toPolicyUpdate, isFamPolicyName, INTERNET_BLOCK_ACTION } from "./payloads";
 export { quarantinePolicyName, groupPolicyName } from "./names";
