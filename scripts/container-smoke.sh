@@ -23,7 +23,7 @@ docker run -d --name "$db" --network "$network" \
   -e POSTGRES_USER=familyfi \
   -e POSTGRES_PASSWORD="$password" \
   -e POSTGRES_DB=familyfi \
-  postgres:16-alpine >/dev/null
+  postgres:18-alpine >/dev/null
 
 i=0
 until docker exec "$db" pg_isready -U familyfi -d familyfi >/dev/null 2>&1; do

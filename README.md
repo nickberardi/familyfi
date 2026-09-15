@@ -34,7 +34,7 @@ Paste a UniFi Network Integration API key in Settings. FamilyFi encrypts it at r
 
 - A UniFi console with the Network Integration API (local console URL or cloud connector)
 - Network access from the FamilyFi host to that API over HTTPS
-- Docker for the recommended install (app + bundled PostgreSQL 16), or Node.js 20+ and pnpm 10 if you run from source
+- Docker for the recommended install (app + bundled PostgreSQL 18), or Node.js 20+ and pnpm 10 if you run from source
 - A box on the LAN. Do not install FamilyFi on the UniFi gateway itself.
 
 Phones on the LAN should use the host’s LAN address, not `localhost`. HTTPS is required for a deployed PWA and for secure cookies in production.
