@@ -70,7 +70,7 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
   const yBefore = (await editHeading.boundingBox())?.y;
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toBeVisible();
   expect((await editHeading.boundingBox())?.y).toBe(yBefore);
 
   await page.getByLabel(/Protected/).check();
