@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ${FAMILYFI_IMAGE:-ghcr.io/nberardi/familyfi:latest}
+    image: ${FAMILYFI_IMAGE:-ghcr.io/nickberardi/familyfi:latest}
     ports:
       - "${APP_PORT:-7001}:7001"
     env_file:
