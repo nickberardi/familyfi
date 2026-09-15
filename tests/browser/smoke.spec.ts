@@ -41,3 +41,27 @@ test("sign-in and household pages", async ({ page }) => {
   await expect(page.getByText("About")).toBeVisible();
   await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
 });
+
+test("create person lands on a seeded detail page that can be edited", async ({ page }) => {
+  test.skip(!password, "DEFAULT_PASSWORD is required for browser tests");
+  const login = await page.request.post("/api/v1/auth/login", {
+    data: { username, password, client: "browser" },
+  });
+  if (!login.ok()) {
+    const body = (await login.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(`login failed (${login.status()}): ${body.error?.message ?? "no error body"}`);
+  }
+
+  const name = `QA ${test.info().project.name} ${Date.now()}`;
+  await page.goto("/family/new");
+  await page.getByLabel("Name").fill(name);
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page).toHaveURL(/\/family\/[^/]+$/);
+  await expect(page.getByText("Group not found.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+
+  const renamed = `${name} Jr`;
+  await page.getByLabel("Name").fill(renamed);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
+});

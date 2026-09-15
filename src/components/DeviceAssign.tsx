@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { assignDeviceLocally } from "@/lib/household-state";
 import type { Device, Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 
@@ -29,7 +30,14 @@ export function DeviceAssignSelect({
       value={device.groupId ?? ""}
       onChange={(event) => {
         const groupId = event.target.value || null;
-        void mutate(() => api(assignPath(device.mac), { method: "PUT", body: JSON.stringify({ groupId }) }));
+        void mutate(
+          () =>
+            api<{ device: Device; change: { changeId: string } }>(assignPath(device.mac), {
+              method: "PUT",
+              body: JSON.stringify({ groupId }),
+            }),
+          (state) => assignDeviceLocally(state, device.mac, groupId),
+        );
       }}
     >
       <option value="">Unassigned</option>

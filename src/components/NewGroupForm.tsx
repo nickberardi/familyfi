@@ -8,7 +8,7 @@ import type { Group } from "@/lib/types";
 
 export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
   const router = useRouter();
-  const { mutate } = useAppData();
+  const { mutate, busy } = useAppData();
   const [name, setName] = useState("");
   const [familyRole, setFamilyRole] = useState<"child" | "teen" | "adult">("child");
   const [monogram, setMonogram] = useState("");
@@ -16,8 +16,8 @@ export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    await mutate(async () => {
-      const result = await api<{ group: Group; change: { changeId: string } }>("/api/v1/groups", {
+    const result = await mutate(() =>
+      api<{ group: Group; change: { changeId: string } }>("/api/v1/groups", {
         method: "POST",
         body: JSON.stringify({
           kind,
@@ -26,10 +26,10 @@ export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
           monogram: monogram || undefined,
           protected: prot,
         }),
-      });
-      router.replace(kind === "family" ? `/family/${result.group.id}` : `/things/${result.group.id}`);
-      return result;
-    });
+      }),
+    );
+    if (!result?.group) return;
+    router.replace(kind === "family" ? `/family/${result.group.id}` : `/things/${result.group.id}`);
   }
 
   return (
@@ -58,7 +58,7 @@ export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
         <input type="checkbox" checked={prot} onChange={(e) => setProt(e.target.checked)} />
         Protected — FamilyFi will not block this group
       </label>
-      <button type="submit" className="rounded-[9px] bg-[var(--ff-accent)] py-3 text-[16px] font-semibold text-white">
+      <button type="submit" disabled={busy} className="rounded-[9px] bg-[var(--ff-accent)] py-3 text-[16px] font-semibold text-white disabled:opacity-50">
         Create
       </button>
     </form>

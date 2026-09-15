@@ -9,13 +9,96 @@ import { useAppData } from "@/components/AppDataProvider";
 import { PauseSheet } from "@/components/PauseSheet";
 import { ScheduleBar } from "@/components/GroupCard";
 import { groupActions } from "@/components/group-actions";
+import type { Group } from "@/lib/types";
+
+const FIELD = "rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]";
+
+function GroupEditForm({ group }: { group: Group }) {
+  const { mutate, busy } = useAppData();
+  const [name, setName] = useState(group.name);
+  const [familyRole, setFamilyRole] = useState<"child" | "teen" | "adult">(group.familyRole ?? "child");
+  const [monogram, setMonogram] = useState(group.monogram ?? "");
+  const [prot, setProt] = useState(group.protected);
+
+  const trimmed = name.trim();
+  const nextMonogram = monogram.trim() || null;
+  const dirty =
+    trimmed !== group.name ||
+    prot !== group.protected ||
+    (group.kind === "family" ? familyRole !== group.familyRole : nextMonogram !== group.monogram);
+
+  async function onSave() {
+    if (!trimmed || !dirty) return;
+    await mutate(() =>
+      api<{ group: Group; change: { changeId: string } }>(`/api/v1/groups/${group.id}`, {
+        method: "PUT",
+        body: JSON.stringify(
+          group.kind === "family"
+            ? { name: trimmed, familyRole, protected: prot }
+            : { name: trimmed, monogram: nextMonogram, protected: prot },
+        ),
+      }),
+    );
+  }
+
+  return (
+    <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
+      <h2 className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-4 text-[14px] font-semibold">Edit</h2>
+      <form
+        className="flex flex-col gap-3 p-[18px]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSave();
+        }}
+      >
+        <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
+          Name
+          <input required className={FIELD} value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        {group.kind === "family" ? (
+          <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
+            Role
+            <select
+              className={FIELD}
+              value={familyRole}
+              onChange={(e) => setFamilyRole(e.target.value as "child" | "teen" | "adult")}
+            >
+              <option value="child">Child</option>
+              <option value="teen">Teen</option>
+              <option value="adult">Adult</option>
+            </select>
+          </label>
+        ) : (
+          <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
+            Monogram
+            <input maxLength={4} className={FIELD} value={monogram} onChange={(e) => setMonogram(e.target.value)} />
+          </label>
+        )}
+        <label className="flex items-center gap-2 text-[14px]">
+          <input type="checkbox" checked={prot} onChange={(e) => setProt(e.target.checked)} />
+          Protected — FamilyFi will not block this group
+        </label>
+        <button
+          type="submit"
+          disabled={busy || !dirty || !trimmed}
+          className="self-start rounded-[9px] bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white disabled:opacity-50"
+        >
+          Save
+        </button>
+      </form>
+    </section>
+  );
+}
 
 export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
   const router = useRouter();
-  const { groups, devices, household, mutate } = useAppData();
+  const { groups, devices, household, mutate, loading } = useAppData();
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
-  if (!group) return <p className="p-6 text-[14px] text-[var(--ff-muted)]">Group not found.</p>;
+  if (!group) {
+    if (loading) return null;
+    return <p className="p-6 text-[14px] text-[var(--ff-muted)]">Group not found.</p>;
+  }
   const members = devices.filter((device) => device.groupId === id);
   const timezone = household?.timezone ?? "America/New_York";
   const enabled = group.schedule.enabled && group.schedule.start && group.schedule.end;
@@ -38,6 +121,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           {cardStateLabel(group, timezone)}
         </p>
       </header>
+      <GroupEditForm key={group.id} group={group} />
       <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
         <h2 className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-4 text-[14px] font-semibold">Current state</h2>
         <div className="p-[18px]">
@@ -109,7 +193,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           void mutate(async () => {
             const result = await api<{ change: { changeId: string } }>(`/api/v1/groups/${id}`, { method: "DELETE" });
             router.replace(kind === "family" ? "/family" : "/things");
-            return result;
+            return { ...result, removedGroupId: id };
           })
         }
       >
