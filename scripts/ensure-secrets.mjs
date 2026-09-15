@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseEnvFile } from "./print-database-url.mjs";
+import { parseEnvFile, resolveEnvPath } from "./print-database-url.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -58,9 +58,9 @@ export function recoveryAdminBanner(password) {
 }
 
 export function ensureSecrets(options = {}) {
-  const envPath = options.envPath ?? path.join(root, ".env");
-  const examplePath = options.examplePath ?? path.join(root, ".env.example");
   const env = options.env ?? process.env;
+  const envPath = options.envPath ?? resolveEnvPath(env);
+  const examplePath = options.examplePath ?? path.join(root, ".env.example");
   const created = [];
 
   const processPassword = nonempty(env.DEFAULT_PASSWORD);
@@ -78,6 +78,7 @@ export function ensureSecrets(options = {}) {
     if (!fs.existsSync(examplePath)) {
       throw new Error(`missing ${envPath} and ${examplePath}`);
     }
+    fs.mkdirSync(path.dirname(envPath), { recursive: true });
     fs.copyFileSync(examplePath, envPath);
     created.push(".env");
   }

@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+DATA_DIR="/var/lib/familyfi/data"
+
+if [ "$(id -u)" = "0" ]; then
+  mkdir -p "$DATA_DIR"
+  chown -R familyfi:familyfi "$DATA_DIR"
+  exec gosu familyfi "$0" "$@"
+fi
+
 cd /app
 node scripts/validate-env.mjs
 DATABASE_URL="$(node scripts/print-database-url.mjs)"

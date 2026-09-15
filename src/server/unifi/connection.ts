@@ -19,11 +19,22 @@ export function clientForHousehold(household: Household): UnifiClient {
     throw new UnifiConfigError("UniFi is not configured.");
   }
   if (unifiMockEnabled()) return getSharedDevMockClient();
-  const apiKey = decryptSecret({
-    ciphertext: Buffer.from(household.unifiKeyCiphertext),
-    iv: Buffer.from(household.unifiKeyIv),
-    authTag: Buffer.from(household.unifiKeyAuthTag),
-  });
+  let apiKey: string;
+  try {
+    apiKey = decryptSecret({
+      ciphertext: Buffer.from(household.unifiKeyCiphertext),
+      iv: Buffer.from(household.unifiKeyIv),
+      authTag: Buffer.from(household.unifiKeyAuthTag),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/authenticate data|Unsupported state/i.test(message)) {
+      throw new UnifiConfigError(
+        "Could not decrypt the stored UniFi API key. APP_ENCRYPTION_KEY no longer matches the key used when it was saved. Restore the previous APP_ENCRYPTION_KEY, or set a stable one and re-enter the API key in Settings.",
+      );
+    }
+    throw error;
+  }
   return new HttpUnifiClient({
     apiKey,
     baseUrl: household.unifiBaseUrl ?? undefined,
