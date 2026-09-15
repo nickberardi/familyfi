@@ -38,7 +38,7 @@ function isActive(pathname: string, href: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, devices, sync, unifi, mutate, loading, error, notice, busy } = useAppData();
+  const { session, devices, sync, unifi, mutate, loading, error, notice, busy, dismissFeedback } = useAppData();
   const unassignedCount = devices.filter((device) => device.assignment === "quarantined" && device.inScope).length;
   const coverageFailing = (sync?.failingCount ?? 0) > 0;
   const deviceAttention = noMembersAttention(sync?.issues ?? []);
@@ -188,10 +188,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {error || notice ? (
             <div
               role={error ? "alert" : "status"}
-              className="pointer-events-auto max-w-lg rounded-[9px] border border-[var(--ff-line)] bg-white px-3.5 py-2.5 text-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]"
+              className="pointer-events-auto flex max-w-lg items-start gap-3 rounded-[9px] border border-[var(--ff-line)] bg-white px-3.5 py-2.5 text-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]"
               style={{ color: error ? "var(--ff-danger)" : "var(--ff-on)" }}
             >
-              {error || notice}
+              <span className="min-w-0 flex-1">{error || notice}</span>
+              <button
+                type="button"
+                onClick={dismissFeedback}
+                className="flex-none rounded px-1.5 text-[14px] font-semibold text-[var(--ff-muted)] hover:text-[var(--ff-ink)]"
+                aria-label="Dismiss"
+              >
+                Dismiss
+              </button>
             </div>
           ) : null}
         </div>

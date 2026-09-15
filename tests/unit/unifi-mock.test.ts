@@ -44,6 +44,7 @@ describe("UNIFI_MOCK", () => {
     expect(unifiMockEnabled({ NODE_ENV: "test", UNIFI_MOCK: "true" })).toBe(true);
     expect(unifiMockRequested({ NODE_ENV: "production", UNIFI_MOCK: "1" })).toBe(true);
     expect(unifiMockEnabled({ NODE_ENV: "production", UNIFI_MOCK: "1" })).toBe(false);
+    expect(unifiMockEnabled({ NODE_ENV: "production", CI: "1", UNIFI_MOCK: "1" })).toBe(true);
     expect(loadEnv({ ...validEnv, NODE_ENV: "production", UNIFI_MOCK: "1" }).UNIFI_MOCK).toBe(false);
     expect(loadEnv({ ...validEnv, NODE_ENV: "test", UNIFI_MOCK: "1" }).UNIFI_MOCK).toBe(true);
   });

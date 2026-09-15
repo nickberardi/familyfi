@@ -10,6 +10,7 @@ import {
   type HouseholdPublic,
   type MutationPayload,
 } from "@/lib/household-state";
+import { beginMutate, canCommitMutate, type MutateGate } from "@/lib/mutate-gate";
 import type { Account, Device, Group, Session, SyncStatus, UnifiSettings } from "@/lib/types";
 
 type Household = HouseholdPublic;
@@ -30,6 +31,7 @@ type AppData = {
     run: () => Promise<unknown>,
     optimistic?: (state: HouseholdLists) => HouseholdLists,
   ) => Promise<MutationPayload | undefined>;
+  dismissFeedback: () => void;
   busy: boolean;
 };
 
@@ -50,6 +52,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const listsRef = useRef<HouseholdLists>({ groups: [], devices: [] });
   const loadGen = useRef(0);
   const followGen = useRef(0);
+  const mutateGate = useRef<MutateGate>({ latest: 0 });
+  const busyCount = useRef(0);
+
+  const bumpBusy = useCallback((delta: number) => {
+    busyCount.current = Math.max(0, busyCount.current + delta);
+    setBusy(busyCount.current > 0);
+  }, []);
+
+  const dismissFeedback = useCallback(() => {
+    setError("");
+    setNotice("");
+  }, []);
 
   const commitLists = useCallback((next: HouseholdLists) => {
     listsRef.current = next;
@@ -121,24 +135,38 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setError("");
       setNotice("");
       const previous = listsRef.current;
-      setBusy(true);
+      const token = beginMutate(mutateGate.current);
+      bumpBusy(1);
       try {
         if (optimistic) {
           flushSync(() => commitLists(optimistic(previous)));
         }
         const result = asMutationPayload(await run());
+        if (!canCommitMutate(mutateGate.current, token)) {
+          return result;
+        }
         loadGen.current += 1;
         followGen.current += 1;
-        const token = followGen.current;
+        const followToken = followGen.current;
         flushSync(() => {
           commitLists(applyMutationResult(listsRef.current, result));
           if (result.household) setHousehold(result.household);
+          if (result.unifi) setUnifi(result.unifi);
+          if (result.account) {
+            setAccounts((current) => {
+              const index = current.findIndex((item) => item.id === result.account!.id);
+              if (index === -1) return [...current, result.account!];
+              const next = current.slice();
+              next[index] = result.account!;
+              return next;
+            });
+          }
         });
         setNotice("Saved.");
         if (result.change?.changeId) {
           void waitForChange(result.change.changeId)
             .then(async (change) => {
-              if (token !== followGen.current) return;
+              if (followToken !== followGen.current) return;
               if (change.status === "failed") setError(change.error ?? "That change did not apply.");
               else if (change.status === "partial") setNotice(change.error ?? "Reconcile finished with issues.");
               else if (change.status === "pending") setNotice(change.error ?? "Still applying.");
@@ -148,21 +176,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               }
               await reload();
             })
-            .catch((err: Error) => {
-              if (token !== followGen.current) return;
-              setError(err.message);
+            .catch(async (err: Error) => {
+              if (followToken !== followGen.current) return;
+              // Desired state is already in Postgres — keep Saved., soft Sync warning, still reload.
+              setError("");
+              setNotice(`Saved. Sync follow-up: ${err.message}`);
+              await reload();
             });
         }
         return result;
       } catch (err) {
-        flushSync(() => commitLists(previous));
-        setError(err instanceof Error ? err.message : "Request failed.");
+        if (canCommitMutate(mutateGate.current, token)) {
+          flushSync(() => commitLists(previous));
+          setError(err instanceof Error ? err.message : "Request failed.");
+        }
         return undefined;
       } finally {
-        setBusy(false);
+        bumpBusy(-1);
       }
     },
-    [commitLists, reload],
+    [bumpBusy, commitLists, reload],
   );
 
   const value = useMemo(
@@ -179,9 +212,25 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       notice,
       reload,
       mutate,
+      dismissFeedback,
       busy,
     }),
-    [session, groups, devices, sync, unifi, household, accounts, loading, error, notice, reload, mutate, busy],
+    [
+      session,
+      groups,
+      devices,
+      sync,
+      unifi,
+      household,
+      accounts,
+      loading,
+      error,
+      notice,
+      reload,
+      mutate,
+      dismissFeedback,
+      busy,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

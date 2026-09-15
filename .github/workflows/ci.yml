@@ -78,6 +78,7 @@ jobs:
       POSTGRES_USER: familyfi
       POSTGRES_PASSWORD: familyfi-ci
       PLAYWRIGHT_PORT: "3100"
+      UNIFI_MOCK: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

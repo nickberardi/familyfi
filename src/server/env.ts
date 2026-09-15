@@ -39,9 +39,13 @@ export function unifiMockRequested(source: Record<string, string | undefined> = 
   return truthyFlag(read(source, "UNIFI_MOCK"));
 }
 
-/** Opt-in UniFi stand-in for local UI work. Never enabled in production. */
+/** Opt-in UniFi stand-in for local UI work. Never enabled in production unless CI opts in. */
 export function unifiMockEnabled(source: Record<string, string | undefined> = process.env): boolean {
-  if (source.NODE_ENV === "production") return false;
+  if (source.NODE_ENV === "production") {
+    // `next start` forces production; browser CI still needs the mock household.
+    if (!(truthyFlag(read(source, "CI")) && unifiMockRequested(source))) return false;
+    return true;
+  }
   return unifiMockRequested(source);
 }
 
