@@ -1,16 +1,18 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { ApiError, api, waitForChange } from "@/lib/api";
+import {
+  applyMutationResult,
+  asMutationPayload,
+  type HouseholdLists,
+  type HouseholdPublic,
+  type MutationPayload,
+} from "@/lib/household-state";
 import type { Account, Device, Group, Session, SyncStatus, UnifiSettings } from "@/lib/types";
 
-type Household = {
-  timezone: string;
-  revision: number;
-  quarantineEnforced: boolean;
-  quarantineObservedEnabled: boolean | null;
-  quarantinePolicyCount: number;
-};
+type Household = HouseholdPublic;
 
 type AppData = {
   session: Session | null;
@@ -24,7 +26,10 @@ type AppData = {
   error: string;
   notice: string;
   reload: () => Promise<void>;
-  mutate: (run: () => Promise<{ change?: { changeId: string } }>) => Promise<void>;
+  mutate: (
+    run: () => Promise<unknown>,
+    optimistic?: (state: HouseholdLists) => HouseholdLists,
+  ) => Promise<MutationPayload | undefined>;
   busy: boolean;
 };
 
@@ -42,8 +47,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const listsRef = useRef<HouseholdLists>({ groups: [], devices: [] });
+  const loadGen = useRef(0);
+  const followGen = useRef(0);
+
+  const commitLists = useCallback((next: HouseholdLists) => {
+    listsRef.current = next;
+    setGroups(next.groups);
+    setDevices(next.devices);
+  }, []);
 
   const reload = useCallback(async () => {
+    const gen = ++loadGen.current;
     let sessionRes: { session: Session };
     try {
       sessionRes = await api<{ session: Session }>("/api/v1/auth/session");
@@ -61,6 +76,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       api<{ household: Household }>("/api/v1/settings/household"),
       api<{ accounts: Account[] }>("/api/v1/accounts"),
     ]);
+    if (gen !== loadGen.current) return;
+    listsRef.current = { groups: groupsRes.groups, devices: devicesRes.devices };
     setSession(sessionRes.session);
     setGroups(groupsRes.groups);
     setDevices(devicesRes.devices);
@@ -93,28 +110,59 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   }, [reload]);
 
+  useEffect(() => {
+    if (!notice || error) return;
+    const timer = window.setTimeout(() => setNotice(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice, error]);
+
   const mutate = useCallback(
-    async (run: () => Promise<{ change?: { changeId: string } }>) => {
+    async (run: () => Promise<unknown>, optimistic?: (state: HouseholdLists) => HouseholdLists) => {
       setError("");
       setNotice("");
+      const previous = listsRef.current;
       setBusy(true);
       try {
-        const result = await run();
-        if (result.change?.changeId) {
-          const change = await waitForChange(result.change.changeId);
-          if (change.status === "failed") setError(change.error ?? "That change did not apply.");
-          else if (change.status === "partial") setNotice(change.error ?? "Reconcile finished with issues.");
-          else if (change.status === "pending") setNotice(change.error ?? "Still applying.");
-          else setNotice("Saved. The gateway has the current desired state.");
+        if (optimistic) {
+          flushSync(() => commitLists(optimistic(previous)));
         }
-        await reload();
+        const result = asMutationPayload(await run());
+        loadGen.current += 1;
+        followGen.current += 1;
+        const token = followGen.current;
+        flushSync(() => {
+          commitLists(applyMutationResult(listsRef.current, result));
+          if (result.household) setHousehold(result.household);
+        });
+        setNotice("Saved.");
+        if (result.change?.changeId) {
+          void waitForChange(result.change.changeId)
+            .then(async (change) => {
+              if (token !== followGen.current) return;
+              if (change.status === "failed") setError(change.error ?? "That change did not apply.");
+              else if (change.status === "partial") setNotice(change.error ?? "Reconcile finished with issues.");
+              else if (change.status === "pending") setNotice(change.error ?? "Still applying.");
+              else {
+                setError("");
+                setNotice("Saved. The gateway has the current desired state.");
+              }
+              await reload();
+            })
+            .catch((err: Error) => {
+              if (token !== followGen.current) return;
+              setError(err.message);
+            });
+        }
+        return result;
       } catch (err) {
+        flushSync(() => commitLists(previous));
         setError(err instanceof Error ? err.message : "Request failed.");
+        return undefined;
       } finally {
         setBusy(false);
       }
     },
-    [reload],
+    [commitLists, reload],
   );
 
   const value = useMemo(

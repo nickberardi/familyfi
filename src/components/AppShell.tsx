@@ -181,17 +181,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="ff-main flex min-w-0 flex-col pb-20 md:pb-0">
+        <div
+          className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4 md:left-[232px] md:top-4"
+          aria-live="polite"
+        >
+          {error || notice ? (
+            <div
+              role={error ? "alert" : "status"}
+              className="pointer-events-auto max-w-lg rounded-[9px] border border-[var(--ff-line)] bg-white px-3.5 py-2.5 text-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]"
+              style={{ color: error ? "var(--ff-danger)" : "var(--ff-on)" }}
+            >
+              {error || notice}
+            </div>
+          ) : null}
+        </div>
         {loading ? <p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">Loading household…</p> : null}
-        {error ? (
-          <div className="mx-4 mt-4 rounded-[9px] bg-[rgba(200,16,10,.1)] px-3 py-2.5 text-[14px] text-[var(--ff-danger)] md:mx-6">
-            {error}
-          </div>
-        ) : null}
-        {notice ? (
-          <div className="mx-4 mt-4 rounded-[9px] bg-[rgba(36,138,61,.1)] px-3 py-2.5 text-[14px] text-[var(--ff-on)] md:mx-6">
-            {notice}
-          </div>
-        ) : null}
         {children}
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-[var(--ff-line)] bg-[#ececee] md:hidden">
