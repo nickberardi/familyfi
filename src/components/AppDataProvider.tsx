@@ -134,6 +134,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           commitLists(applyMutationResult(listsRef.current, result));
           if (result.household) setHousehold(result.household);
         });
+        setNotice("Saved.");
         if (result.change?.changeId) {
           void waitForChange(result.change.changeId)
             .then(async (change) => {

@@ -46,6 +46,7 @@ function GroupEditForm({ group }: { group: Group }) {
       <h2 className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-4 text-[14px] font-semibold">Edit</h2>
       <form
         className="flex flex-col gap-3 p-[18px]"
+        method="post"
         onSubmit={(event) => {
           event.preventDefault();
           void onSave();

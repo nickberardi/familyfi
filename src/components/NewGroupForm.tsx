@@ -33,7 +33,7 @@ export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
   }
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="mx-auto flex max-w-lg flex-col gap-3 p-6">
+    <form method="post" onSubmit={(event) => void onSubmit(event)} className="mx-auto flex max-w-lg flex-col gap-3 p-6">
       <h1 className="text-[21px] font-bold">Add {kind === "family" ? "person" : "Things group"}</h1>
       <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
         Name
