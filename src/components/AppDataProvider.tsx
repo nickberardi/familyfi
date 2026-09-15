@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { ApiError, api, waitForChange } from "@/lib/api";
 import {
@@ -71,14 +72,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setDevices(next.devices);
   }, []);
 
+  const router = useRouter();
+
   const reload = useCallback(async () => {
     const gen = ++loadGen.current;
     let sessionRes: { session: Session };
     try {
       sessionRes = await api<{ session: Session }>("/api/v1/auth/session");
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401 && typeof window !== "undefined") {
-        window.location.href = "/login";
+      if (err instanceof ApiError && err.status === 401) {
+        router.replace("/login");
       }
       throw err;
     }
@@ -99,7 +102,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setUnifi(unifiRes.unifi);
     setHousehold(householdRes.household);
     setAccounts(accountsRes.accounts);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
