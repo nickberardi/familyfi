@@ -14,7 +14,7 @@ describe("ensureSecrets", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
     const envPath = path.join(dir, ".env");
     const examplePath = path.join(dir, ".env.example");
-    writeFileSync(examplePath, "DEFAULT_PASSWORD=\nDB_PASSWORD=\n");
+    writeFileSync(examplePath, "DEFAULT_PASSWORD=\nPOSTGRES_PASSWORD=\n");
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
     expect(result.written).toEqual(["DEFAULT_PASSWORD", "SESSION_SECRET", "APP_ENCRYPTION_KEY"]);
@@ -48,7 +48,7 @@ describe("ensureSecrets", () => {
     const password = "recovery-pass";
     const session = "abcdefghijklmnopqrstuvwxyz012345";
     const key = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
-    writeFileSync(examplePath, "DB_PASSWORD=\n");
+    writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
     writeFileSync(
       envPath,
       `DEFAULT_PASSWORD=${password}\nSESSION_SECRET=${session}\nAPP_ENCRYPTION_KEY=${key}\n`,
@@ -65,7 +65,7 @@ describe("ensureSecrets", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
     const envPath = path.join(dir, ".env");
     const examplePath = path.join(dir, ".env.example");
-    writeFileSync(examplePath, "DB_PASSWORD=\n");
+    writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
     writeFileSync(envPath, "DEFAULT_PASSWORD=short\nSESSION_SECRET=short\nAPP_ENCRYPTION_KEY=nope\n");
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });

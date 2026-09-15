@@ -28,10 +28,10 @@ jobs:
       APP_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
       DB_MODE: external
       DB_HOST: 127.0.0.1
-      DB_PORT: "5432"
-      DB_NAME: familyfi_test
-      DB_USER: familyfi
-      DB_PASSWORD: familyfi-ci
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: familyfi_test
+      POSTGRES_USER: familyfi
+      POSTGRES_PASSWORD: familyfi-ci
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -73,10 +73,10 @@ jobs:
       APP_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
       DB_MODE: external
       DB_HOST: 127.0.0.1
-      DB_PORT: "5432"
-      DB_NAME: familyfi_test
-      DB_USER: familyfi
-      DB_PASSWORD: familyfi-ci
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: familyfi_test
+      POSTGRES_USER: familyfi
+      POSTGRES_PASSWORD: familyfi-ci
       PLAYWRIGHT_PORT: "3100"
     steps:
       - uses: actions/checkout@v7

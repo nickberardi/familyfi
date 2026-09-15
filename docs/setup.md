@@ -12,7 +12,7 @@ Copy `.env.example` to `.env` and set:
 | `SESSION_SECRET` | Binds cookie sessions. Generated on first setup if missing or invalid; never rotated automatically afterward. |
 | `APP_ENCRYPTION_KEY` | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
 | `DB_MODE` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`) or `external` (use `DB_HOST` below). |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Connection parts. Prisma `DATABASE_URL` is derived, with credentials URL-encoded. Do not treat a hand-written `DATABASE_URL` as source of truth. |
+| `DB_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Connection parts. Prisma `DATABASE_URL` is derived, with credentials URL-encoded. Do not treat a hand-written `DATABASE_URL` as source of truth. |
 | `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |
 
 Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a temporary key; that path is not the application credential store.
@@ -21,7 +21,7 @@ Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a te
 
 1. Install Node.js 20+ and pnpm 10.
 2. Install Docker if you want `make setup` to start PostgreSQL for you.
-3. `cp .env.example .env` and set `DB_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. Watch the server log for `username: admin` and `password:`.
+3. `cp .env.example .env` and set `POSTGRES_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. Watch the server log for `username: admin` and `password:`.
 4. `make setup` then `make dev`. `make dev` waits for PostgreSQL, applies pending Prisma migrations, regenerates the database client, then starts Next. The first start can take a few extra seconds. If port 3000 is already taken, `make dev` asks whether to kill that process.
 5. Open http://localhost:3000 and sign in as `admin`.
 

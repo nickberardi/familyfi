@@ -5,7 +5,7 @@ import { applyDatabaseUrl } from "./print-database-url.mjs";
 applyDatabaseUrl();
 
 const host = process.env.DB_HOST || "127.0.0.1";
-const port = Number(process.env.DB_PORT || "5432");
+const port = Number(process.env.POSTGRES_PORT || "5432");
 
 const socket = net.connect({ host, port });
 const timer = setTimeout(() => {

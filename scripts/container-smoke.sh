@@ -43,10 +43,10 @@ run_app() {
     -e APP_ENCRYPTION_KEY="$encryption_key" \
     -e DB_MODE=external \
     -e DB_HOST="$db" \
-    -e DB_PORT=5432 \
-    -e DB_NAME=familyfi \
-    -e DB_USER=familyfi \
-    -e DB_PASSWORD="$password" \
+    -e POSTGRES_PORT=5432 \
+    -e POSTGRES_DB=familyfi \
+    -e POSTGRES_USER=familyfi \
+    -e POSTGRES_PASSWORD="$password" \
     "$image" >/dev/null
 }
 

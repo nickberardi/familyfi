@@ -36,10 +36,10 @@ export function loadDotEnv() {
 
 export function buildDatabaseUrl(env = process.env) {
   const host = env.DB_HOST || "127.0.0.1";
-  const port = env.DB_PORT || "5432";
-  const name = env.DB_NAME || "familyfi";
-  const user = env.DB_USER || "familyfi";
-  const password = env.DB_PASSWORD ?? "";
+  const port = env.POSTGRES_PORT || "5432";
+  const name = env.POSTGRES_DB || "familyfi";
+  const user = env.POSTGRES_USER || "familyfi";
+  const password = env.POSTGRES_PASSWORD ?? "";
   const sslMode = env.DB_SSL_MODE;
   const sslRoot = env.DB_SSL_ROOT_CERT;
   let url = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(name)}`;

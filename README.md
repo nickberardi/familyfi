@@ -49,7 +49,7 @@ Until a published GHCR tag exists, build locally:
 git clone https://github.com/nberardi/familyfi.git
 cd familyfi
 cp .env.example .env
-# Set DB_PASSWORD. Recovery password and crypto secrets are generated on first setup if omitted.
+# Set POSTGRES_PASSWORD. Recovery password and crypto secrets are generated on first setup if omitted.
 make docker-dev-up
 make docker-logs   # look for username: admin and the recovery password
 ```
@@ -60,7 +60,7 @@ After a GHCR release (`git tag -a v0.1.0` then `git push origin v0.1.0`; see [do
 
 ```bash
 cp .env.example .env
-# Set DB_PASSWORD.
+# Set POSTGRES_PASSWORD.
 make docker-up     # pulls ghcr.io/nberardi/familyfi
 ```
 
@@ -70,7 +70,7 @@ make docker-up     # pulls ghcr.io/nberardi/familyfi
 
 ```bash
 cp .env.example .env
-# Set DB_PASSWORD.
+# Set POSTGRES_PASSWORD.
 make setup
 make dev
 ```
