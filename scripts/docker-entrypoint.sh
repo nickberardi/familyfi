@@ -1,9 +1,7 @@
 #!/bin/sh
 set -eu
 
-DATA_DIR="${FAMILYFI_DATA_DIR:-/data}"
-export FAMILYFI_DATA_DIR="$DATA_DIR"
-export FAMILYFI_ENV_PATH="${FAMILYFI_ENV_PATH:-$DATA_DIR/.env}"
+DATA_DIR="/var/lib/familyfi/data"
 
 if [ "$(id -u)" = "0" ]; then
   mkdir -p "$DATA_DIR"

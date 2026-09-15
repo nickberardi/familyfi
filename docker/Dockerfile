@@ -33,7 +33,7 @@ COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh \
   && groupadd --system familyfi \
   && useradd --system --gid familyfi --home-dir /app familyfi \
-  && mkdir -p /data \
-  && chown -R familyfi:familyfi /app /data
+  && mkdir -p /var/lib/familyfi/data \
+  && chown -R familyfi:familyfi /app /var/lib/familyfi
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

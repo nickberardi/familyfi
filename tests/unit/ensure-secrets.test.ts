@@ -74,17 +74,17 @@ describe("ensureSecrets", () => {
     expect(isSessionSecretValid(env.SESSION_SECRET)).toBe(true);
     expect(isEncryptionKeyValid(env.APP_ENCRYPTION_KEY)).toBe(true);
   });
-});
 
-  it("writes secrets under FAMILYFI_DATA_DIR", () => {
+  it("writes secrets to an explicit envPath (volume-backed path in Docker)", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
-    const dataDir = path.join(dir, "data");
+    const dataDir = path.join(dir, "var-lib-familyfi-data");
+    const envPath = path.join(dataDir, ".env");
     const examplePath = path.join(dir, ".env.example");
     writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
-    const env: Record<string, string | undefined> = { FAMILYFI_DATA_DIR: dataDir };
-    const result = ensureSecrets({ examplePath, env });
-    expect(result.envPath).toBe(path.join(dataDir, ".env"));
+    const env: Record<string, string | undefined> = {};
+    const result = ensureSecrets({ envPath, examplePath, env });
+    expect(result.envPath).toBe(envPath);
     expect(result.written).toEqual(["DEFAULT_PASSWORD", "SESSION_SECRET", "APP_ENCRYPTION_KEY"]);
     expect(readFileSync(result.envPath, "utf8")).toContain(`APP_ENCRYPTION_KEY=${env.APP_ENCRYPTION_KEY}`);
   });
-
+});
