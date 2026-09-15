@@ -15,6 +15,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=7001
 ENV HOSTNAME=0.0.0.0
+# Prisma engines need OpenSSL present to pick the right binary (avoids openssl-1.1.x warn).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts

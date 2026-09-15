@@ -17,3 +17,18 @@ describe("secret encryption", () => {
     expect(roundTrip("unifi-key-example", key)).toBe("unifi-key-example");
   });
 });
+
+  it("wrong key fails with authenticate data", () => {
+    const key = randomBytes(32);
+    const other = randomBytes(32);
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const ciphertext = Buffer.concat([cipher.update("secret", "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    const decipher = createDecipheriv("aes-256-gcm", other, iv);
+    decipher.setAuthTag(tag);
+    expect(() => Buffer.concat([decipher.update(ciphertext), decipher.final()])).toThrow(
+      /authenticate data|Unsupported state/i,
+    );
+  });
+

@@ -32,6 +32,10 @@ services:
       DB_NAME: ${POSTGRES_DB:-familyfi}
       DB_USER: ${POSTGRES_USER:-familyfi}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      # Must stay stable across container recreates — UniFi API key ciphertext is in Postgres.
+      DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:?Set DEFAULT_PASSWORD in .env (make setup)}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env (make setup)}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Set APP_ENCRYPTION_KEY in .env (make setup)}
     ports:
       - "${APP_PORT:-7001}:7001"
     depends_on:

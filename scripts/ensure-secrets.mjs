@@ -32,6 +32,10 @@ export function generateEncryptionKey() {
   return randomBytes(32).toString("hex");
 }
 
+export function isProductionEnv(env = process.env) {
+  return (env.NODE_ENV ?? "").trim() === "production";
+}
+
 function nonempty(value) {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : "";
 }
@@ -105,6 +109,11 @@ export function ensureSecrets(options = {}) {
 
   let key = current("APP_ENCRYPTION_KEY");
   if (!isEncryptionKeyValid(key)) {
+    if (isProductionEnv(env)) {
+      throw new Error(
+        "APP_ENCRYPTION_KEY is missing or invalid in production. Set a stable 64-hex (or 32-byte base64) APP_ENCRYPTION_KEY in the container environment and keep it with the database. Auto-generating a new key would make stored UniFi credentials undecryptable.",
+      );
+    }
     key = generateEncryptionKey();
     contents = setEnvFileKey(contents, "APP_ENCRYPTION_KEY", key);
     written.push("APP_ENCRYPTION_KEY");

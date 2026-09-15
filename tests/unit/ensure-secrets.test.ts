@@ -75,3 +75,14 @@ describe("ensureSecrets", () => {
     expect(isEncryptionKeyValid(env.APP_ENCRYPTION_KEY)).toBe(true);
   });
 });
+
+  it("refuses to mint APP_ENCRYPTION_KEY in production", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
+    const envPath = path.join(dir, ".env");
+    const examplePath = path.join(dir, ".env.example");
+    writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
+    writeFileSync(envPath, "DEFAULT_PASSWORD=recovery-pass\nSESSION_SECRET=abcdefghijklmnopqrstuvwxyz012345\n");
+    const env: Record<string, string | undefined> = { NODE_ENV: "production" };
+    expect(() => ensureSecrets({ envPath, examplePath, env })).toThrow(/APP_ENCRYPTION_KEY/);
+  });
+
