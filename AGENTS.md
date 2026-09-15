@@ -50,7 +50,7 @@ UniFi integration: official Network Integration API with `X-API-KEY`. Local base
 | Target | Behavior |
 | --- | --- |
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate |
-| `make dev` | Next.js on port 3000 |
+| `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
 | `make test` | Unit tests, then integration tests against `familyfi_test` |
 | `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database) |
 | `make test-api` | OpenAPI lint and route/method contract |
