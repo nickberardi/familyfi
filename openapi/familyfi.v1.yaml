@@ -767,8 +767,8 @@ paths:
       summary: List UniFi DPI categories
       description: |
         Proxies UniFi `GET /v1/dpi/categories`. Returns integer ids and catalog
-        names. Includes provisional D6 curated-slot candidates until Nick confirms
-        the household map. Secrets never leave the server.
+        names. Includes confirmed D6 curated slots (Video / Social / Gaming only;
+        no Porn curated slot). Secrets never leave the server.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: filter
@@ -1377,29 +1377,22 @@ components:
     D6CategoryCandidate:
       type: object
       additionalProperties: false
-      required: [slot, label, provisionalCategoryId, provisionalCatalogName]
+      required: [slot, label, categoryId, catalogName]
       properties:
-        slot: { type: string, enum: [video, social, gaming, porn] }
+        slot: { type: string, enum: [video, social, gaming] }
         label: { type: string }
-        provisionalCategoryId: { type: integer }
-        provisionalCatalogName: { type: string }
+        categoryId: { type: integer }
+        catalogName: { type: string }
     D6CategoryMap:
       type: object
       additionalProperties: false
       required: [status, candidates]
-      description: Provisional until Nick confirms on the household console.
+      description: Confirmed Phase 2 curated slots — Video (4), Social (24), Gaming (8). No Porn curated slot.
       properties:
         status: { type: string, enum: [provisional, confirmed] }
         candidates:
           type: array
           items: { $ref: "#/components/schemas/D6CategoryCandidate" }
-        optionalAdultTopsites:
-          type: object
-          additionalProperties: false
-          properties:
-            provisionalCategoryId: { type: integer }
-            provisionalCatalogName: { type: string }
-            status: { type: string }
     FamRule:
       type: object
       additionalProperties: false

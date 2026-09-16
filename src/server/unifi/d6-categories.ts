@@ -1,41 +1,37 @@
 /**
- * D6 curated category slots — PROVISIONAL until Nick verifies on the household
- * console against GET /v1/dpi/categories. Do not treat Phase 2 as shipped with
- * these ids locked. Product candidates only; no free-text category names go in
- * UniFi policy bodies (integer ids only).
+ * D6 curated category slots — CONFIRMED for Phase 2 (Video / Social / Gaming).
+ * Integer UniFi DPI category ids only in policy bodies; catalog names are for
+ * UI/docs and must not be written as free-text into UniFi policies.
+ * Porn / Adult is intentionally not a curated slot (may still appear in the
+ * full DPI catalog for arbitrary id picks elsewhere).
  */
-export const D6_MAP_STATUS = "provisional" as const;
+export const D6_MAP_STATUS = "confirmed" as const;
 
-export type D6Slot = "video" | "social" | "gaming" | "porn";
+export type D6Slot = "video" | "social" | "gaming";
 
-export type D6CategoryCandidate = {
+export type D6CategorySlot = {
   slot: D6Slot;
   label: string;
-  /** Provisional UniFi DPI category id — not Nick-confirmed. */
-  provisionalCategoryId: number;
+  /** Confirmed UniFi DPI category id for this curated slot. */
+  categoryId: number;
   /** Generic catalog name hint for docs/UI — not written into UniFi policy bodies. */
-  provisionalCatalogName: string;
+  catalogName: string;
 };
 
-export const D6_CATEGORY_CANDIDATES: readonly D6CategoryCandidate[] = [
-  { slot: "video", label: "Video", provisionalCategoryId: 4, provisionalCatalogName: "Media streaming" },
-  { slot: "social", label: "Social", provisionalCategoryId: 24, provisionalCatalogName: "Social networks" },
-  { slot: "gaming", label: "Gaming", provisionalCategoryId: 8, provisionalCatalogName: "Online games" },
-  {
-    slot: "porn",
-    label: "Porn",
-    provisionalCategoryId: 22,
-    provisionalCatalogName: "Adult",
-  },
+/** @deprecated Use D6CategorySlot — kept as alias for call sites during rename. */
+export type D6CategoryCandidate = D6CategorySlot;
+
+export const D6_CATEGORY_CANDIDATES: readonly D6CategorySlot[] = [
+  { slot: "video", label: "Video", categoryId: 4, catalogName: "Media streaming services" },
+  { slot: "social", label: "Social", categoryId: 24, catalogName: "Social networks" },
+  { slot: "gaming", label: "Gaming", categoryId: 8, catalogName: "Online games" },
 ] as const;
 
-/** Optional secondary Adult-related candidate — also provisional. */
-export const D6_OPTIONAL_ADULT_TOPSITES = {
-  provisionalCategoryId: 28,
-  provisionalCatalogName: "TopSites-Adult",
-  status: "provisional" as const,
-};
+export function d6CategoryIds(): number[] {
+  return D6_CATEGORY_CANDIDATES.map((item) => item.categoryId);
+}
 
+/** @deprecated Use d6CategoryIds */
 export function d6ProvisionalIds(): number[] {
-  return D6_CATEGORY_CANDIDATES.map((item) => item.provisionalCategoryId);
+  return d6CategoryIds();
 }

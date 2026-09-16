@@ -20,6 +20,13 @@ type FamRule = {
 
 type DpiItem = { id: number; name: string };
 
+type D6Slot = {
+  slot: "video" | "social" | "gaming";
+  label: string;
+  categoryId: number;
+  catalogName: string;
+};
+
 const DAYS = [
   { value: 0, label: "S" },
   { value: 1, label: "M" },
@@ -309,6 +316,7 @@ function NewRuleModal({
   const [enforcement, setEnforcement] = useState<"always" | "scheduled">("always");
   const [targetId, setTargetId] = useState("");
   const [catalog, setCatalog] = useState<DpiItem[]>([]);
+  const [curatedSlots, setCuratedSlots] = useState<D6Slot[]>([]);
   const [selectedDpiId, setSelectedDpiId] = useState<number | "">("");
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
@@ -317,21 +325,34 @@ function NewRuleModal({
 
   useEffect(() => {
     let cancelled = false;
-    const path =
-      targetType === "category"
-        ? `/api/v1/dpi/categories${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`
-        : `/api/v1/dpi/applications${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`;
-    void api<{ categories?: DpiItem[]; applications?: DpiItem[] }>(path)
-      .then((res) => {
-        if (cancelled) return;
-        setCatalog(targetType === "category" ? (res.categories ?? []) : (res.applications ?? []));
-        setError("");
-      })
-      .catch((err: Error) => {
-        if (cancelled) return;
-        setCatalog([]);
-        setError(err.message || "Could not load DPI catalog.");
-      });
+    if (targetType === "category") {
+      void api<{ categories?: DpiItem[]; d6?: { status: string; candidates: D6Slot[] } }>("/api/v1/dpi/categories")
+        .then((res) => {
+          if (cancelled) return;
+          setCuratedSlots(res.d6?.candidates ?? []);
+          setCatalog(res.categories ?? []);
+          setError("");
+        })
+        .catch((err: Error) => {
+          if (cancelled) return;
+          setCuratedSlots([]);
+          setCatalog([]);
+          setError(err.message || "Could not load DPI categories.");
+        });
+    } else {
+      const path = `/api/v1/dpi/applications${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`;
+      void api<{ applications?: DpiItem[] }>(path)
+        .then((res) => {
+          if (cancelled) return;
+          setCatalog(res.applications ?? []);
+          setError("");
+        })
+        .catch((err: Error) => {
+          if (cancelled) return;
+          setCatalog([]);
+          setError(err.message || "Could not load DPI catalog.");
+        });
+    }
     return () => {
       cancelled = true;
     };
@@ -420,29 +441,62 @@ function NewRuleModal({
           </div>
           <div>
             <div className="mb-1.5 text-[12px] font-semibold text-[var(--ff-muted)]">{targetType === "category" ? "Category" : "App"}</div>
-            <input
-              type="search"
-              placeholder="Search catalog"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="mb-2 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2 text-[15px]"
-            />
-            <select
-              className="w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]"
-              value={selectedDpiId === "" ? "" : String(selectedDpiId)}
-              onChange={(e) => setSelectedDpiId(e.target.value ? Number(e.target.value) : "")}
-              aria-label={targetType === "category" ? "DPI category" : "DPI application"}
-            >
-              <option value="">Select…</option>
-              {catalog.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} ({item.id})
-                </option>
-              ))}
-            </select>
-            <p className="mt-1.5 text-[12px] text-[var(--ff-muted)]">
-              Integer UniFi DPI ids only — no free-text names in policy bodies. D6 curated map is provisional until Nick confirms.
-            </p>
+            {targetType === "category" ? (
+              <>
+                <div className="flex flex-col gap-1.5" role="group" aria-label="Curated category slots">
+                  {curatedSlots.map((slot) => {
+                    const active = selectedDpiId === slot.categoryId;
+                    return (
+                      <button
+                        key={slot.slot}
+                        type="button"
+                        onClick={() => setSelectedDpiId(slot.categoryId)}
+                        className="rounded-lg border px-3 py-2.5 text-left text-[15px] font-semibold"
+                        style={
+                          active
+                            ? { borderColor: "var(--ff-accent)", background: "rgba(0,122,255,.08)", color: "var(--ff-ink)" }
+                            : { borderColor: "var(--ff-line)", background: "#fff", color: "var(--ff-ink)" }
+                        }
+                      >
+                        {slot.label}
+                        <span className="ml-2 text-[12px] font-normal text-[var(--ff-muted)]">
+                          {slot.catalogName} ({slot.categoryId})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-[12px] text-[var(--ff-muted)]">
+                  Curated slots: Video, Social, Gaming (confirmed D6). Integer UniFi DPI ids only — no free-text names in policy bodies.
+                </p>
+              </>
+            ) : (
+              <>
+                <input
+                  type="search"
+                  placeholder="Search catalog"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="mb-2 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2 text-[15px]"
+                />
+                <select
+                  className="w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]"
+                  value={selectedDpiId === "" ? "" : String(selectedDpiId)}
+                  onChange={(e) => setSelectedDpiId(e.target.value ? Number(e.target.value) : "")}
+                  aria-label="DPI application"
+                >
+                  <option value="">Select…</option>
+                  {catalog.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({item.id})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-[12px] text-[var(--ff-muted)]">
+                  Integer UniFi DPI ids only — no free-text names in policy bodies.
+                </p>
+              </>
+            )}
           </div>
           <div>
             <div className="mb-1.5 text-[12px] font-semibold text-[var(--ff-muted)]">Enforcement</div>
