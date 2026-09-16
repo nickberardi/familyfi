@@ -75,7 +75,7 @@ make setup
 make dev
 ```
 
-Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docker is available, then migrates. If Docker is not available, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`. For UI work without a UniFi console, set `FAMILYFI_UNIFI_MOCK=1` (see [docs/setup.md](docs/setup.md)).
+Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docker is available, then migrates. If Docker is not available, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`. For UI work without a UniFi console, set `UNIFI_MOCK=1` (see [docs/setup.md](docs/setup.md)).
 
 ## First run
 

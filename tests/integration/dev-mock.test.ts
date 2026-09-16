@@ -8,18 +8,18 @@ import { DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, resetDevMockClientForTests } from 
 import { resetDatabase } from "../helpers/db";
 
 describe("dev UniFi mock household", () => {
-  const previous = process.env.FAMILYFI_UNIFI_MOCK;
+  const previous = process.env.UNIFI_MOCK;
 
   beforeEach(async () => {
-    process.env.FAMILYFI_UNIFI_MOCK = "1";
+    process.env.UNIFI_MOCK = "1";
     resetDevMockClientForTests();
     setReconcileClientForTests(undefined);
     await resetDatabase();
   });
 
   afterEach(() => {
-    if (previous === undefined) delete process.env.FAMILYFI_UNIFI_MOCK;
-    else process.env.FAMILYFI_UNIFI_MOCK = previous;
+    if (previous === undefined) delete process.env.UNIFI_MOCK;
+    else process.env.UNIFI_MOCK = previous;
     setReconcileClientForTests(undefined);
     resetDevMockClientForTests();
   });

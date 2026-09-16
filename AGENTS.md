@@ -18,7 +18,7 @@ Human-facing product docs live in [README.md](README.md) and `docs/`. This file 
 - Never modify, disable, delete, or reorder administrator-created policies. Never call the UniFi policy ordering PUT. Own policies by recorded IDs and creation evidence, not a `FamilyFi ` name prefix alone.
 - All UniFi calls are server-side. Do not put keys or UniFi clients in the browser.
 - Do not create UniFi Object Manager groups. Operators paste an Integration API key in Settings; FamilyFi encrypts it with `FAMILYFI_ENCRYPTION_KEY`.
-- `FAMILYFI_UNIFI_MOCK=1` is local-only dummy UniFi plus a seeded household for UI work. Never treat it as enforcement. It is ignored when `NODE_ENV=production`.
+- `UNIFI_MOCK=1` is local-only dummy UniFi plus a seeded household for UI work. Never treat it as enforcement. It is ignored when `NODE_ENV=production`.
 - Pause suspends schedule enforcement (`enabled: false` on app-owned policies, schedule preserved). Resume is `enabled: true`; bedtime may still block. Recurring bedtime is the UniFi policy `schedule`, not clock-driven enable/disable at window edges.
 - Protection is per group. Do not expose controls that bypass protection.
 - Unassigned devices are **quarantined** in the API and tests; the Devices UI may say **Unassigned**. Discovery and quarantine only include clients on managed VLANs.
@@ -66,7 +66,7 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 | CSS tokens | `--ff-` + kebab role | `--ff-hairline-card`, `--ff-ink-3` |
 
 - **`camelCase` runs unbroken from column to JSON.** The schema uses Prisma defaults with zero `@map`/`@@map`, so a Postgres column, a Prisma field, a TypeScript property and an API response field are the same string. Do not introduce a snake_case boundary; it would buy nothing and cost a translation layer.
-- **Env vars that configure an external system keep that system's convention** — `POSTGRES_*`, `DB_*`, real `UNIFI_*` credentials, and framework contracts like `DATABASE_URL`, `PORT`, `NODE_ENV`. `FAMILYFI_UNIFI_MOCK` is ours (a FamilyFi behaviour flag), so it takes the prefix; `UNIFI_API_KEY` is UniFi's, so it does not.
+- **The prefix marks public surface, not ownership.** It belongs on variables an operator sets to run a real deployment — the ones documented in `.env.example`, the README and `docs/`, where a name like `DEFAULT_PASSWORD` would be ambiguous in a shared shell or a Compose file. Two kinds of variable take no prefix: those configuring an external system, which keep that system's convention (`POSTGRES_*`, `DB_*`, `UNIFI_API_KEY`, and framework contracts like `DATABASE_URL`, `PORT`, `NODE_ENV`); and development- or test-only flags, which are never part of a deployment. `UNIFI_MOCK` is the second kind — ours, but local-only and ignored in production, so it stays bare.
 - **Renaming an env var is breaking.** The value must move with the name. `FAMILYFI_ENCRYPTION_KEY` in particular: a fresh key makes the stored UniFi API key undecryptable and Sync fails with "Unsupported state or unable to authenticate data".
 - **Renaming a model is a migration, not a schema edit.** `ALTER ... RENAME` the table, enums, columns, constraints and indexes in place so existing databases upgrade. Constraints keep their old generated names through a table rename — bring them along, then confirm `prisma migrate status` reports no drift.
 - **`LEGACY_POLICY_PREFIX` (`"fam-"`) is the one sanctioned exception.** It matches pre-1.0 spike policies that may still exist on a live console. Nothing generates it. Do not extend it, and do not use it to claim ownership — that comes from recorded ids and creation evidence.
@@ -86,7 +86,7 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 | Target | Behavior |
 | --- | --- |
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate |
-| `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `FAMILYFI_UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
+| `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
 | `make test` | Unit tests, then integration tests against `familyfi_test` |
 | `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database) |
 | `make test-api` | OpenAPI lint and route/method contract |

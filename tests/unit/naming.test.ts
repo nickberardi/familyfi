@@ -80,18 +80,22 @@ describe("naming conventions (AGENTS.md)", () => {
     expect(bad).toEqual([]);
   });
 
-  it("prefixes our own environment variables with FAMILYFI_", () => {
-    // Names that configure an external system or are framework contracts keep
-    // that system's convention — see AGENTS.md.
+  it("prefixes operator-facing environment variables with FAMILYFI_", () => {
+    // Variables that configure an external system, or are framework contracts,
+    // keep that system's convention — see AGENTS.md.
     const foreign =
       /^(POSTGRES_|DB_|UNIFI_|DATABASE_URL|PORT|NODE_ENV|NODE_TLS_REJECT_UNAUTHORIZED|NEXT_|CI$|HOME$|PATH$)/;
+    // Ours, but development/test-only and never set on a real deployment, so
+    // they are not public surface and take no prefix.
+    const internal = new Set(["UNIFI_MOCK"]);
     const offenders = new Set<string>();
 
     for (const file of walk(srcRoot, (f) => f.endsWith(".ts") || f.endsWith(".tsx"))) {
       const text = readFileSync(file, "utf8");
       for (const m of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)) {
         const name = m[1];
-        if (!name.startsWith("FAMILYFI_") && !foreign.test(name)) offenders.add(`${rel(file)}: ${name}`);
+        if (name.startsWith("FAMILYFI_") || internal.has(name) || foreign.test(name)) continue;
+        offenders.add(`${rel(file)}: ${name}`);
       }
     }
     expect([...offenders]).toEqual([]);

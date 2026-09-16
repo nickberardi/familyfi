@@ -73,7 +73,7 @@ describe("Phase 2 DPI rules", () => {
         unifiKeyAuthTag: Buffer.from("z"),
       },
     });
-    process.env.FAMILYFI_UNIFI_MOCK = "1";
+    process.env.UNIFI_MOCK = "1";
 
     const cats = await listCategories(request("/api/v1/dpi/categories", { auth }));
     expect(cats.status).toBe(200);
@@ -111,7 +111,7 @@ describe("Phase 2 DPI rules", () => {
   it("reconcile CUD asserts APPLICATION_CATEGORY body; off sets enabled:false; delete leaves internet untouched", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
-    process.env.FAMILYFI_UNIFI_MOCK = "1";
+    process.env.UNIFI_MOCK = "1";
     await prisma().household.update({
       where: { id: "default" },
       data: {
@@ -194,7 +194,7 @@ describe("Phase 2 DPI rules", () => {
   it("creates app rule via API, reconcile asserts APPLICATION body, and off route works", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
-    process.env.FAMILYFI_UNIFI_MOCK = "1";
+    process.env.UNIFI_MOCK = "1";
     await prisma().household.update({
       where: { id: "default" },
       data: {
