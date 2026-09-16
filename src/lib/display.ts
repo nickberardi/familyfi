@@ -4,7 +4,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export function accessLabel(access: string): string {
   if (access === "paused") return "Paused";
-  if (access === "always_on") return "Always on · Internet blocked";
+  if (access === "always_on") return "Always On · Internet blocked";
   if (access === "blocked") return "Internet blocked (bedtime)";
   if (access === "protected") return "Protected — FamilyFi does not block";
   return "Internet available";
@@ -112,7 +112,7 @@ export function dayCaption(days: number[]): string {
 }
 
 export function scheduleCaption(group: Pick<Group, "kind" | "mode" | "schedule">): string {
-  if (group.mode === "always") return "always on";
+  if (group.mode === "always") return "Always On";
   const { enabled, days, start, end } = group.schedule;
   if (!enabled || !start || !end) return "no schedule";
   const word = group.kind === "family" ? "off" : "off";
@@ -130,13 +130,13 @@ export function cardNoteLine(group: Group): string {
 }
 
 export function cardStateLabel(group: Group, timezone: string): string {
-  if (group.protected) return "Always on — never paused";
+  if (group.protected) return "Always On — never paused";
   if (group.kind === "family" && group.familyRole === "adult") return "No controls applied";
   if (group.access === "paused") {
     if (group.suspension.until) return `Paused until ${formatClock(new Date(group.suspension.until), timezone)}`;
     return "Paused until you resume";
   }
-  if (group.access === "always_on") return "Always on · Internet blocked";
+  if (group.access === "always_on") return "Always On · Internet blocked";
   if (group.access === "blocked") return "Bedtime active · Internet blocked";
   return "Internet available";
 }

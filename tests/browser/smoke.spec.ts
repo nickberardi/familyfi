@@ -34,12 +34,16 @@ test("sign-in and household pages", async ({ page }) => {
   await expect(page).toHaveURL(/\/family/);
   await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
 
-  for (const path of ["/things", "/schedules", "/devices", "/sync", "/settings", "/reference"]) {
+  for (const path of ["/things", "/rules", "/devices", "/sync", "/settings", "/reference"]) {
     await page.goto(path);
     await expect(page.locator("body")).not.toContainText("Something went wrong");
   }
   await expect(page).toHaveURL(/\/reference/);
   await expect(page.getByRole("heading", { name: "API" })).toBeVisible();
+
+  await page.goto("/rules");
+  await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Rules" }).first()).toBeVisible();
 
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();

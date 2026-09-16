@@ -94,7 +94,7 @@ describe("device marks", () => {
 describe("always mode", () => {
   it("labels Always On when access is always_on", () => {
     expect(cardStateLabel(group({ mode: "always", schedule: { enabled: false, days: [], start: null, end: null }, access: "always_on" }), "America/New_York")).toBe(
-      "Always on · Internet blocked",
+      "Always On · Internet blocked",
     );
   });
 
@@ -110,7 +110,7 @@ describe("always mode", () => {
     ).toBe(true);
   });
 
-  it("captions always on", () => {
-    expect(scheduleCaption(group({ mode: "always", schedule: { enabled: false, days: [], start: null, end: null } }))).toBe("always on");
+  it("captions Always On", () => {
+    expect(scheduleCaption(group({ mode: "always", schedule: { enabled: false, days: [], start: null, end: null } }))).toBe("Always On");
   });
 });
