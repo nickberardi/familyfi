@@ -43,7 +43,10 @@ test("sign-in and household pages", async ({ page }) => {
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Rules" }).first()).toBeVisible();
+  // Sidebar Rules link is desktop-only; phone bottom nav never included Schedules/Rules.
+  if (test.info().project.name !== "phone") {
+    await expect(page.getByRole("link", { name: "Rules" }).first()).toBeVisible();
+  }
 
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
