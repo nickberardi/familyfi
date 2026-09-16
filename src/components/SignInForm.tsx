@@ -48,7 +48,7 @@ export function SignInForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex flex-col gap-3.5 rounded-[14px] border border-[var(--ff-line)] bg-white p-5"
+      className="flex flex-col gap-3.5 rounded-[14px] border border-[var(--ff-line)] bg-[var(--ff-card)] p-5"
     >
       <label className="flex flex-col gap-1.5 text-[14px] font-semibold text-[var(--ff-muted)]">
         Username
@@ -79,7 +79,7 @@ export function SignInForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-[9px] bg-[var(--ff-accent)] py-3 text-center text-[16px] font-semibold text-white disabled:opacity-60"
+        className="rounded-[9px] bg-[var(--ff-accent)] py-3 text-center text-[16px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-60"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>

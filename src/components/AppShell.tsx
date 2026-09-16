@@ -113,7 +113,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <span className="min-w-0 flex-1">{item.label}</span>
                       {badge ? (
                         <span
-                          className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[14px] font-semibold text-white"
+                          className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
                           style={{
                             background: item.href === "/family" ? "var(--ff-paused)" : "var(--ff-danger)",
                           }}
@@ -129,7 +129,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="ff-sidebar-end flex flex-col gap-2.5">
-          <div className="rounded-[9px] border border-[var(--ff-line)] bg-white p-2.5">
+          <div className="rounded-[9px] border border-[var(--ff-line)] bg-[var(--ff-card)] p-2.5">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full" style={{ background: syncDot }} />
               <span className="text-[14px] font-semibold">{syncTitle}</span>
@@ -164,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
           ) : null}
-          <div className="flex items-center gap-2.5 rounded-[10px] bg-white/70 p-2.5">
+          <div className="flex items-center gap-2.5 rounded-[10px] bg-[var(--ff-card-veil)] p-2.5">
             <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-person-fill)] text-[14px] font-semibold text-[var(--ff-on)]">
               {initials(session?.displayName ?? "A")}
             </div>
@@ -190,7 +190,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {error || notice ? (
             <div
               role={error ? "alert" : "status"}
-              className="pointer-events-auto flex max-w-lg items-start gap-3 rounded-[9px] border border-[var(--ff-line)] bg-white px-3.5 py-2.5 text-[14px] shadow-[var(--ff-shadow-toast)]"
+              className="pointer-events-auto flex max-w-lg items-start gap-3 rounded-[9px] border border-[var(--ff-line)] bg-[var(--ff-card)] px-3.5 py-2.5 text-[14px] shadow-[var(--ff-shadow-toast)]"
               style={{ color: error ? "var(--ff-danger)" : "var(--ff-on)" }}
             >
               <span className="min-w-0 flex-1">{error || notice}</span>
@@ -223,7 +223,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             {item.label}
             {item.href === "/devices" && unassignedCount ? (
-              <span className="ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--ff-danger)] px-1 text-[12px] font-semibold text-white">
+              <span className="ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--ff-danger)] px-1 text-[12px] font-semibold text-[var(--ff-ink-on-fill)]">
                 {unassignedCount}
               </span>
             ) : null}

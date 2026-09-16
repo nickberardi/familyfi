@@ -58,6 +58,9 @@
   /* Ink that sits on an accent, mark or danger fill. */
   --ff-ink-on-fill: #ffffff;
 
+  /* A translucent card veil, for a panel resting on the sidebar rail. */
+  --ff-card-veil: rgba(255, 255, 255, 0.7);
+
   /* Chrome: sheet scrim and shadows, sticky header wash, inset well. */
   --ff-scrim: rgba(0, 0, 0, 0.32);
   --ff-shadow-sheet: 0 24px 60px rgba(0, 0, 0, 0.28);

@@ -59,7 +59,7 @@ export default function SyncPage() {
       <div className="flex flex-col gap-4 p-4 md:p-6">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           {stats.map((stat) => (
-            <div key={stat.label} className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-white px-[18px] py-4">
+            <div key={stat.label} className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] px-[18px] py-4">
               <div className="text-[14px] font-semibold tracking-wide text-[var(--ff-muted)] uppercase">{stat.label}</div>
               <div className="mt-1.5 text-[26px] font-bold tracking-tight" style={{ color: stat.ink }}>
                 {stat.value}
@@ -69,7 +69,7 @@ export default function SyncPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+        <div className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
           <div className="grid grid-cols-[minmax(92px,128px)_minmax(0,1fr)_minmax(80px,96px)] items-center gap-3.5 bg-[var(--ff-field-soft)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)]">
             <div>When</div>
             <div>Action</div>
@@ -127,7 +127,7 @@ export default function SyncPage() {
           )}
         </div>
 
-        <p className="max-w-[78ch] rounded-[12px] border border-[var(--ff-hairline-card)] bg-white px-[18px] py-3.5 text-[14px] leading-5 text-[var(--ff-muted)]">
+        <p className="max-w-[78ch] rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] px-[18px] py-3.5 text-[14px] leading-5 text-[var(--ff-muted)]">
           Only policies FamilyFi created appear here — named with a <span className="font-mono">FamilyFi</span> prefix.
           Ownership is the recorded policy ID, not the name. Administrator rules are never modified, disabled, or
           reordered.
