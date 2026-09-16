@@ -41,8 +41,10 @@ describe("DPI policy payloads", () => {
 });
 
 describe("D6 map", () => {
-  it("stays provisional until Nick confirms", () => {
-    expect(D6_MAP_STATUS).toBe("provisional");
-    expect(D6_CATEGORY_CANDIDATES.map((c) => c.slot)).toEqual(["video", "social", "gaming", "porn"]);
+  it("locks Video / Social / Gaming curated ids (no Porn slot)", () => {
+    expect(D6_MAP_STATUS).toBe("confirmed");
+    expect(D6_CATEGORY_CANDIDATES.map((c) => c.slot)).toEqual(["video", "social", "gaming"]);
+    expect(D6_CATEGORY_CANDIDATES.map((c) => c.categoryId)).toEqual([4, 24, 8]);
+    expect(D6_CATEGORY_CANDIDATES.some((c) => (c as { slot: string }).slot === "porn")).toBe(false);
   });
 });
