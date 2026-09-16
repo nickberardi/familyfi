@@ -226,7 +226,7 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
   await expectMode(true);
 
   // Phase 3: Network chips from Settings managed networks (manage-all in UNIFI_MOCK seed).
-  await page.getByRole("button", { name: "New rule" }).click();
+  await page.getByRole("button", { name: "Add" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
   const networkTab = dialog.getByRole("button", { name: "Network", exact: true });
@@ -325,7 +325,7 @@ test("Phase 4: card marks, Fam On/Off sheets, soft polish, no DNS chrome", async
   await page.goto("/rules");
   await expect(page.getByText(/Always keeps the block on until you turn it off/i)).toBeVisible();
   await expect(page.getByText(/permanent block/i)).toHaveCount(0);
-  await page.getByRole("button", { name: "New rule" }).click();
+  await page.getByRole("button", { name: "Add" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
   // Soft polish: Network empty helper must be visible when Network tab is disabled.
@@ -354,7 +354,7 @@ test("Phase 4: card marks, Fam On/Off sheets, soft polish, no DNS chrome", async
       });
       expect(put.ok()).toBeTruthy();
       await page.goto("/rules");
-      await page.getByRole("button", { name: "New rule" }).click();
+      await page.getByRole("button", { name: "Add" }).click();
       const emptyDialog = page.getByRole("dialog");
       await expect(emptyDialog.getByRole("button", { name: "Network", exact: true })).toBeDisabled();
       await expect(emptyDialog.getByTestId("network-scope-empty-helper")).toBeVisible();

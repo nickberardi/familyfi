@@ -139,7 +139,7 @@ export default function RulesPage() {
       <PageHeader
         title="Rules"
         sub="Recurring bedtimes and content-filter schedules — desired configuration, applied on the next Sync."
-        actionLabel="New rule"
+        actionLabel="Add"
         onAction={() => setNewRuleOpen(true)}
       />
       <div className="flex flex-col gap-4 p-4 md:p-6">
