@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.1.0
+  version: 0.3.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -29,6 +29,10 @@ tags:
     description: Assigned and quarantined devices
   - name: Sync
     description: Reconciliation and per-action change status
+  - name: DPI
+    description: UniFi DPI category and application catalog (server-side proxy)
+  - name: Rules
+    description: Category and app Fam rules (Internet parents remain groups)
 paths:
   /api/v1/health:
     get:
@@ -755,6 +759,257 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+
+  /api/v1/dpi/categories:
+    get:
+      operationId: listDpiCategories
+      tags: [DPI]
+      summary: List UniFi DPI categories
+      description: |
+        Proxies UniFi `GET /v1/dpi/categories`. Returns integer ids and catalog
+        names. Includes provisional D6 curated-slot candidates until Nick confirms
+        the household map. Secrets never leave the server.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: DPI categories
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [categories, d6]
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/DpiCatalogItem" }
+                  d6: { $ref: "#/components/schemas/D6CategoryMap" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/dpi/applications:
+    get:
+      operationId: listDpiApplications
+      tags: [DPI]
+      summary: List UniFi DPI applications
+      description: Proxies UniFi `GET /v1/dpi/applications` with optional name filter.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: DPI applications
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [applications]
+                properties:
+                  applications:
+                    type: array
+                    items: { $ref: "#/components/schemas/DpiCatalogItem" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules:
+    get:
+      operationId: listRules
+      tags: [Rules]
+      summary: List Fam category and app rules
+      description: Internet parents are group schedule/mode rows, not returned here.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: groupId
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rules]
+                properties:
+                  rules:
+                    type: array
+                    items: { $ref: "#/components/schemas/FamRule" }
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createRule
+      tags: [Rules]
+      summary: Create a category or app rule
+      description: |
+        Group/MAC scope only in Phase 2. Protected groups are rejected.
+        Stores UniFi DPI integer ids (no free-text category/app names in policy bodies).
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamRuleCreate" }
+            examples:
+              category:
+                value: { kind: category, groupId: grp_example, targetIds: [4], mode: always }
+              app:
+                value: { kind: app, groupId: grp_example, targetIds: [10001], mode: always }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/FamRule" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getRule
+      tags: [Rules]
+      summary: Get a Fam rule
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Rule
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule]
+                properties:
+                  rule: { $ref: "#/components/schemas/FamRule" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateRule
+      tags: [Rules]
+      summary: Update a Fam rule
+      description: Update mode, schedule, enabled, or target ids. Internet policies are never mutated here.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamRuleUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/FamRule" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteRule
+      tags: [Rules]
+      summary: Delete a Fam category or app rule
+      description: |
+        Deletes the Fam rule and its recorded UniFi policy ids only.
+        Internet AppPolicy rows are never touched.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [change]
+                properties:
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}/off:
+    post:
+      operationId: turnOffRule
+      tags: [Rules]
+      summary: Turn off a Fam rule
+      description: Sets desired enabled false (UniFi Pause). Does not change Internet group policy.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Turned off
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/FamRule" }
+                  change: { $ref: "#/components/schemas/Change" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/devices:
     get:
       operationId: listDevices
@@ -1111,6 +1366,87 @@ components:
         managedNetworkIds:
           type: array
           items: { type: string }
+
+    DpiCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    D6CategoryCandidate:
+      type: object
+      additionalProperties: false
+      required: [slot, label, provisionalCategoryId, provisionalCatalogName]
+      properties:
+        slot: { type: string, enum: [video, social, gaming, porn] }
+        label: { type: string }
+        provisionalCategoryId: { type: integer }
+        provisionalCatalogName: { type: string }
+    D6CategoryMap:
+      type: object
+      additionalProperties: false
+      required: [status, candidates]
+      description: Provisional until Nick confirms on the household console.
+      properties:
+        status: { type: string, enum: [provisional, confirmed] }
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/D6CategoryCandidate" }
+        optionalAdultTopsites:
+          type: object
+          additionalProperties: false
+          properties:
+            provisionalCategoryId: { type: integer }
+            provisionalCatalogName: { type: string }
+            status: { type: string }
+    FamRule:
+      type: object
+      additionalProperties: false
+      required: [id, kind, groupId, targetIds, enabled, mode, schedule, internet]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [category, app] }
+        groupId: { type: string }
+        targetIds:
+          type: array
+          items: { type: integer }
+          minItems: 1
+          maxItems: 100
+        enabled: { type: boolean }
+        mode: { type: string, enum: [always, scheduled] }
+        schedule: { $ref: "#/components/schemas/Schedule" }
+        internet:
+          type: boolean
+          enum: [false]
+          description: Category/app Fam rules are never Internet parents.
+    FamRuleCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, groupId, targetIds]
+      properties:
+        kind: { type: string, enum: [category, app] }
+        groupId: { type: string }
+        targetIds:
+          type: array
+          items: { type: integer }
+          minItems: 1
+          maxItems: 100
+        enabled: { type: boolean }
+        mode: { type: string, enum: [always, scheduled] }
+        schedule: { $ref: "#/components/schemas/Schedule" }
+    FamRuleUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        targetIds:
+          type: array
+          items: { type: integer }
+          minItems: 1
+          maxItems: 100
+        enabled: { type: boolean }
+        mode: { type: string, enum: [always, scheduled] }
+        schedule: { $ref: "#/components/schemas/Schedule" }
     Schedule:
       type: object
       additionalProperties: false

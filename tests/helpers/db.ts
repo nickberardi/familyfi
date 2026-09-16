@@ -19,6 +19,8 @@ export async function resetDatabase() {
   await db.changeResult.deleteMany();
   await db.syncRun.deleteMany();
   await db.policyOperation.deleteMany();
+  await db.famRulePolicy.deleteMany();
+  await db.famRule.deleteMany();
   await db.appPolicy.deleteMany();
   await db.device.deleteMany();
   await db.session.deleteMany();

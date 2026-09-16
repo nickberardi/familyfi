@@ -84,9 +84,50 @@ export type SourceTrafficFilter = {
   macAddressFilter?: MacAddressFilter;
 };
 
-export type FirewallPolicyEndpoint = {
+export type ApplicationCategoryFilter = {
+  applicationCategoryIds: number[];
+};
+
+export type ApplicationFilter = {
+  applicationIds: number[];
+};
+
+/** Destination traffic filter — internet (zone only) or DPI APPLICATION_* shapes. */
+export type DestinationTrafficFilter =
+  | {
+      type: "APPLICATION_CATEGORY";
+      applicationCategoryFilter: ApplicationCategoryFilter;
+      portFilter?: unknown;
+    }
+  | {
+      type: "APPLICATION";
+      applicationFilter: ApplicationFilter;
+      portFilter?: unknown;
+    }
+  | {
+      type: string;
+      macAddressFilter?: MacAddressFilter;
+      applicationCategoryFilter?: ApplicationCategoryFilter;
+      applicationFilter?: ApplicationFilter;
+      portFilter?: unknown;
+    };
+
+export type FirewallPolicySourceEndpoint = {
   zoneId: string;
   trafficFilter?: SourceTrafficFilter;
+};
+
+export type FirewallPolicyDestinationEndpoint = {
+  zoneId: string;
+  trafficFilter?: DestinationTrafficFilter;
+};
+
+/** @deprecated Prefer source/destination-specific endpoint types. */
+export type FirewallPolicyEndpoint = FirewallPolicySourceEndpoint | FirewallPolicyDestinationEndpoint;
+
+export type DpiCatalogItem = {
+  id: number;
+  name: string;
 };
 
 export type IpProtocolScope = {
@@ -119,8 +160,8 @@ export type FirewallPolicyWrite = {
   loggingEnabled: boolean;
   action: FirewallPolicyAction;
   ipProtocolScope: IpProtocolScope;
-  source: FirewallPolicyEndpoint;
-  destination: FirewallPolicyEndpoint;
+  source: FirewallPolicySourceEndpoint;
+  destination: FirewallPolicyDestinationEndpoint;
   connectionStateFilter?: string[];
   ipsecFilter?: string;
   schedule?: UnifiFirewallSchedule | null;

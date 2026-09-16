@@ -37,3 +37,21 @@ function clipName(name: string): string {
   if (name.length <= MAX_POLICY_NAME) return name;
   return name.slice(0, MAX_POLICY_NAME - 1).trimEnd() + "…";
 }
+
+export function dpiRulePolicyName(input: {
+  groupName: string;
+  kind: "family" | "things";
+  ruleKind: "category" | "app";
+  zoneName: string;
+  targetIds: number[];
+}): string {
+  const label = input.ruleKind === "category" ? "Category" : "App";
+  const ids = [...input.targetIds].sort((a, b) => a - b).join(",");
+  const subject =
+    input.kind === "family"
+      ? `${possessive(input.groupName)} ${label}`
+      : `${input.groupName.trim() || "Group"} ${label}`;
+  const base = `${FAMILYFI_POLICY_PREFIX}${subject} ${ids}`;
+  if (isInternalZone(input.zoneName)) return clipName(base);
+  return clipName(`${base} (${zoneLabel(input.zoneName)})`);
+}
