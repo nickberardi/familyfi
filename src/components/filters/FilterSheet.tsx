@@ -5,19 +5,19 @@
  *
  * The Card System sketches four of these, but two of them (Checking… and the
  * purple "already blocked upstream" report) belong to the DNS probe, which is
- * out of scope for v0.3.0 — see issue #29. That leaves the two Fam-owned
+ * out of scope for v0.3.0 — see issue #29. That leaves the two FamilyFi-owned
  * states: a filter we block, and one nothing is blocking yet.
  */
 
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useAppData } from "@/components/AppDataProvider";
-import type { FamRule } from "@/lib/fam-rules";
+import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 export type FilterSheetState =
-  | { kind: "category"; name: string; categoryId: number; rule: FamRule | undefined }
-  | { kind: "app"; name: string; rule: FamRule };
+  | { kind: "category"; name: string; categoryId: number; rule: Rule | undefined }
+  | { kind: "app"; name: string; rule: Rule };
 
 export function FilterSheet({
   group,

@@ -3,7 +3,7 @@ import type { UnifiClient } from "./client";
 import { UnifiHttpError } from "./errors";
 import { groupMacsBySourceZone, mapClientsToZones, selectExternalZone } from "./mapping";
 import { orderedPolicyIds, relativeOrderPreserved } from "./ordering";
-import { INTERNET_BLOCK_ACTION, internetBlockPolicy, isFamPolicyName, sanitizeInstallId, spikePolicyName, toPolicyUpdate } from "./payloads";
+import { INTERNET_BLOCK_ACTION, internetBlockPolicy, isOwnedPolicyName, sanitizeInstallId, spikePolicyName, toPolicyUpdate } from "./payloads";
 import type {
   ClientOverview,
   ClientZoneMapping,
@@ -225,6 +225,6 @@ export async function deletePolicies(
 export function ownedSpikePolicies(policies: FirewallPolicy[], installId: string): FirewallPolicy[] {
   const legacy = `-${sanitizeInstallId(installId)}-spike-`;
   return policies.filter(
-    (policy) => isFamPolicyName(policy.name) && (policy.name.includes(" Spike ") || policy.name.includes(legacy)),
+    (policy) => isOwnedPolicyName(policy.name) && (policy.name.includes(" Spike ") || policy.name.includes(legacy)),
   );
 }

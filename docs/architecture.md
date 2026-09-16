@@ -57,8 +57,8 @@ Official client overview/details do not include `networkId`. Mapping:
 
 Destination zone: first of External, WAN, Internet (case-insensitive). Source: one policy per source zone. IP scope: `IPV4_AND_IPV6` with no protocol filter. IPv6 blocking, overnight UniFi scheduler windows, and a second concurrent MAC are unproven; do not claim dual-stack blocking.
 
-Mocks and fixtures do not prove enforcement. `UNIFI_MOCK=1` routes Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; it is ignored in production. The spike CLI (`scripts/spike`) is for live gateway experiments; see [spike/OPERATOR.md](spike/OPERATOR.md).
+Mocks and fixtures do not prove enforcement. `FAMILYFI_UNIFI_MOCK=1` routes Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; it is ignored in production. The spike CLI (`scripts/spike`) is for live gateway experiments; see [spike/OPERATOR.md](spike/OPERATOR.md).
 
 ## Secrets
 
-Personal passwords are Argon2id hashes. The UniFi API key is AES-256-GCM encrypted with `APP_ENCRYPTION_KEY`. The recovery admin password is never stored in the database; it is compared to `DEFAULT_PASSWORD` and printed in the server log at startup so an operator can find it. It is never returned by the API.
+Personal passwords are Argon2id hashes. The UniFi API key is AES-256-GCM encrypted with `FAMILYFI_ENCRYPTION_KEY`. The recovery admin password is never stored in the database; it is compared to `FAMILYFI_DEFAULT_PASSWORD` and printed in the server log at startup so an operator can find it. It is never returned by the API.

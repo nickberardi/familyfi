@@ -1,18 +1,18 @@
 export function envIssues(env = process.env) {
   const issues = [];
-  const password = env.DEFAULT_PASSWORD ?? "";
+  const password = env.FAMILYFI_DEFAULT_PASSWORD ?? "";
   if (password.length < 12) {
-    issues.push("DEFAULT_PASSWORD must be at least 12 characters.");
+    issues.push("FAMILYFI_DEFAULT_PASSWORD must be at least 12 characters.");
   }
-  const session = env.SESSION_SECRET ?? "";
+  const session = env.FAMILYFI_SESSION_SECRET ?? "";
   if (session.length < 32) {
-    issues.push("SESSION_SECRET must be at least 32 characters.");
+    issues.push("FAMILYFI_SESSION_SECRET must be at least 32 characters.");
   }
-  const key = env.APP_ENCRYPTION_KEY ?? "";
+  const key = env.FAMILYFI_ENCRYPTION_KEY ?? "";
   const hex = /^[0-9a-fA-F]{64}$/.test(key);
   const b64 = Buffer.from(key, "base64").length === 32 && key.length >= 44;
   if (!hex && !b64) {
-    issues.push("APP_ENCRYPTION_KEY must be 32 bytes as 64 hex characters (or base64).");
+    issues.push("FAMILYFI_ENCRYPTION_KEY must be 32 bytes as 64 hex characters (or base64).");
   }
   if (!env.POSTGRES_PASSWORD) {
     issues.push("POSTGRES_PASSWORD must be set.");

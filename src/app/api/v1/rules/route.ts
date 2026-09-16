@@ -1,4 +1,4 @@
-import { FamRuleKind, FamRuleScope } from "@prisma/client";
+import { RuleKind, RuleScope } from "@prisma/client";
 import { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
@@ -18,8 +18,8 @@ export async function GET(request: Request) {
   return withSession(request, async () => {
     const url = new URL(request.url);
     const groupId = url.searchParams.get("groupId") ?? undefined;
-    const rules = await prisma().famRule.findMany({
-      where: groupId ? { groupId, scope: FamRuleScope.group } : undefined,
+    const rules = await prisma().rule.findMany({
+      where: groupId ? { groupId, scope: RuleScope.group } : undefined,
       orderBy: [{ scope: "asc" }, { groupId: "asc" }, { createdAt: "asc" }],
     });
     return Response.json({ rules: rules.map(publicRule) });
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const parsed = CreateBodyLoose.safeParse(body.value);
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid rule.");
     const scope = parsed.data.scope ?? "group";
-    const kind = parsed.data.kind === "category" ? FamRuleKind.category : FamRuleKind.app;
+    const kind = parsed.data.kind === "category" ? RuleKind.category : RuleKind.app;
     let targetIds: number[];
     try {
       targetIds = normalizeTargetIds(kind, parsed.data.targetIds);
@@ -90,10 +90,10 @@ export async function POST(request: Request) {
         const err = error as { status?: number; code?: string; message?: string };
         return jsonError(err.status ?? 400, err.code ?? "invalid_request", err.message ?? "Invalid networks.");
       }
-      const rule = await prisma().famRule.create({
+      const rule = await prisma().rule.create({
         data: {
           kind,
-          scope: FamRuleScope.network,
+          scope: RuleScope.network,
           groupId: null,
           networkIds,
           targetIds,
@@ -115,10 +115,10 @@ export async function POST(request: Request) {
       const err = error as { status?: number; code?: string; message?: string };
       return jsonError(err.status ?? 400, err.code ?? "invalid_request", err.message ?? "Invalid group.");
     }
-    const rule = await prisma().famRule.create({
+    const rule = await prisma().rule.create({
       data: {
         kind,
-        scope: FamRuleScope.group,
+        scope: RuleScope.group,
         groupId: group.id,
         networkIds: [],
         targetIds,

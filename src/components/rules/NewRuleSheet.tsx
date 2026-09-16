@@ -13,7 +13,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { Segmented } from "@/components/ui/Segmented";
 import { DayPicker } from "@/components/ui/DayPicker";
 import { TimeField } from "@/components/ui/Controls";
-import { D6_CATEGORY_SLOTS } from "@/lib/fam-rules";
+import { D6_CATEGORY_SLOTS } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 type DpiItem = { id: number; name: string };

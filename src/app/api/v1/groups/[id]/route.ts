@@ -64,8 +64,8 @@ export async function DELETE(request: Request, ctx: Ctx) {
       where: { groupId: id },
       data: { groupId: null, assignment: AssignmentState.quarantined },
     });
-    // Delete recorded DPI UniFi policies before cascading FamRule rows (D3).
-    const rules = await prisma().famRule.findMany({ where: { groupId: id }, include: { policies: true } });
+    // Delete recorded DPI UniFi policies before cascading Rule rows (D3).
+    const rules = await prisma().rule.findMany({ where: { groupId: id }, include: { policies: true } });
     const household = await prisma().household.findUnique({ where: { id: "default" } });
     if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
       try {
@@ -78,7 +78,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
             try {
               await client.deletePolicy(household.unifiSiteId, policy.unifiPolicyId);
             } catch {
-              // Ownership cleared with FamRule cascade; Sync may surface leftovers.
+              // Ownership cleared with Rule cascade; Sync may surface leftovers.
             }
           }
         }
@@ -86,8 +86,8 @@ export async function DELETE(request: Request, ctx: Ctx) {
         // Proceed with desired-state delete.
       }
     }
-    await prisma().famRulePolicy.deleteMany({ where: { famRuleId: { in: rules.map((r) => r.id) } } });
-    await prisma().famRule.deleteMany({ where: { groupId: id } });
+    await prisma().rulePolicy.deleteMany({ where: { ruleId: { in: rules.map((r) => r.id) } } });
+    await prisma().rule.deleteMany({ where: { groupId: id } });
     await prisma().group.delete({ where: { id } });
     const change = await enqueueChange("group");
     return Response.json({ ok: true, change });

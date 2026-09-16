@@ -54,7 +54,7 @@ make docker-dev-up
 make docker-logs   # look for username: admin and the recovery password
 ```
 
-Open http://localhost:7001 (override with `APP_PORT`). Compose starts the app and PostgreSQL together. For an existing server when you are not using that stack, set `DB_MODE=external` and the `DB_*` values.
+Open http://localhost:7001 (override with `FAMILYFI_PORT`). Compose starts the app and PostgreSQL together. For an existing server when you are not using that stack, set `DB_MODE=external` and the `DB_*` values.
 
 After a GHCR release (`git tag -a v0.1.0` then `git push origin v0.1.0`; see [docs/operations.md](docs/operations.md)):
 
@@ -75,7 +75,7 @@ make setup
 make dev
 ```
 
-Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docker is available, then migrates. If Docker is not available, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`. For UI work without a UniFi console, set `UNIFI_MOCK=1` (see [docs/setup.md](docs/setup.md)).
+Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docker is available, then migrates. If Docker is not available, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`. For UI work without a UniFi console, set `FAMILYFI_UNIFI_MOCK=1` (see [docs/setup.md](docs/setup.md)).
 
 ## First run
 
@@ -84,9 +84,9 @@ Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docke
 3. Align the household timezone with the UniFi console clock so bedtime windows match wall time.
 4. Assign devices to Family or Things groups and set schedules.
 
-`DEFAULT_PASSWORD` is the permanent recovery credential for username `admin`. Changing it in `.env` takes effect on the next `admin` sign-in. Create personal adult accounts for everyday use; they do not remove `admin`.
+`FAMILYFI_DEFAULT_PASSWORD` is the permanent recovery credential for username `admin`. Changing it in `.env` takes effect on the next `admin` sign-in. Create personal adult accounts for everyday use; they do not remove `admin`.
 
-Back up PostgreSQL and `APP_ENCRYPTION_KEY` together. Restoring the database without that key cannot decrypt the stored UniFi credential.
+Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together. Restoring the database without that key cannot decrypt the stored UniFi credential.
 
 ## Contributing
 

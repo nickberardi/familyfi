@@ -10,12 +10,12 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const existing = await prisma().famRule.findUnique({ where: { id }, include: { group: true } });
+    const existing = await prisma().rule.findUnique({ where: { id }, include: { group: true } });
     if (!existing) return jsonError(404, "not_found", "Rule not found.");
     if (existing.group?.protected) {
       return jsonError(409, "protected", "Protected groups cannot have category or app rules.");
     }
-    const rule = await prisma().famRule.update({
+    const rule = await prisma().rule.update({
       where: { id },
       data: { enabled: false },
     });

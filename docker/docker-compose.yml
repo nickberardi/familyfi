@@ -33,7 +33,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-familyfi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "${APP_PORT:-7001}:7001"
+      - "${FAMILYFI_PORT:-7001}:7001"
     volumes:
       - familyfi-app:/var/lib/familyfi/data
     depends_on:

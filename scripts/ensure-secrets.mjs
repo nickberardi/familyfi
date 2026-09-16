@@ -51,7 +51,7 @@ export function recoveryAdminBanner(password) {
     "  FamilyFi recovery admin",
     "    username: admin",
     `    password: ${password}`,
-    "  This is DEFAULT_PASSWORD in .env. Change it there to pick your own.",
+    "  This is FAMILYFI_DEFAULT_PASSWORD in .env. Change it there to pick your own.",
     line,
     "",
   ].join("\n");
@@ -63,9 +63,9 @@ export function ensureSecrets(options = {}) {
   const examplePath = options.examplePath ?? path.join(root, ".env.example");
   const created = [];
 
-  const processPassword = nonempty(env.DEFAULT_PASSWORD);
-  const processSession = nonempty(env.SESSION_SECRET);
-  const processKey = nonempty(env.APP_ENCRYPTION_KEY);
+  const processPassword = nonempty(env.FAMILYFI_DEFAULT_PASSWORD);
+  const processSession = nonempty(env.FAMILYFI_SESSION_SECRET);
+  const processKey = nonempty(env.FAMILYFI_ENCRYPTION_KEY);
   const processComplete =
     isDefaultPasswordValid(processPassword) &&
     isSessionSecretValid(processSession) &&
@@ -88,29 +88,29 @@ export function ensureSecrets(options = {}) {
   const written = [];
   const current = (key) => nonempty(env[key]) || nonempty(fileValues[key]);
 
-  let password = current("DEFAULT_PASSWORD");
+  let password = current("FAMILYFI_DEFAULT_PASSWORD");
   if (!isDefaultPasswordValid(password)) {
     password = generateDefaultPassword();
-    contents = setEnvFileKey(contents, "DEFAULT_PASSWORD", password);
-    written.push("DEFAULT_PASSWORD");
+    contents = setEnvFileKey(contents, "FAMILYFI_DEFAULT_PASSWORD", password);
+    written.push("FAMILYFI_DEFAULT_PASSWORD");
   }
-  env.DEFAULT_PASSWORD = password;
+  env.FAMILYFI_DEFAULT_PASSWORD = password;
 
-  let session = current("SESSION_SECRET");
+  let session = current("FAMILYFI_SESSION_SECRET");
   if (!isSessionSecretValid(session)) {
     session = generateSessionSecret();
-    contents = setEnvFileKey(contents, "SESSION_SECRET", session);
-    written.push("SESSION_SECRET");
+    contents = setEnvFileKey(contents, "FAMILYFI_SESSION_SECRET", session);
+    written.push("FAMILYFI_SESSION_SECRET");
   }
-  env.SESSION_SECRET = session;
+  env.FAMILYFI_SESSION_SECRET = session;
 
-  let key = current("APP_ENCRYPTION_KEY");
+  let key = current("FAMILYFI_ENCRYPTION_KEY");
   if (!isEncryptionKeyValid(key)) {
     key = generateEncryptionKey();
-    contents = setEnvFileKey(contents, "APP_ENCRYPTION_KEY", key);
-    written.push("APP_ENCRYPTION_KEY");
+    contents = setEnvFileKey(contents, "FAMILYFI_ENCRYPTION_KEY", key);
+    written.push("FAMILYFI_ENCRYPTION_KEY");
   }
-  env.APP_ENCRYPTION_KEY = key;
+  env.FAMILYFI_ENCRYPTION_KEY = key;
 
   if (written.length) {
     try {

@@ -103,7 +103,7 @@ model Group {
   devices          Device[]
   accounts         Account[]
   appPolicies      AppPolicy[]
-  famRules         FamRule[]
+  rules         Rule[]
 }
 
 model Account {
@@ -229,47 +229,47 @@ model ReconciliationLock {
   updatedAt DateTime @updatedAt
 }
 
-enum FamRuleKind {
+enum RuleKind {
   category
   app
 }
 
-enum FamRuleMode {
+enum RuleMode {
   always
   scheduled
 }
 
-enum FamRuleScope {
+enum RuleScope {
   group
   network
 }
 
-model FamRule {
+model Rule {
   id               String       @id @default(cuid())
-  kind             FamRuleKind
-  scope            FamRuleScope @default(group)
+  kind             RuleKind
+  scope            RuleScope @default(group)
   groupId          String?
   group            Group?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
   networkIds       String[]     @default([])
   targetIds        Int[]
   enabled          Boolean      @default(true)
-  mode             FamRuleMode  @default(always)
+  mode             RuleMode  @default(always)
   scheduleEnabled  Boolean      @default(false)
   scheduleDays     Int[]        @default([])
   scheduleStart    String?
   scheduleEnd      String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
-  policies         FamRulePolicy[]
+  policies         RulePolicy[]
 
   @@index([groupId])
   @@index([scope])
 }
 
-model FamRulePolicy {
+model RulePolicy {
   id                  String     @id @default(cuid())
-  famRuleId           String
-  famRule             FamRule    @relation(fields: [famRuleId], references: [id], onDelete: Cascade)
+  ruleId           String
+  rule             Rule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   connectionIdentity  String
   siteId              String
   unifiPolicyId       String?    @unique
@@ -283,6 +283,6 @@ model FamRulePolicy {
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
-  @@unique([famRuleId, connectionIdentity, siteId, zoneId])
+  @@unique([ruleId, connectionIdentity, siteId, zoneId])
   @@index([connectionIdentity, siteId])
 }

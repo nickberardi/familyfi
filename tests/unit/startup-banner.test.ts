@@ -6,6 +6,6 @@ describe("recoveryAdminBanner", () => {
     const banner = recoveryAdminBanner("example-pass-12");
     expect(banner).toContain("username: admin");
     expect(banner).toContain("password: example-pass-12");
-    expect(banner).toContain("DEFAULT_PASSWORD");
+    expect(banner).toContain("FAMILYFI_DEFAULT_PASSWORD");
   });
 });

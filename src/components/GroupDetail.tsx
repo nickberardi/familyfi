@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { FamRule } from "@/lib/fam-rules";
+import type { Rule } from "@/lib/rules";
 import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
 import { GroupFilterMarks } from "@/components/FilterMarks";
@@ -108,13 +108,13 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   const { groups, devices, household, mutate, loading } = useAppData();
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
-  const [rules, setRules] = useState<FamRule[]>([]);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
 
   const loadRules = useCallback(async () => {
     try {
       const [{ rules: next }, cats, apps] = await Promise.all([
-        api<{ rules: FamRule[] }>("/api/v1/rules"),
+        api<{ rules: Rule[] }>("/api/v1/rules"),
         api<{ categories: { id: number; name: string }[] }>("/api/v1/dpi/categories").catch(() => ({
           categories: [] as { id: number; name: string }[],
         })),

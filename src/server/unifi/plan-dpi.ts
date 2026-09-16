@@ -1,4 +1,4 @@
-import { AssignmentState, type FamRuleKind, type FamRuleMode, type FamRuleScope, type GroupKind } from "@prisma/client";
+import { AssignmentState, type RuleKind, type RuleMode, type RuleScope, type GroupKind } from "@prisma/client";
 import { networkInScope, type NetworkScope } from "./scope";
 import { dpiNetworkRulePolicyName, dpiRulePolicyName } from "./names";
 import { toUnifiSchedule } from "./schedule-map";
@@ -7,13 +7,13 @@ import { isSuspended, type Schedule, type Suspension } from "../schedule";
 
 export type PlanDpiRule = {
   id: string;
-  kind: FamRuleKind;
-  scope: FamRuleScope;
+  kind: RuleKind;
+  scope: RuleScope;
   groupId: string | null;
   networkIds: string[];
   targetIds: number[];
   enabled: boolean;
-  mode: FamRuleMode;
+  mode: RuleMode;
   scheduleEnabled: boolean;
   scheduleDays: number[];
   scheduleStart: string | null;
@@ -43,11 +43,11 @@ export type PlanDpiNetwork = {
 
 export type PlannedDpiPolicy = {
   key: string;
-  famRuleId: string;
+  ruleId: string;
   groupId: string | null;
   zoneId: string;
   destinationZoneId: string;
-  kind: FamRuleKind;
+  kind: RuleKind;
   targetIds: number[];
   macAddresses: string[];
   networkIds: string[];
@@ -57,8 +57,8 @@ export type PlannedDpiPolicy = {
   name: string;
 };
 
-export function plannedDpiKey(famRuleId: string, zoneId: string): string {
-  return `famRule:${famRuleId}|${zoneId}`;
+export function plannedDpiKey(ruleId: string, zoneId: string): string {
+  return `rule:${ruleId}|${zoneId}`;
 }
 
 export function planDpiPolicies(input: {
@@ -160,7 +160,7 @@ export function planDpiPolicies(input: {
     const schedule = ruleSchedule(bucket.rule);
     policies.push({
       key: plannedDpiKey(bucket.rule.id, bucket.zoneId),
-      famRuleId: bucket.rule.id,
+      ruleId: bucket.rule.id,
       groupId: bucket.group.id,
       zoneId: bucket.zoneId,
       destinationZoneId: input.destinationZoneId,
@@ -190,7 +190,7 @@ export function planDpiPolicies(input: {
         : `${bucket.networkNames.length} networks`;
     policies.push({
       key: plannedDpiKey(bucket.rule.id, bucket.zoneId),
-      famRuleId: bucket.rule.id,
+      ruleId: bucket.rule.id,
       groupId: null,
       zoneId: bucket.zoneId,
       destinationZoneId: input.destinationZoneId,

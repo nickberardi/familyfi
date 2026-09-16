@@ -1,4 +1,4 @@
-import { FamRuleScope } from "@prisma/client";
+import { RuleScope } from "@prisma/client";
 import { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
@@ -19,7 +19,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {
     const { id } = await ctx.params;
-    const rule = await prisma().famRule.findUnique({ where: { id } });
+    const rule = await prisma().rule.findUnique({ where: { id } });
     if (!rule) return jsonError(404, "not_found", "Rule not found.");
     return Response.json({ rule: publicRule(rule) });
   });
@@ -47,9 +47,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (!body.ok) return body.response;
     const parsed = PatchBody.safeParse(body.value);
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid rule update.");
-    const existing = await prisma().famRule.findUnique({ where: { id }, include: { group: true } });
+    const existing = await prisma().rule.findUnique({ where: { id }, include: { group: true } });
     if (!existing) return jsonError(404, "not_found", "Rule not found.");
-    if (existing.scope === FamRuleScope.group && existing.group?.protected) {
+    if (existing.scope === RuleScope.group && existing.group?.protected) {
       return jsonError(409, "protected", "Protected groups cannot have category or app rules.");
     }
     let targetIds = existing.targetIds;
@@ -62,7 +62,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     }
     let networkIds = existing.networkIds;
     if (parsed.data.networkIds !== undefined) {
-      if (existing.scope !== FamRuleScope.network) {
+      if (existing.scope !== RuleScope.network) {
         return jsonError(400, "invalid_request", "networkIds may only be updated on network-scoped rules.");
       }
       try {
@@ -103,7 +103,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         return jsonError(400, "invalid_schedule", error instanceof Error ? error.message : "Invalid schedule.");
       }
     }
-    const rule = await prisma().famRule.update({
+    const rule = await prisma().rule.update({
       where: { id },
       data: {
         targetIds,
@@ -120,7 +120,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const existing = await prisma().famRule.findUnique({
+    const existing = await prisma().rule.findUnique({
       where: { id },
       include: { policies: true, group: true },
     });
@@ -144,8 +144,8 @@ export async function DELETE(request: Request, ctx: Ctx) {
         // Desired-state delete still proceeds; Sync will surface connection errors.
       }
     }
-    await prisma().famRulePolicy.deleteMany({ where: { famRuleId: id } });
-    await prisma().famRule.delete({ where: { id } });
+    await prisma().rulePolicy.deleteMany({ where: { ruleId: id } });
+    await prisma().rule.delete({ where: { id } });
     const change = await enqueueChange("rule");
     return Response.json({ change });
   });

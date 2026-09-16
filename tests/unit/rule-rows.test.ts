@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRuleRows } from "@/lib/rule-rows";
-import type { FamRule } from "@/lib/fam-rules";
+import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 function group(partial: Partial<Group> & Pick<Group, "id" | "name">): Group {
@@ -18,7 +18,7 @@ function group(partial: Partial<Group> & Pick<Group, "id" | "name">): Group {
   };
 }
 
-function rule(partial: Partial<FamRule> & Pick<FamRule, "id" | "kind" | "targetIds">): FamRule {
+function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">): Rule {
   return {
     scope: "group",
     groupId: "g1",

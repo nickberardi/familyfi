@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { FamRule } from "@/lib/fam-rules";
+import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 import { GroupFilterMarks } from "./FilterMarks";
@@ -16,7 +16,7 @@ type DpiItem = { id: number; name: string };
 export function GroupGrid({ kind }: { kind: "family" | "things" }) {
   const { groups, household, mutate } = useAppData();
   const [sheet, setSheet] = useState<{ group: Group; mode: "pause" | "extend" } | null>(null);
-  const [rules, setRules] = useState<FamRule[]>([]);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
   const rows = groups.filter((group) => group.kind === kind);
   const timezone = household?.timezone ?? "America/New_York";
@@ -32,7 +32,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
   const loadRules = useCallback(async () => {
     try {
       const [{ rules: next }, cats, apps] = await Promise.all([
-        api<{ rules: FamRule[] }>("/api/v1/rules"),
+        api<{ rules: Rule[] }>("/api/v1/rules"),
         api<{ categories: DpiItem[] }>("/api/v1/dpi/categories").catch(() => ({ categories: [] as DpiItem[] })),
         api<{ applications: DpiItem[] }>("/api/v1/dpi/applications").catch(() => ({ applications: [] as DpiItem[] })),
       ]);

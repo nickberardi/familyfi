@@ -23,7 +23,7 @@ export async function PUT(request: Request, ctx: Ctx) {
     const existing = await prisma().account.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Account not found.");
     if (existing.kind === AccountKind.recovery) {
-      return jsonError(409, "recovery_account", "Change DEFAULT_PASSWORD in .env for the recovery admin.");
+      return jsonError(409, "recovery_account", "Change FAMILYFI_DEFAULT_PASSWORD in .env for the recovery admin.");
     }
     const account = await prisma().account.update({
       where: { id },

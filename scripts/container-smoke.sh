@@ -38,9 +38,9 @@ done
 run_app() {
   docker run -d --name "$app" --network "$network" -p "${host_port}:7001" \
     -e NODE_ENV=production \
-    -e DEFAULT_PASSWORD="$admin_password" \
-    -e SESSION_SECRET="$session_secret" \
-    -e APP_ENCRYPTION_KEY="$encryption_key" \
+    -e FAMILYFI_DEFAULT_PASSWORD="$admin_password" \
+    -e FAMILYFI_SESSION_SECRET="$session_secret" \
+    -e FAMILYFI_ENCRYPTION_KEY="$encryption_key" \
     -e DB_MODE=external \
     -e DB_HOST="$db" \
     -e POSTGRES_PORT=5432 \

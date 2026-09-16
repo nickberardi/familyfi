@@ -1,6 +1,6 @@
 /** Client-safe Fam rule helpers + D6 curated slots (mirrors server d6-categories). */
 
-export type FamRule = {
+export type Rule = {
   id: string;
   kind: "category" | "app";
   scope: "group" | "network";
@@ -29,25 +29,25 @@ export const D6_CATEGORY_SLOTS: readonly D6CategorySlot[] = [
   { slot: "gaming", label: "Gaming", categoryId: 8, catalogName: "Online games" },
 ] as const;
 
-export function groupScopedRules(rules: FamRule[], groupId: string): FamRule[] {
+export function groupScopedRules(rules: Rule[], groupId: string): Rule[] {
   return rules.filter((rule) => rule.scope === "group" && rule.groupId === groupId);
 }
 
 /** Find the Fam category rule for a curated D6 slot (prefer enabled). */
-export function categoryRuleForSlot(rules: FamRule[], groupId: string, categoryId: number): FamRule | undefined {
+export function categoryRuleForSlot(rules: Rule[], groupId: string, categoryId: number): Rule | undefined {
   const matches = groupScopedRules(rules, groupId).filter(
     (rule) => rule.kind === "category" && rule.targetIds.includes(categoryId),
   );
   return matches.find((rule) => rule.enabled) ?? matches[0];
 }
 
-export function appRulesForGroup(rules: FamRule[], groupId: string): FamRule[] {
+export function appRulesForGroup(rules: Rule[], groupId: string): Rule[] {
   return groupScopedRules(rules, groupId).filter((rule) => rule.kind === "app");
 }
 
 /** Parent-facing label: curated slot name, else catalog name, else generic — never raw DPI ids. */
 export function parentFacingRuleLabel(
-  rule: FamRule,
+  rule: Rule,
   catalogNames: Map<string, string>,
 ): string {
   if (rule.kind === "category") {

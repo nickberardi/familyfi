@@ -8,14 +8,14 @@ import { Card } from "@/components/ui/Controls";
 import { RuleRow, type ScheduleDraft } from "@/components/rules/RuleRow";
 import { NewRuleSheet } from "@/components/rules/NewRuleSheet";
 import { buildRuleRows, type RuleRow as RuleRowModel } from "@/lib/rule-rows";
-import { D6_CATEGORY_SLOTS, type FamRule } from "@/lib/fam-rules";
+import { D6_CATEGORY_SLOTS, type Rule } from "@/lib/rules";
 
 type DpiItem = { id: number; name: string };
 
 export default function RulesPage() {
   const { groups, unifi, mutate } = useAppData();
   const [newRuleOpen, setNewRuleOpen] = useState(false);
-  const [rules, setRules] = useState<FamRule[]>([]);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [labels, setLabels] = useState<Map<string, string>>(new Map());
 
   const loadGen = useRef(0);
@@ -24,7 +24,7 @@ export default function RulesPage() {
     const gen = ++loadGen.current;
     try {
       const [{ rules: next }, cats, apps] = await Promise.all([
-        api<{ rules: FamRule[] }>("/api/v1/rules"),
+        api<{ rules: Rule[] }>("/api/v1/rules"),
         api<{ categories: DpiItem[] }>("/api/v1/dpi/categories").catch(() => ({
           categories: [] as DpiItem[],
         })),

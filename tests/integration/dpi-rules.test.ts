@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AssignmentState, FamRuleKind, FamRuleMode, FamilyRole, GroupKind } from "@prisma/client";
+import { AssignmentState, RuleKind, RuleMode, FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as listCategories } from "@/app/api/v1/dpi/categories/route";
 import { GET as listApplications } from "@/app/api/v1/dpi/applications/route";
@@ -19,7 +19,7 @@ import {
 } from "../helpers/db";
 import { fixtureUnifiClient, policyMacs } from "../helpers/unifi-world";
 
-const PASSWORD = process.env.DEFAULT_PASSWORD ?? "ci-recovery-password";
+const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
 async function signedIn() {
   const response = await login(
@@ -73,7 +73,7 @@ describe("Phase 2 DPI rules", () => {
         unifiKeyAuthTag: Buffer.from("z"),
       },
     });
-    process.env.UNIFI_MOCK = "1";
+    process.env.FAMILYFI_UNIFI_MOCK = "1";
 
     const cats = await listCategories(request("/api/v1/dpi/categories", { auth }));
     expect(cats.status).toBe(200);
@@ -111,7 +111,7 @@ describe("Phase 2 DPI rules", () => {
   it("reconcile CUD asserts APPLICATION_CATEGORY body; off sets enabled:false; delete leaves internet untouched", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
-    process.env.UNIFI_MOCK = "1";
+    process.env.FAMILYFI_UNIFI_MOCK = "1";
     await prisma().household.update({
       where: { id: "default" },
       data: {
@@ -124,13 +124,13 @@ describe("Phase 2 DPI rules", () => {
     const group = await createFamilyGroup();
     await seedDevice({ mac: "02:00:00:00:00:01", groupId: group.id, zoneId: INTERNAL_ZONE });
 
-    const rule = await prisma().famRule.create({
+    const rule = await prisma().rule.create({
       data: {
-        kind: FamRuleKind.category,
+        kind: RuleKind.category,
         groupId: group.id,
         targetIds: [4],
         enabled: true,
-        mode: FamRuleMode.always,
+        mode: RuleMode.always,
       },
     });
 
@@ -158,11 +158,11 @@ describe("Phase 2 DPI rules", () => {
     expect(createBody.schedule).toBeUndefined();
     expect(createBody.enabled).toBe(true);
 
-    const ownership = await prisma().famRulePolicy.findFirst({ where: { famRuleId: rule.id } });
+    const ownership = await prisma().rulePolicy.findFirst({ where: { ruleId: rule.id } });
     expect(ownership?.unifiPolicyId).toBeTruthy();
     const dpiPolicyId = ownership!.unifiPolicyId!;
 
-    await prisma().famRule.update({ where: { id: rule.id }, data: { enabled: false } });
+    await prisma().rule.update({ where: { id: rule.id }, data: { enabled: false } });
     client.calls.length = 0;
     expect(await runReconcileOnce()).toBe(true);
     const updateCall = client.calls.find(
@@ -179,11 +179,11 @@ describe("Phase 2 DPI rules", () => {
     expect(internetUnifiIds.size).toBeGreaterThan(0);
     expect(client.state.policies.some((p) => p.id === ADMIN_POLICY_ID)).toBe(true);
 
-    await prisma().famRulePolicy.deleteMany({ where: { famRuleId: rule.id } });
-    // Re-create ownership then delete via reconcile path: remove FamRule, keep policy row? API deletes UniFi then rows.
+    await prisma().rulePolicy.deleteMany({ where: { ruleId: rule.id } });
+    // Re-create ownership then delete via reconcile path: remove Rule, keep policy row? API deletes UniFi then rows.
     // Simulate API delete: delete UniFi by recorded id, then DB rows.
     await client.deletePolicy("11111111-1111-4111-8111-111111111111", dpiPolicyId);
-    await prisma().famRule.delete({ where: { id: rule.id } });
+    await prisma().rule.delete({ where: { id: rule.id } });
     // Recreate empty — ensure internet untouched
     const internetAfter = await prisma().appPolicy.findMany();
     expect(internetAfter.map((r) => r.unifiPolicyId).sort()).toEqual([...internetUnifiIds].sort());
@@ -194,7 +194,7 @@ describe("Phase 2 DPI rules", () => {
   it("creates app rule via API, reconcile asserts APPLICATION body, and off route works", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
-    process.env.UNIFI_MOCK = "1";
+    process.env.FAMILYFI_UNIFI_MOCK = "1";
     await prisma().household.update({
       where: { id: "default" },
       data: {
@@ -262,7 +262,7 @@ describe("Phase 2 DPI rules", () => {
       { params: Promise.resolve({ id: createdBody.rule.id }) },
     );
     expect(deleted.status).toBe(200);
-    expect(await prisma().famRule.count()).toBe(0);
+    expect(await prisma().rule.count()).toBe(0);
     expect(client.state.policies.some((p) => p.id === ADMIN_POLICY_ID)).toBe(true);
   });
 });
