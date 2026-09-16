@@ -20,7 +20,7 @@ export {
   dpiAppNetworkBlockPolicy,
   spikePolicyName,
   toPolicyUpdate,
-  isFamPolicyName,
+  isOwnedPolicyName,
   INTERNET_BLOCK_ACTION,
 } from "./payloads";
 export { quarantinePolicyName, groupPolicyName, dpiRulePolicyName, dpiNetworkRulePolicyName } from "./names";
@@ -35,4 +35,4 @@ export { relativeOrderPreserved, orderedPolicyIds } from "./ordering";
 export { toUnifiSchedule, unifiPolicyEnabled } from "./schedule-map";
 export { planPolicies, plannedKey, type PlannedPolicy } from "./plan";
 export { networkInScope, resolveNetworkScope } from "./scope";
-export { UNIFI_PAGE_LIMIT, FAMILYFI_POLICY_PREFIX, FAM_POLICY_PREFIX, UNIFI_API_VERSION } from "./types";
+export { UNIFI_PAGE_LIMIT, FAMILYFI_POLICY_PREFIX, UNIFI_API_VERSION } from "./types";

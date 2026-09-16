@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FamRuleKind, FamRuleMode, FamRuleScope } from "@prisma/client";
+import { RuleKind, RuleMode, RuleScope } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as listRules, POST as createRule } from "@/app/api/v1/rules/route";
 import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
@@ -17,7 +17,7 @@ import {
 } from "../helpers/db";
 import { fixtureUnifiClient } from "../helpers/unifi-world";
 
-const PASSWORD = process.env.DEFAULT_PASSWORD ?? "ci-recovery-password";
+const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
 async function signedIn() {
   const response = await login(
@@ -41,7 +41,7 @@ async function withMockKey() {
       unifiKeyLastFour: "mock",
     },
   });
-  process.env.UNIFI_MOCK = "1";
+  process.env.FAMILYFI_UNIFI_MOCK = "1";
 }
 
 describe("Phase 3 network-scoped DPI", () => {
@@ -170,7 +170,7 @@ describe("Phase 3 network-scoped DPI", () => {
     expect(createBody.destination.trafficFilter.applicationCategoryFilter.applicationCategoryIds).toEqual([4]);
     expect(createBody.schedule).toBeUndefined();
 
-    const ownership = await prisma().famRulePolicy.findFirst({ where: { famRuleId: createdBody.rule.id } });
+    const ownership = await prisma().rulePolicy.findFirst({ where: { ruleId: createdBody.rule.id } });
     expect(ownership?.unifiPolicyId).toBeTruthy();
 
     const patched = await patchRule(
@@ -189,7 +189,7 @@ describe("Phase 3 network-scoped DPI", () => {
       { params: Promise.resolve({ id: createdBody.rule.id }) },
     );
     expect(deleted.status).toBe(200);
-    expect(await prisma().famRule.count()).toBe(0);
+    expect(await prisma().rule.count()).toBe(0);
   });
 
   it("Settings descope prunes network ids and deletes orphan rules (no silent desired-state orphan)", async () => {
@@ -204,26 +204,26 @@ describe("Phase 3 network-scoped DPI", () => {
       },
     });
 
-    const rule = await prisma().famRule.create({
+    const rule = await prisma().rule.create({
       data: {
-        kind: FamRuleKind.category,
-        scope: FamRuleScope.network,
+        kind: RuleKind.category,
+        scope: RuleScope.network,
         groupId: null,
         networkIds: [INTERNAL_NETWORK, IOT_NETWORK],
         targetIds: [8],
         enabled: true,
-        mode: FamRuleMode.always,
+        mode: RuleMode.always,
       },
     });
-    const orphanOnly = await prisma().famRule.create({
+    const orphanOnly = await prisma().rule.create({
       data: {
-        kind: FamRuleKind.app,
-        scope: FamRuleScope.network,
+        kind: RuleKind.app,
+        scope: RuleScope.network,
         groupId: null,
         networkIds: [IOT_NETWORK],
         targetIds: [10001],
         enabled: true,
-        mode: FamRuleMode.always,
+        mode: RuleMode.always,
       },
     });
 
@@ -240,20 +240,20 @@ describe("Phase 3 network-scoped DPI", () => {
     expect(result.pruned).toBe(1);
     expect(result.deleted).toBe(1);
 
-    const kept = await prisma().famRule.findUnique({ where: { id: rule.id } });
+    const kept = await prisma().rule.findUnique({ where: { id: rule.id } });
     expect(kept?.networkIds).toEqual([INTERNAL_NETWORK]);
-    expect(await prisma().famRule.findUnique({ where: { id: orphanOnly.id } })).toBeNull();
+    expect(await prisma().rule.findUnique({ where: { id: orphanOnly.id } })).toBeNull();
 
     // Also assert Settings PUT path invokes prune (via saveManagedNetworks).
     const auth = await signedIn();
-    await prisma().famRule.create({
+    await prisma().rule.create({
       data: {
-        kind: FamRuleKind.category,
-        scope: FamRuleScope.network,
+        kind: RuleKind.category,
+        scope: RuleScope.network,
         networkIds: [INTERNAL_NETWORK],
         targetIds: [4],
         enabled: true,
-        mode: FamRuleMode.always,
+        mode: RuleMode.always,
       },
     });
     const put = await putUnifiSettings(
@@ -265,19 +265,19 @@ describe("Phase 3 network-scoped DPI", () => {
       }),
     );
     expect(put.status).toBe(200);
-    expect(await prisma().famRule.count({ where: { scope: FamRuleScope.network } })).toBe(0);
+    expect(await prisma().rule.count({ where: { scope: RuleScope.network } })).toBe(0);
   });
 
   it("lists network rules alongside group rules", async () => {
     const auth = await signedIn();
-    await prisma().famRule.create({
+    await prisma().rule.create({
       data: {
-        kind: FamRuleKind.category,
-        scope: FamRuleScope.network,
+        kind: RuleKind.category,
+        scope: RuleScope.network,
         networkIds: [INTERNAL_NETWORK],
         targetIds: [4],
         enabled: true,
-        mode: FamRuleMode.always,
+        mode: RuleMode.always,
       },
     });
     const listed = await listRules(request("/api/v1/rules", { auth }));

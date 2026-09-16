@@ -369,7 +369,7 @@ export default function SettingsPage() {
               <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-semibold">{recovery.displayName}</div>
                 <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">
-                  Recovery admin · username {recovery.username} · password is DEFAULT_PASSWORD on the server
+                  Recovery admin · username {recovery.username} · password is FAMILYFI_DEFAULT_PASSWORD on the server
                 </div>
               </div>
             </div>

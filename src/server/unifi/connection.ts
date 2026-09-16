@@ -30,7 +30,7 @@ export function clientForHousehold(household: Household): UnifiClient {
     const message = error instanceof Error ? error.message : String(error);
     if (/authenticate data|Unsupported state/i.test(message)) {
       throw new UnifiConfigError(
-        "Could not decrypt the stored UniFi API key. APP_ENCRYPTION_KEY no longer matches the key used when it was saved. Restore the previous APP_ENCRYPTION_KEY, or set a stable one and re-enter the API key in Settings.",
+        "Could not decrypt the stored UniFi API key. FAMILYFI_ENCRYPTION_KEY no longer matches the key used when it was saved. Restore the previous FAMILYFI_ENCRYPTION_KEY, or set a stable one and re-enter the API key in Settings.",
       );
     }
     throw error;

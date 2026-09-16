@@ -4,7 +4,7 @@ The web UI and any future native client use `/api/v1`. The source of truth is [`
 
 Browser mutations after login send `X-CSRF-Token` matching the `familyfi_csrf` cookie. Native clients send `Authorization: Bearer`.
 
-Normal payloads never return password hashes, `DEFAULT_PASSWORD`, raw UniFi keys, or firewall JSON.
+Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw UniFi keys, or firewall JSON.
 
 ## Implemented
 

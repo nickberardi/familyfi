@@ -19,7 +19,7 @@ import { AssignmentState } from "@prisma/client";
 import { authFromLogin, request } from "../helpers/http";
 import { INTERNAL_NETWORK, INTERNAL_ZONE, resetDatabase, seedDevice } from "../helpers/db";
 
-const PASSWORD = process.env.DEFAULT_PASSWORD ?? "ci-recovery-password";
+const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
 async function signedIn() {
   const response = await login(
@@ -133,7 +133,7 @@ describe("v1 API contracts", () => {
 
     const unifi = await getUnifi(request("/api/v1/settings/unifi", { auth }));
     const unifiBody = await unifi.json();
-    expect(JSON.stringify(unifiBody)).not.toMatch(/apiKey[^M]|ciphertext|DEFAULT_PASSWORD/);
+    expect(JSON.stringify(unifiBody)).not.toMatch(/apiKey[^M]|ciphertext|FAMILYFI_DEFAULT_PASSWORD/);
 
     const sync = await getSync(request("/api/v1/sync", { auth }));
     expect(sync.status).toBe(200);

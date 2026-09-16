@@ -1,4 +1,4 @@
-import { FamRuleKind, FamRuleMode, FamRuleScope, type FamRule, type Group } from "@prisma/client";
+import { RuleKind, RuleMode, RuleScope, type Rule, type Group } from "@prisma/client";
 import { assertSchedule } from "./schedule";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
 
@@ -15,7 +15,7 @@ export type PublicRule = {
   internet: false;
 };
 
-export function publicRule(rule: FamRule): PublicRule {
+export function publicRule(rule: Rule): PublicRule {
   return {
     id: rule.id,
     kind: rule.kind,
@@ -35,12 +35,12 @@ export function publicRule(rule: FamRule): PublicRule {
   };
 }
 
-export function normalizeTargetIds(kind: FamRuleKind, raw: number[]): number[] {
+export function normalizeTargetIds(kind: RuleKind, raw: number[]): number[] {
   const ids = [...new Set(raw.map((n) => Math.trunc(n)).filter((n) => Number.isFinite(n) && n > 0))].sort(
     (a, b) => a - b,
   );
   if (ids.length === 0) throw new Error("At least one target id is required.");
-  if (kind === FamRuleKind.app && ids.length > 100) {
+  if (kind === RuleKind.app && ids.length > 100) {
     throw new Error("App rules may target at most 100 applications.");
   }
   return ids;
@@ -106,14 +106,14 @@ export function parseRuleModeSchedule(input: {
   mode?: "always" | "scheduled";
   schedule?: { enabled: boolean; days: number[]; start: string | null; end: string | null };
 }): {
-  mode: FamRuleMode;
+  mode: RuleMode;
   scheduleEnabled: boolean;
   scheduleDays: number[];
   scheduleStart: string | null;
   scheduleEnd: string | null;
 } {
-  const mode = input.mode === "scheduled" || input.schedule?.enabled ? FamRuleMode.scheduled : FamRuleMode.always;
-  if (mode === FamRuleMode.always) {
+  const mode = input.mode === "scheduled" || input.schedule?.enabled ? RuleMode.scheduled : RuleMode.always;
+  if (mode === RuleMode.always) {
     return {
       mode,
       scheduleEnabled: false,
@@ -138,4 +138,4 @@ export function parseRuleModeSchedule(input: {
   };
 }
 
-export { FamRuleScope };
+export { RuleScope };

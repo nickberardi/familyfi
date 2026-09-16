@@ -10,7 +10,7 @@
  *
  * Two marks from the prototype are deliberately absent: the purple upstream/DNS
  * state and the Porn slot. Both are out for v0.3.0 (issue #29), so a mark here
- * is only ever Fam-owned On or Off.
+ * is only ever FamilyFi-owned On or Off.
  */
 
 import { useState, type ReactNode } from "react";
@@ -20,8 +20,8 @@ import {
   categoryRuleForSlot,
   glyphForAppName,
   parentFacingRuleLabel,
-  type FamRule,
-} from "@/lib/fam-rules";
+  type Rule,
+} from "@/lib/rules";
 import { CategoryGlyph } from "@/components/ui/CategoryGlyph";
 import { FilterSheet, type FilterSheetState } from "@/components/filters/FilterSheet";
 import { AddAppSheet } from "@/components/filters/AddAppSheet";
@@ -93,7 +93,7 @@ export function GroupFilterMarks({
   onRulesChanged,
 }: {
   group: Group;
-  rules: FamRule[];
+  rules: Rule[];
   catalogNames: Map<string, string>;
   /** The + tile is a member-page action only, never the family-list card (A5). */
   showAppAdd?: boolean;

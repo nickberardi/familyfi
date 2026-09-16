@@ -7,7 +7,7 @@ export function recoveryAdminBanner(password: string): string {
     "  FamilyFi recovery admin",
     "    username: admin",
     `    password: ${password}`,
-    "  This is DEFAULT_PASSWORD in .env. Change it there to pick your own.",
+    "  This is FAMILYFI_DEFAULT_PASSWORD in .env. Change it there to pick your own.",
     LINE,
     "",
   ].join("\n");
@@ -21,7 +21,7 @@ export function unifiMockBanner(): string {
     "    Settings API key: mock-unifi-key",
     "    Console: 127.0.0.1  (https://127.0.0.1/proxy/network/integration)",
     "    Extra adult login: pat  (same password as admin)",
-    "  Turn UNIFI_MOCK off to talk to a real gateway. Mocks do not prove enforcement.",
+    "  Turn FAMILYFI_UNIFI_MOCK off to talk to a real gateway. Mocks do not prove enforcement.",
     LINE,
     "",
   ].join("\n");

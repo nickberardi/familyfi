@@ -12,17 +12,17 @@ export async function register() {
     return;
   }
   const { logRecoveryAdmin, logUnifiMock } = await import("./server/startup-banner");
-  logRecoveryAdmin(settings.DEFAULT_PASSWORD);
-  if (settings.UNIFI_MOCK) logUnifiMock();
+  logRecoveryAdmin(settings.FAMILYFI_DEFAULT_PASSWORD);
+  if (settings.FAMILYFI_UNIFI_MOCK) logUnifiMock();
   else if (unifiMockRequested()) {
-    console.warn("UNIFI_MOCK is set but ignored because NODE_ENV is production.");
+    console.warn("FAMILYFI_UNIFI_MOCK is set but ignored because NODE_ENV is production.");
   }
   const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
   const { startReconciliation } = await import("./server/reconciliation");
   try {
     await ensureRecoveryAccount();
     await ensureHousehold();
-    if (settings.UNIFI_MOCK) {
+    if (settings.FAMILYFI_UNIFI_MOCK) {
       const { ensureDevDummyData } = await import("./server/dev-seed");
       await ensureDevDummyData();
     }

@@ -63,7 +63,7 @@ paths:
       tags: [Auth]
       summary: Sign in
       description: |
-        Authenticate the recovery username `admin` against DEFAULT_PASSWORD,
+        Authenticate the recovery username `admin` against FAMILYFI_DEFAULT_PASSWORD,
         or a personal adult account against its stored password hash.
         Browser clients receive an httpOnly session cookie and a readable CSRF
         cookie. Native clients set `client` to `native` and receive a bearer
@@ -291,7 +291,7 @@ paths:
       operationId: updateAccountPassword
       tags: [Accounts]
       summary: Set a personal account password
-      description: Revokes existing sessions for that account. Recovery admin uses DEFAULT_PASSWORD.
+      description: Revokes existing sessions for that account. Recovery admin uses FAMILYFI_DEFAULT_PASSWORD.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/AccountId"

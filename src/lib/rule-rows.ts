@@ -1,5 +1,5 @@
 /**
- * Flattens groups + Fam rules into the one row shape the Rules table renders.
+ * Flattens groups + rules into the one row shape the Rules table renders.
  *
  * The design has a single row template for every line in the table — Internet
  * parents, nested category/app filters, and network-scoped rules. They differ
@@ -7,7 +7,7 @@
  * pure model means the table component has no per-kind branching left in it.
  */
 
-import { parentFacingRuleLabel, glyphForAppName, D6_CATEGORY_SLOTS, type FamRule } from "./fam-rules";
+import { parentFacingRuleLabel, glyphForAppName, D6_CATEGORY_SLOTS, type Rule } from "./rules";
 import { roleTag } from "./display";
 import type { Group } from "./types";
 
@@ -39,10 +39,10 @@ export type RuleRow = {
   /** Set on Internet rows. */
   group?: Group;
   /** Set on filter and network rows. */
-  rule?: FamRule;
+  rule?: Rule;
 };
 
-function curatedSlot(rule: FamRule): "video" | "social" | "gaming" | undefined {
+function curatedSlot(rule: Rule): "video" | "social" | "gaming" | undefined {
   if (rule.kind !== "category") return undefined;
   return D6_CATEGORY_SLOTS.find((s) => rule.targetIds.includes(s.categoryId))?.slot;
 }
@@ -75,7 +75,7 @@ function internetRow(group: Group): RuleRow {
   };
 }
 
-function filterRow(rule: FamRule, labels: Map<string, string>): RuleRow {
+function filterRow(rule: Rule, labels: Map<string, string>): RuleRow {
   const label = parentFacingRuleLabel(rule, labels);
   const slot = curatedSlot(rule);
   return {
@@ -95,7 +95,7 @@ function filterRow(rule: FamRule, labels: Map<string, string>): RuleRow {
 }
 
 function networkRow(
-  rule: FamRule,
+  rule: Rule,
   labels: Map<string, string>,
   networkNames: Map<string, string>,
 ): RuleRow {
@@ -129,7 +129,7 @@ export function buildRuleRows({
   networkNames,
 }: {
   groups: Group[];
-  rules: FamRule[];
+  rules: Rule[];
   labels: Map<string, string>;
   networkNames: Map<string, string>;
 }): RuleRow[] {

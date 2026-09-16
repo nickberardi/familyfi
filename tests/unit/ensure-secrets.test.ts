@@ -14,17 +14,17 @@ describe("ensureSecrets", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
     const envPath = path.join(dir, ".env");
     const examplePath = path.join(dir, ".env.example");
-    writeFileSync(examplePath, "DEFAULT_PASSWORD=\nPOSTGRES_PASSWORD=\n");
+    writeFileSync(examplePath, "FAMILYFI_DEFAULT_PASSWORD=\nPOSTGRES_PASSWORD=\n");
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
-    expect(result.written).toEqual(["DEFAULT_PASSWORD", "SESSION_SECRET", "APP_ENCRYPTION_KEY"]);
+    expect(result.written).toEqual(["FAMILYFI_DEFAULT_PASSWORD", "FAMILYFI_SESSION_SECRET", "FAMILYFI_ENCRYPTION_KEY"]);
     const file = readFileSync(envPath, "utf8");
-    expect(isDefaultPasswordValid(env.DEFAULT_PASSWORD)).toBe(true);
-    expect(isSessionSecretValid(env.SESSION_SECRET)).toBe(true);
-    expect(isEncryptionKeyValid(env.APP_ENCRYPTION_KEY)).toBe(true);
-    expect(file).toContain(`DEFAULT_PASSWORD=${env.DEFAULT_PASSWORD}`);
-    expect(file).toContain(`SESSION_SECRET=${env.SESSION_SECRET}`);
-    expect(file).toContain(`APP_ENCRYPTION_KEY=${env.APP_ENCRYPTION_KEY}`);
+    expect(isDefaultPasswordValid(env.FAMILYFI_DEFAULT_PASSWORD)).toBe(true);
+    expect(isSessionSecretValid(env.FAMILYFI_SESSION_SECRET)).toBe(true);
+    expect(isEncryptionKeyValid(env.FAMILYFI_ENCRYPTION_KEY)).toBe(true);
+    expect(file).toContain(`FAMILYFI_DEFAULT_PASSWORD=${env.FAMILYFI_DEFAULT_PASSWORD}`);
+    expect(file).toContain(`FAMILYFI_SESSION_SECRET=${env.FAMILYFI_SESSION_SECRET}`);
+    expect(file).toContain(`FAMILYFI_ENCRYPTION_KEY=${env.FAMILYFI_ENCRYPTION_KEY}`);
   });
 
   it("does not require a .env file when process env already has secrets", () => {
@@ -32,9 +32,9 @@ describe("ensureSecrets", () => {
     const envPath = path.join(dir, ".env");
     const examplePath = path.join(dir, ".env.example");
     const env: Record<string, string | undefined> = {
-      DEFAULT_PASSWORD: "recovery-pass",
-      SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
-      APP_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      FAMILYFI_DEFAULT_PASSWORD: "recovery-pass",
+      FAMILYFI_SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
+      FAMILYFI_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
     };
     const result = ensureSecrets({ envPath, examplePath, env });
     expect(result.written).toEqual([]);
@@ -51,14 +51,14 @@ describe("ensureSecrets", () => {
     writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
     writeFileSync(
       envPath,
-      `DEFAULT_PASSWORD=${password}\nSESSION_SECRET=${session}\nAPP_ENCRYPTION_KEY=${key}\n`,
+      `FAMILYFI_DEFAULT_PASSWORD=${password}\nFAMILYFI_SESSION_SECRET=${session}\nFAMILYFI_ENCRYPTION_KEY=${key}\n`,
     );
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
     expect(result.written).toEqual([]);
-    expect(env.DEFAULT_PASSWORD).toBe(password);
-    expect(env.SESSION_SECRET).toBe(session);
-    expect(env.APP_ENCRYPTION_KEY).toBe(key);
+    expect(env.FAMILYFI_DEFAULT_PASSWORD).toBe(password);
+    expect(env.FAMILYFI_SESSION_SECRET).toBe(session);
+    expect(env.FAMILYFI_ENCRYPTION_KEY).toBe(key);
   });
 
   it("replaces invalid placeholders", () => {
@@ -66,13 +66,13 @@ describe("ensureSecrets", () => {
     const envPath = path.join(dir, ".env");
     const examplePath = path.join(dir, ".env.example");
     writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
-    writeFileSync(envPath, "DEFAULT_PASSWORD=short\nSESSION_SECRET=short\nAPP_ENCRYPTION_KEY=nope\n");
+    writeFileSync(envPath, "FAMILYFI_DEFAULT_PASSWORD=short\nFAMILYFI_SESSION_SECRET=short\nFAMILYFI_ENCRYPTION_KEY=nope\n");
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
-    expect(result.written).toEqual(["DEFAULT_PASSWORD", "SESSION_SECRET", "APP_ENCRYPTION_KEY"]);
-    expect(isDefaultPasswordValid(env.DEFAULT_PASSWORD)).toBe(true);
-    expect(isSessionSecretValid(env.SESSION_SECRET)).toBe(true);
-    expect(isEncryptionKeyValid(env.APP_ENCRYPTION_KEY)).toBe(true);
+    expect(result.written).toEqual(["FAMILYFI_DEFAULT_PASSWORD", "FAMILYFI_SESSION_SECRET", "FAMILYFI_ENCRYPTION_KEY"]);
+    expect(isDefaultPasswordValid(env.FAMILYFI_DEFAULT_PASSWORD)).toBe(true);
+    expect(isSessionSecretValid(env.FAMILYFI_SESSION_SECRET)).toBe(true);
+    expect(isEncryptionKeyValid(env.FAMILYFI_ENCRYPTION_KEY)).toBe(true);
   });
 
   it("writes secrets to an explicit envPath (volume-backed path in Docker)", () => {
@@ -84,7 +84,7 @@ describe("ensureSecrets", () => {
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
     expect(result.envPath).toBe(envPath);
-    expect(result.written).toEqual(["DEFAULT_PASSWORD", "SESSION_SECRET", "APP_ENCRYPTION_KEY"]);
-    expect(readFileSync(result.envPath, "utf8")).toContain(`APP_ENCRYPTION_KEY=${env.APP_ENCRYPTION_KEY}`);
+    expect(result.written).toEqual(["FAMILYFI_DEFAULT_PASSWORD", "FAMILYFI_SESSION_SECRET", "FAMILYFI_ENCRYPTION_KEY"]);
+    expect(readFileSync(result.envPath, "utf8")).toContain(`FAMILYFI_ENCRYPTION_KEY=${env.FAMILYFI_ENCRYPTION_KEY}`);
   });
 });

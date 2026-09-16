@@ -14,7 +14,7 @@ import { CSRF_HEADER } from "@/lib/constants";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
-const PASSWORD = process.env.DEFAULT_PASSWORD ?? "ci-recovery-password";
+const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
 async function browserLogin(username = "admin", password = PASSWORD) {
   const response = await login(
@@ -54,7 +54,7 @@ describe("auth and accounts API", () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
-    expect(JSON.stringify(body)).not.toMatch(/password|ciphertext|DEFAULT_PASSWORD/i);
+    expect(JSON.stringify(body)).not.toMatch(/password|ciphertext|FAMILYFI_DEFAULT_PASSWORD/i);
   });
 
   it("signs in recovery admin with cookies and CSRF", async () => {

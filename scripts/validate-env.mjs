@@ -9,7 +9,7 @@ if (result.created.includes(".env")) console.log("wrote .env from .env.example")
 if (result.written.length) {
   console.log(`generated ${result.written.join(", ")} in ${result.envPath}`);
 }
-if (result.written.includes("DEFAULT_PASSWORD")) {
+if (result.written.includes("FAMILYFI_DEFAULT_PASSWORD")) {
   console.log(recoveryAdminBanner(result.defaultPassword));
 }
 assertEnv();

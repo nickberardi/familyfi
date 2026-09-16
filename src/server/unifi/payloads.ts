@@ -1,10 +1,10 @@
 import { normalizeMac } from "../mac";
-import { FAMILYFI_POLICY_PREFIX, type FirewallPolicy, type FirewallPolicyWrite, type UnifiFirewallSchedule } from "./types";
+import { FAMILYFI_POLICY_PREFIX, LEGACY_POLICY_PREFIX, type FirewallPolicy, type FirewallPolicyWrite, type UnifiFirewallSchedule } from "./types";
 
 export const INTERNET_BLOCK_ACTION = "BLOCK" as const;
 
-export function isFamPolicyName(name: string): boolean {
-  return name.startsWith(FAMILYFI_POLICY_PREFIX) || name.startsWith("fam-");
+export function isOwnedPolicyName(name: string): boolean {
+  return name.startsWith(FAMILYFI_POLICY_PREFIX) || name.startsWith(LEGACY_POLICY_PREFIX);
 }
 
 export function sanitizeInstallId(value: string): string {

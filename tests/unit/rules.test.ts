@@ -5,10 +5,10 @@ import {
   categoryRuleForSlot,
   glyphForAppName,
   parentFacingRuleLabel,
-  type FamRule,
-} from "@/lib/fam-rules";
+  type Rule,
+} from "@/lib/rules";
 
-function rule(partial: Partial<FamRule> & Pick<FamRule, "id" | "kind" | "targetIds">): FamRule {
+function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">): Rule {
   return {
     scope: "group",
     groupId: "g1",
@@ -21,7 +21,7 @@ function rule(partial: Partial<FamRule> & Pick<FamRule, "id" | "kind" | "targetI
   };
 }
 
-describe("fam-rules helpers", () => {
+describe("rules helpers", () => {
   it("exposes three curated D6 slots without Porn", () => {
     expect(D6_CATEGORY_SLOTS.map((s) => s.slot)).toEqual(["video", "social", "gaming"]);
     expect(D6_CATEGORY_SLOTS.map((s) => s.categoryId)).toEqual([4, 24, 8]);

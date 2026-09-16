@@ -1,4 +1,4 @@
-import { AssignmentState, FamRuleKind, FamRuleMode, GroupKind } from "@prisma/client";
+import { AssignmentState, RuleKind, RuleMode, GroupKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { planDpiPolicies } from "@/server/unifi/plan-dpi";
 
@@ -31,13 +31,13 @@ describe("planDpiPolicies", () => {
       rules: [
         {
           id: "r1",
-          kind: FamRuleKind.category,
+          kind: RuleKind.category,
           scope: "group" as const,
           groupId: "g1",
           networkIds: [],
           targetIds: [4],
           enabled: true,
-          mode: FamRuleMode.always,
+          mode: RuleMode.always,
           scheduleEnabled: false,
           scheduleDays: [],
           scheduleStart: null,
@@ -45,13 +45,13 @@ describe("planDpiPolicies", () => {
         },
         {
           id: "r2",
-          kind: FamRuleKind.app,
+          kind: RuleKind.app,
           scope: "group" as const,
           groupId: "g2",
           networkIds: [],
           targetIds: [10001],
           enabled: true,
-          mode: FamRuleMode.always,
+          mode: RuleMode.always,
           scheduleEnabled: false,
           scheduleDays: [],
           scheduleStart: null,
@@ -60,7 +60,7 @@ describe("planDpiPolicies", () => {
       ],
     });
     expect(policies).toHaveLength(1);
-    expect(policies[0]?.famRuleId).toBe("r1");
+    expect(policies[0]?.ruleId).toBe("r1");
     expect(policies[0]?.macAddresses).toEqual(["02:00:00:00:00:01"]);
     expect(policies[0]?.schedule).toBeUndefined();
   });
@@ -80,13 +80,13 @@ describe("planDpiPolicies", () => {
       rules: [
         {
           id: "rn1",
-          kind: FamRuleKind.category,
+          kind: RuleKind.category,
           scope: "network" as const,
           groupId: null,
           networkIds: ["net-a", "net-unmanaged"],
           targetIds: [24],
           enabled: true,
-          mode: FamRuleMode.always,
+          mode: RuleMode.always,
           scheduleEnabled: false,
           scheduleDays: [],
           scheduleStart: null,
@@ -94,13 +94,13 @@ describe("planDpiPolicies", () => {
         },
         {
           id: "rn-orphan",
-          kind: FamRuleKind.app,
+          kind: RuleKind.app,
           scope: "network" as const,
           groupId: null,
           networkIds: ["net-unmanaged"],
           targetIds: [10001],
           enabled: true,
-          mode: FamRuleMode.always,
+          mode: RuleMode.always,
           scheduleEnabled: false,
           scheduleDays: [],
           scheduleStart: null,

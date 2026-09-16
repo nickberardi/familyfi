@@ -23,9 +23,9 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DEFAULT_PASSWORD: ci-recovery-password
-      SESSION_SECRET: ci-only-session-secret-32chars!!
-      APP_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+      FAMILYFI_DEFAULT_PASSWORD: ci-recovery-password
+      FAMILYFI_SESSION_SECRET: ci-only-session-secret-32chars!!
+      FAMILYFI_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
       DB_MODE: external
       DB_HOST: 127.0.0.1
       POSTGRES_PORT: "5432"
@@ -68,9 +68,9 @@ jobs:
           --health-retries 20
     env:
       CI: "1"
-      DEFAULT_PASSWORD: ci-recovery-password
-      SESSION_SECRET: ci-only-session-secret-32chars!!
-      APP_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+      FAMILYFI_DEFAULT_PASSWORD: ci-recovery-password
+      FAMILYFI_SESSION_SECRET: ci-only-session-secret-32chars!!
+      FAMILYFI_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
       DB_MODE: external
       DB_HOST: 127.0.0.1
       POSTGRES_PORT: "5432"
@@ -78,7 +78,7 @@ jobs:
       POSTGRES_USER: familyfi
       POSTGRES_PASSWORD: familyfi-ci
       PLAYWRIGHT_PORT: "3100"
-      UNIFI_MOCK: "1"
+      FAMILYFI_UNIFI_MOCK: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

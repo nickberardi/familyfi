@@ -17,8 +17,8 @@ Human-facing product docs live in [README.md](README.md) and `docs/`. This file 
 - One deployment serves one household. Desired state is in PostgreSQL; UniFi firewall policies are enforcement only.
 - Never modify, disable, delete, or reorder administrator-created policies. Never call the UniFi policy ordering PUT. Own policies by recorded IDs and creation evidence, not a `FamilyFi ` name prefix alone.
 - All UniFi calls are server-side. Do not put keys or UniFi clients in the browser.
-- Do not create UniFi Object Manager groups. Operators paste an Integration API key in Settings; FamilyFi encrypts it with `APP_ENCRYPTION_KEY`.
-- `UNIFI_MOCK=1` is local-only dummy UniFi plus a seeded household for UI work. Never treat it as enforcement. It is ignored when `NODE_ENV=production`.
+- Do not create UniFi Object Manager groups. Operators paste an Integration API key in Settings; FamilyFi encrypts it with `FAMILYFI_ENCRYPTION_KEY`.
+- `FAMILYFI_UNIFI_MOCK=1` is local-only dummy UniFi plus a seeded household for UI work. Never treat it as enforcement. It is ignored when `NODE_ENV=production`.
 - Pause suspends schedule enforcement (`enabled: false` on app-owned policies, schedule preserved). Resume is `enabled: true`; bedtime may still block. Recurring bedtime is the UniFi policy `schedule`, not clock-driven enable/disable at window edges.
 - Protection is per group. Do not expose controls that bypass protection.
 - Unassigned devices are **quarantined** in the API and tests; the Devices UI may say **Unassigned**. Discovery and quarantine only include clients on managed VLANs.
@@ -50,11 +50,11 @@ UniFi integration: official Network Integration API with `X-API-KEY`. Local base
 | Target | Behavior |
 | --- | --- |
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate |
-| `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
+| `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `FAMILYFI_UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
 | `make test` | Unit tests, then integration tests against `familyfi_test` |
 | `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database) |
 | `make test-api` | OpenAPI lint and route/method contract |
-| `make test-browser` | Playwright desktop/phone smoke (`DEFAULT_PASSWORD`, running app or CI webServer) |
+| `make test-browser` | Playwright desktop/phone smoke (`FAMILYFI_DEFAULT_PASSWORD`, running app or CI webServer) |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
 | `make lint` / `make typecheck` / `make build` | Checks and production build |
 | `make docker-build` | Build `familyfi:dev` |

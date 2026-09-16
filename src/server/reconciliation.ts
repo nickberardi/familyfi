@@ -258,8 +258,8 @@ async function tick(owner: string): Promise<boolean> {
       }
     }
 
-    const famRules = await prisma().famRule.findMany();
-    const famRulePolicies = await prisma().famRulePolicy.findMany({
+    const rules = await prisma().rule.findMany();
+    const rulePolicies = await prisma().rulePolicy.findMany({
       where: { connectionIdentity: identity, siteId },
     });
     const { policies: desiredDpi, retainRuleIds, orphanRuleIds } = planDpiPolicies({
@@ -277,7 +277,7 @@ async function tick(owner: string): Promise<boolean> {
         zoneId: network.zoneId ?? null,
       })),
       networkScope: scope,
-      rules: famRules.map((rule) => ({
+      rules: rules.map((rule) => ({
         ...rule,
         groupId: rule.groupId,
         networkIds: rule.networkIds,
@@ -328,8 +328,8 @@ async function tick(owner: string): Promise<boolean> {
                 schedule: planned.schedule,
               });
       const fingerprint = policyFingerprint(write);
-      const existing = famRulePolicies.find(
-        (row) => plannedDpiKey(row.famRuleId, row.zoneId) === planned.key && row.connectionIdentity === identity,
+      const existing = rulePolicies.find(
+        (row) => plannedDpiKey(row.ruleId, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
         await applyDesiredDpiPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing);
@@ -337,14 +337,14 @@ async function tick(owner: string): Promise<boolean> {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
         if (existing) {
-          await prisma().famRulePolicy.update({
+          await prisma().rulePolicy.update({
             where: { id: existing.id },
             data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision },
           });
         } else {
-          await prisma().famRulePolicy.create({
+          await prisma().rulePolicy.create({
             data: {
-              famRuleId: planned.famRuleId,
+              ruleId: planned.ruleId,
               connectionIdentity: identity,
               siteId,
               zoneId: planned.zoneId,
@@ -358,22 +358,22 @@ async function tick(owner: string): Promise<boolean> {
       }
     }
 
-    for (const row of famRulePolicies) {
-      const key = plannedDpiKey(row.famRuleId, row.zoneId);
+    for (const row of rulePolicies) {
+      const key = plannedDpiKey(row.ruleId, row.zoneId);
       if (desiredDpiKeys.has(key)) continue;
-      if (retainRuleIds.has(row.famRuleId)) continue;
+      if (retainRuleIds.has(row.ruleId)) continue;
       if (!row.unifiPolicyId) {
-        await prisma().famRulePolicy.delete({ where: { id: row.id } });
+        await prisma().rulePolicy.delete({ where: { id: row.id } });
         continue;
       }
       try {
         // D3: only delete the recorded unifiPolicyId — never adopt by name prefix.
         await client.deletePolicy(siteId, row.unifiPolicyId);
-        await prisma().famRulePolicy.delete({ where: { id: row.id } });
+        await prisma().rulePolicy.delete({ where: { id: row.id } });
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
-        await prisma().famRulePolicy.update({
+        await prisma().rulePolicy.update({
           where: { id: row.id },
           data: { lastError: errors[errors.length - 1] },
         });
@@ -382,9 +382,9 @@ async function tick(owner: string): Promise<boolean> {
 
     // Sync cleanup: network rules with no remaining managed network ids leave no silent orphans.
     for (const orphanId of orphanRuleIds) {
-      const remaining = await prisma().famRulePolicy.count({ where: { famRuleId: orphanId } });
+      const remaining = await prisma().rulePolicy.count({ where: { ruleId: orphanId } });
       if (remaining === 0) {
-        await prisma().famRule.delete({ where: { id: orphanId } }).catch(() => undefined);
+        await prisma().rule.delete({ where: { id: orphanId } }).catch(() => undefined);
       }
     }
 
@@ -567,7 +567,7 @@ async function applyDesiredDpiPolicy(
 ) {
   const unifiPolicyId = existing?.unifiPolicyId;
   if (existing && unifiPolicyId && existing.desiredFingerprint === fingerprint && !existing.lastError) {
-    await prisma().famRulePolicy.update({
+    await prisma().rulePolicy.update({
       where: { id: existing.id },
       data: { desiredRevision: revision, observedFingerprint: fingerprint, lastError: null },
     });
@@ -591,11 +591,11 @@ async function applyDesiredDpiPolicy(
         lastError: null as string | null,
       };
       if (existing) {
-        await prisma().famRulePolicy.update({ where: { id: existing.id }, data: observed });
+        await prisma().rulePolicy.update({ where: { id: existing.id }, data: observed });
       } else {
-        await prisma().famRulePolicy.create({
+        await prisma().rulePolicy.create({
           data: {
-            famRuleId: planned.famRuleId,
+            ruleId: planned.ruleId,
             connectionIdentity: identity,
             siteId,
             zoneId: planned.zoneId,
@@ -625,7 +625,7 @@ async function applyDesiredDpiPolicy(
     data: { status: "applied", unifiPolicyId: created.id },
   });
   if (existing) {
-    await prisma().famRulePolicy.update({
+    await prisma().rulePolicy.update({
       where: { id: existing.id },
       data: {
         unifiPolicyId: created.id,
@@ -638,9 +638,9 @@ async function applyDesiredDpiPolicy(
     });
     return;
   }
-  await prisma().famRulePolicy.create({
+  await prisma().rulePolicy.create({
     data: {
-      famRuleId: planned.famRuleId,
+      ruleId: planned.ruleId,
       connectionIdentity: identity,
       siteId,
       unifiPolicyId: created.id,
