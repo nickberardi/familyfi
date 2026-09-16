@@ -32,7 +32,7 @@ tags:
   - name: DPI
     description: UniFi DPI category and application catalog (server-side proxy)
   - name: Rules
-    description: Category and app Fam rules (Internet parents remain groups)
+    description: Category and app Fam rules including network scope (Internet parents remain groups)
 paths:
   /api/v1/health:
     get:
@@ -826,7 +826,7 @@ paths:
     get:
       operationId: listRules
       tags: [Rules]
-      summary: List Fam category and app rules
+      summary: List Fam category, app, and network-scoped rules
       description: Internet parents are group schedule/mode rows, not returned here.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -1396,11 +1396,21 @@ components:
     FamRule:
       type: object
       additionalProperties: false
-      required: [id, kind, groupId, targetIds, enabled, mode, schedule, internet]
+      required: [id, kind, scope, groupId, networkIds, targetIds, enabled, mode, schedule, internet]
       properties:
         id: { type: string }
         kind: { type: string, enum: [category, app] }
-        groupId: { type: string }
+        scope:
+          type: string
+          enum: [group, network]
+          description: group = member/Things MAC source; network = Settings-managed NETWORK source
+        groupId:
+          type: [string, "null"]
+          description: Required when scope=group; null for network-scoped rules
+        networkIds:
+          type: array
+          items: { type: string, format: uuid }
+          description: Managed UniFi network ids when scope=network; empty for group scope
         targetIds:
           type: array
           items: { type: integer }
@@ -1416,10 +1426,22 @@ components:
     FamRuleCreate:
       type: object
       additionalProperties: false
-      required: [kind, groupId, targetIds]
+      required: [kind, targetIds]
       properties:
         kind: { type: string, enum: [category, app] }
-        groupId: { type: string }
+        scope:
+          type: string
+          enum: [group, network]
+          default: group
+          description: Omit or group for member scope; network requires managed networkIds (D9)
+        groupId:
+          type: string
+          description: Required when scope is group (default)
+        networkIds:
+          type: array
+          items: { type: string, format: uuid }
+          minItems: 1
+          description: Required when scope=network; must be Settings-managed (or any site network when manage-all)
         targetIds:
           type: array
           items: { type: integer }
@@ -1437,6 +1459,11 @@ components:
           items: { type: integer }
           minItems: 1
           maxItems: 100
+        networkIds:
+          type: array
+          items: { type: string, format: uuid }
+          minItems: 1
+          description: Only valid for network-scoped rules; managed ids only
         enabled: { type: boolean }
         mode: { type: string, enum: [always, scheduled] }
         schedule: { $ref: "#/components/schemas/Schedule" }

@@ -55,3 +55,17 @@ export function dpiRulePolicyName(input: {
   if (isInternalZone(input.zoneName)) return clipName(base);
   return clipName(`${base} (${zoneLabel(input.zoneName)})`);
 }
+
+export function dpiNetworkRulePolicyName(input: {
+  networkLabel: string;
+  ruleKind: "category" | "app";
+  zoneName: string;
+  targetIds: number[];
+}): string {
+  const label = input.ruleKind === "category" ? "Category" : "App";
+  const ids = [...input.targetIds].sort((a, b) => a - b).join(",");
+  const subject = `${input.networkLabel.trim() || "Network"} ${label}`;
+  const base = `${FAMILYFI_POLICY_PREFIX}${subject} ${ids}`;
+  if (isInternalZone(input.zoneName)) return clipName(base);
+  return clipName(`${base} (${zoneLabel(input.zoneName)})`);
+}

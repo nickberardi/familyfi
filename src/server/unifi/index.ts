@@ -16,12 +16,14 @@ export {
   internetBlockPolicy,
   dpiCategoryBlockPolicy,
   dpiAppBlockPolicy,
+  dpiCategoryNetworkBlockPolicy,
+  dpiAppNetworkBlockPolicy,
   spikePolicyName,
   toPolicyUpdate,
   isFamPolicyName,
   INTERNET_BLOCK_ACTION,
 } from "./payloads";
-export { quarantinePolicyName, groupPolicyName, dpiRulePolicyName } from "./names";
+export { quarantinePolicyName, groupPolicyName, dpiRulePolicyName, dpiNetworkRulePolicyName } from "./names";
 export { planDpiPolicies, plannedDpiKey, type PlannedDpiPolicy } from "./plan-dpi";
 export {
   D6_MAP_STATUS,

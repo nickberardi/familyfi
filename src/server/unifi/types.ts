@@ -79,9 +79,15 @@ export type MacAddressFilter = {
   macAddresses: string[];
 };
 
+export type NetworkFilter = {
+  matchOpposite: boolean;
+  networkIds: string[];
+};
+
 export type SourceTrafficFilter = {
   type: string;
   macAddressFilter?: MacAddressFilter;
+  networkFilter?: NetworkFilter;
 };
 
 export type ApplicationCategoryFilter = {

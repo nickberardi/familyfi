@@ -10,7 +10,9 @@ import type { Group } from "@/lib/types";
 type FamRule = {
   id: string;
   kind: "category" | "app";
-  groupId: string;
+  scope: "group" | "network";
+  groupId: string | null;
+  networkIds: string[];
   targetIds: number[];
   enabled: boolean;
   mode: "always" | "scheduled";
@@ -310,11 +312,12 @@ function NewRuleModal({
   groups: Group[];
   onCreated: () => void;
 }) {
-  const { mutate } = useAppData();
+  const { mutate, unifi } = useAppData();
   const [scope, setScope] = useState<"member" | "network">("member");
   const [targetType, setTargetType] = useState<"category" | "app">("category");
   const [enforcement, setEnforcement] = useState<"always" | "scheduled">("always");
   const [targetId, setTargetId] = useState("");
+  const [selectedNetworkIds, setSelectedNetworkIds] = useState<string[]>([]);
   const [catalog, setCatalog] = useState<DpiItem[]>([]);
   const [curatedSlots, setCuratedSlots] = useState<D6Slot[]>([]);
   const [selectedDpiId, setSelectedDpiId] = useState<number | "">("");
@@ -322,6 +325,14 @@ function NewRuleModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const selectedTargetId = groups.some((g) => g.id === targetId) ? targetId : (groups[0]?.id ?? "");
+
+  const managedNetworks = (() => {
+    if (!unifi) return [];
+    if (unifi.manageAllNetworks) return unifi.networks ?? [];
+    const allowed = new Set(unifi.managedNetworkIds ?? []);
+    return (unifi.networks ?? []).filter((n) => allowed.has(n.id));
+  })();
+  const networkScopeAvailable = managedNetworks.length > 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -363,7 +374,16 @@ function NewRuleModal({
       ? { background: "#fff", color: "var(--ff-ink)", boxShadow: "0 0 0 1px rgba(60,60,67,.12)" }
       : { background: "transparent", color: "var(--ff-muted)" };
 
-  const canCreate = scope === "member" && selectedTargetId && selectedDpiId !== "" && !busy;
+  function toggleNetwork(id: string) {
+    setSelectedNetworkIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  const canCreate =
+    !busy &&
+    selectedDpiId !== "" &&
+    (scope === "member"
+      ? Boolean(selectedTargetId)
+      : networkScopeAvailable && selectedNetworkIds.length > 0);
 
   async function create() {
     if (!canCreate || typeof selectedDpiId !== "number") return;
@@ -376,7 +396,10 @@ function NewRuleModal({
           method: "POST",
           body: JSON.stringify({
             kind: targetType,
-            groupId: selectedTargetId,
+            scope: scope === "network" ? "network" : "group",
+            ...(scope === "network"
+              ? { networkIds: selectedNetworkIds }
+              : { groupId: selectedTargetId }),
             targetIds: [dpiId],
             mode: enforcement,
             ...(enforcement === "scheduled"
@@ -402,7 +425,7 @@ function NewRuleModal({
             New rule
           </h2>
           <p className="mt-1 text-[13px] leading-snug text-[var(--ff-muted)]">
-            Blocks a category or app for one person or group.
+            Blocks a category or app for one person, group, or managed network.
           </p>
         </div>
         <div className="flex flex-col gap-3.5 px-5 py-4">
@@ -412,7 +435,14 @@ function NewRuleModal({
               <button type="button" className="flex-1 rounded-[6px] py-1.5 text-center text-[13px] font-semibold" style={seg(scope === "member")} onClick={() => setScope("member")}>
                 Person / group
               </button>
-              <button type="button" className="flex-1 rounded-[6px] py-1.5 text-center text-[13px] font-semibold" style={seg(scope === "network")} onClick={() => setScope("network")}>
+              <button
+                type="button"
+                className="flex-1 rounded-[6px] py-1.5 text-center text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                style={seg(scope === "network")}
+                disabled={!networkScopeAvailable}
+                aria-disabled={!networkScopeAvailable}
+                onClick={() => networkScopeAvailable && setScope("network")}
+              >
                 Network
               </button>
             </div>
@@ -425,8 +455,33 @@ function NewRuleModal({
                 </option>
               ))}
             </select>
+          ) : networkScopeAvailable ? (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Managed networks">
+              {managedNetworks.map((network) => {
+                const active = selectedNetworkIds.includes(network.id);
+                return (
+                  <button
+                    key={network.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleNetwork(network.id)}
+                    className="rounded-full border px-3 py-1.5 text-[13px] font-semibold"
+                    style={
+                      active
+                        ? { borderColor: "var(--ff-accent)", background: "rgba(0,122,255,.12)", color: "var(--ff-ink)" }
+                        : { borderColor: "var(--ff-line)", background: "#fff", color: "var(--ff-muted)" }
+                    }
+                  >
+                    {network.name}
+                    <span className="ml-1 text-[11px] font-normal opacity-70">VLAN {network.vlanId}</span>
+                  </button>
+                );
+              })}
+            </div>
           ) : (
-            <p className="text-[13px] text-[var(--ff-muted)]">Managed networks from Settings — available in a later phase.</p>
+            <p className="text-[13px] text-[var(--ff-muted)]">
+              No managed networks in Settings — Network scope is empty until you select VLANs (or enable manage-all).
+            </p>
           )}
           <div>
             <div className="mb-1.5 text-[12px] font-semibold text-[var(--ff-muted)]">Target type</div>
@@ -530,12 +585,66 @@ function NewRuleModal({
   );
 }
 
+function NetworkRuleRow({
+  rule,
+  label,
+  networkLabel,
+  onChanged,
+}: {
+  rule: FamRule;
+  label: string;
+  networkLabel: string;
+  onChanged: () => void;
+}) {
+  const { mutate } = useAppData();
+  async function turnOff() {
+    await mutate(() => api(`/api/v1/rules/${rule.id}/off`, { method: "POST", body: "{}" }));
+    onChanged();
+  }
+  async function remove() {
+    await mutate(() => api(`/api/v1/rules/${rule.id}`, { method: "DELETE" }));
+    onChanged();
+  }
+  return (
+    <div
+      id={`net-rule-${rule.id}`}
+      className="flex flex-col gap-2 border-t border-[rgba(60,60,67,.12)] p-4 md:flex-row md:items-center md:gap-3.5 md:px-[18px] md:py-2.5"
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <div className="flex h-6 flex-none items-center justify-center rounded-[6px] bg-[rgba(0,122,255,.14)] px-1.5 text-[10px] font-bold tracking-wide text-[var(--ff-accent)]">
+          NET
+        </div>
+        <div className="min-w-0 truncate text-[14px]">
+          <span className="font-semibold">{networkLabel}</span>
+          <span className="mx-1.5 text-[var(--ff-muted)]">·</span>
+          <span className="text-[var(--ff-muted)]">
+            {rule.kind === "category" ? "Category" : "App"} · {label}
+          </span>
+          {!rule.enabled ? <span className="ml-2 text-[12px] font-semibold text-[var(--ff-muted)]">Off</span> : null}
+        </div>
+      </div>
+      <div className="flex flex-none gap-2 md:justify-end">
+        {rule.enabled ? (
+          <button type="button" onClick={() => void turnOff()} className="text-[13px] font-semibold text-[var(--ff-muted)]">
+            Turn off
+          </button>
+        ) : null}
+        <button type="button" onClick={() => void remove()} aria-label={`Delete network rule ${label}`} className="text-[13px] font-semibold text-[var(--ff-danger,#ff3b30)]">
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function RulesPage() {
-  const { groups } = useAppData();
+  const { groups, unifi } = useAppData();
   const rows = groups.filter((group) => !group.protected);
   const [newRuleOpen, setNewRuleOpen] = useState(false);
   const [rules, setRules] = useState<FamRule[]>([]);
   const [labels, setLabels] = useState<Map<string, string>>(new Map());
+
+  const networkNameById = new Map((unifi?.networks ?? []).map((n) => [n.id, n.name]));
 
   async function loadRules() {
     try {
@@ -567,6 +676,9 @@ export default function RulesPage() {
     document.getElementById(id)?.scrollIntoView({ block: "start" });
   }, [rows]);
 
+  const groupRules = rules.filter((rule) => rule.scope !== "network");
+  const networkRules = rules.filter((rule) => rule.scope === "network");
+
   return (
     <>
       <PageHeader
@@ -576,7 +688,7 @@ export default function RulesPage() {
         onAction={() => setNewRuleOpen(true)}
       />
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        {rows.length === 0 ? (
+        {rows.length === 0 && networkRules.length === 0 ? (
           <p className="rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white p-[18px] text-[14px] text-[var(--ff-muted)]">
             Add a Family or Things group first. Protected groups have no FamilyFi Internet rules.
           </p>
@@ -594,18 +706,34 @@ export default function RulesPage() {
                 <RuleRow
                   key={group.id}
                   group={group}
-                  childRules={rules.filter((rule) => rule.groupId === group.id)}
+                  childRules={groupRules.filter((rule) => rule.groupId === group.id)}
                   labels={labels}
                   onRulesChanged={() => void loadRules()}
                 />
               ))}
+              {networkRules.map((rule) => {
+                const networkLabel =
+                  rule.networkIds
+                    .map((id) => networkNameById.get(id) ?? id.slice(0, 8))
+                    .join(", ") || "Network";
+                return (
+                  <NetworkRuleRow
+                    key={rule.id}
+                    rule={rule}
+                    networkLabel={networkLabel}
+                    label={labels.get(`${rule.kind}:${rule.targetIds.join(",")}`) ?? rule.targetIds.join(", ")}
+                    onChanged={() => void loadRules()}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
         <p className="max-w-[70ch] text-[14px] leading-5 text-[var(--ff-muted)]">
-          Each row is the Internet parent for that member or Things group. Nested category and app filters use UniFi DPI
-          integer ids. Always keeps a permanent block; Scheduled uses Offline / Back on times. Edits are desired
-          configuration — Sync writes them to UniFi. Internet rows are not deletable.
+          Each member row is the Internet parent for that Family or Things group. NET rows are network-scoped category/app
+          rules on Settings-managed VLANs (UniFi source NETWORK). Nested filters use UniFi DPI integer ids. Always keeps a
+          permanent block; Scheduled uses Offline / Back on times. Edits are desired configuration — Sync writes them to
+          UniFi. Internet rows are not deletable.
         </p>
       </div>
       {newRuleOpen ? (

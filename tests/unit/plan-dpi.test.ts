@@ -32,7 +32,9 @@ describe("planDpiPolicies", () => {
         {
           id: "r1",
           kind: FamRuleKind.category,
+          scope: "group" as const,
           groupId: "g1",
+          networkIds: [],
           targetIds: [4],
           enabled: true,
           mode: FamRuleMode.always,
@@ -44,7 +46,9 @@ describe("planDpiPolicies", () => {
         {
           id: "r2",
           kind: FamRuleKind.app,
+          scope: "group" as const,
           groupId: "g2",
+          networkIds: [],
           targetIds: [10001],
           enabled: true,
           mode: FamRuleMode.always,
@@ -59,5 +63,55 @@ describe("planDpiPolicies", () => {
     expect(policies[0]?.famRuleId).toBe("r1");
     expect(policies[0]?.macAddresses).toEqual(["02:00:00:00:00:01"]);
     expect(policies[0]?.schedule).toBeUndefined();
+  });
+
+  it("plans NETWORK source buckets for managed network-scoped rules", () => {
+    const { policies, orphanRuleIds } = planDpiPolicies({
+      now: new Date("2026-09-15T12:00:00Z"),
+      destinationZoneId: "ext",
+      zoneNames: { "zone-1": "Internal", "zone-2": "IoT" },
+      groups: [],
+      devices: [],
+      networks: [
+        { id: "net-a", name: "Family", zoneId: "zone-1" },
+        { id: "net-b", name: "IoT", zoneId: "zone-2" },
+      ],
+      networkScope: { manageAllNetworks: false, managedNetworkIds: ["net-a"] },
+      rules: [
+        {
+          id: "rn1",
+          kind: FamRuleKind.category,
+          scope: "network" as const,
+          groupId: null,
+          networkIds: ["net-a", "net-unmanaged"],
+          targetIds: [24],
+          enabled: true,
+          mode: FamRuleMode.always,
+          scheduleEnabled: false,
+          scheduleDays: [],
+          scheduleStart: null,
+          scheduleEnd: null,
+        },
+        {
+          id: "rn-orphan",
+          kind: FamRuleKind.app,
+          scope: "network" as const,
+          groupId: null,
+          networkIds: ["net-unmanaged"],
+          targetIds: [10001],
+          enabled: true,
+          mode: FamRuleMode.always,
+          scheduleEnabled: false,
+          scheduleDays: [],
+          scheduleStart: null,
+          scheduleEnd: null,
+        },
+      ],
+    });
+    expect(policies).toHaveLength(1);
+    expect(policies[0]?.sourceType).toBe("NETWORK");
+    expect(policies[0]?.networkIds).toEqual(["net-a"]);
+    expect(policies[0]?.macAddresses).toEqual([]);
+    expect(orphanRuleIds.has("rn-orphan")).toBe(true);
   });
 });

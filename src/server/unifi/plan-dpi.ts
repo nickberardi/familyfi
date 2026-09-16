@@ -1,13 +1,16 @@
-import { AssignmentState, type FamRuleKind, type FamRuleMode, type GroupKind } from "@prisma/client";
-import { isSuspended, type Schedule, type Suspension } from "../schedule";
-import { dpiRulePolicyName } from "./names";
+import { AssignmentState, type FamRuleKind, type FamRuleMode, type FamRuleScope, type GroupKind } from "@prisma/client";
+import { networkInScope, type NetworkScope } from "./scope";
+import { dpiNetworkRulePolicyName, dpiRulePolicyName } from "./names";
 import { toUnifiSchedule } from "./schedule-map";
 import type { UnifiFirewallSchedule } from "./types";
+import { isSuspended, type Schedule, type Suspension } from "../schedule";
 
 export type PlanDpiRule = {
   id: string;
   kind: FamRuleKind;
-  groupId: string;
+  scope: FamRuleScope;
+  groupId: string | null;
+  networkIds: string[];
   targetIds: number[];
   enabled: boolean;
   mode: FamRuleMode;
@@ -32,15 +35,23 @@ export type PlanDpiDevice = {
   inScope?: boolean;
 };
 
+export type PlanDpiNetwork = {
+  id: string;
+  name: string;
+  zoneId: string | null;
+};
+
 export type PlannedDpiPolicy = {
   key: string;
   famRuleId: string;
-  groupId: string;
+  groupId: string | null;
   zoneId: string;
   destinationZoneId: string;
   kind: FamRuleKind;
   targetIds: number[];
   macAddresses: string[];
+  networkIds: string[];
+  sourceType: "MAC_ADDRESS" | "NETWORK";
   enabled: boolean;
   schedule?: UnifiFirewallSchedule;
   name: string;
@@ -56,13 +67,62 @@ export function planDpiPolicies(input: {
   zoneNames?: Record<string, string>;
   groups: PlanDpiGroup[];
   devices: PlanDpiDevice[];
+  networks?: PlanDpiNetwork[];
+  networkScope?: NetworkScope;
   rules: PlanDpiRule[];
-}): { policies: PlannedDpiPolicy[]; retainRuleIds: Set<string> } {
+}): { policies: PlannedDpiPolicy[]; retainRuleIds: Set<string>; orphanRuleIds: Set<string> } {
   const groups = new Map(input.groups.map((group) => [group.id, group]));
+  const networks = new Map((input.networks ?? []).map((network) => [network.id, network]));
+  const networkScope = input.networkScope ?? { manageAllNetworks: true, managedNetworkIds: [] };
   const retainRuleIds = new Set<string>();
-  const buckets = new Map<string, { rule: PlanDpiRule; group: PlanDpiGroup; zoneId: string; macs: string[] }>();
+  const orphanRuleIds = new Set<string>();
+  const groupBuckets = new Map<string, { rule: PlanDpiRule; group: PlanDpiGroup; zoneId: string; macs: string[] }>();
+  const networkBuckets = new Map<
+    string,
+    { rule: PlanDpiRule; zoneId: string; networkIds: string[]; networkNames: string[] }
+  >();
 
   for (const rule of input.rules) {
+    if (rule.scope === "network") {
+      const inScopeIds = [...new Set(rule.networkIds)]
+        .filter((id) => networkInScope(networkScope, id))
+        .sort();
+      if (inScopeIds.length === 0) {
+        // Desired state still lists unmanaged-only networks → treat as orphan for Sync cleanup.
+        orphanRuleIds.add(rule.id);
+        continue;
+      }
+      if (inScopeIds.length < rule.networkIds.length) {
+        // Partial descope: still plan remaining managed nets; caller should prune DB.
+        retainRuleIds.add(rule.id);
+      }
+      let anyZone = false;
+      for (const networkId of inScopeIds) {
+        const network = networks.get(networkId);
+        if (!network?.zoneId) {
+          retainRuleIds.add(rule.id);
+          continue;
+        }
+        anyZone = true;
+        const key = plannedDpiKey(rule.id, network.zoneId);
+        const bucket = networkBuckets.get(key) ?? {
+          rule,
+          zoneId: network.zoneId,
+          networkIds: [],
+          networkNames: [],
+        };
+        if (!bucket.networkIds.includes(networkId)) {
+          bucket.networkIds.push(networkId);
+          bucket.networkNames.push(network.name);
+        }
+        networkBuckets.set(key, bucket);
+      }
+      if (!anyZone) retainRuleIds.add(rule.id);
+      continue;
+    }
+
+    // group scope (default)
+    if (!rule.groupId) continue;
     const group = groups.get(rule.groupId);
     if (!group || group.protected) continue;
     const devices = input.devices.filter(
@@ -87,15 +147,15 @@ export function planDpiPolicies(input: {
       }
       anyZone = true;
       const key = plannedDpiKey(rule.id, device.zoneId);
-      const bucket = buckets.get(key) ?? { rule, group, zoneId: device.zoneId, macs: [] };
+      const bucket = groupBuckets.get(key) ?? { rule, group, zoneId: device.zoneId, macs: [] };
       bucket.macs.push(device.mac);
-      buckets.set(key, bucket);
+      groupBuckets.set(key, bucket);
     }
     if (!anyZone) retainRuleIds.add(rule.id);
   }
 
   const policies: PlannedDpiPolicy[] = [];
-  for (const bucket of buckets.values()) {
+  for (const bucket of groupBuckets.values()) {
     if (bucket.macs.length === 0) continue;
     const schedule = ruleSchedule(bucket.rule);
     policies.push({
@@ -107,6 +167,8 @@ export function planDpiPolicies(input: {
       kind: bucket.rule.kind,
       targetIds: [...bucket.rule.targetIds],
       macAddresses: bucket.macs,
+      networkIds: [],
+      sourceType: "MAC_ADDRESS",
       enabled: bucket.rule.enabled,
       schedule: schedule ? toUnifiSchedule(schedule) : undefined,
       name: dpiRulePolicyName({
@@ -119,7 +181,36 @@ export function planDpiPolicies(input: {
     });
   }
 
-  return { policies, retainRuleIds };
+  for (const bucket of networkBuckets.values()) {
+    if (bucket.networkIds.length === 0) continue;
+    const schedule = ruleSchedule(bucket.rule);
+    const networkLabel =
+      bucket.networkNames.length === 1
+        ? bucket.networkNames[0]!
+        : `${bucket.networkNames.length} networks`;
+    policies.push({
+      key: plannedDpiKey(bucket.rule.id, bucket.zoneId),
+      famRuleId: bucket.rule.id,
+      groupId: null,
+      zoneId: bucket.zoneId,
+      destinationZoneId: input.destinationZoneId,
+      kind: bucket.rule.kind,
+      targetIds: [...bucket.rule.targetIds],
+      macAddresses: [],
+      networkIds: [...bucket.networkIds].sort(),
+      sourceType: "NETWORK",
+      enabled: bucket.rule.enabled,
+      schedule: schedule ? toUnifiSchedule(schedule) : undefined,
+      name: dpiNetworkRulePolicyName({
+        networkLabel,
+        ruleKind: bucket.rule.kind,
+        zoneName: input.zoneNames?.[bucket.zoneId] ?? bucket.zoneId,
+        targetIds: bucket.rule.targetIds,
+      }),
+    });
+  }
+
+  return { policies, retainRuleIds, orphanRuleIds };
 }
 
 function ruleSchedule(rule: PlanDpiRule): Schedule | null {

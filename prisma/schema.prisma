@@ -239,11 +239,18 @@ enum FamRuleMode {
   scheduled
 }
 
+enum FamRuleScope {
+  group
+  network
+}
+
 model FamRule {
   id               String       @id @default(cuid())
   kind             FamRuleKind
-  groupId          String
-  group            Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  scope            FamRuleScope @default(group)
+  groupId          String?
+  group            Group?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  networkIds       String[]     @default([])
   targetIds        Int[]
   enabled          Boolean      @default(true)
   mode             FamRuleMode  @default(always)
@@ -256,6 +263,7 @@ model FamRule {
   policies         FamRulePolicy[]
 
   @@index([groupId])
+  @@index([scope])
 }
 
 model FamRulePolicy {

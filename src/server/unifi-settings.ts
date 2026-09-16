@@ -4,6 +4,7 @@ import { unifiMockEnabled } from "./env";
 import { UnifiConfigError } from "./unifi/errors";
 import { clientForHousehold, connectionIdentity, probeClient } from "./unifi/connection";
 import { enqueueChange } from "./changes";
+import { pruneNetworkScopedRulesForScope } from "./network-rules";
 import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type PublicUnifiNetwork } from "./unifi/scope";
 import { loadNetworkDetails } from "./unifi/spike";
 import type { Household } from "@prisma/client";
@@ -112,6 +113,7 @@ export async function saveUnifiConnection(input: {
       connectionError: null,
     },
   });
+  await pruneNetworkScopedRulesForScope(scope);
   return enqueueChange("unifi");
 }
 
@@ -129,6 +131,8 @@ export async function saveManagedNetworks(input: { manageAllNetworks?: boolean; 
       unifiManagedNetworkIds: scope.managedNetworkIds,
     },
   });
+  // D9/Phase 3: removing a managed network must not leave silent desired-state orphans.
+  await pruneNetworkScopedRulesForScope(scope);
   return enqueueChange("unifi");
 }
 
