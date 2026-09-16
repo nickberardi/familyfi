@@ -222,7 +222,7 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
   await page.getByRole("button", { name: "New rule" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
-  const networkTab = dialog.getByRole("button", { name: "Network" });
+  const networkTab = dialog.getByRole("button", { name: "Network", exact: true });
   await expect(networkTab).toBeEnabled();
   await networkTab.click();
   await expect(dialog.getByRole("group", { name: "Managed networks" })).toBeVisible();
