@@ -1,11 +1,13 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import type { FamRule } from "@/lib/fam-rules";
 import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
+import { GroupFilterMarks } from "@/components/FilterMarks";
 import { PauseSheet } from "@/components/PauseSheet";
 import { ScheduleBar } from "@/components/GroupCard";
 import { groupActions } from "@/components/group-actions";
@@ -106,6 +108,37 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   const { groups, devices, household, mutate, loading } = useAppData();
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
+  const [rules, setRules] = useState<FamRule[]>([]);
+  const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
+
+  const loadRules = useCallback(async () => {
+    try {
+      const [{ rules: next }, cats, apps] = await Promise.all([
+        api<{ rules: FamRule[] }>("/api/v1/rules"),
+        api<{ categories: { id: number; name: string }[] }>("/api/v1/dpi/categories").catch(() => ({
+          categories: [] as { id: number; name: string }[],
+        })),
+        api<{ applications: { id: number; name: string }[] }>("/api/v1/dpi/applications").catch(() => ({
+          applications: [] as { id: number; name: string }[],
+        })),
+      ]);
+      setRules(next);
+      const map = new Map<string, string>();
+      for (const item of cats.categories) map.set(`category:${item.id}`, item.name);
+      for (const item of apps.applications) map.set(`app:${item.id}`, item.name);
+      setCatalogNames(map);
+    } catch {
+      setRules([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      void loadRules();
+    }, 0);
+    return () => window.clearTimeout(handle);
+  }, [loadRules]);
+
   if (!group) {
     if (loading) return null;
     return <p className="p-6 text-[14px] text-[var(--ff-muted)]">Group not found.</p>;
@@ -179,6 +212,15 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             </div>
           )}
         </div>
+        {!group.protected ? (
+          <GroupFilterMarks
+            group={group}
+            rules={rules}
+            catalogNames={catalogNames}
+            showAppAdd
+            onRulesChanged={() => void loadRules()}
+          />
+        ) : null}
       </section>
       <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
         <h2 className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>

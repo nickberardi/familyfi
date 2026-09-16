@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { accessColor, cardNoteLine, cardStateLabel, localNowPercent, roleTag, scheduleBands } from "@/lib/display";
 import type { Group } from "@/lib/types";
@@ -53,12 +54,14 @@ export function GroupCard({
   timezone,
   phoneActions,
   webActions,
+  filterMarks,
 }: {
   group: Group;
   href: string;
   timezone: string;
   phoneActions: CardAction[];
   webActions: CardAction[];
+  filterMarks?: ReactNode;
 }) {
   const things = group.kind === "things";
   const monogram = (group.monogram ?? group.name.slice(0, 2)).slice(0, 4);
@@ -104,6 +107,7 @@ export function GroupCard({
         />
         <p className="mt-2 text-[14px] leading-5 text-[var(--ff-muted)] md:hidden">{note}</p>
       </div>
+      {filterMarks}
       <ActionRow actions={phoneActions} className="md:hidden" />
       <ActionRow actions={webActions} className="hidden md:flex" />
     </article>
