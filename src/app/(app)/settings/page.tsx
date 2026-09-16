@@ -405,9 +405,9 @@ export default function SettingsPage() {
                         className="rounded-md px-2.5 py-1 text-[14px] capitalize disabled:opacity-40"
                         style={{
                           fontWeight: on ? 600 : 500,
-                          background: on ? "#fff" : "transparent",
+                          background: on ? "var(--ff-ink-on-fill)" : "transparent",
                           color: on ? "var(--ff-ink)" : "var(--ff-muted)",
-                          boxShadow: on ? "0 1px 2px rgba(0,0,0,.12)" : "none",
+                          boxShadow: on ? "var(--ff-shadow-knob)" : "none",
                         }}
                         onClick={() => {
                           if (on || disabled) return;
@@ -427,7 +427,7 @@ export default function SettingsPage() {
                     className="flex flex-none items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[14px] font-semibold"
                     style={{
                       borderColor: account?.isAdmin ? "var(--ff-accent-line)" : "var(--ff-control-line)",
-                      background: account?.isAdmin ? "var(--ff-accent-wash)" : "#fff",
+                      background: account?.isAdmin ? "var(--ff-accent-wash)" : "var(--ff-ink-on-fill)",
                       color: account?.isAdmin ? "var(--ff-accent)" : "var(--ff-muted)",
                     }}
                     onClick={() => {
@@ -450,7 +450,7 @@ export default function SettingsPage() {
                       className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border text-[10px] leading-none text-white"
                       style={{
                         borderColor: account?.isAdmin ? "var(--ff-accent)" : "var(--ff-disabled)",
-                        background: account?.isAdmin ? "var(--ff-accent)" : "#fff",
+                        background: account?.isAdmin ? "var(--ff-accent)" : "var(--ff-ink-on-fill)",
                       }}
                     >
                       {account?.isAdmin ? "✓" : ""}
@@ -524,7 +524,7 @@ export default function SettingsPage() {
 
       {loginFor ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/32 p-6">
-          <div className="w-full max-w-[420px] overflow-hidden rounded-[14px] bg-white shadow-[0_24px_60px_rgba(0,0,0,.28)]">
+          <div className="w-full max-w-[420px] overflow-hidden rounded-[14px] bg-white shadow-[var(--ff-shadow-sheet)]">
             <div className="px-[18px] pt-[18px] pb-1">
               <div className="text-[17px] font-bold tracking-tight">Create login for {loginFor.name}</div>
               <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">

@@ -39,7 +39,7 @@ export function DayPicker({
             className="flex h-7 w-7 items-center justify-center rounded-[7px] border text-[12.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
             style={{
               background: on ? "var(--ff-accent)" : "var(--ff-card)",
-              color: on ? "#fff" : "var(--ff-ink-3)",
+              color: on ? "var(--ff-ink-on-fill)" : "var(--ff-ink-3)",
               borderColor: on ? "var(--ff-accent)" : "var(--ff-control-line)",
             }}
           >

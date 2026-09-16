@@ -90,7 +90,7 @@ export function FilterSheet({
   return (
     <div
       className="fixed inset-0 z-[81] flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,.32)" }}
+      style={{ background: "var(--ff-scrim)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="filter-sheet-title"
@@ -98,7 +98,7 @@ export function FilterSheet({
     >
       <div
         className="w-full max-w-[360px] overflow-hidden rounded-[14px]"
-        style={{ background: "var(--ff-card)", boxShadow: "0 24px 60px rgba(0,0,0,.28)" }}
+        style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex flex-col gap-2.5 p-5">
@@ -122,8 +122,8 @@ export function FilterSheet({
             className="mt-1 rounded-[9px] py-2.5 text-center text-[14px] font-semibold disabled:opacity-50"
             style={
               on
-                ? { background: "rgba(200,16,10,.1)", color: "var(--ff-danger)" }
-                : { background: "var(--ff-accent)", color: "#fff" }
+                ? { background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }
+                : { background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }
             }
           >
             {on ? "Turn off" : "Create policy"}

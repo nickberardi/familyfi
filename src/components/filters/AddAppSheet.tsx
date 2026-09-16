@@ -92,7 +92,7 @@ export function AddAppSheet({
   return (
     <div
       className="fixed inset-0 z-[81] flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,.32)" }}
+      style={{ background: "var(--ff-scrim)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-app-title"
@@ -100,7 +100,7 @@ export function AddAppSheet({
     >
       <div
         className="w-full max-w-[420px] overflow-hidden rounded-[14px]"
-        style={{ background: "var(--ff-card)", boxShadow: "0 24px 60px rgba(0,0,0,.28)" }}
+        style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="px-5 pb-1 pt-[18px]">

@@ -45,6 +45,42 @@ Before UI work, read local `designs/` (`Card System.dc.html`, `Web Design.dc.htm
 
 UniFi integration: official Network Integration API with `X-API-KEY`. Local base `https://<console-ip>/proxy/network/integration`; cloud connector `https://api.ui.com/v1/connector/consoles/{consoleId}/proxy/network/integration`. Internet-block action is `BLOCK` (not `REJECT`). Spike CLI: [docs/spike/OPERATOR.md](docs/spike/OPERATOR.md).
 
+## Naming
+
+**The rule: a name leads with the full product name, or with nothing. Never an abbreviation.** No `Fam`, `fam-` or `fam_` in identifiers. Environment variables an operator sets lead with `FAMILYFI_`; everything internal leads with nothing, because the repo is already the product.
+
+CSS custom properties are the one place an abbreviation is right: `:root` is a global namespace shared with the browser and any library, so tokens take a short `--ff-` prefix to stay readable at the density they are used. That prefix is closed — do not coin others.
+
+| Layer | Convention | Example |
+| --- | --- | --- |
+| React components | `PascalCase.tsx`, one component per concept | `RuleRow.tsx`, `GroupCard.tsx` |
+| Logic modules (`lib/`, `server/`) | `kebab-case.ts` | `rule-rows.ts`, `unifi-settings.ts` |
+| Directories | lowercase, no separators | `components/ui`, `server/unifi` |
+| Functions, variables, props | `camelCase` | `buildRuleRows`, `parentFacingRuleLabel` |
+| Module constants | `SCREAMING_SNAKE` | `SESSION_TTL_MS`, `D6_CATEGORY_SLOTS` |
+| Prisma models / tables | `PascalCase`, singular | `Rule`, `RulePolicy`, `SyncRun` |
+| Columns and JSON fields | `camelCase` | `suspensionActive`, `targetIds` |
+| Prisma enum values | `lowercase` | `family`, `scheduled`, `quarantined` |
+| API paths | lowercase, plural, `{id}` | `/api/v1/groups/{id}/pause` |
+| Our env vars | `FAMILYFI_` + purpose | `FAMILYFI_ENCRYPTION_KEY` |
+| CSS tokens | `--ff-` + kebab role | `--ff-hairline-card`, `--ff-ink-3` |
+
+- **`camelCase` runs unbroken from column to JSON.** The schema uses Prisma defaults with zero `@map`/`@@map`, so a Postgres column, a Prisma field, a TypeScript property and an API response field are the same string. Do not introduce a snake_case boundary; it would buy nothing and cost a translation layer.
+- **Env vars that configure an external system keep that system's convention** — `POSTGRES_*`, `DB_*`, real `UNIFI_*` credentials, and framework contracts like `DATABASE_URL`, `PORT`, `NODE_ENV`. `FAMILYFI_UNIFI_MOCK` is ours (a FamilyFi behaviour flag), so it takes the prefix; `UNIFI_API_KEY` is UniFi's, so it does not.
+- **Renaming an env var is breaking.** The value must move with the name. `FAMILYFI_ENCRYPTION_KEY` in particular: a fresh key makes the stored UniFi API key undecryptable and Sync fails with "Unsupported state or unable to authenticate data".
+- **Renaming a model is a migration, not a schema edit.** `ALTER ... RENAME` the table, enums, columns, constraints and indexes in place so existing databases upgrade. Constraints keep their old generated names through a table rename — bring them along, then confirm `prisma migrate status` reports no drift.
+- **`LEGACY_POLICY_PREFIX` (`"fam-"`) is the one sanctioned exception.** It matches pre-1.0 spike policies that may still exist on a live console. Nothing generates it. Do not extend it, and do not use it to claim ownership — that comes from recorded ids and creation evidence.
+
+### Styling
+
+- **Never write a raw colour literal.** Every colour is a `--ff-*` token in `src/app/globals.css`; add a token rather than inlining `rgba(...)` or a hex. The only exception is `themeColor` in `src/app/layout.tsx`, which the browser reads before CSS exists.
+- Prefer a shared primitive in `src/components/ui` over a fourth copy of the same control. If you are writing a segmented control, a mark, a day picker or a pill, one already exists.
+- The Card System's density ladder is 44 / 32 / 24 px marks — comfortable, compact, dense. Never a fourth size.
+
+### Enforcement
+
+`tests/unit/naming.test.ts` fails the build on a raw colour literal, an abbreviated product prefix, a misnamed file, an unprefixed env var of ours, and a `var(--ff-…)` reference with no declaration. These rules were written down once before and drifted anyway — the tokens existed while 71 literals sat in components — so treat the test as the contract and this section as its explanation. Extend both together.
+
 ## Commands
 
 | Target | Behavior |

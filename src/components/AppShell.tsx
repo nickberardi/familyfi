@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="ff-shell">
-      <aside className="ff-sidebar flex-col gap-5 overflow-hidden border-r border-[var(--ff-line)] bg-[#ececee] px-3 py-5">
+      <aside className="ff-sidebar flex-col gap-5 overflow-hidden border-r border-[var(--ff-line)] bg-[var(--ff-rail)] px-3 py-5">
         <div className="flex-none px-2.5">
           <div className="text-[15px] font-bold tracking-tight">FamilyFi</div>
           <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">
@@ -153,12 +153,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
           {deviceAttention ? (
-            <div className="rounded-[9px] border border-[rgba(192,76,0,.28)] bg-[rgba(192,76,0,.08)] p-2.5">
+            <div className="rounded-[9px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] p-2.5">
               <div className="text-[14px] font-semibold text-[var(--ff-paused)]">{deviceAttention.title}</div>
               <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{deviceAttention.message}</p>
               <Link
                 href={deviceAttention.href}
-                className="mt-2 block w-full rounded-[6px] bg-[rgba(192,76,0,.12)] py-1.5 text-center text-[14px] font-semibold text-[var(--ff-paused)]"
+                className="mt-2 block w-full rounded-[6px] bg-[var(--ff-paused-fill-strong)] py-1.5 text-center text-[14px] font-semibold text-[var(--ff-paused)]"
               >
                 Assign devices
               </Link>
@@ -190,7 +190,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {error || notice ? (
             <div
               role={error ? "alert" : "status"}
-              className="pointer-events-auto flex max-w-lg items-start gap-3 rounded-[9px] border border-[var(--ff-line)] bg-white px-3.5 py-2.5 text-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]"
+              className="pointer-events-auto flex max-w-lg items-start gap-3 rounded-[9px] border border-[var(--ff-line)] bg-white px-3.5 py-2.5 text-[14px] shadow-[var(--ff-shadow-toast)]"
               style={{ color: error ? "var(--ff-danger)" : "var(--ff-on)" }}
             >
               <span className="min-w-0 flex-1">{error || notice}</span>
@@ -208,7 +208,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {loading ? <p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">Loading household…</p> : null}
         {children}
       </div>
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-[var(--ff-line)] bg-[#ececee] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-[var(--ff-line)] bg-[var(--ff-rail)] md:hidden">
         {[
           { href: "/family", label: "Family" },
           { href: "/things", label: "Things" },
