@@ -14,6 +14,50 @@
   --ff-mark: #2c2c2e;
   --ff-now: #ff9500;
   --ff-font: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+
+  /* Card System — surfaces and hairlines.
+     The border is the ground's business: grey field -> none, white/light -> 1px. */
+  --ff-hairline: rgba(60, 60, 67, 0.12);
+  --ff-hairline-card: rgba(60, 60, 67, 0.14);
+  --ff-field: rgba(120, 120, 128, 0.12);
+  --ff-field-soft: rgba(120, 120, 128, 0.06);
+  --ff-row-nested: rgba(120, 120, 128, 0.04);
+  --ff-row-network: rgba(0, 122, 255, 0.04);
+
+  /* Card System — secondary ink ladder. */
+  --ff-ink-2: rgba(60, 60, 67, 0.75);
+  --ff-ink-3: rgba(60, 60, 67, 0.6);
+  --ff-ink-4: rgba(60, 60, 67, 0.55);
+  --ff-locked: rgba(60, 60, 67, 0.5);
+  --ff-chevron: rgba(60, 60, 67, 0.3);
+
+  /* Accent tints. */
+  --ff-accent-fill: rgba(0, 122, 255, 0.1);
+  --ff-accent-tint: rgba(0, 122, 255, 0.12);
+  --ff-accent-line: rgba(0, 122, 255, 0.35);
+  --ff-control-line: rgba(60, 60, 67, 0.2);
+  --ff-input-line: rgba(60, 60, 67, 0.22);
+
+  /* Person marks are a tinted circle; group marks a #2c2c2e rounded square. */
+  --ff-person-fill: rgba(52, 199, 89, 0.16);
+  --ff-person-ink: #248a3d;
+
+  /* Density ladder — 44 comfortable, 32 compact, 24 dense. Nothing else. */
+  --ff-mark-comfortable: 44px;
+  --ff-mark-compact: 32px;
+  --ff-mark-dense: 24px;
+
+  /* Focus ring, disabled ink, and the comfortable card's action divider. */
+  --ff-focus-ring: rgba(0, 122, 255, 0.16);
+  --ff-disabled: rgba(60, 60, 67, 0.35);
+  --ff-hairline-strong: rgba(60, 60, 67, 0.16);
+  --ff-danger-fill: rgba(255, 59, 48, 0.1);
+  --ff-note-fill: rgba(120, 120, 128, 0.09);
+  --ff-accent-wash: rgba(0, 122, 255, 0.08);
+
+  /* Rules tree indents. */
+  --ff-rule-indent: 34px;
+  --ff-rule-detail-indent: 39px;
 }
 
 html {

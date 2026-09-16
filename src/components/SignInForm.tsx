@@ -53,7 +53,7 @@ export function SignInForm() {
       <label className="flex flex-col gap-1.5 text-[14px] font-semibold text-[var(--ff-muted)]">
         Username
         <input
-          className="rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)] outline-none focus:border-[var(--ff-accent)] focus:shadow-[0_0_0_3px_rgba(0,122,255,0.16)]"
+          className="rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)] outline-none focus:border-[var(--ff-accent)] focus:shadow-[0_0_0_3px_var(--ff-focus-ring)]"
           autoComplete="username"
           value={username}
           onChange={(event) => setUsername(event.target.value)}
@@ -63,7 +63,7 @@ export function SignInForm() {
       <label className="flex flex-col gap-1.5 text-[14px] font-semibold text-[var(--ff-muted)]">
         Password
         <input
-          className="rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)] outline-none focus:border-[var(--ff-accent)] focus:shadow-[0_0_0_3px_rgba(0,122,255,0.16)]"
+          className="rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)] outline-none focus:border-[var(--ff-accent)] focus:shadow-[0_0_0_3px_var(--ff-focus-ring)]"
           type="password"
           autoComplete="current-password"
           value={password}
@@ -72,7 +72,7 @@ export function SignInForm() {
         />
       </label>
       {error ? (
-        <div className="rounded-[9px] bg-[rgba(255,59,48,0.1)] px-3 py-2.5 text-[14px] leading-5 text-[var(--ff-danger)]">
+        <div className="rounded-[9px] bg-[var(--ff-danger-fill)] px-3 py-2.5 text-[14px] leading-5 text-[var(--ff-danger)]">
           {error}
         </div>
       ) : null}

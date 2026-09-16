@@ -47,8 +47,8 @@ function DevicesBody() {
   const observed = household?.quarantineObservedEnabled ?? null;
   const pending = household != null && typeof observed === "boolean" && observed !== household.quarantineEnforced;
   const onStyle = enforced
-    ? { background: "rgba(0,122,255,.1)", borderColor: "rgba(0,122,255,.35)", color: "#0066d6" }
-    : { background: "#fff", borderColor: "rgba(60,60,67,.2)", color: "var(--ff-muted)" };
+    ? { background: "var(--ff-accent-fill)", borderColor: "var(--ff-accent-line)", color: "#0066d6" }
+    : { background: "#fff", borderColor: "var(--ff-control-line)", color: "var(--ff-muted)" };
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -81,7 +81,7 @@ function DevicesBody() {
           </section>
         ) : null}
         {household ? (
-        <section className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white px-[18px] py-3">
+        <section className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--ff-hairline-card)] bg-white px-[18px] py-3">
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-semibold">Quarantine unassigned devices</div>
             <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
@@ -121,7 +121,7 @@ function DevicesBody() {
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-0.5 rounded-lg bg-[rgba(120,120,128,.12)] p-0.5">
+          <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
             {FILTERS.map((item) => {
               const on = filter === item.id;
               return (
@@ -145,7 +145,7 @@ function DevicesBody() {
           </div>
           <div className="flex-1" />
           <input
-            className="w-full max-w-[260px] rounded-[7px] border border-[rgba(60,60,67,.22)] px-2.5 py-2 text-[16px] md:text-[14px]"
+            className="w-full max-w-[260px] rounded-[7px] border border-[var(--ff-input-line)] px-2.5 py-2 text-[16px] md:text-[14px]"
             placeholder="Search name, IP or MAC"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -153,15 +153,15 @@ function DevicesBody() {
         </div>
 
         {rows.length === 0 ? (
-          <p className="rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white p-[18px] text-[14px] text-[var(--ff-muted)]">
+          <p className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-white p-[18px] text-[14px] text-[var(--ff-muted)]">
             {devices.length === 0
               ? "No devices yet. New in-scope MACs appear as unassigned."
               : "Nothing matches this filter."}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
+          <div className="overflow-x-auto rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
             <div className="min-w-[1020px]">
-              <div className="grid grid-cols-[minmax(140px,2.2fr)_minmax(76px,.9fr)_minmax(120px,140px)] items-center gap-3.5 bg-[rgba(120,120,128,.06)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)] lg:grid-cols-[minmax(160px,2.4fr)_minmax(80px,.9fr)_minmax(0,150px)_minmax(120px,140px)] xl:grid-cols-[minmax(180px,2.4fr)_minmax(84px,.9fr)_minmax(0,96px)_minmax(0,150px)_minmax(120px,140px)]">
+              <div className="grid grid-cols-[minmax(140px,2.2fr)_minmax(76px,.9fr)_minmax(120px,140px)] items-center gap-3.5 bg-[var(--ff-field-soft)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)] lg:grid-cols-[minmax(160px,2.4fr)_minmax(80px,.9fr)_minmax(0,150px)_minmax(120px,140px)] xl:grid-cols-[minmax(180px,2.4fr)_minmax(84px,.9fr)_minmax(0,96px)_minmax(0,150px)_minmax(120px,140px)]">
                 <div>Device</div>
                 <div>Belongs to</div>
                 <div className="hidden xl:block">Address</div>
@@ -175,7 +175,7 @@ function DevicesBody() {
                 return (
                   <div
                     key={device.mac}
-                    className="grid grid-cols-[minmax(140px,2.2fr)_minmax(76px,.9fr)_minmax(120px,140px)] items-center gap-3.5 border-t border-[rgba(60,60,67,.12)] px-[18px] py-2.5 hover:bg-[rgba(120,120,128,.06)] lg:grid-cols-[minmax(160px,2.4fr)_minmax(80px,.9fr)_minmax(0,150px)_minmax(120px,140px)] xl:grid-cols-[minmax(180px,2.4fr)_minmax(84px,.9fr)_minmax(0,96px)_minmax(0,150px)_minmax(120px,140px)]"
+                    className="grid grid-cols-[minmax(140px,2.2fr)_minmax(76px,.9fr)_minmax(120px,140px)] items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 hover:bg-[var(--ff-field-soft)] lg:grid-cols-[minmax(160px,2.4fr)_minmax(80px,.9fr)_minmax(0,150px)_minmax(120px,140px)] xl:grid-cols-[minmax(180px,2.4fr)_minmax(84px,.9fr)_minmax(0,96px)_minmax(0,150px)_minmax(120px,140px)]"
                   >
                     {owner ? (
                       <Link href={ownerHref(owner)} className="flex min-w-0 items-center gap-2.5">

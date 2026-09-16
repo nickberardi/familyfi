@@ -26,7 +26,7 @@ export function DeviceAssignSelect({
   const { mutate, busy } = useAppData();
   return (
     <select
-      className="w-full max-w-full rounded-[7px] border border-[rgba(60,60,67,.22)] bg-white px-2 py-1.5 text-[14px] disabled:opacity-50"
+      className="w-full max-w-full rounded-[7px] border border-[var(--ff-input-line)] bg-white px-2 py-1.5 text-[14px] disabled:opacity-50"
       value={device.groupId ?? ""}
       disabled={busy}
       aria-busy={busy || undefined}
