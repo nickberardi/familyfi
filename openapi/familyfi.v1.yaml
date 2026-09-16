@@ -691,7 +691,7 @@ paths:
     post:
       operationId: resumeGroup
       tags: [Groups]
-      summary: Resume UniFi schedule
+      summary: Resume internet policy (Always or Scheduled)
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/GroupId" }
