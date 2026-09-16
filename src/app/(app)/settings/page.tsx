@@ -133,19 +133,19 @@ export default function SettingsPage() {
       <PageHeader title="Settings" sub="Gateway connection, credentials, and household roles." />
       <div className="flex flex-col gap-4 p-4 md:p-6">
         <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
-          <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
-            <div className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-[15px] text-[14px] font-semibold">Gateway</div>
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+            <div className="border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px] text-[14px] font-semibold">Gateway</div>
             {facts.map((fact, index) => (
               <div
                 key={fact.k}
                 className="flex items-center gap-3 px-[18px] py-2.5"
-                style={{ borderTop: index ? "1px solid rgba(60,60,67,.12)" : undefined }}
+                style={{ borderTop: index ? "1px solid var(--ff-hairline)" : undefined }}
               >
                 <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">{fact.k}</div>
                 <div className="min-w-0 flex-1 text-right font-mono text-[14px]">{fact.v}</div>
               </div>
             ))}
-            <div className="flex flex-wrap items-end gap-3 border-t border-[rgba(60,60,67,.12)] px-[18px] py-3">
+            <div className="flex flex-wrap items-end gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-3">
               <label className="min-w-[220px] flex-1 text-[14px] font-semibold text-[var(--ff-muted)]">
                 Timezone
                 <input list="ff-tz" className={FIELD} value={timezone} onChange={(e) => setTimezone(e.target.value)} />
@@ -168,7 +168,7 @@ export default function SettingsPage() {
               </button>
             </div>
             {editingGateway ? (
-              <form className="flex flex-col gap-3 border-t border-[rgba(60,60,67,.12)] px-[18px] py-4" onSubmit={(event) => void testConnection(event)}>
+              <form className="flex flex-col gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-4" onSubmit={(event) => void testConnection(event)}>
                 <div className="flex gap-3 text-[14px]">
                   <label className="flex items-center gap-2">
                     <input type="radio" checked={mode === "local"} onChange={() => setMode("local")} />
@@ -255,7 +255,7 @@ export default function SettingsPage() {
                 </div>
               </form>
             ) : (
-              <div className="border-t border-[rgba(60,60,67,.12)] px-[18px] py-3">
+              <div className="border-t border-[var(--ff-hairline)] px-[18px] py-3">
                 <button
                   type="button"
                   className="text-[14px] font-semibold text-[var(--ff-accent)]"
@@ -267,8 +267,8 @@ export default function SettingsPage() {
             )}
           </section>
 
-          <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
-            <div className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-[15px] text-[14px] font-semibold">UniFi API key</div>
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+            <div className="border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px] text-[14px] font-semibold">UniFi API key</div>
             <div className="px-[18px] py-4">
               <div className="flex flex-wrap items-baseline gap-2.5">
                 <div className="font-mono text-[14px]">{unifi?.apiKeyMasked ?? "No key saved"}</div>
@@ -283,7 +283,7 @@ export default function SettingsPage() {
                     ? `Last sweep ${relativeSweep(lastCall)}`
                     : "Save a key to start discovery and quarantine."}
               </p>
-              <p className="mt-3 rounded-[9px] bg-[rgba(120,120,128,.09)] px-3 py-2.5 text-[14px] leading-5 text-[var(--ff-muted)]">
+              <p className="mt-3 rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 text-[14px] leading-5 text-[var(--ff-muted)]">
                 FamilyFi can&rsquo;t issue or rotate this key — only a UniFi console admin can. Create one in your UniFi
                 console, then paste it here. Revoking the old key in UniFi is what actually retires it.
               </p>
@@ -354,8 +354,8 @@ export default function SettingsPage() {
           </section>
         </div>
 
-        <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
-          <div className="flex flex-wrap items-baseline gap-2.5 border-b border-[rgba(60,60,67,.14)] px-[18px] py-[15px]">
+        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+          <div className="flex flex-wrap items-baseline gap-2.5 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
             <span className="text-[14px] font-semibold">Household</span>
             <span className="text-[14px] text-[var(--ff-muted)]">
               Children and teens get pause and schedules · adults can be admins with their own login
@@ -382,7 +382,7 @@ export default function SettingsPage() {
               <div
                 key={group.id}
                 className="flex flex-wrap items-center gap-3 px-[18px] py-3"
-                style={{ borderTop: "1px solid rgba(60,60,67,.12)" }}
+                style={{ borderTop: "1px solid var(--ff-hairline)" }}
               >
                 <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-mark)] text-[14px] font-semibold text-white">
                   {group.monogram || initials(group.name)}
@@ -391,7 +391,7 @@ export default function SettingsPage() {
                   <div className="text-[14px] font-semibold">{group.name}</div>
                   <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">{householdMemberNote(group, account)}</div>
                 </div>
-                <div className="flex flex-none gap-0.5 rounded-lg bg-[rgba(120,120,128,.12)] p-0.5" role="radiogroup" aria-label={`${group.name} role`}>
+                <div className="flex flex-none gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5" role="radiogroup" aria-label={`${group.name} role`}>
                   {ROLES.map((role) => {
                     const on = group.familyRole === role;
                     const disabled = lockedRole && role !== "adult";
@@ -426,8 +426,8 @@ export default function SettingsPage() {
                     type="button"
                     className="flex flex-none items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[14px] font-semibold"
                     style={{
-                      borderColor: account?.isAdmin ? "rgba(0,122,255,.35)" : "rgba(60,60,67,.2)",
-                      background: account?.isAdmin ? "rgba(0,122,255,.08)" : "#fff",
+                      borderColor: account?.isAdmin ? "var(--ff-accent-line)" : "var(--ff-control-line)",
+                      background: account?.isAdmin ? "var(--ff-accent-wash)" : "#fff",
                       color: account?.isAdmin ? "var(--ff-accent)" : "var(--ff-muted)",
                     }}
                     onClick={() => {
@@ -449,7 +449,7 @@ export default function SettingsPage() {
                     <span
                       className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border text-[10px] leading-none text-white"
                       style={{
-                        borderColor: account?.isAdmin ? "var(--ff-accent)" : "rgba(60,60,67,.35)",
+                        borderColor: account?.isAdmin ? "var(--ff-accent)" : "var(--ff-disabled)",
                         background: account?.isAdmin ? "var(--ff-accent)" : "#fff",
                       }}
                     >
@@ -471,7 +471,7 @@ export default function SettingsPage() {
             );
           })}
           <form
-            className="flex items-center gap-2.5 border-t border-[rgba(60,60,67,.12)] px-[18px] py-3"
+            className="flex items-center gap-2.5 border-t border-[var(--ff-hairline)] px-[18px] py-3"
             onSubmit={(event) => {
               event.preventDefault();
               const name = newName.trim();
@@ -502,20 +502,20 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
-          <div className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-[15px] text-[14px] font-semibold">About</div>
+        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+          <div className="border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px] text-[14px] font-semibold">About</div>
           <div className="flex items-center gap-3 px-[18px] py-2.5">
             <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">Version</div>
             <div className="min-w-0 flex-1 text-right font-mono text-[14px]">{appVersionLabel()}</div>
           </div>
           <div
             className="flex items-center gap-3 px-[18px] py-2.5"
-            style={{ borderTop: "1px solid rgba(60,60,67,.12)" }}
+            style={{ borderTop: "1px solid var(--ff-hairline)" }}
           >
             <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">License</div>
             <div className="min-w-0 flex-1 text-right text-[14px]">Business Source License 1.1</div>
           </div>
-          <p className="border-t border-[rgba(60,60,67,.12)] px-[18px] py-3 text-[14px] leading-5 text-[var(--ff-muted)]">
+          <p className="border-t border-[var(--ff-hairline)] px-[18px] py-3 text-[14px] leading-5 text-[var(--ff-muted)]">
             FamilyFi {appVersionLabel()}. One household UniFi network. Report bugs on GitHub with credentials and IPs
             removed.
           </p>
@@ -548,7 +548,7 @@ export default function SettingsPage() {
                 {pwHint}
               </p>
             </div>
-            <div className="flex border-t border-[rgba(60,60,67,.14)]">
+            <div className="flex border-t border-[var(--ff-hairline-card)]">
               <button
                 type="button"
                 className="flex-1 py-3 text-center text-[14px] text-[var(--ff-muted)]"
@@ -559,7 +559,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 disabled={pw1.length < 8 || pw1 !== pw2 || loginUser.trim().length < 2}
-                className="flex-1 border-l border-[rgba(60,60,67,.14)] py-3 text-center text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
+                className="flex-1 border-l border-[var(--ff-hairline-card)] py-3 text-center text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
                 onClick={() => {
                   const group = loginFor;
                   void mutate(async () => {

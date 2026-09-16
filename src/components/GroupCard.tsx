@@ -71,7 +71,7 @@ export function GroupCard({
   const enabled = group.schedule.enabled && group.schedule.start && group.schedule.end;
 
   return (
-    <article className="overflow-hidden rounded-[12px] bg-white md:border md:border-[rgba(60,60,67,.14)]">
+    <article className="overflow-hidden rounded-[12px] bg-white md:border md:border-[var(--ff-hairline-card)]">
       <Link href={href} className="flex items-center gap-3 px-4 py-3.5 md:items-start md:px-[18px] md:py-4">
         {things ? (
           <div
@@ -95,7 +95,7 @@ export function GroupCard({
           </div>
           <div className="mt-0.5 hidden text-[14px] text-[var(--ff-muted)] md:block">{note}</div>
         </div>
-        <span className="flex-none text-[17px] text-[rgba(60,60,67,.35)] md:hidden" aria-hidden>
+        <span className="flex-none text-[17px] text-[var(--ff-disabled)] md:hidden" aria-hidden>
           ›
         </span>
       </Link>
@@ -117,12 +117,12 @@ export function GroupCard({
 function ActionRow({ actions, className }: { actions: CardAction[]; className?: string }) {
   if (actions.length === 0) return null;
   return (
-    <div className={`flex border-t border-[rgba(60,60,67,.16)] ${className ?? ""}`}>
+    <div className={`flex border-t border-[var(--ff-hairline-strong)] ${className ?? ""}`}>
       {actions.map((action, index) => {
         const className =
           "flex-1 py-3 text-center text-[16px] md:py-2.5 md:text-[14px] " +
           (action.strong ? "font-semibold text-[var(--ff-accent)]" : "font-medium text-[var(--ff-accent)]");
-        const style = { borderLeft: index ? "1px solid rgba(60,60,67,.16)" : undefined };
+        const style = { borderLeft: index ? "1px solid var(--ff-hairline-strong)" : undefined };
         if (action.href) {
           return (
             <Link key={action.label} href={action.href} className={className} style={style}>

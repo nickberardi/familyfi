@@ -45,8 +45,8 @@ function GroupEditForm({ group }: { group: Group }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
-      <h2 className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-4 text-[14px] font-semibold">Edit</h2>
+    <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+      <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Edit</h2>
       <form
         className="flex flex-col gap-3 p-[18px]"
         method="post"
@@ -166,8 +166,8 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         </p>
       </header>
       <GroupEditForm key={group.id} group={group} />
-      <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
-        <h2 className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-4 text-[14px] font-semibold">Current state</h2>
+      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+        <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Current state</h2>
         <div className="p-[18px]">
           <p className="text-[14px] text-[var(--ff-muted)]">{cardNoteLine(group)}</p>
           <div className="mt-3">
@@ -222,8 +222,8 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           />
         ) : null}
       </section>
-      <section className="overflow-hidden rounded-[12px] border border-[rgba(60,60,67,.14)] bg-white">
-        <h2 className="border-b border-[rgba(60,60,67,.14)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
+      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+        <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
         {members.length === 0 ? (
           <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
             No devices assigned.
@@ -240,7 +240,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           </p>
         ) : (
           members.map((device) => (
-            <div key={device.mac} className="flex items-center gap-3 border-t border-[rgba(60,60,67,.14)] px-[18px] py-3">
+            <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
               <div className="min-w-0 flex-1 text-[14px]">{device.hostname ?? "Unnamed device"}</div>
               <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
             </div>

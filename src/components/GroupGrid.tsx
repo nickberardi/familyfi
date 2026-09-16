@@ -69,7 +69,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
       </header>
       <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">
         {rows.length === 0 ? (
-          <p className="rounded-[12px] bg-white p-[18px] text-[14px] text-[var(--ff-muted)] md:border md:border-[rgba(60,60,67,.14)]">
+          <p className="rounded-[12px] bg-white p-[18px] text-[14px] text-[var(--ff-muted)] md:border md:border-[var(--ff-hairline-card)]">
             Nothing here yet.
           </p>
         ) : (

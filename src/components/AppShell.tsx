@@ -105,7 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       className="flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[14px]"
                       style={{
-                        background: active ? "rgba(0,122,255,.12)" : undefined,
+                        background: active ? "var(--ff-accent-tint)" : undefined,
                         color: active ? "var(--ff-accent)" : "var(--ff-ink)",
                         fontWeight: active ? 600 : 500,
                       }}
@@ -146,7 +146,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() =>
                   void mutate(() => api("/api/v1/sync/retry", { method: "POST", body: JSON.stringify({}) }))
                 }
-                className="mt-2 w-full rounded-[6px] bg-[rgba(0,122,255,.1)] py-1.5 text-center text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
+                className="mt-2 w-full rounded-[6px] bg-[var(--ff-accent-fill)] py-1.5 text-center text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
               >
                 {busy ? "Reconciling…" : "Reconcile now"}
               </button>
@@ -165,7 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           ) : null}
           <div className="flex items-center gap-2.5 rounded-[10px] bg-white/70 p-2.5">
-            <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[rgba(52,199,89,.16)] text-[14px] font-semibold text-[var(--ff-on)]">
+            <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-person-fill)] text-[14px] font-semibold text-[var(--ff-on)]">
               {initials(session?.displayName ?? "A")}
             </div>
             <div className="min-w-0 flex-1">
