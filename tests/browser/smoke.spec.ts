@@ -130,3 +130,91 @@ test("device assignment updates immediately", async ({ page }) => {
   await expect(select).toHaveValue(target!.id);
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
 });
+
+test("Rules shell: protected absent and Always|Scheduled persist", async ({ page }) => {
+  await signIn(page);
+
+  const groupsRes = await page.request.get("/api/v1/groups");
+  expect(groupsRes.ok()).toBeTruthy();
+  const body = (await groupsRes.json()) as {
+    groups: {
+      id: string;
+      name: string;
+      kind: string;
+      protected: boolean;
+      familyRole: string | null;
+    }[];
+  };
+
+  const protectedGroup = body.groups.find((group) => group.protected);
+  expect(protectedGroup, "UNIFI_MOCK seed must include a protected group").toBeTruthy();
+
+  // Prefer distinct seeded kids per project to reduce desktop/phone schedule races.
+  const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
+  const child =
+    body.groups.find((group) => !group.protected && group.kind === "family" && group.name === preferredName) ??
+    body.groups.find(
+      (group) =>
+        !group.protected && group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"),
+    );
+  expect(child, "UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
+
+  await page.goto("/rules");
+  await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
+  await expect(page.locator(`#group-${protectedGroup!.id}`)).toHaveCount(0);
+
+  if (test.info().project.name !== "phone") {
+    await expect(page.getByRole("link", { name: "Schedules" })).toHaveCount(0);
+  }
+
+  const row = page.locator(`#group-${child!.id}`);
+  await expect(row).toBeVisible();
+  await expect(row.getByText("Internet").filter({ visible: true })).toBeVisible();
+  await expect(row.getByRole("button", { name: "×" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: /delete/i })).toHaveCount(0);
+
+  const modeOf = (scope: ReturnType<Page["locator"]>) =>
+    scope.getByRole("group", { name: "Internet rule mode" }).filter({ visible: true });
+
+  async function clickMode(enabled: boolean) {
+    const mode = modeOf(page.locator(`#group-${child!.id}`));
+    const label = enabled ? "Scheduled" : "Always";
+    const put = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        response.url().includes(`/api/v1/groups/${child!.id}/schedule`),
+    );
+    await mode.getByRole("button", { name: label }).click();
+    const res = await put;
+    expect(res.ok()).toBeTruthy();
+    expect((res.request().postDataJSON() as { enabled: boolean }).enabled).toBe(enabled);
+  }
+
+  async function expectMode(enabled: boolean) {
+    const mode = modeOf(page.locator(`#group-${child!.id}`));
+    await expect(mode.getByRole("button", { name: "Always" })).toHaveAttribute(
+      "aria-pressed",
+      enabled ? "false" : "true",
+    );
+    await expect(mode.getByRole("button", { name: "Scheduled" })).toHaveAttribute(
+      "aria-pressed",
+      enabled ? "true" : "false",
+    );
+  }
+
+  // Seed starts scheduled; if a prior run left Always, nudge to Scheduled first so Always PUT fires.
+  const initialScheduled =
+    (await modeOf(row).getByRole("button", { name: "Scheduled" }).getAttribute("aria-pressed")) === "true";
+  if (!initialScheduled) {
+    await clickMode(true);
+    await page.goto("/rules");
+  }
+
+  await clickMode(false);
+  await page.goto("/rules");
+  await expectMode(false);
+
+  await clickMode(true);
+  await page.goto("/rules");
+  await expectMode(true);
+});
