@@ -126,13 +126,13 @@ test("device assignment updates immediately", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Devices" })).toBeVisible();
   await expect(page.getByText("Loading household…")).toHaveCount(0);
   const select = page.locator("select").first();
-  await expect(select, "FAMILYFI_UNIFI_MOCK household must seed devices in CI").toHaveCount(1);
+  await expect(select, "UNIFI_MOCK household must seed devices in CI").toHaveCount(1);
   const current = await select.inputValue();
   const groups = await page.request.get("/api/v1/groups");
   expect(groups.ok()).toBeTruthy();
   const body = (await groups.json()) as { groups: { id: string; name: string }[] };
   const target = body.groups.find((group) => group.id !== current) ?? body.groups[0];
-  expect(target, "FAMILYFI_UNIFI_MOCK household must seed groups in CI").toBeTruthy();
+  expect(target, "UNIFI_MOCK household must seed groups in CI").toBeTruthy();
   await select.selectOption(target!.id);
   await expect(select).toHaveValue(target!.id);
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
@@ -154,7 +154,7 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
   };
 
   const protectedGroup = body.groups.find((group) => group.protected);
-  expect(protectedGroup, "FAMILYFI_UNIFI_MOCK seed must include a protected group").toBeTruthy();
+  expect(protectedGroup, "UNIFI_MOCK seed must include a protected group").toBeTruthy();
 
   // Prefer distinct seeded kids per project to reduce desktop/phone schedule races.
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
@@ -164,7 +164,7 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
       (group) =>
         !group.protected && group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"),
     );
-  expect(child, "FAMILYFI_UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
+  expect(child, "UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
@@ -225,7 +225,7 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
   await page.goto("/rules");
   await expectMode(true);
 
-  // Phase 3: Network chips from Settings managed networks (manage-all in FAMILYFI_UNIFI_MOCK seed).
+  // Phase 3: Network chips from Settings managed networks (manage-all in UNIFI_MOCK seed).
   await page.getByRole("button", { name: "New rule" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
@@ -252,7 +252,7 @@ test("Phase 4: card marks, Fam On/Off sheets, soft polish, no DNS chrome", async
       (group) =>
         !group.protected && group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"),
     );
-  expect(child, "FAMILYFI_UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
+  expect(child, "UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
   const protectedGroup = body.groups.find((group) => group.protected);
   expect(protectedGroup).toBeTruthy();
 
@@ -329,7 +329,7 @@ test("Phase 4: card marks, Fam On/Off sheets, soft polish, no DNS chrome", async
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
   // Soft polish: Network empty helper must be visible when Network tab is disabled.
-  // With FAMILYFI_UNIFI_MOCK manage-all, Network is enabled — assert curated chips hide raw ids.
+  // With UNIFI_MOCK manage-all, Network is enabled — assert curated chips hide raw ids.
   const curated = dialog.getByRole("group", { name: "Curated category slots" });
   await expect(curated.getByRole("button", { name: /Video/i })).toBeVisible();
   await expect(curated.getByText(/\(\s*4\s*\)/)).toHaveCount(0);

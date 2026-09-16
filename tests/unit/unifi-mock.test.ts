@@ -26,12 +26,12 @@ function stubHousehold(): Household {
 
 function setMockFlag(value: string | undefined) {
   const env = process.env as Record<string, string | undefined>;
-  if (value === undefined) delete env.FAMILYFI_UNIFI_MOCK;
-  else env.FAMILYFI_UNIFI_MOCK = value;
+  if (value === undefined) delete env.UNIFI_MOCK;
+  else env.UNIFI_MOCK = value;
 }
 
-describe("FAMILYFI_UNIFI_MOCK", () => {
-  const previousMock = process.env.FAMILYFI_UNIFI_MOCK;
+describe("UNIFI_MOCK", () => {
+  const previousMock = process.env.UNIFI_MOCK;
 
   afterEach(() => {
     setMockFlag(previousMock);
@@ -40,13 +40,13 @@ describe("FAMILYFI_UNIFI_MOCK", () => {
 
   it("is opt-in and ignored in production", () => {
     expect(unifiMockEnabled({ NODE_ENV: "development" })).toBe(false);
-    expect(unifiMockEnabled({ NODE_ENV: "development", FAMILYFI_UNIFI_MOCK: "1" })).toBe(true);
-    expect(unifiMockEnabled({ NODE_ENV: "test", FAMILYFI_UNIFI_MOCK: "true" })).toBe(true);
-    expect(unifiMockRequested({ NODE_ENV: "production", FAMILYFI_UNIFI_MOCK: "1" })).toBe(true);
-    expect(unifiMockEnabled({ NODE_ENV: "production", FAMILYFI_UNIFI_MOCK: "1" })).toBe(false);
-    expect(unifiMockEnabled({ NODE_ENV: "production", CI: "1", FAMILYFI_UNIFI_MOCK: "1" })).toBe(true);
-    expect(loadEnv({ ...validEnv, NODE_ENV: "production", FAMILYFI_UNIFI_MOCK: "1" }).FAMILYFI_UNIFI_MOCK).toBe(false);
-    expect(loadEnv({ ...validEnv, NODE_ENV: "test", FAMILYFI_UNIFI_MOCK: "1" }).FAMILYFI_UNIFI_MOCK).toBe(true);
+    expect(unifiMockEnabled({ NODE_ENV: "development", UNIFI_MOCK: "1" })).toBe(true);
+    expect(unifiMockEnabled({ NODE_ENV: "test", UNIFI_MOCK: "true" })).toBe(true);
+    expect(unifiMockRequested({ NODE_ENV: "production", UNIFI_MOCK: "1" })).toBe(true);
+    expect(unifiMockEnabled({ NODE_ENV: "production", UNIFI_MOCK: "1" })).toBe(false);
+    expect(unifiMockEnabled({ NODE_ENV: "production", CI: "1", UNIFI_MOCK: "1" })).toBe(true);
+    expect(loadEnv({ ...validEnv, NODE_ENV: "production", UNIFI_MOCK: "1" }).UNIFI_MOCK).toBe(false);
+    expect(loadEnv({ ...validEnv, NODE_ENV: "test", UNIFI_MOCK: "1" }).UNIFI_MOCK).toBe(true);
   });
 
   it("returns a shared MockUnifiClient for probe and household clients", async () => {

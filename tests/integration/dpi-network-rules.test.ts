@@ -41,7 +41,7 @@ async function withMockKey() {
       unifiKeyLastFour: "mock",
     },
   });
-  process.env.FAMILYFI_UNIFI_MOCK = "1";
+  process.env.UNIFI_MOCK = "1";
 }
 
 describe("Phase 3 network-scoped DPI", () => {

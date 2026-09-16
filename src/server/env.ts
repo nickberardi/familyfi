@@ -26,7 +26,7 @@ const EnvSchema = z.object({
   DB_SSL_ROOT_CERT: z.string().optional(),
 });
 
-export type AppEnv = z.infer<typeof EnvSchema> & { DATABASE_URL: string; FAMILYFI_UNIFI_MOCK: boolean };
+export type AppEnv = z.infer<typeof EnvSchema> & { DATABASE_URL: string; UNIFI_MOCK: boolean };
 
 function truthyFlag(value: string | undefined): boolean {
   if (!value) return false;
@@ -34,9 +34,9 @@ function truthyFlag(value: string | undefined): boolean {
   return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
-/** True when FAMILYFI_UNIFI_MOCK is 1/true/yes, ignoring NODE_ENV. */
+/** True when UNIFI_MOCK is 1/true/yes, ignoring NODE_ENV. */
 export function unifiMockRequested(source: Record<string, string | undefined> = process.env): boolean {
-  return truthyFlag(read(source, "FAMILYFI_UNIFI_MOCK"));
+  return truthyFlag(read(source, "UNIFI_MOCK"));
 }
 
 /** Opt-in UniFi stand-in for local UI work. Never enabled in production unless CI opts in. */
@@ -129,7 +129,7 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
   parseEncryptionKey(parsed.FAMILYFI_ENCRYPTION_KEY);
   const DATABASE_URL = buildDatabaseUrl(parsed);
   source.DATABASE_URL = DATABASE_URL;
-  return { ...parsed, DATABASE_URL, FAMILYFI_UNIFI_MOCK: unifiMockEnabled(source) };
+  return { ...parsed, DATABASE_URL, UNIFI_MOCK: unifiMockEnabled(source) };
 }
 
 export function env(): AppEnv {
