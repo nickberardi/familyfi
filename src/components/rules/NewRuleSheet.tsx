@@ -13,7 +13,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { Segmented } from "@/components/ui/Segmented";
 import { DayPicker } from "@/components/ui/DayPicker";
 import { TimeField } from "@/components/ui/Controls";
-import { D6_CATEGORY_SLOTS } from "@/lib/rules";
+import { CURATED_CATEGORY_SLOTS } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 type DpiItem = { id: number; name: string };
@@ -239,7 +239,7 @@ export function NewRuleSheet({
             {targetType === "category" ? (
               <>
                 <div className="flex flex-col gap-1.5" role="group" aria-label="Curated category slots">
-                  {D6_CATEGORY_SLOTS.map((slot) => {
+                  {CURATED_CATEGORY_SLOTS.map((slot) => {
                     const active = selectedDpiId === slot.categoryId;
                     return (
                       <button

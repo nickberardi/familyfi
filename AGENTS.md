@@ -57,7 +57,7 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 | Logic modules (`lib/`, `server/`) | `kebab-case.ts` | `rule-rows.ts`, `unifi-settings.ts` |
 | Directories | lowercase, no separators | `components/ui`, `server/unifi` |
 | Functions, variables, props | `camelCase` | `buildRuleRows`, `parentFacingRuleLabel` |
-| Module constants | `SCREAMING_SNAKE` | `SESSION_TTL_MS`, `D6_CATEGORY_SLOTS` |
+| Module constants | `SCREAMING_SNAKE` | `SESSION_TTL_MS`, `CURATED_CATEGORY_SLOTS` |
 | Prisma models / tables | `PascalCase`, singular | `Rule`, `RulePolicy`, `SyncRun` |
 | Columns and JSON fields | `camelCase` | `suspensionActive`, `targetIds` |
 | Prisma enum values | `lowercase` | `family`, `scheduled`, `quarantined` |

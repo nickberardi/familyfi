@@ -7,7 +7,7 @@
  * pure model means the table component has no per-kind branching left in it.
  */
 
-import { parentFacingRuleLabel, glyphForAppName, D6_CATEGORY_SLOTS, type Rule } from "./rules";
+import { parentFacingRuleLabel, glyphForAppName, CURATED_CATEGORY_SLOTS, type Rule } from "./rules";
 import { roleTag } from "./display";
 import type { Group } from "./types";
 
@@ -44,7 +44,7 @@ export type RuleRow = {
 
 function curatedSlot(rule: Rule): "video" | "social" | "gaming" | undefined {
   if (rule.kind !== "category") return undefined;
-  return D6_CATEGORY_SLOTS.find((s) => rule.targetIds.includes(s.categoryId))?.slot;
+  return CURATED_CATEGORY_SLOTS.find((s) => rule.targetIds.includes(s.categoryId))?.slot;
 }
 
 function internetRow(group: Group): RuleRow {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  D6_CATEGORY_SLOTS,
+  CURATED_CATEGORY_SLOTS,
   appRulesForGroup,
   categoryRuleForSlot,
   glyphForAppName,
@@ -22,9 +22,9 @@ function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">):
 }
 
 describe("rules helpers", () => {
-  it("exposes three curated D6 slots without Porn", () => {
-    expect(D6_CATEGORY_SLOTS.map((s) => s.slot)).toEqual(["video", "social", "gaming"]);
-    expect(D6_CATEGORY_SLOTS.map((s) => s.categoryId)).toEqual([4, 24, 8]);
+  it("exposes three curated slots without Porn", () => {
+    expect(CURATED_CATEGORY_SLOTS.map((s) => s.slot)).toEqual(["video", "social", "gaming"]);
+    expect(CURATED_CATEGORY_SLOTS.map((s) => s.categoryId)).toEqual([4, 24, 8]);
   });
 
   it("resolves category and app rules for a group", () => {
