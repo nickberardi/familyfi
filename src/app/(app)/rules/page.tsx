@@ -7,6 +7,19 @@ import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import type { Group } from "@/lib/types";
 
+type FamRule = {
+  id: string;
+  kind: "category" | "app";
+  groupId: string;
+  targetIds: number[];
+  enabled: boolean;
+  mode: "always" | "scheduled";
+  schedule: { enabled: boolean; days: number[]; start: string | null; end: string | null };
+  internet: false;
+};
+
+type DpiItem = { id: number; name: string };
+
 const DAYS = [
   { value: 0, label: "S" },
   { value: 1, label: "M" },
@@ -40,16 +53,69 @@ function RuleMark({ group }: { group: Group }) {
   );
 }
 
-function RuleRow({ group }: { group: Group }) {
+function NestedRuleRow({
+  rule,
+  label,
+  onChanged,
+}: {
+  rule: FamRule;
+  label: string;
+  onChanged: () => void;
+}) {
+  const { mutate } = useAppData();
+  async function turnOff() {
+    await mutate(() => api(`/api/v1/rules/${rule.id}/off`, { method: "POST", body: "{}" }));
+    onChanged();
+  }
+  async function remove() {
+    await mutate(() => api(`/api/v1/rules/${rule.id}`, { method: "DELETE" }));
+    onChanged();
+  }
+  return (
+    <div className="flex items-center gap-3 border-t border-[rgba(60,60,67,.08)] bg-[rgba(120,120,128,.04)] px-4 py-2.5 md:px-[18px] md:pl-12">
+      <div className="min-w-0 flex-1 truncate text-[13px] text-[var(--ff-muted)]">
+        <span className="font-semibold text-[var(--ff-ink)]">{rule.kind === "category" ? "Category" : "App"}</span>
+        <span className="mx-1.5">·</span>
+        <span>{label}</span>
+        {!rule.enabled ? <span className="ml-2 text-[12px] font-semibold text-[var(--ff-muted)]">Off</span> : null}
+      </div>
+      <div className="flex flex-none gap-2">
+        {rule.enabled ? (
+          <button type="button" onClick={() => void turnOff()} className="text-[13px] font-semibold text-[var(--ff-muted)]">
+            Turn off
+          </button>
+        ) : null}
+        <button type="button" onClick={() => void remove()} aria-label={`Delete ${label}`} className="text-[13px] font-semibold text-[var(--ff-danger,#ff3b30)]">
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RuleRow({ group, childRules, labels, onRulesChanged }: { group: Group; childRules: FamRule[]; labels: Map<string, string>; onRulesChanged: () => void }) {
   return (
     <RuleRowForm
       key={`${group.id}:${group.mode}:${group.schedule.enabled}:${group.schedule.start}:${group.schedule.end}:${group.schedule.days.join(",")}`}
       group={group}
+      childRules={childRules}
+      labels={labels}
+      onRulesChanged={onRulesChanged}
     />
   );
 }
 
-function RuleRowForm({ group }: { group: Group }) {
+function RuleRowForm({
+  group,
+  childRules,
+  labels,
+  onRulesChanged,
+}: {
+  group: Group;
+  childRules: FamRule[];
+  labels: Map<string, string>;
+  onRulesChanged: () => void;
+}) {
   const { mutate } = useAppData();
   const scheduled = group.mode === "scheduled" || group.schedule.enabled;
   const [enabled, setEnabled] = useState(scheduled);
@@ -216,21 +282,96 @@ function RuleRowForm({ group }: { group: Group }) {
         {enabled ? dayToggles : <div />}
         <div className="flex justify-end">{modeControl}</div>
       </div>
+      {childRules.map((rule) => (
+        <NestedRuleRow
+          key={rule.id}
+          rule={rule}
+          label={labels.get(`${rule.kind}:${rule.targetIds.join(",")}`) ?? rule.targetIds.join(", ")}
+          onChanged={onRulesChanged}
+        />
+      ))}
     </div>
   );
 }
 
-function NewRuleModal({ onClose, groups }: { onClose: () => void; groups: Group[] }) {
+function NewRuleModal({
+  onClose,
+  groups,
+  onCreated,
+}: {
+  onClose: () => void;
+  groups: Group[];
+  onCreated: () => void;
+}) {
+  const { mutate } = useAppData();
   const [scope, setScope] = useState<"member" | "network">("member");
   const [targetType, setTargetType] = useState<"category" | "app">("category");
   const [enforcement, setEnforcement] = useState<"always" | "scheduled">("always");
   const [targetId, setTargetId] = useState("");
+  const [catalog, setCatalog] = useState<DpiItem[]>([]);
+  const [selectedDpiId, setSelectedDpiId] = useState<number | "">("");
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const selectedTargetId = groups.some((g) => g.id === targetId) ? targetId : (groups[0]?.id ?? "");
+
+  useEffect(() => {
+    let cancelled = false;
+    const path =
+      targetType === "category"
+        ? `/api/v1/dpi/categories${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`
+        : `/api/v1/dpi/applications${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`;
+    void api<{ categories?: DpiItem[]; applications?: DpiItem[] }>(path)
+      .then((res) => {
+        if (cancelled) return;
+        setCatalog(targetType === "category" ? (res.categories ?? []) : (res.applications ?? []));
+        setError("");
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setCatalog([]);
+        setError(err.message || "Could not load DPI catalog.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetType, filter]);
 
   const seg = (active: boolean) =>
     active
       ? { background: "#fff", color: "var(--ff-ink)", boxShadow: "0 0 0 1px rgba(60,60,67,.12)" }
       : { background: "transparent", color: "var(--ff-muted)" };
+
+  const canCreate = scope === "member" && selectedTargetId && selectedDpiId !== "" && !busy;
+
+  async function create() {
+    if (!canCreate || typeof selectedDpiId !== "number") return;
+    const dpiId = selectedDpiId;
+    setBusy(true);
+    setError("");
+    try {
+      await mutate(() =>
+        api("/api/v1/rules", {
+          method: "POST",
+          body: JSON.stringify({
+            kind: targetType,
+            groupId: selectedTargetId,
+            targetIds: [dpiId],
+            mode: enforcement,
+            ...(enforcement === "scheduled"
+              ? { schedule: { enabled: true, days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" } }
+              : {}),
+          }),
+        }),
+      );
+      onCreated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create rule.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/32 p-6" role="dialog" aria-modal="true" aria-labelledby="new-rule-title">
@@ -269,13 +410,39 @@ function NewRuleModal({ onClose, groups }: { onClose: () => void; groups: Group[
           <div>
             <div className="mb-1.5 text-[12px] font-semibold text-[var(--ff-muted)]">Target type</div>
             <div className="flex gap-0.5 rounded-[8px] bg-[rgba(120,120,128,.12)] p-0.5">
-              <button type="button" className="flex-1 rounded-[6px] py-1.5 text-center text-[13px] font-semibold" style={seg(targetType === "category")} onClick={() => setTargetType("category")}>
+              <button type="button" className="flex-1 rounded-[6px] py-1.5 text-center text-[13px] font-semibold" style={seg(targetType === "category")} onClick={() => { setTargetType("category"); setSelectedDpiId(""); }}>
                 Category
               </button>
-              <button type="button" className="flex-1 rounded-[6px] py-1.5 text-center text-[13px] font-semibold" style={seg(targetType === "app")} onClick={() => setTargetType("app")}>
+              <button type="button" className="flex-1 rounded-[6px] py-1.5 text-center text-[13px] font-semibold" style={seg(targetType === "app")} onClick={() => { setTargetType("app"); setSelectedDpiId(""); }}>
                 App
               </button>
             </div>
+          </div>
+          <div>
+            <div className="mb-1.5 text-[12px] font-semibold text-[var(--ff-muted)]">{targetType === "category" ? "Category" : "App"}</div>
+            <input
+              type="search"
+              placeholder="Search catalog"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="mb-2 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2 text-[15px]"
+            />
+            <select
+              className="w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]"
+              value={selectedDpiId === "" ? "" : String(selectedDpiId)}
+              onChange={(e) => setSelectedDpiId(e.target.value ? Number(e.target.value) : "")}
+              aria-label={targetType === "category" ? "DPI category" : "DPI application"}
+            >
+              <option value="">Select…</option>
+              {catalog.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} ({item.id})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-[12px] text-[var(--ff-muted)]">
+              Integer UniFi DPI ids only — no free-text names in policy bodies. D6 curated map is provisional until Nick confirms.
+            </p>
           </div>
           <div>
             <div className="mb-1.5 text-[12px] font-semibold text-[var(--ff-muted)]">Enforcement</div>
@@ -288,9 +455,7 @@ function NewRuleModal({ onClose, groups }: { onClose: () => void; groups: Group[
               </button>
             </div>
           </div>
-          <p className="rounded-[9px] bg-[rgba(120,120,128,.08)] px-3 py-2.5 text-[13px] leading-snug text-[var(--ff-muted)]">
-            Category and app rules land in the next phase. Internet Always / Scheduled is editable on each row above.
-          </p>
+          {error ? <p className="text-[13px] text-[var(--ff-danger,#ff3b30)]">{error}</p> : null}
         </div>
         <div className="flex border-t border-[rgba(60,60,67,.14)]">
           <button type="button" onClick={onClose} className="flex-1 py-3 text-center text-[14px] text-[var(--ff-muted)]">
@@ -298,8 +463,10 @@ function NewRuleModal({ onClose, groups }: { onClose: () => void; groups: Group[
           </button>
           <button
             type="button"
-            disabled
-            className="flex-1 cursor-not-allowed border-l border-[rgba(60,60,67,.14)] py-3 text-center text-[14px] font-semibold text-[rgba(60,60,67,.35)]"
+            disabled={!canCreate}
+            onClick={() => void create()}
+            className="flex-1 border-l border-[rgba(60,60,67,.14)] py-3 text-center text-[14px] font-semibold disabled:cursor-not-allowed disabled:text-[rgba(60,60,67,.35)]"
+            style={canCreate ? { color: "var(--ff-accent)" } : undefined}
           >
             Create rule
           </button>
@@ -313,6 +480,32 @@ export default function RulesPage() {
   const { groups } = useAppData();
   const rows = groups.filter((group) => !group.protected);
   const [newRuleOpen, setNewRuleOpen] = useState(false);
+  const [rules, setRules] = useState<FamRule[]>([]);
+  const [labels, setLabels] = useState<Map<string, string>>(new Map());
+
+  async function loadRules() {
+    try {
+      const [{ rules: next }, cats, apps] = await Promise.all([
+        api<{ rules: FamRule[] }>("/api/v1/rules"),
+        api<{ categories: DpiItem[] }>("/api/v1/dpi/categories").catch(() => ({ categories: [] as DpiItem[] })),
+        api<{ applications: DpiItem[] }>("/api/v1/dpi/applications").catch(() => ({ applications: [] as DpiItem[] })),
+      ]);
+      setRules(next);
+      const map = new Map<string, string>();
+      for (const item of cats.categories) map.set(`category:${item.id}`, item.name);
+      for (const item of apps.applications) map.set(`app:${item.id}`, item.name);
+      setLabels(map);
+    } catch {
+      setRules([]);
+    }
+  }
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      void loadRules();
+    }, 0);
+    return () => window.clearTimeout(handle);
+  }, []);
 
   useEffect(() => {
     const id = window.location.hash.replace(/^#/, "");
@@ -344,18 +537,31 @@ export default function RulesPage() {
                 <div className="text-right">Mode</div>
               </div>
               {rows.map((group) => (
-                <RuleRow key={group.id} group={group} />
+                <RuleRow
+                  key={group.id}
+                  group={group}
+                  childRules={rules.filter((rule) => rule.groupId === group.id)}
+                  labels={labels}
+                  onRulesChanged={() => void loadRules()}
+                />
               ))}
             </div>
           </div>
         )}
         <p className="max-w-[70ch] text-[14px] leading-5 text-[var(--ff-muted)]">
-          Each row is the Internet parent for that member or Things group. Always keeps a permanent block; Scheduled uses
-          Offline / Back on times. Edits are desired configuration — Sync writes them to UniFi. Internet rows are not
-          deletable.
+          Each row is the Internet parent for that member or Things group. Nested category and app filters use UniFi DPI
+          integer ids. Always keeps a permanent block; Scheduled uses Offline / Back on times. Edits are desired
+          configuration — Sync writes them to UniFi. Internet rows are not deletable.
         </p>
       </div>
-      {newRuleOpen ? <NewRuleModal key="new-rule" onClose={() => setNewRuleOpen(false)} groups={rows} /> : null}
+      {newRuleOpen ? (
+        <NewRuleModal
+          key="new-rule"
+          onClose={() => setNewRuleOpen(false)}
+          groups={rows}
+          onCreated={() => void loadRules()}
+        />
+      ) : null}
     </>
   );
 }

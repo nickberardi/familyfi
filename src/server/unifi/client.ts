@@ -5,6 +5,7 @@ import { UNIFI_PAGE_LIMIT } from "./types";
 import type {
   ApplicationInfo,
   ClientOverview,
+  DpiCatalogItem,
   FirewallPolicy,
   FirewallPolicyWrite,
   FirewallZone,
@@ -31,6 +32,8 @@ export type UnifiClient = {
   updatePolicy(siteId: string, policyId: string, body: FirewallPolicyWrite): Promise<FirewallPolicy>;
   deletePolicy(siteId: string, policyId: string): Promise<void>;
   getPolicyOrdering(siteId: string, sourceFirewallZoneId?: string): Promise<PolicyOrdering>;
+  listDpiCategories(filter?: string): Promise<DpiCatalogItem[]>;
+  listDpiApplications(filter?: string): Promise<DpiCatalogItem[]>;
 };
 
 export type HttpUnifiClientOptions = {
@@ -133,6 +136,14 @@ export class HttpUnifiClient implements UnifiClient {
         sourceFirewallZoneId,
       }),
     );
+  }
+
+  async listDpiCategories(filter?: string): Promise<DpiCatalogItem[]> {
+    return this.paginate("/v1/dpi/categories", filter);
+  }
+
+  async listDpiApplications(filter?: string): Promise<DpiCatalogItem[]> {
+    return this.paginate("/v1/dpi/applications", filter);
   }
 
   private async paginate<T>(path: string, filter?: string): Promise<T[]> {

@@ -8,10 +8,16 @@ import { clientForHousehold, connectionIdentity } from "./unifi/connection";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
-import { internetBlockPolicy, toPolicyUpdate } from "./unifi/payloads";
+import {
+  dpiAppBlockPolicy,
+  dpiCategoryBlockPolicy,
+  internetBlockPolicy,
+  toPolicyUpdate,
+} from "./unifi/payloads";
 import { networkInScope } from "./unifi/scope";
 import { coverageIssues, isWriteFailure } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
+import { planDpiPolicies, plannedDpiKey, type PlannedDpiPolicy } from "./unifi/plan-dpi";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicyWrite } from "./unifi/types";
 
@@ -250,6 +256,97 @@ async function tick(owner: string): Promise<boolean> {
       }
     }
 
+    const famRules = await prisma().famRule.findMany();
+    const famRulePolicies = await prisma().famRulePolicy.findMany({
+      where: { connectionIdentity: identity, siteId },
+    });
+    const { policies: desiredDpi, retainRuleIds } = planDpiPolicies({
+      now,
+      destinationZoneId: external.id,
+      zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
+      groups,
+      devices: devices.map((device) => ({
+        ...device,
+        inScope: networkInScope(scope, device.networkId),
+      })),
+      rules: famRules,
+    });
+    const desiredDpiKeys = new Set(desiredDpi.map((item) => item.key));
+
+    for (const planned of desiredDpi) {
+      const write =
+        planned.kind === "category"
+          ? dpiCategoryBlockPolicy({
+              name: planned.name,
+              sourceZoneId: planned.zoneId,
+              destinationZoneId: planned.destinationZoneId,
+              macAddresses: planned.macAddresses,
+              applicationCategoryIds: planned.targetIds,
+              enabled: planned.enabled,
+              schedule: planned.schedule,
+            })
+          : dpiAppBlockPolicy({
+              name: planned.name,
+              sourceZoneId: planned.zoneId,
+              destinationZoneId: planned.destinationZoneId,
+              macAddresses: planned.macAddresses,
+              applicationIds: planned.targetIds,
+              enabled: planned.enabled,
+              schedule: planned.schedule,
+            });
+      const fingerprint = policyFingerprint(write);
+      const existing = famRulePolicies.find(
+        (row) => plannedDpiKey(row.famRuleId, row.zoneId) === planned.key && row.connectionIdentity === identity,
+      );
+      try {
+        await applyDesiredDpiPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing);
+      } catch (error) {
+        failed += 1;
+        errors.push(error instanceof Error ? error.message : String(error));
+        if (existing) {
+          await prisma().famRulePolicy.update({
+            where: { id: existing.id },
+            data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision },
+          });
+        } else {
+          await prisma().famRulePolicy.create({
+            data: {
+              famRuleId: planned.famRuleId,
+              connectionIdentity: identity,
+              siteId,
+              zoneId: planned.zoneId,
+              ipVersion: IpVersion.dual,
+              desiredFingerprint: fingerprint,
+              desiredRevision: revision,
+              lastError: errors[errors.length - 1],
+            },
+          });
+        }
+      }
+    }
+
+    for (const row of famRulePolicies) {
+      const key = plannedDpiKey(row.famRuleId, row.zoneId);
+      if (desiredDpiKeys.has(key)) continue;
+      if (retainRuleIds.has(row.famRuleId)) continue;
+      if (!row.unifiPolicyId) {
+        await prisma().famRulePolicy.delete({ where: { id: row.id } });
+        continue;
+      }
+      try {
+        // D3: only delete the recorded unifiPolicyId — never adopt by name prefix.
+        await client.deletePolicy(siteId, row.unifiPolicyId);
+        await prisma().famRulePolicy.delete({ where: { id: row.id } });
+      } catch (error) {
+        failed += 1;
+        errors.push(error instanceof Error ? error.message : String(error));
+        await prisma().famRulePolicy.update({
+          where: { id: row.id },
+          data: { lastError: errors[errors.length - 1] },
+        });
+      }
+    }
+
     const livePolicies = await prisma().appPolicy.findMany({ where: { connectionIdentity: identity, siteId } });
     const issues = coverageIssues({
       groups,
@@ -399,6 +496,113 @@ async function applyDesiredPolicy(
       unifiPolicyId: created.id,
       ownerScope: scope,
       groupId: planned.groupId,
+      zoneId: planned.zoneId,
+      ipVersion: IpVersion.dual,
+      desiredFingerprint: fingerprint,
+      desiredRevision: revision,
+      observedEnabled: created.enabled,
+      observedFingerprint: fingerprint,
+    },
+  });
+}
+
+
+async function applyDesiredDpiPolicy(
+  client: UnifiClient,
+  siteId: string,
+  identity: string,
+  revision: number,
+  planned: PlannedDpiPolicy,
+  write: FirewallPolicyWrite,
+  fingerprint: string,
+  existing:
+    | {
+        id: string;
+        unifiPolicyId: string | null;
+        desiredFingerprint: string;
+        lastError: string | null;
+      }
+    | undefined,
+) {
+  const unifiPolicyId = existing?.unifiPolicyId;
+  if (existing && unifiPolicyId && existing.desiredFingerprint === fingerprint && !existing.lastError) {
+    await prisma().famRulePolicy.update({
+      where: { id: existing.id },
+      data: { desiredRevision: revision, observedFingerprint: fingerprint, lastError: null },
+    });
+    return;
+  }
+  if (unifiPolicyId) {
+    try {
+      // D3: update only the recorded id — never search/adopt by FamilyFi name prefix.
+      const current = await client.getPolicy(siteId, unifiPolicyId);
+      const updated = await client.updatePolicy(
+        siteId,
+        unifiPolicyId,
+        toPolicyUpdate(current, { ...write, schedule: write.schedule ?? null }),
+      );
+      const observed = {
+        unifiPolicyId: updated.id,
+        desiredFingerprint: fingerprint,
+        desiredRevision: revision,
+        observedEnabled: updated.enabled,
+        observedFingerprint: fingerprint,
+        lastError: null as string | null,
+      };
+      if (existing) {
+        await prisma().famRulePolicy.update({ where: { id: existing.id }, data: observed });
+      } else {
+        await prisma().famRulePolicy.create({
+          data: {
+            famRuleId: planned.famRuleId,
+            connectionIdentity: identity,
+            siteId,
+            zoneId: planned.zoneId,
+            ipVersion: IpVersion.dual,
+            ...observed,
+          },
+        });
+      }
+      return;
+    } catch (error) {
+      if (!(error instanceof UnifiHttpError) || error.status !== 404) throw error;
+    }
+  }
+
+  const operation = await prisma().policyOperation.create({
+    data: {
+      intent: PolicyOperationIntent.create,
+      connectionIdentity: identity,
+      siteId,
+      payloadFingerprint: fingerprint,
+      status: "pending",
+    },
+  });
+  const created = await client.createPolicy(siteId, write);
+  await prisma().policyOperation.update({
+    where: { id: operation.id },
+    data: { status: "applied", unifiPolicyId: created.id },
+  });
+  if (existing) {
+    await prisma().famRulePolicy.update({
+      where: { id: existing.id },
+      data: {
+        unifiPolicyId: created.id,
+        desiredFingerprint: fingerprint,
+        desiredRevision: revision,
+        observedEnabled: created.enabled,
+        observedFingerprint: fingerprint,
+        lastError: null,
+      },
+    });
+    return;
+  }
+  await prisma().famRulePolicy.create({
+    data: {
+      famRuleId: planned.famRuleId,
+      connectionIdentity: identity,
+      siteId,
+      unifiPolicyId: created.id,
       zoneId: planned.zoneId,
       ipVersion: IpVersion.dual,
       desiredFingerprint: fingerprint,

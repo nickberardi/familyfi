@@ -3,6 +3,7 @@ import type { UnifiClient } from "./client";
 import type {
   ApplicationInfo,
   ClientOverview,
+  DpiCatalogItem,
   FirewallPolicy,
   FirewallPolicyWrite,
   FirewallZone,
@@ -24,6 +25,8 @@ export type MockUnifiState = {
   policies: FirewallPolicy[];
   ordering: PolicyOrdering;
   networkClientIds: Map<string, Set<string>>;
+  dpiCategories: DpiCatalogItem[];
+  dpiApplications: DpiCatalogItem[];
 };
 
 function page<T>(items: T[], offset: number, limit: number): UnifiPage<T> {
@@ -41,11 +44,13 @@ export function createMockUnifiState(partial: Partial<MockUnifiState> = {}): Moc
     policies: partial.policies ?? [],
     ordering: partial.ordering ?? { beforeSystemDefined: [], afterSystemDefined: [] },
     networkClientIds: partial.networkClientIds ?? new Map(),
+    dpiCategories: partial.dpiCategories ?? [],
+    dpiApplications: partial.dpiApplications ?? [],
   };
 }
 
 export class MockUnifiClient implements UnifiClient {
-  readonly calls: { method: string; path: string }[] = [];
+  readonly calls: { method: string; path: string; body?: unknown }[] = [];
   /** Throw instead of creating. May inspect the write body. */
   createError?: Error | ((body: FirewallPolicyWrite) => Error | undefined);
   /** Persist the policy, then throw — interrupted create. */
@@ -119,7 +124,7 @@ export class MockUnifiClient implements UnifiClient {
   }
 
   async createPolicy(siteId: string, body: FirewallPolicyWrite): Promise<FirewallPolicy> {
-    this.record("POST", `/v1/sites/${siteId}/firewall/policies`);
+    this.record("POST", `/v1/sites/${siteId}/firewall/policies`, body);
     const failure = typeof this.createError === "function" ? this.createError(body) : this.createError;
     if (failure) throw failure;
     const policy: FirewallPolicy = {
@@ -135,7 +140,7 @@ export class MockUnifiClient implements UnifiClient {
   }
 
   async updatePolicy(siteId: string, policyId: string, body: FirewallPolicyWrite): Promise<FirewallPolicy> {
-    this.record("PUT", `/v1/sites/${siteId}/firewall/policies/${policyId}`);
+    this.record("PUT", `/v1/sites/${siteId}/firewall/policies/${policyId}`, body);
     const index = this.state.policies.findIndex((item) => item.id === policyId);
     if (index === -1) throw new Error("policy not found");
     const current = this.state.policies[index]!;
@@ -160,11 +165,27 @@ export class MockUnifiClient implements UnifiClient {
     };
   }
 
+  async listDpiCategories(filter?: string): Promise<DpiCatalogItem[]> {
+    this.record("GET", "/v1/dpi/categories");
+    return filterCatalog(this.state.dpiCategories, filter);
+  }
+
+  async listDpiApplications(filter?: string): Promise<DpiCatalogItem[]> {
+    this.record("GET", "/v1/dpi/applications");
+    return filterCatalog(this.state.dpiApplications, filter);
+  }
+
   pageForTests<T>(items: T[], offset: number, limit = UNIFI_PAGE_LIMIT): UnifiPage<T> {
     return page(items, offset, limit);
   }
 
-  private record(method: string, path: string) {
-    this.calls.push({ method, path });
+  private record(method: string, path: string, body?: unknown) {
+    this.calls.push(body === undefined ? { method, path } : { method, path, body });
   }
+}
+
+function filterCatalog(items: DpiCatalogItem[], filter?: string): DpiCatalogItem[] {
+  const q = filter?.trim().toLowerCase();
+  if (!q) return [...items];
+  return items.filter((item) => item.name.toLowerCase().includes(q) || String(item.id).includes(q));
 }

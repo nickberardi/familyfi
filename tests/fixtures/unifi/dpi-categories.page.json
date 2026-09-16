@@ -1,0 +1,14 @@
+{
+  "count": 6,
+  "data": [
+    { "id": 4, "name": "Media streaming" },
+    { "id": 8, "name": "Online games" },
+    { "id": 22, "name": "Adult" },
+    { "id": 24, "name": "Social networks" },
+    { "id": 28, "name": "TopSites-Adult" },
+    { "id": 9001, "name": "Fixture Category Alpha" }
+  ],
+  "limit": 200,
+  "offset": 0,
+  "totalCount": 6
+}

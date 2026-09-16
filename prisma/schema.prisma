@@ -103,6 +103,7 @@ model Group {
   devices          Device[]
   accounts         Account[]
   appPolicies      AppPolicy[]
+  famRules         FamRule[]
 }
 
 model Account {
@@ -226,4 +227,54 @@ model ReconciliationLock {
   owner     String
   expiresAt DateTime
   updatedAt DateTime @updatedAt
+}
+
+enum FamRuleKind {
+  category
+  app
+}
+
+enum FamRuleMode {
+  always
+  scheduled
+}
+
+model FamRule {
+  id               String       @id @default(cuid())
+  kind             FamRuleKind
+  groupId          String
+  group            Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  targetIds        Int[]
+  enabled          Boolean      @default(true)
+  mode             FamRuleMode  @default(always)
+  scheduleEnabled  Boolean      @default(false)
+  scheduleDays     Int[]        @default([])
+  scheduleStart    String?
+  scheduleEnd      String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  policies         FamRulePolicy[]
+
+  @@index([groupId])
+}
+
+model FamRulePolicy {
+  id                  String     @id @default(cuid())
+  famRuleId           String
+  famRule             FamRule    @relation(fields: [famRuleId], references: [id], onDelete: Cascade)
+  connectionIdentity  String
+  siteId              String
+  unifiPolicyId       String?    @unique
+  zoneId              String
+  ipVersion           IpVersion  @default(dual)
+  desiredFingerprint  String
+  desiredRevision     Int
+  observedEnabled     Boolean?
+  observedFingerprint String?
+  lastError           String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([famRuleId, connectionIdentity, siteId, zoneId])
+  @@index([connectionIdentity, siteId])
 }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { MockUnifiClient, createMockUnifiState, type MockUnifiState } from "./mock";
 import type {
   ClientOverview,
+  DpiCatalogItem,
   FirewallPolicy,
   FirewallZone,
   NetworkDetails,
@@ -70,6 +71,8 @@ export function createFixtureUnifiState(options?: { friendlyNames?: boolean }): 
     clients: readJson<UnifiPage<ClientOverview>>("clients.page.json").data,
     policies: [admin, rogue],
     ordering: { beforeSystemDefined: [], afterSystemDefined: [DEV_MOCK_ADMIN_POLICY_ID, rogue.id] },
+    dpiCategories: readJson<UnifiPage<DpiCatalogItem>>("dpi-categories.page.json").data,
+    dpiApplications: readJson<UnifiPage<DpiCatalogItem>>("dpi-applications.page.json").data,
   });
   return options?.friendlyNames ? applyFriendlyNames(state) : state;
 }
