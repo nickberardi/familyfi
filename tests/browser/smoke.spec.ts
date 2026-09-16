@@ -236,7 +236,7 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
   await dialog.getByRole("button", { name: "Cancel" }).click();
 });
 
-test("Phase 4: card marks, Fam On/Off sheets, soft polish, no DNS chrome", async ({ page }) => {
+test("Phase 4: card marks, filter On/Off sheets, soft polish, no DNS chrome", async ({ page }) => {
   await signIn(page);
 
   const groupsRes = await page.request.get("/api/v1/groups");
@@ -283,7 +283,7 @@ test("Phase 4: card marks, Fam On/Off sheets, soft polish, no DNS chrome", async
   // Protected: no marks
   await expect(page.getByTestId(`filter-marks-${protectedGroup!.id}`)).toHaveCount(0);
 
-  // Fam Off → Create policy (no Checking / DNS)
+  // Off → Create policy (no Checking / DNS)
   await marks.getByRole("button", { name: /Video Off/i }).click();
   const offSheet = page.getByRole("dialog");
   await expect(offSheet.getByRole("heading", { name: /Nothing's blocking Video yet/i })).toBeVisible();
@@ -303,7 +303,7 @@ test("Phase 4: card marks, Fam On/Off sheets, soft polish, no DNS chrome", async
 
   await expect(marks.getByRole("button", { name: /Video On/i })).toBeVisible();
 
-  // Fam On → Turn off
+  // On → Turn off
   await marks.getByRole("button", { name: /Video On/i }).click();
   const onSheet = page.getByRole("dialog");
   await expect(onSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();

@@ -79,9 +79,9 @@ describe("Phase 2 DPI rules", () => {
     expect(cats.status).toBe(200);
     const catBody = (await cats.json()) as {
       categories: { id: number; name: string }[];
-      d6: { status: string };
+      curated: { status: string };
     };
-    expect(catBody.d6.status).toBe("confirmed");
+    expect(catBody.curated.status).toBe("confirmed");
     expect(catBody.categories.some((c) => c.id === 9001 && c.name === "Fixture Category Alpha")).toBe(true);
 
     const apps = await listApplications(request("/api/v1/dpi/applications?filter=Fixture", { auth }));

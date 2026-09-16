@@ -1,4 +1,4 @@
-/** Client-safe Fam rule helpers + D6 curated slots (mirrors server d6-categories). */
+/** Client-safe rule helpers + curated slots (mirrors server curated-categories). */
 
 export type Rule = {
   id: string;
@@ -13,17 +13,17 @@ export type Rule = {
   internet: false;
 };
 
-export type D6Slot = "video" | "social" | "gaming";
+export type CuratedSlot = "video" | "social" | "gaming";
 
-export type D6CategorySlot = {
-  slot: D6Slot;
+export type CuratedCategorySlot = {
+  slot: CuratedSlot;
   label: string;
   categoryId: number;
   catalogName: string;
 };
 
-/** Confirmed D6 curated slots — Video / Social / Gaming only (Porn OUT). */
-export const D6_CATEGORY_SLOTS: readonly D6CategorySlot[] = [
+/** Confirmed curated slots — Video / Social / Gaming only (Porn OUT). */
+export const CURATED_CATEGORY_SLOTS: readonly CuratedCategorySlot[] = [
   { slot: "video", label: "Video", categoryId: 4, catalogName: "Media streaming services" },
   { slot: "social", label: "Social", categoryId: 24, catalogName: "Social networks" },
   { slot: "gaming", label: "Gaming", categoryId: 8, catalogName: "Online games" },
@@ -33,7 +33,7 @@ export function groupScopedRules(rules: Rule[], groupId: string): Rule[] {
   return rules.filter((rule) => rule.scope === "group" && rule.groupId === groupId);
 }
 
-/** Find the Fam category rule for a curated D6 slot (prefer enabled). */
+/** Find the category rule for a curated slot (prefer enabled). */
 export function categoryRuleForSlot(rules: Rule[], groupId: string, categoryId: number): Rule | undefined {
   const matches = groupScopedRules(rules, groupId).filter(
     (rule) => rule.kind === "category" && rule.targetIds.includes(categoryId),
@@ -51,7 +51,7 @@ export function parentFacingRuleLabel(
   catalogNames: Map<string, string>,
 ): string {
   if (rule.kind === "category") {
-    const slot = D6_CATEGORY_SLOTS.find((s) => rule.targetIds.includes(s.categoryId));
+    const slot = CURATED_CATEGORY_SLOTS.find((s) => rule.targetIds.includes(s.categoryId));
     if (slot) return slot.label;
   }
   const key = `${rule.kind}:${rule.targetIds.join(",")}`;

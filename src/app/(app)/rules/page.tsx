@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Controls";
 import { RuleRow, type ScheduleDraft } from "@/components/rules/RuleRow";
 import { NewRuleSheet } from "@/components/rules/NewRuleSheet";
 import { buildRuleRows, type RuleRow as RuleRowModel } from "@/lib/rule-rows";
-import { D6_CATEGORY_SLOTS, type Rule } from "@/lib/rules";
+import { CURATED_CATEGORY_SLOTS, type Rule } from "@/lib/rules";
 
 type DpiItem = { id: number; name: string };
 
@@ -36,7 +36,7 @@ export default function RulesPage() {
       const map = new Map<string, string>();
       for (const item of cats.categories) map.set(`category:${item.id}`, item.name);
       for (const item of apps.applications) map.set(`app:${item.id}`, item.name);
-      for (const slot of D6_CATEGORY_SLOTS) map.set(`category:${slot.categoryId}`, slot.label);
+      for (const slot of CURATED_CATEGORY_SLOTS) map.set(`category:${slot.categoryId}`, slot.label);
       setRules(next);
       setLabels(map);
     } catch {

@@ -15,7 +15,7 @@
 
 import { useState, type ReactNode } from "react";
 import {
-  D6_CATEGORY_SLOTS,
+  CURATED_CATEGORY_SLOTS,
   appRulesForGroup,
   categoryRuleForSlot,
   glyphForAppName,
@@ -112,7 +112,7 @@ export function GroupFilterMarks({
         <div className="px-[18px] pt-2">
           <SectionLabel>Category Rules</SectionLabel>
           <div className="flex flex-wrap gap-3.5 py-2">
-            {D6_CATEGORY_SLOTS.map((slot) => {
+            {CURATED_CATEGORY_SLOTS.map((slot) => {
               const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
               return (
                 <MarkButton

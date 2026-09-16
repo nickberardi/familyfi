@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dpiAppBlockPolicy, dpiAppNetworkBlockPolicy, dpiCategoryBlockPolicy, dpiCategoryNetworkBlockPolicy } from "@/server/unifi/payloads";
-import { D6_CATEGORY_CANDIDATES, D6_MAP_STATUS } from "@/server/unifi/d6-categories";
+import { CURATED_CATEGORY_CANDIDATES, CURATED_MAP_STATUS } from "@/server/unifi/curated-categories";
 
 describe("DPI policy payloads", () => {
   it("builds APPLICATION_CATEGORY destination with MAC source and integer ids", () => {
@@ -40,12 +40,12 @@ describe("DPI policy payloads", () => {
   });
 });
 
-describe("D6 map", () => {
+describe("curated map", () => {
   it("locks Video / Social / Gaming curated ids (no Porn slot)", () => {
-    expect(D6_MAP_STATUS).toBe("confirmed");
-    expect(D6_CATEGORY_CANDIDATES.map((c) => c.slot)).toEqual(["video", "social", "gaming"]);
-    expect(D6_CATEGORY_CANDIDATES.map((c) => c.categoryId)).toEqual([4, 24, 8]);
-    expect(D6_CATEGORY_CANDIDATES.some((c) => (c as { slot: string }).slot === "porn")).toBe(false);
+    expect(CURATED_MAP_STATUS).toBe("confirmed");
+    expect(CURATED_CATEGORY_CANDIDATES.map((c) => c.slot)).toEqual(["video", "social", "gaming"]);
+    expect(CURATED_CATEGORY_CANDIDATES.map((c) => c.categoryId)).toEqual([4, 24, 8]);
+    expect(CURATED_CATEGORY_CANDIDATES.some((c) => (c as { slot: string }).slot === "porn")).toBe(false);
   });
 });
 

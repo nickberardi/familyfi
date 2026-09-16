@@ -32,7 +32,7 @@ tags:
   - name: DPI
     description: UniFi DPI category and application catalog (server-side proxy)
   - name: Rules
-    description: Category and app Fam rules including network scope (Internet parents remain groups)
+    description: Category and app rules including network scope (Internet parents remain groups)
 paths:
   /api/v1/health:
     get:
@@ -767,7 +767,7 @@ paths:
       summary: List UniFi DPI categories
       description: |
         Proxies UniFi `GET /v1/dpi/categories`. Returns integer ids and catalog
-        names. Includes confirmed D6 curated slots (Video / Social / Gaming only;
+        names. Includes confirmed curated slots (Video / Social / Gaming only;
         no Porn curated slot). Secrets never leave the server.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -783,12 +783,12 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [categories, d6]
+                required: [categories, curated]
                 properties:
                   categories:
                     type: array
                     items: { $ref: "#/components/schemas/DpiCatalogItem" }
-                  d6: { $ref: "#/components/schemas/D6CategoryMap" }
+                  curated: { $ref: "#/components/schemas/CuratedCategoryMap" }
         "401":
           $ref: "#/components/responses/Error"
         "409":
@@ -826,7 +826,7 @@ paths:
     get:
       operationId: listRules
       tags: [Rules]
-      summary: List Fam category, app, and network-scoped rules
+      summary: List category, app, and network-scoped rules
       description: Internet parents are group schedule/mode rows, not returned here.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -846,7 +846,7 @@ paths:
                 properties:
                   rules:
                     type: array
-                    items: { $ref: "#/components/schemas/FamRule" }
+                    items: { $ref: "#/components/schemas/Rule" }
         "401":
           $ref: "#/components/responses/Error"
     post:
@@ -863,7 +863,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/FamRuleCreate" }
+            schema: { $ref: "#/components/schemas/RuleCreate" }
             examples:
               category:
                 value: { kind: category, groupId: grp_example, targetIds: [4], mode: always }
@@ -879,7 +879,7 @@ paths:
                 additionalProperties: false
                 required: [rule, change]
                 properties:
-                  rule: { $ref: "#/components/schemas/FamRule" }
+                  rule: { $ref: "#/components/schemas/Rule" }
                   change: { $ref: "#/components/schemas/Change" }
         "400":
           $ref: "#/components/responses/Error"
@@ -898,7 +898,7 @@ paths:
     get:
       operationId: getRule
       tags: [Rules]
-      summary: Get a Fam rule
+      summary: Get a rule
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200":
@@ -910,7 +910,7 @@ paths:
                 additionalProperties: false
                 required: [rule]
                 properties:
-                  rule: { $ref: "#/components/schemas/FamRule" }
+                  rule: { $ref: "#/components/schemas/Rule" }
         "401":
           $ref: "#/components/responses/Error"
         "404":
@@ -918,7 +918,7 @@ paths:
     patch:
       operationId: updateRule
       tags: [Rules]
-      summary: Update a Fam rule
+      summary: Update a rule
       description: Update mode, schedule, enabled, or target ids. Internet policies are never mutated here.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -927,7 +927,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/FamRuleUpdate" }
+            schema: { $ref: "#/components/schemas/RuleUpdate" }
       responses:
         "200":
           description: Updated
@@ -938,7 +938,7 @@ paths:
                 additionalProperties: false
                 required: [rule, change]
                 properties:
-                  rule: { $ref: "#/components/schemas/FamRule" }
+                  rule: { $ref: "#/components/schemas/Rule" }
                   change: { $ref: "#/components/schemas/Change" }
         "400":
           $ref: "#/components/responses/Error"
@@ -953,9 +953,9 @@ paths:
     delete:
       operationId: deleteRule
       tags: [Rules]
-      summary: Delete a Fam category or app rule
+      summary: Delete a category or app rule
       description: |
-        Deletes the Fam rule and its recorded UniFi policy ids only.
+        Deletes the rule and its recorded UniFi policy ids only.
         Internet AppPolicy rows are never touched.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -981,7 +981,7 @@ paths:
     post:
       operationId: turnOffRule
       tags: [Rules]
-      summary: Turn off a Fam rule
+      summary: Turn off a rule
       description: Sets desired enabled false (UniFi Pause). Does not change Internet group policy.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -1000,7 +1000,7 @@ paths:
                 additionalProperties: false
                 required: [rule, change]
                 properties:
-                  rule: { $ref: "#/components/schemas/FamRule" }
+                  rule: { $ref: "#/components/schemas/Rule" }
                   change: { $ref: "#/components/schemas/Change" }
         "401":
           $ref: "#/components/responses/Error"
@@ -1374,7 +1374,7 @@ components:
       properties:
         id: { type: integer }
         name: { type: string }
-    D6CategoryCandidate:
+    CuratedCategoryCandidate:
       type: object
       additionalProperties: false
       required: [slot, label, categoryId, catalogName]
@@ -1383,17 +1383,17 @@ components:
         label: { type: string }
         categoryId: { type: integer }
         catalogName: { type: string }
-    D6CategoryMap:
+    CuratedCategoryMap:
       type: object
       additionalProperties: false
       required: [status, candidates]
-      description: Confirmed Phase 2 curated slots — Video (4), Social (24), Gaming (8). No Porn curated slot.
+      description: Confirmed curated slots — Video (4), Social (24), Gaming (8). No Porn curated slot.
       properties:
         status: { type: string, enum: [provisional, confirmed] }
         candidates:
           type: array
-          items: { $ref: "#/components/schemas/D6CategoryCandidate" }
-    FamRule:
+          items: { $ref: "#/components/schemas/CuratedCategoryCandidate" }
+    Rule:
       type: object
       additionalProperties: false
       required: [id, kind, scope, groupId, networkIds, targetIds, enabled, mode, schedule, internet]
@@ -1422,8 +1422,8 @@ components:
         internet:
           type: boolean
           enum: [false]
-          description: Category/app Fam rules are never Internet parents.
-    FamRuleCreate:
+          description: Category/app rules are never Internet parents.
+    RuleCreate:
       type: object
       additionalProperties: false
       required: [kind, targetIds]
@@ -1450,7 +1450,7 @@ components:
         enabled: { type: boolean }
         mode: { type: string, enum: [always, scheduled] }
         schedule: { $ref: "#/components/schemas/Schedule" }
-    FamRuleUpdate:
+    RuleUpdate:
       type: object
       additionalProperties: false
       properties:

@@ -32,6 +32,30 @@ const rel = (file: string) => path.relative(repoRoot, file);
 const COLOR_LITERAL_EXEMPT = new Set(["src/app/layout.tsx"]);
 
 describe("naming conventions (AGENTS.md)", () => {
+  /**
+   * Scans `src/`, the OpenAPI document and `tests/` — this file excepted, since it
+   * necessarily spells the patterns it bans. `prisma/migrations/` is deliberately
+   * out of scope: those files are applied history, and editing them breaks the
+   * checksum on databases that already ran them.
+   */
+  function offendingLines(pattern: RegExp): string[] {
+    const files = [
+      ...walk(srcRoot, (f) => f.endsWith(".tsx") || f.endsWith(".ts")),
+      ...walk(path.join(repoRoot, "openapi"), (f) => f.endsWith(".yaml") || f.endsWith(".yml")),
+      ...walk(path.join(repoRoot, "tests"), (f) => f.endsWith(".ts")),
+    ].filter((f) => rel(f) !== "tests/unit/naming.test.ts");
+
+    const offenders: string[] = [];
+    for (const file of files) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (pattern.test(line)) offenders.push(`${rel(file)}:${i + 1}: ${line.trim()}`);
+        });
+    }
+    return offenders;
+  }
+
   it("keeps colours in --ff-* tokens, never inline literals", () => {
     const offenders: string[] = [];
     for (const file of walk(srcRoot, (f) => f.endsWith(".tsx") || f.endsWith(".ts"))) {
@@ -75,17 +99,20 @@ describe("naming conventions (AGENTS.md)", () => {
   });
 
   it("uses no abbreviated product prefix in identifiers", () => {
-    const offenders: string[] = [];
-    for (const file of walk(srcRoot, (f) => f.endsWith(".tsx") || f.endsWith(".ts"))) {
-      readFileSync(file, "utf8")
-        .split("\n")
-        .forEach((line, i) => {
-          if (/\bFam[A-Z]|\bfam[-_][a-z]|\bfamRule/.test(line)) {
-            offenders.push(`${rel(file)}:${i + 1}: ${line.trim()}`);
-          }
-        });
-    }
-    expect(offenders).toEqual([]);
+    // `Fam` bare catches prose too: the schema names were renamed while summaries
+    // still read "Update a Fam rule", which a `Fam[A-Z]` pattern walks straight past.
+    const pattern = /\bFam\b|\bFam[A-Z]|\bfam[-_][a-z]|\bfamRule/;
+    expect(offendingLines(pattern)).toEqual([]);
+  });
+
+  /**
+   * `D6` was a design-document section number that leaked into a module name, a
+   * type, three constants, a response field and the OpenAPI schemas. It means
+   * nothing to anyone reading the API, so the vocabulary is `curated` now and
+   * the section number may not come back.
+   */
+  it("uses no design-document section numbers in identifiers", () => {
+    expect(offendingLines(/\bD6|\bd6\b|\bd6[A-Z_-]/)).toEqual([]);
   });
 
   it("names every component file PascalCase and every module kebab-case", () => {
