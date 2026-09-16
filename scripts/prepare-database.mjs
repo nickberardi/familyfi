@@ -10,7 +10,7 @@ function truthy(value) {
 }
 
 export function shouldPrepareDatabase(command, args = []) {
-  if (truthy(process.env.FAMILYFI_SKIP_DB_PREPARE)) return false;
+  if (truthy(process.env.SKIP_DB_PREPARE)) return false;
   const hay = [command, ...args].join(" ");
   if (hay.includes("scripts/spike")) return false;
   if (hay.includes("node_modules/.bin/prisma") || /(^|\s)prisma(\s|$)/.test(hay)) return false;

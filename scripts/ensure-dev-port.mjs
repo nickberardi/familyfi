@@ -34,7 +34,7 @@ async function sleep(ms) {
 }
 
 async function confirm(question) {
-  const auto = process.env.FAMILYFI_KILL_PORT;
+  const auto = process.env.KILL_PORT;
   if (auto === "1" || auto === "true") return true;
   if (auto === "0" || auto === "false") return false;
   if (!fs.existsSync("/dev/tty")) return false;

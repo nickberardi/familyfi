@@ -2,14 +2,14 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { FAMILYFI_DATA_DIR, resolveEnvPath } from "../../scripts/print-database-url.mjs";
+import { DATA_DIR, resolveEnvPath } from "../../scripts/print-database-url.mjs";
 
 describe("resolveEnvPath", () => {
   it("uses repo-root .env when the standard data dir is absent", () => {
     // Container images set /.dockerenv and prefer /var/lib/familyfi/data/.env.
-    if (existsSync("/.dockerenv") || existsSync(FAMILYFI_DATA_DIR)) {
+    if (existsSync("/.dockerenv") || existsSync(DATA_DIR)) {
       expect(resolveEnvPath({}, mkdtempSync(path.join(tmpdir(), "familyfi-root-")))).toBe(
-        path.join(FAMILYFI_DATA_DIR, ".env"),
+        path.join(DATA_DIR, ".env"),
       );
       return;
     }
@@ -19,6 +19,6 @@ describe("resolveEnvPath", () => {
   });
 
   it("exports the standard Docker data dir constant", () => {
-    expect(FAMILYFI_DATA_DIR).toBe("/var/lib/familyfi/data");
+    expect(DATA_DIR).toBe("/var/lib/familyfi/data");
   });
 });
