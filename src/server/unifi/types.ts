@@ -1,12 +1,5 @@
 export const UNIFI_PAGE_LIMIT = 200;
 export const FAMILYFI_POLICY_PREFIX = "FamilyFi ";
-/**
- * Policy-name prefix used by the pre-1.0 spike CLI. Nothing generates it any
- * more; it is recognised so a console carrying leftover spike policies still
- * reads them as ours. Ownership is decided by recorded id and creation
- * evidence — a name prefix alone never claims a policy.
- */
-export const LEGACY_POLICY_PREFIX = "fam-";
 export const UNIFI_API_VERSION = "10.4.57";
 
 export type UnifiPage<T> = {

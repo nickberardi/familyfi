@@ -170,7 +170,7 @@ async function main(): Promise<number> {
       return 2;
     }
     const inventory = await discoverInventory(client, siteId);
-    const result = await applyInternetBlocks(client, inventory, macs, installId);
+    const result = await applyInternetBlocks(client, inventory, macs);
     writeSpikeState({
       siteId: inventory.site.id,
       installId,
@@ -218,7 +218,7 @@ async function main(): Promise<number> {
     const inventory = await discoverInventory(client, siteId ?? state?.siteId);
     const ids = state?.policyIds?.length
       ? state.policyIds
-      : ownedSpikePolicies(inventory.policies, state?.installId ?? installId).map((policy) => policy.id);
+      : ownedSpikePolicies(inventory.policies).map((policy) => policy.id);
     if (ids.length === 0) {
       console.error("No spike policies to delete. If create may have succeeded, keep the UniFi policy list for recovery.");
       return 1;

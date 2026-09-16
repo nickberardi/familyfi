@@ -1,4 +1,4 @@
-import { FAMILYFI_POLICY_PREFIX, LEGACY_POLICY_PREFIX } from "./types";
+import { FAMILYFI_POLICY_PREFIX } from "./types";
 
 const MAC = /\b[0-9a-f]{2}(?::[0-9a-f]{2}){5}\b/gi;
 const IPV4 = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\b/g;
@@ -40,7 +40,7 @@ export function sanitizeUnifiValue(value: unknown, nameKeys = new Set(["name", "
     const out: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value)) {
       if (nameKeys.has(key) && typeof nested === "string") {
-        out[key] = nested.startsWith(FAMILYFI_POLICY_PREFIX) || nested.startsWith(LEGACY_POLICY_PREFIX) ? nested : "redacted";
+        out[key] = nested.startsWith(FAMILYFI_POLICY_PREFIX) ? nested : "redacted";
         continue;
       }
       out[key] = sanitizeUnifiValue(nested, nameKeys);
