@@ -29,15 +29,17 @@ Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actio
 
 ## Releases
 
-`package.json` is `0.1.0`. Publish that version with an annotated git tag that matches semver, then push the tag. Do not use `v0.1`; the release workflow’s Docker tags need a full `MAJOR.MINOR.PATCH`.
+`package.json` is `0.3.0`. Publish that version with an annotated git tag that matches semver, then push the tag. Do not use `v0.3`; the release workflow’s Docker tags need a full `MAJOR.MINOR.PATCH`.
 
 ```bash
 git checkout main
 git pull
-git tag -a v0.1.0 -m "FamilyFi 0.1.0"
-git push origin v0.1.0
+git tag -a v0.3.0 -m "FamilyFi 0.3.0"
+git push origin v0.3.0
 ```
 
-Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml): a multi-arch image (`linux/amd64` and `linux/arm64`) to `ghcr.io/nberardi/familyfi` (`0.1.0`, `0.1`, and `latest`) and a GitHub Release with generated notes. After the first package appears, link it to the repository in GitHub Packages if GHCR is not yet public.
+Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml): a multi-arch image (`linux/amd64` and `linux/arm64`) to `ghcr.io/nberardi/familyfi` (`0.3.0`, `0.3`, and `latest`) and a GitHub Release with generated notes. After the first package appears, link it to the repository in GitHub Packages if GHCR is not yet public.
 
-Bump `package.json` (and `openapi/familyfi.v1.yaml` `info.version`) before a later tag so Settings, the sign-in screen, and `GET /api/v1/health` show the same number as the image tag.
+Bump `package.json` and `openapi/familyfi.v1.yaml` `info.version` together before a later tag, so Settings, the sign-in screen, and `GET /api/v1/health` show the same number as the image tag. `tests/unit/version.test.ts` fails the build when the two drift apart.
+
+Every release so far is a **pre-release** on GitHub. The workflow does not set that flag, so mark the release as a pre-release after it is created, until the project reaches 1.0.
