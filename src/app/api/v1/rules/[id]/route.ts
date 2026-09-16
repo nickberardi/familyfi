@@ -1,3 +1,4 @@
+import { FamRuleScope } from "@prisma/client";
 import { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
@@ -5,10 +6,13 @@ import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
 import {
+  assertManagedNetworkIds,
+  normalizeNetworkIds,
   normalizeTargetIds,
   parseRuleModeSchedule,
   publicRule,
 } from "@/server/rules";
+import { listSiteNetworks } from "@/server/unifi-settings";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,6 +27,7 @@ export async function GET(request: Request, ctx: Ctx) {
 
 const PatchBody = z.object({
   targetIds: z.array(z.number().int().positive()).min(1).max(100).optional(),
+  networkIds: z.array(z.string().min(1)).min(1).optional(),
   enabled: z.boolean().optional(),
   mode: z.enum(["always", "scheduled"]).optional(),
   schedule: z
@@ -44,7 +49,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid rule update.");
     const existing = await prisma().famRule.findUnique({ where: { id }, include: { group: true } });
     if (!existing) return jsonError(404, "not_found", "Rule not found.");
-    if (existing.group.protected) {
+    if (existing.scope === FamRuleScope.group && existing.group?.protected) {
       return jsonError(409, "protected", "Protected groups cannot have category or app rules.");
     }
     let targetIds = existing.targetIds;
@@ -53,6 +58,33 @@ export async function PATCH(request: Request, ctx: Ctx) {
         targetIds = normalizeTargetIds(existing.kind, parsed.data.targetIds);
       } catch (error) {
         return jsonError(400, "invalid_targets", error instanceof Error ? error.message : "Invalid targets.");
+      }
+    }
+    let networkIds = existing.networkIds;
+    if (parsed.data.networkIds !== undefined) {
+      if (existing.scope !== FamRuleScope.network) {
+        return jsonError(400, "invalid_request", "networkIds may only be updated on network-scoped rules.");
+      }
+      try {
+        networkIds = normalizeNetworkIds(parsed.data.networkIds);
+      } catch (error) {
+        return jsonError(400, "invalid_networks", error instanceof Error ? error.message : "Invalid networks.");
+      }
+      const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+      const managedScope = {
+        manageAllNetworks: household.unifiManageAllNetworks,
+        managedNetworkIds: household.unifiManagedNetworkIds,
+      };
+      try {
+        let known: Set<string> | undefined;
+        if (managedScope.manageAllNetworks) {
+          const networks = await listSiteNetworks(household);
+          known = new Set(networks.map((n) => n.id));
+        }
+        assertManagedNetworkIds(networkIds, managedScope, known);
+      } catch (error) {
+        const err = error as { status?: number; code?: string; message?: string };
+        return jsonError(err.status ?? 400, err.code ?? "invalid_request", err.message ?? "Invalid networks.");
       }
     }
     let scheduleFields: ReturnType<typeof parseRuleModeSchedule> | Record<string, never> = {};
@@ -75,6 +107,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       where: { id },
       data: {
         targetIds,
+        networkIds,
         ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
         ...scheduleFields,
       },

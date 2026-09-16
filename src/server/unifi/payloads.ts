@@ -156,3 +156,93 @@ export function dpiAppBlockPolicy(input: {
     ...(input.schedule ? { schedule: input.schedule } : {}),
   };
 }
+
+function networkSourceFilter(networkIds: string[]) {
+  const ids = [...new Set(networkIds)].sort();
+  if (ids.length === 0) {
+    throw new Error("A network DPI policy needs at least one network id.");
+  }
+  return {
+    type: "NETWORK" as const,
+    networkFilter: { matchOpposite: false, networkIds: ids },
+  };
+}
+
+/** Category DPI with UniFi source type NETWORK (managed VLAN ids — not MAC fan-out). */
+export function dpiCategoryNetworkBlockPolicy(input: {
+  name: string;
+  sourceZoneId: string;
+  destinationZoneId: string;
+  networkIds: string[];
+  applicationCategoryIds: number[];
+  enabled?: boolean;
+  action?: "BLOCK" | "REJECT";
+  schedule?: UnifiFirewallSchedule;
+  description?: string;
+}): FirewallPolicyWrite {
+  const applicationCategoryIds = [...new Set(input.applicationCategoryIds)].sort((a, b) => a - b);
+  if (applicationCategoryIds.length === 0) {
+    throw new Error("A category DPI policy needs at least one category id.");
+  }
+  return {
+    name: input.name,
+    description: input.description ?? "FamilyFi managed network category block.",
+    enabled: input.enabled ?? true,
+    loggingEnabled: false,
+    action: { type: input.action ?? INTERNET_BLOCK_ACTION },
+    ipProtocolScope: { ipVersion: "IPV4_AND_IPV6" },
+    source: {
+      zoneId: input.sourceZoneId,
+      trafficFilter: networkSourceFilter(input.networkIds),
+    },
+    destination: {
+      zoneId: input.destinationZoneId,
+      trafficFilter: {
+        type: "APPLICATION_CATEGORY",
+        applicationCategoryFilter: { applicationCategoryIds },
+      },
+    },
+    ...(input.schedule ? { schedule: input.schedule } : {}),
+  };
+}
+
+/** App DPI with UniFi source type NETWORK (managed VLAN ids — not MAC fan-out). */
+export function dpiAppNetworkBlockPolicy(input: {
+  name: string;
+  sourceZoneId: string;
+  destinationZoneId: string;
+  networkIds: string[];
+  applicationIds: number[];
+  enabled?: boolean;
+  action?: "BLOCK" | "REJECT";
+  schedule?: UnifiFirewallSchedule;
+  description?: string;
+}): FirewallPolicyWrite {
+  const applicationIds = [...new Set(input.applicationIds)].sort((a, b) => a - b);
+  if (applicationIds.length === 0) {
+    throw new Error("An app DPI policy needs at least one application id.");
+  }
+  if (applicationIds.length > 100) {
+    throw new Error("An app DPI policy may target at most 100 applications.");
+  }
+  return {
+    name: input.name,
+    description: input.description ?? "FamilyFi managed network app block.",
+    enabled: input.enabled ?? true,
+    loggingEnabled: false,
+    action: { type: input.action ?? INTERNET_BLOCK_ACTION },
+    ipProtocolScope: { ipVersion: "IPV4_AND_IPV6" },
+    source: {
+      zoneId: input.sourceZoneId,
+      trafficFilter: networkSourceFilter(input.networkIds),
+    },
+    destination: {
+      zoneId: input.destinationZoneId,
+      trafficFilter: {
+        type: "APPLICATION",
+        applicationFilter: { applicationIds },
+      },
+    },
+    ...(input.schedule ? { schedule: input.schedule } : {}),
+  };
+}

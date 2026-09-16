@@ -10,7 +10,9 @@ import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
 import {
   dpiAppBlockPolicy,
+  dpiAppNetworkBlockPolicy,
   dpiCategoryBlockPolicy,
+  dpiCategoryNetworkBlockPolicy,
   internetBlockPolicy,
   toPolicyUpdate,
 } from "./unifi/payloads";
@@ -260,7 +262,7 @@ async function tick(owner: string): Promise<boolean> {
     const famRulePolicies = await prisma().famRulePolicy.findMany({
       where: { connectionIdentity: identity, siteId },
     });
-    const { policies: desiredDpi, retainRuleIds } = planDpiPolicies({
+    const { policies: desiredDpi, retainRuleIds, orphanRuleIds } = planDpiPolicies({
       now,
       destinationZoneId: external.id,
       zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
@@ -269,31 +271,62 @@ async function tick(owner: string): Promise<boolean> {
         ...device,
         inScope: networkInScope(scope, device.networkId),
       })),
-      rules: famRules,
+      networks: networks.map((network) => ({
+        id: network.id,
+        name: network.name,
+        zoneId: network.zoneId ?? null,
+      })),
+      networkScope: scope,
+      rules: famRules.map((rule) => ({
+        ...rule,
+        groupId: rule.groupId,
+        networkIds: rule.networkIds,
+        scope: rule.scope,
+      })),
     });
     const desiredDpiKeys = new Set(desiredDpi.map((item) => item.key));
 
     for (const planned of desiredDpi) {
       const write =
-        planned.kind === "category"
-          ? dpiCategoryBlockPolicy({
-              name: planned.name,
-              sourceZoneId: planned.zoneId,
-              destinationZoneId: planned.destinationZoneId,
-              macAddresses: planned.macAddresses,
-              applicationCategoryIds: planned.targetIds,
-              enabled: planned.enabled,
-              schedule: planned.schedule,
-            })
-          : dpiAppBlockPolicy({
-              name: planned.name,
-              sourceZoneId: planned.zoneId,
-              destinationZoneId: planned.destinationZoneId,
-              macAddresses: planned.macAddresses,
-              applicationIds: planned.targetIds,
-              enabled: planned.enabled,
-              schedule: planned.schedule,
-            });
+        planned.sourceType === "NETWORK"
+          ? planned.kind === "category"
+            ? dpiCategoryNetworkBlockPolicy({
+                name: planned.name,
+                sourceZoneId: planned.zoneId,
+                destinationZoneId: planned.destinationZoneId,
+                networkIds: planned.networkIds,
+                applicationCategoryIds: planned.targetIds,
+                enabled: planned.enabled,
+                schedule: planned.schedule,
+              })
+            : dpiAppNetworkBlockPolicy({
+                name: planned.name,
+                sourceZoneId: planned.zoneId,
+                destinationZoneId: planned.destinationZoneId,
+                networkIds: planned.networkIds,
+                applicationIds: planned.targetIds,
+                enabled: planned.enabled,
+                schedule: planned.schedule,
+              })
+          : planned.kind === "category"
+            ? dpiCategoryBlockPolicy({
+                name: planned.name,
+                sourceZoneId: planned.zoneId,
+                destinationZoneId: planned.destinationZoneId,
+                macAddresses: planned.macAddresses,
+                applicationCategoryIds: planned.targetIds,
+                enabled: planned.enabled,
+                schedule: planned.schedule,
+              })
+            : dpiAppBlockPolicy({
+                name: planned.name,
+                sourceZoneId: planned.zoneId,
+                destinationZoneId: planned.destinationZoneId,
+                macAddresses: planned.macAddresses,
+                applicationIds: planned.targetIds,
+                enabled: planned.enabled,
+                schedule: planned.schedule,
+              });
       const fingerprint = policyFingerprint(write);
       const existing = famRulePolicies.find(
         (row) => plannedDpiKey(row.famRuleId, row.zoneId) === planned.key && row.connectionIdentity === identity,
@@ -344,6 +377,14 @@ async function tick(owner: string): Promise<boolean> {
           where: { id: row.id },
           data: { lastError: errors[errors.length - 1] },
         });
+      }
+    }
+
+    // Sync cleanup: network rules with no remaining managed network ids leave no silent orphans.
+    for (const orphanId of orphanRuleIds) {
+      const remaining = await prisma().famRulePolicy.count({ where: { famRuleId: orphanId } });
+      if (remaining === 0) {
+        await prisma().famRule.delete({ where: { id: orphanId } }).catch(() => undefined);
       }
     }
 

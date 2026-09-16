@@ -217,4 +217,14 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
   await clickMode(true);
   await page.goto("/rules");
   await expectMode(true);
+
+  // Phase 3: Network chips from Settings managed networks (manage-all in UNIFI_MOCK seed).
+  await page.getByRole("button", { name: "New rule" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
+  const networkTab = dialog.getByRole("button", { name: "Network", exact: true });
+  await expect(networkTab).toBeEnabled();
+  await networkTab.click();
+  await expect(dialog.getByRole("group", { name: "Managed networks" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
 });
