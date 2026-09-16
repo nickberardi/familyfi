@@ -44,8 +44,6 @@ function DevicesBody() {
   const networks = unifi?.networks ?? [];
   const unassigned = devices.filter((device) => device.assignment === "quarantined");
   const enforced = household?.quarantineEnforced === true;
-  const observed = household?.quarantineObservedEnabled ?? null;
-  const pending = household != null && typeof observed === "boolean" && observed !== household.quarantineEnforced;
   const onStyle = enforced
     ? { background: "var(--ff-card)", borderColor: "var(--ff-control-line)", color: "var(--ff-muted)" }
     : { background: "var(--ff-card)", borderColor: "var(--ff-control-line)", color: "var(--ff-ink)" };
@@ -94,12 +92,6 @@ function DevicesBody() {
             <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
               New arrivals stay off the internet until assigned. Off is an emergency override on FamilyFi policies only.
             </p>
-            {pending ? (
-              <p className="mt-1.5 text-[14px] text-[var(--ff-accent)]">
-                Desired state is {household?.quarantineEnforced ? "on" : "off"}. The gateway still shows{" "}
-                {observed ? "on" : "off"}.
-              </p>
-            ) : null}
           </div>
           <button
             type="button"
