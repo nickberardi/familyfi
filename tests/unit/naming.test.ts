@@ -85,10 +85,15 @@ describe("naming conventions (AGENTS.md)", () => {
       /^(POSTGRES_|DB_|UNIFI_|DATABASE_URL|PORT|NODE_ENV|NODE_TLS_REJECT_UNAUTHORIZED|NEXT_|CI$|HOME$|PATH$)/;
     // Ours, but development/test-only and never set on a real deployment, so
     // they are not public surface and take no prefix.
-    const internal = new Set(["UNIFI_MOCK"]);
+    const internal = new Set(["UNIFI_MOCK", "KILL_PORT", "SKIP_DB_PREPARE"]);
     const offenders = new Set<string>();
 
-    for (const file of walk(srcRoot, (f) => f.endsWith(".ts") || f.endsWith(".tsx"))) {
+    // scripts/ reads the operator-facing secrets too, so it is in scope here.
+    const files = [
+      ...walk(srcRoot, (f) => f.endsWith(".ts") || f.endsWith(".tsx")),
+      ...walk(path.join(repoRoot, "scripts"), (f) => f.endsWith(".ts") || f.endsWith(".mjs")),
+    ];
+    for (const file of files) {
       const text = readFileSync(file, "utf8");
       for (const m of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)) {
         const name = m[1];

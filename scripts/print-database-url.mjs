@@ -26,7 +26,7 @@ export function parseEnvFile(contents) {
 }
 
 /** Docker/standard data dir for persisted secrets. Not configurable via env. */
-export const FAMILYFI_DATA_DIR = "/var/lib/familyfi/data";
+export const DATA_DIR = "/var/lib/familyfi/data";
 
 /**
  * Env file path the app chooses:
@@ -35,8 +35,8 @@ export const FAMILYFI_DATA_DIR = "/var/lib/familyfi/data";
  */
 export function resolveEnvPath(env = /** @type {Record<string, string | undefined>} */ (process.env), rootDir = root) {
   const underDocker = fs.existsSync("/.dockerenv");
-  if (underDocker || fs.existsSync(FAMILYFI_DATA_DIR)) {
-    return path.join(FAMILYFI_DATA_DIR, ".env");
+  if (underDocker || fs.existsSync(DATA_DIR)) {
+    return path.join(DATA_DIR, ".env");
   }
   return path.join(rootDir, ".env");
 }
