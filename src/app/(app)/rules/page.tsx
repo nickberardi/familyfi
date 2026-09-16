@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { initials } from "@/lib/display";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
+import { D6_CATEGORY_SLOTS, parentFacingRuleLabel } from "@/lib/fam-rules";
 import type { Group } from "@/lib/types";
 
 type FamRule = {
@@ -295,7 +296,7 @@ function RuleRowForm({
         <NestedRuleRow
           key={rule.id}
           rule={rule}
-          label={labels.get(`${rule.kind}:${rule.targetIds.join(",")}`) ?? rule.targetIds.join(", ")}
+          label={parentFacingRuleLabel(rule, labels)}
           onChanged={onRulesChanged}
         />
       ))}
@@ -446,6 +447,11 @@ function NewRuleModal({
                 Network
               </button>
             </div>
+            {!networkScopeAvailable ? (
+              <p className="mt-1.5 text-[13px] text-[var(--ff-muted)]" data-testid="network-scope-empty-helper">
+                No managed networks in Settings — pick VLANs (or Watch every network) before using Network scope.
+              </p>
+            ) : null}
           </div>
           {scope === "member" ? (
             <select className="w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]" value={selectedTargetId} onChange={(e) => setTargetId(e.target.value)}>
@@ -515,7 +521,7 @@ function NewRuleModal({
                       >
                         {slot.label}
                         <span className="ml-2 text-[12px] font-normal text-[var(--ff-muted)]">
-                          {slot.catalogName} ({slot.categoryId})
+                          {slot.catalogName}
                         </span>
                       </button>
                     );
@@ -543,7 +549,7 @@ function NewRuleModal({
                   <option value="">Select…</option>
                   {catalog.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} ({item.id})
+                      {item.name}
                     </option>
                   ))}
                 </select>
@@ -657,6 +663,7 @@ export default function RulesPage() {
       const map = new Map<string, string>();
       for (const item of cats.categories) map.set(`category:${item.id}`, item.name);
       for (const item of apps.applications) map.set(`app:${item.id}`, item.name);
+      for (const slot of D6_CATEGORY_SLOTS) map.set(`category:${slot.categoryId}`, slot.label);
       setLabels(map);
     } catch {
       setRules([]);
@@ -721,7 +728,7 @@ export default function RulesPage() {
                     key={rule.id}
                     rule={rule}
                     networkLabel={networkLabel}
-                    label={labels.get(`${rule.kind}:${rule.targetIds.join(",")}`) ?? rule.targetIds.join(", ")}
+                    label={parentFacingRuleLabel(rule, labels)}
                     onChanged={() => void loadRules()}
                   />
                 );
@@ -731,9 +738,9 @@ export default function RulesPage() {
         )}
         <p className="max-w-[70ch] text-[14px] leading-5 text-[var(--ff-muted)]">
           Each member row is the Internet parent for that Family or Things group. NET rows are network-scoped category/app
-          rules on Settings-managed VLANs (UniFi source NETWORK). Nested filters use UniFi DPI integer ids. Always keeps a
-          permanent block; Scheduled uses Offline / Back on times. Edits are desired configuration — Sync writes them to
-          UniFi. Internet rows are not deletable.
+          rules on Settings-managed VLANs (UniFi source NETWORK). Nested filters use UniFi DPI integer ids. Always keeps the
+          block on until you turn it off; Scheduled uses Offline / Back on times. Edits are desired configuration — Sync
+          writes them to UniFi. Internet rows are not deletable.
         </p>
       </div>
       {newRuleOpen ? (
