@@ -24,7 +24,7 @@ export function ScheduleBar({
   const bands = scheduleBands(start, end);
   return (
     <div>
-      <div className="relative h-[30px] overflow-hidden rounded-[6px] bg-[#f2f2f7] md:h-[26px]">
+      <div className="relative h-[30px] overflow-hidden rounded-[6px] bg-[var(--ff-well)] md:h-[26px]">
         {bands.map((band, index) => (
           <div
             key={index}

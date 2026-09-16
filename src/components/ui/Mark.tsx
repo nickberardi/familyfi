@@ -60,7 +60,7 @@ export function Mark({
             : "var(--ff-person-fill)",
     color:
       kind === "group" || kind === "network"
-        ? "#fff"
+        ? "var(--ff-ink-on-fill)"
         : kind === "filter"
           ? "var(--ff-accent)"
           : "var(--ff-person-ink)",

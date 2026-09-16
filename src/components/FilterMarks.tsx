@@ -64,7 +64,7 @@ function MarkButton({
         className="flex h-[34px] w-[34px] items-center justify-center rounded-full"
         style={{
           background: on ? "var(--ff-accent)" : "var(--ff-field)",
-          color: on ? "#fff" : "var(--ff-ink-3)",
+          color: on ? "var(--ff-ink-on-fill)" : "var(--ff-ink-3)",
         }}
       >
         {children}

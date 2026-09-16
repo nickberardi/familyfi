@@ -51,9 +51,31 @@
   --ff-focus-ring: rgba(0, 122, 255, 0.16);
   --ff-disabled: rgba(60, 60, 67, 0.35);
   --ff-hairline-strong: rgba(60, 60, 67, 0.16);
-  --ff-danger-fill: rgba(255, 59, 48, 0.1);
+  --ff-danger-fill: rgba(200, 16, 10, 0.1);
   --ff-note-fill: rgba(120, 120, 128, 0.09);
   --ff-accent-wash: rgba(0, 122, 255, 0.08);
+
+  /* Ink that sits on an accent, mark or danger fill. */
+  --ff-ink-on-fill: #ffffff;
+
+  /* Chrome: sheet scrim and shadows, sticky header wash, inset well. */
+  --ff-scrim: rgba(0, 0, 0, 0.32);
+  --ff-shadow-sheet: 0 24px 60px rgba(0, 0, 0, 0.28);
+  --ff-shadow-toast: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --ff-shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --ff-header-wash: rgba(245, 245, 247, 0.86);
+  --ff-well: #f2f2f7;
+  --ff-rail: #ececee;
+
+  /* Paused/attention banner, tinted from --ff-paused (#c04c00). */
+  --ff-paused-line: rgba(192, 76, 0, 0.28);
+  --ff-paused-fill: rgba(192, 76, 0, 0.08);
+  --ff-paused-fill-strong: rgba(192, 76, 0, 0.12);
+
+  /* Status-pill tints, each derived from its state ink. */
+  --ff-field-strong: rgba(120, 120, 128, 0.16);
+  --ff-danger-tint: rgba(200, 16, 10, 0.12);
+  --ff-on-tint: rgba(52, 199, 89, 0.16);
 
   /* Rules tree indents. */
   --ff-rule-indent: 34px;

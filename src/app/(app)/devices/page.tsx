@@ -47,8 +47,8 @@ function DevicesBody() {
   const observed = household?.quarantineObservedEnabled ?? null;
   const pending = household != null && typeof observed === "boolean" && observed !== household.quarantineEnforced;
   const onStyle = enforced
-    ? { background: "var(--ff-accent-fill)", borderColor: "var(--ff-accent-line)", color: "#0066d6" }
-    : { background: "#fff", borderColor: "var(--ff-control-line)", color: "var(--ff-muted)" };
+    ? { background: "var(--ff-accent-fill)", borderColor: "var(--ff-accent-line)", color: "var(--ff-accent-hover)" }
+    : { background: "var(--ff-ink-on-fill)", borderColor: "var(--ff-control-line)", color: "var(--ff-muted)" };
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -72,7 +72,7 @@ function DevicesBody() {
       <PageHeader title="Devices" sub="Assignment is by MAC address and persists while a device is offline." />
       <div className="flex flex-col gap-4 p-4 md:p-6">
         {assignGroup ? (
-          <section className="rounded-[12px] border border-[rgba(192,76,0,.28)] bg-[rgba(192,76,0,.08)] px-[18px] py-3">
+          <section className="rounded-[12px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] px-[18px] py-3">
             <div className="text-[14px] font-semibold text-[var(--ff-paused)]">{assignGroup.name} needs devices</div>
             <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
               {assignGroup.name} has a bedtime but no assigned devices, so a UniFi policy cannot be created. Assign an
@@ -132,9 +132,9 @@ function DevicesBody() {
                   className="rounded-md px-3.5 py-1.5 text-[14px]"
                   style={{
                     fontWeight: on ? 600 : 500,
-                    background: on ? "#fff" : "transparent",
+                    background: on ? "var(--ff-ink-on-fill)" : "transparent",
                     color: on ? "var(--ff-ink)" : "var(--ff-muted)",
-                    boxShadow: on ? "0 1px 3px rgba(0,0,0,.12)" : "none",
+                    boxShadow: on ? "var(--ff-shadow-knob)" : "none",
                   }}
                 >
                   {item.label}
@@ -216,7 +216,7 @@ function DevicesBody() {
 
 function DeviceMark({ hostname }: { hostname: string | null }) {
   return (
-    <div className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px] bg-[#f2f2f7] text-[10px] font-semibold text-[var(--ff-muted)]">
+    <div className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px] bg-[var(--ff-well)] text-[10px] font-semibold text-[var(--ff-muted)]">
       {deviceTag(hostname)}
     </div>
   );

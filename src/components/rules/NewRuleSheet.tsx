@@ -130,14 +130,14 @@ export function NewRuleSheet({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,.32)" }}
+      style={{ background: "var(--ff-scrim)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="new-rule-title"
     >
       <div
         className="max-h-full w-full max-w-[420px] overflow-y-auto rounded-[14px]"
-        style={{ background: "var(--ff-card)", boxShadow: "0 24px 60px rgba(0,0,0,.28)" }}
+        style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
       >
         <div className="px-5 pb-1 pt-[18px]">
           <h2 id="new-rule-title" className="text-[17px] font-bold tracking-tight">

@@ -40,12 +40,12 @@ export function connectionStatusLabel(status: string): string {
 
 export function keyState(unifi: UnifiSettings | null): { label: string; bg: string; ink: string } {
   if (!unifi?.configured) {
-    return { label: "Missing", bg: "rgba(120,120,128,.16)", ink: "var(--ff-muted)" };
+    return { label: "Missing", bg: "var(--ff-field-strong)", ink: "var(--ff-muted)" };
   }
   if (unifi.connectionStatus === "error") {
-    return { label: "Failed", bg: "rgba(200,16,10,.12)", ink: "var(--ff-danger)" };
+    return { label: "Failed", bg: "var(--ff-danger-tint)", ink: "var(--ff-danger)" };
   }
-  return { label: "Working", bg: "rgba(52,199,89,.16)", ink: "var(--ff-on)" };
+  return { label: "Working", bg: "var(--ff-on-tint)", ink: "var(--ff-on)" };
 }
 
 export function householdMemberNote(group: Pick<Group, "familyRole" | "deviceCount">, account?: Account): string {
