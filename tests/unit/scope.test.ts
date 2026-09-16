@@ -1,4 +1,4 @@
-import { AssignmentState, GroupKind } from "@prisma/client";
+import { AssignmentState, GroupKind, GroupMode } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { networkInScope, resolveNetworkScope } from "@/server/unifi/scope";
 import { planPolicies } from "@/server/unifi/plan";
@@ -65,6 +65,7 @@ describe("planPolicies network scope", () => {
           name: "Betsy",
           kind: GroupKind.family,
           protected: false,
+          mode: GroupMode.scheduled,
           scheduleEnabled: true,
           scheduleDays: [1],
           scheduleStart: "21:00",

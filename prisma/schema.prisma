@@ -11,6 +11,11 @@ enum GroupKind {
   things
 }
 
+enum GroupMode {
+  always
+  scheduled
+}
+
 enum FamilyRole {
   child
   teen
@@ -86,6 +91,7 @@ model Group {
   monogram         String?
   familyRole       FamilyRole?
   protected        Boolean     @default(false)
+  mode             GroupMode   @default(always)
   scheduleEnabled  Boolean     @default(false)
   scheduleDays     Int[]       @default([])
   scheduleStart    String?

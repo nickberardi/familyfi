@@ -650,8 +650,8 @@ paths:
     post:
       operationId: pauseGroup
       tags: [Groups]
-      summary: Pause schedule enforcement
-      description: Sets UniFi policy enabled false. Omit until for an indefinite pause.
+      summary: Pause internet policy (Always or Scheduled)
+      description: Sets UniFi policy enabled false for Always or Scheduled modes. Omit until for an indefinite pause. Protected groups still return 409.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/GroupId" }
@@ -691,7 +691,7 @@ paths:
     post:
       operationId: resumeGroup
       tags: [Groups]
-      summary: Resume UniFi schedule
+      summary: Resume internet policy (Always or Scheduled)
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/GroupId" }
@@ -1132,7 +1132,7 @@ components:
     Group:
       type: object
       additionalProperties: false
-      required: [id, kind, name, protected, deviceCount, schedule, suspension, access]
+      required: [id, kind, name, protected, mode, deviceCount, schedule, suspension, access]
       properties:
         id: { type: string }
         kind: { type: string, enum: [family, things] }
@@ -1140,10 +1140,11 @@ components:
         monogram: { type: [string, "null"] }
         familyRole: { type: [string, "null"], enum: [child, teen, adult] }
         protected: { type: boolean }
+        mode: { type: string, enum: [always, scheduled], description: "always = permanent internet block (UniFi schedule omitted); scheduled = bedtime window" }
         deviceCount: { type: integer, minimum: 0 }
         schedule: { $ref: "#/components/schemas/Schedule" }
         suspension: { $ref: "#/components/schemas/Suspension" }
-        access: { type: string, enum: [available, blocked, paused, protected] }
+        access: { type: string, enum: [available, blocked, paused, protected, always_on] }
     GroupCreate:
       type: object
       additionalProperties: false

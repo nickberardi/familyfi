@@ -1,4 +1,4 @@
-import { AssignmentState, GroupKind } from "@prisma/client";
+import { AssignmentState, GroupKind, GroupMode } from "@prisma/client";
 import { isSuspended, type Schedule, type Suspension } from "../schedule";
 import { groupPolicyName, quarantinePolicyName } from "./names";
 import { toUnifiSchedule } from "./schedule-map";
@@ -21,6 +21,7 @@ export type PlanGroup = {
   name: string;
   kind: GroupKind;
   protected: boolean;
+  mode: GroupMode;
   scheduleEnabled: boolean;
   scheduleDays: number[];
   scheduleStart: string | null;
@@ -105,7 +106,7 @@ export function planPolicies(input: {
       zoneId: bucket.zoneId,
       macAddresses: bucket.macs,
       enabled: !isSuspended(suspension, input.now),
-      schedule: toUnifiSchedule(schedule),
+      schedule: schedule ? toUnifiSchedule(schedule) : undefined,
       name: groupPolicyName({
         name: group.name,
         kind: group.kind,
@@ -118,10 +119,10 @@ export function planPolicies(input: {
   return { policies, retainOwners };
 }
 
-function groupSchedule(group: PlanGroup): Schedule {
-  if (!group.scheduleEnabled || !group.scheduleStart || !group.scheduleEnd) {
-    return { enabled: false, days: [], start: "21:00", end: "07:00" };
-  }
+/** Always → null (omit UniFi schedule). Scheduled → recurring window. */
+function groupSchedule(group: PlanGroup): Schedule | null {
+  if (group.mode === "always") return null;
+  if (!group.scheduleEnabled || !group.scheduleStart || !group.scheduleEnd) return null;
   return {
     enabled: true,
     days: group.scheduleDays,

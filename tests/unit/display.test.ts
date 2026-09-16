@@ -22,6 +22,7 @@ function group(overrides: Partial<Group> = {}): Group {
     monogram: null,
     familyRole: "child",
     protected: false,
+    mode: "scheduled",
     deviceCount: 4,
     schedule: { enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" },
     suspension: { active: false, until: null },
@@ -87,5 +88,29 @@ describe("device marks", () => {
     expect(deviceKindLabel("Abby's iPhone")).toBe("Phone");
     expect(deviceTag("Living Room Apple TV")).toBe("TV");
     expect(deviceTag("Unknown")).toBe("DEV");
+  });
+});
+
+describe("always mode", () => {
+  it("labels Always On when access is always_on", () => {
+    expect(cardStateLabel(group({ mode: "always", schedule: { enabled: false, days: [], start: null, end: null }, access: "always_on" }), "America/New_York")).toBe(
+      "Always on · Internet blocked",
+    );
+  });
+
+  it("allows Pause without a bedtime schedule in Always mode", () => {
+    expect(
+      canPauseGroup(
+        group({
+          mode: "always",
+          schedule: { enabled: false, days: [], start: null, end: null },
+          access: "always_on",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("captions always on", () => {
+    expect(scheduleCaption(group({ mode: "always", schedule: { enabled: false, days: [], start: null, end: null } }))).toBe("always on");
   });
 });

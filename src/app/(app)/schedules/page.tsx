@@ -48,7 +48,7 @@ function kindTag(group: Group) {
 function ScheduleRow({ group }: { group: Group }) {
   return (
     <ScheduleRowForm
-      key={`${group.id}:${group.schedule.enabled}:${group.schedule.start}:${group.schedule.end}:${group.schedule.days.join(",")}`}
+      key={`${group.id}:${group.mode}:${group.schedule.enabled}:${group.schedule.start}:${group.schedule.end}:${group.schedule.days.join(",")}`}
       group={group}
     />
   );
@@ -176,7 +176,7 @@ function ScheduleRowForm({ group }: { group: Group }) {
       className="rounded-[7px] border px-3 py-1.5 text-[14px] font-semibold"
       style={onStyle}
     >
-      {enabled ? "On" : "Off"}
+      {enabled ? "Bedtime" : "Always"}
     </button>
   );
 

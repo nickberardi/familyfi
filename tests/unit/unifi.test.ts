@@ -13,7 +13,7 @@ import { toUnifiSchedule, unifiPolicyEnabled } from "@/server/unifi/schedule-map
 import { sanitizeUnifiText } from "@/server/unifi/sanitize";
 import { applyInternetBlocks, discoverInventory, setPoliciesEnabled, deletePolicies } from "@/server/unifi/spike";
 import { planPolicies } from "@/server/unifi/plan";
-import { AssignmentState, GroupKind } from "@prisma/client";
+import { AssignmentState, GroupKind, GroupMode } from "@prisma/client";
 import { UNIFI_PAGE_LIMIT } from "@/server/unifi/types";
 import type { ClientOverview, FirewallPolicy, FirewallZone, NetworkDetails, UnifiPage } from "@/server/unifi/types";
 
@@ -242,6 +242,7 @@ describe("planPolicies", () => {
     name: "Betsy",
     kind: GroupKind.family,
     protected: false,
+    mode: GroupMode.scheduled,
     scheduleEnabled: true,
     scheduleDays: [1, 2, 3, 4, 5],
     scheduleStart: "21:00",
@@ -315,6 +316,41 @@ describe("planPolicies", () => {
     });
     expect(paused.policies[0]?.enabled).toBe(false);
     expect(paused.policies[0]?.schedule?.mode).toBe("EVERY_WEEK");
+  });
+
+  it("Always mode omits UniFi schedule; Pause disables; Resume restores permanent block", () => {
+    const always = { ...child, mode: GroupMode.always, scheduleEnabled: false };
+    const { policies } = planPolicies({
+      installId: "default",
+      now,
+      destinationZoneId,
+      zoneNames: { z1: "Internal" },
+      groups: [always],
+      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" }],
+    });
+    expect(policies).toHaveLength(1);
+    expect(policies[0]?.enabled).toBe(true);
+    expect(policies[0]?.schedule).toBeUndefined();
+
+    const paused = planPolicies({
+      installId: "default",
+      now,
+      destinationZoneId,
+      groups: [{ ...always, suspensionActive: true, suspensionUntil: null }],
+      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" }],
+    });
+    expect(paused.policies[0]?.enabled).toBe(false);
+    expect(paused.policies[0]?.schedule).toBeUndefined();
+
+    const resumed = planPolicies({
+      installId: "default",
+      now,
+      destinationZoneId,
+      groups: [{ ...always, suspensionActive: false, suspensionUntil: null }],
+      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" }],
+    });
+    expect(resumed.policies[0]?.enabled).toBe(true);
+    expect(resumed.policies[0]?.schedule).toBeUndefined();
   });
 
   it("does not drop existing owners when a MAC has no zone", () => {
