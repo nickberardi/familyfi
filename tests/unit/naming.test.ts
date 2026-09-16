@@ -49,6 +49,31 @@ describe("naming conventions (AGENTS.md)", () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * The literal check above only sees rgb/hsl/hex, so Tailwind's colour
+   * keywords walked straight past it — 21 `bg-white` and 19 `text-white` sat in
+   * components while --ff-card and --ff-ink-on-fill were already declared.
+   * `transparent`, `current` and `inherit` are keywords, not colours, so they stay.
+   */
+  it("uses --ff-* tokens rather than Tailwind colour keywords", () => {
+    const palette =
+      "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
+    const utility =
+      "bg|text|border|ring|fill|stroke|divide|placeholder|caret|accent|outline|decoration|from|via|to|shadow";
+    const pattern = new RegExp(`\\b(?:${utility})-(?:white|black|(?:${palette})-\\d{2,3})(?:\\/\\d{1,3})?\\b`);
+
+    const offenders: string[] = [];
+    for (const file of walk(srcRoot, (f) => f.endsWith(".tsx") || f.endsWith(".ts"))) {
+      if (COLOR_LITERAL_EXEMPT.has(rel(file))) continue;
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (pattern.test(line)) offenders.push(`${rel(file)}:${i + 1}: ${line.trim()}`);
+        });
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("uses no abbreviated product prefix in identifiers", () => {
     const offenders: string[] = [];
     for (const file of walk(srcRoot, (f) => f.endsWith(".tsx") || f.endsWith(".ts"))) {

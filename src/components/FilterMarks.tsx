@@ -27,15 +27,9 @@ import { FilterSheet, type FilterSheetState } from "@/components/filters/FilterS
 import { AddAppSheet } from "@/components/filters/AddAppSheet";
 import type { Group } from "@/lib/types";
 
-function SectionLabel({ children, divided }: { children: ReactNode; divided?: boolean }) {
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div
-      className="pt-1.5 text-[11px] font-semibold uppercase tracking-[0.05em]"
-      style={{
-        color: "var(--ff-ink-4)",
-        borderTop: divided ? "1px solid var(--ff-hairline)" : undefined,
-      }}
-    >
+    <div className="text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ color: "var(--ff-ink-2)" }}>
       {children}
     </div>
   );
@@ -77,7 +71,7 @@ function MarkButton({
       </div>
       <div
         className="text-[9px] font-semibold"
-        style={{ color: on ? "var(--ff-accent)" : "var(--ff-ink-3)" }}
+        style={{ color: on ? "var(--ff-accent)" : "var(--ff-ink-2)" }}
       >
         {on ? "On" : "Off"}
       </div>
@@ -105,75 +99,83 @@ export function GroupFilterMarks({
   if (group.protected) return null;
 
   const apps = appRulesForGroup(rules, group.id);
+  /** Without app rules and without the + tile the section is a heading over nothing. */
+  const showApps = apps.length > 0 || Boolean(showAppAdd);
 
   return (
     <>
       <div
-        className="px-[18px] pb-2.5 pt-2"
+        className="pb-2.5"
         style={{ borderTop: "1px solid var(--ff-hairline)" }}
         data-testid={`filter-marks-${group.id}`}
       >
-        <SectionLabel>Category Rules</SectionLabel>
-        <div className="flex flex-wrap gap-3.5 py-2">
-          {D6_CATEGORY_SLOTS.map((slot) => {
-            const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
-            return (
-              <MarkButton
-                key={slot.slot}
-                label={slot.label}
-                on={Boolean(rule?.enabled)}
-                onClick={() =>
-                  setSheet({
-                    kind: "category",
-                    name: slot.label,
-                    categoryId: slot.categoryId,
-                    rule,
-                  })
-                }
-              >
-                <CategoryGlyph slot={slot.slot} size={15} />
-              </MarkButton>
-            );
-          })}
+        <div className="px-[18px] pt-2">
+          <SectionLabel>Category Rules</SectionLabel>
+          <div className="flex flex-wrap gap-3.5 py-2">
+            {D6_CATEGORY_SLOTS.map((slot) => {
+              const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
+              return (
+                <MarkButton
+                  key={slot.slot}
+                  label={slot.label}
+                  on={Boolean(rule?.enabled)}
+                  onClick={() =>
+                    setSheet({
+                      kind: "category",
+                      name: slot.label,
+                      categoryId: slot.categoryId,
+                      rule,
+                    })
+                  }
+                >
+                  <CategoryGlyph slot={slot.slot} size={15} />
+                </MarkButton>
+              );
+            })}
+          </div>
         </div>
 
-        <SectionLabel divided>App Rules</SectionLabel>
-        <div className="flex flex-wrap gap-3.5 py-2 pb-1">
-          {apps.map((rule) => {
-            const name = parentFacingRuleLabel(rule, catalogNames);
-            return (
-              <MarkButton
-                key={rule.id}
-                label={name}
-                on={rule.enabled}
-                onClick={() => setSheet({ kind: "app", name, rule })}
-              >
-                <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>
-              </MarkButton>
-            );
-          })}
-          {showAppAdd ? (
-            <button
-              type="button"
-              onClick={() => setAddApp(true)}
-              className="flex w-[52px] flex-col items-center gap-1"
-              aria-label="Add app filter"
-            >
-              <div
-                className="flex h-[34px] w-[34px] items-center justify-center rounded-full border-[1.5px] border-dashed text-[16px] font-light leading-none"
-                style={{ borderColor: "var(--ff-control-line)", color: "var(--ff-accent)" }}
-              >
-                +
-              </div>
-              <div
-                className="text-center text-[10px] font-semibold leading-tight"
-                style={{ color: "var(--ff-accent)" }}
-              >
-                Add
-              </div>
-            </button>
-          ) : null}
-        </div>
+        {showApps ? (
+          <div className="px-[18px] pt-2" style={{ borderTop: "1px solid var(--ff-hairline)" }}>
+            <SectionLabel>App Rules</SectionLabel>
+            <div className="flex flex-wrap gap-3.5 py-2 pb-1">
+              {apps.map((rule) => {
+                const name = parentFacingRuleLabel(rule, catalogNames);
+                return (
+                  <MarkButton
+                    key={rule.id}
+                    label={name}
+                    on={rule.enabled}
+                    onClick={() => setSheet({ kind: "app", name, rule })}
+                  >
+                    <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>
+                  </MarkButton>
+                );
+              })}
+              {showAppAdd ? (
+                <button
+                  type="button"
+                  onClick={() => setAddApp(true)}
+                  className="flex w-[52px] flex-col items-center gap-1"
+                  aria-label="Add app filter"
+                >
+                  <div
+                    className="flex h-[34px] w-[34px] items-center justify-center rounded-full border-[1.5px] border-dashed text-[16px] font-light leading-none"
+                    style={{ borderColor: "var(--ff-control-line)", color: "var(--ff-accent)" }}
+                  >
+                    +
+                  </div>
+                  <div
+                    className="text-center text-[10px] font-semibold leading-tight"
+                    style={{ color: "var(--ff-accent)" }}
+                  >
+                    Add
+                  </div>
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {sheet ? (

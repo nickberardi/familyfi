@@ -18,6 +18,8 @@ export const DEV_SEED_ADULT_USERNAME = "pat";
 const CHILD_MAC = "02:00:00:00:00:01";
 const THINGS_MAC = "02:00:00:00:00:02";
 const TEEN_MAC = "02:00:00:00:00:03";
+const PAUSED_MAC = "02:00:00:00:00:04";
+const LOOSE_MAC = "02:00:00:00:00:05";
 
 async function ensureMockUnifiConnection() {
   const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
@@ -74,8 +76,37 @@ async function ensureDummyHouseholdMembers() {
       scheduleEnd: "07:00",
     },
   });
+  // Paused, so the card's paused ink and its Resume/Extend actions are visible.
+  const paused = await prisma().group.create({
+    data: {
+      kind: GroupKind.family,
+      name: "Robin",
+      familyRole: FamilyRole.teen,
+      mode: "scheduled",
+      scheduleEnabled: true,
+      scheduleDays: [1, 2, 3, 4, 5],
+      scheduleStart: "22:00",
+      scheduleEnd: "06:30",
+      suspensionActive: true,
+      suspensionUntil: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    },
+  });
+  // A things group carries the 44px monogram tile a person's card goes without.
   const things = await prisma().group.create({
-    data: { kind: GroupKind.things, name: "Living Room" },
+    data: {
+      kind: GroupKind.things,
+      name: "Living Room",
+      monogram: "TV",
+      mode: "scheduled",
+      scheduleEnabled: true,
+      scheduleDays: [0, 1, 2, 3, 4, 5, 6],
+      scheduleStart: "23:00",
+      scheduleEnd: "07:00",
+    },
+  });
+  // No devices and no schedule — the emptiest comfortable card there is.
+  await prisma().group.create({
+    data: { kind: GroupKind.things, name: "Smart Home", monogram: "IOT" },
   });
 
   const password = recoveryPassword();
@@ -118,6 +149,24 @@ async function ensureDummyHouseholdMembers() {
         zoneId: DEV_MOCK_INTERNAL_ZONE,
         groupId: teen.id,
         assignment: AssignmentState.assigned,
+      },
+      {
+        mac: PAUSED_MAC,
+        hostname: "Robin iPad",
+        ip: "192.0.2.40",
+        networkId: DEV_MOCK_INTERNAL_NETWORK,
+        zoneId: DEV_MOCK_INTERNAL_ZONE,
+        groupId: paused.id,
+        assignment: AssignmentState.assigned,
+      },
+      // Unassigned, so the Devices quarantine banner and its counts have a subject.
+      {
+        mac: LOOSE_MAC,
+        hostname: "Guest Laptop",
+        ip: "192.0.2.50",
+        networkId: DEV_MOCK_INTERNAL_NETWORK,
+        zoneId: DEV_MOCK_INTERNAL_ZONE,
+        assignment: AssignmentState.quarantined,
       },
     ],
   });

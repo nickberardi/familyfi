@@ -45,7 +45,7 @@ function GroupEditForm({ group }: { group: Group }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+    <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
       <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Edit</h2>
       <form
         className="flex flex-col gap-3 p-[18px]"
@@ -94,7 +94,7 @@ function GroupEditForm({ group }: { group: Group }) {
         <button
           type="submit"
           disabled={busy || !dirty || !trimmed}
-          className="self-start rounded-[9px] bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white disabled:opacity-50"
+          className="self-start rounded-[9px] bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
         >
           Save
         </button>
@@ -166,7 +166,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         </p>
       </header>
       <GroupEditForm key={group.id} group={group} />
-      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
         <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Current state</h2>
         <div className="p-[18px]">
           <p className="text-[14px] text-[var(--ff-muted)]">{cardNoteLine(group)}</p>
@@ -183,7 +183,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             <div className="mt-4 flex flex-wrap gap-2">
               {actions.map((action) => {
                 const className = action.strong
-                  ? "rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white"
+                  ? "rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
                   : "rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]";
                 if (action.href && action.label !== "Detail" && action.label !== "View devices") {
                   return (
@@ -222,7 +222,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           />
         ) : null}
       </section>
-      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
         <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
         {members.length === 0 ? (
           <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">

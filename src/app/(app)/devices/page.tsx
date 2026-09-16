@@ -47,8 +47,8 @@ function DevicesBody() {
   const observed = household?.quarantineObservedEnabled ?? null;
   const pending = household != null && typeof observed === "boolean" && observed !== household.quarantineEnforced;
   const onStyle = enforced
-    ? { background: "var(--ff-accent-fill)", borderColor: "var(--ff-accent-line)", color: "var(--ff-accent-hover)" }
-    : { background: "var(--ff-ink-on-fill)", borderColor: "var(--ff-control-line)", color: "var(--ff-muted)" };
+    ? { background: "var(--ff-card)", borderColor: "var(--ff-control-line)", color: "var(--ff-muted)" }
+    : { background: "var(--ff-card)", borderColor: "var(--ff-control-line)", color: "var(--ff-ink)" };
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -81,9 +81,16 @@ function DevicesBody() {
           </section>
         ) : null}
         {household ? (
-        <section className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--ff-hairline-card)] bg-white px-[18px] py-3">
+        <section className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] px-[18px] py-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold">Quarantine unassigned devices</div>
+            <div
+              className="text-[14px] font-semibold"
+              style={{ color: enforced ? undefined : "var(--ff-paused)" }}
+            >
+              {enforced
+                ? "Quarantine unassigned devices"
+                : "Quarantine is off — unassigned devices may have internet"}
+            </div>
             <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
               New arrivals stay off the internet until assigned. Off is an emergency override on FamilyFi policies only.
             </p>
@@ -93,17 +100,12 @@ function DevicesBody() {
                 {observed ? "on" : "off"}.
               </p>
             ) : null}
-            {!enforced ? (
-              <p className="mt-1.5 text-[14px] text-[var(--ff-paused)]">
-                Unassigned devices may have internet until you turn this back on.
-              </p>
-            ) : null}
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={enforced}
-            aria-label="Quarantine unassigned devices"
+            aria-label={enforced ? "Turn quarantine off" : "Turn quarantine on"}
             className="flex-none rounded-[7px] border px-3 py-1.5 text-[14px] font-semibold"
             style={onStyle}
             onClick={() =>
@@ -115,7 +117,7 @@ function DevicesBody() {
               )
             }
           >
-            {enforced ? "On" : "Off"}
+            {enforced ? "Off" : "On"}
           </button>
         </section>
         ) : null}
@@ -153,14 +155,16 @@ function DevicesBody() {
         </div>
 
         {rows.length === 0 ? (
-          <p className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-white p-[18px] text-[14px] text-[var(--ff-muted)]">
+          <p className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px] text-[14px] text-[var(--ff-muted)]">
             {devices.length === 0
               ? "No devices yet. New in-scope MACs appear as unassigned."
               : "Nothing matches this filter."}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
-            <div className="min-w-[1020px]">
+          <div className="overflow-x-auto rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+            {/* The column template carries its own minimums from lg up, so the
+                scroll floor is only needed where the narrow layout would crush. */}
+            <div className="min-w-[720px] lg:min-w-0">
               <div className="grid grid-cols-[minmax(140px,2.2fr)_minmax(76px,.9fr)_minmax(120px,140px)] items-center gap-3.5 bg-[var(--ff-field-soft)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)] lg:grid-cols-[minmax(160px,2.4fr)_minmax(80px,.9fr)_minmax(0,150px)_minmax(120px,140px)] xl:grid-cols-[minmax(180px,2.4fr)_minmax(84px,.9fr)_minmax(0,96px)_minmax(0,150px)_minmax(120px,140px)]">
                 <div>Device</div>
                 <div>Belongs to</div>

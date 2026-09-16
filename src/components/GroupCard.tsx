@@ -71,11 +71,11 @@ export function GroupCard({
   const enabled = group.schedule.enabled && group.schedule.start && group.schedule.end;
 
   return (
-    <article className="overflow-hidden rounded-[12px] bg-white md:border md:border-[var(--ff-hairline-card)]">
+    <article className="overflow-hidden rounded-[12px] bg-[var(--ff-card)] md:border md:border-[var(--ff-hairline-card)]">
       <Link href={href} className="flex items-center gap-3 px-4 py-3.5 md:items-start md:px-[18px] md:py-4">
         {things ? (
           <div
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-[11px] bg-[var(--ff-mark)] text-[14px] font-bold tracking-wide text-white"
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-[11px] bg-[var(--ff-mark)] text-[14px] font-bold tracking-wide text-[var(--ff-ink-on-fill)]"
             style={{ fontSize: monogram.length > 2 ? 12 : 14 }}
           >
             {monogram}

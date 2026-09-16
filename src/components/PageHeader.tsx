@@ -17,7 +17,7 @@ export function PageHeader({
   let action: ReactNode = null;
   if (actionHref && actionLabel) {
     action = (
-      <Link href={actionHref} className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white">
+      <Link href={actionHref} className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]">
         {actionLabel}
       </Link>
     );
@@ -26,7 +26,7 @@ export function PageHeader({
       <button
         type="button"
         onClick={onAction}
-        className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white"
+        className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
       >
         {actionLabel}
       </button>

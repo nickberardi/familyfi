@@ -133,7 +133,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" sub="Gateway connection, credentials, and household roles." />
       <div className="flex flex-col gap-4 p-4 md:p-6">
         <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
-          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
             <div className="border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px] text-[14px] font-semibold">Gateway</div>
             {facts.map((fact, index) => (
               <div
@@ -157,7 +157,7 @@ export default function SettingsPage() {
               </label>
               <button
                 type="button"
-                className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white"
+                className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
                 onClick={() =>
                   void mutate(() =>
                     api("/api/v1/settings/household", { method: "PUT", body: JSON.stringify({ timezone }) }),
@@ -231,7 +231,7 @@ export default function SettingsPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white"
+                    className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
                     onClick={() =>
                       void mutate(() =>
                         api("/api/v1/settings/unifi", {
@@ -267,7 +267,7 @@ export default function SettingsPage() {
             )}
           </section>
 
-          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
             <div className="border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px] text-[14px] font-semibold">UniFi API key</div>
             <div className="px-[18px] py-4">
               <div className="flex flex-wrap items-baseline gap-2.5">
@@ -306,7 +306,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       disabled={apiKey.length < 8}
-                      className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white disabled:opacity-40"
+                      className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
                       onClick={saveKey}
                     >
                       Save and test
@@ -329,7 +329,7 @@ export default function SettingsPage() {
                 <div className="mt-3.5 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white"
+                    className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
                     onClick={() => {
                       setPasting(true);
                       setApiKey("");
@@ -354,7 +354,7 @@ export default function SettingsPage() {
           </section>
         </div>
 
-        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
           <div className="flex flex-wrap items-baseline gap-2.5 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
             <span className="text-[14px] font-semibold">Household</span>
             <span className="text-[14px] text-[var(--ff-muted)]">
@@ -363,7 +363,7 @@ export default function SettingsPage() {
           </div>
           {recovery ? (
             <div className="flex items-center gap-3 px-[18px] py-3">
-              <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-mark)] text-[14px] font-semibold text-white">
+              <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-mark)] text-[14px] font-semibold text-[var(--ff-ink-on-fill)]">
                 {initials(recovery.displayName)}
               </div>
               <div className="min-w-0 flex-1">
@@ -384,7 +384,7 @@ export default function SettingsPage() {
                 className="flex flex-wrap items-center gap-3 px-[18px] py-3"
                 style={{ borderTop: "1px solid var(--ff-hairline)" }}
               >
-                <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-mark)] text-[14px] font-semibold text-white">
+                <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-mark)] text-[14px] font-semibold text-[var(--ff-ink-on-fill)]">
                   {group.monogram || initials(group.name)}
                 </div>
                 <div className="min-w-[150px] flex-1">
@@ -447,7 +447,7 @@ export default function SettingsPage() {
                     }}
                   >
                     <span
-                      className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border text-[10px] leading-none text-white"
+                      className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border text-[10px] leading-none text-[var(--ff-ink-on-fill)]"
                       style={{
                         borderColor: account?.isAdmin ? "var(--ff-accent)" : "var(--ff-disabled)",
                         background: account?.isAdmin ? "var(--ff-accent)" : "var(--ff-ink-on-fill)",
@@ -495,14 +495,14 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={!newName.trim()}
-              className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white disabled:opacity-40"
+              className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
             >
               Add
             </button>
           </form>
         </section>
 
-        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-white">
+        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
           <div className="border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px] text-[14px] font-semibold">About</div>
           <div className="flex items-center gap-3 px-[18px] py-2.5">
             <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">Version</div>
@@ -523,8 +523,8 @@ export default function SettingsPage() {
       </div>
 
       {loginFor ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/32 p-6">
-          <div className="w-full max-w-[420px] overflow-hidden rounded-[14px] bg-white shadow-[var(--ff-shadow-sheet)]">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--ff-scrim)] p-6">
+          <div className="w-full max-w-[420px] overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-[var(--ff-shadow-sheet)]">
             <div className="px-[18px] pt-[18px] pb-1">
               <div className="text-[17px] font-bold tracking-tight">Create login for {loginFor.name}</div>
               <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">

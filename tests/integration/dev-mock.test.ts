@@ -40,14 +40,29 @@ describe("dev UniFi mock household", () => {
   it("seeds groups, an adult login, and assigned devices for UI work", async () => {
     await ensureDevDummyData();
     const groups = await prisma().group.findMany({ orderBy: { name: "asc" } });
-    expect(groups.map((group) => group.name)).toEqual(["Betsy", "Living Room", "Pat", "Sam"]);
+    // One group per comfortable-card layout: protected adult, scheduled child and
+    // teen, a paused member, and things groups with and without a schedule.
+    expect(groups.map((group) => group.name)).toEqual([
+      "Betsy",
+      "Living Room",
+      "Pat",
+      "Robin",
+      "Sam",
+      "Smart Home",
+    ]);
+    const paused = groups.find((group) => group.name === "Robin");
+    expect(paused?.suspensionActive).toBe(true);
+    expect(groups.find((group) => group.name === "Smart Home")?.monogram).toBe("IOT");
     const pat = await prisma().account.findUnique({ where: { username: DEV_SEED_ADULT_USERNAME } });
     expect(pat?.isAdmin).toBe(true);
     expect(await runReconcileOnce()).toBe(true);
     const devices = await prisma().device.findMany({ orderBy: { mac: "asc" } });
-    expect(devices.every((row) => row.assignment === AssignmentState.assigned)).toBe(true);
+    // One device is left unassigned so the Devices quarantine banner has a subject.
+    const loose = devices.filter((row) => row.assignment === AssignmentState.quarantined);
+    expect(loose.map((row) => row.hostname)).toEqual(["Guest Laptop"]);
+    expect(devices.filter((row) => row.assignment === AssignmentState.assigned)).toHaveLength(4);
     await ensureDevDummyData();
-    expect(await prisma().group.count()).toBe(4);
+    expect(await prisma().group.count()).toBe(6);
     expect(await prisma().account.count({ where: { username: DEV_SEED_ADULT_USERNAME } })).toBe(1);
   });
 });

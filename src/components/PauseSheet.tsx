@@ -73,9 +73,9 @@ export function PauseSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/32 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ff-scrim)] p-6" onClick={onClose}>
       <div
-        className="w-full max-w-[400px] overflow-hidden rounded-[14px] bg-white shadow-xl"
+        className="w-full max-w-[400px] overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="p-[18px]">

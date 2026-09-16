@@ -62,14 +62,14 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
         </div>
         <Link
           href={kind === "family" ? "/family/new" : "/things/new"}
-          className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-white"
+          className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
         >
           Add
         </Link>
       </header>
-      <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">
+      <div className="grid grid-cols-1 items-start gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">
         {rows.length === 0 ? (
-          <p className="rounded-[12px] bg-white p-[18px] text-[14px] text-[var(--ff-muted)] md:border md:border-[var(--ff-hairline-card)]">
+          <p className="rounded-[12px] bg-[var(--ff-card)] p-[18px] text-[14px] text-[var(--ff-muted)] md:border md:border-[var(--ff-hairline-card)]">
             Nothing here yet.
           </p>
         ) : (
