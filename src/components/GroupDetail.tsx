@@ -155,7 +155,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
                 if (action.href && action.label !== "Detail" && action.label !== "View devices") {
                   return (
                     <Link key={action.label} href={action.href} className={className}>
-                      {action.label === "Bedtime" || action.label === "Schedule" ? `Edit ${action.label.toLowerCase()}` : action.label}
+                      {action.label === "Rules" ? "Rules" : action.label}
                     </Link>
                   );
                 }

@@ -12,8 +12,8 @@ export function groupActions(
   mutate: ReturnType<typeof useAppData>["mutate"],
 ): CardAction[] {
   const href = group.kind === "family" ? `/family/${group.id}` : `/things/${group.id}`;
-  const scheduleHref = `/schedules#group-${group.id}`;
-  const scheduleWord = group.kind === "family" ? "Bedtime" : "Schedule";
+  const scheduleHref = `/rules#group-${group.id}`;
+  const scheduleWord = "Rules";
   const detail: CardAction = {
     label: group.kind === "family" && group.familyRole === "adult" ? "View devices" : "Detail",
     href,

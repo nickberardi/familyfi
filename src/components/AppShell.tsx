@@ -14,12 +14,14 @@ const NAV = [
     items: [
       { href: "/family", label: "Family" },
       { href: "/things", label: "Things" },
-      { href: "/schedules", label: "Schedules" },
     ],
   },
   {
     title: "Network",
-    items: [{ href: "/devices", label: "Devices" }],
+    items: [
+      { href: "/devices", label: "Devices" },
+      { href: "/rules", label: "Rules" },
+    ],
   },
   {
     title: "System",
