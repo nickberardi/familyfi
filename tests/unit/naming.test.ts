@@ -55,8 +55,6 @@ describe("naming conventions (AGENTS.md)", () => {
       readFileSync(file, "utf8")
         .split("\n")
         .forEach((line, i) => {
-          // LEGACY_POLICY_PREFIX is the one sanctioned "fam-" (see AGENTS.md).
-          if (line.includes("LEGACY_POLICY_PREFIX")) return;
           if (/\bFam[A-Z]|\bfam[-_][a-z]|\bfamRule/.test(line)) {
             offenders.push(`${rel(file)}:${i + 1}: ${line.trim()}`);
           }

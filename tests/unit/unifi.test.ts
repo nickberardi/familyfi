@@ -208,12 +208,10 @@ describe("mocked spike flow", () => {
     const client = new MockUnifiClient(state);
     const inventory = await discoverInventory(client);
     expect(inventory.applicationVersion).toBe("9.5.0");
-    const applied = await applyInternetBlocks(
-      client,
-      inventory,
-      ["02:00:00:00:00:01", "02:00:00:00:00:02"],
-      "local",
-    );
+    const applied = await applyInternetBlocks(client, inventory, [
+      "02:00:00:00:00:01",
+      "02:00:00:00:00:02",
+    ]);
     expect(applied.created).toHaveLength(2);
     expect(applied.created.every((policy) => policy.action.type === "BLOCK")).toBe(true);
     expect(applied.adminOrderPreserved).toBe(true);

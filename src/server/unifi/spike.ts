@@ -3,7 +3,7 @@ import type { UnifiClient } from "./client";
 import { UnifiHttpError } from "./errors";
 import { groupMacsBySourceZone, mapClientsToZones, selectExternalZone } from "./mapping";
 import { orderedPolicyIds, relativeOrderPreserved } from "./ordering";
-import { INTERNET_BLOCK_ACTION, internetBlockPolicy, isOwnedPolicyName, sanitizeInstallId, spikePolicyName, toPolicyUpdate } from "./payloads";
+import { INTERNET_BLOCK_ACTION, internetBlockPolicy, isOwnedPolicyName, spikePolicyName, toPolicyUpdate } from "./payloads";
 import type {
   ClientOverview,
   ClientZoneMapping,
@@ -131,9 +131,7 @@ export async function applyInternetBlocks(
   client: UnifiClient,
   inventory: SpikeInventory,
   macs: string[],
-  installId: string,
 ): Promise<SpikeApplyResult> {
-  void installId;
   const wanted = new Set(macs.map(normalizeMac));
   const selected = inventory.mappings.filter((mapping) => mapping.macAddress && wanted.has(mapping.macAddress));
   const missing = [...wanted].filter((mac) => !selected.some((mapping) => mapping.macAddress === mac));
@@ -222,9 +220,6 @@ export async function deletePolicies(
   return { deleted, failed };
 }
 
-export function ownedSpikePolicies(policies: FirewallPolicy[], installId: string): FirewallPolicy[] {
-  const legacy = `-${sanitizeInstallId(installId)}-spike-`;
-  return policies.filter(
-    (policy) => isOwnedPolicyName(policy.name) && (policy.name.includes(" Spike ") || policy.name.includes(legacy)),
-  );
+export function ownedSpikePolicies(policies: FirewallPolicy[]): FirewallPolicy[] {
+  return policies.filter((policy) => isOwnedPolicyName(policy.name) && policy.name.includes(" Spike "));
 }
