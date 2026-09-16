@@ -2,7 +2,7 @@ import { prisma } from "@/server/db";
 import { withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { clientForHousehold } from "@/server/unifi/connection";
-import { D6_CATEGORY_CANDIDATES, D6_MAP_STATUS, D6_OPTIONAL_ADULT_TOPSITES } from "@/server/unifi/d6-categories";
+import { D6_CATEGORY_CANDIDATES, D6_MAP_STATUS } from "@/server/unifi/d6-categories";
 import { UnifiConfigError } from "@/server/unifi/errors";
 
 export async function GET(request: Request) {
@@ -21,7 +21,6 @@ export async function GET(request: Request) {
         d6: {
           status: D6_MAP_STATUS,
           candidates: D6_CATEGORY_CANDIDATES,
-          optionalAdultTopsites: D6_OPTIONAL_ADULT_TOPSITES,
         },
       });
     } catch (error) {

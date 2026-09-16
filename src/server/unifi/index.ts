@@ -26,7 +26,7 @@ export { planDpiPolicies, plannedDpiKey, type PlannedDpiPolicy } from "./plan-dp
 export {
   D6_MAP_STATUS,
   D6_CATEGORY_CANDIDATES,
-  D6_OPTIONAL_ADULT_TOPSITES,
+  d6CategoryIds,
   d6ProvisionalIds,
 } from "./d6-categories";
 export { relativeOrderPreserved, orderedPolicyIds } from "./ordering";
