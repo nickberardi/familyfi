@@ -59,6 +59,42 @@ Destination zone: first of External, WAN, Internet (case-insensitive). Source: o
 
 Mocks and fixtures do not prove enforcement. `UNIFI_MOCK=1` routes Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; it is ignored in production. The spike CLI (`scripts/spike`) is for live gateway experiments; see [spike/OPERATOR.md](spike/OPERATOR.md).
 
+## Upstream DNS categories
+
+A second, independent signal: domain-list categories resolved through the household's
+own DoH endpoint to report whether something already blocks them. **Reporting only.**
+Nothing here creates, changes or deletes a UniFi policy, so these routes return no
+`change` object and never enqueue reconciliation. UniFi remains the sole enforcement
+path.
+
+A verdict has four values and the fourth carries the weight. Every canary blocked is
+`blocked`, some is `partial`, none is `open`, and any domain we could not resolve makes
+the category `unknown` regardless of the rest. A failed query is a failure to observe,
+not an observation: reporting `open` off a failed sweep would tell a parent nothing is
+filtered when the truth is that we do not know, and reporting `blocked` would be a false
+assurance. No configured endpoint, an undecryptable one and an empty list are all
+`unknown` for the same reason.
+
+`src/lib/upstream-domains.ts` is a **seed, not runtime data**. The probe reads the
+database. `ensureUpstreamCategories()` runs at every boot beside
+`ensureRecoveryAccount()` — the only place a real deployment creates app-owned rows,
+since `dev-seed` is `UNIFI_MOCK` only and a migration cannot import the seed module.
+Running every boot is what carries a release's new canaries into an existing household.
+A category's label and monogram follow the seed; domain membership does not. A seeded
+domain the household removed keeps its `removedAt` and is shown struck through, so the
+removal survives an upgrade and can be undone; a domain the household added is deleted
+outright. A domain that has left the shipped seed is left in place rather than deleted.
+
+Lists are uncapped. The twenty-per-category figure bounds what FamilyFi ships, not what
+a household may add, and the cost note under each list is how growth is priced.
+
+Unproven: the exact blocked-response shape of any specific provider, including NextDNS.
+The predicate accepts NXDOMAIN, a sinkhole address (`0.0.0.0` / `::`) and NOERROR with
+no address record, which covers the documented cases, but it has not been confirmed
+against a live profile. A group may carry its own endpoint, which changes what that
+group's devices resolve through; verdicts are still household-wide, because
+`UpstreamCheck` is keyed one row per category.
+
 ## Secrets
 
-Personal passwords are Argon2id hashes. The UniFi API key is AES-256-GCM encrypted with `FAMILYFI_ENCRYPTION_KEY`. The recovery admin password is never stored in the database; it is compared to `FAMILYFI_DEFAULT_PASSWORD` and printed in the server log at startup so an operator can find it. It is never returned by the API.
+Personal passwords are Argon2id hashes. The UniFi API key is AES-256-GCM encrypted with `FAMILYFI_ENCRYPTION_KEY`. The DoH endpoint — household and per-group override — is encrypted the same way, and masked to host only rather than last-four: a NextDNS path *is* the profile id, so its trailing characters are no use as a hint while still leaking a credential. The recovery admin password is never stored in the database; it is compared to `FAMILYFI_DEFAULT_PASSWORD` and printed in the server log at startup so an operator can find it. It is never returned by the API.
