@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   UPSTREAM_CATEGORIES,
   UPSTREAM_CATEGORY_DOMAINS,
+  UPSTREAM_CATEGORY_DOMAIN_LIMIT,
   upstreamProbeDomainCount,
   type UpstreamCategory,
 } from "@/lib/upstream-domains";
@@ -9,15 +10,36 @@ import {
 const DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
 describe("upstream canary domains", () => {
-  it("covers every category with exactly twenty domains", () => {
-    expect(UPSTREAM_CATEGORIES).toEqual(["adult", "video", "social", "gaming", "vpn", "messaging"]);
+  it("covers every category without exceeding the sample ceiling", () => {
+    expect(UPSTREAM_CATEGORIES).toEqual([
+      "adult",
+      "video",
+      "social",
+      "gaming",
+      "vpn",
+      "messaging",
+      "ai",
+      "gambling",
+      "dating",
+    ]);
     for (const category of UPSTREAM_CATEGORIES) {
-      expect(UPSTREAM_CATEGORY_DOMAINS[category], category).toHaveLength(20);
+      const domains = UPSTREAM_CATEGORY_DOMAINS[category];
+      // A short category is fine — a weak canary costs more than a missing one.
+      expect(domains.length, category).toBeGreaterThan(0);
+      expect(domains.length, category).toBeLessThanOrEqual(UPSTREAM_CATEGORY_DOMAIN_LIMIT);
     }
   });
 
-  it("keeps a daily run at 120 queries", () => {
-    expect(upstreamProbeDomainCount()).toBe(120);
+  /** The helper is what the scheduler budgets against, so it must not drift. */
+  it("counts the domains a single run queries", () => {
+    const expected = UPSTREAM_CATEGORIES.reduce(
+      (total, category) => total + UPSTREAM_CATEGORY_DOMAINS[category].length,
+      0,
+    );
+    expect(upstreamProbeDomainCount()).toBe(expected);
+    expect(upstreamProbeDomainCount()).toBeLessThanOrEqual(
+      UPSTREAM_CATEGORIES.length * UPSTREAM_CATEGORY_DOMAIN_LIMIT,
+    );
   });
 
   it("stores bare lowercase hostnames — no scheme, port, path or wildcard", () => {

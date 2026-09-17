@@ -1,12 +1,22 @@
 /** Client-safe canary domains for the upstream DNS category probe. */
 
-export type UpstreamCategory = "adult" | "video" | "social" | "gaming" | "vpn" | "messaging";
+export type UpstreamCategory =
+  | "adult"
+  | "video"
+  | "social"
+  | "gaming"
+  | "vpn"
+  | "messaging"
+  | "ai"
+  | "gambling"
+  | "dating";
 
 /**
  * These are a *sample*, not a blocklist. FamilyFi never blocks anything from
  * this file — the probe resolves each domain through the household resolver and
- * infers whether that category is filtered upstream. Twenty per category keeps a
- * daily run at 120 queries, small enough to be unremarkable to any resolver.
+ * infers whether that category is filtered upstream. Twenty per category is a
+ * ceiling, not a quota: a category that has fewer domains meeting the rules
+ * below carries fewer, because a weak canary costs more than a missing one.
  *
  * Selection rules, in order:
  *
@@ -24,7 +34,11 @@ export type UpstreamCategory = "adult" | "video" | "social" | "gaming" | "vpn" |
  * categories `audio-video`, `social_networks`, `games`, `vpn` — CC BY-SA, used
  * here only to check membership of a hand-picked sample, not redistributed.
  * Messaging is hand-picked: UT1's `chat` category is dominated by defunct chat
- * sites that fail rule 2, so it is the weakest category here.
+ * sites that fail rule 2, so it is the weakest category here. AI, gambling and
+ * dating come from the UT1 categories of the same names.
+ *
+ * `ai` and `dating` have no UniFi DPI slot, so DNS is the only layer that can
+ * report on them at all.
  */
 export const UPSTREAM_CATEGORY_DOMAINS: Record<UpstreamCategory, readonly string[]> = {
   adult: [
@@ -159,7 +173,76 @@ export const UPSTREAM_CATEGORY_DOMAINS: Record<UpstreamCategory, readonly string
     "chatroulette.com",
     "imvu.com",
   ],
+  ai: [
+    "chatgpt.com",
+    "openai.com",
+    "claude.ai",
+    "anthropic.com",
+    "gemini.google.com",
+    "copilot.microsoft.com",
+    "character.ai",
+    "perplexity.ai",
+    "deepseek.com",
+    "huggingface.co",
+    "mistral.ai",
+    "grok.com",
+    "poe.com",
+    "pi.ai",
+    "you.com",
+    "janitorai.com",
+    "llama.com",
+    "qwen.ai",
+    "suno.com",
+    "jasper.ai",
+  ],
+  gambling: [
+    "draftkings.com",
+    "fanduel.com",
+    "bet365.com",
+    "pokerstars.com",
+    "williamhill.com",
+    "betmgm.com",
+    "ladbrokes.com",
+    "bwin.com",
+    "888casino.com",
+    "unibet.com",
+    "paddypower.com",
+    "betfair.com",
+    "stake.com",
+    "roobet.com",
+    "bovada.lv",
+    "betway.com",
+    "partypoker.com",
+    "skybet.com",
+    "betrivers.com",
+    "pointsbet.com",
+  ],
+  /** Nineteen, not twenty: pof.com already covers Plenty of Fish. */
+  dating: [
+    "tinder.com",
+    "bumble.com",
+    "hinge.co",
+    "match.com",
+    "okcupid.com",
+    "pof.com",
+    "eharmony.com",
+    "grindr.com",
+    "zoosk.com",
+    "happn.com",
+    "coffeemeetsbagel.com",
+    "meetme.com",
+    "ashleymadison.com",
+    "jdate.com",
+    "christianmingle.com",
+    "elitesingles.com",
+    "silversingles.com",
+    "seeking.com",
+    "feeld.co",
+  ],
 };
+
+/** The ceiling on a category's sample — see the selection rules above. */
+export const UPSTREAM_CATEGORY_DOMAIN_LIMIT = 20;
 
 export const UPSTREAM_CATEGORIES = Object.keys(UPSTREAM_CATEGORY_DOMAINS) as UpstreamCategory[];
 
