@@ -307,6 +307,38 @@ describe("blocked-response predicate", () => {
     expect(isBlockedResponse(cloudflare)).toBe(false);
   });
 
+  /**
+   * Cloudflare for Families (1.1.1.3), measured live: it sinkholes *and* sends the
+   * EDE, so either branch alone would catch it. Kept because it is the shape that
+   * proves the two signals agree rather than compete.
+   */
+  it("reads a sinkhole carrying an EDE as blocked", () => {
+    const family = decodeResponse(
+      buildResponse({
+        id: 1,
+        question: { name: "pornhub.com", type: TYPE_A },
+        answers: [{ type: TYPE_A, rdata: V4_SINKHOLE }],
+        ede: { infoCode: 17, text: "Filtered" },
+      }),
+    );
+    expect(isBlockedResponse(family)).toBe(true);
+    expect(family.addresses[0]!.address).toBe("0.0.0.0");
+    expect(family.extendedError?.infoCode).toBe(17);
+  });
+
+  /** A resolver that sinkholes without an EDE is still caught — Pi-hole, AdGuard Home. */
+  it("reads a sinkhole with no EDE as blocked", () => {
+    const sinkholeOnly = decodeResponse(
+      buildResponse({
+        id: 1,
+        question: { name: "pornhub.com", type: TYPE_A },
+        answers: [{ type: TYPE_A, rdata: V4_SINKHOLE }],
+      }),
+    );
+    expect(sinkholeOnly.extendedError).toBeNull();
+    expect(isBlockedResponse(sinkholeOnly)).toBe(true);
+  });
+
   it("treats Blocked and Censored as filtered too, but not Prohibited", () => {
     const withCode = (infoCode: number) =>
       decodeResponse(
