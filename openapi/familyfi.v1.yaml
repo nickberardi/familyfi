@@ -1920,7 +1920,7 @@ components:
     UpstreamCheck:
       type: object
       additionalProperties: false
-      required: [verdict, blockedCount, totalCount, checkedAt, error]
+      required: [verdict, blockedCount, totalCount, checkedAt, error, groupId]
       properties:
         verdict:
           type: string
@@ -1930,10 +1930,13 @@ components:
         totalCount: { type: integer }
         checkedAt: { type: string, format: date-time }
         error: { type: [string, "null"] }
+        groupId:
+          type: [string, "null"]
+          description: The group this was measured for. Null is the household default.
     UpstreamCategory:
       type: object
       additionalProperties: false
-      required: [id, slug, label, monogram, source, enabled, domains, activeDomainCount, costNote, check]
+      required: [id, slug, label, monogram, source, enabled, domains, activeDomainCount, costNote, checks]
       properties:
         id: { type: string }
         slug: { type: string }
@@ -1948,10 +1951,14 @@ components:
           items: { $ref: "#/components/schemas/UpstreamDomain" }
         activeDomainCount: { type: integer }
         costNote: { type: string }
-        check:
-          oneOf:
-            - $ref: "#/components/schemas/UpstreamCheck"
-            - type: "null"
+        checks:
+          type: array
+          description: |
+            Every verdict measured for this category — the household default plus one
+            per group with its own resolver. A card resolves its own: a group with an
+            override reads the row carrying its id, any other group reads the row with
+            a null groupId.
+          items: { $ref: "#/components/schemas/UpstreamCheck" }
     UpstreamCategoryCreate:
       type: object
       additionalProperties: false

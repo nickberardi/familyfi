@@ -15,6 +15,15 @@ export type UpstreamCheckRow = {
   totalCount: number;
   checkedAt: string;
   error: string | null;
+  /** The group this verdict was measured for. Null is the household default. */
+  groupId: string | null;
+};
+
+/** What a card needs to know to resolve its own verdict. */
+export type UpstreamGroupContext = {
+  id: string;
+  /** Null means this group reads the household default. */
+  dohOverrideUrl: string | null;
 };
 
 export type UpstreamCategoryRow = {
@@ -27,7 +36,8 @@ export type UpstreamCategoryRow = {
   domains: UpstreamDomainRow[];
   activeDomainCount: number;
   costNote: string;
-  check: UpstreamCheckRow | null;
+  /** Every measured verdict. Resolve with `effectiveCheck`, never by indexing. */
+  checks: UpstreamCheckRow[];
 };
 
 export type UpstreamResolverSettings = {
@@ -75,6 +85,33 @@ const VERDICT: Record<UpstreamVerdictValue, VerdictStyle> = {
 
 export function verdictStyle(check: UpstreamCheckRow | null): VerdictStyle {
   return VERDICT[check?.verdict ?? "unknown"];
+}
+
+/**
+ * The verdict for a card, in that card's own resolver context.
+ *
+ * A group with its own endpoint is filtered differently from the rest of the house, so
+ * its card must show its own answer wherever it appears — beside a sibling on Family,
+ * on its own detail page, anywhere. A group without an override reads the household
+ * default. Passing no group asks the household question.
+ *
+ * This is the only place that rule lives. Read a row out of `checks` directly and a
+ * card will sooner or later show someone else's answer.
+ */
+export function effectiveCheck(
+  checks: UpstreamCheckRow[],
+  group?: UpstreamGroupContext | null,
+): UpstreamCheckRow | null {
+  if (group?.dohOverrideUrl) {
+    // Measured for this group. Absent only until the first sweep after the override.
+    return checks.find((check) => check.groupId === group.id) ?? null;
+  }
+  return checks.find((check) => check.groupId === null) ?? null;
+}
+
+/** Whether a card is reporting its own endpoint rather than the household's. */
+export function usesOwnResolver(group?: UpstreamGroupContext | null): boolean {
+  return Boolean(group?.dohOverrideUrl);
 }
 
 /**

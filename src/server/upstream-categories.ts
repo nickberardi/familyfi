@@ -15,6 +15,8 @@ export type PublicUpstreamCheck = {
   totalCount: number;
   checkedAt: string;
   error: string | null;
+  /** Null is the household default; a group id is that group's own resolver. */
+  groupId: string | null;
 };
 
 export type PublicUpstreamCategory = {
@@ -27,12 +29,17 @@ export type PublicUpstreamCategory = {
   domains: PublicUpstreamDomain[];
   activeDomainCount: number;
   costNote: string;
-  check: PublicUpstreamCheck | null;
+  /**
+   * Every verdict measured for this category — the household default plus one per
+   * group with its own resolver. The caller picks with `effectiveCheck` rather than
+   * the server guessing a context, so the rule lives in exactly one function.
+   */
+  checks: PublicUpstreamCheck[];
 };
 
 type CategoryWithChildren = UpstreamCategory & {
   domains: UpstreamDomain[];
-  check?: UpstreamCheck | null;
+  checks?: UpstreamCheck[];
 };
 
 /**
@@ -59,7 +66,7 @@ export function publicUpstreamCategory(category: CategoryWithChildren): PublicUp
     domains,
     activeDomainCount,
     costNote: probeCostNote(activeDomainCount),
-    check: category.check ? publicUpstreamCheck(category.check) : null,
+    checks: (category.checks ?? []).map(publicUpstreamCheck),
   };
 }
 
@@ -70,6 +77,7 @@ export function publicUpstreamCheck(check: UpstreamCheck): PublicUpstreamCheck {
     totalCount: check.totalCount,
     checkedAt: check.checkedAt.toISOString(),
     error: check.error,
+    groupId: check.groupId,
   };
 }
 

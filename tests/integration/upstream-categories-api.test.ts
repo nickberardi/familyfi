@@ -12,6 +12,7 @@ import {
 } from "@/app/api/v1/upstream/categories/[id]/route";
 import { prisma } from "@/server/db";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
+import { effectiveCheck, type UpstreamCheckRow } from "@/lib/upstream";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -39,7 +40,7 @@ type PublicCategory = {
   domains: { domain: string; source: "seed" | "user"; removed: boolean }[];
   activeDomainCount: number;
   costNote: string;
-  check: { verdict: string; blockedCount: number; totalCount: number } | null;
+  checks: UpstreamCheckRow[];
 };
 
 async function categories(auth: Awaited<ReturnType<typeof signedIn>>) {
@@ -85,7 +86,8 @@ describe("upstream categories API", () => {
     expect(video.monogram).toBe("VID");
     expect(video.activeDomainCount).toBe(20);
     expect(video.costNote).toMatch(/A full pass takes about \d+s\./);
-    expect(video.check).toBeNull();
+    expect(video.checks).toEqual([]);
+    expect(effectiveCheck(video.checks)).toBeNull();
     expect(video.domains.every((domain) => domain.source === "seed")).toBe(true);
   });
 
@@ -197,8 +199,11 @@ describe("upstream categories API", () => {
     expect(response.status).toBe(200);
     const after = (await response.json()).category as PublicCategory;
     expect(after.enabled).toBe(false);
-    expect(after.check?.verdict).toBe("partial");
-    expect(after.check?.blockedCount).toBe(6);
+    // The household verdict, resolved the way a card resolves it.
+    const held = effectiveCheck(after.checks);
+    expect(held?.verdict).toBe("partial");
+    expect(held?.blockedCount).toBe(6);
+    expect(held?.groupId).toBeNull();
   });
 
   it("refuses to rename or delete a built-in category", async () => {
