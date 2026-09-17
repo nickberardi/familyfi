@@ -72,7 +72,7 @@ A verdict has four values and the fourth carries the weight. Every canary blocke
 the category `unknown` regardless of the rest. A failed query is a failure to observe,
 not an observation: reporting `open` off a failed sweep would tell a parent nothing is
 filtered when the truth is that we do not know, and reporting `blocked` would be a false
-assurance. No configured endpoint, an undecryptable one and an empty list are all
+assurance. No configured endpoint, an unreachable one and an empty list are all
 `unknown` for the same reason.
 
 `src/lib/upstream-domains.ts` is a **seed, not runtime data**. The probe reads the

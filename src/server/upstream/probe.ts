@@ -94,7 +94,7 @@ export async function probeCategory(
   try {
     resolve = options.resolve ?? (await resolverForSweep(options.timeoutMs ?? 0, options.fetchImpl));
   } catch (error) {
-    // No endpoint, or an undecryptable one: unknown, never open.
+    // No endpoint configured: unknown, never open.
     const message = error instanceof Error ? error.message : String(error);
     const rollup = await recordCheck(
       category.id,
