@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import {
   activeDomainList,
   checkedAgo,
+  effectiveCheck,
   enabledNoteText,
   sourceNoteText,
   verdictDetailText,
@@ -96,7 +97,8 @@ export default function CategoryDetailPage() {
     );
   }
 
-  const style = verdictStyle(category.check);
+  const check = effectiveCheck(category.checks);
+  const style = verdictStyle(check);
   const active = activeDomainList(category.domains);
 
   return (
@@ -143,8 +145,8 @@ export default function CategoryDetailPage() {
           </button>
         </div>
         <p className="mt-2 mb-0 text-[12.5px]" style={{ color: "var(--ff-ink-3)" }}>
-          {verdictDetailText(category.check)}
-          {category.check ? ` · checked ${checkedAgo(category.check.checkedAt)}` : ""}
+          {verdictDetailText(check)}
+          {check ? ` · checked ${checkedAgo(check.checkedAt)}` : ""}
         </p>
 
         <div

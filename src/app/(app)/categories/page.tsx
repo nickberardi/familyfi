@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
+  effectiveCheck,
   verdictDetailText,
   verdictStyle,
   type UpstreamCategoryRow,
@@ -128,7 +129,9 @@ export default function CategoriesPage() {
           </div>
 
           {categories.map((category) => {
-            const style = verdictStyle(category.check);
+            // This page is the household context, so no group is passed.
+            const check = effectiveCheck(category.checks);
+            const style = verdictStyle(check);
             return (
               <div
                 key={category.id}
@@ -143,7 +146,7 @@ export default function CategoriesPage() {
                 >
                   <span className="block text-[14px] font-semibold">{category.label}</span>
                   <span className="block text-[12px]" style={{ color: "var(--ff-ink-3)" }}>
-                    {category.activeDomainCount} domains · {verdictDetailText(category.check)}
+                    {category.activeDomainCount} domains · {verdictDetailText(check)}
                   </span>
                 </Link>
                 <span

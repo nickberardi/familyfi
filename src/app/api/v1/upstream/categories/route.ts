@@ -17,7 +17,7 @@ import {
 export async function GET(request: Request) {
   return withSession(request, async () => {
     const categories = await prisma().upstreamCategory.findMany({
-      include: { domains: true, check: true },
+      include: { domains: true, checks: true },
       orderBy: [{ source: "asc" }, { label: "asc" }],
     });
     return Response.json({ categories: categories.map(publicUpstreamCategory) });
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
           create: domains.map((domain) => ({ domain, source: UpstreamSource.user })),
         },
       },
-      include: { domains: true, check: true },
+      include: { domains: true, checks: true },
     });
     return Response.json({ category: publicUpstreamCategory(category) }, { status: 201 });
   });

@@ -13,7 +13,7 @@ import {
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const WITH_CHILDREN = { domains: true, check: true } as const;
+const WITH_CHILDREN = { domains: true, checks: true } as const;
 
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {

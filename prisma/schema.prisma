@@ -89,26 +89,27 @@ model Household {
 }
 
 model Group {
-  id               String      @id @default(cuid())
+  id               String          @id @default(cuid())
   kind             GroupKind
   name             String
   monogram         String?
   familyRole       FamilyRole?
-  protected        Boolean     @default(false)
-  mode             GroupMode   @default(always)
-  scheduleEnabled  Boolean     @default(false)
-  scheduleDays     Int[]       @default([])
+  protected        Boolean         @default(false)
+  mode             GroupMode       @default(always)
+  scheduleEnabled  Boolean         @default(false)
+  scheduleDays     Int[]           @default([])
   scheduleStart    String?
   scheduleEnd      String?
-  suspensionActive Boolean     @default(false)
+  suspensionActive Boolean         @default(false)
   suspensionUntil  DateTime?
   dohOverrideUrl   String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   devices          Device[]
   accounts         Account[]
   appPolicies      AppPolicy[]
   rules            Rule[]
+  upstreamChecks   UpstreamCheck[]
 }
 
 model Account {
@@ -314,7 +315,7 @@ model UpstreamCategory {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   domains   UpstreamDomain[]
-  check     UpstreamCheck?
+  checks    UpstreamCheck[]
 
   @@index([source])
 }
@@ -335,8 +336,12 @@ model UpstreamDomain {
 
 model UpstreamCheck {
   id           String           @id @default(cuid())
-  categoryId   String           @unique
+  categoryId   String
   category     UpstreamCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  /// The group this verdict was measured for. Null is the household default, which is
+  /// what every group without its own endpoint reads.
+  groupId      String?
+  group        Group?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
   verdict      UpstreamVerdict
   blockedCount Int
   totalCount   Int
@@ -345,5 +350,7 @@ model UpstreamCheck {
   durationMs   Int
   error        String?
 
+  @@unique([categoryId, groupId])
   @@index([checkedAt])
+  @@index([groupId])
 }

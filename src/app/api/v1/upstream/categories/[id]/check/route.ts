@@ -20,7 +20,7 @@ export async function POST(request: Request, ctx: Ctx) {
     await probeCategory(id);
     const category = await prisma().upstreamCategory.findUnique({
       where: { id },
-      include: { domains: true, check: true },
+      include: { domains: true, checks: true },
     });
     if (!category) return jsonError(404, "not_found", "Category not found.");
     return Response.json({ category: publicUpstreamCategory(category) });
