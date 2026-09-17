@@ -1477,6 +1477,81 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/resolver:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: setGroupResolver
+      tags: [Upstream]
+      summary: Point this group's upstream checks at its own endpoint
+      description: |
+        Reporting only, like the rest of Upstream. This changes which resolver FamilyFi
+        asks about this group, so its category verdicts describe its own devices
+        instead of the household's. It does not change what reaches those devices —
+        pointing them at the resolver is a DHCP or client-side job.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: { type: string, description: Absolute https URL. }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: clearGroupResolver
+      tags: [Upstream]
+      summary: Return this group to the household endpoint
+      description: |
+        Drops the group's own verdicts with the override. They describe an endpoint it
+        no longer uses, and keeping them would leave a stale answer on its cards until
+        the next sweep.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     cookieAuth:
@@ -1801,7 +1876,7 @@ components:
     Group:
       type: object
       additionalProperties: false
-      required: [id, kind, name, protected, mode, deviceCount, schedule, suspension, access]
+      required: [id, kind, name, protected, mode, deviceCount, schedule, suspension, access, dohOverrideUrl]
       properties:
         id: { type: string }
         kind: { type: string, enum: [family, things] }
@@ -1814,6 +1889,11 @@ components:
         schedule: { $ref: "#/components/schemas/Schedule" }
         suspension: { $ref: "#/components/schemas/Suspension" }
         access: { type: string, enum: [available, blocked, paused, protected, always_on] }
+        dohOverrideUrl:
+          type: [string, "null"]
+          description: |
+            This group's own DoH endpoint, or null to read the household default. A card
+            uses it to resolve its own upstream verdict rather than the household's.
     GroupCreate:
       type: object
       additionalProperties: false

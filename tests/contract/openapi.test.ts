@@ -27,6 +27,7 @@ describe("openapi contract", () => {
         "/api/v1/groups/{id}",
         "/api/v1/groups/{id}/extend",
         "/api/v1/groups/{id}/pause",
+        "/api/v1/groups/{id}/resolver",
         "/api/v1/groups/{id}/resume",
         "/api/v1/groups/{id}/schedule",
         "/api/v1/health",

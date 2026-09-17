@@ -46,6 +46,7 @@ export function publicGroup(
     scheduleEnd: string | null;
     suspensionActive: boolean;
     suspensionUntil: Date | null;
+    dohOverrideUrl?: string | null;
     _count?: { devices: number };
   },
   timezone: string,
@@ -58,6 +59,11 @@ export function publicGroup(
     monogram: group.monogram,
     familyRole: group.familyRole,
     protected: group.protected,
+    /**
+     * Null means this group reads the household resolver. A card needs it to resolve
+     * its own upstream verdict rather than showing the household's.
+     */
+    dohOverrideUrl: group.dohOverrideUrl ?? null,
     mode: group.mode,
     deviceCount: group._count?.devices ?? 0,
     schedule: {

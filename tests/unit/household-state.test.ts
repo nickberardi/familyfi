@@ -19,6 +19,7 @@ function group(overrides: Partial<Group> = {}): Group {
     deviceCount: 1,
     schedule: { enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" },
     suspension: { active: false, until: null },
+    dohOverrideUrl: null,
     access: "available",
     ...overrides,
   };
