@@ -21,6 +21,9 @@ export async function resetDatabase() {
   await db.policyOperation.deleteMany();
   await db.rulePolicy.deleteMany();
   await db.rule.deleteMany();
+  await db.upstreamCheck.deleteMany();
+  await db.upstreamDomain.deleteMany();
+  await db.upstreamCategory.deleteMany();
   await db.appPolicy.deleteMany();
   await db.device.deleteMany();
   await db.session.deleteMany();

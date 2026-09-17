@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   UPSTREAM_CATEGORIES,
   UPSTREAM_CATEGORY_DOMAINS,
-  UPSTREAM_CATEGORY_DOMAIN_LIMIT,
+  UPSTREAM_SEED_CATEGORIES,
+  UPSTREAM_SEED_DOMAIN_CEILING,
   upstreamProbeDomainCount,
   type UpstreamCategory,
 } from "@/lib/upstream-domains";
@@ -26,7 +27,16 @@ describe("upstream canary domains", () => {
       const domains = UPSTREAM_CATEGORY_DOMAINS[category];
       // A short category is fine — a weak canary costs more than a missing one.
       expect(domains.length, category).toBeGreaterThan(0);
-      expect(domains.length, category).toBeLessThanOrEqual(UPSTREAM_CATEGORY_DOMAIN_LIMIT);
+      expect(domains.length, category).toBeLessThanOrEqual(UPSTREAM_SEED_DOMAIN_CEILING);
+    }
+  });
+
+  /** The reconcile reads both, so a category present in one and not the other would half-seed. */
+  it("carries seed metadata for every category and no others", () => {
+    expect(UPSTREAM_SEED_CATEGORIES.map((seed) => seed.slug)).toEqual(UPSTREAM_CATEGORIES);
+    for (const seed of UPSTREAM_SEED_CATEGORIES) {
+      expect(seed.label.length, seed.slug).toBeGreaterThan(0);
+      expect(seed.monogram, seed.slug).toMatch(/^[A-Z0-9+]{1,3}$/);
     }
   });
 
@@ -38,7 +48,7 @@ describe("upstream canary domains", () => {
     );
     expect(upstreamProbeDomainCount()).toBe(expected);
     expect(upstreamProbeDomainCount()).toBeLessThanOrEqual(
-      UPSTREAM_CATEGORIES.length * UPSTREAM_CATEGORY_DOMAIN_LIMIT,
+      UPSTREAM_CATEGORIES.length * UPSTREAM_SEED_DOMAIN_CEILING,
     );
   });
 
