@@ -13,6 +13,7 @@ function group(partial: Partial<Group> & Pick<Group, "id" | "name">): Group {
     deviceCount: 2,
     schedule: { enabled: true, days: [1, 2, 3], start: "21:00", end: "07:00" },
     suspension: { active: false, until: null },
+    dohOverrideUrl: null,
     access: "available",
     ...partial,
   };

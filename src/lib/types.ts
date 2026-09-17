@@ -12,6 +12,11 @@ export type Group = {
   schedule: { enabled: boolean; days: number[]; start: string | null; end: string | null };
   suspension: { active: boolean; until: string | null };
   access: GroupAccess;
+  /**
+   * This group's own DNS-over-HTTPS endpoint, or null to read the household default.
+   * A card passes itself to `effectiveCheck` so it reports its own resolver's verdict.
+   */
+  dohOverrideUrl: string | null;
 };
 
 export type Device = {

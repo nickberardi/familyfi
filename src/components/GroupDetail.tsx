@@ -10,6 +10,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { GroupFilterMarks } from "@/components/FilterMarks";
 import { PauseSheet } from "@/components/PauseSheet";
 import { ScheduleBar } from "@/components/GroupCard";
+import { GroupResolverCard } from "@/components/upstream/GroupResolverCard";
 import { groupActions } from "@/components/group-actions";
 import type { Group } from "@/lib/types";
 
@@ -105,11 +106,22 @@ function GroupEditForm({ group }: { group: Group }) {
 
 export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
   const router = useRouter();
-  const { groups, devices, household, mutate, loading } = useAppData();
+  const { groups, devices, household, mutate, reload, loading } = useAppData();
+  const [resolverConfigured, setResolverConfigured] = useState(false);
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
+
+  // Only to tell a member card whether a household default exists to fall back to.
+  useEffect(() => {
+    const start = window.setTimeout(() => {
+      void api<{ resolver: { configured: boolean } }>("/api/v1/upstream/resolver")
+        .then((res) => setResolverConfigured(res.resolver.configured))
+        .catch(() => setResolverConfigured(false));
+    }, 0);
+    return () => window.clearTimeout(start);
+  }, []);
 
   const loadRules = useCallback(async () => {
     try {
@@ -222,6 +234,13 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           />
         ) : null}
       </section>
+      <GroupResolverCard
+        groupId={group.id}
+        groupName={group.name}
+        dohOverrideUrl={group.dohOverrideUrl ?? null}
+        householdConfigured={Boolean(resolverConfigured)}
+        onChanged={() => void reload()}
+      />
       <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
         <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
         {members.length === 0 ? (

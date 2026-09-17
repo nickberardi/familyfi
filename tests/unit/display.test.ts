@@ -26,6 +26,7 @@ function group(overrides: Partial<Group> = {}): Group {
     deviceCount: 4,
     schedule: { enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" },
     suspension: { active: false, until: null },
+    dohOverrideUrl: null,
     access: "available",
     ...overrides,
   };
@@ -46,6 +47,7 @@ describe("schedule copy", () => {
     expect(
       cardStateLabel(
         group({
+          dohOverrideUrl: null,
           access: "paused",
           suspension: { active: true, until: "2026-09-14T20:00:00-04:00" },
         }),
@@ -104,6 +106,7 @@ describe("always mode", () => {
         group({
           mode: "always",
           schedule: { enabled: false, days: [], start: null, end: null },
+          dohOverrideUrl: null,
           access: "always_on",
         }),
       ),

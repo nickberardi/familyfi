@@ -88,6 +88,21 @@ outright. A domain that has left the shipped seed is left in place rather than d
 Lists are uncapped. The twenty-per-category figure bounds what FamilyFi ships, not what
 a household may add, and the cost note under each list is how growth is priced.
 
+A verdict belongs to a resolver, not to a category. A group may carry its own endpoint
+(`Group.dohOverrideUrl`), and `UpstreamCheck` is keyed `(categoryId, groupId)` with a
+null group meaning the household default — so a card reports for the devices it actually
+has rather than for the rest of the house. `effectiveCheck()` is the only place that
+resolution happens; a card asks with its own group, and reading a row out of the array
+directly is how a card ends up showing someone else's answer. Between setting an
+override and the next sweep a group has no row, and that reports as "not checked"
+rather than borrowing the household's.
+
+The unique index is written by hand as `NULLS NOT DISTINCT`: Postgres treats every NULL
+as distinct, so the plain index Prisma generates would let a sweep and a "Check now"
+each insert their own household row. Sweeps run once per distinct endpoint, so groups
+sharing an override share a pass. The override changes what FamilyFi *asks about* a
+group — pointing its devices at that resolver is a DHCP or client-side job.
+
 Transport is RFC 8484 wire format (`application/dns-message`) over POST, which every
 conforming resolver must accept, so the probe works against any DoH endpoint rather
 than the subset that also serves the non-standard `application/dns-json` API.
