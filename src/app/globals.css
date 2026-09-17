@@ -83,6 +83,33 @@
   /* Rules tree indents. */
   --ff-rule-indent: 34px;
   --ff-rule-detail-indent: 39px;
+
+  /*
+   * Upstream verdict chips. Four states, each needing its own ink, fill and line,
+   * because the design sets the border independently of the fill. Blocked reuses the
+   * green "on" ink, partial the paused amber, open the neutral ink ladder, and
+   * unknown stays deliberately colourless: it means we could not look, so it must
+   * not read as either good or bad news.
+   */
+  --ff-verdict-blocked-ink: #1e7a34;
+  --ff-verdict-blocked-fill: rgba(52, 199, 89, 0.14);
+  --ff-verdict-blocked-line: rgba(52, 199, 89, 0.32);
+  --ff-verdict-partial-ink: #8a4300;
+  --ff-verdict-partial-fill: rgba(192, 76, 0, 0.1);
+  --ff-verdict-partial-line: rgba(192, 76, 0, 0.3);
+  --ff-verdict-open-ink: rgba(60, 60, 67, 0.75);
+  --ff-verdict-open-fill: rgba(120, 120, 128, 0.1);
+  --ff-verdict-open-line: rgba(60, 60, 67, 0.18);
+  --ff-verdict-unknown-ink: rgba(60, 60, 67, 0.6);
+  --ff-verdict-unknown-fill: rgba(120, 120, 128, 0.06);
+  --ff-verdict-unknown-line: rgba(60, 60, 67, 0.14);
+
+  /* Category monogram tiles: built-in reads as chrome, custom as the accent family. */
+  --ff-mono-seed-fill: #2c2c2e;
+  --ff-mono-user-fill: #5854d6;
+
+  /* A struck-through seeded domain the household removed. */
+  --ff-ink-struck: rgba(60, 60, 67, 0.4);
 }
 
 html {

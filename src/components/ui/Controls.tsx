@@ -35,6 +35,68 @@ export function TimeField({
   );
 }
 
+/**
+ * A single-line text input. Replaces the three hand-rolled input styles that had
+ * grown up separately in the settings page, the new-rule sheet and the group form.
+ */
+export function TextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+  maxLength,
+  onSubmit,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  maxLength?: number;
+  /** Fires on Enter, so an add-row works without a surrounding form. */
+  onSubmit?: () => void;
+  mono?: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      aria-label={label}
+      disabled={disabled}
+      value={value}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      onChange={(event) => onChange(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && onSubmit) {
+          event.preventDefault();
+          onSubmit();
+        }
+      }}
+      className={`w-full min-w-0 rounded-[7px] border px-[10px] py-[7px] text-[13.5px] outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
+        mono ? "font-mono" : ""
+      }`}
+      style={{ borderColor: "var(--ff-input-line)", background: "var(--ff-card)" }}
+    />
+  );
+}
+
+/** Label over a control, the shape the sheets had been repeating inline. */
+export function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span
+        className="mb-1.5 block text-[12px] font-semibold"
+        style={{ color: "var(--ff-ink-3)" }}
+      >
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
 /** The On/Off pill that ends each rule row. */
 export function TogglePill({
   on,
