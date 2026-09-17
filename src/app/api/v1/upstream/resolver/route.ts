@@ -5,9 +5,9 @@ import { jsonError } from "@/server/http";
 import { ResolverConfigError, encryptResolverUrl } from "@/server/upstream/resolver-settings";
 
 /**
- * The household DNS-over-HTTPS endpoint. The URL itself is never returned — a
- * NextDNS path carries the profile id, which is bearer-ish — so reads get the mask
- * and writes are replace-only, the same shape as the UniFi API key.
+ * The household DNS-over-HTTPS endpoint. The URL itself is never returned — a path
+ * often carries an account or profile id, which is bearer-ish — so reads get the
+ * mask and writes are replace-only, the same shape as the UniFi API key.
  */
 export async function GET(request: Request) {
   return withSession(request, async () => {

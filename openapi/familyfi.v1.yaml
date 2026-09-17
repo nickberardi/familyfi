@@ -1407,8 +1407,8 @@ paths:
       tags: [Upstream]
       summary: Household DNS-over-HTTPS endpoint (masked)
       description: |
-        The URL is never returned. A NextDNS path carries the profile id, which anyone
-        holding can query through, so reads get a host-only mask and writes replace.
+        The URL is never returned. A path often carries an account or profile id, which
+        anyone holding can query through, so reads get a host-only mask and writes replace.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200":
@@ -2003,7 +2003,7 @@ components:
         configured: { type: boolean }
         mask:
           type: [string, "null"]
-          description: Host only, e.g. https://dns.nextdns.io/••••••
+          description: Host only, e.g. https://dns.example.com/••••••
         probeEnabled: { type: boolean }
         intervalMinutes: { type: integer }
         timeoutMs: { type: integer }

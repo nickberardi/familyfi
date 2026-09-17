@@ -1,18 +1,24 @@
 /**
- * DNS-over-HTTPS probe client (RFC 8484 JSON, `application/dns-json`).
+ * DNS-over-HTTPS probe client, RFC 8484.
  *
- * JSON rather than wireformat so there is no new dependency. If a resolver turns out
- * not to serve `application/dns-json`, the fallback is `dns-packet` behind the same
- * `DohResolver` interface — nothing above this module needs to change.
- *
- * NOT YET CONFIRMED against a live NextDNS profile: the exact blocked-response shape
- * is unverified, because this environment has no egress to any DoH provider. The
- * predicate below covers every documented way a filtering resolver signals a block,
- * so it should hold, but `make spike SPIKE_ARGS=doh` against real hardware is what
- * settles it.
+ * Wire format (`application/dns-message`) over POST, which RFC 8484 requires every
+ * conforming resolver to accept. That is the whole reason to prefer it: the probe
+ * works against any DoH endpoint a household points it at, with no per-provider
+ * response shape to guess.
  */
 
-/** Per-domain outcome. `unknown` is a failure to observe, never an observation. */
+import {
+  RCODE_NXDOMAIN,
+  TYPE_A,
+  TYPE_AAAA,
+  decodeResponse,
+  encodeQuery,
+  type DnsResponse,
+} from "./dns-message";
+
+export const DNS_MESSAGE_MEDIA_TYPE = "application/dns-message";
+
+/** Per-domain outcome. `blocked: null` is a failure to observe, never an observation. */
 export type DomainProbe = {
   domain: string;
   blocked: boolean | null;
@@ -23,53 +29,43 @@ export type DomainProbe = {
 
 export type DohResolver = (domain: string) => Promise<DomainProbe>;
 
-type DnsJsonAnswer = { name?: string; type?: number; TTL?: number; data?: string };
-type DnsJsonResponse = { Status?: number; Answer?: DnsJsonAnswer[] };
-
-const RCODE_NXDOMAIN = 3;
-const TYPE_A = 1;
-const TYPE_AAAA = 28;
-
-/** Addresses a filtering resolver returns to mean "nothing here". */
-const SINKHOLE = new Set(["0.0.0.0", "::", "0:0:0:0:0:0:0:0"]);
+/**
+ * Addresses a filtering resolver returns to mean "nothing here". Emitted in the
+ * canonical forms `dns-message.ts` produces, plus the compressed IPv6 spelling in
+ * case an address reaches this predicate from elsewhere.
+ */
+const SINKHOLE = new Set(["0.0.0.0", "0:0:0:0:0:0:0:0", "::"]);
 
 /**
  * True when the response says this name is filtered. Any one of:
  *
  * - NXDOMAIN — the resolver denies the name exists
- * - a sinkhole address (`0.0.0.0` / `::`), which is what NextDNS returns by default
- * - NOERROR with no address record at all (NODATA)
+ * - every address is a sinkhole (`0.0.0.0` / `::`)
+ * - NOERROR with no address record at all (NODATA), including a CNAME that leads
+ *   nowhere
  *
- * The NXDOMAIN case is also how a *dead* domain answers, which is why the canary
- * list is liveness-checked: a domain that has ceased to exist would otherwise be
- * counted as blocked and inflate the verdict.
+ * NXDOMAIN is also how a domain that has ceased to exist answers, which is why the
+ * shipped canaries were liveness-checked: a dead canary would otherwise be counted as
+ * blocked and inflate the verdict.
  */
-export function isBlockedResponse(response: DnsJsonResponse): boolean {
-  if (response.Status === RCODE_NXDOMAIN) return true;
-  const addresses = (response.Answer ?? []).filter(
-    (answer) => answer.type === TYPE_A || answer.type === TYPE_AAAA,
-  );
-  if (addresses.length === 0) return true;
-  return addresses.every((answer) => SINKHOLE.has((answer.data ?? "").trim()));
+export function isBlockedResponse(response: DnsResponse): boolean {
+  if (response.rcode === RCODE_NXDOMAIN) return true;
+  if (response.addresses.length === 0) return true;
+  return response.addresses.every((answer) => SINKHOLE.has(answer.address));
 }
 
-export function answerAddresses(response: DnsJsonResponse): string[] {
-  return (response.Answer ?? [])
-    .filter((answer) => answer.type === TYPE_A || answer.type === TYPE_AAAA)
-    .map((answer) => (answer.data ?? "").trim())
-    .filter(Boolean);
+export function answerAddresses(response: DnsResponse): string[] {
+  return response.addresses.map((answer) => answer.address);
 }
 
-function queryUrl(resolverUrl: string, domain: string): string {
-  const url = new URL(resolverUrl);
-  url.searchParams.set("name", domain);
-  url.searchParams.set("type", "A");
-  return url.toString();
+function randomId(): number {
+  return Math.floor(Math.random() * 0x10000);
 }
 
 /**
- * Builds a resolver bound to one endpoint. A transport failure yields
- * `blocked: null` — the probe must never read "could not ask" as "not blocked".
+ * Binds a resolver to one endpoint. Queries A first and only asks for AAAA when the
+ * A answer looks filtered, so a household running IPv4-only does not get a false
+ * `blocked` from a name that simply has no A record.
  */
 export function dohResolver(input: {
   resolverUrl: string;
@@ -77,34 +73,57 @@ export function dohResolver(input: {
   fetchImpl?: typeof fetch;
 }): DohResolver {
   const doFetch = input.fetchImpl ?? fetch;
-  return async (domain: string): Promise<DomainProbe> => {
+
+  async function ask(domain: string, type: number): Promise<DnsResponse> {
+    const id = randomId();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), input.timeoutMs);
     try {
-      const response = await doFetch(queryUrl(input.resolverUrl, domain), {
-        headers: { accept: "application/dns-json" },
+      const response = await doFetch(input.resolverUrl, {
+        method: "POST",
+        headers: {
+          "content-type": DNS_MESSAGE_MEDIA_TYPE,
+          accept: DNS_MESSAGE_MEDIA_TYPE,
+        },
+        body: encodeQuery(domain, type, id),
         signal: controller.signal,
       });
-      if (!response.ok) {
-        return { domain, blocked: null, rcode: null, answers: [], error: `HTTP ${response.status}` };
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const decoded = decodeResponse(new Uint8Array(await response.arrayBuffer()));
+      // A mismatched id means this answer is not for the question we asked.
+      if (decoded.id !== id) throw new Error("Response id did not match the query.");
+      return decoded;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return async (domain: string): Promise<DomainProbe> => {
+    try {
+      const v4 = await ask(domain, TYPE_A);
+      if (!isBlockedResponse(v4)) {
+        return { domain, blocked: false, rcode: v4.rcode, answers: answerAddresses(v4) };
       }
-      const body = (await response.json()) as DnsJsonResponse;
+      // NXDOMAIN is authoritative for the whole name, so AAAA cannot contradict it.
+      if (v4.rcode === RCODE_NXDOMAIN) {
+        return { domain, blocked: true, rcode: v4.rcode, answers: [] };
+      }
+      const v6 = await ask(domain, TYPE_AAAA);
+      const blocked = isBlockedResponse(v6);
       return {
         domain,
-        blocked: isBlockedResponse(body),
-        rcode: body.Status ?? null,
-        answers: answerAddresses(body),
+        blocked,
+        rcode: v6.rcode,
+        answers: [...answerAddresses(v4), ...answerAddresses(v6)],
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { domain, blocked: null, rcode: null, answers: [], error: message };
-    } finally {
-      clearTimeout(timer);
     }
   };
 }
 
-/** Resolves `domains` with at most `concurrency` requests in flight, input order preserved. */
+/** Resolves `domains` with at most `concurrency` requests in flight, input order kept. */
 export async function probeDomains(
   domains: string[],
   resolve: DohResolver,
@@ -122,3 +141,5 @@ export async function probeDomains(
   await Promise.all(workers);
   return results;
 }
+
+export { TYPE_A, TYPE_AAAA };

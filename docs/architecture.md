@@ -88,13 +88,17 @@ outright. A domain that has left the shipped seed is left in place rather than d
 Lists are uncapped. The twenty-per-category figure bounds what FamilyFi ships, not what
 a household may add, and the cost note under each list is how growth is priced.
 
-Unproven: the exact blocked-response shape of any specific provider, including NextDNS.
-The predicate accepts NXDOMAIN, a sinkhole address (`0.0.0.0` / `::`) and NOERROR with
-no address record, which covers the documented cases, but it has not been confirmed
-against a live profile. A group may carry its own endpoint, which changes what that
-group's devices resolve through; verdicts are still household-wide, because
-`UpstreamCheck` is keyed one row per category.
+Transport is RFC 8484 wire format (`application/dns-message`) over POST, which every
+conforming resolver must accept, so the probe works against any DoH endpoint rather
+than the subset that also serves the non-standard `application/dns-json` API. A name is
+read as filtered on NXDOMAIN, on every address being a sinkhole (`0.0.0.0` / `::`), or
+on NOERROR with no address record. A missing A record alone is not enough — the probe
+asks for AAAA before concluding anything, so an IPv6-only name is not mistaken for a
+blocked one.
+
+Still untested against live hardware: no verdict in this repo has been produced by a
+real resolver, only by wire-format fixtures.
 
 ## Secrets
 
-Personal passwords are Argon2id hashes. The UniFi API key is AES-256-GCM encrypted with `FAMILYFI_ENCRYPTION_KEY`. The DoH endpoint — household and per-group override — is encrypted the same way, and masked to host only rather than last-four: a NextDNS path *is* the profile id, so its trailing characters are no use as a hint while still leaking a credential. The recovery admin password is never stored in the database; it is compared to `FAMILYFI_DEFAULT_PASSWORD` and printed in the server log at startup so an operator can find it. It is never returned by the API.
+Personal passwords are Argon2id hashes. The UniFi API key is AES-256-GCM encrypted with `FAMILYFI_ENCRYPTION_KEY`. The DoH endpoint — household and per-group override — is encrypted the same way, and masked to host only rather than last-four: a DoH path often *is* an account or profile id, so its trailing characters are no use as a hint while still leaking a credential. The recovery admin password is never stored in the database; it is compared to `FAMILYFI_DEFAULT_PASSWORD` and printed in the server log at startup so an operator can find it. It is never returned by the API.
