@@ -32,6 +32,17 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET | `/api/v1/sync` | Revision, last run, app-owned policy counts, recent changes |
 | POST | `/api/v1/sync/retry` | Enqueue another run |
 | GET | `/api/v1/changes/{id}` | Per-action status |
+| GET/POST | `/api/v1/upstream/categories` | Domain-list categories with their domains and last verdict. **No `change` object** — see below |
+| GET/PATCH/DELETE | `/api/v1/upstream/categories/{id}` | `domains` is the whole *active* list and replaces what is stored. A built-in category cannot be renamed or deleted |
+| POST | `/api/v1/upstream/categories/{id}/check` | Check one category now; 200 even when the resolver was unreachable |
+| GET | `/api/v1/upstream/checks` | Latest verdict per category |
+| POST | `/api/v1/upstream/checks/run` | Sweep every category with checking on |
+| GET/PUT/DELETE | `/api/v1/upstream/resolver` | Household DoH endpoint. Masked to host only; replace-only, never read back |
+
+The `upstream` resource is the one exception to the `change` envelope. Those rows are
+reporting only and never produce a UniFi policy, so there is nothing to reconcile —
+returning a `change` would create a `ChangeResult` that stays `pending` until an
+unrelated sync runs, and never settles at all while UniFi is unconfigured.
 
 Settings is in the web app: UniFi key replacement, managed VLANs, timezone (Gateway card), family roles, and adult logins.
 
