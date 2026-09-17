@@ -1321,6 +1321,160 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/upstream/categories/{id}/check:
+    post:
+      operationId: checkUpstreamCategory
+      tags: [Upstream]
+      summary: Check one category now
+      description: |
+        Runs a sweep for this category and returns it with the new verdict. Returns 200
+        even when the resolver could not be reached — that is a verdict of unknown to
+        show, not a failed request.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Checked
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [category]
+                properties:
+                  category: { $ref: "#/components/schemas/UpstreamCategory" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/upstream/checks:
+    get:
+      operationId: listUpstreamChecks
+      tags: [Upstream]
+      summary: Latest verdict per category
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Checks
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [checks]
+                properties:
+                  checks:
+                    type: array
+                    items: { $ref: "#/components/schemas/UpstreamCheckRow" }
+        "401":
+          $ref: "#/components/responses/Error"
+  /api/v1/upstream/checks/run:
+    post:
+      operationId: runUpstreamChecks
+      tags: [Upstream]
+      summary: Sweep every category with checking on
+      description: Categories with checking off are skipped and keep their last verdict.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Swept
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [outcomes]
+                properties:
+                  outcomes:
+                    type: array
+                    items: { $ref: "#/components/schemas/UpstreamProbeOutcome" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/upstream/resolver:
+    get:
+      operationId: getUpstreamResolver
+      tags: [Upstream]
+      summary: Household DNS-over-HTTPS endpoint (masked)
+      description: |
+        The URL is never returned. A NextDNS path carries the profile id, which anyone
+        holding can query through, so reads get a host-only mask and writes replace.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Resolver settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [resolver]
+                properties:
+                  resolver: { $ref: "#/components/schemas/UpstreamResolver" }
+        "401":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateUpstreamResolver
+      tags: [Upstream]
+      summary: Set the endpoint or the sweep settings
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpstreamResolverUpdate" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [resolver]
+                properties:
+                  resolver: { $ref: "#/components/schemas/UpstreamResolver" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: clearUpstreamResolver
+      tags: [Upstream]
+      summary: Clear the endpoint and turn checking off
+      description: Every verdict becomes unknown on the next sweep, never open.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     cookieAuth:
@@ -1818,3 +1972,46 @@ components:
           type: array
           description: The whole active list, replacing what is stored.
           items: { type: string }
+    UpstreamCheckRow:
+      type: object
+      additionalProperties: false
+      required: [categoryId, slug, label, verdict, blockedCount, totalCount, checkedAt, error]
+      properties:
+        categoryId: { type: string }
+        slug: { type: string }
+        label: { type: string }
+        verdict: { type: string, enum: [blocked, partial, open, unknown] }
+        blockedCount: { type: integer }
+        totalCount: { type: integer }
+        checkedAt: { type: string, format: date-time }
+        error: { type: [string, "null"] }
+    UpstreamProbeOutcome:
+      type: object
+      additionalProperties: false
+      required: [categoryId, slug, verdict, blockedCount, totalCount]
+      properties:
+        categoryId: { type: string }
+        slug: { type: string }
+        verdict: { type: string, enum: [blocked, partial, open, unknown] }
+        blockedCount: { type: integer }
+        totalCount: { type: integer }
+    UpstreamResolver:
+      type: object
+      additionalProperties: false
+      required: [configured, mask, probeEnabled, intervalMinutes, timeoutMs]
+      properties:
+        configured: { type: boolean }
+        mask:
+          type: [string, "null"]
+          description: Host only, e.g. https://dns.nextdns.io/••••••
+        probeEnabled: { type: boolean }
+        intervalMinutes: { type: integer }
+        timeoutMs: { type: integer }
+    UpstreamResolverUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        url: { type: string, description: Absolute https URL. Replace-only; never read back. }
+        probeEnabled: { type: boolean }
+        intervalMinutes: { type: integer, minimum: 1, maximum: 10080 }
+        timeoutMs: { type: integer, minimum: 500, maximum: 30000 }

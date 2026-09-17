@@ -20,6 +20,7 @@ export async function register() {
   const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
   const { ensureUpstreamCategories } = await import("./server/upstream-seed");
   const { startReconciliation } = await import("./server/reconciliation");
+  const { startUpstreamProbe } = await import("./server/upstream/schedule");
   try {
     await ensureRecoveryAccount();
     await ensureHousehold();
@@ -32,4 +33,5 @@ export async function register() {
     // Database may not be up yet during `next build` or a local start.
   }
   startReconciliation();
+  startUpstreamProbe();
 }
