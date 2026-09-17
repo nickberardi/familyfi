@@ -7,8 +7,8 @@ import { TextField } from "@/components/ui/Controls";
 
 /**
  * The household DNS-over-HTTPS endpoint. Paste-to-replace only: the URL is never
- * read back, because a NextDNS path is the profile id and anyone holding it can
- * query through the household's profile. The card shows a host-only mask instead.
+ * read back, because a path often carries an account or profile id and anyone
+ * holding it can query through that profile. The card shows a host-only mask.
  */
 export function ResolverCard({
   resolver,

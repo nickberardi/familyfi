@@ -4,11 +4,11 @@ import { decryptSecret, encryptSecret } from "../crypto";
 export class ResolverConfigError extends Error {}
 
 /**
- * The host with its path hidden. A NextDNS URL carries the profile id in its path
- * (`https://dns.nextdns.io/<profile>/<name>`), and that id is bearer-ish — anyone
- * holding it can query through the household's profile — so the stored display value
- * keeps the host and drops the rest. `maskSecret` is wrong here: the last four
- * characters of a profile path are not a useful hint and still leak.
+ * The host with its path hidden. Several DoH providers put an account or profile id
+ * in the URL path, and that id is bearer-ish — anyone holding it can query through
+ * the household's profile — so the stored display value keeps the host and drops the
+ * rest. `maskSecret` is wrong here: the last four characters of a profile path are
+ * not a useful hint and still leak.
  */
 export function maskResolverUrl(url: string): string {
   try {
