@@ -1405,10 +1405,12 @@ paths:
     get:
       operationId: getUpstreamResolver
       tags: [Upstream]
-      summary: Household DNS-over-HTTPS endpoint (masked)
+      summary: Household DNS-over-HTTPS endpoint
       description: |
-        The URL is never returned. A path often carries an account or profile id, which
-        anyone holding can query through, so reads get a host-only mask and writes replace.
+        Returned in full. A resolver URL is configuration rather than a credential — a
+        profile id in its path lets someone spend that profile's quota, not read its
+        logs or change a setting — and hiding it left a mistyped endpoint invisible
+        behind an unknown verdict.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200":
@@ -1998,12 +2000,12 @@ components:
     UpstreamResolver:
       type: object
       additionalProperties: false
-      required: [configured, mask, probeEnabled, intervalMinutes, timeoutMs]
+      required: [configured, url, probeEnabled, intervalMinutes, timeoutMs]
       properties:
         configured: { type: boolean }
-        mask:
+        url:
           type: [string, "null"]
-          description: Host only, e.g. https://dns.example.com/••••••
+          description: The endpoint in full, e.g. https://dns.example.com/dns-query/profile
         probeEnabled: { type: boolean }
         intervalMinutes: { type: integer }
         timeoutMs: { type: integer }
@@ -2011,7 +2013,7 @@ components:
       type: object
       additionalProperties: false
       properties:
-        url: { type: string, description: Absolute https URL. Replace-only; never read back. }
+        url: { type: string, description: Absolute https URL. }
         probeEnabled: { type: boolean }
         intervalMinutes: { type: integer, minimum: 1, maximum: 10080 }
         timeoutMs: { type: integer, minimum: 500, maximum: 30000 }

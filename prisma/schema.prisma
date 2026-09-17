@@ -77,10 +77,7 @@ model Household {
   unifiManageAllNetworks  Boolean  @default(false)
   unifiManagedNetworkIds  String[] @default([])
   quarantineEnforced      Boolean  @default(true)
-  dohUrlCiphertext        Bytes?
-  dohUrlIv                Bytes?
-  dohUrlAuthTag           Bytes?
-  dohUrlMask              String?
+  dohUrl                  String?
   dohProbeEnabled         Boolean  @default(false)
   dohProbeIntervalMinutes Int      @default(1440)
   dohProbeTimeoutMs       Int      @default(5000)
@@ -92,29 +89,26 @@ model Household {
 }
 
 model Group {
-  id                    String      @id @default(cuid())
-  kind                  GroupKind
-  name                  String
-  monogram              String?
-  familyRole            FamilyRole?
-  protected             Boolean     @default(false)
-  mode                  GroupMode   @default(always)
-  scheduleEnabled       Boolean     @default(false)
-  scheduleDays          Int[]       @default([])
-  scheduleStart         String?
-  scheduleEnd           String?
-  suspensionActive      Boolean     @default(false)
-  suspensionUntil       DateTime?
-  dohOverrideCiphertext Bytes?
-  dohOverrideIv         Bytes?
-  dohOverrideAuthTag    Bytes?
-  dohOverrideMask       String?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  devices               Device[]
-  accounts              Account[]
-  appPolicies           AppPolicy[]
-  rules                 Rule[]
+  id               String      @id @default(cuid())
+  kind             GroupKind
+  name             String
+  monogram         String?
+  familyRole       FamilyRole?
+  protected        Boolean     @default(false)
+  mode             GroupMode   @default(always)
+  scheduleEnabled  Boolean     @default(false)
+  scheduleDays     Int[]       @default([])
+  scheduleStart    String?
+  scheduleEnd      String?
+  suspensionActive Boolean     @default(false)
+  suspensionUntil  DateTime?
+  dohOverrideUrl   String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  devices          Device[]
+  accounts         Account[]
+  appPolicies      AppPolicy[]
+  rules            Rule[]
 }
 
 model Account {
