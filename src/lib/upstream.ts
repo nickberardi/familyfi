@@ -32,7 +32,8 @@ export type UpstreamCategoryRow = {
 
 export type UpstreamResolverSettings = {
   configured: boolean;
-  mask: string | null;
+  /** The endpoint in full. Configuration, not a credential — see resolver-settings.ts. */
+  url: string | null;
   probeEnabled: boolean;
   intervalMinutes: number;
   timeoutMs: number;

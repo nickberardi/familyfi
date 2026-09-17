@@ -3,21 +3,13 @@ import { UpstreamSource, UpstreamVerdict } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
 import { probeCategory, probeEnabledCategories } from "@/server/upstream/probe";
-import { encryptResolverUrl } from "@/server/upstream/resolver-settings";
 import type { DomainProbe } from "@/server/upstream/doh";
 import { resetDatabase } from "../helpers/db";
 
 async function setHouseholdResolver(url = "https://dns.example.com/dns-query/profile") {
-  const secret = encryptResolverUrl(url);
   await prisma().household.update({
     where: { id: "default" },
-    data: {
-      dohUrlCiphertext: secret.ciphertext,
-      dohUrlIv: secret.iv,
-      dohUrlAuthTag: secret.authTag,
-      dohUrlMask: secret.mask,
-      dohProbeEnabled: true,
-    },
+    data: { dohUrl: url, dohProbeEnabled: true },
   });
 }
 
@@ -95,7 +87,7 @@ describe("upstream probe", () => {
   it("records unknown, not open, when no endpoint is configured", async () => {
     await prisma().household.update({
       where: { id: "default" },
-      data: { dohUrlCiphertext: null, dohUrlIv: null, dohUrlAuthTag: null, dohUrlMask: null },
+      data: { dohUrl: null },
     });
     const id = await categoryId("adult");
 

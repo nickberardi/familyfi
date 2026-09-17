@@ -2,23 +2,23 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { ResolverConfigError, encryptResolverUrl } from "@/server/upstream/resolver-settings";
+import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
 
 /**
- * The household DNS-over-HTTPS endpoint. The URL itself is never returned — a path
- * often carries an account or profile id, which is bearer-ish — so reads get the
- * mask and writes are replace-only, the same shape as the UniFi API key.
+ * The household DNS-over-HTTPS endpoint, returned in full. It is configuration rather
+ * than a credential, and an operator who mistyped a profile id needs to be able to see
+ * that rather than stare at a mask while every category reports unknown.
  */
 export async function GET(request: Request) {
   return withSession(request, async () => {
     const household = await prisma().household.findUnique({
       where: { id: "default" },
-      select: { dohUrlMask: true, dohProbeEnabled: true, dohProbeIntervalMinutes: true, dohProbeTimeoutMs: true },
+      select: { dohUrl: true, dohProbeEnabled: true, dohProbeIntervalMinutes: true, dohProbeTimeoutMs: true },
     });
     return Response.json({
       resolver: {
-        configured: Boolean(household?.dohUrlMask),
-        mask: household?.dohUrlMask ?? null,
+        configured: Boolean(household?.dohUrl),
+        url: household?.dohUrl ?? null,
         probeEnabled: household?.dohProbeEnabled ?? false,
         intervalMinutes: household?.dohProbeIntervalMinutes ?? 1440,
         timeoutMs: household?.dohProbeTimeoutMs ?? 5000,
@@ -41,10 +41,10 @@ export async function PUT(request: Request) {
     const parsed = PutBody.safeParse(body.value);
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid resolver settings.");
 
-    let secret: ReturnType<typeof encryptResolverUrl> | undefined;
+    let url: string | undefined;
     if (parsed.data.url !== undefined) {
       try {
-        secret = encryptResolverUrl(parsed.data.url);
+        url = normalizeResolverUrl(parsed.data.url);
       } catch (error) {
         if (error instanceof ResolverConfigError) {
           return jsonError(400, "invalid_resolver", error.message);
@@ -56,26 +56,19 @@ export async function PUT(request: Request) {
     const household = await prisma().household.update({
       where: { id: "default" },
       data: {
-        ...(secret
-          ? {
-              dohUrlCiphertext: secret.ciphertext,
-              dohUrlIv: secret.iv,
-              dohUrlAuthTag: secret.authTag,
-              dohUrlMask: secret.mask,
-            }
-          : {}),
+        ...(url !== undefined ? { dohUrl: url } : {}),
         ...(parsed.data.probeEnabled !== undefined ? { dohProbeEnabled: parsed.data.probeEnabled } : {}),
         ...(parsed.data.intervalMinutes !== undefined
           ? { dohProbeIntervalMinutes: parsed.data.intervalMinutes }
           : {}),
         ...(parsed.data.timeoutMs !== undefined ? { dohProbeTimeoutMs: parsed.data.timeoutMs } : {}),
       },
-      select: { dohUrlMask: true, dohProbeEnabled: true, dohProbeIntervalMinutes: true, dohProbeTimeoutMs: true },
+      select: { dohUrl: true, dohProbeEnabled: true, dohProbeIntervalMinutes: true, dohProbeTimeoutMs: true },
     });
     return Response.json({
       resolver: {
-        configured: Boolean(household.dohUrlMask),
-        mask: household.dohUrlMask,
+        configured: Boolean(household.dohUrl),
+        url: household.dohUrl,
         probeEnabled: household.dohProbeEnabled,
         intervalMinutes: household.dohProbeIntervalMinutes,
         timeoutMs: household.dohProbeTimeoutMs,
@@ -89,13 +82,7 @@ export async function DELETE(request: Request) {
   return withMutation(request, async () => {
     await prisma().household.update({
       where: { id: "default" },
-      data: {
-        dohUrlCiphertext: null,
-        dohUrlIv: null,
-        dohUrlAuthTag: null,
-        dohUrlMask: null,
-        dohProbeEnabled: false,
-      },
+      data: { dohUrl: null, dohProbeEnabled: false },
     });
     return Response.json({ ok: true });
   });

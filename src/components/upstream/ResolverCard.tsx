@@ -6,9 +6,8 @@ import type { UpstreamResolverSettings } from "@/lib/upstream";
 import { TextField } from "@/components/ui/Controls";
 
 /**
- * The household DNS-over-HTTPS endpoint. Paste-to-replace only: the URL is never
- * read back, because a path often carries an account or profile id and anyone
- * holding it can query through that profile. The card shows a host-only mask.
+ * The household DNS-over-HTTPS endpoint, shown in full. Seeing what you configured is
+ * the point: a mistyped profile id is otherwise invisible behind an unknown verdict.
  */
 export function ResolverCard({
   resolver,
@@ -53,7 +52,7 @@ export function ResolverCard({
       </div>
       <div className="px-[18px] py-4">
         {resolver?.configured && !pasting ? (
-          <p className="m-0 font-mono text-[13px]">{resolver.mask}</p>
+          <p className="m-0 break-all font-mono text-[13px]">{resolver.url}</p>
         ) : null}
         {!resolver?.configured && !pasting ? (
           <p className="m-0 text-[12.5px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
