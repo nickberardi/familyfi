@@ -63,47 +63,58 @@ enum ChangeStatus {
 }
 
 model Household {
-  id                 String   @id @default("default")
-  timezone           String   @default("America/New_York")
-  unifiMode          String?
-  unifiBaseUrl       String?
-  unifiConsoleId     String?
-  unifiSiteId        String?
-  unifiKeyCiphertext Bytes?
-  unifiKeyIv         Bytes?
-  unifiKeyAuthTag    Bytes?
-  unifiKeyLastFour   String?
-  unifiTlsInsecure   Boolean  @default(false)
-  unifiManageAllNetworks Boolean @default(false)
-  unifiManagedNetworkIds String[] @default([])
-  quarantineEnforced Boolean @default(true)
-  connectionStatus   String   @default("unconfigured")
-  connectionError    String?
-  revision           Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                      String   @id @default("default")
+  timezone                String   @default("America/New_York")
+  unifiMode               String?
+  unifiBaseUrl            String?
+  unifiConsoleId          String?
+  unifiSiteId             String?
+  unifiKeyCiphertext      Bytes?
+  unifiKeyIv              Bytes?
+  unifiKeyAuthTag         Bytes?
+  unifiKeyLastFour        String?
+  unifiTlsInsecure        Boolean  @default(false)
+  unifiManageAllNetworks  Boolean  @default(false)
+  unifiManagedNetworkIds  String[] @default([])
+  quarantineEnforced      Boolean  @default(true)
+  dohUrlCiphertext        Bytes?
+  dohUrlIv                Bytes?
+  dohUrlAuthTag           Bytes?
+  dohUrlMask              String?
+  dohProbeEnabled         Boolean  @default(false)
+  dohProbeIntervalMinutes Int      @default(1440)
+  dohProbeTimeoutMs       Int      @default(5000)
+  connectionStatus        String   @default("unconfigured")
+  connectionError         String?
+  revision                Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model Group {
-  id               String      @id @default(cuid())
-  kind             GroupKind
-  name             String
-  monogram         String?
-  familyRole       FamilyRole?
-  protected        Boolean     @default(false)
-  mode             GroupMode   @default(always)
-  scheduleEnabled  Boolean     @default(false)
-  scheduleDays     Int[]       @default([])
-  scheduleStart    String?
-  scheduleEnd      String?
-  suspensionActive Boolean     @default(false)
-  suspensionUntil  DateTime?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  devices          Device[]
-  accounts         Account[]
-  appPolicies      AppPolicy[]
-  rules         Rule[]
+  id                    String      @id @default(cuid())
+  kind                  GroupKind
+  name                  String
+  monogram              String?
+  familyRole            FamilyRole?
+  protected             Boolean     @default(false)
+  mode                  GroupMode   @default(always)
+  scheduleEnabled       Boolean     @default(false)
+  scheduleDays          Int[]       @default([])
+  scheduleStart         String?
+  scheduleEnd           String?
+  suspensionActive      Boolean     @default(false)
+  suspensionUntil       DateTime?
+  dohOverrideCiphertext Bytes?
+  dohOverrideIv         Bytes?
+  dohOverrideAuthTag    Bytes?
+  dohOverrideMask       String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  devices               Device[]
+  accounts              Account[]
+  appPolicies           AppPolicy[]
+  rules                 Rule[]
 }
 
 model Account {
@@ -151,18 +162,18 @@ model LoginAttempt {
 }
 
 model Device {
-  id         String           @id @default(cuid())
-  mac        String           @unique
+  id         String          @id @default(cuid())
+  mac        String          @unique
   hostname   String?
   ip         String?
   networkId  String?
   zoneId     String?
   groupId    String?
-  group      Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  assignment AssignmentState  @default(quarantined)
+  group      Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  assignment AssignmentState @default(quarantined)
   lastSeenAt DateTime?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 }
 
 model AppPolicy {
@@ -185,16 +196,16 @@ model AppPolicy {
 }
 
 model PolicyOperation {
-  id                 String                 @id @default(cuid())
+  id                 String                @id @default(cuid())
   intent             PolicyOperationIntent
   appPolicyId        String?
   connectionIdentity String
   siteId             String
   payloadFingerprint String?
   unifiPolicyId      String?
-  status             String                 @default("pending")
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  status             String                @default("pending")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 }
 
 model SyncRun {
@@ -245,44 +256,100 @@ enum RuleScope {
 }
 
 model Rule {
-  id               String       @id @default(cuid())
-  kind             RuleKind
-  scope            RuleScope @default(group)
-  groupId          String?
-  group            Group?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  networkIds       String[]     @default([])
-  targetIds        Int[]
-  enabled          Boolean      @default(true)
-  mode             RuleMode  @default(always)
-  scheduleEnabled  Boolean      @default(false)
-  scheduleDays     Int[]        @default([])
-  scheduleStart    String?
-  scheduleEnd      String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  policies         RulePolicy[]
+  id              String       @id @default(cuid())
+  kind            RuleKind
+  scope           RuleScope    @default(group)
+  groupId         String?
+  group           Group?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  networkIds      String[]     @default([])
+  targetIds       Int[]
+  enabled         Boolean      @default(true)
+  mode            RuleMode     @default(always)
+  scheduleEnabled Boolean      @default(false)
+  scheduleDays    Int[]        @default([])
+  scheduleStart   String?
+  scheduleEnd     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  policies        RulePolicy[]
 
   @@index([groupId])
   @@index([scope])
 }
 
 model RulePolicy {
-  id                  String     @id @default(cuid())
-  ruleId           String
-  rule             Rule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  id                  String    @id @default(cuid())
+  ruleId              String
+  rule                Rule      @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   connectionIdentity  String
   siteId              String
-  unifiPolicyId       String?    @unique
+  unifiPolicyId       String?   @unique
   zoneId              String
-  ipVersion           IpVersion  @default(dual)
+  ipVersion           IpVersion @default(dual)
   desiredFingerprint  String
   desiredRevision     Int
   observedEnabled     Boolean?
   observedFingerprint String?
   lastError           String?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@unique([ruleId, connectionIdentity, siteId, zoneId])
   @@index([connectionIdentity, siteId])
+}
+
+enum UpstreamSource {
+  seed
+  user
+}
+
+enum UpstreamVerdict {
+  blocked
+  partial
+  open
+  unknown
+}
+
+model UpstreamCategory {
+  id        String           @id @default(cuid())
+  slug      String           @unique
+  label     String
+  monogram  String
+  source    UpstreamSource   @default(user)
+  enabled   Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  domains   UpstreamDomain[]
+  check     UpstreamCheck?
+
+  @@index([source])
+}
+
+model UpstreamDomain {
+  id         String           @id @default(cuid())
+  categoryId String
+  category   UpstreamCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  domain     String
+  source     UpstreamSource
+  removedAt  DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([categoryId, domain])
+  @@index([categoryId])
+}
+
+model UpstreamCheck {
+  id           String           @id @default(cuid())
+  categoryId   String           @unique
+  category     UpstreamCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  verdict      UpstreamVerdict
+  blockedCount Int
+  totalCount   Int
+  results      Json
+  checkedAt    DateTime         @default(now())
+  durationMs   Int
+  error        String?
+
+  @@index([checkedAt])
 }

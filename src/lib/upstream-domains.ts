@@ -241,10 +241,38 @@ export const UPSTREAM_CATEGORY_DOMAINS: Record<UpstreamCategory, readonly string
   ],
 };
 
-/** The ceiling on a category's sample — see the selection rules above. */
-export const UPSTREAM_CATEGORY_DOMAIN_LIMIT = 20;
+/**
+ * The ceiling on a *seeded* sample — see the selection rules above. It is not a
+ * limit on what a household may add: a customer can grow a list as far as they
+ * like, and the UI tells them what it costs in probe time instead.
+ */
+export const UPSTREAM_SEED_DOMAIN_CEILING = 20;
 
 export const UPSTREAM_CATEGORIES = Object.keys(UPSTREAM_CATEGORY_DOMAINS) as UpstreamCategory[];
+
+export type UpstreamSeedCategory = {
+  slug: UpstreamCategory;
+  label: string;
+  /** 1-3 characters, rendered in the category's tile. */
+  monogram: string;
+};
+
+/**
+ * Parent-facing label and monogram per seeded category. The reconcile keeps these
+ * following the shipped seed on every boot; domain membership does not follow, so a
+ * household's edits survive an upgrade.
+ */
+export const UPSTREAM_SEED_CATEGORIES: readonly UpstreamSeedCategory[] = [
+  { slug: "adult", label: "Adult", monogram: "18+" },
+  { slug: "video", label: "Video", monogram: "VID" },
+  { slug: "social", label: "Social", monogram: "SOC" },
+  { slug: "gaming", label: "Gaming", monogram: "GAM" },
+  { slug: "vpn", label: "VPN", monogram: "VPN" },
+  { slug: "messaging", label: "Messaging", monogram: "MSG" },
+  { slug: "ai", label: "AI", monogram: "AI" },
+  { slug: "gambling", label: "Gambling", monogram: "GMB" },
+  { slug: "dating", label: "Dating", monogram: "DAT" },
+] as const;
 
 /** Domains probed per run — the cost of one scheduled pass. */
 export function upstreamProbeDomainCount(): number {

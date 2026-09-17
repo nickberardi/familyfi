@@ -18,10 +18,12 @@ export async function register() {
     console.warn("UNIFI_MOCK is set but ignored because NODE_ENV is production.");
   }
   const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
+  const { ensureUpstreamCategories } = await import("./server/upstream-seed");
   const { startReconciliation } = await import("./server/reconciliation");
   try {
     await ensureRecoveryAccount();
     await ensureHousehold();
+    await ensureUpstreamCategories();
     if (settings.UNIFI_MOCK) {
       const { ensureDevDummyData } = await import("./server/dev-seed");
       await ensureDevDummyData();
