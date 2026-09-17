@@ -102,10 +102,28 @@ reads as "not blocked".
 
 So a name is read as filtered on any of: an EDE of 15 (Blocked), 16 (Censored) or 17
 (Filtered); NXDOMAIN; every address being a sinkhole (`0.0.0.0` / `::`); or NOERROR with
-no address record. The heuristics still earn their place — Pi-hole, AdGuard Home and
-Cloudflare for Families sinkhole or NXDOMAIN rather than send an EDE. EDE 18
-(Prohibited) is deliberately not treated as a block: it says the client may not query
-at all, which would apply to every name equally.
+no address record. EDE 18 (Prohibited) is deliberately not treated as a block: it says
+the client may not query at all, which would apply to every name equally.
+
+Measured shapes, all four captured live and kept as unit fixtures:
+
+| Resolver | Blocked name answers | EDE |
+| --- | --- | --- |
+| NextDNS (filtered profile) | routable block-page address | 17 |
+| Cloudflare for Families (1.1.1.3) | `0.0.0.0` | 17 |
+| Cloudflare (1.1.1.1) | the real address | none |
+| Google (8.8.8.8) | the real address | none |
+
+The two filtering resolvers converged on EDE 17 independently. The sinkhole branch is
+still needed for a resolver that sinkholes without sending one, and the EDE branch is
+the only thing that catches NextDNS, whose answer is otherwise indistinguishable from
+the unfiltered ones — the two public resolvers return the same address for that name,
+which is what shows NextDNS's is a block page.
+
+This is also why the transport matters beyond conformance. Both filtering resolvers
+report the same wire-level EDE, but their JSON APIs spell it differently — Cloudflare
+puts it in `Comment`, NextDNS in an `Additional` pseudo-record — so staying on the JSON
+API would have meant per-provider parsing of the one field that decides a verdict.
 
 A missing A record alone is not enough to conclude anything, since an IPv6-only name
 presents that way, so that one case — and only that one — triggers a follow-up AAAA
