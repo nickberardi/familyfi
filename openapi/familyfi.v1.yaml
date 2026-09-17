@@ -33,6 +33,8 @@ tags:
     description: UniFi DPI category and application catalog (server-side proxy)
   - name: Rules
     description: Category and app rules including network scope (Internet parents remain groups)
+  - name: Upstream
+    description: Domain-list categories checked against the household resolver (reporting only)
 paths:
   /api/v1/health:
     get:
@@ -1164,6 +1166,161 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/upstream/categories:
+    get:
+      operationId: listUpstreamCategories
+      tags: [Upstream]
+      summary: List upstream categories with their domains and last verdict
+      description: |
+        Reporting only. These categories never create a UniFi policy, so no response
+        here carries a change envelope. Removed seeded domains are included so the UI
+        can show them struck through and offer to restore them.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [categories]
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/UpstreamCategory" }
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createUpstreamCategory
+      tags: [Upstream]
+      summary: Create a custom category
+      description: Always report-only, with source user. The slug is derived from the label.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpstreamCategoryCreate" }
+            examples:
+              homework:
+                value: { label: Homework, monogram: HW, domains: [chegg.com] }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [category]
+                properties:
+                  category: { $ref: "#/components/schemas/UpstreamCategory" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/upstream/categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getUpstreamCategory
+      tags: [Upstream]
+      summary: Get one upstream category
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Category
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [category]
+                properties:
+                  category: { $ref: "#/components/schemas/UpstreamCategory" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateUpstreamCategory
+      tags: [Upstream]
+      summary: Update a category or replace its domain list
+      description: |
+        The domains array is the whole ACTIVE list and replaces what is stored.
+        Including a struck-through seeded domain restores it; leaving one out strikes
+        it. A domain the household added is deleted outright when left out, because
+        there is nothing to restore it to. A built-in category's label follows
+        FamilyFi updates and cannot be changed here.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpstreamCategoryUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [category]
+                properties:
+                  category: { $ref: "#/components/schemas/UpstreamCategory" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteUpstreamCategory
+      tags: [Upstream]
+      summary: Delete a custom category
+      description: |
+        Only a custom category can be deleted. A built-in one would be recreated by
+        the boot reconcile, so deleting it is refused with 409 — turn checking off
+        instead.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     cookieAuth:
@@ -1593,3 +1750,71 @@ components:
           properties:
             code: { type: string }
             message: { type: string }
+    UpstreamDomain:
+      type: object
+      additionalProperties: false
+      required: [id, domain, source, removed]
+      properties:
+        id: { type: string }
+        domain: { type: string }
+        source: { type: string, enum: [seed, user] }
+        removed:
+          type: boolean
+          description: A seeded domain the household removed. Shown struck through and restorable.
+    UpstreamCheck:
+      type: object
+      additionalProperties: false
+      required: [verdict, blockedCount, totalCount, checkedAt, error]
+      properties:
+        verdict:
+          type: string
+          enum: [blocked, partial, open, unknown]
+          description: unknown means the resolver could not be reached, never that nothing is blocked.
+        blockedCount: { type: integer }
+        totalCount: { type: integer }
+        checkedAt: { type: string, format: date-time }
+        error: { type: [string, "null"] }
+    UpstreamCategory:
+      type: object
+      additionalProperties: false
+      required: [id, slug, label, monogram, source, enabled, domains, activeDomainCount, costNote, check]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        label: { type: string }
+        monogram: { type: string, maxLength: 3 }
+        source: { type: string, enum: [seed, user] }
+        enabled:
+          type: boolean
+          description: Turns checking on or off only. It never blocks or unblocks anything.
+        domains:
+          type: array
+          items: { $ref: "#/components/schemas/UpstreamDomain" }
+        activeDomainCount: { type: integer }
+        costNote: { type: string }
+        check:
+          oneOf:
+            - $ref: "#/components/schemas/UpstreamCheck"
+            - type: "null"
+    UpstreamCategoryCreate:
+      type: object
+      additionalProperties: false
+      required: [label]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 60 }
+        monogram: { type: string, minLength: 1, maxLength: 3 }
+        domains:
+          type: array
+          items: { type: string }
+        enabled: { type: boolean }
+    UpstreamCategoryUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        label: { type: string, minLength: 1, maxLength: 60 }
+        monogram: { type: string, minLength: 1, maxLength: 3 }
+        enabled: { type: boolean }
+        domains:
+          type: array
+          description: The whole active list, replacing what is stored.
+          items: { type: string }
