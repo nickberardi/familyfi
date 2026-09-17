@@ -24,6 +24,8 @@ export type DomainProbe = {
   blocked: boolean | null;
   rcode: number | null;
   answers: string[];
+  /** The resolver's own words when it sent an EDE, e.g. "Blocked by …: category:porn". */
+  reason?: string;
   error?: string;
 };
 
@@ -37,18 +39,38 @@ export type DohResolver = (domain: string) => Promise<DomainProbe>;
 const SINKHOLE = new Set(["0.0.0.0", "0:0:0:0:0:0:0:0", "::"]);
 
 /**
+ * RFC 8914 info-codes that mean the resolver deliberately withheld this name:
+ * 15 Blocked (internal policy), 16 Censored (external requirement), 17 Filtered
+ * (blocked as the client asked). 18 Prohibited is deliberately absent — it says the
+ * client is not allowed to query at all, which would apply to every name equally and
+ * is an access failure rather than a verdict about this one.
+ */
+const FILTERED_INFO_CODES = new Set([15, 16, 17]);
+
+/**
  * True when the response says this name is filtered. Any one of:
  *
+ * - an Extended DNS Error marking it Blocked, Censored or Filtered
  * - NXDOMAIN — the resolver denies the name exists
  * - every address is a sinkhole (`0.0.0.0` / `::`)
  * - NOERROR with no address record at all (NODATA), including a CNAME that leads
  *   nowhere
+ *
+ * **The EDE branch is the one that matters in practice, not a nicety.** A real
+ * NextDNS profile answers a blocked name with NOERROR *and a routable address* — the
+ * address of its block page — so none of the three heuristics below fire and the name
+ * looks perfectly ordinary. Only the EDE says otherwise. Providers that sinkhole or
+ * NXDOMAIN instead (Pi-hole, AdGuard Home, Cloudflare for Families) are covered by
+ * the heuristics, so both paths earn their place.
  *
  * NXDOMAIN is also how a domain that has ceased to exist answers, which is why the
  * shipped canaries were liveness-checked: a dead canary would otherwise be counted as
  * blocked and inflate the verdict.
  */
 export function isBlockedResponse(response: DnsResponse): boolean {
+  if (response.extendedError && FILTERED_INFO_CODES.has(response.extendedError.infoCode)) {
+    return true;
+  }
   if (response.rcode === RCODE_NXDOMAIN) return true;
   if (response.addresses.length === 0) return true;
   return response.addresses.every((answer) => SINKHOLE.has(answer.address));
@@ -104,17 +126,27 @@ export function dohResolver(input: {
       if (!isBlockedResponse(v4)) {
         return { domain, blocked: false, rcode: v4.rcode, answers: answerAddresses(v4) };
       }
-      // NXDOMAIN is authoritative for the whole name, so AAAA cannot contradict it.
-      if (v4.rcode === RCODE_NXDOMAIN) {
-        return { domain, blocked: true, rcode: v4.rcode, answers: [] };
+      // An EDE, NXDOMAIN or a sinkholed address all settle the name on their own.
+      // Only NODATA is ambiguous: a name with no A record may still be reachable over
+      // IPv6, so that is the one case worth a second query.
+      const ambiguous =
+        !v4.extendedError && v4.rcode !== RCODE_NXDOMAIN && v4.addresses.length === 0;
+      if (!ambiguous) {
+        return {
+          domain,
+          blocked: true,
+          rcode: v4.rcode,
+          answers: answerAddresses(v4),
+          reason: v4.extendedError?.text || undefined,
+        };
       }
       const v6 = await ask(domain, TYPE_AAAA);
-      const blocked = isBlockedResponse(v6);
       return {
         domain,
-        blocked,
+        blocked: isBlockedResponse(v6),
         rcode: v6.rcode,
-        answers: [...answerAddresses(v4), ...answerAddresses(v6)],
+        answers: answerAddresses(v6),
+        reason: v6.extendedError?.text || undefined,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

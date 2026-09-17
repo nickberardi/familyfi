@@ -90,14 +90,26 @@ a household may add, and the cost note under each list is how growth is priced.
 
 Transport is RFC 8484 wire format (`application/dns-message`) over POST, which every
 conforming resolver must accept, so the probe works against any DoH endpoint rather
-than the subset that also serves the non-standard `application/dns-json` API. A name is
-read as filtered on NXDOMAIN, on every address being a sinkhole (`0.0.0.0` / `::`), or
-on NOERROR with no address record. A missing A record alone is not enough — the probe
-asks for AAAA before concluding anything, so an IPv6-only name is not mistaken for a
-blocked one.
+than the subset that also serves the non-standard `application/dns-json` API.
 
-Still untested against live hardware: no verdict in this repo has been produced by a
-real resolver, only by wire-format fixtures.
+**Every query carries an EDNS(0) OPT record, and that is load-bearing.** A resolver
+only returns an OPT record when the query sent one, and the RFC 8914 Extended DNS Error
+that says "I filtered this" rides inside it. Measured against a live NextDNS profile, a
+blocked name comes back as **NOERROR with a routable address** — the address of the
+provider's block page — and is otherwise indistinguishable from an ordinary answer.
+Only the EDE distinguishes it. Drop the OPT record and every block on that provider
+reads as "not blocked".
+
+So a name is read as filtered on any of: an EDE of 15 (Blocked), 16 (Censored) or 17
+(Filtered); NXDOMAIN; every address being a sinkhole (`0.0.0.0` / `::`); or NOERROR with
+no address record. The heuristics still earn their place — Pi-hole, AdGuard Home and
+Cloudflare for Families sinkhole or NXDOMAIN rather than send an EDE. EDE 18
+(Prohibited) is deliberately not treated as a block: it says the client may not query
+at all, which would apply to every name equally.
+
+A missing A record alone is not enough to conclude anything, since an IPv6-only name
+presents that way, so that one case — and only that one — triggers a follow-up AAAA
+query. An EDE, NXDOMAIN or a sinkholed address settles the name on the first query.
 
 ## Secrets
 

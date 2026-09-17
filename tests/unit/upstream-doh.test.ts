@@ -35,6 +35,10 @@ function buildResponse(input: {
   answers?: { type: number; rdata: number[] }[];
   truncated?: boolean;
   omitQuestion?: boolean;
+  /** RFC 8914 Extended DNS Error, carried in an EDNS(0) OPT record. */
+  ede?: { infoCode: number; text?: string };
+  /** Authority records to walk past before the additional section. */
+  authority?: number;
 }): Uint8Array<ArrayBuffer> {
   const answers = input.answers ?? [];
   const labels = input.question.name.split(".").filter(Boolean);
@@ -57,12 +61,34 @@ function buildResponse(input: {
     body.push(...answer.rdata);
   }
 
+  // Authority filler, only there to prove the decoder walks past it to the OPT record.
+  const authorityCount = input.authority ?? 0;
+  for (let i = 0; i < authorityCount; i += 1) {
+    body.push(0xc0, 0x0c, 0, 2, 0, 1, 0, 0, 0, 60, 0, 2, 0xc0, 0x0c); // an NS record
+  }
+
+  if (input.ede) {
+    const text = [...(input.ede.text ?? "")].map((c) => c.charCodeAt(0));
+    const optionData = [(input.ede.infoCode >> 8) & 0xff, input.ede.infoCode & 0xff, ...text];
+    body.push(0); // OPT owner name is root
+    body.push(0, 41); // type OPT
+    body.push(0x10, 0x00); // class: udp payload size
+    body.push(0, 0, 0, 0); // ttl: extended rcode, version, flags
+    const rdLength = 4 + optionData.length;
+    body.push((rdLength >> 8) & 0xff, rdLength & 0xff);
+    body.push(0, 15); // option code: Extended DNS Error
+    body.push((optionData.length >> 8) & 0xff, optionData.length & 0xff);
+    body.push(...optionData);
+  }
+
   const out = new Uint8Array(12 + body.length);
   const view = new DataView(out.buffer);
   view.setUint16(0, input.id);
   view.setUint16(2, 0x8180 | (input.truncated ? 0x0200 : 0) | (input.rcode ?? RCODE_NOERROR));
   view.setUint16(4, input.omitQuestion ? 0 : 1);
   view.setUint16(6, answers.length);
+  view.setUint16(8, authorityCount);
+  view.setUint16(10, input.ede ? 1 : 0);
   out.set(body, 12);
   return out;
 }
@@ -80,6 +106,7 @@ describe("dns wire format", () => {
     expect(view.getUint16(2)).toBe(0x0100); // RD set, not a response
     expect(view.getUint16(4)).toBe(1); // one question
     expect(view.getUint16(6)).toBe(0); // no answers
+    expect(view.getUint16(10)).toBe(1); // one additional: the EDNS(0) OPT record
     // 7example3com0 then qtype + qclass
     expect([...query.slice(12, 25)]).toEqual([
       7, 101, 120, 97, 109, 112, 108, 101, 3, 99, 111, 109, 0,
@@ -167,6 +194,50 @@ describe("dns wire format", () => {
     expect(() => decodeResponse(new Uint8Array(4))).toThrow(/shorter than a DNS header/i);
   });
 
+  it("carries an EDNS(0) OPT record on every query", () => {
+    const query = encodeQuery("example.com", TYPE_A, 1);
+    // root name, type 41, class 4096, ttl 0, rdlength 0
+    expect([...query.slice(-11)]).toEqual([0, 0, 41, 0x10, 0x00, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it("reads an Extended DNS Error out of the OPT record", () => {
+    const decoded = decodeResponse(
+      buildResponse({
+        id: 1,
+        question: { name: "pornhub.com", type: TYPE_A },
+        answers: [{ type: TYPE_A, rdata: [149, 248, 211, 216] }],
+        ede: { infoCode: 17, text: "Blocked by NextDNS: category:porn~beta" },
+      }),
+    );
+    expect(decoded.extendedError).toEqual({
+      infoCode: 17,
+      text: "Blocked by NextDNS: category:porn~beta",
+    });
+  });
+
+  it("finds the OPT record past authority records", () => {
+    const decoded = decodeResponse(
+      buildResponse({
+        id: 1,
+        question: { name: "x.example", type: TYPE_A },
+        authority: 2,
+        ede: { infoCode: 15, text: "" },
+      }),
+    );
+    expect(decoded.extendedError?.infoCode).toBe(15);
+  });
+
+  it("reports no extended error when the resolver sent none", () => {
+    const decoded = decodeResponse(
+      buildResponse({
+        id: 1,
+        question: { name: "example.com", type: TYPE_A },
+        answers: [{ type: TYPE_A, rdata: V4 }],
+      }),
+    );
+    expect(decoded.extendedError).toBeNull();
+  });
+
   it("tolerates an answer count larger than the body rather than throwing", () => {
     const short = buildResponse({ id: 1, question: { name: "a.example", type: TYPE_A } });
     new DataView(short.buffer).setUint16(6, 5); // claim five answers that are not there
@@ -197,6 +268,62 @@ describe("blocked-response predicate", () => {
     expect(isBlockedResponse(response(RCODE_NOERROR, [{ type: TYPE_CNAME, rdata: [0xc0, 0x0c] }]))).toBe(
       true,
     );
+  });
+
+  /**
+   * The shape a real NextDNS profile returns for a blocked name: NOERROR, and a
+   * routable address — its block page — so every heuristic below says "fine". Only
+   * the EDE says otherwise. Captured from dns.nextdns.io against a live profile.
+   */
+  it("reads a routable address with a Filtered EDE as blocked", () => {
+    const nextdns = decodeResponse(
+      buildResponse({
+        id: 1,
+        question: { name: "pornhub.com", type: TYPE_A },
+        answers: [{ type: TYPE_A, rdata: [149, 248, 211, 216] }],
+        ede: { infoCode: 17, text: "Blocked by NextDNS: category:porn~beta" },
+      }),
+    );
+    expect(nextdns.rcode).toBe(RCODE_NOERROR);
+    expect(nextdns.addresses).toHaveLength(1);
+    expect(isBlockedResponse(nextdns)).toBe(true);
+  });
+
+  /**
+   * The control, captured from unfiltered Cloudflare (1.1.1.1) for the same name that
+   * NextDNS blocks. Both are NOERROR with a routable address; only the EDE differs.
+   * Nothing may classify by address, or these two become indistinguishable.
+   */
+  it("reads the same name from an unfiltered resolver as not blocked", () => {
+    const cloudflare = decodeResponse(
+      buildResponse({
+        id: 1,
+        question: { name: "pornhub.com", type: TYPE_A },
+        answers: [{ type: TYPE_A, rdata: [66, 254, 114, 41] }],
+      }),
+    );
+    expect(cloudflare.rcode).toBe(RCODE_NOERROR);
+    expect(cloudflare.extendedError).toBeNull();
+    expect(isBlockedResponse(cloudflare)).toBe(false);
+  });
+
+  it("treats Blocked and Censored as filtered too, but not Prohibited", () => {
+    const withCode = (infoCode: number) =>
+      decodeResponse(
+        buildResponse({
+          id: 1,
+          question: { name: "x.example", type: TYPE_A },
+          answers: [{ type: TYPE_A, rdata: V4 }],
+          ede: { infoCode, text: "" },
+        }),
+      );
+    expect(isBlockedResponse(withCode(15))).toBe(true); // Blocked
+    expect(isBlockedResponse(withCode(16))).toBe(true); // Censored
+    expect(isBlockedResponse(withCode(17))).toBe(true); // Filtered
+    // Prohibited says the client may not ask at all — not a verdict about this name.
+    expect(isBlockedResponse(withCode(18))).toBe(false);
+    // An informational EDE on an ordinary answer must not read as a block.
+    expect(isBlockedResponse(withCode(0))).toBe(false);
   });
 
   it("reads a routable address as not blocked", () => {
@@ -269,8 +396,8 @@ describe("doh resolver", () => {
       const query = new Uint8Array(init!.body as ArrayBuffer);
       const view = new DataView(query.buffer);
       const id = view.getUint16(0);
-      const type = view.getUint16(query.length - 4);
-      // Recover the queried name from the question section.
+      // Recover the queried name, then read qtype from just past it. Not from the end
+      // of the buffer: an EDNS(0) OPT record now follows the question.
       const labels: string[] = [];
       let offset = 12;
       while (query[offset] !== 0) {
@@ -278,6 +405,7 @@ describe("doh resolver", () => {
         labels.push(String.fromCharCode(...query.slice(offset + 1, offset + 1 + length)));
         offset += 1 + length;
       }
+      const type = view.getUint16(offset + 1);
       const domain = labels.join(".");
       calls.push({ domain, type });
       const { rcode, rdata } = answer(domain, type);
