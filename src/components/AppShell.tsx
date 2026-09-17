@@ -21,6 +21,7 @@ const NAV = [
     items: [
       { href: "/devices", label: "Devices" },
       { href: "/rules", label: "Rules" },
+      { href: "/categories", label: "Categories" },
     ],
   },
   {
