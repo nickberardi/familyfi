@@ -38,6 +38,8 @@ describe("openapi contract", () => {
         "/api/v1/settings/unifi/test",
         "/api/v1/sync",
         "/api/v1/sync/retry",
+        "/api/v1/upstream/categories",
+        "/api/v1/upstream/categories/{id}",
       ].sort(),
     );
   });

@@ -281,3 +281,34 @@ export function upstreamProbeDomainCount(): number {
     0,
   );
 }
+
+/** Queries the probe keeps in flight. */
+export const UPSTREAM_PROBE_CONCURRENCY = 4;
+
+/**
+ * A typical resolver round trip. The estimate deliberately uses this rather than the
+ * configured timeout: a note that quotes the worst case reads as a warning about
+ * every pass, when a timeout only costs that much on a resolver that is failing.
+ */
+export const UPSTREAM_PROBE_NOMINAL_MS = 120;
+
+/** Where the cost note starts telling the customer that growth has a price. */
+export const UPSTREAM_PROBE_NOTICE_DOMAINS = 30;
+
+/** Rough seconds for one pass over `activeDomains`, rounded up to a whole second. */
+export function estimateProbeSeconds(activeDomains: number): number {
+  if (activeDomains <= 0) return 0;
+  const waves = Math.ceil(activeDomains / UPSTREAM_PROBE_CONCURRENCY);
+  return Math.max(1, Math.ceil((waves * UPSTREAM_PROBE_NOMINAL_MS) / 1000));
+}
+
+/**
+ * The line under a category's domain list. Decision: lists are never capped, so this
+ * is the whole mechanism for telling a customer what adding more costs.
+ */
+export function probeCostNote(activeDomains: number): string {
+  const seconds = estimateProbeSeconds(activeDomains);
+  return activeDomains > UPSTREAM_PROBE_NOTICE_DOMAINS
+    ? `A full pass now takes about ${seconds}s — adding more domains makes it take longer.`
+    : `A full pass takes about ${seconds}s.`;
+}
