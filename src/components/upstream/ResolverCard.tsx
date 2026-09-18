@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import type { UpstreamResolverSettings } from "@/lib/upstream";
-import { TextField } from "@/components/ui/Controls";
+import { probeScheduleWhen, type UpstreamResolverSettings } from "@/lib/upstream";
+import { formatHhmm, relativeDayLabel } from "@/lib/display";
+import { useAppData } from "@/components/AppDataProvider";
+import { TextField, TimeField } from "@/components/ui/Controls";
+import { DayPicker } from "@/components/ui/DayPicker";
 
 /**
  * The household DNS-over-HTTPS endpoint, shown in full. Seeing what you configured is
@@ -35,6 +38,27 @@ export function ResolverCard({
   }
 
   const canSave = !busy && url.trim().length > 8;
+  const { household } = useAppData();
+  const timezone = household?.timezone ?? "America/New_York";
+
+  function toggleDay(day: number) {
+    if (!resolver) return;
+    const days = resolver.probeDays.includes(day)
+      ? resolver.probeDays.filter((d) => d !== day)
+      : [...resolver.probeDays, day].sort((a, b) => a - b);
+    void run(
+      () => api("/api/v1/upstream/resolver", { method: "PUT", body: JSON.stringify({ probeDays: days }) }),
+      "Could not change the check days.",
+    );
+  }
+
+  function scheduleLine(r: UpstreamResolverSettings): string {
+    if (!r.probeEnabled) return "Paused — last results kept";
+    if (r.probeDays.length === 0) return "No days selected — checking won't run";
+    const when = `${probeScheduleWhen(r.probeDays)} at ${formatHhmm(r.probeTime)}`;
+    if (!r.nextRunAt) return when;
+    return `${when} · next ${relativeDayLabel(new Date(r.nextRunAt), timezone)}`;
+  }
 
   return (
     <section
@@ -60,9 +84,36 @@ export function ResolverCard({
           </p>
         ) : null}
         <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
-          Queried on every sweep to check whether each category is already blocked
+          Queried on a schedule to check whether each category is already blocked
           upstream. Categories keep their last result while this is off.
         </p>
+
+        {resolver?.configured ? (
+          <div className="mt-3.5 pt-3.5" style={{ borderTop: "1px solid var(--ff-hairline)" }}>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] font-semibold">Check schedule</div>
+                <div className="mt-0.5 text-[12px]" style={{ color: "var(--ff-ink-3)" }}>
+                  {scheduleLine(resolver)}
+                </div>
+              </div>
+              <TimeField
+                label="Check time"
+                value={resolver.probeTime}
+                disabled={busy}
+                onChange={(next) =>
+                  void run(
+                    () => api("/api/v1/upstream/resolver", { method: "PUT", body: JSON.stringify({ probeTime: next }) }),
+                    "Could not change the check time.",
+                  )
+                }
+              />
+            </div>
+            <div className="mt-2.5">
+              <DayPicker days={resolver.probeDays} onToggle={toggleDay} disabled={busy} />
+            </div>
+          </div>
+        ) : null}
 
         {pasting ? (
           <div className="mt-3 flex flex-col gap-2">

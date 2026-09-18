@@ -63,29 +63,31 @@ enum ChangeStatus {
 }
 
 model Household {
-  id                      String   @id @default("default")
-  timezone                String   @default("America/New_York")
-  unifiMode               String?
-  unifiBaseUrl            String?
-  unifiConsoleId          String?
-  unifiSiteId             String?
-  unifiKeyCiphertext      Bytes?
-  unifiKeyIv              Bytes?
-  unifiKeyAuthTag         Bytes?
-  unifiKeyLastFour        String?
-  unifiTlsInsecure        Boolean  @default(false)
-  unifiManageAllNetworks  Boolean  @default(false)
-  unifiManagedNetworkIds  String[] @default([])
-  quarantineEnforced      Boolean  @default(true)
-  dohUrl                  String?
-  dohProbeEnabled         Boolean  @default(false)
-  dohProbeIntervalMinutes Int      @default(1440)
-  dohProbeTimeoutMs       Int      @default(5000)
-  connectionStatus        String   @default("unconfigured")
-  connectionError         String?
-  revision                Int      @default(0)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                     String    @id @default("default")
+  timezone               String    @default("America/New_York")
+  unifiMode              String?
+  unifiBaseUrl           String?
+  unifiConsoleId         String?
+  unifiSiteId            String?
+  unifiKeyCiphertext     Bytes?
+  unifiKeyIv             Bytes?
+  unifiKeyAuthTag        Bytes?
+  unifiKeyLastFour       String?
+  unifiTlsInsecure       Boolean   @default(false)
+  unifiManageAllNetworks Boolean   @default(false)
+  unifiManagedNetworkIds String[]  @default([])
+  quarantineEnforced     Boolean   @default(true)
+  dohUrl                 String?
+  dohProbeEnabled        Boolean   @default(false)
+  dohProbeTime           String    @default("12:00")
+  dohProbeDays           Int[]     @default([0, 1, 2, 3, 4, 5, 6])
+  dohProbeLastRunAt      DateTime?
+  dohProbeTimeoutMs      Int       @default(5000)
+  connectionStatus       String    @default("unconfigured")
+  connectionError        String?
+  revision               Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 }
 
 model Group {

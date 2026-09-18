@@ -4,6 +4,7 @@ import { enqueueChange } from "@/server/changes";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { observeQuarantineBlocking } from "@/server/quarantine";
+import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 import type { Household } from "@prisma/client";
 
 const Body = z
@@ -54,6 +55,7 @@ export async function PUT(request: Request) {
       },
     });
     const change = await enqueueChange(parsed.data.quarantineEnforced !== undefined ? "quarantine" : "household");
+    if (parsed.data.timezone) rescheduleUpstreamProbe();
     return Response.json({
       household: await publicHousehold(household),
       change,

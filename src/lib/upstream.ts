@@ -54,8 +54,15 @@ export type UpstreamResolverSettings = {
   /** The endpoint in full. Configuration, not a credential — see resolver-settings.ts. */
   url: string | null;
   probeEnabled: boolean;
-  intervalMinutes: number;
+  /** "HH:MM", household-local. */
+  probeTime: string;
+  /** 0 (Sunday) through 6 (Saturday). Empty means checking never runs. */
+  probeDays: number[];
   timeoutMs: number;
+  /** ISO instant of the most recent completed sweep, or null if none yet. */
+  lastRunAt: string | null;
+  /** ISO instant of the next scheduled sweep, or null when checking is off. */
+  nextRunAt: string | null;
 };
 
 type VerdictStyle = {
@@ -131,6 +138,17 @@ export function verdictDetailText(check: UpstreamCheckRow | null): string {
   if (!check) return "Not checked yet";
   if (check.verdict === "unknown") return "Last check couldn't reach the resolver";
   return `${check.blockedCount} of ${check.totalCount} test domains blocked`;
+}
+
+const FULL_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** "Daily" / "Weekdays" / "Weekends" / a list of day names, for the check-schedule line. */
+export function probeScheduleWhen(days: number[]): string {
+  const set = [...new Set(days)].sort((a, b) => a - b);
+  if (set.length === 7) return "Daily";
+  if (set.join(",") === "1,2,3,4,5") return "Weekdays";
+  if (set.join(",") === "0,6") return "Weekends";
+  return set.map((day) => FULL_WEEKDAYS[day]).join(", ");
 }
 
 export function sourceNoteText(source: "seed" | "user"): string {

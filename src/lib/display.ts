@@ -182,6 +182,22 @@ export function nextBedtimeResumeAt(group: Pick<Group, "schedule">, timezone: st
   return nextClockOnDays(timezone, bedtimeEndDays(days, start, end), end, now);
 }
 
+/**
+ * "today" / "tomorrow" / a weekday name, for a scheduled instant relative to `now` —
+ * both compared as calendar dates in the household timezone, since a UTC-day boundary
+ * can fall in the middle of a local day.
+ */
+export function relativeDayLabel(instant: Date, timezone: string, now = new Date()): string {
+  const today = zonedParts(now, timezone);
+  const target = zonedParts(instant, timezone);
+  if (today.year === target.year && today.month === target.month && today.day === target.day) return "today";
+  const tomorrow = addCalendarDays(today.year, today.month, today.day, 1);
+  if (tomorrow.year === target.year && tomorrow.month === target.month && tomorrow.day === target.day) {
+    return "tomorrow";
+  }
+  return WEEKDAYS[target.weekday] ?? "";
+}
+
 type ZonedParts = {
   year: number;
   month: number;
