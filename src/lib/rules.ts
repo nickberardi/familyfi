@@ -13,7 +13,7 @@ export type Rule = {
   internet: false;
 };
 
-export type CuratedSlot = "video" | "social" | "gaming";
+export type CuratedSlot = "video" | "social" | "gaming" | "vpn" | "messaging";
 
 export type CuratedCategorySlot = {
   slot: CuratedSlot;
@@ -22,11 +22,17 @@ export type CuratedCategorySlot = {
   catalogName: string;
 };
 
-/** Confirmed curated slots — Video / Social / Gaming only (Porn OUT). */
+/**
+ * Confirmed curated slots (Porn OUT). Mirrors
+ * `src/server/unifi/curated-categories.ts` — including Messaging's id of 0, which
+ * is a real DPI category, so never test a target id for truthiness.
+ */
 export const CURATED_CATEGORY_SLOTS: readonly CuratedCategorySlot[] = [
   { slot: "video", label: "Video", categoryId: 4, catalogName: "Media streaming services" },
   { slot: "social", label: "Social", categoryId: 24, catalogName: "Social networks" },
   { slot: "gaming", label: "Gaming", categoryId: 8, catalogName: "Online games" },
+  { slot: "vpn", label: "VPN", categoryId: 11, catalogName: "Tunneling and proxy services" },
+  { slot: "messaging", label: "Messaging", categoryId: 0, catalogName: "Instant messengers" },
 ] as const;
 
 export function groupScopedRules(rules: Rule[], groupId: string): Rule[] {

@@ -173,16 +173,19 @@ async function ensureDummyHouseholdMembers() {
 }
 
 /**
- * A measured upstream verdict for two curated slots, so the DNS-derived mark states are
- * visible without a real resolver — the same reason the mock household exists.
+ * A measured upstream verdict for three curated slots, so the DNS-derived mark states
+ * are visible without a real resolver — the same reason the mock household exists.
  *
- * Video is deliberately left unmeasured: a mark with no verdict and no rule must still
- * read "not blocked", and that is the case most likely to regress.
+ * One slot per state that has a colour: Social blocked, Gaming partial, VPN measured
+ * open. Video and Messaging are deliberately left unmeasured, because "we never looked"
+ * has to stay visibly distinct from "we looked and it is clear" — that is the pair most
+ * likely to regress, and collapsing it is exactly the false assurance to avoid.
  */
 async function ensureMockUpstreamChecks() {
   const measured: { slug: string; verdict: UpstreamVerdict; blockedCount: number }[] = [
     { slug: "social", verdict: UpstreamVerdict.blocked, blockedCount: 20 },
     { slug: "gaming", verdict: UpstreamVerdict.partial, blockedCount: 7 },
+    { slug: "vpn", verdict: UpstreamVerdict.open, blockedCount: 0 },
   ];
   for (const item of measured) {
     const category = await prisma().upstreamCategory.findUnique({

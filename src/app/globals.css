@@ -80,26 +80,38 @@
   --ff-danger-tint: rgba(200, 16, 10, 0.12);
   --ff-on-tint: rgba(52, 199, 89, 0.16);
 
+  /*
+   * The green that sits *on* --ff-on-tint. --ff-on itself is only 3.9:1 against that
+   * fill, under the 4.5:1 floor, so an all-clear mark or chip takes this darker green
+   * instead. Same hue, same reading, a contrast ratio that holds.
+   */
+  --ff-on-ink: #1e7a34;
+
   /* Rules tree indents. */
   --ff-rule-indent: 34px;
   --ff-rule-detail-indent: 39px;
 
   /*
    * Upstream verdict chips. Four states, each needing its own ink, fill and line,
-   * because the design sets the border independently of the fill. Blocked reuses the
-   * green "on" ink, partial the paused amber, open the neutral ink ladder, and
-   * unknown stays deliberately colourless: it means we could not look, so it must
-   * not read as either good or bad news.
+   * because the design sets the border independently of the fill.
+   *
+   * These share a palette with the category marks on a card, and they must: both are
+   * driven by the same UpstreamCheck row, so a colour cannot mean "the resolver blocks
+   * this" in one place and "nothing blocks this" in the other. Blocked is the solid
+   * upstream purple, partial its tint, open the green all-clear, and unknown stays
+   * deliberately colourless — it means we could not look, so it must read as neither
+   * good nor bad news. Blocked once used the green "on" ink and partial the paused
+   * amber; that was the collision.
    */
-  --ff-verdict-blocked-ink: #1e7a34;
-  --ff-verdict-blocked-fill: rgba(52, 199, 89, 0.14);
-  --ff-verdict-blocked-line: rgba(52, 199, 89, 0.32);
-  --ff-verdict-partial-ink: #8a4300;
-  --ff-verdict-partial-fill: rgba(192, 76, 0, 0.1);
-  --ff-verdict-partial-line: rgba(192, 76, 0, 0.3);
-  --ff-verdict-open-ink: rgba(60, 60, 67, 0.75);
-  --ff-verdict-open-fill: rgba(120, 120, 128, 0.1);
-  --ff-verdict-open-line: rgba(60, 60, 67, 0.18);
+  --ff-verdict-blocked-ink: var(--ff-ink-on-fill);
+  --ff-verdict-blocked-fill: var(--ff-upstream-fill);
+  --ff-verdict-blocked-line: var(--ff-upstream-fill);
+  --ff-verdict-partial-ink: var(--ff-upstream-ink);
+  --ff-verdict-partial-fill: var(--ff-upstream-tint);
+  --ff-verdict-partial-line: rgba(88, 84, 214, 0.3);
+  --ff-verdict-open-ink: var(--ff-on-ink);
+  --ff-verdict-open-fill: var(--ff-on-tint);
+  --ff-verdict-open-line: rgba(52, 199, 89, 0.32);
   --ff-verdict-unknown-ink: rgba(60, 60, 67, 0.6);
   --ff-verdict-unknown-fill: rgba(120, 120, 128, 0.06);
   --ff-verdict-unknown-line: rgba(60, 60, 67, 0.14);

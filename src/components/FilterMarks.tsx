@@ -8,10 +8,11 @@
  * policy with its own popover; the card-level Pause/Schedule pair stays with
  * Internet alone.
  *
- * A mark shows whichever thing is actually blocking the category. An enabled
- * FamilyFi rule wins and renders in the accent; otherwise the mark falls back to
- * what this group's own resolver reports, in purple. The colour answers *who*,
- * which is why upstream does not borrow the accent.
+ * A mark shows whichever thing is actually blocking the category. A FamilyFi rule
+ * blocking right now wins and renders in red, the same red as the sheet's Turn off;
+ * otherwise the mark falls back to what this group's own resolver reports, in purple.
+ * The colour answers *who*, which is why neither borrows the accent. Green is a
+ * measured all-clear and grey is "we have not looked" — never the same thing.
  */
 
 import { useState, type ReactNode } from "react";
@@ -24,8 +25,10 @@ import {
   type Rule,
 } from "@/lib/rules";
 import {
+  appMarkState,
   categoryMarkLabel,
   categoryMarkState,
+  categoryMarkStyle,
   categoryMarkWord,
   effectiveCheck,
   ruleActivelyBlocking,
@@ -58,20 +61,8 @@ function MarkButton({
   onClick: () => void;
   children: ReactNode;
 }) {
-  const fill =
-    state === "on"
-      ? "var(--ff-accent)"
-      : state === "blocked"
-        ? "var(--ff-upstream-fill)"
-        : state === "partial"
-          ? "var(--ff-upstream-tint)"
-          : "var(--ff-field)";
-  const ink =
-    state === "on" || state === "blocked"
-      ? "var(--ff-ink-on-fill)"
-      : state === "partial"
-        ? "var(--ff-upstream-ink)"
-        : "var(--ff-ink-2)";
+  const { fill, ink } = categoryMarkStyle(state);
+  const word = categoryMarkWord(state);
   return (
     <button
       type="button"
@@ -88,11 +79,13 @@ function MarkButton({
       <span className="text-[10px]" style={{ color: "var(--ff-ink-2)" }}>
         {label}
       </span>
-      <span
-        className="text-[9px]"
-        style={{ color: state === "off" ? "var(--ff-ink-4)" : "var(--ff-ink-3)" }}
-      >
-        {categoryMarkWord(state)}
+      {/*
+        Always rendered, even when wordless, so marks in a row keep one baseline.
+        --ff-ink-2, not the ink-3 this used to take: 9px text may not sit below 0.7
+        alpha (AGENTS.md), and ink-3 was 3.4:1 on the card.
+      */}
+      <span className="text-[9px]" style={{ color: "var(--ff-ink-2)" }}>
+        {word || "\u00A0"}
       </span>
     </button>
   );
@@ -181,7 +174,7 @@ export function GroupFilterMarks({
                   <MarkButton
                     key={rule.id}
                     label={name}
-                    state={ruleActivelyBlocking(rule, timezone) ? "on" : "off"}
+                    state={appMarkState(ruleActivelyBlocking(rule, timezone))}
                     onClick={() => setSheet({ kind: "app", name, rule })}
                   >
                     <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>

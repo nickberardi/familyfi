@@ -22,9 +22,25 @@ function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">):
 }
 
 describe("rules helpers", () => {
-  it("exposes three curated slots without Porn", () => {
-    expect(CURATED_CATEGORY_SLOTS.map((s) => s.slot)).toEqual(["video", "social", "gaming"]);
-    expect(CURATED_CATEGORY_SLOTS.map((s) => s.categoryId)).toEqual([4, 24, 8]);
+  it("exposes the curated slots without Porn", () => {
+    expect(CURATED_CATEGORY_SLOTS.map((s) => s.slot)).toEqual([
+      "video",
+      "social",
+      "gaming",
+      "vpn",
+      "messaging",
+    ]);
+    expect(CURATED_CATEGORY_SLOTS.map((s) => s.categoryId)).toEqual([4, 24, 8, 11, 0]);
+  });
+
+  /**
+   * Messaging's DPI id is 0. Every id-keyed lookup has to survive that, because a
+   * truthiness test anywhere on this path silently drops the whole slot.
+   */
+  it("resolves the Messaging slot even though its category id is zero", () => {
+    const rules = [rule({ id: "m", kind: "category", targetIds: [0], enabled: true })];
+    expect(categoryRuleForSlot(rules, "g1", 0)?.id).toBe("m");
+    expect(parentFacingRuleLabel(rules[0], new Map())).toBe("Messaging");
   });
 
   it("resolves category and app rules for a group", () => {

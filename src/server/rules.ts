@@ -35,8 +35,13 @@ export function publicRule(rule: Rule): PublicRule {
   };
 }
 
+/**
+ * Zero is a valid DPI id — it is the Messaging curated slot's category — so the floor
+ * here is `>= 0`, not `> 0`. The old positive-only filter silently dropped it, turning
+ * a Messaging rule into an empty target list and an "at least one target id" error.
+ */
 export function normalizeTargetIds(kind: RuleKind, raw: number[]): number[] {
-  const ids = [...new Set(raw.map((n) => Math.trunc(n)).filter((n) => Number.isFinite(n) && n > 0))].sort(
+  const ids = [...new Set(raw.map((n) => Math.trunc(n)).filter((n) => Number.isFinite(n) && n >= 0))].sort(
     (a, b) => a - b,
   );
   if (ids.length === 0) throw new Error("At least one target id is required.");

@@ -265,7 +265,7 @@ export function NewRuleSheet({
                   })}
                 </div>
                 <p className="mt-1.5 text-[12px]" style={{ color: "var(--ff-ink-3)" }}>
-                  Curated slots: Video, Social, Gaming.
+                  Curated slots: {CURATED_CATEGORY_SLOTS.map((slot) => slot.label).join(", ")}.
                 </p>
               </>
             ) : (

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { dpiAppBlockPolicy, dpiAppNetworkBlockPolicy, dpiCategoryBlockPolicy, dpiCategoryNetworkBlockPolicy } from "@/server/unifi/payloads";
 import { CURATED_CATEGORY_CANDIDATES, CURATED_MAP_STATUS } from "@/server/unifi/curated-categories";
+import { CURATED_CATEGORY_SLOTS } from "@/lib/rules";
+import { UPSTREAM_SEED_CATEGORIES } from "@/lib/upstream-domains";
 
 describe("DPI policy payloads", () => {
   it("builds APPLICATION_CATEGORY destination with MAC source and integer ids", () => {
@@ -41,11 +43,30 @@ describe("DPI policy payloads", () => {
 });
 
 describe("curated map", () => {
-  it("locks Video / Social / Gaming curated ids (no Porn slot)", () => {
+  it("locks the curated ids (no Porn slot)", () => {
     expect(CURATED_MAP_STATUS).toBe("confirmed");
-    expect(CURATED_CATEGORY_CANDIDATES.map((c) => c.slot)).toEqual(["video", "social", "gaming"]);
-    expect(CURATED_CATEGORY_CANDIDATES.map((c) => c.categoryId)).toEqual([4, 24, 8]);
+    expect(CURATED_CATEGORY_CANDIDATES.map((c) => c.slot)).toEqual([
+      "video",
+      "social",
+      "gaming",
+      "vpn",
+      "messaging",
+    ]);
+    expect(CURATED_CATEGORY_CANDIDATES.map((c) => c.categoryId)).toEqual([4, 24, 8, 11, 0]);
     expect(CURATED_CATEGORY_CANDIDATES.some((c) => (c as { slot: string }).slot === "porn")).toBe(false);
+  });
+
+  /** The server table and the client mirror are two files; they must not drift. */
+  it("matches the client-side mirror exactly", () => {
+    expect(CURATED_CATEGORY_SLOTS).toEqual(CURATED_CATEGORY_CANDIDATES);
+  });
+
+  /** Every curated slot needs a domain list behind it, or its mark can never go purple. */
+  it("has an upstream seed category for every curated slot", () => {
+    const seeded = new Set(UPSTREAM_SEED_CATEGORIES.map((category) => category.slug));
+    for (const candidate of CURATED_CATEGORY_CANDIDATES) {
+      expect(seeded.has(candidate.slot), candidate.slot).toBe(true);
+    }
   });
 });
 

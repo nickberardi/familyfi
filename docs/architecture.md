@@ -57,6 +57,31 @@ Official client overview/details do not include `networkId`. Mapping:
 
 Destination zone: first of External, WAN, Internet (case-insensitive). Source: one policy per source zone. IP scope: `IPV4_AND_IPV6` with no protocol filter. IPv6 blocking, overnight UniFi scheduler windows, and a second concurrent MAC are unproven; do not claim dual-stack blocking.
 
+### Curated category slots
+
+`src/server/unifi/curated-categories.ts` maps five parent-facing slots onto confirmed
+integer DPI category ids: Video (4), Social (24), Gaming (8), VPN (11) and Messaging (0).
+`src/lib/rules.ts` mirrors that table for the browser and a unit test asserts the two
+cannot drift. Only ids go into a policy body; `catalogName` is the console's own name for
+that id and exists for docs and UI. Adult is deliberately not a slot, though the full
+catalog still lists it for an arbitrary id pick.
+
+Video, Social and Gaming were read off a household console. VPN and Messaging were added
+against a catalog dump of Network 10.6.106 whose ids 4 / 8 / 22 / 24 / 28 reproduce the
+already-confirmed map and the fixture's names exactly; that agreement on known ids is
+what promotes the two new ones. Messaging is category 0 alone — the catalog also carries
+15 "Web instant messengers", but it holds three obscure regional clients and a slot maps
+to one id.
+
+**Messaging's id is zero, so nothing on this path may test a target id for truthiness.**
+Rule validation is `nonnegative`, not `positive`, and `normalizeTargetIds` filters on
+`>= 0`. Both were `> 0` and silently turned a Messaging rule into an empty target list.
+An integration test walks the id from the API through to the policy body.
+
+Every curated slot also has a domain list of the same slug behind it in
+`src/lib/upstream-domains.ts`, which is what lets its mark report a DNS verdict when no
+policy is blocking; a unit test holds that pairing.
+
 Mocks and fixtures do not prove enforcement. `UNIFI_MOCK=1` routes Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; it is ignored in production. The spike CLI (`scripts/spike`) is for live gateway experiments; see [spike/OPERATOR.md](spike/OPERATOR.md).
 
 ## Upstream DNS categories
@@ -98,10 +123,25 @@ that genuinely is blocking. `ruleActivelyBlocking()` evaluates that against the
 household timezone through the same `inRecurringWindow` the desired-block formula uses,
 which is why `schedule.ts` lives in `src/lib` — one implementation, reachable from both
 sides. A malformed schedule evaluates to not-blocking rather than throwing: claiming a
-block we cannot verify is the worse of the two failures. `categoryMarkState()` is that rule and nothing else implements it. The accent
-belongs to FamilyFi's own blocks and upstream renders purple, because on a mark the
-colour answers *who* is blocking; the verdict chips on Categories use their own ladder,
-where the question is instead how much of the category is filtered.
+block we cannot verify is the worse of the two failures. `categoryMarkState()` is that
+rule and nothing else implements it.
+
+A mark has five states, and the colour answers *who* is blocking. Red is FamilyFi's own
+policy, the same red as the sheet's Turn off. Purple is the resolver — solid when it
+blocks the whole domain list, a tint when it blocks part of it. Green is a measured
+all-clear. Grey is "we have not looked". Both blocking states read the word *blocked*
+and the partial one reads *partial*; the two that are not blocking carry no word at all.
+
+Green and grey are separate states on purpose. Both mean nothing is blocking, but only
+green is a claim about the resolver, and a category we never measured must not borrow
+it — that false assurance is the thing this whole feature exists to avoid. It is also
+why an app mark, which has no resolver behind it, reports grey rather than green
+(`appMarkState()`).
+
+The verdict chips on Categories share this palette rather than keeping their own. They
+are driven by the same `UpstreamCheck` row, so a colour cannot mean "the resolver blocks
+this" on one screen and "nothing blocks this" on the next; the chips used to paint
+*blocked* green, which collided head-on with green meaning all-clear on a mark.
 
 A verdict belongs to a resolver, not to a category. A group may carry its own endpoint
 (`Group.dohOverrideUrl`), and `UpstreamCheck` is keyed `(categoryId, groupId)` with a

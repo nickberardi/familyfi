@@ -26,7 +26,8 @@ export async function GET(request: Request, ctx: Ctx) {
 }
 
 const PatchBody = z.object({
-  targetIds: z.array(z.number().int().positive()).min(1).max(100).optional(),
+  // `nonnegative`, not `positive`: DPI category 0 is Messaging. See normalizeTargetIds.
+  targetIds: z.array(z.number().int().nonnegative()).min(1).max(100).optional(),
   networkIds: z.array(z.string().min(1)).min(1).optional(),
   enabled: z.boolean().optional(),
   mode: z.enum(["always", "scheduled"]).optional(),
