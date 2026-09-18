@@ -115,6 +115,20 @@ slug to the first available `-custom`, `-custom-2`, etc. before creating the bui
 category. Its id, label, source, enabled setting, domains and checks are preserved.
 The move and seed creation share a transaction; repeated boots do not move it again.
 
+The sweep runs on a household-local wall-clock schedule — `Household.dohProbeTime`
+("HH:MM") and `dohProbeDays` (0 Sunday–6 Saturday, all seven by default) evaluated
+against `Household.timezone` — not an interval counted from the last boot. A single
+`setTimeout` is re-armed after each fire (`src/server/upstream/schedule.ts`), reusing
+`nextClockOnDays` (`src/lib/display.ts`), the same DST-correct function behind bedtime's
+`nextBedtimeResumeAt`. A restart is not itself a trigger: at boot, and on every timer
+fire, the process claims the currently-due scheduled instant with a conditional update
+(`dohProbeLastRunAt IS NULL OR < due`) inside the existing upstream lock before
+sweeping. This is what lets a restart shortly after the scheduled time still catch up
+that day's report exactly once, and what keeps two processes off the same run without a
+second lock table — one deployment serves one household, so a claim column is enough.
+Changing the probe time, days, or the household timezone re-arms the timer immediately
+rather than waiting for the next restart.
+
 Lists are uncapped. The twenty-per-category figure bounds what FamilyFi ships, not what
 a household may add, and the cost note under each list is how growth is priced.
 

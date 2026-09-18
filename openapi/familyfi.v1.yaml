@@ -1428,7 +1428,7 @@ paths:
     put:
       operationId: updateUpstreamResolver
       tags: [Upstream]
-      summary: Set the endpoint or the sweep settings
+      summary: Set the endpoint or the sweep schedule
       description: |
         Changing the URL immediately clears household verdicts. Saving the same URL
         or disabling checking preserves them. In-flight results from a replaced
@@ -2099,20 +2099,35 @@ components:
     UpstreamResolver:
       type: object
       additionalProperties: false
-      required: [configured, url, probeEnabled, intervalMinutes, timeoutMs]
+      required: [configured, url, probeEnabled, probeTime, probeDays, timeoutMs, lastRunAt, nextRunAt]
       properties:
         configured: { type: boolean }
         url:
           type: [string, "null"]
           description: The endpoint in full, e.g. https://dns.example.com/dns-query/profile
         probeEnabled: { type: boolean }
-        intervalMinutes: { type: integer }
+        probeTime: { type: string, description: "Household-local HH:MM, 24-hour." }
+        probeDays:
+          type: array
+          items: { type: integer, minimum: 0, maximum: 6 }
+          description: 0 (Sunday) through 6 (Saturday). Empty means checking never runs.
         timeoutMs: { type: integer }
+        lastRunAt:
+          type: [string, "null"]
+          format: date-time
+          description: The most recent completed sweep, or null if none yet.
+        nextRunAt:
+          type: [string, "null"]
+          format: date-time
+          description: The next scheduled sweep, or null when checking is off or no days are selected.
     UpstreamResolverUpdate:
       type: object
       additionalProperties: false
       properties:
         url: { type: string, description: Absolute https URL. }
         probeEnabled: { type: boolean }
-        intervalMinutes: { type: integer, minimum: 1, maximum: 10080 }
+        probeTime: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "Household-local HH:MM, 24-hour." }
+        probeDays:
+          type: array
+          items: { type: integer, minimum: 0, maximum: 6 }
         timeoutMs: { type: integer, minimum: 500, maximum: 30000 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { PUT as setHousehold, DELETE as clearHousehold } from "@/app/api/v1/upstream/resolver/route";
+import { GET as getHousehold, PUT as setHousehold, DELETE as clearHousehold } from "@/app/api/v1/upstream/resolver/route";
 import { PUT as setGroup, DELETE as clearGroup } from "@/app/api/v1/groups/[id]/resolver/route";
 import { prisma } from "@/server/db";
 import { probeCategory } from "@/server/upstream/probe";
@@ -93,5 +93,67 @@ describe("resolver verdict invalidation", () => {
       where: { categoryId: category.id, groupId: owner === "household" ? null : group.id },
     })).toBe(0);
     expect(await prisma().upstreamCheck.count()).toBe(1);
+  });
+});
+
+describe("resolver check schedule", () => {
+  beforeEach(resetDatabase);
+
+  async function login_() {
+    const response = await login(request("/api/v1/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD, client: "browser" }),
+    }));
+    expect(response.status).toBe(200);
+    return authFromLogin(response);
+  }
+
+  it("round-trips probeTime and probeDays", async () => {
+    const auth = await login_();
+    await prisma().household.update({ where: { id: "default" }, data: { dohUrl: OLD_URL } });
+    const res = await setHousehold(request("/api/v1/upstream/resolver", {
+      auth, method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ probeTime: "09:30", probeDays: [1, 3, 5] }),
+    }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.resolver.probeTime).toBe("09:30");
+    expect(body.resolver.probeDays).toEqual([1, 3, 5]);
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    expect(household.dohProbeTime).toBe("09:30");
+    expect(household.dohProbeDays).toEqual([1, 3, 5]);
+  });
+
+  it("rejects a malformed probeTime", async () => {
+    const auth = await login_();
+    const res = await setHousehold(request("/api/v1/upstream/resolver", {
+      auth, method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ probeTime: "25:99" }),
+    }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error?.code).toBe("invalid_probe_time");
+  });
+
+  it("rejects an out-of-range day", async () => {
+    const auth = await login_();
+    const res = await setHousehold(request("/api/v1/upstream/resolver", {
+      auth, method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ probeDays: [0, 7] }),
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  it("carries nextRunAt on GET when checking is on, and null when off", async () => {
+    const auth = await login_();
+    await prisma().household.update({
+      where: { id: "default" },
+      data: { dohUrl: OLD_URL, dohProbeEnabled: true, dohProbeTime: "12:00", dohProbeDays: [0, 1, 2, 3, 4, 5, 6] },
+    });
+    const on = await getHousehold(request("/api/v1/upstream/resolver", { auth }));
+    expect((await on.json()).resolver.nextRunAt).not.toBeNull();
+
+    await prisma().household.update({ where: { id: "default" }, data: { dohProbeEnabled: false } });
+    const off = await getHousehold(request("/api/v1/upstream/resolver", { auth }));
+    expect((await off.json()).resolver.nextRunAt).toBeNull();
   });
 });
