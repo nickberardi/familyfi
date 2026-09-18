@@ -28,6 +28,7 @@ import {
   categoryMarkState,
   categoryMarkWord,
   effectiveCheck,
+  ruleActivelyBlocking,
   upstreamCategoryForSlot,
   type CategoryMarkState,
   type UpstreamCategoryRow,
@@ -102,6 +103,7 @@ export function GroupFilterMarks({
   rules,
   catalogNames,
   upstreamCategories,
+  timezone,
   showAppAdd,
   onRulesChanged,
 }: {
@@ -113,6 +115,8 @@ export function GroupFilterMarks({
    * `effectiveCheck(…, group)`, so a kid on their own resolver reports that resolver.
    */
   upstreamCategories?: UpstreamCategoryRow[];
+  /** Household IANA zone — a scheduled rule is only blocking inside its local window. */
+  timezone: string;
   /** The + tile is a member-page action only, never the family-list card (A5). */
   showAppAdd?: boolean;
   onRulesChanged: () => void;
@@ -138,10 +142,12 @@ export function GroupFilterMarks({
           <div className="flex flex-wrap gap-3.5 py-2">
             {CURATED_CATEGORY_SLOTS.map((slot) => {
               const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
-              // An enabled rule wins; otherwise this group's own resolver decides.
+              // A rule blocking *right now* wins; otherwise this group's resolver
+              // decides. A scheduled rule outside its window is not blocking.
               const upstream = upstreamCategoryForSlot(upstreamCategories ?? [], slot.slot);
               const check = upstream ? effectiveCheck(upstream.checks, group) : null;
-              const state = categoryMarkState(Boolean(rule?.enabled), check);
+              const blocking = ruleActivelyBlocking(rule, timezone);
+              const state = categoryMarkState(blocking, check);
               return (
                 <MarkButton
                   key={slot.slot}
@@ -154,6 +160,7 @@ export function GroupFilterMarks({
                       categoryId: slot.categoryId,
                       rule,
                       upstream: check,
+                      activelyBlocking: blocking,
                     })
                   }
                 >
@@ -174,7 +181,7 @@ export function GroupFilterMarks({
                   <MarkButton
                     key={rule.id}
                     label={name}
-                    state={rule.enabled ? "on" : "off"}
+                    state={ruleActivelyBlocking(rule, timezone) ? "on" : "off"}
                     onClick={() => setSheet({ kind: "app", name, rule })}
                   >
                     <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>

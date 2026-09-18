@@ -1,5 +1,14 @@
 /** Client-safe types and presentation for upstream categories. */
 
+import { inRecurringWindow } from "@/lib/schedule";
+
+type RuleScheduleShape = {
+  enabled: boolean;
+  days: number[];
+  start: string | null;
+  end: string | null;
+};
+
 export type UpstreamVerdictValue = "blocked" | "partial" | "open" | "unknown";
 
 export type UpstreamDomainRow = {
@@ -170,11 +179,39 @@ export function suggestedMonogramFor(label: string): string {
 export type CategoryMarkState = "on" | "blocked" | "partial" | "off";
 
 /**
- * The precedence rule: an existing, enabled FamilyFi rule is the state shown.
- * Otherwise the mark falls back to the DNS-derived verdict.
+ * Is this rule blocking the category *right now*?
  *
- * A rule that exists but is turned off does not win — it is not blocking anything, so
- * the honest answer is whatever the resolver is doing.
+ * Not the same as enabled. A scheduled rule outside its window is switched on and
+ * blocking nothing, so it must not be reported as the thing keeping a category shut —
+ * and it must not hide a resolver that genuinely is.
+ *
+ * A malformed schedule evaluates to "not blocking" rather than throwing: a render must
+ * not crash over bad stored times, and claiming a block we cannot verify is the worse
+ * of the two failures.
+ */
+export function ruleActivelyBlocking(
+  rule: { enabled: boolean; mode: "always" | "scheduled"; schedule: RuleScheduleShape } | undefined,
+  timezone: string,
+  now = new Date(),
+): boolean {
+  if (!rule?.enabled) return false;
+  if (rule.mode === "always") return true;
+  const { enabled, days, start, end } = rule.schedule;
+  if (!enabled || !start || !end) return false;
+  try {
+    return inRecurringWindow(now, { enabled, days, start, end }, timezone);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The precedence rule: a FamilyFi rule that is *actively blocking* is the state shown.
+ * Otherwise the mark falls back to the DNS-derived verdict — the downstream status.
+ *
+ * So a rule that is off, or on but outside its schedule, does not win. It is blocking
+ * nothing at this moment, and reporting it as the blocker would both overstate what
+ * FamilyFi is doing and hide what the resolver is actually doing.
  *
  * `check` must already be resolved for this card's group with `effectiveCheck`, which
  * is what makes a mark on a kid with their own resolver report that resolver rather
@@ -185,10 +222,10 @@ export type CategoryMarkState = "on" | "blocked" | "partial" | "off";
  * still no; the sheet carries the nuance.
  */
 export function categoryMarkState(
-  ruleEnabled: boolean,
+  activelyBlocking: boolean,
   check: UpstreamCheckRow | null,
 ): CategoryMarkState {
-  if (ruleEnabled) return "on";
+  if (activelyBlocking) return "on";
   if (check?.verdict === "blocked") return "blocked";
   if (check?.verdict === "partial") return "partial";
   return "off";

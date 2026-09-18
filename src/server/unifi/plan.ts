@@ -1,5 +1,5 @@
 import { AssignmentState, GroupKind, GroupMode } from "@prisma/client";
-import { isSuspended, type Schedule, type Suspension } from "../schedule";
+import { isSuspended, type Schedule, type Suspension } from "@/lib/schedule";
 import { groupPolicyName, quarantinePolicyName } from "./names";
 import { toUnifiSchedule } from "./schedule-map";
 import type { UnifiFirewallSchedule } from "./types";

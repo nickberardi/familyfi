@@ -3,7 +3,7 @@ import { networkInScope, type NetworkScope } from "./scope";
 import { dpiNetworkRulePolicyName, dpiRulePolicyName } from "./names";
 import { toUnifiSchedule } from "./schedule-map";
 import type { UnifiFirewallSchedule } from "./types";
-import { isSuspended, type Schedule, type Suspension } from "../schedule";
+import { isSuspended, type Schedule, type Suspension } from "@/lib/schedule";
 
 export type PlanDpiRule = {
   id: string;

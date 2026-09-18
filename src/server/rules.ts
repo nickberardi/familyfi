@@ -1,5 +1,5 @@
 import { RuleKind, RuleMode, RuleScope, type Rule, type Group } from "@prisma/client";
-import { assertSchedule } from "./schedule";
+import { assertSchedule } from "@/lib/schedule";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
 
 export type PublicRule = {

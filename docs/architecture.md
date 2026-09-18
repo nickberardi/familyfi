@@ -6,7 +6,7 @@ One Next.js App Router application serves the UI and `/api/v1`. All UniFi calls 
 src/app          pages, layouts, api/v1 route handlers
 src/components   shared UI
 src/server       env, database, auth, schedule, UniFi, reconciliation
-src/lib          client-safe constants and types
+src/lib          client-safe constants, types, and pure logic (schedule windows)
 prisma           PostgreSQL schema and migrations
 openapi          versioned HTTP contract
 docker           Dockerfile and Compose files
@@ -88,11 +88,17 @@ outright. A domain that has left the shipped seed is left in place rather than d
 Lists are uncapped. The twenty-per-category figure bounds what FamilyFi ships, not what
 a household may add, and the cost note under each list is how growth is priced.
 
-A category mark on a group card shows whichever thing is actually blocking: an existing,
-enabled FamilyFi rule is the state shown, and otherwise the mark falls back to the
-DNS-derived verdict for that group's resolver. A rule that exists but is turned off does
-not win — it is blocking nothing, so the honest answer is whatever the resolver is
-doing. `categoryMarkState()` is that rule and nothing else implements it. The accent
+A category mark on a group card shows whichever thing is actually blocking: a FamilyFi
+rule that is blocking **at this moment** is the state shown, and otherwise the mark
+reports the downstream status — the DNS verdict for that group's resolver.
+
+Actively blocking is not the same as enabled. A scheduled rule outside its window is
+switched on and blocking nothing, so it neither claims the mark nor hides a resolver
+that genuinely is blocking. `ruleActivelyBlocking()` evaluates that against the
+household timezone through the same `inRecurringWindow` the desired-block formula uses,
+which is why `schedule.ts` lives in `src/lib` — one implementation, reachable from both
+sides. A malformed schedule evaluates to not-blocking rather than throwing: claiming a
+block we cannot verify is the worse of the two failures. `categoryMarkState()` is that rule and nothing else implements it. The accent
 belongs to FamilyFi's own blocks and upstream renders purple, because on a mark the
 colour answers *who* is blocking; the verdict chips on Categories use their own ladder,
 where the question is instead how much of the category is filtered.

@@ -96,6 +96,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
                     rules={rules}
                     catalogNames={catalogNames}
                     upstreamCategories={upstreamCategories}
+                    timezone={household?.timezone ?? "UTC"}
                     onRulesChanged={() => void loadRules()}
                   />
                 )

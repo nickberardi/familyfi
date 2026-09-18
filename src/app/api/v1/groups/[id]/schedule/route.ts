@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { assertSchedule } from "@/server/schedule";
+import { assertSchedule } from "@/lib/schedule";
 import { enqueueChange } from "@/server/changes";
 import { publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { publicGroup } from "@/server/groups";
-import { extendSuspensionUntil } from "@/server/schedule";
+import { extendSuspensionUntil } from "@/lib/schedule";
 import { prisma } from "@/server/db";
 import { readJson, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";

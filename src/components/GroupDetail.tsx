@@ -237,6 +237,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             rules={rules}
             catalogNames={catalogNames}
             upstreamCategories={upstreamCategories}
+            timezone={household?.timezone ?? "UTC"}
             showAppAdd
             onRulesChanged={() => void loadRules()}
           />
