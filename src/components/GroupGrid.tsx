@@ -7,6 +7,7 @@ import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 import { GroupFilterMarks } from "./FilterMarks";
+import type { UpstreamCategoryRow } from "@/lib/upstream";
 import { GroupCard } from "./GroupCard";
 import { groupActions } from "./group-actions";
 import { PauseSheet } from "./PauseSheet";
@@ -18,6 +19,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
   const [sheet, setSheet] = useState<{ group: Group; mode: "pause" | "extend" } | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
+  const [upstreamCategories, setUpstreamCategories] = useState<UpstreamCategoryRow[]>([]);
   const rows = groups.filter((group) => group.kind === kind);
   const timezone = household?.timezone ?? "America/New_York";
   const title = kind === "family" ? "Family" : "Things";
@@ -31,12 +33,18 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
 
   const loadRules = useCallback(async () => {
     try {
-      const [{ rules: next }, cats, apps] = await Promise.all([
+      const [{ rules: next }, cats, apps, upstream] = await Promise.all([
         api<{ rules: Rule[] }>("/api/v1/rules"),
         api<{ categories: DpiItem[] }>("/api/v1/dpi/categories").catch(() => ({ categories: [] as DpiItem[] })),
         api<{ applications: DpiItem[] }>("/api/v1/dpi/applications").catch(() => ({ applications: [] as DpiItem[] })),
+        // Each card resolves its own verdict from these — two kids on different
+        // resolvers show different answers on the same page.
+        api<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({
+          categories: [] as UpstreamCategoryRow[],
+        })),
       ]);
       setRules(next);
+      setUpstreamCategories(upstream.categories);
       const map = new Map<string, string>();
       for (const item of cats.categories) map.set(`category:${item.id}`, item.name);
       for (const item of apps.applications) map.set(`app:${item.id}`, item.name);
@@ -87,6 +95,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
                     group={group}
                     rules={rules}
                     catalogNames={catalogNames}
+                    upstreamCategories={upstreamCategories}
                     onRulesChanged={() => void loadRules()}
                   />
                 )

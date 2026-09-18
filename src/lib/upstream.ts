@@ -158,3 +158,65 @@ export function suggestedMonogramFor(label: string): string {
   const letters = label.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2).toUpperCase();
   return letters || "NEW";
 }
+
+/**
+ * What a category mark on a group card shows.
+ *
+ * - `on` — a FamilyFi rule is blocking it. Ours, and it wins.
+ * - `blocked` — nothing of ours, but this group's resolver filters it.
+ * - `partial` — the resolver filters some of the category's domains.
+ * - `off` — nothing is known to be blocking it.
+ */
+export type CategoryMarkState = "on" | "blocked" | "partial" | "off";
+
+/**
+ * The precedence rule: an existing, enabled FamilyFi rule is the state shown.
+ * Otherwise the mark falls back to the DNS-derived verdict.
+ *
+ * A rule that exists but is turned off does not win — it is not blocking anything, so
+ * the honest answer is whatever the resolver is doing.
+ *
+ * `check` must already be resolved for this card's group with `effectiveCheck`, which
+ * is what makes a mark on a kid with their own resolver report that resolver rather
+ * than the household's.
+ *
+ * `unknown` and "never checked" both land on `off`. The mark answers "is something
+ * blocking this", and when we could not look the truthful answer about *FamilyFi* is
+ * still no; the sheet carries the nuance.
+ */
+export function categoryMarkState(
+  ruleEnabled: boolean,
+  check: UpstreamCheckRow | null,
+): CategoryMarkState {
+  if (ruleEnabled) return "on";
+  if (check?.verdict === "blocked") return "blocked";
+  if (check?.verdict === "partial") return "partial";
+  return "off";
+}
+
+/** The word under a mark. Short by necessity — the sheet explains. */
+export function categoryMarkWord(state: CategoryMarkState): string {
+  return state === "on" ? "On" : state === "blocked" ? "DNS" : state === "partial" ? "Part" : "Off";
+}
+
+/** The accessible name, which has room to say what the word cannot. */
+export function categoryMarkLabel(label: string, state: CategoryMarkState): string {
+  switch (state) {
+    case "on":
+      return `${label} blocked by FamilyFi`;
+    case "blocked":
+      return `${label} already blocked by DNS`;
+    case "partial":
+      return `${label} partially blocked by DNS`;
+    default:
+      return `${label} not blocked`;
+  }
+}
+
+/** Finds the upstream category that corresponds to a curated DPI slot, by slug. */
+export function upstreamCategoryForSlot(
+  categories: UpstreamCategoryRow[],
+  slot: string,
+): UpstreamCategoryRow | undefined {
+  return categories.find((category) => category.slug === slot);
+}

@@ -110,6 +110,16 @@
 
   /* A struck-through seeded domain the household removed. */
   --ff-ink-struck: rgba(60, 60, 67, 0.4);
+
+  /*
+   * A mark blocked upstream rather than by us. Purple, not the accent: on a mark the
+   * colour answers *who* is blocking, and FamilyFi's own blocks own the accent. The
+   * verdict chips on Categories stay on their own ladder because there the colour
+   * answers a different question — how much of the category is filtered.
+   */
+  --ff-upstream-fill: #5854d6;
+  --ff-upstream-tint: rgba(88, 84, 214, 0.14);
+  --ff-upstream-ink: #4b47b8;
 }
 
 html {

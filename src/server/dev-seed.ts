@@ -1,4 +1,4 @@
-import { AccountKind, AssignmentState, FamilyRole, GroupKind } from "@prisma/client";
+import { AccountKind, AssignmentState, FamilyRole, GroupKind, UpstreamVerdict } from "@prisma/client";
 import { hashPassword } from "./auth";
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
@@ -172,9 +172,47 @@ async function ensureDummyHouseholdMembers() {
   });
 }
 
+/**
+ * A measured upstream verdict for two curated slots, so the DNS-derived mark states are
+ * visible without a real resolver — the same reason the mock household exists.
+ *
+ * Video is deliberately left unmeasured: a mark with no verdict and no rule must still
+ * read "not blocked", and that is the case most likely to regress.
+ */
+async function ensureMockUpstreamChecks() {
+  const measured: { slug: string; verdict: UpstreamVerdict; blockedCount: number }[] = [
+    { slug: "social", verdict: UpstreamVerdict.blocked, blockedCount: 20 },
+    { slug: "gaming", verdict: UpstreamVerdict.partial, blockedCount: 7 },
+  ];
+  for (const item of measured) {
+    const category = await prisma().upstreamCategory.findUnique({
+      where: { slug: item.slug },
+      select: { id: true },
+    });
+    if (!category) continue;
+    const existing = await prisma().upstreamCheck.findFirst({
+      where: { categoryId: category.id, groupId: null },
+      select: { id: true },
+    });
+    if (existing) continue;
+    await prisma().upstreamCheck.create({
+      data: {
+        categoryId: category.id,
+        groupId: null,
+        verdict: item.verdict,
+        blockedCount: item.blockedCount,
+        totalCount: 20,
+        results: [],
+        durationMs: 120,
+      },
+    });
+  }
+}
+
 /** Populate groups, a personal adult login, devices, and mock UniFi so the UI is usable without a console. */
 export async function ensureDevDummyData() {
   if (!unifiMockEnabled()) return;
   await ensureMockUnifiConnection();
   await ensureDummyHouseholdMembers();
+  await ensureMockUpstreamChecks();
 }

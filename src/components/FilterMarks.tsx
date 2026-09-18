@@ -8,9 +8,10 @@
  * policy with its own popover; the card-level Pause/Schedule pair stays with
  * Internet alone.
  *
- * Two marks from the prototype are deliberately absent: the purple upstream/DNS
- * state and the Porn slot. Both are out for v0.3.0 (issue #29), so a mark here
- * is only ever FamilyFi-owned On or Off.
+ * A mark shows whichever thing is actually blocking the category. An enabled
+ * FamilyFi rule wins and renders in the accent; otherwise the mark falls back to
+ * what this group's own resolver reports, in purple. The colour answers *who*,
+ * which is why upstream does not borrow the accent.
  */
 
 import { useState, type ReactNode } from "react";
@@ -22,6 +23,15 @@ import {
   parentFacingRuleLabel,
   type Rule,
 } from "@/lib/rules";
+import {
+  categoryMarkLabel,
+  categoryMarkState,
+  categoryMarkWord,
+  effectiveCheck,
+  upstreamCategoryForSlot,
+  type CategoryMarkState,
+  type UpstreamCategoryRow,
+} from "@/lib/upstream";
 import { CategoryGlyph } from "@/components/ui/CategoryGlyph";
 import { FilterSheet, type FilterSheetState } from "@/components/filters/FilterSheet";
 import { AddAppSheet } from "@/components/filters/AddAppSheet";
@@ -38,43 +48,51 @@ function SectionLabel({ children }: { children: ReactNode }) {
 /** A 34px mark with its label and state word beneath, per the Card System. */
 function MarkButton({
   label,
-  on,
+  state,
   onClick,
   children,
 }: {
   label: string;
-  on: boolean;
+  state: CategoryMarkState;
   onClick: () => void;
   children: ReactNode;
 }) {
+  const fill =
+    state === "on"
+      ? "var(--ff-accent)"
+      : state === "blocked"
+        ? "var(--ff-upstream-fill)"
+        : state === "partial"
+          ? "var(--ff-upstream-tint)"
+          : "var(--ff-field)";
+  const ink =
+    state === "on" || state === "blocked"
+      ? "var(--ff-ink-on-fill)"
+      : state === "partial"
+        ? "var(--ff-upstream-ink)"
+        : "var(--ff-ink-2)";
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={categoryMarkLabel(label, state)}
       className="flex w-[52px] flex-col items-center gap-1"
-      aria-label={`${label} ${on ? "On" : "Off"}`}
     >
-      <div
+      <span
         className="flex h-[34px] w-[34px] items-center justify-center rounded-full"
-        style={{
-          background: on ? "var(--ff-accent)" : "var(--ff-field)",
-          color: on ? "var(--ff-ink-on-fill)" : "var(--ff-ink-3)",
-        }}
+        style={{ background: fill, color: ink }}
       >
         {children}
-      </div>
-      <div
-        className="text-center text-[10px] leading-tight"
-        style={{ color: "var(--ff-ink-2)" }}
-      >
+      </span>
+      <span className="text-[10px]" style={{ color: "var(--ff-ink-2)" }}>
         {label}
-      </div>
-      <div
-        className="text-[9px] font-semibold"
-        style={{ color: on ? "var(--ff-accent)" : "var(--ff-ink-2)" }}
+      </span>
+      <span
+        className="text-[9px]"
+        style={{ color: state === "off" ? "var(--ff-ink-4)" : "var(--ff-ink-3)" }}
       >
-        {on ? "On" : "Off"}
-      </div>
+        {categoryMarkWord(state)}
+      </span>
     </button>
   );
 }
@@ -83,12 +101,18 @@ export function GroupFilterMarks({
   group,
   rules,
   catalogNames,
+  upstreamCategories,
   showAppAdd,
   onRulesChanged,
 }: {
   group: Group;
   rules: Rule[];
   catalogNames: Map<string, string>;
+  /**
+   * Upstream categories with every measured verdict. The mark resolves its own with
+   * `effectiveCheck(…, group)`, so a kid on their own resolver reports that resolver.
+   */
+  upstreamCategories?: UpstreamCategoryRow[];
   /** The + tile is a member-page action only, never the family-list card (A5). */
   showAppAdd?: boolean;
   onRulesChanged: () => void;
@@ -114,17 +138,22 @@ export function GroupFilterMarks({
           <div className="flex flex-wrap gap-3.5 py-2">
             {CURATED_CATEGORY_SLOTS.map((slot) => {
               const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
+              // An enabled rule wins; otherwise this group's own resolver decides.
+              const upstream = upstreamCategoryForSlot(upstreamCategories ?? [], slot.slot);
+              const check = upstream ? effectiveCheck(upstream.checks, group) : null;
+              const state = categoryMarkState(Boolean(rule?.enabled), check);
               return (
                 <MarkButton
                   key={slot.slot}
                   label={slot.label}
-                  on={Boolean(rule?.enabled)}
+                  state={state}
                   onClick={() =>
                     setSheet({
                       kind: "category",
                       name: slot.label,
                       categoryId: slot.categoryId,
                       rule,
+                      upstream: check,
                     })
                   }
                 >
@@ -145,7 +174,7 @@ export function GroupFilterMarks({
                   <MarkButton
                     key={rule.id}
                     label={name}
-                    on={rule.enabled}
+                    state={rule.enabled ? "on" : "off"}
                     onClick={() => setSheet({ kind: "app", name, rule })}
                   >
                     <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>
