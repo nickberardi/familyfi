@@ -45,7 +45,11 @@ async function childGroup(page: Page) {
 test("a mark reports DNS when no FamilyFi rule is blocking", async ({ page }) => {
   await signIn(page);
   const kid = await childGroup(page);
+  // Clear every slot this test asserts on, not just Social: a Video policy left by
+  // another run would flip that mark to ours and the failure would look like a bug.
   await clearSlotRules(page, kid.id, 24);
+  await clearSlotRules(page, kid.id, 8);
+  await clearSlotRules(page, kid.id, 4);
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
@@ -100,4 +104,48 @@ test("a FamilyFi rule outranks the DNS verdict on the same mark", async ({ page 
   await clearSlotRules(page, kid.id, 24);
   await page.reload();
   await expect(marks.getByRole("button", { name: /Social already blocked by DNS/i })).toBeVisible();
+});
+
+/**
+ * "We looked and nothing is blocking it" and "we never looked" both mean no block, and
+ * before this they were one grey mark reading "Off". Now one is green and the other
+ * stays neutral, because green is an assurance and we can only give it for a category
+ * we actually measured. The mock seeds VPN open and leaves Messaging unmeasured.
+ */
+test("a measured all-clear is not the same mark as an unmeasured category", async ({ page }) => {
+  await signIn(page);
+  const kid = await childGroup(page);
+  await clearSlotRules(page, kid.id, 11);
+  await clearSlotRules(page, kid.id, 0);
+  await page.goto(`/family/${kid.id}`);
+
+  const marks = page.getByTestId(`filter-marks-${kid.id}`);
+  // Anchored, because "VPN not blocked" is a prefix of the unmeasured wording.
+  const open = marks.getByRole("button", { name: /^VPN not blocked$/ });
+  const unknown = marks.getByRole("button", { name: /^Messaging not blocked by FamilyFi$/ });
+  await expect(open).toBeVisible();
+  await expect(unknown).toBeVisible();
+
+  const circleFill = (button: typeof open) =>
+    button.locator("span").first().evaluate((node) => getComputedStyle(node).backgroundColor);
+  expect(await circleFill(open)).not.toBe(await circleFill(unknown));
+});
+
+/** Both blocking states read "blocked"; only the colour says who is doing it. */
+test("a mark's word says blocked or partial, and nothing at all when nothing is", async ({ page }) => {
+  await signIn(page);
+  const kid = await childGroup(page);
+  await clearSlotRules(page, kid.id, 24);
+  await clearSlotRules(page, kid.id, 8);
+  await page.goto(`/family/${kid.id}`);
+
+  const marks = page.getByTestId(`filter-marks-${kid.id}`);
+  await expect(marks.getByRole("button", { name: /Social already blocked by DNS/i })).toContainText(
+    "blocked",
+  );
+  await expect(marks.getByRole("button", { name: /Gaming partially blocked by DNS/i })).toContainText(
+    "partial",
+  );
+  // The old vocabulary is gone: no mark says On, Off, DNS or Part any more.
+  await expect(marks.getByText(/^(On|Off|DNS|Part)$/)).toHaveCount(0);
 });

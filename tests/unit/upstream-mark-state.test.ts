@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  appMarkState,
   categoryMarkLabel,
   categoryMarkState,
+  categoryMarkStyle,
   categoryMarkWord,
   ruleActivelyBlocking,
   type UpstreamCheckRow,
@@ -86,7 +88,7 @@ describe("category mark state", () => {
   it("falls back to DNS when no rule is blocking", () => {
     expect(categoryMarkState(false, check("blocked"))).toBe("blocked");
     expect(categoryMarkState(false, check("partial"))).toBe("partial");
-    expect(categoryMarkState(false, check("open"))).toBe("off");
+    expect(categoryMarkState(false, check("open"))).toBe("open");
   });
 
   /**
@@ -101,20 +103,55 @@ describe("category mark state", () => {
     expect(categoryMarkState(ruleActivelyBlocking(rule(), ZONE, inWindow), check("blocked"))).toBe("on");
   });
 
-  it("shows off when nothing is known", () => {
-    expect(categoryMarkState(false, check("unknown"))).toBe("off");
-    expect(categoryMarkState(false, null)).toBe("off");
+  /**
+   * The state that pays for itself: a measured all-clear is green, and an unmeasured
+   * category must not borrow that green. Both mean "nothing of ours is blocking it",
+   * but only one of them is a claim about the resolver.
+   */
+  it("keeps never-looked apart from looked-and-clear", () => {
+    expect(categoryMarkState(false, check("unknown"))).toBe("unknown");
+    expect(categoryMarkState(false, null)).toBe("unknown");
+    expect(categoryMarkState(false, check("open"))).toBe("open");
+    expect(categoryMarkStyle("unknown")).not.toEqual(categoryMarkStyle("open"));
+  });
+
+  /** An app rule has no resolver behind it, so an app mark can never claim green. */
+  it("never reports an app mark as measured-open", () => {
+    expect(appMarkState(true)).toBe("on");
+    expect(appMarkState(false)).toBe("unknown");
   });
 
   it("names each state for a reader and for a screen reader", () => {
-    expect(categoryMarkWord("on")).toBe("On");
-    expect(categoryMarkWord("blocked")).toBe("DNS");
-    expect(categoryMarkWord("partial")).toBe("Part");
-    expect(categoryMarkWord("off")).toBe("Off");
+    // Both blocking states read the same word; the colour answers who is blocking.
+    expect(categoryMarkWord("on")).toBe("blocked");
+    expect(categoryMarkWord("blocked")).toBe("blocked");
+    expect(categoryMarkWord("partial")).toBe("partial");
+    // Nothing blocking gets no word at all — the fill carries it.
+    expect(categoryMarkWord("open")).toBe("");
+    expect(categoryMarkWord("unknown")).toBe("");
 
     expect(categoryMarkLabel("Video", "on")).toBe("Video blocked by FamilyFi");
     expect(categoryMarkLabel("Video", "blocked")).toBe("Video already blocked by DNS");
     expect(categoryMarkLabel("Video", "partial")).toBe("Video partially blocked by DNS");
-    expect(categoryMarkLabel("Video", "off")).toBe("Video not blocked");
+    expect(categoryMarkLabel("Video", "open")).toBe("Video not blocked");
+    expect(categoryMarkLabel("Video", "unknown")).toBe("Video not blocked by FamilyFi");
+  });
+
+  /**
+   * The colours themselves, because the words alone do not distinguish `on` from
+   * `blocked` and a swap between them would misattribute the block to FamilyFi.
+   */
+  it("gives every state its own fill, and reuses no colour across two meanings", () => {
+    const states = ["on", "blocked", "partial", "open", "unknown"] as const;
+    const fills = states.map((state) => categoryMarkStyle(state).fill);
+    expect(new Set(fills).size).toBe(states.length);
+    expect(categoryMarkStyle("on").ink).toBe("var(--ff-danger)");
+    expect(categoryMarkStyle("open").ink).toBe("var(--ff-on-ink)");
+    // Every colour is a token; a literal here would sail past naming.test.ts.
+    for (const state of states) {
+      const style = categoryMarkStyle(state);
+      expect(style.fill).toMatch(/^var\(--ff-[a-z0-9-]+\)$/);
+      expect(style.ink).toMatch(/^var\(--ff-[a-z0-9-]+\)$/);
+    }
   });
 });

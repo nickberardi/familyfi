@@ -769,8 +769,8 @@ paths:
       summary: List UniFi DPI categories
       description: |
         Proxies UniFi `GET /v1/dpi/categories`. Returns integer ids and catalog
-        names. Includes confirmed curated slots (Video / Social / Gaming only;
-        no Porn curated slot). Secrets never leave the server.
+        names. Includes confirmed curated slots (Video / Social / Gaming / VPN /
+        Messaging; no Porn curated slot). Secrets never leave the server.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: filter
@@ -1767,7 +1767,7 @@ components:
       additionalProperties: false
       required: [slot, label, categoryId, catalogName]
       properties:
-        slot: { type: string, enum: [video, social, gaming] }
+        slot: { type: string, enum: [video, social, gaming, vpn, messaging] }
         label: { type: string }
         categoryId: { type: integer }
         catalogName: { type: string }
@@ -1775,7 +1775,10 @@ components:
       type: object
       additionalProperties: false
       required: [status, candidates]
-      description: Confirmed curated slots — Video (4), Social (24), Gaming (8). No Porn curated slot.
+      description: |
+        Confirmed curated slots — Video (4), Social (24), Gaming (8), VPN (11),
+        Messaging (0). No Porn curated slot. Messaging's id is zero, so clients
+        must not treat a category id as falsy.
       properties:
         status: { type: string, enum: [provisional, confirmed] }
         candidates:

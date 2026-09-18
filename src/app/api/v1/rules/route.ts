@@ -40,7 +40,8 @@ const CreateBodyLoose = z.object({
   kind: z.enum(["category", "app"]),
   groupId: z.string().min(1).optional(),
   networkIds: z.array(z.string()).optional(),
-  targetIds: z.array(z.number().int().positive()).min(1).max(100),
+  // `nonnegative`, not `positive`: DPI category 0 is Messaging. See normalizeTargetIds.
+  targetIds: z.array(z.number().int().nonnegative()).min(1).max(100),
   enabled: z.boolean().optional(),
   mode: z.enum(["always", "scheduled"]).optional(),
   schedule: ScheduleSchema,

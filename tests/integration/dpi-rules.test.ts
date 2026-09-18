@@ -18,6 +18,7 @@ import {
   seedDevice,
 } from "../helpers/db";
 import { fixtureUnifiClient, policyMacs } from "../helpers/unifi-world";
+import { CURATED_CATEGORY_CANDIDATES } from "@/server/unifi/curated-categories";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
@@ -189,6 +190,69 @@ describe("Phase 2 DPI rules", () => {
     expect(internetAfter.map((r) => r.unifiPolicyId).sort()).toEqual([...internetUnifiIds].sort());
     expect(client.state.policies.some((p) => p.id === ADMIN_POLICY_ID)).toBe(true);
     expect(client.state.policies.some((p) => p.id === dpiPolicyId)).toBe(false);
+  });
+
+  /**
+   * Messaging's confirmed DPI category id is 0. Zod's `positive()` rejected it outright,
+   * and `normalizeTargetIds` filtered it out — so the slot could be picked in the UI and
+   * the request would come back "At least one target id is required". This walks the id
+   * all the way to the policy body, which is the only place the mistake would show up on
+   * a real gateway.
+   */
+  it("carries the Messaging slot's category id of zero through create and reconcile", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    process.env.UNIFI_MOCK = "1";
+    await prisma().household.update({
+      where: { id: "default" },
+      data: {
+        unifiKeyCiphertext: Buffer.from("x"),
+        unifiKeyIv: Buffer.from("y"),
+        unifiKeyAuthTag: Buffer.from("z"),
+      },
+    });
+    const auth = await signedIn();
+    const group = await createFamilyGroup();
+    await seedDevice({
+      mac: "02:00:00:00:00:01",
+      groupId: group.id,
+      zoneId: INTERNAL_ZONE,
+      assignment: AssignmentState.assigned,
+    });
+
+    const messaging = CURATED_CATEGORY_CANDIDATES.find((slot) => slot.slot === "messaging");
+    expect(messaging?.categoryId).toBe(0);
+
+    const created = await createRule(
+      request("/api/v1/rules", {
+        method: "POST",
+        auth,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "category",
+          groupId: group.id,
+          targetIds: [messaging!.categoryId],
+          mode: "always",
+        }),
+      }),
+    );
+    expect(created.status).toBe(201);
+    expect(((await created.json()) as { rule: { targetIds: number[] } }).rule.targetIds).toEqual([0]);
+
+    expect(await runReconcileOnce()).toBe(true);
+    const createCall = client.calls.find(
+      (call) =>
+        call.method === "POST" &&
+        (call.body as { destination?: { trafficFilter?: { type?: string } } })?.destination?.trafficFilter
+          ?.type === "APPLICATION_CATEGORY",
+    );
+    expect(createCall).toBeTruthy();
+    const body = createCall!.body as {
+      destination: {
+        trafficFilter: { applicationCategoryFilter: { applicationCategoryIds: number[] } };
+      };
+    };
+    expect(body.destination.trafficFilter.applicationCategoryFilter.applicationCategoryIds).toEqual([0]);
   });
 
   it("creates app rule via API, reconcile asserts APPLICATION body, and off route works", async () => {
