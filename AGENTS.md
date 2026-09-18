@@ -102,7 +102,21 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 
 CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, Playwright, container smoke. Integration tests use `familyfi_test` and never truncate the development `familyfi` database. Live IPv4 MAC block/restore was proven on a household gateway; IPv6, overnight UniFi scheduler, and a second concurrent MAC are unproven.
 
-PRs should include tests and, for any `/api/v1` change, an OpenAPI update in the same change.
+## Pull requests
+
+PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same change.
+
+**A PR built from a plan carries that plan in its description, in full and verbatim.**
+Put it in a collapsed `<details>` block so it does not bury the summary. A plan records
+the decisions the work was approved on, and a reviewer cannot judge a diff against a plan
+they cannot see — so it belongs on the PR, not in a chat log that closes with the session.
+
+Follow it with what shipped differently. Plans are written before the work and the work
+teaches you things; a plan presented as if it all held is worse than no plan at all. Say
+what changed and why — the deviations are usually the most interesting part of the review.
+
+Keep the description current with the branch. A body written for the first commit is
+stale the moment the second one lands, and a stale description is read as the truth.
 
 ## Further reading
 
