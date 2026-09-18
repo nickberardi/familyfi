@@ -9,6 +9,7 @@
 
 import {
   RCODE_NXDOMAIN,
+  RCODE_NOERROR,
   TYPE_A,
   TYPE_AAAA,
   decodeResponse,
@@ -68,8 +69,13 @@ const FILTERED_INFO_CODES = new Set([15, 16, 17]);
  * blocked and inflate the verdict.
  */
 export function isBlockedResponse(response: DnsResponse): boolean {
+  if (response.truncated) throw new Error("Truncated DNS response.");
   if (response.extendedError && FILTERED_INFO_CODES.has(response.extendedError.infoCode)) {
     return true;
+  }
+  if (response.extendedError?.infoCode === 18) throw new Error("Resolver prohibited this query.");
+  if (response.rcode !== RCODE_NOERROR && response.rcode !== RCODE_NXDOMAIN) {
+    throw new Error(`DNS query failed with RCODE ${response.rcode}.`);
   }
   if (response.rcode === RCODE_NXDOMAIN) return true;
   if (response.addresses.length === 0) return true;
@@ -130,7 +136,8 @@ export function dohResolver(input: {
       // Only NODATA is ambiguous: a name with no A record may still be reachable over
       // IPv6, so that is the one case worth a second query.
       const ambiguous =
-        !v4.extendedError && v4.rcode !== RCODE_NXDOMAIN && v4.addresses.length === 0;
+        !(v4.extendedError && FILTERED_INFO_CODES.has(v4.extendedError.infoCode)) &&
+        v4.rcode === RCODE_NOERROR && v4.addresses.length === 0;
       if (!ambiguous) {
         return {
           domain,

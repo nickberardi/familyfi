@@ -248,7 +248,10 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         groupName={group.name}
         dohOverrideUrl={group.dohOverrideUrl ?? null}
         householdConfigured={Boolean(resolverConfigured)}
-        onChanged={() => void reload()}
+        onChanged={() => {
+          void reload();
+          void loadRules();
+        }}
       />
       <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
         <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>

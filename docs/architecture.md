@@ -110,6 +110,11 @@ domain the household removed keeps its `removedAt` and is shown struck through, 
 removal survives an upgrade and can be undone; a domain the household added is deleted
 outright. A domain that has left the shipped seed is left in place rather than deleted.
 
+If a new built-in category's slug belongs to a custom category, boot moves the custom
+slug to the first available `-custom`, `-custom-2`, etc. before creating the built-in
+category. Its id, label, source, enabled setting, domains and checks are preserved.
+The move and seed creation share a transaction; repeated boots do not move it again.
+
 Lists are uncapped. The twenty-per-category figure bounds what FamilyFi ships, not what
 a household may add, and the cost note under each list is how growth is priced.
 
@@ -158,6 +163,12 @@ each insert their own household row. Sweeps run once per distinct endpoint, so g
 sharing an override share a pass. The override changes what FamilyFi *asks about* a
 group — pointing its devices at that resolver is a DHCP or client-side job.
 
+Changing or removing an endpoint clears its checks in the same transaction. Merely
+turning checking off, or saving the same URL, keeps the last result. Probe writes and
+resolver edits share a short household row lock, so a check cannot race its first insert
+or restore a result after an endpoint change. DNS I/O runs outside the transaction;
+before storing a result the probe verifies that its endpoint is still configured.
+
 Transport is RFC 8484 wire format (`application/dns-message`) over POST, which every
 conforming resolver must accept, so the probe works against any DoH endpoint rather
 than the subset that also serves the non-standard `application/dns-json` API.
@@ -174,6 +185,11 @@ So a name is read as filtered on any of: an EDE of 15 (Blocked), 16 (Censored) o
 (Filtered); NXDOMAIN; every address being a sinkhole (`0.0.0.0` / `::`); or NOERROR with
 no address record. EDE 18 (Prohibited) is deliberately not treated as a block: it says
 the client may not query at all, which would apply to every name equally.
+
+Absent an explicit filtering EDE, DNS error codes such as SERVFAIL and REFUSED are
+failed observations. Prohibited, truncated and malformed replies also produce `unknown`,
+never evidence of upstream filtering. A valid filtering EDE still takes precedence over
+an error code because some resolvers deliberately answer blocked queries with REFUSED.
 
 Measured shapes, all four captured live and kept as unit fixtures:
 

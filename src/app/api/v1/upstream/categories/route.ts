@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
+import { withUpstreamLock } from "@/server/upstream/transaction";
 import {
   normalizeDomains,
   publicUpstreamCategory,
@@ -48,22 +49,25 @@ export async function POST(request: Request) {
       return jsonError(err.status ?? 400, err.code ?? "invalid_request", err.message ?? "Invalid category.");
     }
 
-    const taken = await prisma().upstreamCategory.findUnique({ where: { slug }, select: { id: true } });
-    if (taken) return jsonError(409, "slug_taken", "A category with that name already exists.");
+    const category = await withUpstreamLock(async (tx) => {
+      const taken = await tx.upstreamCategory.findUnique({ where: { slug }, select: { id: true } });
+      if (taken) return null;
 
-    const category = await prisma().upstreamCategory.create({
-      data: {
-        slug,
-        label: parsed.data.label.trim(),
-        monogram: (parsed.data.monogram ?? suggestedMonogram(parsed.data.label)).toUpperCase(),
-        source: UpstreamSource.user,
-        enabled: parsed.data.enabled ?? true,
-        domains: {
-          create: domains.map((domain) => ({ domain, source: UpstreamSource.user })),
+      return tx.upstreamCategory.create({
+        data: {
+          slug,
+          label: parsed.data.label.trim(),
+          monogram: (parsed.data.monogram ?? suggestedMonogram(parsed.data.label)).toUpperCase(),
+          source: UpstreamSource.user,
+          enabled: parsed.data.enabled ?? true,
+          domains: {
+            create: domains.map((domain) => ({ domain, source: UpstreamSource.user })),
+          },
         },
-      },
-      include: { domains: true, checks: true },
+        include: { domains: true, checks: true },
+      });
     });
+    if (!category) return jsonError(409, "slug_taken", "A category with that name already exists.");
     return Response.json({ category: publicUpstreamCategory(category) }, { status: 201 });
   });
 }

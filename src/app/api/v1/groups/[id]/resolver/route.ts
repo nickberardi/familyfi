@@ -4,6 +4,7 @@ import { publicGroup } from "@/server/groups";
 import { readJson, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
+import { withUpstreamLock } from "@/server/upstream/transaction";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -43,7 +44,13 @@ export async function PUT(request: Request, ctx: Ctx) {
       where: { id: "default" },
       select: { timezone: true },
     });
-    const group = await prisma().group.update({ where: { id }, data: { dohOverrideUrl: url } });
+    const group = await withUpstreamLock(async (tx) => {
+      const current = await tx.group.findUniqueOrThrow({ where: { id } });
+      if (current.dohOverrideUrl !== url) {
+        await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
+      }
+      return tx.group.update({ where: { id }, data: { dohOverrideUrl: url } });
+    });
     return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
   });
 }
@@ -63,10 +70,10 @@ export async function DELETE(request: Request, ctx: Ctx) {
       where: { id: "default" },
       select: { timezone: true },
     });
-    const [, group] = await prisma().$transaction([
-      prisma().upstreamCheck.deleteMany({ where: { groupId: id } }),
-      prisma().group.update({ where: { id }, data: { dohOverrideUrl: null } }),
-    ]);
+    const group = await withUpstreamLock(async (tx) => {
+      await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
+      return tx.group.update({ where: { id }, data: { dohOverrideUrl: null } });
+    });
     return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
   });
 }

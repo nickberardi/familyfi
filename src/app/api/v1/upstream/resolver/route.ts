@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
+import { withUpstreamLock } from "@/server/upstream/transaction";
 
 /**
  * The household DNS-over-HTTPS endpoint, returned in full. It is configuration rather
@@ -53,17 +54,23 @@ export async function PUT(request: Request) {
       }
     }
 
-    const household = await prisma().household.update({
-      where: { id: "default" },
-      data: {
-        ...(url !== undefined ? { dohUrl: url } : {}),
-        ...(parsed.data.probeEnabled !== undefined ? { dohProbeEnabled: parsed.data.probeEnabled } : {}),
-        ...(parsed.data.intervalMinutes !== undefined
-          ? { dohProbeIntervalMinutes: parsed.data.intervalMinutes }
-          : {}),
-        ...(parsed.data.timeoutMs !== undefined ? { dohProbeTimeoutMs: parsed.data.timeoutMs } : {}),
-      },
-      select: { dohUrl: true, dohProbeEnabled: true, dohProbeIntervalMinutes: true, dohProbeTimeoutMs: true },
+    const household = await withUpstreamLock(async (tx) => {
+      const existing = await tx.household.findUniqueOrThrow({ where: { id: "default" } });
+      if (url !== undefined && url !== existing.dohUrl) {
+        await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
+      }
+      return tx.household.update({
+        where: { id: "default" },
+        data: {
+          ...(url !== undefined ? { dohUrl: url } : {}),
+          ...(parsed.data.probeEnabled !== undefined ? { dohProbeEnabled: parsed.data.probeEnabled } : {}),
+          ...(parsed.data.intervalMinutes !== undefined
+            ? { dohProbeIntervalMinutes: parsed.data.intervalMinutes }
+            : {}),
+          ...(parsed.data.timeoutMs !== undefined ? { dohProbeTimeoutMs: parsed.data.timeoutMs } : {}),
+        },
+        select: { dohUrl: true, dohProbeEnabled: true, dohProbeIntervalMinutes: true, dohProbeTimeoutMs: true },
+      });
     });
     return Response.json({
       resolver: {
@@ -77,12 +84,15 @@ export async function PUT(request: Request) {
   });
 }
 
-/** Clearing the endpoint turns every verdict unknown on the next sweep, never open. */
+/** Clearing an endpoint invalidates its verdicts immediately, even with checking off. */
 export async function DELETE(request: Request) {
   return withMutation(request, async () => {
-    await prisma().household.update({
-      where: { id: "default" },
-      data: { dohUrl: null, dohProbeEnabled: false },
+    await withUpstreamLock(async (tx) => {
+      await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
+      await tx.household.update({
+        where: { id: "default" },
+        data: { dohUrl: null, dohProbeEnabled: false },
+      });
     });
     return Response.json({ ok: true });
   });
