@@ -88,6 +88,17 @@ describe("upstream probe", () => {
     await setHouseholdResolver();
   });
 
+  it("settles overlapping first checks with one row per resolver", async () => {
+    const id = await categoryId("video");
+    const group = await createGroup("Own resolver", STRICT_URL);
+    const { fetchImpl } = perEndpointFetch({ [HOUSEHOLD_URL]: false, [STRICT_URL]: true });
+    const outcomes = await Promise.all(Array.from({ length: 4 }, () => probeCategory(id, { fetchImpl })));
+    expect(outcomes.every((rows) => rows.length === 2)).toBe(true);
+    expect(await prisma().upstreamCheck.count({ where: { categoryId: id } })).toBe(2);
+    expect((await checkFor(id, null))?.verdict).toBe("open");
+    expect((await checkFor(id, group.id))?.verdict).toBe("blocked");
+  });
+
   it("records blocked when every domain is blocked", async () => {
     const id = await categoryId("adult");
     const [outcome] = await probeCategory(id, { resolve: stubResolver(() => true).resolve });

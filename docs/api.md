@@ -37,8 +37,8 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | POST | `/api/v1/upstream/categories/{id}/check` | Check one category now; 200 even when the resolver was unreachable |
 | GET | `/api/v1/upstream/checks` | Latest verdict per category |
 | POST | `/api/v1/upstream/checks/run` | Sweep every category with checking on |
-| GET/PUT/DELETE | `/api/v1/upstream/resolver` | Household DoH endpoint, returned in full |
-| PUT/DELETE | `/api/v1/groups/{id}/resolver` | A group's own DoH endpoint. DELETE also drops that group's verdicts, which describe an endpoint it no longer uses |
+| GET/PUT/DELETE | `/api/v1/upstream/resolver` | Household DoH endpoint, returned in full. Changing or removing the endpoint immediately clears household verdicts |
+| PUT/DELETE | `/api/v1/groups/{id}/resolver` | A group's own DoH endpoint. Changing or removing it immediately clears that group's verdicts |
 
 The `upstream` resource is the one exception to the `change` envelope. Those rows are
 reporting only and never produce a UniFi policy, so there is nothing to reconcile —

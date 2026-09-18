@@ -134,7 +134,10 @@ function readExtendedError(
     const optionCode = view.getUint16(offset);
     const optionLength = view.getUint16(offset + 2);
     const dataStart = offset + 4;
-    if (dataStart + optionLength > end) break;
+    if (dataStart + optionLength > end) throw new DnsMessageError("Truncated EDNS option.");
+    if (optionCode === OPTION_EXTENDED_DNS_ERROR && optionLength < 2) {
+      throw new DnsMessageError("Truncated extended DNS error.");
+    }
     if (optionCode === OPTION_EXTENDED_DNS_ERROR && optionLength >= 2) {
       const infoCode = view.getUint16(dataStart);
       const text = new TextDecoder().decode(message.subarray(dataStart + 2, dataStart + optionLength));
@@ -142,6 +145,7 @@ function readExtendedError(
     }
     offset = dataStart + optionLength;
   }
+  if (offset !== end) throw new DnsMessageError("Truncated EDNS option header.");
   return null;
 }
 
@@ -150,7 +154,10 @@ export function decodeResponse(message: Uint8Array): DnsResponse {
   const view = new DataView(message.buffer, message.byteOffset, message.byteLength);
   const id = view.getUint16(0);
   const flags = view.getUint16(2);
-  const rcode = flags & 0x000f;
+  let rcode = flags & 0x000f;
+  if (!(flags & 0x8000) || (flags & 0x7800)) {
+    throw new DnsMessageError("Expected a standard DNS response.");
+  }
   const truncated = (flags & 0x0200) !== 0;
   const questionCount = view.getUint16(4);
   const answerCount = view.getUint16(6);
@@ -160,6 +167,7 @@ export function decodeResponse(message: Uint8Array): DnsResponse {
   let offset = 12;
   for (let i = 0; i < questionCount; i += 1) {
     offset = skipName(message, offset);
+    if (offset + 4 > message.length) throw new DnsMessageError("Truncated question.");
     offset += 4; // qtype + qclass
   }
 
@@ -168,14 +176,17 @@ export function decodeResponse(message: Uint8Array): DnsResponse {
   let extendedError: ExtendedError | null = null;
 
   /** Walks one resource record, collecting what this section cares about. */
-  function readRecord(section: "answer" | "other"): boolean {
-    if (offset >= message.length) return false;
+  function readRecord(section: "answer" | "other"): void {
+    if (offset >= message.length) throw new DnsMessageError("Missing resource record.");
     offset = skipName(message, offset);
-    if (offset + 10 > message.length) return false;
+    if (offset + 10 > message.length) throw new DnsMessageError("Truncated resource record.");
     const type = view.getUint16(offset);
     const rdLength = view.getUint16(offset + 8);
     const rdStart = offset + 10;
-    if (rdStart + rdLength > message.length) return false;
+    if (rdStart + rdLength > message.length) throw new DnsMessageError("Truncated record data.");
+    if ((type === TYPE_A && rdLength !== 4) || (type === TYPE_AAAA && rdLength !== 16)) {
+      throw new DnsMessageError("Invalid address record length.");
+    }
 
     if (section === "answer") {
       if (type === TYPE_A && rdLength === 4) {
@@ -186,17 +197,17 @@ export function decodeResponse(message: Uint8Array): DnsResponse {
         otherAnswerCount += 1;
       }
     } else if (type === TYPE_OPT && !extendedError) {
+      rcode |= (view.getUint32(offset + 4) >>> 24) << 4;
       extendedError = readExtendedError(message, view, rdStart, rdLength);
     }
 
     offset = rdStart + rdLength;
-    return true;
   }
 
-  for (let i = 0; i < answerCount; i += 1) if (!readRecord("answer")) break;
+  for (let i = 0; i < answerCount; i += 1) readRecord("answer");
   // Authority records are skipped, but must be walked to reach the additional section.
-  for (let i = 0; i < authorityCount; i += 1) if (!readRecord("other")) break;
-  for (let i = 0; i < additionalCount; i += 1) if (!readRecord("other")) break;
+  for (let i = 0; i < authorityCount; i += 1) readRecord("other");
+  for (let i = 0; i < additionalCount; i += 1) readRecord("other");
 
   return { id, rcode, truncated, addresses, otherAnswerCount, extendedError };
 }

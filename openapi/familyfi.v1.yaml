@@ -1429,6 +1429,10 @@ paths:
       operationId: updateUpstreamResolver
       tags: [Upstream]
       summary: Set the endpoint or the sweep settings
+      description: |
+        Changing the URL immediately clears household verdicts. Saving the same URL
+        or disabling checking preserves them. In-flight results from a replaced
+        endpoint are discarded.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -1458,7 +1462,10 @@ paths:
       operationId: clearUpstreamResolver
       tags: [Upstream]
       summary: Clear the endpoint and turn checking off
-      description: Every verdict becomes unknown on the next sweep, never open.
+      description: |
+        Immediately clears household verdicts and disables automatic checking.
+        Group override verdicts are preserved. In-flight results for the removed
+        endpoint cannot restore household verdicts.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -1492,6 +1499,8 @@ paths:
         asks about this group, so its category verdicts describe its own devices
         instead of the household's. It does not change what reaches those devices —
         pointing them at the resolver is a DHCP or client-side job.
+        Changing the URL immediately clears this group's verdicts; saving the same
+        URL preserves them. In-flight results from the replaced endpoint are discarded.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }

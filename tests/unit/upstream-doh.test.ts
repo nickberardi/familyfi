@@ -238,10 +238,10 @@ describe("dns wire format", () => {
     expect(decoded.extendedError).toBeNull();
   });
 
-  it("tolerates an answer count larger than the body rather than throwing", () => {
+  it("rejects an answer count larger than the body", () => {
     const short = buildResponse({ id: 1, question: { name: "a.example", type: TYPE_A } });
     new DataView(short.buffer).setUint16(6, 5); // claim five answers that are not there
-    expect(decodeResponse(short).addresses).toEqual([]);
+    expect(() => decodeResponse(short)).toThrow(/resource record/i);
   });
 });
 
@@ -353,7 +353,7 @@ describe("blocked-response predicate", () => {
     expect(isBlockedResponse(withCode(16))).toBe(true); // Censored
     expect(isBlockedResponse(withCode(17))).toBe(true); // Filtered
     // Prohibited says the client may not ask at all — not a verdict about this name.
-    expect(isBlockedResponse(withCode(18))).toBe(false);
+    expect(() => isBlockedResponse(withCode(18))).toThrow(/prohibited/i);
     // An informational EDE on an ordinary answer must not read as a block.
     expect(isBlockedResponse(withCode(0))).toBe(false);
   });
@@ -372,6 +372,43 @@ describe("blocked-response predicate", () => {
         ]),
       ),
     ).toBe(false);
+  });
+});
+
+describe("failed DNS observations", () => {
+  it.each([
+    { name: "SERVFAIL", rcode: 2 },
+    { name: "REFUSED", rcode: 5 },
+    { name: "truncated answer", truncated: true },
+    { name: "prohibited", rcode: 5, ede: { infoCode: 18 } },
+    { name: "missing answer body", missing: true },
+  ])("keeps $name unknown through category rollup", async (shape) => {
+    const resolve = dohResolver({
+      resolverUrl: "https://dns.example/query",
+      timeoutMs: 1000,
+      fetchImpl: (async (_url, init) => {
+        const query = new Uint8Array(init!.body as ArrayBuffer);
+        const bytes = buildResponse({
+          ...shape,
+          id: new DataView(query.buffer).getUint16(0),
+          question: { name: "example.com", type: TYPE_A },
+        });
+        if ("missing" in shape) new DataView(bytes.buffer).setUint16(6, 1);
+        return new Response(bytes);
+      }) as typeof fetch,
+    });
+    const result = await resolve("example.com");
+    expect(result.blocked).toBeNull();
+    expect(result.error).toBeTruthy();
+    expect(rollUpVerdict([result]).verdict).toBe("unknown");
+  });
+
+  it("still honors an explicit filtering EDE on a refused query", () => {
+    const response = decodeResponse(buildResponse({
+      id: 1, rcode: 5, question: { name: "example.com", type: TYPE_A },
+      ede: { infoCode: 17 },
+    }));
+    expect(isBlockedResponse(response)).toBe(true);
   });
 });
 

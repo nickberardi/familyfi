@@ -48,7 +48,7 @@ describe("upstream seed reconcile", () => {
       select: { slug: true, updatedAt: true },
       orderBy: { slug: "asc" },
     });
-    expect(after.map((row) => row.slug)).toEqual(stamps.map((row) => row.slug));
+    expect(after).toEqual(stamps);
   });
 
   /** A release that adds a canary must reach a household that already ran the seed. */
@@ -138,5 +138,35 @@ describe("upstream seed reconcile", () => {
     const reseeded = await categoryBySlug("video");
     expect(reseeded?.label).toBe("Video");
     expect(reseeded?.monogram).toBe("VID");
+  });
+
+  it("moves a conflicting custom slug without changing the customer's category or children", async () => {
+    const custom = await prisma().upstreamCategory.create({
+      data: {
+        slug: "video", label: "My video list", monogram: "MY", enabled: false,
+        source: UpstreamSource.user,
+        domains: { create: { domain: "example.com", source: UpstreamSource.user } },
+        checks: { create: { verdict: "open", blockedCount: 0, totalCount: 1, results: [], durationMs: 1 } },
+      },
+      include: { domains: true, checks: true },
+    });
+    await prisma().upstreamCategory.create({
+      data: { slug: "video-custom", label: "Already taken", monogram: "AT", source: UpstreamSource.user },
+    });
+
+    await Promise.all([ensureUpstreamCategories(), ensureUpstreamCategories()]);
+
+    const migrated = await prisma().upstreamCategory.findUniqueOrThrow({
+      where: { id: custom.id }, include: { domains: true, checks: true },
+    });
+    expect(migrated).toEqual({ ...custom, slug: "video-custom-2", updatedAt: expect.any(Date) });
+    const seed = await categoryBySlug("video");
+    expect(seed?.id).not.toBe(custom.id);
+    expect(seed?.source).toBe("seed");
+    expect(seed?.domains).toHaveLength(UPSTREAM_CATEGORY_DOMAINS.video.length);
+    await ensureUpstreamCategories();
+    expect(await prisma().upstreamCategory.findUnique({ where: { id: custom.id } })).toMatchObject({
+      slug: "video-custom-2", label: "My video list", source: "user", enabled: false,
+    });
   });
 });

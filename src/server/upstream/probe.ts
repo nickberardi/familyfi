@@ -4,6 +4,7 @@ import { prisma } from "../db";
 import { dohResolver, probeDomains, type DohResolver, type DomainProbe } from "./doh";
 import { ResolverConfigError, distinctResolvers } from "./resolver-settings";
 import { rollUpVerdict } from "./verdict";
+import { withUpstreamLock } from "./transaction";
 
 export type ProbeOutcome = {
   categoryId: string;
@@ -50,6 +51,8 @@ async function recordCheck(input: {
   results: DomainProbe[];
   durationMs: number;
   error: string | null;
+  /** Undefined only for injected test resolvers; null means no household endpoint. */
+  resolverUrl?: string | null;
 }) {
   const rollup = rollUpVerdict(input.results);
   const payload = {
@@ -65,20 +68,28 @@ async function recordCheck(input: {
     durationMs: input.durationMs,
     error: input.error,
   };
-  // Not `upsert`: Prisma's compound-unique `where` types a nullable member as
-  // non-null, so the household row (groupId null) cannot be addressed through it.
-  // updateMany takes the null filter. The database still holds the line if two
-  // sweeps race — the unique index is NULLS NOT DISTINCT.
-  const updated = await prisma().upstreamCheck.updateMany({
-    where: { categoryId: input.categoryId, groupId: input.groupId },
-    data: { ...payload, checkedAt: new Date() },
-  });
-  if (updated.count === 0) {
-    await prisma().upstreamCheck.create({
-      data: { categoryId: input.categoryId, groupId: input.groupId, ...payload },
+  return withUpstreamLock(async (tx) => {
+    if (input.resolverUrl !== undefined) {
+      const owner = input.groupId === null
+        ? await tx.household.findUnique({ where: { id: "default" }, select: { dohUrl: true } })
+        : await tx.group.findUnique({ where: { id: input.groupId }, select: { dohOverrideUrl: true } });
+      const currentUrl = owner && ("dohUrl" in owner ? owner.dohUrl : owner.dohOverrideUrl);
+      // A settings write cleared the verdict while DNS was in flight. Do not restore it.
+      if (!owner || currentUrl !== input.resolverUrl) return null;
+    }
+    // The shared database lock makes update-then-create atomic even for the NULL
+    // household key, which Prisma cannot address through a compound-unique upsert.
+    const updated = await tx.upstreamCheck.updateMany({
+      where: { categoryId: input.categoryId, groupId: input.groupId },
+      data: { ...payload, checkedAt: new Date() },
     });
-  }
-  return rollup;
+    if (updated.count === 0) {
+      await tx.upstreamCheck.create({
+        data: { categoryId: input.categoryId, groupId: input.groupId, ...payload },
+      });
+    }
+    return rollup;
+  });
 }
 
 /**
@@ -118,8 +129,9 @@ export async function probeCategory(
       results: domains.map((domain) => ({ domain, blocked: null, rcode: null, answers: [] })),
       durationMs: Date.now() - started,
       error: message,
+      resolverUrl: null,
     });
-    return [{ categoryId: category.id, slug: category.slug, groupId: null, ...rollup }];
+    return rollup ? [{ categoryId: category.id, slug: category.slug, groupId: null, ...rollup }] : [];
   }
 
   const outcomes: ProbeOutcome[] = [];
@@ -139,8 +151,9 @@ export async function probeCategory(
         results,
         durationMs,
         error: firstError,
+        resolverUrl: options.resolve ? undefined : target.url,
       });
-      outcomes.push({ categoryId: category.id, slug: category.slug, groupId, ...rollup });
+      if (rollup) outcomes.push({ categoryId: category.id, slug: category.slug, groupId, ...rollup });
     }
   }
   return outcomes;
