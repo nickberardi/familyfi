@@ -28,6 +28,8 @@ export type FilterSheetState =
       rule: Rule | undefined;
       /** Already resolved for this card's group; null when nothing has been measured. */
       upstream: UpstreamCheckRow | null;
+      /** Whether the rule is blocking at this moment, not merely switched on. */
+      activelyBlocking: boolean;
     }
   | { kind: "app"; name: string; rule: Rule };
 
@@ -46,7 +48,19 @@ export function FilterSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const on = Boolean(state.rule?.enabled);
+  /**
+   * Two different questions, deliberately kept apart.
+   *
+   * `owned` decides which *control* to offer, and turns on rule existence: a scheduled
+   * rule sitting outside its window still needs a Turn off button, not an offer to
+   * create the policy it already has.
+   *
+   * `blocking` decides what the sheet *reports*, and is true only while the rule is
+   * actually blocking. Outside its window the honest report is whatever the resolver
+   * is doing.
+   */
+  const owned = Boolean(state.rule?.enabled);
+  const on = state.kind === "category" ? state.activelyBlocking : owned;
 
   async function run(work: () => Promise<unknown>, failure: string) {
     if (busy) return;
@@ -100,13 +114,19 @@ export function FilterSheet({
   };
 
   const upstream = state.kind === "category" ? state.upstream : null;
+  /** On but out of window: say so, rather than implying no policy exists. */
+  const scheduledIdle = owned && !on;
   const upstreamBlocked = !on && upstream?.verdict === "blocked";
   const upstreamPartial = !on && upstream?.verdict === "partial";
   const measured = upstream ? ` Checked ${checkedAgo(upstream.checkedAt)}.` : "";
 
   const heading = on
     ? `${state.name} · blocked`
-    : upstreamBlocked
+    : scheduledIdle && upstreamBlocked
+      ? `Already blocked (DNS)`
+      : scheduledIdle
+        ? `${state.name} · scheduled, not now`
+        : upstreamBlocked
       ? `Already blocked (DNS)`
       : upstreamPartial
         ? `Partially blocked (DNS)`
@@ -114,7 +134,11 @@ export function FilterSheet({
 
   const body = on
     ? `Its own policy, its own controls — scoped to ${state.name} only.`
-    : upstreamBlocked
+    : scheduledIdle
+      ? `${state.name} has a FamilyFi policy on a schedule, and this is not one of its hours.${
+          upstreamBlocked ? " Its DNS resolver is blocking it anyway right now." : ""
+        }`
+      : upstreamBlocked
       ? `${group.name}'s DNS resolver already blocks every ${state.name} domain we test.${measured} FamilyFi is not doing it, so it cannot schedule or pause it — create a policy if you want that.`
       : upstreamPartial
         ? `${group.name}'s DNS resolver blocks ${upstream!.blockedCount} of ${upstream!.totalCount} ${state.name} domains we test.${measured} A FamilyFi policy would cover the rest.`

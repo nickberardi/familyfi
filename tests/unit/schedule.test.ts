@@ -4,7 +4,7 @@ import {
   extendSuspensionUntil,
   inRecurringWindow,
   isDesiredBlocked,
-} from "@/server/schedule";
+} from "@/lib/schedule";
 
 const zone = "America/New_York";
 

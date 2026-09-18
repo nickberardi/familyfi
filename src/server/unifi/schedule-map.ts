@@ -1,4 +1,4 @@
-import { assertSchedule, isSuspended, type Schedule, type Suspension } from "../schedule";
+import { assertSchedule, isSuspended, type Schedule, type Suspension } from "@/lib/schedule";
 import type { UnifiFirewallSchedule, UnifiWeekday } from "./types";
 
 const UNIFI_DAYS: UnifiWeekday[] = [

@@ -1,5 +1,5 @@
 import { FamilyRole, GroupKind, GroupMode } from "@prisma/client";
-import { isDesiredBlocked, isSuspended, type Schedule, type Suspension } from "./schedule";
+import { isDesiredBlocked, isSuspended, type Schedule, type Suspension } from "@/lib/schedule";
 
 export type GroupAccess = "available" | "blocked" | "paused" | "protected" | "always_on";
 
