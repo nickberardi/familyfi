@@ -236,7 +236,7 @@ test("Rules shell: protected absent and Always|Scheduled persist", async ({ page
   await dialog.getByRole("button", { name: "Cancel" }).click();
 });
 
-test("Phase 4: card marks, filter On/Off sheets, soft polish, no DNS chrome", async ({ page }) => {
+test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without a resolver", async ({ page }) => {
   await signIn(page);
 
   const groupsRes = await page.request.get("/api/v1/groups");
@@ -262,8 +262,8 @@ test("Phase 4: card marks, filter On/Off sheets, soft polish, no DNS chrome", as
   await expect(marks).toBeVisible();
 
   // Ensure Video starts Off (turn off if a prior run left it On).
-  if (await marks.getByRole("button", { name: /Video On/i }).count()) {
-    await marks.getByRole("button", { name: /Video On/i }).click();
+  if (await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).count()) {
+    await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
     const turnOffSheet = page.getByRole("dialog");
     await expect(turnOffSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
     const offRes = page.waitForResponse(
@@ -272,22 +272,21 @@ test("Phase 4: card marks, filter On/Off sheets, soft polish, no DNS chrome", as
     await turnOffSheet.getByRole("button", { name: "Turn off" }).click();
     expect((await offRes).ok()).toBeTruthy();
   }
-  await expect(marks.getByRole("button", { name: /Video Off/i })).toBeVisible();
-  await expect(marks.getByRole("button", { name: /Social Off/i })).toBeVisible();
-  await expect(marks.getByRole("button", { name: /Gaming Off/i })).toBeVisible();
-  await expect(page.getByText("DNS")).toHaveCount(0);
-  await expect(page.getByText(/Checking/i)).toHaveCount(0);
+  // Video is left unmeasured by the mock seed, so with no rule it must read "not
+  // blocked" — a mark with no verdict must never imply one. Social and Gaming carry
+  // seeded verdicts and are asserted in upstream-marks.spec.
+  await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
   await expect(page.getByText(/Porn/i)).toHaveCount(0);
   // No App + on list cards
   await expect(marks.getByRole("button", { name: "Add app filter" })).toHaveCount(0);
   // Protected: no marks
   await expect(page.getByTestId(`filter-marks-${protectedGroup!.id}`)).toHaveCount(0);
 
-  // Off → Create policy (no Checking / DNS)
-  await marks.getByRole("button", { name: /Video Off/i }).click();
+  // Off → Create policy. With nothing measured the sheet must not claim anything
+  // about DNS either way.
+  await marks.getByRole("button", { name: /Video not blocked/i }).click();
   const offSheet = page.getByRole("dialog");
   await expect(offSheet.getByRole("heading", { name: /Nothing's blocking Video yet/i })).toBeVisible();
-  await expect(offSheet.getByText(/Checking/i)).toHaveCount(0);
   await expect(offSheet.getByText(/DNS/i)).toHaveCount(0);
   // Off may POST create (no rule) or PATCH enable (existing disabled rule).
   const create = page.waitForResponse((response) => {
@@ -301,10 +300,10 @@ test("Phase 4: card marks, filter On/Off sheets, soft polish, no DNS chrome", as
   await offSheet.getByRole("button", { name: "Create policy" }).click();
   expect((await create).ok()).toBeTruthy();
 
-  await expect(marks.getByRole("button", { name: /Video On/i })).toBeVisible();
+  await expect(marks.getByRole("button", { name: /Video blocked by FamilyFi/i })).toBeVisible();
 
   // On → Turn off
-  await marks.getByRole("button", { name: /Video On/i }).click();
+  await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
   const onSheet = page.getByRole("dialog");
   await expect(onSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
   await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeVisible();
@@ -313,7 +312,7 @@ test("Phase 4: card marks, filter On/Off sheets, soft polish, no DNS chrome", as
   );
   await onSheet.getByRole("button", { name: "Turn off" }).click();
   expect((await off).ok()).toBeTruthy();
-  await expect(marks.getByRole("button", { name: /Video Off/i })).toBeVisible();
+  await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
 
   // GroupDetail: App + present
   await page.goto(`/family/${child!.id}`);

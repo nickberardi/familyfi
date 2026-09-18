@@ -11,6 +11,7 @@ import { GroupFilterMarks } from "@/components/FilterMarks";
 import { PauseSheet } from "@/components/PauseSheet";
 import { ScheduleBar } from "@/components/GroupCard";
 import { GroupResolverCard } from "@/components/upstream/GroupResolverCard";
+import type { UpstreamCategoryRow } from "@/lib/upstream";
 import { groupActions } from "@/components/group-actions";
 import type { Group } from "@/lib/types";
 
@@ -112,6 +113,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
+  const [upstreamCategories, setUpstreamCategories] = useState<UpstreamCategoryRow[]>([]);
 
   // Only to tell a member card whether a household default exists to fall back to.
   useEffect(() => {
@@ -125,7 +127,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
 
   const loadRules = useCallback(async () => {
     try {
-      const [{ rules: next }, cats, apps] = await Promise.all([
+      const [{ rules: next }, cats, apps, upstream] = await Promise.all([
         api<{ rules: Rule[] }>("/api/v1/rules"),
         api<{ categories: { id: number; name: string }[] }>("/api/v1/dpi/categories").catch(() => ({
           categories: [] as { id: number; name: string }[],
@@ -133,8 +135,13 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         api<{ applications: { id: number; name: string }[] }>("/api/v1/dpi/applications").catch(() => ({
           applications: [] as { id: number; name: string }[],
         })),
+        // A mark falls back to this when no FamilyFi rule is blocking.
+        api<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({
+          categories: [] as UpstreamCategoryRow[],
+        })),
       ]);
       setRules(next);
+      setUpstreamCategories(upstream.categories);
       const map = new Map<string, string>();
       for (const item of cats.categories) map.set(`category:${item.id}`, item.name);
       for (const item of apps.applications) map.set(`app:${item.id}`, item.name);
@@ -229,6 +236,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             group={group}
             rules={rules}
             catalogNames={catalogNames}
+            upstreamCategories={upstreamCategories}
             showAppAdd
             onRulesChanged={() => void loadRules()}
           />

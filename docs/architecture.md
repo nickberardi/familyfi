@@ -88,6 +88,15 @@ outright. A domain that has left the shipped seed is left in place rather than d
 Lists are uncapped. The twenty-per-category figure bounds what FamilyFi ships, not what
 a household may add, and the cost note under each list is how growth is priced.
 
+A category mark on a group card shows whichever thing is actually blocking: an existing,
+enabled FamilyFi rule is the state shown, and otherwise the mark falls back to the
+DNS-derived verdict for that group's resolver. A rule that exists but is turned off does
+not win — it is blocking nothing, so the honest answer is whatever the resolver is
+doing. `categoryMarkState()` is that rule and nothing else implements it. The accent
+belongs to FamilyFi's own blocks and upstream renders purple, because on a mark the
+colour answers *who* is blocking; the verdict chips on Categories use their own ladder,
+where the question is instead how much of the category is filtered.
+
 A verdict belongs to a resolver, not to a category. A group may carry its own endpoint
 (`Group.dohOverrideUrl`), and `UpstreamCheck` is keyed `(categoryId, groupId)` with a
 null group meaning the household default — so a card reports for the devices it actually
