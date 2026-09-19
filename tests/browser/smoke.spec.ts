@@ -50,8 +50,14 @@ test("sign-in and household pages", async ({ page }) => {
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
-  // Sidebar Rules link is desktop-only; phone bottom nav never included Schedules/Rules.
-  if (test.info().project.name !== "phone") {
+  if (test.info().project.name === "phone") {
+    // The sidebar is hidden on phone; Rules is reached through the hamburger drawer.
+    // The hidden sidebar carries the same link, so this scopes to the drawer itself.
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    const drawer = page.getByRole("dialog", { name: "Navigation" });
+    await expect(drawer.getByRole("link", { name: "Rules" })).toBeVisible();
+    await drawer.getByRole("link", { name: "Rules" }).click();
+  } else {
     await expect(page.getByRole("link", { name: "Rules" }).first()).toBeVisible();
   }
 

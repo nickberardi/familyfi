@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Rule } from "@/lib/rules";
@@ -10,6 +9,7 @@ import { GroupFilterMarks } from "./FilterMarks";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
 import { GroupCard } from "./GroupCard";
 import { groupActions } from "./group-actions";
+import { PageHeader } from "./PageHeader";
 import { PauseSheet } from "./PauseSheet";
 
 type DpiItem = { id: number; name: string };
@@ -63,18 +63,12 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex items-center gap-3.5 border-b border-[var(--ff-line)] bg-[var(--ff-header-wash)] px-4 py-4 backdrop-blur md:px-6">
-        <div className="min-w-0 flex-1">
-          <h1 className="m-0 text-[21px] font-bold tracking-tight">{title}</h1>
-          <p className="mt-0.5 text-[14px] text-[var(--ff-muted)]">{sub}</p>
-        </div>
-        <Link
-          href={kind === "family" ? "/family/new" : "/things/new"}
-          className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
-        >
-          Add
-        </Link>
-      </header>
+      <PageHeader
+        title={title}
+        sub={sub}
+        actionHref={kind === "family" ? "/family/new" : "/things/new"}
+        actionLabel="Add"
+      />
       <div className="grid grid-cols-1 items-start gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">
         {rows.length === 0 ? (
           <p className="rounded-[12px] bg-[var(--ff-card)] p-[18px] text-[14px] text-[var(--ff-muted)] md:border md:border-[var(--ff-hairline-card)]">
