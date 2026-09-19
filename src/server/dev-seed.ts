@@ -198,14 +198,27 @@ async function ensureMockUpstreamChecks() {
       select: { id: true },
     });
     if (existing) continue;
+    // Real per-domain results, not an empty array — otherwise every domain row on
+    // the category detail screen reads "Not checked" no matter what the category
+    // chip says, which is the exact mismatch the mock exists to catch.
+    const domains = await prisma().upstreamDomain.findMany({
+      where: { categoryId: category.id, removedAt: null },
+      select: { domain: true },
+      orderBy: { domain: "asc" },
+    });
+    const results = domains.map(({ domain }, index) => ({
+      domain,
+      blocked: index < item.blockedCount,
+      rcode: index < item.blockedCount ? 3 : 0,
+    }));
     await prisma().upstreamCheck.create({
       data: {
         categoryId: category.id,
         groupId: null,
         verdict: item.verdict,
         blockedCount: item.blockedCount,
-        totalCount: 20,
-        results: [],
+        totalCount: domains.length,
+        results,
         durationMs: 120,
       },
     });

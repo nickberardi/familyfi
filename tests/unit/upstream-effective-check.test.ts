@@ -14,6 +14,7 @@ function check(groupId: string | null, verdict: UpstreamCheckRow["verdict"]): Up
     totalCount: 20,
     checkedAt: "2026-09-17T12:00:00.000Z",
     error: null,
+    results: [],
   };
 }
 

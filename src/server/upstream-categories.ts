@@ -9,6 +9,12 @@ export type PublicUpstreamDomain = {
   removed: boolean;
 };
 
+export type PublicUpstreamDomainResult = {
+  domain: string;
+  /** Null means this domain could not be resolved — unknown, never "not blocked". */
+  blocked: boolean | null;
+};
+
 export type PublicUpstreamCheck = {
   verdict: "blocked" | "partial" | "open" | "unknown";
   blockedCount: number;
@@ -17,6 +23,8 @@ export type PublicUpstreamCheck = {
   error: string | null;
   /** Null is the household default; a group id is that group's own resolver. */
   groupId: string | null;
+  /** One entry per domain probed in this sweep. Domains removed since are absent. */
+  results: PublicUpstreamDomainResult[];
 };
 
 export type PublicUpstreamCategory = {
@@ -70,6 +78,31 @@ export function publicUpstreamCategory(category: CategoryWithChildren): PublicUp
   };
 }
 
+/**
+ * `results` is stored as `Json`, so it comes back untyped. Parsed defensively rather
+ * than cast: a malformed or legacy row should render as "nothing measured" for that
+ * domain, not throw or silently claim a shape it does not have.
+ */
+function parseDomainResults(value: unknown): PublicUpstreamDomainResult[] {
+  if (!Array.isArray(value)) return [];
+  const results: PublicUpstreamDomainResult[] = [];
+  for (const item of value) {
+    if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as { domain?: unknown }).domain === "string" &&
+      (typeof (item as { blocked?: unknown }).blocked === "boolean" ||
+        (item as { blocked?: unknown }).blocked === null)
+    ) {
+      results.push({
+        domain: (item as { domain: string }).domain,
+        blocked: (item as { blocked: boolean | null }).blocked,
+      });
+    }
+  }
+  return results;
+}
+
 export function publicUpstreamCheck(check: UpstreamCheck): PublicUpstreamCheck {
   return {
     verdict: check.verdict,
@@ -78,6 +111,7 @@ export function publicUpstreamCheck(check: UpstreamCheck): PublicUpstreamCheck {
     checkedAt: check.checkedAt.toISOString(),
     error: check.error,
     groupId: check.groupId,
+    results: parseDomainResults(check.results),
   };
 }
 

@@ -156,6 +156,7 @@ describe("group resolver override", () => {
         checkedAt: row.checkedAt.toISOString(),
         error: row.error,
         groupId: row.groupId,
+        results: [],
       }),
     );
     const all = await groups(auth);

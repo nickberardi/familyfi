@@ -100,6 +100,15 @@ filtered when the truth is that we do not know, and reporting `blocked` would be
 assurance. No configured endpoint, an unreachable one and an empty list are all
 `unknown` for the same reason.
 
+The same rule holds one level down. Each `UpstreamCheck` keeps the raw per-domain
+results from its sweep (`{ domain, blocked }`), which the Category detail screen shows
+next to each domain. `domainVerdict()` (`src/lib/upstream.ts`) is the one place that
+resolves it: a domain absent from the sweep — never probed, or added since — reads
+`unknown`, not `open`, and a domain a household has struck through reads `unknown`
+regardless of what an older sweep, taken before the strike, still says about it. Removing
+a domain does not touch past checks, so without that second rule a stale `blocked: true`
+would outlive the strike-through it sits beside.
+
 `src/lib/upstream-domains.ts` is a **seed, not runtime data**. The probe reads the
 database. `ensureUpstreamCategories()` runs at every boot beside
 `ensureRecoveryAccount()` — the only place a real deployment creates app-owned rows,

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -2009,10 +2009,19 @@ components:
         removed:
           type: boolean
           description: A seeded domain the household removed. Shown struck through and restorable.
+    UpstreamDomainResult:
+      type: object
+      additionalProperties: false
+      required: [domain, blocked]
+      properties:
+        domain: { type: string }
+        blocked:
+          type: [boolean, "null"]
+          description: Null means this domain could not be resolved — unknown, never "not blocked".
     UpstreamCheck:
       type: object
       additionalProperties: false
-      required: [verdict, blockedCount, totalCount, checkedAt, error, groupId]
+      required: [verdict, blockedCount, totalCount, checkedAt, error, groupId, results]
       properties:
         verdict:
           type: string
@@ -2025,6 +2034,10 @@ components:
         groupId:
           type: [string, "null"]
           description: The group this was measured for. Null is the household default.
+        results:
+          type: array
+          description: One entry per domain probed in this sweep. A domain removed since is absent.
+          items: { $ref: "#/components/schemas/UpstreamDomainResult" }
     UpstreamCategory:
       type: object
       additionalProperties: false
@@ -2076,7 +2089,7 @@ components:
     UpstreamCheckRow:
       type: object
       additionalProperties: false
-      required: [categoryId, slug, label, verdict, blockedCount, totalCount, checkedAt, error]
+      required: [categoryId, slug, label, verdict, blockedCount, totalCount, checkedAt, error, groupId, results]
       properties:
         categoryId: { type: string }
         slug: { type: string }
@@ -2086,6 +2099,13 @@ components:
         totalCount: { type: integer }
         checkedAt: { type: string, format: date-time }
         error: { type: [string, "null"] }
+        groupId:
+          type: [string, "null"]
+          description: The group this was measured for. Null is the household default.
+        results:
+          type: array
+          description: One entry per domain probed in this sweep. A domain removed since is absent.
+          items: { $ref: "#/components/schemas/UpstreamDomainResult" }
     UpstreamProbeOutcome:
       type: object
       additionalProperties: false
