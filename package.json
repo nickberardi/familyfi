@@ -1,6 +1,6 @@
 {
   "name": "familyfi",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "license": "BUSL-1.1",
   "packageManager": "pnpm@10.15.1",
