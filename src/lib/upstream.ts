@@ -18,6 +18,12 @@ export type UpstreamDomainRow = {
   removed: boolean;
 };
 
+export type UpstreamDomainResult = {
+  domain: string;
+  /** Null means this domain could not be resolved — unknown, never "not blocked". */
+  blocked: boolean | null;
+};
+
 export type UpstreamCheckRow = {
   verdict: UpstreamVerdictValue;
   blockedCount: number;
@@ -26,6 +32,8 @@ export type UpstreamCheckRow = {
   error: string | null;
   /** The group this verdict was measured for. Null is the household default. */
   groupId: string | null;
+  /** One entry per domain probed in this sweep. Domains removed since are absent. */
+  results: UpstreamDomainResult[];
 };
 
 /** What a card needs to know to resolve its own verdict. */
@@ -101,6 +109,33 @@ const VERDICT: Record<UpstreamVerdictValue, VerdictStyle> = {
 
 export function verdictStyle(check: UpstreamCheckRow | null): VerdictStyle {
   return VERDICT[check?.verdict ?? "unknown"];
+}
+
+/**
+ * One domain's own verdict, from the check that measured it — never "partial", since
+ * that only describes a category's mix.
+ *
+ * A removed domain is `unknown` even if an older sweep, taken before it was removed,
+ * still carries a `blocked` answer for it in `results`: a struck-through row must not
+ * show a stale verdict. A domain absent from `results` — never swept, or added after
+ * the last sweep — is `unknown` for the same reason `null` is: an absent measurement
+ * must never read as a clean bill of health.
+ */
+export function domainVerdict(
+  domain: Pick<UpstreamDomainRow, "domain" | "removed">,
+  check: UpstreamCheckRow | null,
+): UpstreamVerdictValue {
+  if (domain.removed || !check) return "unknown";
+  const result = check.results.find((entry) => entry.domain === domain.domain);
+  if (!result || result.blocked === null) return "unknown";
+  return result.blocked ? "blocked" : "open";
+}
+
+export function domainVerdictStyle(
+  domain: Pick<UpstreamDomainRow, "domain" | "removed">,
+  check: UpstreamCheckRow | null,
+): VerdictStyle {
+  return VERDICT[domainVerdict(domain, check)];
 }
 
 /**

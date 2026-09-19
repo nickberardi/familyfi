@@ -37,6 +37,7 @@ function check(verdict: UpstreamCheckRow["verdict"]): UpstreamCheckRow {
     checkedAt: "2026-09-18T09:00:00.000Z",
     error: null,
     groupId: null,
+    results: [],
   };
 }
 

@@ -12,7 +12,7 @@ import {
 } from "@/app/api/v1/upstream/categories/[id]/route";
 import { prisma } from "@/server/db";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
-import { effectiveCheck, type UpstreamCheckRow } from "@/lib/upstream";
+import { domainVerdict, effectiveCheck, type UpstreamCheckRow } from "@/lib/upstream";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -249,5 +249,95 @@ describe("upstream categories API", () => {
       params: Promise.resolve({ id: "whatever" }),
     });
     expect(response.status).toBe(401);
+  });
+
+  describe("per-domain results", () => {
+    it("carries the sweep's own per-domain results through the check row", async () => {
+      const auth = await signedIn();
+      const created = await prisma().upstreamCategory.create({
+        data: {
+          slug: "homework", label: "Homework", monogram: "HW", source: UpstreamSource.user,
+          domains: {
+            create: [
+              { domain: "chegg.com", source: UpstreamSource.user },
+              { domain: "quizlet.com", source: UpstreamSource.user },
+            ],
+          },
+        },
+      });
+      await prisma().upstreamCheck.create({
+        data: {
+          categoryId: created.id, groupId: null, verdict: UpstreamVerdict.partial,
+          blockedCount: 1, totalCount: 2, durationMs: 5,
+          results: [
+            { domain: "chegg.com", blocked: true, rcode: 3 },
+            { domain: "quizlet.com", blocked: false, rcode: 0 },
+          ],
+        },
+      });
+
+      const category = await bySlug(auth, "homework");
+      const check = effectiveCheck(category.checks)!;
+      expect(check.results).toEqual(
+        expect.arrayContaining([
+          { domain: "chegg.com", blocked: true },
+          { domain: "quizlet.com", blocked: false },
+        ]),
+      );
+    });
+
+    it("drops a malformed results entry rather than throwing", async () => {
+      const auth = await signedIn();
+      const created = await prisma().upstreamCategory.create({
+        data: {
+          slug: "homework", label: "Homework", monogram: "HW", source: UpstreamSource.user,
+          domains: { create: [{ domain: "chegg.com", source: UpstreamSource.user }] },
+        },
+      });
+      await prisma().upstreamCheck.create({
+        data: {
+          categoryId: created.id, groupId: null, verdict: UpstreamVerdict.unknown,
+          blockedCount: 0, totalCount: 1, durationMs: 5,
+          // Not the shape probe.ts ever writes, but Json accepts anything.
+          results: [{ domain: "chegg.com", blocked: "yes" }, "garbage", null],
+        },
+      });
+
+      const category = await bySlug(auth, "homework");
+      const check = effectiveCheck(category.checks)!;
+      expect(check.results).toEqual([]);
+    });
+
+    /**
+     * Removing a domain doesn't touch past checks — the sweep that recorded it as
+     * blocked ran before the removal. `domainVerdict` has to notice the domain's own
+     * `removed` flag, not just look the domain up in `results`.
+     */
+    it("reads a removed domain as unknown end to end, even with a stale blocked result", async () => {
+      // A seed domain, not a user one: removing a user domain deletes the row
+      // outright, but a seed domain is struck through (`removedAt` set) — the case
+      // that leaves a stale check result sitting next to a `removed: true` row.
+      const auth = await signedIn();
+      const created = await prisma().upstreamCategory.create({
+        data: {
+          slug: "homework", label: "Homework", monogram: "HW", source: UpstreamSource.seed,
+          domains: { create: [{ domain: "chegg.com", source: UpstreamSource.seed }] },
+        },
+      });
+      await prisma().upstreamCheck.create({
+        data: {
+          categoryId: created.id, groupId: null, verdict: UpstreamVerdict.blocked,
+          blockedCount: 1, totalCount: 1, durationMs: 5,
+          results: [{ domain: "chegg.com", blocked: true, rcode: 3 }],
+        },
+      });
+
+      await patch(auth, created.id, { domains: [] });
+
+      const category = await bySlug(auth, "homework");
+      const chegg = category.domains.find((d) => d.domain === "chegg.com")!;
+      expect(chegg.removed).toBe(true);
+      expect(domainVerdict(chegg, effectiveCheck(category.checks))).toBe("unknown");
+    });
   });
 });

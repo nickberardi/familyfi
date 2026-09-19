@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import {
   activeDomainList,
   checkedAgo,
+  domainVerdictStyle,
   effectiveCheck,
   enabledNoteText,
   sourceNoteText,
@@ -209,39 +210,52 @@ export default function CategoryDetailPage() {
           Domains
         </div>
 
-        {category.domains.map((domain) => (
-          <div
-            key={domain.id}
-            className="flex items-center gap-3 px-[18px] py-2.5"
-            style={{ borderTop: "1px solid var(--ff-hairline)" }}
-          >
-            <span
-              className="min-w-0 flex-1 font-mono text-[13px]"
-              style={{
-                textDecoration: domain.removed ? "line-through" : "none",
-                color: domain.removed ? "var(--ff-ink-struck)" : "var(--ff-ink)",
-              }}
+        {category.domains.map((domain) => {
+          const domainStyle = domainVerdictStyle(domain, check);
+          return (
+            <div
+              key={domain.id}
+              className="flex items-center gap-3 px-[18px] py-2.5"
+              style={{ borderTop: "1px solid var(--ff-hairline)" }}
             >
-              {domain.domain}
-            </span>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void patchDomains(
-                  domain.removed
-                    ? [...active, domain.domain]
-                    : active.filter((name) => name !== domain.domain),
-                  domain.removed ? "Could not restore the domain." : "Could not remove the domain.",
-                )
-              }
-              className="flex-none text-[12.5px] font-semibold disabled:opacity-40"
-              style={{ color: "var(--ff-accent)" }}
-            >
-              {domain.removed ? "Restore" : "Remove"}
-            </button>
-          </div>
-        ))}
+              <span
+                className="min-w-0 flex-1 font-mono text-[13px]"
+                style={{
+                  textDecoration: domain.removed ? "line-through" : "none",
+                  color: domain.removed ? "var(--ff-ink-struck)" : "var(--ff-ink)",
+                }}
+              >
+                {domain.domain}
+              </span>
+              <span
+                className="flex-none rounded-[10px] px-[10px] py-[4px] text-[11.5px] font-semibold"
+                style={{
+                  background: domainStyle.fill,
+                  color: domainStyle.ink,
+                  border: `1px solid ${domainStyle.line}`,
+                }}
+              >
+                {domainStyle.label}
+              </span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void patchDomains(
+                    domain.removed
+                      ? [...active, domain.domain]
+                      : active.filter((name) => name !== domain.domain),
+                    domain.removed ? "Could not restore the domain." : "Could not remove the domain.",
+                  )
+                }
+                className="flex-none text-[12.5px] font-semibold disabled:opacity-40"
+                style={{ color: "var(--ff-accent)" }}
+              >
+                {domain.removed ? "Restore" : "Remove"}
+              </button>
+            </div>
+          );
+        })}
 
         <div
           className="flex items-center gap-2.5 px-[18px] py-[13px]"
