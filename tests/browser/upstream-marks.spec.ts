@@ -131,21 +131,36 @@ test("a measured all-clear is not the same mark as an unmeasured category", asyn
   expect(await circleFill(open)).not.toBe(await circleFill(unknown));
 });
 
-/** Both blocking states read "blocked"; only the colour says who is doing it. */
-test("a mark's word says blocked or partial, and nothing at all when nothing is", async ({ page }) => {
+/**
+ * One word per state, and the colour says who is doing it.
+ *
+ * "Off" is the word for a FamilyFi rule blocking right now, and it pairs with the
+ * sheet's Turn off — the control that put it there. It is not the old vocabulary's
+ * "Off", which sat under a mark where *nothing* was blocking and meant the opposite;
+ * that reading is gone along with On, DNS and Part.
+ */
+test("a mark's word names its state, and says nothing when nothing was measured", async ({
+  page,
+}) => {
   await signIn(page);
   const kid = await childGroup(page);
   await clearSlotRules(page, kid.id, 24);
   await clearSlotRules(page, kid.id, 8);
+  await clearSlotRules(page, kid.id, 11);
+  await clearSlotRules(page, kid.id, 0);
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
   await expect(marks.getByRole("button", { name: /Social already blocked by DNS/i })).toContainText(
-    "blocked",
+    "Blocked",
   );
   await expect(marks.getByRole("button", { name: /Gaming partially blocked by DNS/i })).toContainText(
-    "partial",
+    "Partial",
   );
-  // The old vocabulary is gone: no mark says On, Off, DNS or Part any more.
-  await expect(marks.getByText(/^(On|Off|DNS|Part)$/)).toHaveCount(0);
+  await expect(marks.getByRole("button", { name: /^VPN not blocked$/ })).toContainText("Open");
+  // Unmeasured is the one wordless state: we did not look, and no word says that.
+  await expect(marks.getByRole("button", { name: /^Messaging not blocked by FamilyFi$/ })).toHaveText(
+    /^Messaging\s*$/,
+  );
+  await expect(marks.getByText(/^(On|DNS|Part)$/)).toHaveCount(0);
 });

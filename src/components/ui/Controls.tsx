@@ -97,31 +97,64 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-/** The On/Off pill that ends each rule row. */
+/**
+ * A toggle: one control, two states, and it always names the state it is *in*.
+ *
+ * On/Off is the default pairing and the one the rule rows use, but any two-state pair
+ * works — Enforced/Off for quarantine, Checking/Paused for a category — so pass
+ * `onLabel` and `offLabel` rather than hand-rolling another button. The leading dot
+ * fills when on, which is what stops a lone pill reading as one of a pair of buttons:
+ * before it, a quarantine control that said "Off" while quarantine was *enforced* was
+ * the only way to say "turn it off".
+ *
+ * `role="switch"` with `aria-checked`, not `aria-pressed`: this is a setting that is
+ * on or off, not a button that stays depressed, and a screen reader announces the two
+ * differently. Pinned to 33px, the height `TimeField` and the segmented control share,
+ * so a mixed row of them sits on one baseline.
+ */
 export function TogglePill({
   on,
   onToggle,
   label,
+  onLabel = "On",
+  offLabel = "Off",
+  disabled = false,
+  title,
 }: {
   on: boolean;
   onToggle: () => void;
-  /** Accessible name, e.g. "Betsy Internet". */
+  /** Accessible name, e.g. "Betsy Internet". The state comes from `aria-checked`. */
   label: string;
+  onLabel?: string;
+  offLabel?: string;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
       type="button"
-      aria-pressed={on}
-      aria-label={`${label} ${on ? "On" : "Off"}`}
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      title={title}
+      disabled={disabled}
       onClick={onToggle}
-      className="flex-none rounded-[7px] border px-3 py-1.5 text-[11.5px] font-semibold"
+      className="inline-flex h-[33px] flex-none items-center gap-1.5 rounded-[7px] border pr-[11px] pl-2 text-[13px] font-semibold disabled:opacity-40"
       style={{
         background: on ? "var(--ff-accent-fill)" : "var(--ff-card)",
-        borderColor: on ? "var(--ff-accent-line)" : "var(--ff-control-line)",
+        borderColor: on ? "var(--ff-accent-line)" : "var(--ff-input-line)",
         color: on ? "var(--ff-accent-hover)" : "var(--ff-ink-2)",
       }}
     >
-      {on ? "On" : "Off"}
+      <span
+        aria-hidden="true"
+        className="block h-[9px] w-[9px] flex-none rounded-full"
+        style={{
+          background: on ? "var(--ff-accent)" : "transparent",
+          boxShadow: on ? "none" : "inset 0 0 0 1.5px var(--ff-ink-3)",
+        }}
+      />
+      {on ? onLabel : offLabel}
     </button>
   );
 }

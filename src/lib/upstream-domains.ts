@@ -1,5 +1,7 @@
 /** Client-safe canary domains for the upstream DNS category probe. */
 
+import type { IconName } from "./icons";
+
 export type UpstreamCategory =
   | "adult"
   | "video"
@@ -255,24 +257,44 @@ export type UpstreamSeedCategory = {
   label: string;
   /** 1-3 characters, rendered in the category's tile. */
   monogram: string;
+  /** The glyph the tile draws. The monogram stays as the fallback beneath it. */
+  icon: IconName;
 };
 
 /**
- * Parent-facing label and monogram per seeded category. The reconcile keeps these
- * following the shipped seed on every boot; domain membership does not follow, so a
- * household's edits survive an upgrade.
+ * Parent-facing label, monogram and glyph per seeded category. The reconcile keeps
+ * these following the shipped seed on every boot; domain membership does not follow,
+ * so a household's edits survive an upgrade.
+ *
+ * Only a seeded category has a glyph. A household can invent a category and there is
+ * no icon to give it, so an invented one keeps its monogram — which is why the
+ * monogram is still stored for every category, seeded ones included.
  */
 export const UPSTREAM_SEED_CATEGORIES: readonly UpstreamSeedCategory[] = [
-  { slug: "adult", label: "Adult", monogram: "18+" },
-  { slug: "video", label: "Video", monogram: "VID" },
-  { slug: "social", label: "Social", monogram: "SOC" },
-  { slug: "gaming", label: "Gaming", monogram: "GAM" },
-  { slug: "vpn", label: "VPN", monogram: "VPN" },
-  { slug: "messaging", label: "Messaging", monogram: "MSG" },
-  { slug: "ai", label: "AI", monogram: "AI" },
-  { slug: "gambling", label: "Gambling", monogram: "GMB" },
-  { slug: "dating", label: "Dating", monogram: "DAT" },
+  { slug: "adult", label: "Adult", monogram: "18+", icon: "prohibit" },
+  { slug: "video", label: "Video", monogram: "VID", icon: "play-circle" },
+  { slug: "social", label: "Social", monogram: "SOC", icon: "users-three" },
+  { slug: "gaming", label: "Gaming", monogram: "GAM", icon: "game-controller" },
+  { slug: "vpn", label: "VPN", monogram: "VPN", icon: "shield-check" },
+  { slug: "messaging", label: "Messaging", monogram: "MSG", icon: "chat-circle" },
+  { slug: "ai", label: "AI", monogram: "AI", icon: "sparkle" },
+  { slug: "gambling", label: "Gambling", monogram: "GMB", icon: "poker-chip" },
+  { slug: "dating", label: "Dating", monogram: "DAT", icon: "heart" },
 ] as const;
+
+/**
+ * The glyph for a category's tile, or `undefined` for one the household invented.
+ *
+ * Keyed on the slug rather than the source alone: a household could name a category
+ * `video` of its own, and it would still be its own list of domains, not the seed.
+ */
+export function upstreamCategoryIcon(
+  slug: string,
+  source: "seed" | "user",
+): IconName | undefined {
+  if (source !== "seed") return undefined;
+  return UPSTREAM_SEED_CATEGORIES.find((category) => category.slug === slug)?.icon;
+}
 
 /** Domains probed per run — the cost of one scheduled pass. */
 export function upstreamProbeDomainCount(): number {

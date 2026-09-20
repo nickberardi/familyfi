@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/*
+ * Tailwind's own font keys, pointed at ours, so `font-mono` on a MAC address and
+ * `font-sans` anywhere else resolve to the product's families rather than Tailwind's
+ * defaults. The --ff-* tokens below stay the single source; this only forwards them.
+ */
+@theme inline {
+  --font-sans: var(--ff-font);
+  --font-mono: var(--ff-font-mono);
+}
+
 :root {
   --ff-ink: #1c1c1e;
   --ff-muted: #3a3a3c;
@@ -13,7 +23,21 @@
   --ff-danger: #c8100a;
   --ff-mark: #2c2c2e;
   --ff-now: #ff9500;
-  --ff-font: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  /*
+   * Type. Inter carries every UI size — body, labels, titles and stats — and the
+   * display token differs from it only in tracking, applied where it is used.
+   * JetBrains Mono carries the machine column: MAC addresses, IPs, policy names,
+   * endpoints and timestamps. Both are loaded and self-hosted by next/font in
+   * `src/app/layout.tsx`, which is what defines --ff-font-inter and
+   * --ff-font-jetbrains-mono; the system stack behind each one is the fallback
+   * while the file loads, and the whole of it if a build ever ships without them.
+   */
+  --ff-font:
+    var(--ff-font-inter), system-ui, -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --ff-font-display:
+    var(--ff-font-inter), system-ui, -apple-system, "SF Pro Display", sans-serif;
+  --ff-font-mono:
+    var(--ff-font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Card System — surfaces and hairlines.
      The border is the ground's business: grey field -> none, white/light -> 1px. */
@@ -92,8 +116,10 @@
   --ff-rule-detail-indent: 39px;
 
   /*
-   * Upstream verdict chips. Four states, each needing its own ink, fill and line,
-   * because the design sets the border independently of the fill.
+   * Verdict chips and marks. Five states, each needing its own ink, fill and line,
+   * because the design sets the border independently of the fill. `rule` is ours —
+   * a FamilyFi rule blocking right now, which always wins over the upstream reading —
+   * and the other four are what the resolver reported.
    *
    * These share a palette with the category marks on a card, and they must: both are
    * driven by the same UpstreamCheck row, so a colour cannot mean "the resolver blocks
@@ -103,6 +129,9 @@
    * good nor bad news. Blocked once used the green "on" ink and partial the paused
    * amber; that was the collision.
    */
+  --ff-verdict-rule-ink: var(--ff-danger);
+  --ff-verdict-rule-fill: var(--ff-danger-fill);
+  --ff-verdict-rule-line: rgba(200, 16, 10, 0.3);
   --ff-verdict-blocked-ink: var(--ff-ink-on-fill);
   --ff-verdict-blocked-fill: var(--ff-upstream-fill);
   --ff-verdict-blocked-line: var(--ff-upstream-fill);
@@ -132,6 +161,37 @@
   --ff-upstream-fill: #5854d6;
   --ff-upstream-tint: rgba(88, 84, 214, 0.14);
   --ff-upstream-ink: #4b47b8;
+
+  /*
+   * The brand layer, sampled from the logo lockup. It is deliberately separate from
+   * everything above: the product UI is the light Apple-system palette, and these
+   * darker values belong to the mark, the app icon and any marketing surface. The
+   * cyan is the shield's stroke and the "Fi" of the wordmark — it is not the accent,
+   * and nothing interactive may take it.
+   *
+   * `deep` is the ground the deep cut of the check shield and the app icon are painted
+   * against, and it is what `background_color` in the web manifest duplicates as a
+   * literal, since JSON cannot hold a token. It is named here because `on-deep` and
+   * `on-deep-2` are the inks *for* that ground: any surface that sets `onDeep` on the
+   * logo owes it this background, and an ink with no named ground would be worse than
+   * a ground that only one surface has reached for so far.
+   */
+  --ff-brand-deep: #000a1e;
+  --ff-brand-cyan: #03a0ef;
+  --ff-brand-on-deep: #ffffff;
+  --ff-brand-on-deep-2: #7e849a;
+
+  /*
+   * Motion. State flips are instant and everything else is near-instant: the gateway
+   * is the slow part, never the interface. Nothing bounces and nothing slides in
+   * decoratively.
+   */
+  --ff-duration-fast: 120ms;
+  --ff-ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --ff-press-opacity: 0.72;
+
+  /* The header wash is the only blur in the product. */
+  --ff-blur-header: blur(12px);
 }
 
 html {
@@ -145,6 +205,34 @@ body {
   margin: 0;
   color: var(--ff-ink);
   background: var(--ff-page);
+}
+
+/*
+ * Press and hover, everywhere, once.
+ *
+ * Near-instant and never decorative: the gateway is the slow part, and a control that
+ * animates while a policy is being written is lying about which one you are waiting
+ * for. Colour moves; nothing scales, slides or bounces. Press drops opacity rather
+ * than shifting the control, so a thumb never loses the thing it is on.
+ */
+a,
+button {
+  transition:
+    background-color var(--ff-duration-fast) var(--ff-ease-standard),
+    border-color var(--ff-duration-fast) var(--ff-ease-standard),
+    color var(--ff-duration-fast) var(--ff-ease-standard);
+}
+
+a:active,
+button:not(:disabled):active {
+  opacity: var(--ff-press-opacity);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a,
+  button {
+    transition: none;
+  }
 }
 
 .ff-sidebar {

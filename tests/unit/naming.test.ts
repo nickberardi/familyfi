@@ -156,6 +156,18 @@ describe("naming conventions (AGENTS.md)", () => {
     expect([...offenders]).toEqual([]);
   });
 
+  /**
+   * Phosphor is the product's one icon set and `Icon` is its one door. A component
+   * writing the class itself sidesteps the `IconName` union, and a name that is not a
+   * glyph renders as nothing at all — see tests/unit/icons.test.ts.
+   */
+  it("draws Phosphor glyphs only through the Icon component", () => {
+    const offenders = offendingLines(/\bph ph-/).filter(
+      (line) => !line.startsWith("src/components/ui/Icon.tsx:"),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it("declares every --ff-* token that components reference", () => {
     const css = readFileSync(path.join(srcRoot, "app/globals.css"), "utf8");
     const declared = new Set([...css.matchAll(/^\s*(--ff-[a-z0-9-]+):/gm)].map((m) => m[1]));

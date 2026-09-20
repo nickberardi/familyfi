@@ -235,7 +235,7 @@ export function suggestedMonogramFor(label: string): string {
  * paint a category we never measured — or one whose resolver timed out — as verified
  * fine, which is the exact false assurance this whole feature exists to avoid.
  */
-export type CategoryMarkState = "on" | "blocked" | "partial" | "open" | "unknown";
+export type CategoryMarkState = "rule" | "blocked" | "partial" | "open" | "unknown";
 
 /**
  * Is this rule blocking the category *right now*?
@@ -283,7 +283,7 @@ export function categoryMarkState(
   activelyBlocking: boolean,
   check: UpstreamCheckRow | null,
 ): CategoryMarkState {
-  if (activelyBlocking) return "on";
+  if (activelyBlocking) return "rule";
   if (check?.verdict === "blocked") return "blocked";
   if (check?.verdict === "partial") return "partial";
   if (check?.verdict === "open") return "open";
@@ -292,25 +292,29 @@ export function categoryMarkState(
 
 /**
  * An app mark has no DNS side — an app rule is the only thing FamilyFi knows about —
- * so it reports `on` or `unknown`, never the green `open`. Nobody measured the app.
+ * so it reports `rule` or `unknown`, never the green `open`. Nobody measured the app.
  */
 export function appMarkState(activelyBlocking: boolean): CategoryMarkState {
-  return activelyBlocking ? "on" : "unknown";
+  return activelyBlocking ? "rule" : "unknown";
 }
 
 /**
- * The word under a mark. Both blocking states read "blocked" on purpose: the question
- * a parent is asking is whether the thing is shut, and the colour answers *who* shut
- * it. Nothing blocking gets no word at all — an empty label is quieter than "Off", and
- * the circle's fill already says it.
+ * The word under a mark. One word per state, and the same word wherever that state
+ * appears: the word says *what* is true of the thing and the colour says *who* made
+ * it so, which is why `rule` and `blocked` no longer share one. `Off` pairs with the
+ * sheet's Turn off, the control that undoes it. `unknown` alone is wordless — we did
+ * not look, and a word for that would be louder than the fact deserves.
  */
 export function categoryMarkWord(state: CategoryMarkState): string {
   switch (state) {
-    case "on":
+    case "rule":
+      return "Off";
     case "blocked":
-      return "blocked";
+      return "Blocked";
     case "partial":
-      return "partial";
+      return "Partial";
+    case "open":
+      return "Open";
     default:
       return "";
   }
@@ -319,19 +323,22 @@ export function categoryMarkWord(state: CategoryMarkState): string {
 type MarkStyle = { fill: string; ink: string };
 
 /**
- * Mark colours, kept here beside the words so the two cannot drift.
+ * Mark colours: the verdict tokens, never a local restyle.
  *
  * Red is FamilyFi's own block, matching the Turn off control in the sheet. Purple is
  * the resolver's — solid when it blocks the whole list, a tint when it blocks part of
  * it. Green is a measured all-clear. Neutral is "we do not know", and it is
  * deliberately not green: unmeasured must never read as verified.
+ *
+ * Every pair resolves to the same `--ff-verdict-*` tokens the chips on Categories
+ * take, so a colour cannot come to mean one thing on a card and another in a list.
  */
 const MARK: Record<CategoryMarkState, MarkStyle> = {
-  on: { fill: "var(--ff-danger-fill)", ink: "var(--ff-danger)" },
-  blocked: { fill: "var(--ff-upstream-fill)", ink: "var(--ff-ink-on-fill)" },
-  partial: { fill: "var(--ff-upstream-tint)", ink: "var(--ff-upstream-ink)" },
-  open: { fill: "var(--ff-on-tint)", ink: "var(--ff-on-ink)" },
-  unknown: { fill: "var(--ff-field)", ink: "var(--ff-ink-2)" },
+  rule: { fill: "var(--ff-verdict-rule-fill)", ink: "var(--ff-verdict-rule-ink)" },
+  blocked: { fill: "var(--ff-verdict-blocked-fill)", ink: "var(--ff-verdict-blocked-ink)" },
+  partial: { fill: "var(--ff-verdict-partial-fill)", ink: "var(--ff-verdict-partial-ink)" },
+  open: { fill: "var(--ff-verdict-open-fill)", ink: "var(--ff-verdict-open-ink)" },
+  unknown: { fill: "var(--ff-verdict-unknown-fill)", ink: "var(--ff-verdict-unknown-ink)" },
 };
 
 export function categoryMarkStyle(state: CategoryMarkState): MarkStyle {
@@ -347,7 +354,7 @@ export function categoryMarkStyle(state: CategoryMarkState): MarkStyle {
  */
 export function categoryMarkLabel(label: string, state: CategoryMarkState): string {
   switch (state) {
-    case "on":
+    case "rule":
       return `${label} blocked by FamilyFi`;
     case "blocked":
       return `${label} already blocked by DNS`;

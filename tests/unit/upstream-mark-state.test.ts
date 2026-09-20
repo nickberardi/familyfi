@@ -81,9 +81,9 @@ describe("category mark state", () => {
   /** The rule: a policy that is blocking right now is the state shown, whatever DNS says. */
   it("lets an actively blocking rule win over every DNS verdict", () => {
     for (const verdict of ["blocked", "partial", "open", "unknown"] as const) {
-      expect(categoryMarkState(true, check(verdict)), verdict).toBe("on");
+      expect(categoryMarkState(true, check(verdict)), verdict).toBe("rule");
     }
-    expect(categoryMarkState(true, null)).toBe("on");
+    expect(categoryMarkState(true, null)).toBe("rule");
   });
 
   it("falls back to DNS when no rule is blocking", () => {
@@ -101,7 +101,7 @@ describe("category mark state", () => {
     expect(blocking).toBe(false);
     expect(categoryMarkState(blocking, check("blocked"))).toBe("blocked");
     // And inside its hours the policy is what the mark reports.
-    expect(categoryMarkState(ruleActivelyBlocking(rule(), ZONE, inWindow), check("blocked"))).toBe("on");
+    expect(categoryMarkState(ruleActivelyBlocking(rule(), ZONE, inWindow), check("blocked"))).toBe("rule");
   });
 
   /**
@@ -118,20 +118,20 @@ describe("category mark state", () => {
 
   /** An app rule has no resolver behind it, so an app mark can never claim green. */
   it("never reports an app mark as measured-open", () => {
-    expect(appMarkState(true)).toBe("on");
+    expect(appMarkState(true)).toBe("rule");
     expect(appMarkState(false)).toBe("unknown");
   });
 
   it("names each state for a reader and for a screen reader", () => {
-    // Both blocking states read the same word; the colour answers who is blocking.
-    expect(categoryMarkWord("on")).toBe("blocked");
-    expect(categoryMarkWord("blocked")).toBe("blocked");
-    expect(categoryMarkWord("partial")).toBe("partial");
-    // Nothing blocking gets no word at all — the fill carries it.
-    expect(categoryMarkWord("open")).toBe("");
+    // One word per state: the word says what is true, the colour says who made it so.
+    expect(categoryMarkWord("rule")).toBe("Off");
+    expect(categoryMarkWord("blocked")).toBe("Blocked");
+    expect(categoryMarkWord("partial")).toBe("Partial");
+    expect(categoryMarkWord("open")).toBe("Open");
+    // `unknown` alone is wordless — we did not look, and it must not read as a verdict.
     expect(categoryMarkWord("unknown")).toBe("");
 
-    expect(categoryMarkLabel("Video", "on")).toBe("Video blocked by FamilyFi");
+    expect(categoryMarkLabel("Video", "rule")).toBe("Video blocked by FamilyFi");
     expect(categoryMarkLabel("Video", "blocked")).toBe("Video already blocked by DNS");
     expect(categoryMarkLabel("Video", "partial")).toBe("Video partially blocked by DNS");
     expect(categoryMarkLabel("Video", "open")).toBe("Video not blocked");
@@ -139,15 +139,18 @@ describe("category mark state", () => {
   });
 
   /**
-   * The colours themselves, because the words alone do not distinguish `on` from
-   * `blocked` and a swap between them would misattribute the block to FamilyFi.
+   * The colours themselves, because a swap between `rule` and `blocked` would
+   * misattribute the resolver's block to FamilyFi, or FamilyFi's to the resolver.
    */
   it("gives every state its own fill, and reuses no colour across two meanings", () => {
-    const states = ["on", "blocked", "partial", "open", "unknown"] as const;
+    const states = ["rule", "blocked", "partial", "open", "unknown"] as const;
     const fills = states.map((state) => categoryMarkStyle(state).fill);
     expect(new Set(fills).size).toBe(states.length);
-    expect(categoryMarkStyle("on").ink).toBe("var(--ff-danger)");
-    expect(categoryMarkStyle("open").ink).toBe("var(--ff-on-ink)");
+    // Every pair is a verdict token, so a mark and a chip cannot drift apart.
+    for (const state of states) {
+      expect(categoryMarkStyle(state).fill).toBe(`var(--ff-verdict-${state}-fill)`);
+      expect(categoryMarkStyle(state).ink).toBe(`var(--ff-verdict-${state}-ink)`);
+    }
     // Every colour is a token; a literal here would sail past naming.test.ts.
     for (const state of states) {
       const style = categoryMarkStyle(state);

@@ -16,7 +16,8 @@ import {
   type UpstreamCategoryRow,
 } from "@/lib/upstream";
 import { MonoTile } from "@/components/ui/MonoTile";
-import { TextField } from "@/components/ui/Controls";
+import { upstreamCategoryIcon } from "@/lib/upstream-domains";
+import { TextField, TogglePill } from "@/components/ui/Controls";
 
 export default function CategoryDetailPage() {
   const params = useParams<{ id: string }>();
@@ -117,7 +118,12 @@ export default function CategoryDetailPage() {
         style={{ background: "var(--ff-card)", border: "1px solid var(--ff-hairline-card)" }}
       >
         <div className="flex flex-wrap items-center gap-3.5">
-          <MonoTile monogram={category.monogram} source={category.source} size="detail" />
+          <MonoTile
+            monogram={category.monogram}
+            source={category.source}
+            icon={upstreamCategoryIcon(category.slug, category.source)}
+            size="detail"
+          />
           <div className="min-w-[200px] flex-1">
             <h1 className="m-0 text-[18px] font-bold tracking-tight">{category.label}</h1>
             <p className="mt-0.5 mb-0 text-[12.5px]" style={{ color: "var(--ff-ink-3)" }}>
@@ -154,10 +160,9 @@ export default function CategoryDetailPage() {
           className="mt-3.5 flex flex-wrap items-center gap-2.5 pt-3.5"
           style={{ borderTop: "1px solid var(--ff-hairline)" }}
         >
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
+          <TogglePill
+            on={category.enabled}
+            onToggle={() =>
               void run(
                 () =>
                   api(`/api/v1/upstream/categories/${category.id}`, {
@@ -167,15 +172,11 @@ export default function CategoryDetailPage() {
                 "Could not change checking.",
               )
             }
-            className="flex-none rounded-[7px] px-3 py-[6px] text-[11.5px] font-semibold disabled:opacity-40"
-            style={{
-              border: `1px solid ${category.enabled ? "var(--ff-accent-line)" : "var(--ff-control-line)"}`,
-              background: category.enabled ? "var(--ff-accent-tint)" : "var(--ff-field)",
-              color: category.enabled ? "var(--ff-accent)" : "var(--ff-ink-3)",
-            }}
-          >
-            {category.enabled ? "Checking on" : "Checking off"}
-          </button>
+            disabled={busy}
+            label={`Checking ${category.label}`}
+            onLabel="Checking on"
+            offLabel="Checking off"
+          />
           <span className="text-[12.5px]" style={{ color: "var(--ff-ink-3)" }}>
             {enabledNoteText(category.enabled)}
           </span>
