@@ -6,7 +6,7 @@ import {
   canPauseGroup,
   dayCaption,
   deviceKindLabel,
-  deviceTag,
+  deviceIcon,
   formatHhmm,
   nextBedtimeResumeAt,
   nextClockOnDays,
@@ -85,11 +85,38 @@ describe("until bedtime", () => {
 });
 
 describe("device marks", () => {
-  it("maps common hostnames to a short tag and kind", () => {
-    expect(deviceTag("Abby's iPhone")).toBe("PHN");
+  it("maps common hostnames to a kind and its glyph", () => {
     expect(deviceKindLabel("Abby's iPhone")).toBe("Phone");
-    expect(deviceTag("Living Room Apple TV")).toBe("TV");
-    expect(deviceTag("Unknown")).toBe("DEV");
+    expect(deviceIcon("Abby's iPhone")).toBe("device-mobile");
+    expect(deviceKindLabel("Living Room Apple TV")).toBe("TV");
+    expect(deviceIcon("Living Room Apple TV")).toBe("television");
+    expect(deviceIcon("Nick's MacBook")).toBe("laptop");
+    expect(deviceIcon("Echo — kitchen")).toBe("speaker-high");
+  });
+
+  /* The table is ordered, and the order is the whole of how these two resolve. */
+  it("reads an Apple TV as a television, not as a Mac", () => {
+    expect(deviceKindLabel("Apple TV — playroom")).toBe("TV");
+    expect(deviceIcon("Apple TV — playroom")).toBe("television");
+  });
+
+  it("places the device names a household actually types", () => {
+    expect(deviceKindLabel("Guest Laptop")).toBe("Computer");
+    expect(deviceKindLabel("Schoolroom Chromebook")).toBe("Computer");
+    expect(deviceKindLabel("EPSON ET-3830")).toBe("Printer");
+    expect(deviceKindLabel("Basement Sonos")).toBe("Speaker");
+    expect(deviceKindLabel("Playroom Xbox")).toBe("Console");
+    expect(deviceKindLabel("Living room AP")).toBe("Network");
+  });
+
+  /*
+   * An arrival we cannot place is the common case on the Devices page, and it must
+   * not borrow another type's glyph: a wrong icon reads as a fact about the device.
+   */
+  it("falls back to the unknown glyph rather than guessing a type", () => {
+    expect(deviceKindLabel("Unknown")).toBe("Device");
+    expect(deviceIcon("Unknown")).toBe("question");
+    expect(deviceIcon(null)).toBe("question");
   });
 });
 

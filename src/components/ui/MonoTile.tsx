@@ -1,21 +1,32 @@
 /**
- * The rounded monogram tile a category is identified by.
+ * The rounded tile a category is identified by.
  *
- * Categories carry a customer-set monogram rather than a glyph, because a household
- * can invent a category and there is no icon to give it. That also keeps
- * `CategoryGlyph` out of this surface: its slot union only covers the three curated
- * DPI slots, and an unrecognised slot falls through to the game controller.
+ * A seeded category draws a Phosphor glyph; one the household invented draws its
+ * monogram, because a household can name anything and there is no icon to give it.
+ * Every category stores a monogram regardless — it is the category's short name in the
+ * API and in the seed, and the only thing an invented one has to draw with.
+ * `CategoryGlyph` stays out of this surface: its slot union only covers the curated
+ * DPI slots, and an unrecognised slot renders nothing.
  *
  * Sibling to `Mark` rather than a variant of it — `Mark` is a circle on the
  * 44/32/24 density ladder, and these are squares at two fixed sizes from the design.
+ *
+ * Decorative: the category's label always sits beside it as text.
  */
+
+import { Icon } from "./Icon";
+import type { IconName } from "@/lib/icons";
+
 export function MonoTile({
   monogram,
   source,
+  icon,
   size = "list",
 }: {
   monogram: string;
   source: "seed" | "user";
+  /** The seeded category's glyph, from `upstreamCategoryIcon`. */
+  icon?: IconName;
   size?: "list" | "detail";
 }) {
   const px = size === "detail" ? 40 : 32;
@@ -33,7 +44,7 @@ export function MonoTile({
         letterSpacing: "-0.01em",
       }}
     >
-      {monogram}
+      {icon ? <Icon name={icon} size={size === "detail" ? 21 : 17} /> : monogram}
     </span>
   );
 }

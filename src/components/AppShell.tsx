@@ -3,34 +3,37 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Icon } from "@/components/ui/Icon";
+import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api } from "@/lib/api";
 import { initials } from "@/lib/display";
+import type { IconName } from "@/lib/icons";
 import { noMembersAttention } from "@/lib/sync-copy";
 import { appVersionLabel } from "@/lib/version";
 import { useAppData } from "./AppDataProvider";
 
-const NAV = [
+const NAV: { title: string; items: { href: string; label: string; icon: IconName }[] }[] = [
   {
     title: "Household",
     items: [
-      { href: "/family", label: "Family" },
-      { href: "/things", label: "Things" },
+      { href: "/family", label: "Family", icon: "users-three" },
+      { href: "/things", label: "Things", icon: "house-line" },
     ],
   },
   {
     title: "Network",
     items: [
-      { href: "/devices", label: "Devices" },
-      { href: "/rules", label: "Rules" },
-      { href: "/categories", label: "Categories" },
+      { href: "/devices", label: "Devices", icon: "device-mobile" },
+      { href: "/rules", label: "Rules", icon: "list-checks" },
+      { href: "/categories", label: "Categories", icon: "squares-four" },
     ],
   },
   {
     title: "System",
     items: [
-      { href: "/sync", label: "Sync" },
-      { href: "/settings", label: "Settings" },
-      { href: "/reference", label: "API" },
+      { href: "/sync", label: "Sync", icon: "arrows-clockwise" },
+      { href: "/settings", label: "Settings", icon: "gear" },
+      { href: "/reference", label: "API", icon: "code" },
     ],
   },
 ];
@@ -52,12 +55,25 @@ export function useNavDrawer(): { toggle: () => void } {
   return value;
 }
 
-/** "FamilyFi" plus the version/status line, shared by the rail and the drawer. */
-function NavBrand({ statusLine }: { statusLine: string }) {
+/**
+ * The lockup plus the version/status line, shared by the rail and the drawer.
+ *
+ * The pieces are composed here rather than through `Logo` because the rail sets the
+ * shield larger than the wordmark's own ladder would give it — the design's rail is a
+ * 56px shield over a 22.5px wordmark — and the drawer wants the same block at the
+ * width a phone leaves for it.
+ */
+function NavBrand({ statusLine, compact }: { statusLine: string; compact?: boolean }) {
   return (
-    <div className="flex-none px-2.5">
-      <div className="text-[15px] font-bold tracking-tight">FamilyFi</div>
-      <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">{statusLine}</div>
+    <div className="flex flex-none flex-col items-center gap-1.5 px-2.5 pt-0.5">
+      <div className="flex flex-col items-center gap-2.5">
+        <Shield size={compact ? 44 : 56} />
+        <div className="grid justify-items-center gap-1.5">
+          <Wordmark size={compact ? 19 : 22.5} />
+          <Tagline size={compact ? 6.5 : 7.5} />
+        </div>
+      </div>
+      <div className="text-center text-[14px] text-[var(--ff-muted)]">{statusLine}</div>
     </div>
   );
 }
@@ -103,13 +119,14 @@ function NavGroups({
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
-                  className="flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[14px]"
+                  className="flex items-center gap-2.5 rounded-[7px] px-2.5 py-1.5 text-[14px]"
                   style={{
                     background: active ? "var(--ff-accent-tint)" : undefined,
                     color: active ? "var(--ff-accent)" : "var(--ff-ink)",
                     fontWeight: active ? 600 : 500,
                   }}
                 >
+                  <Icon name={item.icon} size={16} />
                   <span className="min-w-0 flex-1">{item.label}</span>
                   {badge ? (
                     <span
@@ -290,7 +307,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="fixed inset-y-0 left-0 z-[71] flex w-[min(78%,280px)] flex-col gap-5 overflow-y-auto p-3 md:hidden"
               style={{ background: "var(--ff-rail)", boxShadow: "var(--ff-shadow-sheet)" }}
             >
-              <NavBrand statusLine={statusLine} />
+              <NavBrand statusLine={statusLine} compact />
               <nav className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
                 <NavGroups
                   pathname={pathname}

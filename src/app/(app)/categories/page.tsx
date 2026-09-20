@@ -11,7 +11,9 @@ import {
   type UpstreamResolverSettings,
 } from "@/lib/upstream";
 import { PageHeader } from "@/components/PageHeader";
+import { TogglePill } from "@/components/ui/Controls";
 import { MonoTile } from "@/components/ui/MonoTile";
+import { upstreamCategoryIcon } from "@/lib/upstream-domains";
 import { NewCategorySheet } from "@/components/upstream/NewCategorySheet";
 import { ResolverCard } from "@/components/upstream/ResolverCard";
 
@@ -138,7 +140,11 @@ export default function CategoriesPage() {
                 className="flex flex-wrap items-center gap-3 px-[18px] py-3"
                 style={{ borderTop: "1px solid var(--ff-hairline)" }}
               >
-                <MonoTile monogram={category.monogram} source={category.source} />
+                <MonoTile
+                  monogram={category.monogram}
+                  source={category.source}
+                  icon={upstreamCategoryIcon(category.slug, category.source)}
+                />
                 <Link
                   href={`/categories/${category.id}`}
                   className="min-w-[140px] flex-1 no-underline"
@@ -155,22 +161,16 @@ export default function CategoriesPage() {
                 >
                   {style.label}
                 </span>
-                <button
-                  type="button"
+                {/* Reads "On"/"Off", not "Checking" — it sits beside a verdict chip
+                    that can itself read "Not checked", and the two must not blur. The
+                    accessible name says which of the two this control is. */}
+                <TogglePill
+                  on={category.enabled}
+                  onToggle={() => void toggleEnabled(category)}
                   disabled={busy}
-                  onClick={() => void toggleEnabled(category)}
+                  label={`Checking ${category.label}`}
                   title="Only turns checking on or off — never blocks or unblocks anything"
-                  className="flex-none rounded-[7px] px-3 py-[6px] text-[11.5px] font-semibold disabled:opacity-40"
-                  style={{
-                    border: `1px solid ${category.enabled ? "var(--ff-accent-line)" : "var(--ff-control-line)"}`,
-                    background: category.enabled ? "var(--ff-accent-tint)" : "var(--ff-field)",
-                    color: category.enabled ? "var(--ff-accent)" : "var(--ff-ink-3)",
-                  }}
-                >
-                  {/* "On"/"Off", not "Checking" — it sits beside a verdict chip that
-                      can itself read "Not checked", and the two must not blur. */}
-                  {category.enabled ? "On" : "Off"}
-                </button>
+                />
               </div>
             );
           })}

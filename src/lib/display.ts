@@ -1,3 +1,4 @@
+import type { IconName } from "./icons";
 import type { Group } from "./types";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -63,26 +64,63 @@ export function initials(name: string): string {
   return letters || "•";
 }
 
-export function deviceTag(hostname: string | null): string {
-  const n = (hostname ?? "").toLowerCase();
-  if (n.includes("iphone")) return "PHN";
-  if (n.includes("ipad")) return "PAD";
-  if (n.includes("watch")) return "WCH";
-  if (n.includes("apple tv") || n.includes("appletv") || /\btv\b/.test(n)) return "TV";
-  if (n.includes("imac") || n.includes("macbook") || n.includes("mac ")) return "MAC";
-  if (n.includes("echo") || n.includes("homepod") || n.includes("speaker")) return "SPK";
-  return "DEV";
+/**
+ * Device types, as one ordered table.
+ *
+ * The word and the glyph answer the same question — what is this thing — so they are
+ * declared together and matched once. Two lists would drift, and a laptop drawn as a
+ * phone reads as a fact about the device rather than a styling slip.
+ *
+ * Matching is on the hostname UniFi reports, which is whatever the household named it,
+ * so this is a best guess and the order matters: "Apple TV" is a television before it
+ * is a Mac. A hostname we cannot place is `Device` with the question glyph — the shape
+ * of "not yet known", which is exactly what a new arrival is. Never guess a type from
+ * nothing; a wrong icon is worse than an honest blank.
+ */
+const DEVICE_KINDS: readonly { match: RegExp; label: string; icon: IconName }[] = [
+  { match: /\bapple ?tv\b|\btv\b|roku|chromecast|firestick|\bvizio\b/, label: "TV", icon: "television" },
+  { match: /iphone|pixel|galaxy|\bphone\b/, label: "Phone", icon: "device-mobile" },
+  { match: /ipad|tablet|kindle|\bfire hd\b/, label: "Tablet", icon: "device-tablet" },
+  { match: /watch/, label: "Watch", icon: "watch" },
+  {
+    match: /macbook|imac|\bmac\b|laptop|chromebook|thinkpad|surface|desktop|\bpc\b/,
+    label: "Computer",
+    icon: "laptop",
+  },
+  {
+    match: /echo|homepod|sonos|speaker|airpods|\bhifi\b/,
+    label: "Speaker",
+    icon: "speaker-high",
+  },
+  { match: /printer|epson|officejet|laserjet|\bbrother\b/, label: "Printer", icon: "printer" },
+  {
+    match: /playstation|\bps[45]\b|xbox|nintendo/,
+    label: "Console",
+    icon: "game-controller",
+  },
+  {
+    match: /router|gateway|firewalla|access point|\bap\b|unifi|\budm\b/,
+    label: "Network",
+    icon: "network",
+  },
+];
+
+function deviceKind(hostname: string | null): { label: string; icon: IconName } {
+  const name = (hostname ?? "").toLowerCase();
+  return (
+    DEVICE_KINDS.find((kind) => kind.match.test(name)) ?? {
+      label: "Device",
+      icon: "question" as const,
+    }
+  );
 }
 
 export function deviceKindLabel(hostname: string | null): string {
-  const n = (hostname ?? "").toLowerCase();
-  if (n.includes("iphone")) return "Phone";
-  if (n.includes("ipad")) return "Tablet";
-  if (n.includes("watch")) return "Watch";
-  if (n.includes("apple tv") || n.includes("appletv") || /\btv\b/.test(n)) return "TV";
-  if (n.includes("imac") || n.includes("macbook") || n.includes("mac ")) return "Computer";
-  if (n.includes("echo") || n.includes("homepod") || n.includes("speaker")) return "Speaker";
-  return "Device";
+  return deviceKind(hostname).label;
+}
+
+export function deviceIcon(hostname: string | null): IconName {
+  return deviceKind(hostname).icon;
 }
 
 export function formatHhmm(value: string): string {

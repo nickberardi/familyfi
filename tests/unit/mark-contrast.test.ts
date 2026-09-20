@@ -71,7 +71,7 @@ function contrast(foreground: Rgba, background: Rgba): number {
 }
 
 describe("category mark contrast", () => {
-  const states: CategoryMarkState[] = ["on", "blocked", "partial", "open", "unknown"];
+  const states: CategoryMarkState[] = ["rule", "blocked", "partial", "open", "unknown"];
 
   it.each(states)("keeps %s's glyph readable on its own fill", (state) => {
     const { fill, ink } = categoryMarkStyle(state);

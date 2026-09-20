@@ -7,7 +7,9 @@ import { api } from "@/lib/api";
 import { DeviceAssignSelect, networkLabel } from "@/components/DeviceAssign";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
-import { deviceKindLabel, deviceTag } from "@/lib/display";
+import { TogglePill } from "@/components/ui/Controls";
+import { Icon } from "@/components/ui/Icon";
+import { deviceIcon, deviceKindLabel } from "@/lib/display";
 import type { Device, Group } from "@/lib/types";
 
 const FILTERS = [
@@ -44,9 +46,6 @@ function DevicesBody() {
   const networks = unifi?.networks ?? [];
   const unassigned = devices.filter((device) => device.assignment === "quarantined");
   const enforced = household?.quarantineEnforced === true;
-  const onStyle = enforced
-    ? { background: "var(--ff-card)", borderColor: "var(--ff-control-line)", color: "var(--ff-muted)" }
-    : { background: "var(--ff-card)", borderColor: "var(--ff-control-line)", color: "var(--ff-ink)" };
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -93,14 +92,14 @@ function DevicesBody() {
               New arrivals stay off the internet until assigned. Off is an emergency override on FamilyFi policies only.
             </p>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enforced}
-            aria-label={enforced ? "Turn quarantine off" : "Turn quarantine on"}
-            className="flex-none rounded-[7px] border px-3 py-1.5 text-[14px] font-semibold"
-            style={onStyle}
-            onClick={() =>
+          {/*
+            The pill names the state quarantine is *in*. It used to name the action —
+            reading "Off" while quarantine was being enforced — which is the one
+            reading a household must not get wrong on this control.
+          */}
+          <TogglePill
+            on={enforced}
+            onToggle={() =>
               void mutate(() =>
                 api("/api/v1/settings/household", {
                   method: "PUT",
@@ -108,9 +107,10 @@ function DevicesBody() {
                 }),
               )
             }
-          >
-            {enforced ? "Off" : "On"}
-          </button>
+            label="Quarantine unassigned devices"
+            onLabel="Enforced"
+            offLabel="Off"
+          />
         </section>
         ) : null}
 
@@ -210,10 +210,16 @@ function DevicesBody() {
   );
 }
 
+/**
+ * The device's type, as a glyph on the well.
+ *
+ * Decorative on purpose: `DeviceIdentity` renders the same type as a word right
+ * beside it, so the icon is a second reading of the row rather than its only one.
+ */
 function DeviceMark({ hostname }: { hostname: string | null }) {
   return (
-    <div className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px] bg-[var(--ff-well)] text-[10px] font-semibold text-[var(--ff-muted)]">
-      {deviceTag(hostname)}
+    <div className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px] bg-[var(--ff-well)] text-[var(--ff-muted)]">
+      <Icon name={deviceIcon(hostname)} size={16} />
     </div>
   );
 }
