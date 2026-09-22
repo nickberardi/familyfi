@@ -37,6 +37,19 @@ enum SessionKind {
   bearer
 }
 
+enum ConnectionTransport {
+  lan
+  vpn
+  reverseProxy
+  tailscale
+  cloudflare
+}
+
+enum ConnectionTrustMode {
+  system
+  pinned
+}
+
 enum PolicyOwnerScope {
   group
   quarantine
@@ -85,9 +98,65 @@ model Household {
   dohProbeTimeoutMs      Int       @default(5000)
   connectionStatus       String    @default("unconfigured")
   connectionError        String?
+  displayName            String    @default("FamilyFi household")
+  instanceId             String?   @unique
+  instancePublicKey      String?
+  instancePrivateKeyCiphertext Bytes?
+  instancePrivateKeyIv   Bytes?
+  instancePrivateKeyAuthTag Bytes?
   revision               Int       @default(0)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+  connectionEndpoints    ConnectionEndpoint[]
+  pairings               Pairing[]
+}
+
+model ConnectionEndpoint {
+  id           String              @id @default(cuid())
+  householdId  String              @default("default")
+  household    Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  url          String              @unique
+  transport    ConnectionTransport
+  trustMode    ConnectionTrustMode @default(system)
+  spkiSha256   String?
+  priority     Int                 @default(0)
+  enabled      Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  pairings     Pairing[]
+
+  @@index([householdId, priority])
+}
+
+model PairedDevice {
+  id              String         @id @default(cuid())
+  displayName     String
+  credentialHash  String         @unique
+  revokedAt       DateTime?
+  lastSeenAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  sessions        Session[]
+  pairings        Pairing[]
+  authoredChanges ChangeResult[] @relation("changeActorDevice")
+}
+
+model Pairing {
+  id                 String              @id @default(cuid())
+  householdId        String              @default("default")
+  household          Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  endpointId         String
+  endpoint           ConnectionEndpoint  @relation(fields: [endpointId], references: [id], onDelete: Restrict)
+  tokenHash          String              @unique
+  displayName        String
+  createdByAccountId String
+  expiresAt          DateTime
+  claimedAt          DateTime?
+  claimedDeviceId    String?             @unique
+  claimedDevice      PairedDevice?       @relation(fields: [claimedDeviceId], references: [id], onDelete: SetNull)
+  createdAt          DateTime            @default(now())
+
+  @@index([expiresAt])
 }
 
 model Group {
@@ -127,6 +196,7 @@ model Account {
   updatedAt     DateTime       @updatedAt
   sessions      Session[]
   loginAttempts LoginAttempt[]
+  authoredChanges ChangeResult[] @relation("changeActorAccount")
 }
 
 model Session {
@@ -139,10 +209,13 @@ model Session {
   expiresAt DateTime
   revokedAt DateTime?
   userAgent String?
+  deviceId  String?
+  device    PairedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   createdAt DateTime    @default(now())
 
   @@index([username])
   @@index([expiresAt])
+  @@index([deviceId])
 }
 
 model LoginAttempt {
@@ -228,6 +301,12 @@ model ChangeResult {
   error             String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+  actorAccountId    String?
+  actorAccount      Account?     @relation("changeActorAccount", fields: [actorAccountId], references: [id], onDelete: SetNull)
+  actorDeviceId     String?
+  actorDevice       PairedDevice? @relation("changeActorDevice", fields: [actorDeviceId], references: [id], onDelete: SetNull)
+
+  @@index([actorAccountId, updatedAt])
 }
 
 model ReconciliationLock {

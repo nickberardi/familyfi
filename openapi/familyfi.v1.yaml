@@ -35,6 +35,8 @@ tags:
     description: Category and app rules including network scope (Internet parents remain groups)
   - name: Upstream
     description: Domain-list categories checked against the household resolver (reporting only)
+  - name: Connection
+    description: Paired native devices, trusted HTTPS endpoints, and connection status
 paths:
   /api/v1/health:
     get:
@@ -68,8 +70,9 @@ paths:
         Authenticate the recovery username `admin` against FAMILYFI_DEFAULT_PASSWORD,
         or a personal adult account against its stored password hash.
         Browser clients receive an httpOnly session cookie and a readable CSRF
-        cookie. Native clients set `client` to `native` and receive a bearer
-        token instead of cookies. Five failed attempts in 15 minutes for a
+        cookie. Native clients first claim an administrator-created pairing,
+        then set `client` to `native` with their paired device ID and credential
+        to receive a bearer token instead of cookies. Five failed attempts in 15 minutes for a
         username or IP return 429. Sessions last 30 days unless revoked.
       security: []
       requestBody:
@@ -82,7 +85,7 @@ paths:
               browser:
                 value: { username: admin, password: "example-password", client: browser }
               native:
-                value: { username: admin, password: "example-password", client: native }
+                value: { username: admin, password: "example-password", client: native, deviceId: "paired-device-id", deviceCredential: "device-keychain-credential" }
       responses:
         "200":
           description: Authenticated.
@@ -1401,6 +1404,122 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+  /api/v1/connection/identity:
+    get:
+      operationId: getConnectionIdentity
+      tags: [Connection]
+      summary: Public household identity for pairing verification
+      security: []
+      responses:
+        "200":
+          description: Non-secret identity anchor
+          content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionIdentity" } } }
+  /api/v1/connection:
+    get:
+      operationId: getConnection
+      tags: [Connection]
+      summary: Current connection status
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Phone-independent FamilyFi and UniFi status
+          content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionStatus" } } }
+        "401": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/endpoints:
+    get:
+      operationId: listConnectionEndpoints
+      tags: [Connection]
+      summary: List operator-configured endpoints
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Endpoints, content: { application/json: { schema: { type: object, required: [endpoints], properties: { endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createConnectionEndpoint
+      tags: [Connection]
+      summary: Add an HTTPS endpoint
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointWrite" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/endpoints/{id}:
+    put:
+      operationId: updateConnectionEndpoint
+      tags: [Connection]
+      summary: Update an HTTPS endpoint
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointWrite" } } } }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteConnectionEndpoint
+      tags: [Connection]
+      summary: Delete an HTTPS endpoint
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200": { description: Deleted, content: { application/json: { schema: { type: object, required: [ok], properties: { ok: { type: boolean } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/pairings:
+    post:
+      operationId: createConnectionPairing
+      tags: [Connection]
+      summary: Create an admin-authorized phone pairing code
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingCreate" } } } }
+      responses:
+        "201": { description: Pairing code, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingResponse" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/pairings/{id}/claim:
+    post:
+      operationId: claimConnectionPairing
+      tags: [Connection]
+      summary: Claim a single-use pairing code
+      security: []
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingClaim" } } } }
+      responses:
+        "200": { description: Device enrollment, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingClaimResponse" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/devices:
+    get:
+      operationId: listConnectionDevices
+      tags: [Connection]
+      summary: List paired phones and sessions
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Devices, content: { application/json: { schema: { type: object, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/ConnectionDevice" } } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/devices/{id}:
+    delete:
+      operationId: revokeConnectionDevice
+      tags: [Connection]
+      summary: Revoke a paired phone and its sessions
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200": { description: Revoked, content: { application/json: { schema: { type: object, required: [ok], properties: { ok: { type: boolean } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/v1/upstream/resolver:
     get:
       operationId: getUpstreamResolver
@@ -1637,6 +1756,12 @@ components:
           type: string
           enum: [browser, native]
           default: browser
+        deviceId:
+          type: string
+          description: Required when client is native; returned by pairing claim.
+        deviceCredential:
+          type: string
+          description: Required when client is native; stored only in the device keychain.
     Session:
       type: object
       additionalProperties: false
@@ -1702,8 +1827,9 @@ components:
     Household:
       type: object
       additionalProperties: false
-      required: [timezone, revision, quarantineEnforced, quarantineObservedEnabled, quarantinePolicyCount]
+      required: [displayName, timezone, revision, quarantineEnforced, quarantineObservedEnabled, quarantinePolicyCount]
       properties:
+        displayName: { type: string }
         timezone: { type: string }
         revision: { type: integer, minimum: 0 }
         quarantineEnforced: { type: boolean }
@@ -1711,6 +1837,128 @@ components:
           type: [boolean, "null"]
           description: Live UniFi enabled flag across app-owned quarantine policies. True if any is enabled.
         quarantinePolicyCount: { type: integer, minimum: 0 }
+    ConnectionIdentity:
+      type: object
+      additionalProperties: false
+      required: [protocolVersion, householdName, instanceId, publicKey, keyFingerprint]
+      properties:
+        protocolVersion: { type: integer, const: 1 }
+        householdName: { type: string }
+        instanceId: { type: string }
+        publicKey: { $ref: "#/components/schemas/ConnectionSigningKey" }
+        keyFingerprint: { type: string }
+    ConnectionSigningKey:
+      type: object
+      additionalProperties: false
+      required: [kty, crv, x]
+      properties:
+        kty: { type: string, const: OKP }
+        crv: { type: string, const: Ed25519 }
+        x: { type: string, description: Base64url encoded Ed25519 public key. }
+    ConnectionEndpoint:
+      type: object
+      additionalProperties: false
+      required: [id, url, transport, trustMode, spkiSha256, priority, enabled]
+      properties:
+        id: { type: string }
+        url: { type: string, format: uri }
+        transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
+        trustMode: { type: string, enum: [system, pinned] }
+        spkiSha256: { type: [string, "null"] }
+        priority: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+    ConnectionEndpointWrite:
+      type: object
+      additionalProperties: false
+      required: [url, transport, trustMode]
+      properties:
+        url: { type: string, format: uri }
+        transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
+        trustMode: { type: string, enum: [system, pinned] }
+        spkiSha256: { type: string }
+        priority: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+    ConnectionPairingCreate:
+      type: object
+      additionalProperties: false
+      required: [endpointId, deviceName]
+      properties:
+        endpointId: { type: string }
+        deviceName: { type: string, minLength: 1, maxLength: 80 }
+    ConnectionPairingClaim:
+      type: object
+      additionalProperties: false
+      required: [token, deviceName]
+      properties:
+        token: { type: string }
+        deviceName: { type: string, minLength: 1, maxLength: 80 }
+    ConnectionPairingResponse:
+      type: object
+      additionalProperties: false
+      required: [pairing]
+      properties:
+        pairing:
+          type: object
+          required: [id, expiresAt, qr]
+          properties:
+            id: { type: string }
+            expiresAt: { type: string, format: date-time }
+            qr: { type: object, additionalProperties: true }
+    ConnectionPairingClaimResponse:
+      type: object
+      additionalProperties: false
+      required: [device, deviceCredential, endpoint, manifest]
+      properties:
+        device: { type: object, required: [id, displayName], properties: { id: { type: string }, displayName: { type: string } } }
+        deviceCredential: { type: string }
+        endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" }
+        manifest: { $ref: "#/components/schemas/ConnectionEndpointManifest" }
+    ConnectionEndpointManifest:
+      type: object
+      additionalProperties: false
+      required: [instanceId, endpoints, signedPayload, signature]
+      properties:
+        instanceId: { type: string }
+        endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } }
+        signedPayload: { type: string, description: Base64url canonical manifest bytes covered by signature. }
+        signature: { type: string, description: Base64url Ed25519 signature over signedPayload bytes. }
+    ConnectionDevice:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, enrolledAt, lastSeenAt, revokedAt, sessions]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        enrolledAt: { type: string, format: date-time }
+        lastSeenAt: { type: [string, "null"], format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+        sessions: { type: array, items: { type: object, additionalProperties: true } }
+    ConnectionStatus:
+      type: object
+      additionalProperties: false
+      required: [endpoints, endpointManifest, unifi, lastChange]
+      properties:
+        endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } }
+        endpointManifest: { $ref: "#/components/schemas/ConnectionEndpointManifest" }
+        unifi: { $ref: "#/components/schemas/ConnectionUnifiStatus" }
+        lastChange:
+          type: [object, "null"]
+          additionalProperties: false
+          required: [id, scope, status, error, updatedAt]
+          properties:
+            id: { type: string }
+            scope: { type: string }
+            status: { type: string }
+            error: { type: [string, "null"] }
+            updatedAt: { type: string, format: date-time }
+    ConnectionUnifiStatus:
+      type: object
+      additionalProperties: false
+      required: [status, error, lastSyncAt]
+      properties:
+        status: { type: string }
+        error: { type: [string, "null"] }
+        lastSyncAt: { type: [string, "null"], format: date-time }
     UnifiSettings:
       type: object
       additionalProperties: false
@@ -1950,6 +2198,8 @@ components:
         status: { type: string, enum: [pending, applied, partial, failed, superseded] }
         scope: { type: string }
         deviceMac: { type: [string, "null"] }
+        actorAccountId: { type: [string, "null"] }
+        actorDeviceId: { type: [string, "null"] }
         error: { type: [string, "null"] }
         updatedAt: { type: string, format: date-time }
     SyncStatus:

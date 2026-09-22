@@ -6,7 +6,23 @@ Username `admin` with `FAMILYFI_DEFAULT_PASSWORD` remains available after person
 
 ## Backup and restore
 
-Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` after first setup). Restoring the database without that key cannot decrypt the stored UniFi credential. Ordinary `make docker-down` does not delete volumes. Do not regenerate `FAMILYFI_ENCRYPTION_KEY` once a UniFi key has been saved.
+Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` after first setup). Restoring the database without that key cannot decrypt the stored UniFi credential or the persisted companion instance signing key. Ordinary `make docker-down` does not delete volumes. Do not regenerate `FAMILYFI_ENCRYPTION_KEY` once a UniFi key has been saved.
+
+## Companion access routes
+
+HTTPS is required for every companion route. Start with direct LAN HTTPS and either a normal
+system-trusted certificate or a pairing QR that pins the LAN server public key. A household
+that already has VPN-to-LAN or a reverse proxy simply adds its HTTPS origin as a system-trusted
+endpoint; FamilyFi does not manage the VPN, proxy, or certificate issuer.
+
+For private remote access, add an operator-managed [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve)
+`https://…ts.net` origin as a `tailscale`/`system` endpoint. The phone must be in the same
+tailnet. Do not use Tailscale Funnel: it would expose the household service publicly.
+
+Cloudflare Tunnel and Access remain a future option. Cloudflare is only an outer perimeter;
+the FamilyFi bearer session remains authoritative. Do not place a Cloudflare service-token
+secret in a phone. Native Access browser/PKCE handoff must be designed and tested before that
+route is enabled.
 
 ## Database modes
 

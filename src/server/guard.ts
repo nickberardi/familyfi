@@ -1,4 +1,6 @@
 import { requireCsrf, requireSession } from "./auth";
+import { isAdministrator } from "./connection";
+import { withChangeActor } from "./changes";
 import { jsonCaughtError, jsonError } from "./http";
 
 export async function readJson(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; response: Response }> {
@@ -9,23 +11,36 @@ export async function readJson(request: Request): Promise<{ ok: true; value: unk
   }
 }
 
-export async function withSession(request: Request, handler: () => Promise<Response>): Promise<Response> {
+export async function withSession(request: Request, handler: (session: NonNullable<Awaited<ReturnType<typeof requireSession>>["session"]>) => Promise<Response>): Promise<Response> {
   try {
     const { session, error } = await requireSession(request);
     if (error || !session) return error!;
-    return await handler();
+    return await withChangeActor({ accountId: session.accountId, deviceId: session.deviceId }, () => handler(session));
   } catch (error) {
     return jsonCaughtError(error);
   }
 }
 
-export async function withMutation(request: Request, handler: () => Promise<Response>): Promise<Response> {
+export async function withMutation(request: Request, handler: (session: NonNullable<Awaited<ReturnType<typeof requireSession>>["session"]>) => Promise<Response>): Promise<Response> {
   try {
     const { session, error } = await requireSession(request);
     if (error || !session) return error!;
     const csrf = await requireCsrf(request);
     if (csrf) return csrf;
-    return await handler();
+    return await withChangeActor({ accountId: session.accountId, deviceId: session.deviceId }, () => handler(session));
+  } catch (error) {
+    return jsonCaughtError(error);
+  }
+}
+
+export async function withAdmin(request: Request, handler: (session: NonNullable<Awaited<ReturnType<typeof requireSession>>["session"]>) => Promise<Response>): Promise<Response> {
+  try {
+    const { session, error } = await requireSession(request);
+    if (error || !session) return error!;
+    const csrf = await requireCsrf(request);
+    if (csrf) return csrf;
+    if (!isAdministrator(session as never)) return jsonError(403, "administrator_required", "A FamilyFi administrator is required.");
+    return await withChangeActor({ accountId: session.accountId, deviceId: session.deviceId }, () => handler(session));
   } catch (error) {
     return jsonCaughtError(error);
   }
