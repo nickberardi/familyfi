@@ -13,11 +13,14 @@ import {
   toPublicSession,
 } from "@/server/auth";
 import { clientIp, jsonCaughtError, jsonError } from "@/server/http";
+import { authenticatePairedDevice } from "@/server/connection";
 
 const Body = z.object({
   username: z.string(),
   password: z.string(),
   client: z.enum(["browser", "native"]).optional(),
+  deviceId: z.string().min(1).optional(),
+  deviceCredential: z.string().min(1).optional(),
 });
 
 export async function POST(request: Request) {
@@ -41,11 +44,16 @@ export async function POST(request: Request) {
     if (!result.ok) return jsonError(result.status, result.code, result.message);
 
     const native = parsed.data.client === "native";
+    const device = native && parsed.data.deviceId && parsed.data.deviceCredential
+      ? await authenticatePairedDevice(parsed.data.deviceId, parsed.data.deviceCredential)
+      : null;
+    if (native && !device) return jsonError(403, "device_not_paired", "Pair this phone with a household administrator before signing in.");
     const issued = await createSession({
       accountId: result.account.id,
       username: result.account.username,
       kind: native ? SessionKind.bearer : SessionKind.cookie,
       userAgent: request.headers.get("user-agent"),
+      deviceId: device?.id,
     });
 
     const body = {

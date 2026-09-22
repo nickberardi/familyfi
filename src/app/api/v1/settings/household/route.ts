@@ -10,10 +10,11 @@ import type { Household } from "@prisma/client";
 const Body = z
   .object({
     timezone: z.string().min(1).optional(),
+    displayName: z.string().trim().min(1).max(80).optional(),
     quarantineEnforced: z.boolean().optional(),
   })
-  .refine((value) => value.timezone !== undefined || value.quarantineEnforced !== undefined, {
-    message: "timezone or quarantineEnforced is required.",
+  .refine((value) => value.timezone !== undefined || value.quarantineEnforced !== undefined || value.displayName !== undefined, {
+    message: "timezone, displayName, or quarantineEnforced is required.",
   });
 
 export async function publicHousehold(household: Household) {
@@ -24,6 +25,7 @@ export async function publicHousehold(household: Household) {
     quarantineEnforced: household.quarantineEnforced,
     quarantineObservedEnabled: live.observedEnabled,
     quarantinePolicyCount: live.policyCount,
+    displayName: household.displayName,
   };
 }
 
@@ -52,6 +54,7 @@ export async function PUT(request: Request) {
       data: {
         ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
         ...(parsed.data.quarantineEnforced !== undefined ? { quarantineEnforced: parsed.data.quarantineEnforced } : {}),
+        ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
       },
     });
     const change = await enqueueChange(parsed.data.quarantineEnforced !== undefined ? "quarantine" : "household");

@@ -161,6 +161,7 @@ export async function createSession(input: {
   username: string;
   kind: SessionKind;
   userAgent?: string | null;
+  deviceId?: string | null;
 }) {
   const raw = randomToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -172,6 +173,7 @@ export async function createSession(input: {
       username: input.username,
       expiresAt,
       userAgent: input.userAgent ?? undefined,
+      deviceId: input.deviceId ?? undefined,
     },
   });
   return { raw, expiresAt, csrf: randomToken(24) };
@@ -196,9 +198,12 @@ export async function readSessionFromRequest(request: Request) {
   if (!raw) return null;
   const session = await prisma().session.findUnique({
     where: { tokenHash: sha256(raw) },
-    include: { account: true },
+    include: { account: true, device: true },
   });
-  if (!session || session.revokedAt || session.expiresAt <= new Date()) return null;
+  if (!session || session.revokedAt || session.expiresAt <= new Date() || (session.kind === SessionKind.bearer && (!session.device || session.device.revokedAt))) return null;
+  if (session.device && (!session.device.lastSeenAt || session.device.lastSeenAt < new Date(Date.now() - 15 * 60 * 1000))) {
+    await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date() } });
+  }
   return session;
 }
 

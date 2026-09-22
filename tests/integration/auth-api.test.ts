@@ -8,6 +8,7 @@ import { DELETE as deleteAccount, PUT as updateAccount } from "@/app/api/v1/acco
 import { PUT as setPassword } from "@/app/api/v1/accounts/[id]/password/route";
 import { GET as getHealth } from "@/app/api/v1/health/route";
 import { hashPassword } from "@/server/auth";
+import { sha256 } from "@/server/crypto";
 import { prisma } from "@/server/db";
 import { publicAccount } from "@/server/accounts";
 import { CSRF_HEADER } from "@/lib/constants";
@@ -28,11 +29,17 @@ async function browserLogin(username = "admin", password = PASSWORD) {
 }
 
 async function nativeLogin(username = "admin", password = PASSWORD) {
+  const deviceCredential = "test-paired-device-credential";
+  const device = await prisma().pairedDevice.upsert({
+    where: { credentialHash: sha256(deviceCredential) },
+    update: { revokedAt: null },
+    create: { displayName: "Test phone", credentialHash: sha256(deviceCredential) },
+  });
   const response = await login(
     request("/api/v1/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, password, client: "native" }),
+      body: JSON.stringify({ username, password, client: "native", deviceId: device.id, deviceCredential }),
     }),
   );
   const body = (await response.clone().json()) as { token?: string };
