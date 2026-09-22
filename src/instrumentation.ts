@@ -17,6 +17,7 @@ export async function register() {
   else if (unifiMockRequested()) {
     console.warn("UNIFI_MOCK is set but ignored because NODE_ENV is production.");
   }
+  const { startUpdateCheck } = await import("./server/update-check");
   const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
   const { ensureUpstreamCategories } = await import("./server/upstream-seed");
   const { startReconciliation } = await import("./server/reconciliation");
@@ -32,6 +33,7 @@ export async function register() {
   } catch {
     // Database may not be up yet during `next build` or a local start.
   }
+  startUpdateCheck();
   startReconciliation();
   startUpstreamProbe();
 }

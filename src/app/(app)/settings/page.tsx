@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,7 +13,7 @@ import {
   usernameFromName,
 } from "@/lib/settings-copy";
 import { relativeSweep } from "@/lib/sync-copy";
-import type { Group } from "@/lib/types";
+import type { Group, UpdateCheck } from "@/lib/types";
 import { appVersionLabel } from "@/lib/version";
 
 const TIMEZONES = [
@@ -29,6 +29,27 @@ const TIMEZONES = [
 
 const FIELD = "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
 const ROLES = ["child", "teen", "adult"] as const;
+
+function UpdateSummary({ update, loadError }: { update: UpdateCheck | null; loadError: boolean }) {
+  if (loadError || update?.status === "error") {
+    return <span className="text-[14px] font-semibold text-[var(--ff-danger)]">Update check unavailable</span>;
+  }
+  if (!update || update.status === "pending") {
+    return <span className="text-[14px] text-[var(--ff-muted)]">Checking for updates…</span>;
+  }
+  if (update.available && update.latestVersion && update.releaseUrl) {
+    return (
+      <span className="text-[14px] font-semibold text-[var(--ff-accent)]">
+        Update available: {appVersionLabel(update.latestVersion)} · {" "}
+        <a href={update.releaseUrl} target="_blank" rel="noreferrer" className="underline">
+          View release
+        </a>
+      </span>
+    );
+  }
+  if (!update.latestVersion) return <span className="text-[14px] text-[var(--ff-muted)]">No published release found</span>;
+  return <span className="text-[14px] font-semibold text-[var(--ff-on-ink)]">Up to date</span>;
+}
 
 export default function SettingsPage() {
   const { unifi, household, accounts, groups, sync, mutate } = useAppData();
@@ -52,6 +73,32 @@ export default function SettingsPage() {
 
   const [unifiStamp, setUnifiStamp] = useState<string | null>(null);
   const [timezoneStamp, setTimezoneStamp] = useState<string | null>(null);
+  const [update, setUpdate] = useState<UpdateCheck | null>(null);
+  const [updateLoadError, setUpdateLoadError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      let nextDelay = 60_000;
+      try {
+        const result = await api<{ update: UpdateCheck }>("/api/v1/health");
+        if (cancelled) return;
+        setUpdate(result.update);
+        setUpdateLoadError(false);
+        if (result.update.status === "pending") nextDelay = 5_000;
+      } catch {
+        if (cancelled) return;
+        setUpdateLoadError(true);
+      }
+      if (!cancelled) timer = setTimeout(() => void poll(), nextDelay);
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
 
   const family = groups.filter((group) => group.kind === "family");
   const personal = accounts.filter((account) => !account.recovery);
@@ -507,6 +554,15 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 px-[18px] py-2.5">
             <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">Version</div>
             <div className="min-w-0 flex-1 text-right font-mono text-[14px]">{appVersionLabel()}</div>
+          </div>
+          <div
+            className="flex items-center gap-3 px-[18px] py-2.5"
+            style={{ borderTop: "1px solid var(--ff-hairline)" }}
+          >
+            <div className="w-[130px] flex-none text-[14px] text-[var(--ff-muted)]">Updates</div>
+            <div className="min-w-0 flex-1 text-right">
+              <UpdateSummary update={update} loadError={updateLoadError} />
+            </div>
           </div>
           <div
             className="flex items-center gap-3 px-[18px] py-2.5"

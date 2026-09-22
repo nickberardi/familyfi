@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { UpdateCheck } from "@/lib/types";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 const username = "admin";
@@ -65,6 +66,58 @@ test("sign-in and household pages", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByText("About")).toBeVisible();
   await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
+});
+
+test("settings shows available, current, and unavailable update checks", async ({ page }) => {
+  await signIn(page);
+  let update: UpdateCheck = {
+    status: "ok",
+    available: true,
+    currentVersion: "0.5.1",
+    latestVersion: "0.6.0",
+    releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
+    checkedAt: "2026-09-22T12:00:00.000Z",
+    lastSuccessfulAt: "2026-09-22T12:00:00.000Z",
+    error: null,
+  };
+  await page.route("**/api/v1/health", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "ok",
+        db: "ok",
+        version: "0.5.1",
+        revision: 0,
+        update,
+      }),
+    });
+  });
+  await page.goto("/settings");
+  await expect(page.getByText("Update available: v0.6.0")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View release" })).toHaveAttribute(
+    "href",
+    "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
+  );
+
+  update = {
+    ...update,
+    available: false,
+    latestVersion: "0.5.1",
+    releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v0.5.1",
+  };
+  await page.reload();
+  await expect(page.getByText("Up to date")).toBeVisible();
+
+  update = {
+    ...update,
+    status: "error",
+    available: null,
+    latestVersion: null,
+    releaseUrl: null,
+    error: "GitHub release check failed.",
+  };
+  await page.reload();
+  await expect(page.getByText("Update check unavailable")).toBeVisible();
 });
 
 test("create person lands on a seeded detail page that can be edited", async ({ page }) => {

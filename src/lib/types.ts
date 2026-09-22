@@ -103,3 +103,15 @@ export type SyncStatus = {
 };
 
 export type MutationResult<T> = T & { change: { changeId: string; revision: number } };
+
+/** Non-secret release-check metadata returned by GET /api/v1/health. */
+export type UpdateCheck = {
+  status: "pending" | "ok" | "error";
+  available: boolean | null;
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseUrl: string | null;
+  checkedAt: string | null;
+  lastSuccessfulAt: string | null;
+  error: string | null;
+};
