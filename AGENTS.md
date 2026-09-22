@@ -121,7 +121,7 @@ CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, P
 
 ## Pull requests
 
-PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same change.
+PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same change. The PR description explicitly lists every issue or alert it closes; use `Closes #<number>` for GitHub issues and identify security alerts by their Dependabot alert number and advisory.
 
 **A PR built from a plan carries that plan in its description, in full and verbatim.**
 Put it in a collapsed `<details>` block so it does not bury the summary. A plan records
