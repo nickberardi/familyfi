@@ -10,7 +10,7 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/v1/health` | No secrets; includes `version` from `package.json` |
+| GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. |
 | POST | `/api/v1/auth/login` | Cookie session, or a paired native device bearer session |
 | POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for native |
 | GET | `/api/v1/auth/session` | Current principal |

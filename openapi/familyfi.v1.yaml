@@ -43,7 +43,7 @@ paths:
       operationId: getHealth
       tags: [Health]
       summary: Deployment health
-      description: Minimal non-secret readiness. Does not expose credentials.
+      description: Minimal non-secret readiness. Does not expose credentials. The optional update snapshot is cached GitHub release metadata and does not affect application readiness.
       security: []
       responses:
         "200":
@@ -54,7 +54,20 @@ paths:
                 $ref: "#/components/schemas/Health"
               examples:
                 ok:
-                  value: { status: ok, db: ok, version: "0.1.0", revision: 0 }
+                  value:
+                    status: ok
+                    db: ok
+                    version: "0.1.0"
+                    revision: 0
+                    update:
+                      status: ok
+                      available: true
+                      currentVersion: "0.1.0"
+                      latestVersion: "0.2.0"
+                      releaseUrl: https://github.com/nickberardi/familyfi/releases/tag/v0.2.0
+                      checkedAt: "2026-09-22T12:00:00.000Z"
+                      lastSuccessfulAt: "2026-09-22T12:00:00.000Z"
+                      error: null
         "503":
           description: Application is up but the database is not.
           content:
@@ -1741,6 +1754,41 @@ components:
         error:
           type: string
           description: Present when status is degraded due to configuration, not secrets.
+        update:
+          $ref: "#/components/schemas/UpdateCheck"
+    UpdateCheck:
+      type: object
+      additionalProperties: false
+      required: [status, available, currentVersion, latestVersion, releaseUrl, checkedAt, lastSuccessfulAt, error]
+      description: Process-local GitHub release metadata. An error here does not degrade FamilyFi or database readiness.
+      properties:
+        status:
+          type: string
+          enum: [pending, ok, error]
+        available:
+          type: [boolean, "null"]
+          description: True only when a newer applicable GitHub release is known; null while pending or after a failed check.
+        currentVersion:
+          type: string
+          description: Application semver from package.json (no leading v).
+        latestVersion:
+          type: [string, "null"]
+          description: Highest applicable published GitHub release semver (no leading v), if one exists.
+        releaseUrl:
+          type: [string, "null"]
+          format: uri
+          description: Canonical GitHub URL for latestVersion, if one exists.
+        checkedAt:
+          type: [string, "null"]
+          format: date-time
+          description: Completion time for the latest check attempt.
+        lastSuccessfulAt:
+          type: [string, "null"]
+          format: date-time
+          description: Completion time for the latest successful GitHub response.
+        error:
+          type: [string, "null"]
+          description: Safe operator-facing reason for a failed check; never a raw GitHub response body or credentials.
     LoginRequest:
       type: object
       additionalProperties: false

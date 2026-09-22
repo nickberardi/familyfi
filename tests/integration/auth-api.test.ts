@@ -11,6 +11,8 @@ import { hashPassword } from "@/server/auth";
 import { sha256 } from "@/server/crypto";
 import { prisma } from "@/server/db";
 import { publicAccount } from "@/server/accounts";
+import { refreshUpdateCheck } from "@/server/update-check";
+import { APP_VERSION } from "@/lib/version";
 import { CSRF_HEADER } from "@/lib/constants";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
@@ -57,11 +59,43 @@ describe("auth and accounts API", () => {
 
   it("serves non-secret health", async () => {
     const response = await getHealth();
-    const body = (await response.json()) as { status: string; db: string; version: string };
+    const body = (await response.json()) as { status: string; db: string; version: string; update: { status: string; available: boolean | null } };
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(body.update).toMatchObject({ status: "pending", available: null });
     expect(JSON.stringify(body)).not.toMatch(/password|ciphertext|FAMILYFI_DEFAULT_PASSWORD/i);
+  });
+
+  it("exposes successful and failed GitHub update checks without changing readiness", async () => {
+    await refreshUpdateCheck({
+      fetchImpl: async () => new Response(JSON.stringify([{ tag_name: `v${APP_VERSION}` }])),
+    });
+    const current = await getHealth();
+    expect(current.status).toBe(200);
+    await expect(current.json()).resolves.toMatchObject({
+      status: "ok",
+      update: { status: "ok", available: false, latestVersion: APP_VERSION },
+    });
+
+    await refreshUpdateCheck({
+      fetchImpl: async () => new Response(JSON.stringify([{ tag_name: "v999.0.0", prerelease: true }])),
+      now: () => new Date("2026-09-22T12:00:00.000Z"),
+    });
+    const available = await getHealth();
+    expect(available.status).toBe(200);
+    await expect(available.json()).resolves.toMatchObject({
+      status: "ok",
+      update: { status: "ok", available: true, latestVersion: "999.0.0" },
+    });
+
+    await refreshUpdateCheck({ fetchImpl: async () => new Response("rate limited", { status: 429 }) });
+    const failed = await getHealth();
+    expect(failed.status).toBe(200);
+    await expect(failed.json()).resolves.toMatchObject({
+      status: "ok",
+      update: { status: "error", available: null, error: "GitHub release check returned HTTP 429." },
+    });
   });
 
   it("signs in recovery admin with cookies and CSRF", async () => {
