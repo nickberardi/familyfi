@@ -123,6 +123,12 @@ CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, P
 
 PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same change. The PR description explicitly lists every issue or alert it closes; use `Closes #<number>` for GitHub issues and identify security alerts by their Dependabot alert number and advisory.
 
+## OpenAPI consumer coordination
+
+- Whenever a change modifies the OpenAPI specification, open an issue in `familyfi-ios` for the iOS client to adopt that contract change. Describe the affected endpoints and schemas, the expected client work, and any rollout or compatibility considerations.
+- Assess every requested contract change for compatibility. If the requested change would be breaking, call that out clearly before making the change. The human operator—not the agent—decides whether the breaking change is warranted or whether a compatible approach is needed; do not make that product decision on the operator's behalf.
+- Do not raise a breaking-change warning for additive or otherwise compatible contract changes. The agent's role is to identify a breaking impact when the requested work would cause one, not to speculate about or independently choose breaking changes.
+
 **A PR built from a plan carries that plan in its description, in full and verbatim.**
 Put it in a collapsed `<details>` block so it does not bury the summary. A plan records
 the decisions the work was approved on, and a reviewer cannot judge a diff against a plan
