@@ -5,7 +5,7 @@ COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.y
 WITH_ENV := node scripts/with-env.mjs
 
 .PHONY: setup dev test test-api test-integration test-browser spike lint typecheck build \
-	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev secrets
+	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev db-drift secrets
 
 setup:
 	corepack enable >/dev/null 2>&1 || true
@@ -28,6 +28,9 @@ setup:
 
 db-migrate:
 	$(WITH_ENV) ./node_modules/.bin/prisma migrate deploy
+
+db-drift:
+	$(PNPM) db-drift
 
 dev:
 	node scripts/ensure-dev-port.mjs 3000
