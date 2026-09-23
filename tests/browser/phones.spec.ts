@@ -135,3 +135,13 @@ test("pins a home-network route from a pasted certificate and hands out the full
     }
   }
 });
+
+test("shows remote access and never offers to edit the route it manages", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/phones");
+  const card = page.getByTestId("remote-access");
+  await expect(card.getByText("Remote access", { exact: true })).toBeVisible();
+  await expect(card.getByRole("switch", { name: "Remote access" })).toBeVisible();
+  await expect(card).toContainText("this web page and its sign-in stay on your home network");
+  await shot(page, "remote-access");
+});

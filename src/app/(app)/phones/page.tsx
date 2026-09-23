@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { PairPhoneSheet } from "@/components/phones/PairPhoneSheet";
 import { PairedPhoneRow } from "@/components/phones/PairedPhoneRow";
+import { RemoteAccessCard } from "@/components/phones/RemoteAccessCard";
 import { RouteRow } from "@/components/phones/RouteRow";
 import { RouteSheet } from "@/components/phones/RouteSheet";
 import { api, ApiError } from "@/lib/api";
@@ -24,6 +25,7 @@ export default function PhonesPage() {
   const [pairing, setPairing] = useState(false);
   const [showRevoked, setShowRevoked] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [managedId, setManagedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +93,13 @@ export default function PhonesPage() {
             {error}
           </p>
         ) : null}
+
+        <RemoteAccessCard
+          onRouteChange={(id) => {
+            setManagedId(id);
+            void load();
+          }}
+        />
 
         <section className={CARD}>
           <div className={CARD_HEAD}>
@@ -166,6 +175,7 @@ export default function PhonesPage() {
                 first={index === 0}
                 last={index === ordered.length - 1}
                 phones={pairedThrough(route.id)}
+                managed={route.id === managedId}
                 onToggle={() => {
                   const warning = route.enabled ? strandWarning(route, "turn off") : "";
                   if (warning && !window.confirm(warning)) return;

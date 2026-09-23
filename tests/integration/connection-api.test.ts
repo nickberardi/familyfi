@@ -15,6 +15,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { AccountKind } from "@prisma/client";
 import { POST as computePin } from "@/app/api/v1/connection/pins/route";
+import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
+import { TUNNEL_HEADER } from "@/lib/constants";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
@@ -254,5 +256,47 @@ describe("certificate pins", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("remote access", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  function tunnelLogin(body: Record<string, unknown>) {
+    return login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json", [TUNNEL_HEADER]: "tunnel" }, body: JSON.stringify({ username: "admin", password: PASSWORD, ...body }) }));
+  }
+
+  it("keeps browser sign-in off the tunnel and checks the phone before the password", async () => {
+    const browser = await tunnelLogin({ client: "browser" });
+    expect(browser.status).toBe(403);
+    expect(((await browser.json()) as { error: { code: string } }).error.code).toBe("remote_browser_login");
+
+    const unpaired = await tunnelLogin({ client: "native", password: "wrong-guess", deviceId: "nope", deviceCredential: "nope" });
+    expect(unpaired.status).toBe(403);
+    expect(((await unpaired.json()) as { error: { code: string } }).error.code).toBe("device_not_paired");
+    // The password was never checked, so the internet learns nothing and burns no attempt.
+    expect(await prisma().loginAttempt.count()).toBe(0);
+
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const pairing = await issuePairing(auth, route);
+    const claimed = (await (await claim(pairing.id, pairing.qr.token)).json()) as { device: { id: string }; deviceCredential: string };
+    const phone = await tunnelLogin({ client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential });
+    expect(phone.status).toBe(200);
+    expect(((await phone.json()) as { tokenType: string }).tokenType).toBe("Bearer");
+  });
+
+  it("reports and switches remote access for an admin, and says when cloudflared is missing", async () => {
+    expect((await tunnelState(request("/api/v1/connection/tunnel"))).status).toBe(401);
+    const auth = await adminAuth();
+    const initial = (await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: { mode: string; status: string } };
+    expect(initial.tunnel).toMatchObject({ mode: "off", status: "off" });
+
+    expect((await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "named" })))).status).toBe(400);
+
+    const off = (await (await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "off" })))).json()) as { tunnel: { mode: string; status: string } };
+    expect(off.tunnel).toMatchObject({ mode: "off", status: "off" });
   });
 });

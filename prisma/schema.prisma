@@ -45,6 +45,12 @@ enum ConnectionTransport {
   cloudflare
 }
 
+enum TunnelMode {
+  off
+  quick
+  named
+}
+
 enum ConnectionTrustMode {
   system
   pinned
@@ -104,6 +110,8 @@ model Household {
   instancePrivateKeyCiphertext Bytes?
   instancePrivateKeyIv   Bytes?
   instancePrivateKeyAuthTag Bytes?
+  tunnelMode             TunnelMode @default(off)
+  tunnelEndpointId       String?
   revision               Int       @default(0)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt

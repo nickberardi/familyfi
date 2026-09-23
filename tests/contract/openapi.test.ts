@@ -28,6 +28,7 @@ describe("openapi contract", () => {
         "/api/v1/connection/pairings/{id}",
         "/api/v1/connection/pairings/{id}/claim",
         "/api/v1/connection/pins",
+        "/api/v1/connection/tunnel",
         "/api/v1/devices",
         "/api/v1/devices/{mac}",
         "/api/v1/devices/{mac}/assignment",

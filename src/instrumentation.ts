@@ -36,4 +36,6 @@ export async function register() {
   startUpdateCheck();
   startReconciliation();
   startUpstreamProbe();
+  const { resumeRemoteAccess } = await import("./server/tunnel/remote-access");
+  void resumeRemoteAccess().catch((error) => console.error("Remote access did not start:", error));
 }

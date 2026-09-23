@@ -162,3 +162,12 @@ export type CertificatePin = {
   systemTrusted: boolean | null;
   source: "probe" | "certificate";
 };
+
+export type RemoteAccess = {
+  mode: "off" | "quick" | "named";
+  status: "off" | "starting" | "running" | "error" | "unavailable";
+  url: string | null;
+  error: string | null;
+  endpointId: string | null;
+  cloudflared: string | null;
+};
