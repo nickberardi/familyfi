@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import YAML from "yaml";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getGroups, POST as createGroup } from "@/app/api/v1/groups/route";
 import { DELETE as deleteGroup } from "@/app/api/v1/groups/[id]/route";
@@ -53,6 +56,13 @@ describe("v1 API contracts", () => {
     );
     expect(created.status).toBe(201);
     const groupBody = (await created.json()) as { group: { id: string }; change: { changeId: string; revision: number } };
+    const spec = YAML.parse(readFileSync(path.join(process.cwd(), "openapi/familyfi.v1.yaml"), "utf8")) as {
+      components: { schemas: { ChangeSummary: { required: string[]; properties: Record<string, unknown> } } };
+    };
+    const summarySchema = spec.components.schemas.ChangeSummary;
+    expect(Object.keys(groupBody.change).sort()).toEqual(summarySchema.required.toSorted());
+    expect(Object.keys(groupBody.change).sort()).toEqual(Object.keys(summarySchema.properties).sort());
+    expect(groupBody.change.changeId).toEqual(expect.any(String));
     expect(groupBody.change.revision).toBeGreaterThan(0);
 
     const listed = await getGroups(request("/api/v1/groups", { auth }));
