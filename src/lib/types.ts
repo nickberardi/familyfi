@@ -165,9 +165,11 @@ export type CertificatePin = {
 
 export type RemoteAccess = {
   mode: "off" | "quick" | "named";
-  status: "off" | "starting" | "running" | "error" | "unavailable";
+  status: "off" | "signing-in" | "starting" | "running" | "error" | "unavailable";
   url: string | null;
   error: string | null;
   endpointId: string | null;
   cloudflared: string | null;
+  hostname: string | null;
+  loginUrl: string | null;
 };

@@ -58,6 +58,24 @@ time they reach FamilyFi another way, usually at home. Cloudflare offers quick t
 testing, with no uptime guarantee and a 200-request concurrency limit. For a permanent address,
 use your own domain or one of the options below.
 
+### Remote access on your own domain
+
+Choose **My domain**, enter a hostname on a domain in your Cloudflare account (for example
+`familyfi.example.com`), and **Connect with Cloudflare**. FamilyFi shows a Cloudflare link; open
+it, pick the domain, and come back — the page updates by itself. FamilyFi then:
+
+1. creates a tunnel named `familyfi-<instance id>` and a DNS record for the hostname. It never
+   overwrites a record that already exists; choose another hostname or remove that record first;
+2. stores only that tunnel's credential, encrypted with `FAMILYFI_ENCRYPTION_KEY` like the UniFi
+   key, and passes it to `cloudflared` through its environment, never a file;
+3. deletes the account-wide certificate the Cloudflare sign-in produced, which could otherwise
+   create and delete tunnels and DNS across the zone.
+
+The address is permanent, so phones keep working across restarts. The tunnel still reaches only
+the phone-only gateway. **Forget domain** deletes the stored credential; the tunnel and DNS
+record stay in your Cloudflare account until you remove them there. Back up
+`FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
+
 ### Cloudflare Access (advanced)
 
 Cloudflare Tunnel with Access in front works as an ordinary `cloudflare`/`system` route when

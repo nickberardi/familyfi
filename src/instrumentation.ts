@@ -36,6 +36,10 @@ export async function register() {
   startUpdateCheck();
   startReconciliation();
   startUpstreamProbe();
-  const { resumeRemoteAccess } = await import("./server/tunnel/remote-access");
+  const { resumeRemoteAccess, startSidecarGateway } = await import("./server/tunnel/remote-access");
+  const sidecarPort = Number(process.env.FAMILYFI_PHONE_GATEWAY_PORT);
+  if (Number.isInteger(sidecarPort) && sidecarPort > 0 && sidecarPort < 65536) {
+    void startSidecarGateway(sidecarPort).catch((error) => console.error("Phone-only gateway did not start:", error));
+  }
   void resumeRemoteAccess().catch((error) => console.error("Remote access did not start:", error));
 }
