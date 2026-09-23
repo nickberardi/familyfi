@@ -21,10 +21,11 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |
 | GET | `/api/v1/connection` | Authenticated endpoint manifest, FamilyFi-to-UniFi status, and the account's last attributed change |
 | GET/POST | `/api/v1/connection/endpoints` | Administrator-managed HTTPS connection routes |
-| PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route; deleting a route with an outstanding pairing is rejected |
+| PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use` |
 | POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing QR payload |
+| GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
-| GET | `/api/v1/connection/devices` | Administrator list of paired phones and their active sessions |
+| GET | `/api/v1/connection/devices` | Administrator list of paired phones, the route each paired through (`pairedVia`), and their active sessions |
 | DELETE | `/api/v1/connection/devices/{id}` | Administrator revocation; invalidates every bearer session for that phone |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds` |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
@@ -65,6 +66,8 @@ FamilyFi never stores credentials for a tunnel provider.
 valid LAN certificate, VPN, public reverse proxy, Tailscale Serve, or Cloudflare. A `pinned`
 route is limited to direct LAN use and carries an SHA-256 SPKI pin in the pairing QR; a phone
 rejects every other public key. FamilyFi does not distribute a household CA.
+
+Administrators do all of this from **System → Phones** in the web app. Administrator reads need only the session; writes also need the CSRF header.
 
 Pairing is separate from sign-in: an administrator generates a five-minute, single-use QR
 for an enabled endpoint; the phone claims it, verifies the instance identity, stores its

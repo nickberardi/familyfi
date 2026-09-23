@@ -1,6 +1,6 @@
 {
   "name": "familyfi",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "license": "BUSL-1.1",
   "packageManager": "pnpm@10.15.1",
@@ -31,6 +31,7 @@
     "react-dom": "19.3.0",
     "swagger-ui-dist": "^5.33.0",
     "undici": "^8.10.2",
+    "uqr": "0.1.3",
     "zod": "^4.1.11"
   },
   "devDependencies": {

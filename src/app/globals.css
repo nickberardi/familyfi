@@ -190,6 +190,13 @@
   --ff-ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
   --ff-press-opacity: 0.72;
 
+  /*
+   * Pairing QR. Always black on white, whatever the surface around it: phone cameras
+   * decode dark-on-light reliably and inverted codes poorly.
+   */
+  --ff-qr-ink: #000000;
+  --ff-qr-ground: #ffffff;
+
   /* The header wash is the only blur in the product. */
   --ff-blur-header: blur(12px);
 }

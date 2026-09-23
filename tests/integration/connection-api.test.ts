@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as identity } from "@/app/api/v1/connection/identity/route";
-import { POST as createEndpoint } from "@/app/api/v1/connection/endpoints/route";
+import { GET as listEndpoints, POST as createEndpoint } from "@/app/api/v1/connection/endpoints/route";
+import { DELETE as deleteEndpoint, PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
 import { POST as createPairing } from "@/app/api/v1/connection/pairings/route";
+import { DELETE as cancelPairing, GET as pairingStatus } from "@/app/api/v1/connection/pairings/[id]/route";
+import { GET as listDevices } from "@/app/api/v1/connection/devices/route";
 import { POST as claimPairing } from "@/app/api/v1/connection/pairings/[id]/claim/route";
 import { DELETE as revokeDevice } from "@/app/api/v1/connection/devices/[id]/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
+import { AccountKind } from "@prisma/client";
+import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { authFromLogin, request } from "../helpers/http";
+import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -108,5 +113,102 @@ describe("companion connection API", () => {
     expect(revoked.status).toBe(200);
     expect((await connection(request("/api/v1/connection", { auth: bearer }))).status).toBe(401);
     expect(await prisma().session.count({ where: { deviceId: claimed.device.id, revokedAt: null } })).toBe(0);
+  });
+});
+
+function json(auth: SessionAuth, method: string, body?: unknown): RequestInit & { auth: SessionAuth } {
+  return { method, auth, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) };
+}
+
+const params = (id: string) => ({ params: Promise.resolve({ id }) });
+
+async function addRoute(auth: SessionAuth, url = "https://familyfi.home:8443") {
+  const response = await createEndpoint(request("/api/v1/connection/endpoints", json(auth, "POST", { url, transport: "lan", trustMode: "system" })));
+  return { response, body: (await response.json()) as { endpoint: { id: string }; error?: { code: string; message: string } } };
+}
+
+async function issuePairing(auth: SessionAuth, endpointId: string) {
+  const response = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId, deviceName: "Kitchen iPhone" })));
+  return ((await response.json()) as { pairing: { id: string; qr: { token: string } } }).pairing;
+}
+
+async function claim(id: string, token: string) {
+  return claimPairing(
+    request(`/api/v1/connection/pairings/${id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, deviceName: "Nick's iPhone" }) }),
+    params(id),
+  );
+}
+
+describe("companion admin surface", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it("serves admin reads to a cookie session without a CSRF header, but still guards writes", async () => {
+    const auth = await adminAuth();
+    const noCsrf = { cookie: auth.cookie, csrf: "" };
+    expect((await listEndpoints(request("/api/v1/connection/endpoints", { auth: noCsrf }))).status).toBe(200);
+    expect((await listDevices(request("/api/v1/connection/devices", { auth: noCsrf }))).status).toBe(200);
+    const write = await createEndpoint(request("/api/v1/connection/endpoints", json(noCsrf, "POST", { url: "https://a.home", transport: "lan", trustMode: "system" })));
+    expect(write.status).toBe(403);
+  });
+
+  it("refuses a personal account that is not an admin", async () => {
+    await prisma().account.create({ data: { username: "sam", displayName: "Sam", kind: AccountKind.personal, isAdmin: false, passwordHash: await hashPassword("sam-password-1") } });
+    const response = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "sam", password: "sam-password-1", client: "browser" }) }));
+    const sam = authFromLogin(response);
+    const denied = await listEndpoints(request("/api/v1/connection/endpoints", { auth: sam }));
+    expect(denied.status).toBe(403);
+    expect(((await denied.json()) as { error: { code: string } }).error.code).toBe("administrator_required");
+  });
+
+  it("rejects a duplicate address with a clean 409", async () => {
+    const auth = await adminAuth();
+    expect((await addRoute(auth)).response.status).toBe(201);
+    const duplicate = await addRoute(auth, "https://familyfi.home:8443/");
+    expect(duplicate.response.status).toBe(409);
+    expect(duplicate.body.error).toEqual({ code: "endpoint_exists", message: "A route with this address already exists." });
+
+    const other = await addRoute(auth, "https://vpn.example.com");
+    const renamed = await updateEndpoint(request(`/api/v1/connection/endpoints/${other.body.endpoint.id}`, json(auth, "PUT", { url: "https://familyfi.home:8443" })), params(other.body.endpoint.id));
+    expect(renamed.status).toBe(409);
+  });
+
+  it("reports pairing status, cancels a pending code, and only then lets its route go", async () => {
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const pairing = await issuePairing(auth, route);
+
+    const status = await pairingStatus(request(`/api/v1/connection/pairings/${pairing.id}`, { auth }), params(pairing.id));
+    expect(((await status.json()) as { pairing: { status: string } }).pairing.status).toBe("pending");
+
+    const blocked = await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route));
+    expect(blocked.status).toBe(409);
+    expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe("endpoint_in_use");
+
+    expect((await cancelPairing(request(`/api/v1/connection/pairings/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(200);
+    expect((await cancelPairing(request(`/api/v1/connection/pairings/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(404);
+    expect((await claim(pairing.id, pairing.qr.token)).status).toBe(403);
+
+    expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
+    expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(404);
+  });
+
+  it("shows the route a phone paired through, and survives that route being deleted", async () => {
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const pairing = await issuePairing(auth, route);
+    expect((await claim(pairing.id, pairing.qr.token)).status).toBe(200);
+
+    const status = await pairingStatus(request(`/api/v1/connection/pairings/${pairing.id}`, { auth }), params(pairing.id));
+    expect(((await status.json()) as { pairing: { status: string; device: { displayName: string } } }).pairing).toMatchObject({ status: "claimed", device: { displayName: "Nick's iPhone" } });
+
+    type Devices = { devices: { pairedVia: { endpointId: string; url: string; transport: string } | null }[] };
+    const before = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as Devices;
+    expect(before.devices[0].pairedVia).toEqual({ endpointId: route, url: "https://familyfi.home:8443", transport: "lan" });
+
+    expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
+    const after = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as Devices;
+    expect(after.devices[0].pairedVia).toBeNull();
   });
 });

@@ -37,7 +37,9 @@ export async function withAdmin(request: Request, handler: (session: NonNullable
   try {
     const { session, error } = await requireSession(request);
     if (error || !session) return error!;
-    const csrf = await requireCsrf(request);
+    // Reads carry no CSRF risk, and the browser client only sends the header on writes.
+    const safe = request.method === "GET" || request.method === "HEAD";
+    const csrf = safe ? null : await requireCsrf(request);
     if (csrf) return csrf;
     if (!isAdministrator(session as never)) return jsonError(403, "administrator_required", "A FamilyFi administrator is required.");
     return await withChangeActor({ accountId: session.accountId, deviceId: session.deviceId }, () => handler(session));

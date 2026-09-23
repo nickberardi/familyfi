@@ -145,8 +145,8 @@ model Pairing {
   id                 String              @id @default(cuid())
   householdId        String              @default("default")
   household          Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  endpointId         String
-  endpoint           ConnectionEndpoint  @relation(fields: [endpointId], references: [id], onDelete: Restrict)
+  endpointId         String?
+  endpoint           ConnectionEndpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
   tokenHash          String              @unique
   displayName        String
   createdByAccountId String

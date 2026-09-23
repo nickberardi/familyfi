@@ -1,6 +1,6 @@
 import { ConnectionTransport, ConnectionTrustMode } from "@prisma/client";
 import { z } from "zod";
-import { assertEndpoint, publicEndpoint } from "@/server/connection";
+import { assertEndpoint, isUniqueViolation, publicEndpoint } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
@@ -23,12 +23,18 @@ export async function POST(request: Request) {
     if (!body.ok) return body.response;
     const parsed = Body.safeParse(body.value);
     if (!parsed.success) return jsonError(400, "invalid_request", "Provide a valid connection endpoint.");
+    let url: string;
     try {
-      const url = assertEndpoint(parsed.data);
+      url = assertEndpoint(parsed.data);
+    } catch (error) {
+      return jsonError(400, "invalid_endpoint", error instanceof Error ? error.message : "Invalid connection endpoint.");
+    }
+    try {
       const endpoint = await prisma().connectionEndpoint.create({ data: { ...parsed.data, url } });
       return Response.json({ endpoint: publicEndpoint(endpoint) }, { status: 201 });
     } catch (error) {
-      return jsonError(400, "invalid_endpoint", error instanceof Error ? error.message : "Invalid connection endpoint.");
+      if (isUniqueViolation(error)) return jsonError(409, "endpoint_exists", "A route with this address already exists.");
+      throw error;
     }
   });
 }

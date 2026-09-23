@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.6.1
+  version: 0.7.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -36,7 +36,9 @@ tags:
   - name: Upstream
     description: Domain-list categories checked against the household resolver (reporting only)
   - name: Connection
-    description: Paired native devices, trusted HTTPS endpoints, and connection status
+    description: |
+      Paired native devices, trusted HTTPS endpoints, and connection status.
+      Administrator reads (GET) need only the session; writes also need the CSRF header.
 paths:
   /api/v1/health:
     get:
@@ -1489,6 +1491,7 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+        "409": { description: "`endpoint_exists` — another route already uses this address", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /api/v1/connection/endpoints/{id}:
     put:
       operationId: updateConnectionEndpoint
@@ -1496,17 +1499,19 @@ paths:
       summary: Update an HTTPS endpoint
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointWrite" } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointUpdate" } } } }
       responses:
         "200": { description: Updated, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+        "409": { description: "`endpoint_exists` — another route already uses this address", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
     delete:
       operationId: deleteConnectionEndpoint
       tags: [Connection]
       summary: Delete an HTTPS endpoint
+      description: Refused while an unclaimed, unexpired pairing uses the route. Phones already paired through it keep their other routes; their `pairedVia` becomes null.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
       responses:
@@ -1514,6 +1519,7 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+        "409": { description: "`endpoint_in_use` — a pending pairing uses this route", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /api/v1/connection/pairings:
     post:
       operationId: createConnectionPairing
@@ -1528,6 +1534,29 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/pairings/{id}:
+    get:
+      operationId: getConnectionPairing
+      tags: [Connection]
+      summary: Pairing status, so an admin screen can tell when the phone claimed it
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Pairing status, content: { application/json: { schema: { type: object, additionalProperties: false, required: [pairing], properties: { pairing: { $ref: "#/components/schemas/ConnectionPairingStatus" } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: cancelConnectionPairing
+      tags: [Connection]
+      summary: Cancel a pending pairing before it expires
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200": { description: Cancelled, content: { application/json: { schema: { type: object, required: [ok], properties: { ok: { type: boolean } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { description: "No pending pairing with that id: unknown, claimed, expired, or already cancelled", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /api/v1/connection/pairings/{id}/claim:
     post:
       operationId: claimConnectionPairing
@@ -1955,6 +1984,32 @@ components:
         spkiSha256: { type: string }
         priority: { type: integer, minimum: 0 }
         enabled: { type: boolean }
+    ConnectionEndpointUpdate:
+      type: object
+      additionalProperties: false
+      description: "Partial update. Moving a pinned route to `system` trust must also send `spkiSha256: null`."
+      properties:
+        url: { type: string, format: uri }
+        transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
+        trustMode: { type: string, enum: [system, pinned] }
+        spkiSha256: { type: [string, "null"] }
+        priority: { type: integer, minimum: 0, maximum: 999 }
+        enabled: { type: boolean }
+    ConnectionPairingStatus:
+      type: object
+      additionalProperties: false
+      required: [id, status, expiresAt, device]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, claimed, expired], description: A cancelled pairing reads as expired. }
+        expiresAt: { type: string, format: date-time }
+        device:
+          type: [object, "null"]
+          additionalProperties: false
+          required: [id, displayName]
+          properties:
+            id: { type: string }
+            displayName: { type: string }
     ConnectionPairingCreate:
       type: object
       additionalProperties: false
@@ -2002,13 +2057,22 @@ components:
     ConnectionDevice:
       type: object
       additionalProperties: false
-      required: [id, displayName, enrolledAt, lastSeenAt, revokedAt, sessions]
+      required: [id, displayName, enrolledAt, lastSeenAt, revokedAt, pairedVia, sessions]
       properties:
         id: { type: string }
         displayName: { type: string }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
         revokedAt: { type: [string, "null"], format: date-time }
+        pairedVia:
+          type: [object, "null"]
+          description: The route this phone paired through; null once that route is deleted.
+          additionalProperties: false
+          required: [endpointId, url, transport]
+          properties:
+            endpointId: { type: string }
+            url: { type: string, format: uri }
+            transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
         sessions: { type: array, items: { type: object, additionalProperties: true } }
     ConnectionStatus:
       type: object

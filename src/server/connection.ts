@@ -78,13 +78,13 @@ export async function createPairing(input: { endpointId: string; displayName: st
   const household = await ensureConnectionIdentity();
   return {
     pairing,
-    qr: { version: 1, pairingId: pairing.id, token, endpoint: publicEndpoint(pairing.endpoint), instanceId: household.instanceId, keyFingerprint: instanceFingerprint(household.instancePublicKey!) },
+    qr: { version: 1, pairingId: pairing.id, token, endpoint: publicEndpoint(pairing.endpoint!), instanceId: household.instanceId, keyFingerprint: instanceFingerprint(household.instancePublicKey!) },
   };
 }
 
 export async function claimPairing(input: { id: string; token: string; displayName: string }) {
   const pairing = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true } });
-  if (!pairing || pairing.claimedAt || pairing.expiresAt <= new Date() || !safeEqual(pairing.tokenHash, sha256(input.token))) return null;
+  if (!pairing || !pairing.endpoint || pairing.claimedAt || pairing.expiresAt <= new Date() || !safeEqual(pairing.tokenHash, sha256(input.token))) return null;
   const credential = randomToken();
   const now = new Date();
   const device = await prisma().$transaction(async (transaction) => {
@@ -109,4 +109,26 @@ export async function authenticatePairedDevice(id: string, credential: string) {
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
   if (!device.lastSeenAt || device.lastSeenAt < fifteenMinutesAgo) await prisma().pairedDevice.update({ where: { id }, data: { lastSeenAt: new Date() } });
   return device;
+}
+
+export type PairingStatus = "pending" | "claimed" | "expired";
+
+export function pairingStatus(pairing: { claimedAt: Date | null; expiresAt: Date }, now = new Date()): PairingStatus {
+  if (pairing.claimedAt) return "claimed";
+  return pairing.expiresAt <= now ? "expired" : "pending";
+}
+
+/** Ends a pending pairing early. Expiring it, rather than deleting it, keeps the claim path's single check. */
+export async function cancelPairing(id: string): Promise<boolean> {
+  const now = new Date();
+  const cancelled = await prisma().pairing.updateMany({ where: { id, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
+  return cancelled.count === 1;
+}
+
+export async function hasPendingPairing(endpointId: string): Promise<boolean> {
+  return (await prisma().pairing.count({ where: { endpointId, claimedAt: null, expiresAt: { gt: new Date() } } })) > 0;
+}
+
+export function isUniqueViolation(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
 }

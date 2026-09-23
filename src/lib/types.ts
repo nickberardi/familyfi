@@ -115,3 +115,41 @@ export type UpdateCheck = {
   lastSuccessfulAt: string | null;
   error: string | null;
 };
+
+export type ConnectionTransport = "lan" | "vpn" | "reverseProxy" | "tailscale" | "cloudflare";
+
+export type ConnectionRoute = {
+  id: string;
+  url: string;
+  transport: ConnectionTransport;
+  trustMode: "system" | "pinned";
+  spkiSha256: string | null;
+  priority: number;
+  enabled: boolean;
+};
+
+export type PairedPhone = {
+  id: string;
+  displayName: string;
+  enrolledAt: string;
+  lastSeenAt: string | null;
+  revokedAt: string | null;
+  pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
+  sessions: { id: string; username: string; expiresAt: string; createdAt: string }[];
+};
+
+export type PairingQr = {
+  version: number;
+  pairingId: string;
+  token: string;
+  endpoint: ConnectionRoute;
+  instanceId: string;
+  keyFingerprint: string;
+};
+
+export type PairingState = {
+  id: string;
+  status: "pending" | "claimed" | "expired";
+  expiresAt: string;
+  device: { id: string; displayName: string } | null;
+};
