@@ -9,7 +9,18 @@ function pairedDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function PairedPhoneRow({ phone, onRevoke }: { phone: PairedPhone; onRevoke?: () => void }) {
+/** An active phone offers Revoke; a revoked one offers Re-pair and Remove. */
+export function PairedPhoneRow({
+  phone,
+  onRevoke,
+  onRepair,
+  onRemove,
+}: {
+  phone: PairedPhone;
+  onRevoke?: () => void;
+  onRepair?: () => void;
+  onRemove?: () => void;
+}) {
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt) : "never";
   return (
     <div data-testid="phone-row" className="flex flex-wrap items-center gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-3 first:border-t-0">
@@ -34,6 +45,16 @@ export function PairedPhoneRow({ phone, onRevoke }: { phone: PairedPhone; onRevo
       {onRevoke ? (
         <button type="button" className="text-[14px] font-semibold text-[var(--ff-danger)]" onClick={onRevoke}>
           Revoke
+        </button>
+      ) : null}
+      {onRepair ? (
+        <button type="button" className="text-[14px] font-semibold text-[var(--ff-accent)]" onClick={onRepair}>
+          Re-pair
+        </button>
+      ) : null}
+      {onRemove ? (
+        <button type="button" className="text-[14px] font-semibold text-[var(--ff-danger)]" onClick={onRemove}>
+          Remove
         </button>
       ) : null}
     </div>

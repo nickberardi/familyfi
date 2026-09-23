@@ -82,10 +82,10 @@ export function assertEndpoint(input: { url: string; transport: ConnectionTransp
   return url.origin;
 }
 
-export async function createPairing(input: { endpointId: string; displayName: string; createdByAccountId: string }) {
+export async function createPairing(input: { endpointId: string; displayName: string; createdByAccountId: string; replacesDeviceId?: string | null }) {
   const token = randomToken();
   const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
-  const pairing = await prisma().pairing.create({ data: { endpointId: input.endpointId, displayName: input.displayName, createdByAccountId: input.createdByAccountId, tokenHash: sha256(token), expiresAt }, include: { endpoint: true } });
+  const pairing = await prisma().pairing.create({ data: { endpointId: input.endpointId, displayName: input.displayName, createdByAccountId: input.createdByAccountId, replacesDeviceId: input.replacesDeviceId ?? null, tokenHash: sha256(token), expiresAt }, include: { endpoint: true } });
   const household = await ensureConnectionIdentity();
   return {
     pairing,
@@ -108,6 +108,8 @@ export async function claimPairing(input: { id: string; token: string; displayNa
       data: { displayName: input.displayName, credentialHash: sha256(credential), lastSeenAt: now },
     });
     await transaction.pairing.update({ where: { id: pairing.id }, data: { claimedDeviceId: pairedDevice.id } });
+    // A re-pair retires the record it replaces, so the same phone is never listed twice.
+    if (pairing.replacesDeviceId) await removeDevice(pairing.replacesDeviceId, transaction, now);
     return pairedDevice;
   });
   if (!device) return null;
@@ -142,4 +144,23 @@ export async function hasPendingPairing(endpointId: string): Promise<boolean> {
 
 export function isUniqueViolation(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
+}
+
+type Db = Parameters<Parameters<ReturnType<typeof prisma>["$transaction"]>[0]>[0];
+
+/**
+ * Deletes a paired phone's record for good, signing out anything it still had. Sessions,
+ * pairings and change history keep their rows with the phone reference cleared, so the
+ * Sync log still shows what changed, just not from which phone.
+ */
+export async function removeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {
+  await db.session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
+  const removed = await db.pairedDevice.deleteMany({ where: { id } });
+  return removed.count === 1;
+}
+
+/** Deletes every revoked phone's record; the live-test harness alone can leave hundreds. */
+export async function removeRevokedDevices(): Promise<number> {
+  const removed = await prisma().pairedDevice.deleteMany({ where: { revokedAt: { not: null } } });
+  return removed.count;
 }

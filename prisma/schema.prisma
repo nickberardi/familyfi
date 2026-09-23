@@ -166,6 +166,8 @@ model Pairing {
   claimedAt          DateTime?
   claimedDeviceId    String?             @unique
   claimedDevice      PairedDevice?       @relation(fields: [claimedDeviceId], references: [id], onDelete: SetNull)
+  /// A phone this pairing re-pairs: when the pairing is claimed, that old record is revoked and removed.
+  replacesDeviceId   String?
   createdAt          DateTime            @default(now())
 
   @@index([expiresAt])

@@ -146,6 +146,56 @@ test("shows remote access and never offers to edit the route it manages", async 
   await shot(page, "remote-access");
 });
 
+test("re-pairs a revoked phone in place and removes another", async ({ page }) => {
+  await signIn(page);
+  const url = `https://revoked-e2e-${test.info().project.name}-${Date.now()}.home`;
+  const tag = `${test.info().project.name}-${Date.now()}`;
+  page.on("dialog", (dialog) => void dialog.accept());
+  const headers = await csrf(page);
+  const route = ((await (await page.request.post("/api/v1/connection/endpoints", { headers, data: { url, transport: "lan", trustMode: "system" } })).json()) as { endpoint: { id: string } }).endpoint.id;
+
+  async function pairAndRevoke(name: string) {
+    const { pairing } = (await (await page.request.post("/api/v1/connection/pairings", { headers, data: { endpointId: route, deviceName: name } })).json()) as { pairing: { id: string; qr: { token: string } } };
+    const claimed = (await (await page.request.post(`/api/v1/connection/pairings/${pairing.id}/claim`, { data: { token: pairing.qr.token, deviceName: name } })).json()) as { device: { id: string } };
+    await page.request.delete(`/api/v1/connection/devices/${claimed.device.id}`, { headers });
+  }
+
+  try {
+    await pairAndRevoke(`Old phone ${tag}`);
+    await pairAndRevoke(`Lost phone ${tag}`);
+    await page.goto("/phones");
+    await page.getByRole("button", { name: /Show revoked/ }).click();
+
+    const old = page.getByTestId("phone-row").filter({ hasText: `Old phone ${tag}` });
+    await old.getByRole("button", { name: "Re-pair" }).click();
+    const sheet = page.getByRole("dialog", { name: `Re-pair Old phone ${tag}` });
+    await expect(sheet.getByLabel("Phone", { exact: true })).toHaveValue(`Old phone ${tag}`);
+    await expect(sheet.getByLabel("Route")).toHaveValue(route);
+    await sheet.getByRole("button", { name: "Show pairing code" }).click();
+    const code = (await page.getByTestId("pairing-code").textContent()) ?? "";
+    const dot = code.indexOf(".");
+    expect((await page.request.post(`/api/v1/connection/pairings/${code.slice(0, dot)}/claim`, { data: { token: code.slice(dot + 1), deviceName: `Old phone ${tag}` } })).ok()).toBe(true);
+    await expect(page.getByTestId("pairing-claimed")).toBeVisible({ timeout: 10_000 });
+    await shot(page, "repaired");
+    await page.getByRole("button", { name: "Done" }).click();
+
+    // One entry for the re-paired phone, and it is active again.
+    await expect(page.getByTestId("phone-row").filter({ hasText: `Old phone ${tag}` })).toHaveCount(1);
+    await expect(page.getByTestId("phone-row").filter({ hasText: `Old phone ${tag}` }).getByRole("button", { name: "Revoke" })).toBeVisible();
+
+    const lost = page.getByTestId("phone-row").filter({ hasText: `Lost phone ${tag}` });
+    await lost.getByRole("button", { name: "Remove" }).click();
+    await expect(lost).toHaveCount(0);
+    await shot(page, "removed");
+  } finally {
+    const list = (await (await page.request.get("/api/v1/connection/devices")).json()) as { devices: { id: string; displayName: string }[] };
+    for (const device of list.devices.filter((item) => item.displayName.includes(tag))) {
+      await page.request.delete(`/api/v1/connection/devices/${device.id}?remove=true`, { headers });
+    }
+    await page.request.delete(`/api/v1/connection/endpoints/${route}`, { headers });
+  }
+});
+
 test("sets up remote access on a domain through the Cloudflare sign-in link", async ({ page }) => {
   await signIn(page);
   await page.goto("/phones");

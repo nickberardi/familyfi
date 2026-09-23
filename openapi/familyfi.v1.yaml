@@ -1651,13 +1651,33 @@ paths:
         "200": { description: Devices, content: { application/json: { schema: { type: object, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/ConnectionDevice" } } } } } } }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: removeRevokedConnectionDevices
+      tags: [Connection]
+      summary: Remove every revoked phone's record
+      description: Requires `?revoked=true`. Active phones are never touched. Sessions, pairings and change history keep their rows with the phone reference cleared.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: revoked, in: query, required: true, schema: { type: string, enum: ["true"] } }, { $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200": { description: Removed, content: { application/json: { schema: { type: object, additionalProperties: false, required: [removed], properties: { removed: { type: integer, minimum: 0 } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /api/v1/connection/devices/{id}:
     delete:
       operationId: revokeConnectionDevice
       tags: [Connection]
-      summary: Revoke a paired phone and its sessions
+      summary: Revoke a paired phone and its sessions, or remove its record
+      description: |
+        Without a query this revokes the phone: every bearer session ends and it must pair
+        again. With `?remove=true` it also deletes the phone's record for good (revoking first
+        if it was still active). Sessions, pairings and change history keep their rows with the
+        phone reference cleared.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: remove, in: query, required: false, schema: { type: string, enum: ["true"] } }
+        - { $ref: "#/components/parameters/CsrfToken" }
       responses:
         "200": { description: Revoked, content: { application/json: { schema: { type: object, required: [ok], properties: { ok: { type: boolean } } } } } }
         "401": { $ref: "#/components/responses/Error" }
@@ -2113,6 +2133,7 @@ components:
       properties:
         endpointId: { type: string }
         deviceName: { type: string, minLength: 1, maxLength: 80 }
+        replacesDeviceId: { type: string, description: "Re-pair: when this pairing is claimed, the phone with this id is revoked and its record removed, so it is not listed twice. 404 if it no longer exists." }
     ConnectionPairingClaim:
       type: object
       additionalProperties: false
