@@ -124,6 +124,19 @@ describe("remote access with your own domain", () => {
     expect(readFileSync(log, "utf8")).toMatch(/argv: tunnel --origincert \S+ delete 11111111-2222-3333-4444-555555555555/);
   });
 
+  it("never runs a second tunnel while another FamilyFi process holds the lease", async () => {
+    await prisma().reconciliationLock.create({ data: { id: "tunnel", owner: "some-other-process", expiresAt: new Date(Date.now() + 60_000) } });
+    await put({ mode: "quick" });
+    const refused = await waitFor((t) => t.status === "error", "the refusal");
+    expect(refused.error).toContain("Another FamilyFi process");
+    expect(existsSync(log) ? readFileSync(log, "utf8") : "").not.toMatch(/argv: tunnel .*--url/);
+
+    // Once the lease is released (or expires), this process may run the tunnel.
+    await prisma().reconciliationLock.update({ where: { id: "tunnel" }, data: { expiresAt: new Date(0) } });
+    await put({ mode: "quick" });
+    await waitFor((t) => t.status === "running", "the tunnel after the lease freed up");
+  });
+
   it("rejects hostnames that are not on a household domain", async () => {
     for (const hostname of ["localhost", "x.trycloudflare.com", "bad host.example.com", "https://familyfi.example.com"]) {
       expect((await put({ mode: "named", hostname })).status).toBe(400);

@@ -1,4 +1,5 @@
 import type { ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -45,6 +46,10 @@ type Runtime = {
   restartTimer: ReturnType<typeof setTimeout> | null;
   attempts: number;
   wanted: TunnelMode;
+  /** This process's identity for the tunnel lease. */
+  owner: string;
+  leaseTimer: ReturnType<typeof setInterval> | null;
+  exitHook: boolean;
 };
 
 /** One tunnel per process, surviving dev reloads of this module. */
@@ -59,7 +64,72 @@ const runtime: Runtime = ((globalThis as { familyfiRemoteAccess?: Runtime }).fam
   restartTimer: null,
   attempts: 0,
   wanted: TunnelMode.off,
+  owner: randomUUID(),
+  leaseTimer: null,
+  exitHook: false,
 });
+
+/**
+ * Only one FamilyFi process may run the tunnel for a database. Two would each keep the
+ * managed route pointed at their own address and fight over it — two dev servers do it,
+ * and so could an old and a new container overlapping during an upgrade. The lease is a
+ * row in the same table reconciliation uses, under its own id.
+ */
+const LEASE_ID = "tunnel";
+const LEASE_MS = 60_000;
+const LEASE_RENEW_MS = 20_000;
+
+async function acquireLease(): Promise<boolean> {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + LEASE_MS);
+  const existing = await prisma().reconciliationLock.findUnique({ where: { id: LEASE_ID } });
+  if (!existing) {
+    try {
+      await prisma().reconciliationLock.create({ data: { id: LEASE_ID, owner: runtime.owner, expiresAt } });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (existing.owner !== runtime.owner && existing.expiresAt > now) return false;
+  const updated = await prisma().reconciliationLock.updateMany({
+    where: { id: LEASE_ID, OR: [{ owner: runtime.owner }, { expiresAt: { lte: now } }] },
+    data: { owner: runtime.owner, expiresAt },
+  });
+  return updated.count === 1;
+}
+
+async function releaseLease() {
+  if (runtime.leaseTimer) clearInterval(runtime.leaseTimer);
+  runtime.leaseTimer = null;
+  await prisma().reconciliationLock.updateMany({ where: { id: LEASE_ID, owner: runtime.owner }, data: { expiresAt: new Date(0) } });
+}
+
+/** Renews the lease while a tunnel is wanted; losing it stops this process's tunnel. */
+function keepLease() {
+  if (runtime.leaseTimer) return;
+  runtime.leaseTimer = setInterval(() => {
+    void acquireLease()
+      .then((held) => {
+        if (held || runtime.wanted === TunnelMode.off) return;
+        runtime.child?.kill();
+        runtime.child = null;
+        runtime.url = null;
+        runtime.status = "error";
+        runtime.error = ANOTHER_PROCESS;
+      })
+      .catch(() => undefined);
+  }, LEASE_RENEW_MS);
+}
+
+const ANOTHER_PROCESS = "Another FamilyFi process using this database is running remote access. Only one may; this one will take over if that one stops.";
+
+/** A tunnel must not outlive the FamilyFi process that started it. */
+function killChildOnExit() {
+  if (runtime.exitHook) return;
+  runtime.exitHook = true;
+  process.once("exit", () => runtime.child?.kill());
+}
 
 /** Time a person gets to finish the Cloudflare authorization in their browser. */
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
@@ -160,6 +230,15 @@ async function launch() {
     runtime.error = "cloudflared is not installed on this server.";
     return;
   }
+  if (!(await acquireLease())) {
+    runtime.status = "error";
+    runtime.error = ANOTHER_PROCESS;
+    // Try again later: the other process may stop, and its lease then expires.
+    runtime.restartTimer = setTimeout(() => void launch(), LEASE_MS);
+    return;
+  }
+  keepLease();
+  killChildOnExit();
   runtime.gateway ??= await startPhoneGateway(appPort());
   const origin = `http://127.0.0.1:${runtime.gateway.port}`;
   runtime.status = "starting";
@@ -294,6 +373,7 @@ export async function setRemoteAccess(change: RemoteAccessChange) {
   if (change.mode === TunnelMode.off) {
     runtime.wanted = TunnelMode.off;
     runtime.status = "off";
+    await releaseLease();
     await prisma().household.update({
       where: { id: "default" },
       data: {
