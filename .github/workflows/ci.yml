@@ -50,6 +50,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test-api
       - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
+      # Exit 2 when schema.prisma differs from what the migrations built: a schema edit with no migration.
+      - run: pnpm db-drift
       - run: pnpm test
       - run: pnpm test:integration
       - run: pnpm build
