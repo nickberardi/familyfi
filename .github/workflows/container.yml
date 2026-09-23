@@ -1,8 +1,11 @@
-name: CI
+name: Container
 
+# Not on pull requests: the image build is slow and costly in Actions minutes.
+# It runs on demand and gates every release (see release.yml).
 on:
   workflow_dispatch:
-    
+  workflow_call:
+
 jobs:
   container:
     runs-on: ubuntu-latest
@@ -17,8 +20,9 @@ jobs:
           push: false
           load: true
           tags: familyfi:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Same scope as release.yml's amd64 build, so a release reuses these layers.
+          cache-from: type=gha,scope=linux-amd64
+          cache-to: type=gha,mode=max,scope=linux-amd64
       - name: Image hygiene
         run: sh scripts/check-image.sh familyfi:ci
       - name: Container smoke

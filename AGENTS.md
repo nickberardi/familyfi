@@ -118,7 +118,7 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 | `make docker-down` | Stop without deleting volumes |
 | `make docker-smoke` | Build `familyfi:dev`, reject `designs/` in the image, run health/login against bundled-style external Postgres |
 
-CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, Playwright, container smoke. Integration tests use `familyfi_test` and never truncate the development `familyfi` database. Live IPv4 MAC block/restore was proven on a household gateway; IPv6, overnight UniFi scheduler, and a second concurrent MAC are unproven.
+CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, Playwright. The container smoke is not on pull requests (image builds are slow and costly); it runs on demand and, with CI, gates every release: `release.yml` publishes only a `v*` tag on `main` whose commit passes both. Integration tests use `familyfi_test` and never truncate the development `familyfi` database. Live IPv4 MAC block/restore was proven on a household gateway; IPv6, overnight UniFi scheduler, and a second concurrent MAC are unproven.
 
 ## Pull requests
 

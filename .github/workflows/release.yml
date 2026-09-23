@@ -13,7 +13,29 @@ permissions:
   packages: write
 
 jobs:
+  on-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Tag points at a commit on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+  ci:
+    needs: on-main
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  container:
+    needs: on-main
+    permissions:
+      contents: read
+    uses: ./.github/workflows/container.yml
+
   ghcr:
+    needs: [ci, container]
     strategy:
       fail-fast: false
       matrix:
