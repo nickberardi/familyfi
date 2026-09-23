@@ -56,4 +56,26 @@ describe("openapi contract", () => {
       ].sort(),
     );
   });
+
+  it("uses a change summary for mutations and a full change for polling", () => {
+    const paths = spec.paths as Record<string, Record<string, {
+      responses?: Record<string, {
+        content?: { "application/json"?: { schema?: { properties?: { change?: { $ref?: string } } } } };
+      }>;
+    }>>;
+    const changeResponses = Object.entries(paths).flatMap(([route, operations]) =>
+      Object.entries(operations).flatMap(([method, operation]) =>
+        Object.values(operation.responses ?? {}).flatMap((response) => {
+          const reference = response.content?.["application/json"]?.schema?.properties?.change?.$ref;
+          return reference ? [{ route, method, reference }] : [];
+        }),
+      ),
+    );
+
+    expect(changeResponses).toHaveLength(20);
+    expect(changeResponses.filter(({ reference }) => reference === "#/components/schemas/ChangeSummary")).toHaveLength(19);
+    expect(changeResponses.filter(({ reference }) => reference === "#/components/schemas/Change")).toEqual([
+      { route: "/api/v1/changes/{id}", method: "get", reference: "#/components/schemas/Change" },
+    ]);
+  });
 });
