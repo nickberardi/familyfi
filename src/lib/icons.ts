@@ -26,6 +26,9 @@ export type IconName =
   | "arrows-clockwise"
   | "gear"
   | "code"
+  | "qr-code"
+  // Actions
+  | "copy"
   // Device types
   | "device-tablet"
   | "laptop"

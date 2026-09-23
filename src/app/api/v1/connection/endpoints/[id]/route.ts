@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { assertEndpoint, publicEndpoint } from "@/server/connection";
+import { assertEndpoint, hasPendingPairing, isUniqueViolation, publicEndpoint } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
@@ -16,15 +16,21 @@ export async function PUT(request: Request, context: Ctx) {
     const { id } = await context.params;
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");
+    const trustMode = parsed.data.trustMode ?? current.trustMode;
+    const transport = parsed.data.transport ?? current.transport;
+    const spkiSha256 = parsed.data.spkiSha256 === undefined ? current.spkiSha256 : parsed.data.spkiSha256;
+    let url: string;
     try {
-      const trustMode = parsed.data.trustMode ?? current.trustMode;
-      const transport = parsed.data.transport ?? current.transport;
-      const spkiSha256 = parsed.data.spkiSha256 === undefined ? current.spkiSha256 : parsed.data.spkiSha256;
-      const url = assertEndpoint({ url: parsed.data.url ?? current.url, transport, trustMode, spkiSha256 });
+      url = assertEndpoint({ url: parsed.data.url ?? current.url, transport, trustMode, spkiSha256 });
+    } catch (error) {
+      return jsonError(400, "invalid_endpoint", error instanceof Error ? error.message : "Invalid connection endpoint.");
+    }
+    try {
       const endpoint = await prisma().connectionEndpoint.update({ where: { id }, data: { ...parsed.data, url, transport, trustMode, spkiSha256 } });
       return Response.json({ endpoint: publicEndpoint(endpoint) });
     } catch (error) {
-      return jsonError(400, "invalid_endpoint", error instanceof Error ? error.message : "Invalid connection endpoint.");
+      if (isUniqueViolation(error)) return jsonError(409, "endpoint_exists", "A route with this address already exists.");
+      throw error;
     }
   });
 }
@@ -32,7 +38,11 @@ export async function PUT(request: Request, context: Ctx) {
 export async function DELETE(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
     const { id } = await context.params;
-    try { await prisma().connectionEndpoint.delete({ where: { id } }); return Response.json({ ok: true }); }
-    catch { return jsonError(404, "not_found", "Connection endpoint not found."); }
+    if (await hasPendingPairing(id)) {
+      return jsonError(409, "endpoint_in_use", "A pairing code for this route is still active. Cancel it or wait for it to expire.");
+    }
+    const deleted = await prisma().connectionEndpoint.deleteMany({ where: { id } });
+    if (!deleted.count) return jsonError(404, "not_found", "Connection endpoint not found.");
+    return Response.json({ ok: true });
   });
 }

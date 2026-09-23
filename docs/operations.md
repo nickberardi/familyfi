@@ -10,6 +10,13 @@ Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` af
 
 ## Companion access routes
 
+Manage routes and pair phones from **System → Phones**. Pick a route, name the phone, and show
+the QR; the page also shows the exact server address to type in the app and a `pairingId.token`
+code for pairing without the camera. The code expires in five minutes and is cancelled when you
+close it. Revoke a lost phone from the same page; it is signed out at once and must pair again.
+Routes are tried top first, and a phone learns routes added after it paired from the signed
+manifest, so adding a VPN or Tailscale route later reaches every paired phone.
+
 HTTPS is required for every companion route. Start with direct LAN HTTPS and either a normal
 system-trusted certificate or a pairing QR that pins the LAN server public key. A household
 that already has VPN-to-LAN or a reverse proxy simply adds its HTTPS origin as a system-trusted
