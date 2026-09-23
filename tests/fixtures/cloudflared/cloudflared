@@ -1,0 +1,45 @@
+#!/bin/sh
+# Stand-in for cloudflared in integration tests. It follows the real CLI's command
+# shapes and log lines, and records what it was given in $FAKE_CLOUDFLARED_LOG.
+log="${FAKE_CLOUDFLARED_LOG:-/dev/null}"
+echo "argv: $*" >> "$log"
+echo "home: $HOME" >> "$log"
+
+case " $* " in
+  *" --version "*) echo "cloudflared version 2026.9.1 (fake)"; exit 0 ;;
+esac
+
+case " $* " in
+  *" tunnel login "*)
+    echo "Please open the following URL and log in with your Cloudflare account:" >&2
+    echo "" >&2
+    echo "https://dash.cloudflare.com/argotunnel?aud=&callback=https%3A%2F%2Flogin.cloudflareaccess.org%2Ffake" >&2
+    echo "" >&2
+    echo "Leave cloudflared running to download the cert automatically." >&2
+    # A person takes a while to authorize; long enough for the page to poll and show the link.
+    sleep 4
+    mkdir -p "$HOME/.cloudflared" && echo "ACCOUNT-WIDE-CERT" > "$HOME/.cloudflared/cert.pem"
+    echo "You have successfully logged in." >&2
+    exit 0 ;;
+  *" delete "*) echo "2026-09-23T00:00:00Z ERR tunnel not found" >&2; exit 1 ;;
+  *" create "*)
+    creds=$(echo "$*" | sed -n 's/.*--credentials-file \([^ ]*\).*/\1/p')
+    printf '{"AccountTag":"acct","TunnelSecret":"c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0LXNlY3JldA==","TunnelID":"11111111-2222-3333-4444-555555555555"}' > "$creds"
+    echo "Created tunnel familyfi with id 11111111-2222-3333-4444-555555555555" >&2
+    exit 0 ;;
+  *" route dns "*)
+    case "$*" in
+      *taken.*) echo "2026-09-23T00:00:00Z ERR Failed to add route: code: 1003, reason: An A, AAAA, or CNAME record with that host already exists." >&2; exit 1 ;;
+    esac
+    echo "Added CNAME to route to tunnel" >&2; exit 0 ;;
+  *" run "*)
+    echo "cred-contents: ${TUNNEL_CRED_CONTENTS:-missing}" >> "$log"
+    echo "leaked-key: ${FAMILYFI_ENCRYPTION_KEY:-none}" >> "$log"
+    echo "2026-09-23T00:00:00Z INF Registered tunnel connection connIndex=0" >&2
+    exec sleep 600 ;;
+  *" --url "*)
+    echo "2026-09-23T00:00:00Z INF |  https://fake-quick-tunnel-demo.trycloudflare.com  |" >&2
+    exec sleep 600 ;;
+esac
+echo "unexpected: $*" >&2
+exit 2

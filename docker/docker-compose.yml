@@ -32,6 +32,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-familyfi}
       POSTGRES_USER: ${POSTGRES_USER:-familyfi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      # Set to expose the phone-only gateway to a tunnel sidecar on this Compose network
+      # (see docs/setup.md). Never add it to `ports`.
+      FAMILYFI_PHONE_GATEWAY_PORT: ${FAMILYFI_PHONE_GATEWAY_PORT:-}
     ports:
       - "${FAMILYFI_PORT:-7001}:7001"
     volumes:

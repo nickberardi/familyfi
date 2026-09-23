@@ -137,7 +137,7 @@ describe("naming conventions (AGENTS.md)", () => {
       /^(POSTGRES_|DB_|UNIFI_|DATABASE_URL|PORT|NODE_ENV|NODE_TLS_REJECT_UNAUTHORIZED|NEXT_|CI$|HOME$|PATH$)/;
     // Ours, but development/test-only and never set on a real deployment, so
     // they are not public surface and take no prefix.
-    const internal = new Set(["UNIFI_MOCK", "KILL_PORT", "SKIP_DB_PREPARE"]);
+    const internal = new Set(["UNIFI_MOCK", "KILL_PORT", "SKIP_DB_PREPARE", "CLOUDFLARED_BIN"]);
     const offenders = new Set<string>();
 
     // scripts/ reads the operator-facing secrets too, so it is in scope here.

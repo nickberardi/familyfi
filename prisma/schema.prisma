@@ -112,6 +112,10 @@ model Household {
   instancePrivateKeyAuthTag Bytes?
   tunnelMode             TunnelMode @default(off)
   tunnelEndpointId       String?
+  tunnelHostname         String?
+  tunnelCredentialCiphertext Bytes?
+  tunnelCredentialIv     Bytes?
+  tunnelCredentialAuthTag Bytes?
   revision               Int       @default(0)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt

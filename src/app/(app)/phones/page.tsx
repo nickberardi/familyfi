@@ -46,6 +46,14 @@ export default function PhonesPage() {
     void load();
   }, [load]);
 
+  const onRouteChange = useCallback(
+    (id: string | null) => {
+      setManagedId(id);
+      void load();
+    },
+    [load],
+  );
+
   async function run(action: () => Promise<unknown>) {
     setError("");
     try {
@@ -94,12 +102,7 @@ export default function PhonesPage() {
           </p>
         ) : null}
 
-        <RemoteAccessCard
-          onRouteChange={(id) => {
-            setManagedId(id);
-            void load();
-          }}
-        />
+        <RemoteAccessCard onRouteChange={onRouteChange} />
 
         <section className={CARD}>
           <div className={CARD_HEAD}>
