@@ -91,4 +91,10 @@ if [ "$ok" -ne 1 ]; then
   exit 1
 fi
 
+# Remote access needs the pinned cloudflared the image ships.
+docker exec "$app" /usr/local/bin/cloudflared --version >/dev/null || {
+  echo "cloudflared is missing from the image" >&2
+  exit 1
+}
+
 echo "container smoke ok"

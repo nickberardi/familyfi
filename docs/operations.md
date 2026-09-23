@@ -39,10 +39,28 @@ For private remote access, add an operator-managed [Tailscale Serve](https://tai
 `https://…ts.net` origin as a `tailscale`/`system` endpoint. The phone must be in the same
 tailnet. Do not use Tailscale Funnel: it would expose the household service publicly.
 
-Cloudflare Tunnel and Access remain a future option. Cloudflare is only an outer perimeter;
-the FamilyFi bearer session remains authoritative. Do not place a Cloudflare service-token
-secret in a phone. Native Access browser/PKCE handoff must be designed and tested before that
-route is enabled.
+### Remote access (easy button)
+
+**System → Phones → Remote access** turns on a Cloudflare quick tunnel with one switch: no
+Cloudflare account, router change, DNS or certificate. FamilyFi runs the pinned `cloudflared`
+shipped in the image (never a runtime download) and keeps one `cloudflare` route pointed at the
+tunnel's address, so paired phones pick it up from the signed manifest.
+
+The tunnel reaches only a phone-only gateway on loopback. It forwards `/api/v1/*` and nothing
+else, drops cookies, and marks each call as remote. The web app and its sign-in page are not
+reachable through it. Signing in remotely requires the FamilyFi app on a paired phone; its
+device credential is checked before the password, so the internet cannot test passwords.
+
+A quick tunnel's address changes whenever FamilyFi restarts. Phones learn the new one the next
+time they reach FamilyFi another way, usually at home. Cloudflare offers quick tunnels for
+testing, with no uptime guarantee and a 200-request concurrency limit. For a permanent address,
+use your own domain or one of the options below.
+
+### Cloudflare Access (advanced)
+
+Cloudflare Tunnel with Access in front works as an ordinary `cloudflare`/`system` route when
+Access is satisfied by the Cloudflare One Client (WARP) on the phone. Do not place a Cloudflare
+service-token secret in a phone.
 
 ## Database modes
 

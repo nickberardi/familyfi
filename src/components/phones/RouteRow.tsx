@@ -30,6 +30,7 @@ export function RouteRow({
   first,
   last,
   phones,
+  managed = false,
   onToggle,
   onMove,
   onEdit,
@@ -40,6 +41,8 @@ export function RouteRow({
   last: boolean;
   /** Active phones that paired through this route — the ones a change would strand. */
   phones: number;
+  /** Kept pointed at the tunnel by Remote access; its address is not the admin's to edit. */
+  managed?: boolean;
   onToggle: () => void;
   onMove: (direction: -1 | 1) => void;
   onEdit: () => void;
@@ -70,6 +73,7 @@ export function RouteRow({
             "Ordinary certificate checks"
           )}
           {phones ? ` · ${phones} phone${phones === 1 ? "" : "s"} paired here` : ""}
+          {managed ? " · managed by Remote access" : ""}
         </div>
         {check ? (
           <div data-testid="pin-check" role="status" className="mt-0.5 text-[14px] font-semibold" style={{ color: CHECK_INK[check.tone] }}>
@@ -94,12 +98,16 @@ export function RouteRow({
           {checking ? "Checking…" : "Check"}
         </button>
       ) : null}
-      <button type="button" className={LINK} onClick={onEdit}>
-        Edit
-      </button>
-      <button type="button" className="text-[14px] font-semibold text-[var(--ff-danger)]" onClick={onDelete}>
-        Delete
-      </button>
+      {managed ? null : (
+        <>
+          <button type="button" className={LINK} onClick={onEdit}>
+            Edit
+          </button>
+          <button type="button" className="text-[14px] font-semibold text-[var(--ff-danger)]" onClick={onDelete}>
+            Delete
+          </button>
+        </>
+      )}
     </div>
   );
 }

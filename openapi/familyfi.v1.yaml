@@ -89,6 +89,10 @@ paths:
         then set `client` to `native` with their paired device ID and credential
         to receive a bearer token instead of cookies. Five failed attempts in 15 minutes for a
         username or IP return 429. Sessions last 30 days unless revoked.
+
+        Through remote access (the Cloudflare tunnel), only `client: native` may sign
+        in (403 `remote_browser_login` otherwise), and the paired device is checked
+        before the password (403 `device_not_paired`, with no attempt recorded).
       security: []
       requestBody:
         required: true
@@ -1520,6 +1524,33 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { description: "`endpoint_in_use` — a pending pairing uses this route", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /api/v1/connection/tunnel:
+    get:
+      operationId: getRemoteAccess
+      tags: [Connection]
+      summary: Remote access (Cloudflare quick tunnel) state
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Remote access, content: { application/json: { schema: { type: object, additionalProperties: false, required: [tunnel], properties: { tunnel: { $ref: "#/components/schemas/RemoteAccess" } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: setRemoteAccess
+      tags: [Connection]
+      summary: Turn remote access on (quick tunnel) or off
+      description: |
+        `quick` starts a Cloudflare quick tunnel to FamilyFi's phone-only gateway, which
+        forwards only `/api/v1/*`, strips cookies, and requires a paired phone to sign in.
+        FamilyFi keeps one `cloudflare` route pointed at the tunnel's current address.
+        `off` stops the tunnel and disables that route.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [mode], properties: { mode: { type: string, enum: ["off", quick] } } } } } }
+      responses:
+        "200": { description: Remote access, content: { application/json: { schema: { type: object, additionalProperties: false, required: [tunnel], properties: { tunnel: { $ref: "#/components/schemas/RemoteAccess" } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /api/v1/connection/pins:
     post:
       operationId: computeConnectionPin
@@ -2022,6 +2053,17 @@ components:
         spkiSha256: { type: [string, "null"] }
         priority: { type: integer, minimum: 0, maximum: 999 }
         enabled: { type: boolean }
+    RemoteAccess:
+      type: object
+      additionalProperties: false
+      required: [mode, status, url, error, endpointId, cloudflared]
+      properties:
+        mode: { type: string, enum: ["off", quick, named] }
+        status: { type: string, enum: ["off", starting, running, error, unavailable] }
+        url: { type: [string, "null"], format: uri, description: The tunnel's current public address. }
+        error: { type: [string, "null"] }
+        endpointId: { type: [string, "null"], description: The connection route FamilyFi keeps pointed at the tunnel. }
+        cloudflared: { type: [string, "null"], description: "cloudflared version on this server, or null when it is not installed." }
     ConnectionCertificatePin:
       type: object
       additionalProperties: false
