@@ -178,6 +178,19 @@ test("create things group lands on a seeded detail page that can be edited", asy
   await expect(page.getByLabel("Monogram")).toHaveValue("TV");
 });
 
+test("desktop Sync summary keeps four cards on one row", async ({ page }) => {
+  test.skip(test.info().project.name !== "desktop", "Desktop layout only");
+  await signIn(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/sync");
+  const cards = page.getByText("App-owned policies", { exact: true }).locator("..").locator("..");
+  await expect(cards.locator(":scope > div")).toHaveCount(4);
+  const tops = await cards.locator(":scope > div").evaluateAll((items) =>
+    items.map((item) => Math.round(item.getBoundingClientRect().top)),
+  );
+  expect(new Set(tops).size).toBe(1);
+});
+
 test("device assignment updates immediately", async ({ page }) => {
   await signIn(page);
 

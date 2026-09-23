@@ -239,6 +239,28 @@ button:not(:disabled):active {
   display: none;
 }
 
+.ff-device-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(105px, 120px);
+}
+
+@media (min-width: 768px) {
+  .ff-device-grid {
+    grid-template-columns: minmax(140px, 2.2fr) minmax(76px, 0.9fr) minmax(120px, 140px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .ff-device-grid {
+    grid-template-columns: minmax(160px, 2.4fr) minmax(80px, 0.9fr) minmax(0, 150px) minmax(120px, 140px);
+  }
+}
+
+@media (min-width: 1280px) {
+  .ff-device-grid {
+    grid-template-columns: minmax(180px, 2.4fr) minmax(84px, 0.9fr) minmax(0, 96px) minmax(0, 150px) minmax(120px, 140px);
+  }
+}
+
 @media (min-width: 768px) {
   body:has(.ff-shell) {
     overflow: hidden;

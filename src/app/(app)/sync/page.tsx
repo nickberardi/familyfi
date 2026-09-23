@@ -57,7 +57,7 @@ export default function SyncPage() {
         sub="App-owned policy state, sweeps, and failures."
       />
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))" }}>
           {stats.map((stat) => (
             <div key={stat.label} className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] px-[18px] py-4">
               <div className="text-[14px] font-semibold tracking-wide text-[var(--ff-muted)] uppercase">{stat.label}</div>

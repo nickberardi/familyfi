@@ -137,7 +137,7 @@ export default function CategoriesPage() {
             return (
               <div
                 key={category.id}
-                className="flex flex-wrap items-center gap-3 px-[18px] py-3"
+                className="flex flex-wrap items-center gap-1.5 px-3 py-3 md:gap-3 md:px-[18px]"
                 style={{ borderTop: "1px solid var(--ff-hairline)" }}
               >
                 <MonoTile
@@ -147,11 +147,11 @@ export default function CategoriesPage() {
                 />
                 <Link
                   href={`/categories/${category.id}`}
-                  className="min-w-[140px] flex-1 no-underline"
+                  className="min-w-[60px] flex-1 no-underline md:min-w-[140px]"
                   style={{ color: "var(--ff-ink)" }}
                 >
-                  <span className="block text-[14px] font-semibold">{category.label}</span>
-                  <span className="block text-[12px]" style={{ color: "var(--ff-ink-3)" }}>
+                  <span className="block truncate text-[14px] font-semibold">{category.label}</span>
+                  <span className="hidden text-[12px] md:block" style={{ color: "var(--ff-ink-3)" }}>
                     {category.activeDomainCount} domains · {verdictDetailText(check)}
                   </span>
                 </Link>
@@ -164,13 +164,15 @@ export default function CategoriesPage() {
                 {/* Reads "On"/"Off", not "Checking" — it sits beside a verdict chip
                     that can itself read "Not checked", and the two must not blur. The
                     accessible name says which of the two this control is. */}
-                <TogglePill
-                  on={category.enabled}
-                  onToggle={() => void toggleEnabled(category)}
-                  disabled={busy}
-                  label={`Checking ${category.label}`}
-                  title="Only turns checking on or off — never blocks or unblocks anything"
-                />
+                <div className="ml-auto flex-none">
+                  <TogglePill
+                    on={category.enabled}
+                    onToggle={() => void toggleEnabled(category)}
+                    disabled={busy}
+                    label={`Checking ${category.label}`}
+                    title="Only turns checking on or off — never blocks or unblocks anything"
+                  />
+                </div>
               </div>
             );
           })}
