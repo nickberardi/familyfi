@@ -13,7 +13,9 @@ Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` af
 Manage routes and pair phones from **System → Phones**. Pick a route, name the phone, and show
 the QR; the page also shows the exact server address to type in the app and a `pairingId.token`
 code for pairing without the camera. The code expires in five minutes and is cancelled when you
-close it. Revoke a lost phone from the same page; it is signed out at once and must pair again.
+close it. Revoke a lost phone from the same page; it is signed out at once and must pair again. A revoked
+phone stays listed until you **Remove** it, or use **Remove all revoked**; **Re-pair** opens a new
+code with its name filled in, and once the phone uses it the old entry disappears.
 Routes are tried top first, and a phone learns routes added after it paired from the signed
 manifest, so adding a VPN or Tailscale route later reaches every paired phone.
 

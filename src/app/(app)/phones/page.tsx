@@ -23,6 +23,7 @@ export default function PhonesPage() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<ConnectionRoute | "new" | null>(null);
   const [pairing, setPairing] = useState(false);
+  const [replacing, setReplacing] = useState<PairedPhone | null>(null);
   const [showRevoked, setShowRevoked] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [managedId, setManagedId] = useState<string | null>(null);
@@ -141,7 +142,40 @@ export default function PhonesPage() {
               >
                 {showRevoked ? "Hide" : "Show"} revoked ({revoked.length})
               </button>
-              {showRevoked ? revoked.map((phone) => <PairedPhoneRow key={phone.id} phone={phone} />) : null}
+              {showRevoked ? (
+                <>
+                  {revoked.map((phone) => (
+                    <PairedPhoneRow
+                      key={phone.id}
+                      phone={phone}
+                      onRepair={
+                        canPair
+                          ? () => {
+                              setReplacing(phone);
+                              setPairing(true);
+                            }
+                          : undefined
+                      }
+                      onRemove={() => {
+                        if (!window.confirm(`Remove ${phone.displayName} from the list? This can't be undone; the phone would need to pair again.`)) return;
+                        void run(() => api(`/api/v1/connection/devices/${phone.id}?remove=true`, { method: "DELETE" }));
+                      }}
+                    />
+                  ))}
+                  <div className="border-t border-[var(--ff-hairline)] px-[18px] py-2.5">
+                    <button
+                      type="button"
+                      className="text-[14px] font-semibold text-[var(--ff-danger)]"
+                      onClick={() => {
+                        if (!window.confirm(`Remove all ${revoked.length} revoked phones from the list? This can't be undone.`)) return;
+                        void run(() => api("/api/v1/connection/devices?revoked=true", { method: "DELETE" }));
+                      }}
+                    >
+                      Remove all revoked
+                    </button>
+                  </div>
+                </>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -211,7 +245,18 @@ export default function PhonesPage() {
           }}
         />
       ) : null}
-      {pairing ? <PairPhoneSheet routes={ordered} onClose={() => { setPairing(false); void load(); }} onPaired={() => void load()} /> : null}
+      {pairing ? (
+        <PairPhoneSheet
+          routes={ordered}
+          replacing={replacing}
+          onClose={() => {
+            setPairing(false);
+            setReplacing(null);
+            void load();
+          }}
+          onPaired={() => void load()}
+        />
+      ) : null}
     </>
   );
 }

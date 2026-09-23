@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { countdown, manualPairingCode, sortRoutes, transportLabel } from "@/lib/connection-routes";
-import type { ConnectionRoute, PairingQr, PairingState } from "@/lib/types";
+import type { ConnectionRoute, PairedPhone, PairingQr, PairingState } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { QrCode } from "@/components/ui/QrCode";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "./SheetFrame";
@@ -45,16 +45,21 @@ function CopyRow({ label, value, testId }: { label: string; value: string; testI
  */
 export function PairPhoneSheet({
   routes,
+  replacing,
   onClose,
   onPaired,
 }: {
   routes: ConnectionRoute[];
+  /** Re-pairing: the (usually revoked) phone this pairing replaces once it is claimed. */
+  replacing?: PairedPhone | null;
   onClose: () => void;
   onPaired: () => void;
 }) {
   const usable = sortRoutes(routes.filter((route) => route.enabled));
-  const [routeId, setRouteId] = useState(usable[0]?.id ?? "");
-  const [name, setName] = useState("iPhone");
+  const [routeId, setRouteId] = useState(
+    usable.find((route) => route.id === replacing?.pairedVia?.endpointId)?.id ?? usable[0]?.id ?? "",
+  );
+  const [name, setName] = useState(replacing?.displayName ?? "iPhone");
   const [issued, setIssued] = useState<Issued | null>(null);
   const [state, setState] = useState<PairingState | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -101,7 +106,7 @@ export function PairPhoneSheet({
       if (pending.current) await api(`/api/v1/connection/pairings/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
       const { pairing } = await api<{ pairing: Issued }>("/api/v1/connection/pairings", {
         method: "POST",
-        body: JSON.stringify({ endpointId: routeId, deviceName: name.trim() }),
+        body: JSON.stringify({ endpointId: routeId, deviceName: name.trim(), ...(replacing ? { replacesDeviceId: replacing.id } : {}) }),
       });
       pending.current = pairing.id;
       setIssued(pairing);
@@ -117,8 +122,12 @@ export function PairPhoneSheet({
   if (!issued) {
     return (
       <SheetFrame
-        title="Pair a phone"
-        sub="Makes a single-use code that lets one phone join this household. It expires in five minutes and does not sign anyone in."
+        title={replacing ? `Re-pair ${replacing.displayName}` : "Pair a phone"}
+        sub={
+          replacing
+            ? "Makes a new single-use code for this phone. Once the phone uses it, its old entry is removed from the list."
+            : "Makes a single-use code that lets one phone join this household. It expires in five minutes and does not sign anyone in."
+        }
         onClose={onClose}
         footer={
           <>
@@ -161,7 +170,7 @@ export function PairPhoneSheet({
       title={claimed ? "Phone paired" : "Scan with the FamilyFi app"}
       sub={
         claimed
-          ? `${state?.device?.displayName ?? "The phone"} is paired. Sign in on the phone to finish.`
+          ? `${state?.device?.displayName ?? "The phone"} is paired${replacing ? " and its old entry is gone" : ""}. Sign in on the phone to finish.`
           : "Open FamilyFi on the phone, choose Scan pairing QR, and confirm the household it shows."
       }
       onClose={onClose}

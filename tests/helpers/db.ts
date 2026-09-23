@@ -27,6 +27,8 @@ export async function resetDatabase() {
   await db.appPolicy.deleteMany();
   await db.device.deleteMany();
   await db.session.deleteMany();
+  // Paired phones don't hang off the household, so its cascade never clears them.
+  await db.pairedDevice.deleteMany();
   await db.loginAttempt.deleteMany();
   await db.account.deleteMany();
   await db.group.deleteMany();

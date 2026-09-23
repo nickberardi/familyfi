@@ -5,7 +5,7 @@ import { GET as listEndpoints, POST as createEndpoint } from "@/app/api/v1/conne
 import { DELETE as deleteEndpoint, PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
 import { POST as createPairing } from "@/app/api/v1/connection/pairings/route";
 import { DELETE as cancelPairing, GET as pairingStatus } from "@/app/api/v1/connection/pairings/[id]/route";
-import { GET as listDevices } from "@/app/api/v1/connection/devices/route";
+import { DELETE as removeRevoked, GET as listDevices } from "@/app/api/v1/connection/devices/route";
 import { POST as claimPairing } from "@/app/api/v1/connection/pairings/[id]/claim/route";
 import { DELETE as revokeDevice } from "@/app/api/v1/connection/devices/[id]/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
@@ -298,5 +298,64 @@ describe("remote access", () => {
 
     const off = (await (await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "off" })))).json()) as { tunnel: { mode: string; status: string } };
     expect(off.tunnel).toMatchObject({ mode: "off", status: "off" });
+  });
+});
+
+describe("removing and re-pairing phones", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  async function pairPhone(auth: SessionAuth, route: string, body: Record<string, unknown> = {}) {
+    const response = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId: route, deviceName: "Kitchen iPhone", ...body })));
+    const pairing = ((await response.json()) as { pairing: { id: string; qr: { token: string } } }).pairing;
+    const claimed = (await (await claim(pairing.id, pairing.qr.token)).json()) as { device: { id: string }; deviceCredential: string };
+    const native = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential }) }));
+    const { token } = (await native.json()) as { token: string };
+    return { id: claimed.device.id, bearer: { cookie: "", csrf: "", token } };
+  }
+
+  const revoke = (auth: SessionAuth, id: string, query = "") =>
+    revokeDevice(request(`/api/v1/connection/devices/${id}${query}`, { method: "DELETE", auth }), { params: Promise.resolve({ id }) });
+
+  it("removes one phone for good, signing it out even if it was still active", async () => {
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const phone = await pairPhone(auth, route);
+    expect((await connection(request("/api/v1/connection", { auth: phone.bearer }))).status).toBe(200);
+
+    expect((await revoke(auth, phone.id, "?remove=true")).status).toBe(200);
+    expect(await prisma().pairedDevice.findUnique({ where: { id: phone.id } })).toBeNull();
+    expect((await connection(request("/api/v1/connection", { auth: phone.bearer }))).status).toBe(401);
+    expect((await revoke(auth, phone.id, "?remove=true")).status).toBe(404);
+  });
+
+  it("removes every revoked phone at once and leaves active ones alone", async () => {
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const [a, b, keep] = [await pairPhone(auth, route), await pairPhone(auth, route), await pairPhone(auth, route)];
+    await revoke(auth, a.id);
+    await revoke(auth, b.id);
+
+    expect((await removeRevoked(request("/api/v1/connection/devices", { method: "DELETE", auth }))).status).toBe(400);
+    const removed = await removeRevoked(request("/api/v1/connection/devices?revoked=true", { method: "DELETE", auth }));
+    expect(await removed.json()).toEqual({ removed: 2 });
+    expect((await prisma().pairedDevice.findMany()).map((device) => device.id)).toEqual([keep.id]);
+    expect((await connection(request("/api/v1/connection", { auth: keep.bearer }))).status).toBe(200);
+  });
+
+  it("re-pairs a revoked phone and drops its old entry once the new pairing is claimed", async () => {
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const old = await pairPhone(auth, route);
+    await revoke(auth, old.id);
+
+    const unknown = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId: route, deviceName: "x", replacesDeviceId: "missing" })));
+    expect(unknown.status).toBe(404);
+
+    const fresh = await pairPhone(auth, route, { replacesDeviceId: old.id });
+    const devices = await prisma().pairedDevice.findMany();
+    expect(devices.map((device) => device.id)).toEqual([fresh.id]);
+    expect((await connection(request("/api/v1/connection", { auth: fresh.bearer }))).status).toBe(200);
   });
 });

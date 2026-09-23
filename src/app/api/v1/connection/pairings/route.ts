@@ -4,7 +4,7 @@ import { prisma } from "@/server/db";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
 
-const Body = z.object({ endpointId: z.string().min(1), deviceName: z.string().trim().min(1).max(80) });
+const Body = z.object({ endpointId: z.string().min(1), deviceName: z.string().trim().min(1).max(80), replacesDeviceId: z.string().min(1).optional() });
 
 export async function POST(request: Request) {
   return withAdmin(request, async (session) => {
@@ -14,7 +14,10 @@ export async function POST(request: Request) {
     if (!parsed.success) return jsonError(400, "invalid_request", "Endpoint and phone name are required.");
     const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: parsed.data.endpointId, householdId: "default", enabled: true } });
     if (!endpoint || !session.accountId) return jsonError(404, "not_found", "Connection endpoint not found.");
-    const { pairing, qr } = await createPairing({ endpointId: endpoint.id, displayName: parsed.data.deviceName, createdByAccountId: session.accountId });
+    if (parsed.data.replacesDeviceId && !(await prisma().pairedDevice.findUnique({ where: { id: parsed.data.replacesDeviceId } }))) {
+      return jsonError(404, "not_found", "The phone to re-pair no longer exists.");
+    }
+    const { pairing, qr } = await createPairing({ endpointId: endpoint.id, displayName: parsed.data.deviceName, createdByAccountId: session.accountId, replacesDeviceId: parsed.data.replacesDeviceId });
     return Response.json({ pairing: { id: pairing.id, expiresAt: pairing.expiresAt.toISOString(), qr }, }, { status: 201 });
   });
 }

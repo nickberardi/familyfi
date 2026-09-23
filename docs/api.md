@@ -27,7 +27,8 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
 | GET | `/api/v1/connection/devices` | Administrator list of paired phones, the route each paired through (`pairedVia`), and their active sessions |
-| DELETE | `/api/v1/connection/devices/{id}` | Administrator revocation; invalidates every bearer session for that phone |
+| DELETE | `/api/v1/connection/devices/{id}` | Administrator revocation; invalidates every bearer session for that phone. `?remove=true` also deletes the phone's record |
+| DELETE | `/api/v1/connection/devices?revoked=true` | Administrator removes every revoked phone's record; active phones are untouched |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds` |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
