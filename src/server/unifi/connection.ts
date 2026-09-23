@@ -5,6 +5,7 @@ import { UnifiConfigError } from "./errors";
 import { HttpUnifiClient, type UnifiClient } from "./client";
 import { resolveIntegrationBase } from "./base-url";
 import { getSharedDevMockClient } from "./dev-mock";
+import { withPolicyOwnership, type OwnershipScope } from "./policy-ownership";
 
 export function connectionIdentity(household: Household): string {
   const site = household.unifiSiteId ?? "site";
@@ -14,7 +15,17 @@ export function connectionIdentity(household: Household): string {
   return `local:${household.unifiBaseUrl ?? ""}:${site}`;
 }
 
+/** The console and site this household's policies are recorded against. */
+export function ownershipScope(household: Household): OwnershipScope {
+  return { connectionIdentity: connectionIdentity(household), siteId: household.unifiSiteId };
+}
+
+/** The household's UniFi client. It refuses to update or delete a policy FamilyFi has no record of. */
 export function clientForHousehold(household: Household): UnifiClient {
+  return withPolicyOwnership(unguardedClientForHousehold(household), ownershipScope(household));
+}
+
+function unguardedClientForHousehold(household: Household): UnifiClient {
   if (!household.unifiKeyCiphertext || !household.unifiKeyIv || !household.unifiKeyAuthTag) {
     throw new UnifiConfigError("UniFi is not configured.");
   }

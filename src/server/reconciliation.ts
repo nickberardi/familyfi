@@ -4,7 +4,8 @@ import { prisma } from "./db";
 import { env } from "./env";
 import { normalizeMac } from "./mac";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/spike";
-import { clientForHousehold, connectionIdentity } from "./unifi/connection";
+import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
+import { withPolicyOwnership } from "./unifi/policy-ownership";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
@@ -120,7 +121,8 @@ async function tick(owner: string): Promise<boolean> {
   });
 
   try {
-    const client = testClient ?? clientForHousehold(household);
+    // Tests inject a fixture client; it gets the same ownership guard as the real one.
+    const client = testClient ? withPolicyOwnership(testClient, ownershipScope(household)) : clientForHousehold(household);
     const identity = connectionIdentity(household);
     const siteId = household.unifiSiteId;
     const [zones, networks, clients, info] = await Promise.all([

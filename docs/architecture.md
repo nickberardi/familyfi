@@ -38,7 +38,7 @@ Days identify the local weekday a window starts. Windows are half-open. Evaluati
 
 A database-backed lock serializes startup, interval (~30s), and mutation-triggered runs. Overlapping writers, including container replacement, must not apply stale revisions. Interval work is discovery, membership, and Extend expiry — not bedtime start/end. Until a UniFi key is saved in Settings, reconciliation is a no-op.
 
-If a create may have succeeded but ownership cannot be proven, the app reports an unresolved operation instead of adopting arbitrary `FamilyFi ` prefix matches. Do not delete administrator rules to recover.
+If a create may have succeeded but ownership cannot be proven, the app reports an unresolved operation instead of adopting arbitrary `FamilyFi ` prefix matches. Do not delete administrator rules to recover. Every UniFi client the app hands out (`clientForHousehold`, and the fixture client tests inject into reconcile) refuses to update or delete a policy whose id is not on record for the current console and site: an `AppPolicy` or `RulePolicy` row, or an applied create operation. During reconcile the refusal is recorded as that policy's error and shows on Sync.
 
 ## UniFi client
 

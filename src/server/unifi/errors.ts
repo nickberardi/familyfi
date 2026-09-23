@@ -27,3 +27,14 @@ export class UnifiTimeoutError extends Error {
     this.name = "UnifiTimeoutError";
   }
 }
+
+/** A write to a UniFi policy FamilyFi has no record of creating on this console and site. */
+export class PolicyOwnershipError extends Error {
+  readonly policyId: string;
+
+  constructor(action: "update" | "delete", policyId: string) {
+    super(`FamilyFi will not ${action} UniFi policy ${policyId}: it has no record of creating it on this console and site.`);
+    this.name = "PolicyOwnershipError";
+    this.policyId = policyId;
+  }
+}

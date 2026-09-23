@@ -1,6 +1,6 @@
 export { resolveIntegrationBase, localIntegrationUrlExample } from "./base-url";
 export { HttpUnifiClient, type UnifiClient } from "./client";
-export { UnifiConfigError, UnifiHttpError, UnifiTimeoutError } from "./errors";
+export { PolicyOwnershipError, UnifiConfigError, UnifiHttpError, UnifiTimeoutError } from "./errors";
 export { MockUnifiClient, createMockUnifiState } from "./mock";
 export {
   createFixtureUnifiClient,
