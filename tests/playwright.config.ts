@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { CI_EXCLUDED_TAGS } from "./browser-ci-guard";
 
 const repoRoot = path.resolve(__dirname, "..");
 const envPath = path.join(repoRoot, ".env");
@@ -23,6 +24,14 @@ if (existsSync(envPath)) {
   }
 }
 
+const ci = Boolean(process.env.CI);
+if (ci && !process.env.FAMILYFI_DEFAULT_PASSWORD) {
+  throw new Error("FAMILYFI_DEFAULT_PASSWORD must be set in CI; without it every browser test skips.");
+}
+// Tags are matched whole, so `@phone` never catches a longer tag that starts the same way.
+const tagPattern = (tag: string) => new RegExp(`${tag}(?![\\w-])`);
+const ciExcluded = ci ? Object.keys(CI_EXCLUDED_TAGS).map(tagPattern) : [];
+
 const port = process.env.PLAYWRIGHT_PORT || "3100";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${port}`;
 
@@ -30,17 +39,19 @@ export default defineConfig({
   testDir: "./browser",
   outputDir: path.join(repoRoot, "test-results"),
   fullyParallel: false,
-  forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  forbidOnly: ci,
+  retries: ci ? 1 : 0,
+  reporter: ci ? [["dot"], ["./browser-ci-guard.ts"]] : "list",
   use: {
     baseURL,
     trace: "on-first-retry",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "phone", use: { ...devices["Pixel 7"] } },
+    // A test tagged for one viewport never runs in the other, so it needs no run-time skip.
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, grepInvert: [tagPattern("@phone"), ...ciExcluded] },
+    { name: "phone", use: { ...devices["Pixel 7"] }, grepInvert: [tagPattern("@desktop"), ...ciExcluded] },
   ],
-  webServer: process.env.CI
+  webServer: ci
     ? {
         command: `node scripts/with-env.mjs next start --port ${port}`,
         cwd: repoRoot,

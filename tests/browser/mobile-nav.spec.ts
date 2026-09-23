@@ -3,9 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 const username = process.env.FAMILYFI_RECOVERY_USERNAME ?? "admin";
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 
+// The hamburger drawer only exists below the desktop breakpoint, so every test here is `@phone`.
 async function signIn(page: Page) {
   test.skip(!password, "FAMILYFI_DEFAULT_PASSWORD is required for browser tests");
-  test.skip(test.info().project.name !== "phone", "The hamburger drawer only exists below the desktop breakpoint.");
   const login = await page.request.post("/api/v1/auth/login", {
     data: { username, password, client: "browser" },
   });
@@ -15,7 +15,7 @@ async function signIn(page: Page) {
   }
 }
 
-test("reaches every destination the desktop sidebar has, not just the old bottom bar's four", async ({ page }) => {
+test("reaches every destination the desktop sidebar has, not just the old bottom bar's four", { tag: "@phone" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/family");
 
@@ -40,7 +40,7 @@ test("reaches every destination the desktop sidebar has, not just the old bottom
   await expect(page.getByRole("link", { name: "Rules" })).toHaveCount(0);
 });
 
-test("closes on a tap outside it without navigating", async ({ page }) => {
+test("closes on a tap outside it without navigating", { tag: "@phone" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/family");
 
@@ -57,7 +57,7 @@ test("closes on a tap outside it without navigating", async ({ page }) => {
   await expect(page).toHaveURL(/\/family/);
 });
 
-test("closes on a route change from outside the drawer", async ({ page }) => {
+test("closes on a route change from outside the drawer", { tag: "@phone" }, async ({ page }) => {
   await signIn(page);
   // Two real in-app history entries, so the browser back button below is a client-side
   // route change within the running app rather than a full unload.

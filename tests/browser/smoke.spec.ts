@@ -178,8 +178,7 @@ test("create things group lands on a seeded detail page that can be edited", asy
   await expect(page.getByLabel("Monogram")).toHaveValue("TV");
 });
 
-test("desktop Sync summary keeps four cards on one row", async ({ page }) => {
-  test.skip(test.info().project.name !== "desktop", "Desktop layout only");
+test("desktop Sync summary keeps four cards on one row", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/sync");
