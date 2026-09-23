@@ -9,7 +9,12 @@ import { GET as listDevices } from "@/app/api/v1/connection/devices/route";
 import { POST as claimPairing } from "@/app/api/v1/connection/pairings/[id]/claim/route";
 import { DELETE as revokeDevice } from "@/app/api/v1/connection/devices/[id]/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { AccountKind } from "@prisma/client";
+import { POST as computePin } from "@/app/api/v1/connection/pins/route";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
@@ -210,5 +215,44 @@ describe("companion admin surface", () => {
     expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
     const after = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as Devices;
     expect(after.devices[0].pairedVia).toBeNull();
+  });
+});
+
+describe("certificate pins", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it("computes a pin from a pasted certificate for an admin only, and pairs a route pinned with it", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "familyfi-pin-"));
+    try {
+      execFileSync("openssl", ["req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "2", "-subj", "/CN=familyfi.home", "-keyout", path.join(dir, "k.pem"), "-out", path.join(dir, "c.pem")], { stdio: "ignore" });
+      const certificate = readFileSync(path.join(dir, "c.pem"), "utf8");
+
+      expect((await computePin(request("/api/v1/connection/pins", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ certificate }) }))).status).toBe(401);
+
+      const auth = await adminAuth();
+      const response = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { certificate })));
+      expect(response.status).toBe(200);
+      const { pin } = (await response.json()) as { pin: { spkiSha256: string; source: string; systemTrusted: null } };
+      expect(pin).toMatchObject({ source: "certificate", systemTrusted: null });
+
+      const route = await createEndpoint(request("/api/v1/connection/endpoints", json(auth, "POST", { url: "https://familyfi.home:8443", transport: "lan", trustMode: "pinned", spkiSha256: pin.spkiSha256 })));
+      expect(route.status).toBe(201);
+      const created = (await route.json()) as { endpoint: { id: string } };
+      const pairing = await issuePairing(auth, created.endpoint.id);
+      const claimed = await claim(pairing.id, pairing.qr.token);
+      const body = (await claimed.json()) as { endpoint: { spkiSha256: string } };
+      expect(body.endpoint.spkiSha256).toBe(pin.spkiSha256);
+
+      const bad = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { certificate: "nope" })));
+      expect(bad.status).toBe(422);
+      const both = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { certificate, url: "https://x.home" })));
+      expect(both.status).toBe(400);
+      const plain = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { url: "http://x.home" })));
+      expect(plain.status).toBe(400);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

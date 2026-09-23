@@ -1520,6 +1520,33 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { description: "`endpoint_in_use` — a pending pairing uses this route", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /api/v1/connection/pins:
+    post:
+      operationId: computeConnectionPin
+      tags: [Connection]
+      summary: Compute the SPKI SHA-256 pin for a pinned LAN route
+      description: |
+        Send `url` to have FamilyFi complete a TLS handshake with that HTTPS origin and read its leaf
+        certificate (no HTTP request is sent), or `certificate` to hash a pasted PEM. The pin is
+        base64url SHA-256 of the DER SubjectPublicKeyInfo, identical to
+        `openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary`
+        encoded base64url. Nothing is stored.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { type: object, additionalProperties: false, required: [url], properties: { url: { type: string, format: uri } } }
+                - { type: object, additionalProperties: false, required: [certificate], properties: { certificate: { type: string, maxLength: 20000 } } }
+      responses:
+        "200": { description: Pin, content: { application/json: { schema: { type: object, additionalProperties: false, required: [pin], properties: { pin: { $ref: "#/components/schemas/ConnectionCertificatePin" } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "422": { description: "`probe_failed` — the address could not be reached or the text is not a certificate", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /api/v1/connection/pairings:
     post:
       operationId: createConnectionPairing
@@ -1995,6 +2022,17 @@ components:
         spkiSha256: { type: [string, "null"] }
         priority: { type: integer, minimum: 0, maximum: 999 }
         enabled: { type: boolean }
+    ConnectionCertificatePin:
+      type: object
+      additionalProperties: false
+      required: [spkiSha256, subject, issuer, validTo, systemTrusted, source]
+      properties:
+        spkiSha256: { type: string, pattern: "^[A-Za-z0-9_-]{43}$" }
+        subject: { type: string }
+        issuer: { type: string }
+        validTo: { type: string, format: date-time }
+        systemTrusted: { type: [boolean, "null"], description: "Whether FamilyFi's CA store trusts the chain for this host; null for a pasted certificate. True means a pin is unnecessary." }
+        source: { type: string, enum: [probe, certificate] }
     ConnectionPairingStatus:
       type: object
       additionalProperties: false
