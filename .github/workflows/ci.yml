@@ -83,6 +83,7 @@ jobs:
       POSTGRES_PASSWORD: familyfi-ci
       PLAYWRIGHT_PORT: "3100"
       UNIFI_MOCK: "1"
+      CLOUDFLARED_BIN: ${{ github.workspace }}/tests/fixtures/cloudflared/cloudflared
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
