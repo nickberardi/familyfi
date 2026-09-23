@@ -123,7 +123,7 @@ function DevicesBody() {
                   key={item.id}
                   type="button"
                   onClick={() => setFilter(item.id)}
-                  className="rounded-md px-3.5 py-1.5 text-[14px]"
+                  className="rounded-md px-2.5 py-1.5 text-[14px] md:px-3.5"
                   style={{
                     fontWeight: on ? 600 : 500,
                     background: on ? "var(--ff-ink-on-fill)" : "transparent",
@@ -153,13 +153,11 @@ function DevicesBody() {
               : "Nothing matches this filter."}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-            {/* The column template carries its own minimums from lg up, so the
-                scroll floor is only needed where the narrow layout would crush. */}
-            <div className="min-w-[720px] lg:min-w-0">
-              <div className="grid grid-cols-[minmax(140px,2.2fr)_minmax(76px,.9fr)_minmax(120px,140px)] items-center gap-3.5 bg-[var(--ff-field-soft)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)] lg:grid-cols-[minmax(160px,2.4fr)_minmax(80px,.9fr)_minmax(0,150px)_minmax(120px,140px)] xl:grid-cols-[minmax(180px,2.4fr)_minmax(84px,.9fr)_minmax(0,96px)_minmax(0,150px)_minmax(120px,140px)]">
+          <div className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+            <div>
+              <div className="ff-device-grid grid items-center gap-3.5 bg-[var(--ff-field-soft)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)]">
                 <div>Device</div>
-                <div>Belongs to</div>
+                <div className="hidden md:block">Belongs to</div>
                 <div className="hidden xl:block">Address</div>
                 <div className="hidden lg:block">Hardware</div>
                 <div>Assign</div>
@@ -171,7 +169,7 @@ function DevicesBody() {
                 return (
                   <div
                     key={device.mac}
-                    className="grid grid-cols-[minmax(140px,2.2fr)_minmax(76px,.9fr)_minmax(120px,140px)] items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 hover:bg-[var(--ff-field-soft)] lg:grid-cols-[minmax(160px,2.4fr)_minmax(80px,.9fr)_minmax(0,150px)_minmax(120px,140px)] xl:grid-cols-[minmax(180px,2.4fr)_minmax(84px,.9fr)_minmax(0,96px)_minmax(0,150px)_minmax(120px,140px)]"
+                    className="ff-device-grid grid items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 hover:bg-[var(--ff-field-soft)]"
                   >
                     {owner ? (
                       <Link href={ownerHref(owner)} className="flex min-w-0 items-center gap-2.5">
@@ -185,7 +183,7 @@ function DevicesBody() {
                       </div>
                     )}
                     <div
-                      className="min-w-0 truncate text-[14px]"
+                      className="hidden min-w-0 truncate text-[14px] md:block"
                       style={{ color: unassignedRow ? "var(--ff-danger)" : "var(--ff-ink)" }}
                     >
                       {owner?.name ?? "Unassigned"}
