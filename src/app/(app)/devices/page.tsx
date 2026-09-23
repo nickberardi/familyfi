@@ -10,6 +10,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { TogglePill } from "@/components/ui/Controls";
 import { Icon } from "@/components/ui/Icon";
 import { deviceIcon, deviceKindLabel } from "@/lib/display";
+import { removeDeviceLocally } from "@/lib/household-state";
 import type { Device, Group } from "@/lib/types";
 
 const FILTERS = [
@@ -37,7 +38,7 @@ export default function DevicesPage() {
 }
 
 function DevicesBody() {
-  const { devices, groups, unifi, household, mutate } = useAppData();
+  const { devices, groups, unifi, household, mutate, busy } = useAppData();
   const searchParams = useSearchParams();
   const assignGroupId = searchParams.get("assign");
   const assignGroup = groups.find((group) => group.id === assignGroupId) ?? null;
@@ -161,6 +162,7 @@ function DevicesBody() {
                 <div className="hidden xl:block">Address</div>
                 <div className="hidden lg:block">Hardware</div>
                 <div>Assign</div>
+                <div aria-hidden="true" />
               </div>
               {rows.map((device) => {
                 const owner = ownerOf(device, groups);
@@ -197,6 +199,21 @@ function DevicesBody() {
                     <div className="min-w-0">
                       <DeviceAssignSelect device={device} groups={groups} />
                     </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void mutate(
+                          () => api(`/api/v1/devices/${encodeURIComponent(device.mac)}`, { method: "DELETE" }),
+                          (state) => removeDeviceLocally(state, device.mac),
+                        )
+                      }
+                      aria-label={`Delete ${name} (${device.mac.toUpperCase()})`}
+                      className="flex h-5 w-5 items-center justify-center rounded-md text-[14px] leading-none disabled:opacity-40"
+                      style={{ color: "var(--ff-danger)" }}
+                    >
+                      &times;
+                    </button>
                   </div>
                 );
               })}

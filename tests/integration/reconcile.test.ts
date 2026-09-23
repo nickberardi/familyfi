@@ -68,6 +68,36 @@ describe("reconciliation against mocked UniFi", () => {
     expect(quarantine.some((policy) => policyMacs(policy).includes("02:00:00:00:00:01"))).toBe(false);
   });
 
+  it("rediscovers a deleted assigned device as quarantined and leaves absent devices deleted", async () => {
+    const mac = "02:00:00:00:00:01";
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const group = await createFamilyGroup();
+    const assigned = await prisma().device.update({
+      where: { mac },
+      data: { groupId: group.id, assignment: AssignmentState.assigned },
+    });
+    await runReconcileOnce();
+    expect(client.state.policies.some((policy) => policy.name.includes("Betsy") && policyMacs(policy).includes(mac))).toBe(true);
+
+    await prisma().device.delete({ where: { mac } });
+    await runReconcileOnce();
+    const rediscovered = await prisma().device.findUniqueOrThrow({ where: { mac } });
+    expect(rediscovered.id).not.toBe(assigned.id);
+    expect(rediscovered.groupId).toBeNull();
+    expect(rediscovered.assignment).toBe(AssignmentState.quarantined);
+    expect(client.state.policies.some((policy) => policy.name.includes("Betsy") && policyMacs(policy).includes(mac))).toBe(false);
+    expect(client.state.policies.some((policy) => policy.name.includes("Quarantine") && policyMacs(policy).includes(mac))).toBe(true);
+    expect(client.state.policies.find((policy) => policy.id === ADMIN_POLICY_ID)?.name).toBe("Allow LAN DNS");
+    expect(client.calls.some((call) => (call.method === "PUT" || call.method === "DELETE") && call.path.includes(ADMIN_POLICY_ID))).toBe(false);
+
+    client.state.clients = client.state.clients.filter((clientRow) => clientRow.macAddress !== mac);
+    await prisma().device.delete({ where: { mac } });
+    await runReconcileOnce();
+    expect(await prisma().device.findUnique({ where: { mac } })).toBeNull();
+  });
+
   it("skips protected groups and quarantines devices when the group is deleted", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);

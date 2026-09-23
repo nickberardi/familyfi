@@ -11,7 +11,7 @@ import { POST as resume } from "@/app/api/v1/groups/[id]/resume/route";
 import { POST as extend } from "@/app/api/v1/groups/[id]/extend/route";
 import { GET as getDevices } from "@/app/api/v1/devices/route";
 import { PUT as assignDevice } from "@/app/api/v1/devices/[mac]/assignment/route";
-import { GET as getDevice } from "@/app/api/v1/devices/[mac]/route";
+import { GET as getDevice, DELETE as deleteDevice } from "@/app/api/v1/devices/[mac]/route";
 import { GET as getSync } from "@/app/api/v1/sync/route";
 import { POST as retrySync } from "@/app/api/v1/sync/retry/route";
 import { GET as getChange } from "@/app/api/v1/changes/[id]/route";
@@ -39,6 +39,46 @@ async function signedIn() {
 describe("v1 API contracts", () => {
   beforeEach(async () => {
     await resetDatabase();
+  });
+
+  it("deletes known devices with mutation authorization and queues reconciliation", async () => {
+    const mac = "02:00:00:00:00:01";
+    const path = `/api/v1/devices/${encodeURIComponent(mac)}`;
+    const ctx = { params: Promise.resolve({ mac }) };
+    await seedDevice({ mac });
+    expect((await deleteDevice(request(path, { method: "DELETE" }), ctx)).status).toBe(401);
+
+    const auth = await signedIn();
+    const noCsrf = request(path, {
+      method: "DELETE",
+      headers: { cookie: auth.cookie },
+    });
+    expect((await deleteDevice(noCsrf, ctx)).status).toBe(403);
+    expect(await prisma().device.count({ where: { mac } })).toBe(1);
+
+    const invalid = await deleteDevice(
+      request("/api/v1/devices/invalid", { method: "DELETE", auth }),
+      { params: Promise.resolve({ mac: "invalid" }) },
+    );
+    expect(invalid.status).toBe(400);
+    expect((await invalid.json()).error.code).toBe("invalid_mac");
+
+    const missing = await deleteDevice(
+      request("/api/v1/devices/02:00:00:00:00:99", { method: "DELETE", auth }),
+      { params: Promise.resolve({ mac: "02:00:00:00:00:99" }) },
+    );
+    expect(missing.status).toBe(404);
+    expect((await missing.json()).error.code).toBe("not_found");
+
+    const deleted = await deleteDevice(request(path, { method: "DELETE", auth }), ctx);
+    expect(deleted.status).toBe(200);
+    const body = (await deleted.json()) as { ok: boolean; change: { changeId: string; revision: number } };
+    expect(body.ok).toBe(true);
+    expect(body.change.changeId).toEqual(expect.any(String));
+    expect(await prisma().device.count({ where: { mac } })).toBe(0);
+    const change = await prisma().changeResult.findUniqueOrThrow({ where: { id: body.change.changeId } });
+    expect(change.scope).toBe("device");
+    expect(change.deviceMac).toBe(mac);
   });
 
   it("requires a session for household routes and accepts timezone updates", async () => {

@@ -1079,6 +1079,35 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteDevice
+      tags: [Devices]
+      summary: Delete a known device and its assignment
+      description: A still-present device on a managed VLAN is rediscovered as quarantined on the next sync.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Mac" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Deleted; reconciliation queued
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok, change]
+                properties:
+                  ok: { type: boolean, const: true }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/devices/{mac}/assignment:
     put:
       operationId: assignDevice

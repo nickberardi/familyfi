@@ -63,6 +63,15 @@ export function assignDeviceLocally(state: HouseholdLists, mac: string, groupId:
   };
 }
 
+export function removeDeviceLocally(state: HouseholdLists, mac: string): HouseholdLists {
+  const current = state.devices.find((device) => device.mac === mac);
+  if (!current) return state;
+  return {
+    groups: shiftDeviceCount(state.groups, current.groupId, null),
+    devices: state.devices.filter((device) => device.mac !== mac),
+  };
+}
+
 export function removeGroupLocally(state: HouseholdLists, groupId: string): HouseholdLists {
   return {
     groups: state.groups.filter((group) => group.id !== groupId),

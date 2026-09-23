@@ -72,8 +72,8 @@ describe("openapi contract", () => {
       ),
     );
 
-    expect(changeResponses).toHaveLength(20);
-    expect(changeResponses.filter(({ reference }) => reference === "#/components/schemas/ChangeSummary")).toHaveLength(19);
+    expect(changeResponses).toHaveLength(21);
+    expect(changeResponses.filter(({ reference }) => reference === "#/components/schemas/ChangeSummary")).toHaveLength(20);
     expect(changeResponses.filter(({ reference }) => reference === "#/components/schemas/Change")).toEqual([
       { route: "/api/v1/changes/{id}", method: "get", reference: "#/components/schemas/Change" },
     ]);

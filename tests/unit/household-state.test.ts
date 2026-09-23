@@ -3,6 +3,7 @@ import {
   applyMutationResult,
   asMutationPayload,
   assignDeviceLocally,
+  removeDeviceLocally,
   removeGroupLocally,
 } from "@/lib/household-state";
 import type { Device, Group } from "@/lib/types";
@@ -104,5 +105,13 @@ describe("applyMutationResult", () => {
     );
     expect(next.devices[0]?.assignment).toBe("quarantined");
     expect(next.groups[0]?.deviceCount).toBe(0);
+  });
+
+  it("removes a device and updates its former group's count", () => {
+    const state = { groups: [group({ deviceCount: 1 })], devices: [device()] };
+    const next = removeDeviceLocally(state, device().mac);
+    expect(next.devices).toEqual([]);
+    expect(next.groups[0]?.deviceCount).toBe(0);
+    expect(state.groups[0]?.deviceCount).toBe(1);
   });
 });
