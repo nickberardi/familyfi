@@ -20,7 +20,7 @@ Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a te
 
 ## Local development
 
-1. Install Node.js 20+ and pnpm 10.
+1. Install Node.js 26+ and pnpm 10. `.node-version` names the version CI and the Docker image use; `nvm`, `fnm` and similar tools read it.
 2. Install Docker if you want `make setup` to start PostgreSQL for you.
 3. `cp .env.example .env` and set `POSTGRES_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. Watch the server log for `username: admin` and `password:`.
 4. `make setup` then `make dev`. `make dev` waits for PostgreSQL, applies pending Prisma migrations, regenerates the database client, then starts Next. The first start can take a few extra seconds. If port 3000 is already taken, `make dev` asks whether to kill that process.
