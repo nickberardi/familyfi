@@ -107,7 +107,7 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate |
 | `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
 | `make test` | Unit tests, then integration tests against `familyfi_test` |
-| `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database) |
+| `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database). Every route handler response is checked against `openapi/familyfi.v1.yaml` — an undocumented status or a body that does not match its schema fails the test that produced it |
 | `make test-api` | OpenAPI lint and route/method contract |
 | `make db-drift` | Fail when `prisma/schema.prisma` differs from the database its migrations built — a schema edit with no migration (run after `db-migrate`) |
 | `make test-browser` | Playwright desktop/phone smoke (`FAMILYFI_DEFAULT_PASSWORD`, running app or CI webServer). In CI a skipped test fails the run: tag a one-viewport test `@desktop` or `@phone`, and a test that cannot run in CI with a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts` |
