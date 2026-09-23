@@ -40,13 +40,34 @@ export function tunnelHeaders(incoming: IncomingHttpHeaders): Record<string, str
   return headers;
 }
 
+/** What a browser sees at the bare tunnel address: an explanation instead of a bare 404. */
+const ROOT_NOTE = [
+  "This is a FamilyFi remote-access address.",
+  "",
+  "Open the FamilyFi app on a paired phone to use it. The FamilyFi web app is only",
+  "available on your home network.",
+  "",
+].join("\n");
+
 function refuse(res: ServerResponse) {
   res.writeHead(404, { "content-type": "application/json" });
   res.end(JSON.stringify({ error: { code: "not_found", message: "Not available through remote access." } }));
 }
 
-export function startPhoneGateway(upstreamPort: number): Promise<{ server: Server; port: number }> {
+/**
+ * By default the gateway listens on a free loopback port for FamilyFi's own cloudflared.
+ * `listen` is for a sidecar tunnel container (FAMILYFI_PHONE_GATEWAY_PORT): same rules,
+ * reachable on the Compose network instead.
+ */
+export function startPhoneGateway(
+  upstreamPort: number,
+  listen: { host: string; port: number } = { host: "127.0.0.1", port: 0 },
+): Promise<{ server: Server; port: number }> {
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    if (req.url === "/" && (req.method === "GET" || req.method === "HEAD")) {
+      res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" });
+      return res.end(req.method === "HEAD" ? undefined : ROOT_NOTE);
+    }
     if (!allowedThroughTunnel(req.url)) return refuse(res);
     const upstream = forward(
       { host: "127.0.0.1", port: upstreamPort, method: req.method, path: req.url, headers: tunnelHeaders(req.headers) },
@@ -66,6 +87,6 @@ export function startPhoneGateway(upstreamPort: number): Promise<{ server: Serve
   server.on("upgrade", (_req, socket) => socket.destroy());
   return new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve({ server, port: (server.address() as AddressInfo).port }));
+    server.listen(listen.port, listen.host, () => resolve({ server, port: (server.address() as AddressInfo).port }));
   });
 }

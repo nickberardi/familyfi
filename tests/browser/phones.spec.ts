@@ -141,7 +141,32 @@ test("shows remote access and never offers to edit the route it manages", async 
   await page.goto("/phones");
   const card = page.getByTestId("remote-access");
   await expect(card.getByText("Remote access", { exact: true })).toBeVisible();
-  await expect(card.getByRole("switch", { name: "Remote access" })).toBeVisible();
+  await expect(card.getByRole("group", { name: "Remote access" })).toBeVisible();
   await expect(card).toContainText("this web page and its sign-in stay on your home network");
   await shot(page, "remote-access");
+});
+
+test("sets up remote access on a domain through the Cloudflare sign-in link", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/phones");
+  const card = page.getByTestId("remote-access");
+  const mine = card.getByRole("button", { name: "My domain" });
+  // Off becomes pickable once the card has loaded the server's state.
+  await expect(card.getByRole("button", { name: "Off" })).toBeEnabled();
+  test.skip(await mine.isDisabled(), "needs cloudflared (or CLOUDFLARED_BIN pointing at tests/fixtures/cloudflared) on the server");
+  const hostname = `familyfi-${test.info().project.name}.example.com`;
+  try {
+    await mine.click();
+    await card.getByLabel("Hostname").fill(hostname);
+    await card.getByRole("button", { name: "Connect with Cloudflare" }).click();
+    const link = card.getByRole("link", { name: "Open Cloudflare to authorize FamilyFi" });
+    await expect(link).toHaveAttribute("href", /^https:\/\/dash\.cloudflare\.com\/argotunnel/);
+    await shot(page, "remote-domain-login");
+    await expect(card.getByTestId("remote-url")).toHaveText(`https://${hostname}`, { timeout: 15_000 });
+    await expect(page.getByTestId("route-row").filter({ hasText: hostname })).toContainText("managed by Remote access");
+    await shot(page, "remote-domain-running");
+  } finally {
+    const headers = await csrf(page);
+    await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "off", forget: true } });
+  }
 });

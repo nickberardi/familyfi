@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { allowedThroughTunnel, startPhoneGateway, tunnelHeaders } from "@/server/tunnel/phone-gateway";
-import { quickTunnelUrl, tunnelError } from "@/server/tunnel/cloudflared";
+import { loginUrl, parseTunnelCredential, quickTunnelUrl, tunnelError, tunnelRegistered, validHostname } from "@/server/tunnel/cloudflared";
 
 describe("phone-only gateway rules", () => {
   it("passes the app's API and nothing else", () => {
@@ -87,6 +87,14 @@ describe("phone-only gateway", () => {
     expect(last.headers[TUNNEL_HEADER]).toBe("tunnel");
   });
 
+  it("explains itself at the bare address without reaching the app", async () => {
+    const before = seen.length;
+    const root = await get("/");
+    expect(root.status).toBe(200);
+    expect(root.body).toContain("FamilyFi remote-access address");
+    expect(seen.length).toBe(before);
+  });
+
   it("never reaches the app for a page", async () => {
     const before = seen.length;
     expect((await get("/login")).status).toBe(404);
@@ -110,5 +118,31 @@ describe("cloudflared log parsing", () => {
       "failed to request quick Tunnel: 429 Too Many Requests",
     );
     expect(tunnelError("2026-09-23T18:00:00Z INF fine")).toBeNull();
+  });
+});
+
+describe("named tunnel helpers", () => {
+  it("finds the Cloudflare authorization link", () => {
+    const prompt = "Please open the following URL and log in with your Cloudflare account:\n\nhttps://dash.cloudflare.com/argotunnel?aud=&callback=https%3A%2F%2Flogin.cloudflareaccess.org%2Fabc\n\nLeave cloudflared running";
+    expect(loginUrl(prompt)).toBe("https://dash.cloudflare.com/argotunnel?aud=&callback=https%3A%2F%2Flogin.cloudflareaccess.org%2Fabc");
+    expect(loginUrl("nothing here")).toBeNull();
+  });
+
+  it("knows when a named tunnel is serving", () => {
+    expect(tunnelRegistered("2026-09-23T00:00:00Z INF Registered tunnel connection connIndex=0 ip=198.41.200.1")).toBe(true);
+    expect(tunnelRegistered("2026-09-23T00:00:00Z INF Starting tunnel")).toBe(false);
+  });
+
+  it("accepts hostnames on a real domain only", () => {
+    for (const ok of ["familyfi.example.com", "home.berardi.family", "a-b.c.example.co.uk"]) expect(validHostname(ok)).toBe(true);
+    for (const bad of ["localhost", "example", "x.trycloudflare.com", "id.cfargotunnel.com", "Upper.Example.com", "-x.example.com", "a b.example.com"]) {
+      expect(validHostname(bad)).toBe(false);
+    }
+  });
+
+  it("keeps exactly the tunnel-scoped credential fields", () => {
+    const credential = parseTunnelCredential('{"AccountTag":"a","TunnelSecret":"s","TunnelID":"t","Extra":"x"}');
+    expect(credential).toEqual({ AccountTag: "a", TunnelSecret: "s", TunnelID: "t" });
+    expect(() => parseTunnelCredential('{"AccountTag":"a"}')).toThrow();
   });
 });
