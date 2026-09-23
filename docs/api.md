@@ -82,3 +82,5 @@ accept a pin change only in a manifest signed by the already trusted key; any ot
 or pin change requires a new administrator-generated pairing.
 
 The signed-in **System → API** page (`/reference`) renders this OpenAPI file with Swagger UI. Try it out sends the session cookie and CSRF header. `GET /openapi` returns the YAML and requires a session.
+
+CI holds the implementation to this document: `pnpm test-api` fails when a route or method is missing from it, and every response the integration tests receive must use a status documented for that route and, when JSON, match its schema.
