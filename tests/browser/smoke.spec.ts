@@ -199,6 +199,11 @@ test("device assignment updates immediately", async ({ page }) => {
   await expect(page.getByText("Loading household…")).toHaveCount(0);
   const select = page.locator("select").first();
   await expect(select, "UNIFI_MOCK household must seed devices in CI").toHaveCount(1);
+  const deleteButton = page.getByRole("button", { name: /^Delete .+ \([0-9A-F:]+\)$/ }).first();
+  await expect(deleteButton).toBeVisible();
+  const bounds = await deleteButton.boundingBox();
+  const viewport = page.viewportSize();
+  expect(bounds && viewport && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width).toBe(true);
   const current = await select.inputValue();
   const groups = await page.request.get("/api/v1/groups");
   expect(groups.ok()).toBeTruthy();

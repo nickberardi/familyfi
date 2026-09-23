@@ -35,7 +35,7 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | POST | `/api/v1/groups/{id}/resume` | Clears suspension (`enabled: true`; schedule may still block) |
 | POST | `/api/v1/groups/{id}/extend` | Adds minutes to a timed pause |
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
-| GET | `/api/v1/devices/{mac}` | Includes `unresolved` when zone is unknown |
+| GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |
 | GET | `/api/v1/sync` | Revision, last run, app-owned policy counts, recent changes |
 | POST | `/api/v1/sync/retry` | Enqueue another run |
