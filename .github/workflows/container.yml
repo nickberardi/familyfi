@@ -1,8 +1,11 @@
 name: Container
 
-# Not on pull requests: the image build is slow and costly in Actions minutes.
-# It runs on demand and gates every release (see release.yml).
+# Pull requests, not pushes to main: the image build is slow and costly in Actions
+# minutes, and a merged PR already passed it. It also gates every release (see release.yml).
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
   workflow_call:
 
