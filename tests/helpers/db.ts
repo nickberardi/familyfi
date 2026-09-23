@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { ensureHousehold, ensureRecoveryAccount } from "@/server/auth";
 import { setAutoReconcileForTests, setReconcileClientForTests } from "@/server/reconciliation";
 import { resetDevMockClientForTests } from "@/server/unifi/dev-mock";
+import { TEST_POSTGRES_DB } from "./test-env";
 
 export const SITE_ID = "11111111-1111-4111-8111-111111111111";
 export const INTERNAL_ZONE = "33333333-3333-4333-8333-333333333333";
@@ -16,26 +17,48 @@ export async function resetDatabase() {
   setReconcileClientForTests(undefined);
   resetDevMockClientForTests();
   const db = prisma();
-  await db.changeResult.deleteMany();
-  await db.syncRun.deleteMany();
-  await db.policyOperation.deleteMany();
-  await db.rulePolicy.deleteMany();
-  await db.rule.deleteMany();
-  await db.upstreamCheck.deleteMany();
-  await db.upstreamDomain.deleteMany();
-  await db.upstreamCategory.deleteMany();
-  await db.appPolicy.deleteMany();
-  await db.device.deleteMany();
-  await db.session.deleteMany();
-  // Paired phones don't hang off the household, so its cascade never clears them.
-  await db.pairedDevice.deleteMany();
-  await db.loginAttempt.deleteMany();
-  await db.account.deleteMany();
-  await db.group.deleteMany();
-  await db.reconciliationLock.deleteMany();
-  await db.household.deleteMany();
+  // Refuse anything but the test database: this empties whatever it is pointed at.
+  const [{ name }] = await db.$queryRaw<{ name: string }[]>`SELECT current_database() AS name`;
+  if (name !== TEST_POSTGRES_DB) {
+    throw new Error(`resetDatabase only runs against ${TEST_POSTGRES_DB}, not ${name}.`);
+  }
+  for (const table of await tablesChildrenFirst()) {
+    await db.$executeRawUnsafe(`DELETE FROM "${table}"`);
+  }
   await ensureHousehold();
   await ensureRecoveryAccount();
+}
+
+/**
+ * Every table in the schema, found at run time so a new model can never be left out of
+ * the reset, ordered so each table is emptied before any table it references. Row-level
+ * DELETE rather than TRUNCATE: TRUNCATE's exclusive lock deadlocks with background work
+ * (reconcile pump, probe sweep, tunnel lease) that a previous test left running.
+ */
+async function tablesChildrenFirst(): Promise<string[]> {
+  const db = prisma();
+  const tables = await db.$queryRaw<{ name: string }[]>`
+    SELECT tablename AS name FROM pg_tables
+    WHERE schemaname = current_schema() AND tablename <> '_prisma_migrations'`;
+  const references = await db.$queryRaw<{ child: string; parent: string }[]>`
+    SELECT child.relname AS child, parent.relname AS parent
+    FROM pg_constraint fk
+    JOIN pg_class child ON child.oid = fk.conrelid
+    JOIN pg_class parent ON parent.oid = fk.confrelid
+    WHERE fk.contype = 'f' AND fk.connamespace = current_schema()::regnamespace`;
+  const remaining = new Set(tables.map((table) => table.name));
+  const ordered: string[] = [];
+  while (remaining.size) {
+    const next = [...remaining].filter(
+      (table) => !references.some(({ child, parent }) => parent === table && child !== table && remaining.has(child)),
+    );
+    if (!next.length) throw new Error(`Foreign keys form a cycle among: ${[...remaining].join(", ")}`);
+    for (const table of next) {
+      ordered.push(table);
+      remaining.delete(table);
+    }
+  }
+  return ordered;
 }
 
 export async function configureConnectedHousehold(input?: {
