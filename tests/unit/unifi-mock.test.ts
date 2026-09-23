@@ -58,7 +58,9 @@ describe("UNIFI_MOCK", () => {
     const household = clientForHousehold(stubHousehold());
     expect(probed).toBeInstanceOf(MockUnifiClient);
     expect(household).toBeInstanceOf(MockUnifiClient);
-    expect(probed).toBe(household);
+    // The household client is that same shared mock behind the policy ownership guard.
+    expect(probed).toBe(getSharedDevMockClient());
+    expect(household).not.toBe(probed);
     const created = await probed.createPolicy("11111111-1111-4111-8111-111111111111", {
       name: "FamilyFi Test",
       enabled: true,
