@@ -153,3 +153,12 @@ export type PairingState = {
   expiresAt: string;
   device: { id: string; displayName: string } | null;
 };
+
+export type CertificatePin = {
+  spkiSha256: string;
+  subject: string;
+  issuer: string;
+  validTo: string;
+  systemTrusted: boolean | null;
+  source: "probe" | "certificate";
+};
