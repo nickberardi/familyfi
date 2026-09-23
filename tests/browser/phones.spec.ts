@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
@@ -77,6 +81,53 @@ test("adds a route, pairs a phone from the QR sheet, and revokes it", async ({ p
     expect((await page.request.get("/api/v1/connection", { headers: bearer })).status()).toBe(401);
   } finally {
     await signIn(page);
+    const headers = await csrf(page);
+    const list = (await (await page.request.get("/api/v1/connection/endpoints")).json()) as { endpoints: { id: string; url: string }[] };
+    for (const endpoint of list.endpoints.filter((item) => item.url === url)) {
+      await page.request.delete(`/api/v1/connection/endpoints/${endpoint.id}`, { headers });
+    }
+  }
+});
+
+test("pins a home-network route from a pasted certificate and hands out the full payload", async ({ page }) => {
+  await signIn(page);
+  const url = `https://pinned-e2e-${test.info().project.name}-${Date.now()}.home`;
+  const dir = mkdtempSync(path.join(tmpdir(), "familyfi-pin-e2e-"));
+  page.on("dialog", (dialog) => void dialog.accept());
+  try {
+    execFileSync("openssl", ["req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "2", "-subj", "/CN=familyfi.home", "-keyout", path.join(dir, "k.pem"), "-out", path.join(dir, "c.pem")], { stdio: "ignore" });
+    const certificate = readFileSync(path.join(dir, "c.pem"), "utf8");
+
+    await page.goto("/phones");
+    await page.getByRole("button", { name: "Add route" }).click();
+    const sheet = page.getByRole("dialog", { name: "Add a route" });
+    await sheet.getByLabel("Address").fill(url);
+    await sheet.getByRole("button", { name: "Pin this certificate" }).click();
+    await sheet.getByRole("button", { name: "Paste certificate instead" }).click();
+    await sheet.getByLabel("Certificate (PEM)").fill(certificate);
+    await sheet.getByRole("button", { name: "Use this certificate" }).click();
+    await expect(sheet.getByTestId("certificate-read")).toContainText("CN=familyfi.home");
+    await expect(sheet.getByLabel("SPKI SHA-256 pin")).toHaveValue(/^[A-Za-z0-9_-]{43}$/);
+    await shot(page, "pinned-sheet");
+    await sheet.getByRole("button", { name: "Add route" }).click();
+
+    const row = page.getByTestId("route-row").filter({ hasText: url });
+    await expect(row).toContainText("Pinned");
+    // Nothing answers at this made-up address: the check must say it could not look, never "matches".
+    await row.getByRole("button", { name: "Check" }).click();
+    await expect(row.getByTestId("pin-check")).toContainText("Couldn't check", { timeout: 10_000 });
+
+    await page.getByRole("button", { name: "Pair a phone" }).click();
+    const pair = page.getByRole("dialog", { name: "Pair a phone" });
+    await pair.getByLabel("Route").selectOption({ label: `${url} · Home network` });
+    await pair.getByRole("button", { name: "Show pairing code" }).click();
+    const qr = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
+    await expect(qr.getByTestId("pairing-payload")).toContainText('"trustMode":"pinned"');
+    await expect(qr.getByTestId("pairing-code")).toHaveCount(0);
+    await shot(page, "pinned-qr");
+    await qr.getByRole("button", { name: "Cancel" }).click();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
     const headers = await csrf(page);
     const list = (await (await page.request.get("/api/v1/connection/endpoints")).json()) as { endpoints: { id: string; url: string }[] };
     for (const endpoint of list.endpoints.filter((item) => item.url === url)) {

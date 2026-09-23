@@ -61,9 +61,20 @@ export async function signedEndpointManifest() {
   };
 }
 
-export function assertEndpoint(input: { url: string; transport: ConnectionTransport; trustMode: ConnectionTrustMode; spkiSha256?: string | null }) {
-  const url = new URL(input.url);
+/** A route is a bare HTTPS origin: no credentials, path, query or fragment. */
+export function httpsOrigin(value: string): URL {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Endpoint must be an absolute HTTPS origin.");
+  }
   if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("Endpoint must be an absolute HTTPS origin.");
+  return url;
+}
+
+export function assertEndpoint(input: { url: string; transport: ConnectionTransport; trustMode: ConnectionTrustMode; spkiSha256?: string | null }) {
+  const url = httpsOrigin(input.url);
   if (input.trustMode === ConnectionTrustMode.pinned && input.transport !== ConnectionTransport.lan) throw new Error("Only LAN endpoints may use a pinned certificate.");
   if (input.trustMode === ConnectionTrustMode.pinned && !input.spkiSha256) throw new Error("Pinned endpoints require an SPKI SHA-256 pin.");
   if (input.trustMode === ConnectionTrustMode.system && input.spkiSha256) throw new Error("System-trusted endpoints cannot include an SPKI pin.");

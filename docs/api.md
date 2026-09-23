@@ -23,6 +23,7 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/POST | `/api/v1/connection/endpoints` | Administrator-managed HTTPS connection routes |
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use` |
 | POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing QR payload |
+| POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
 | GET | `/api/v1/connection/devices` | Administrator list of paired phones, the route each paired through (`pairedVia`), and their active sessions |

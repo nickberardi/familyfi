@@ -17,7 +17,20 @@ close it. Revoke a lost phone from the same page; it is signed out at once and m
 Routes are tried top first, and a phone learns routes added after it paired from the signed
 manifest, so adding a VPN or Tailscale route later reaches every paired phone.
 
-HTTPS is required for every companion route. Start with direct LAN HTTPS and either a normal
+HTTPS is required for every companion route. For a self-signed LAN certificate, choose **Pin this certificate** on the route and
+**Read certificate from this address**: FamilyFi completes a TLS handshake with that address and
+stores the SHA-256 of its public key, or hashes a certificate you paste when FamilyFi cannot reach
+it. The value equals
+
+```sh
+openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform der \
+  | openssl dgst -sha256 -binary | openssl base64 -A | tr '+/' '-_' | tr -d '='
+```
+
+**Check** on a pinned route compares the stored pin with what the address serves now. Renewing the
+certificate with a new key breaks the pin until you update it; phones fail closed rather than
+trust the new key. A certificate the iPhone already trusts should use ordinary trust instead.
+ Start with direct LAN HTTPS and either a normal
 system-trusted certificate or a pairing QR that pins the LAN server public key. A household
 that already has VPN-to-LAN or a reverse proxy simply adds its HTTPS origin as a system-trusted
 endpoint; FamilyFi does not manage the VPN, proxy, or certificate issuer.
