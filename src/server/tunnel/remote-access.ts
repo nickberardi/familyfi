@@ -200,6 +200,19 @@ function onAdoptFailure(error: unknown) {
   runtime.error = `The tunnel is up, but its route could not be saved: ${error instanceof Error ? error.message : String(error)}`;
 }
 
+/**
+ * Saves the managed route, then reports running — never the other way round, so
+ * "running" always means phones can already learn the address.
+ */
+function goLive(url: string) {
+  runtime.attempts = 0;
+  void adoptUrl(url)
+    .then(() => {
+      if (runtime.url === url) runtime.status = "running";
+    })
+    .catch(onAdoptFailure);
+}
+
 /** Watches a running tunnel process and restarts it with backoff if it stops while still wanted. */
 function supervise(child: ChildProcess, onChunk: (text: string) => void) {
   runtime.child = child;
@@ -249,9 +262,7 @@ async function launch() {
       const url = quickTunnelUrl(text);
       if (url && url !== runtime.url) {
         runtime.url = url;
-        runtime.status = "running";
-        runtime.attempts = 0;
-        void adoptUrl(url).catch(onAdoptFailure);
+        goLive(url);
       }
     });
     return;
@@ -266,11 +277,10 @@ async function launch() {
   }
   const url = `https://${row.tunnelHostname}`;
   supervise(startNamedTunnel(binary.bin, origin, credential), (text) => {
-    if (tunnelRegistered(text) && runtime.status !== "running") {
+    // cloudflared registers several edge connections; the first is enough.
+    if (tunnelRegistered(text) && runtime.url !== url) {
       runtime.url = url;
-      runtime.status = "running";
-      runtime.attempts = 0;
-      void adoptUrl(url).catch(onAdoptFailure);
+      goLive(url);
     }
   });
 }
