@@ -40,7 +40,10 @@ export default defineConfig({
   outputDir: path.join(repoRoot, "test-results"),
   fullyParallel: false,
   forbidOnly: ci,
+  // One retry records a trace (`on-first-retry`); a test that needed it is a flake and
+  // fails the run rather than passing quietly.
   retries: ci ? 1 : 0,
+  failOnFlakyTests: ci,
   reporter: ci ? [["dot"], ["./browser-ci-guard.ts"]] : "list",
   use: {
     baseURL,
