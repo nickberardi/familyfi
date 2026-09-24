@@ -1,0 +1,6 @@
+#!/bin/sh
+# Fast checks before a push: lint, typecheck and unit tests. Integration, browser and
+# migration checks need PostgreSQL and run in CI. Skip once with `git push --no-verify`.
+set -e
+echo "pre-push: lint, typecheck and unit tests (skip once with git push --no-verify)"
+make -s lint typecheck test-unit
