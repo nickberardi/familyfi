@@ -4,7 +4,7 @@ FAMILYFI_IMAGE ?= ghcr.io/nberardi/familyfi:latest
 COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.yml
 WITH_ENV := node scripts/with-env.mjs
 
-.PHONY: setup dev test test-api test-api-breaking test-integration test-browser spike lint typecheck build \
+.PHONY: setup dev test test-coverage test-api test-api-breaking test-integration test-browser spike lint typecheck build \
 	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev db-drift db-upgrade secrets
 
 setup:
@@ -42,6 +42,9 @@ dev:
 test:
 	$(PNPM) test
 	$(MAKE) test-integration
+
+test-coverage:
+	POSTGRES_DB=familyfi_test $(PNPM) test:coverage
 
 test-integration:
 	POSTGRES_DB=familyfi_test $(PNPM) test:integration

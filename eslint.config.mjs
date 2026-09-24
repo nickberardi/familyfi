@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "designs/**",
     "playwright-report/**",
     "test-results/**",
+    "coverage/**",
     "prisma/migrations/**",
   ]),
 ]);
