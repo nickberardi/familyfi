@@ -108,6 +108,7 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 | `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
 | `make test` | Unit tests, then integration tests against `familyfi_test` |
 | `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database). Every route handler response is checked against `openapi/familyfi.v1.yaml` — an undocumented status or a body that does not match its schema fails the test that produced it |
+| `make test-coverage` | Unit and integration tests in one run with coverage of `src/server`, `src/lib` and `src/app/api`. Fails below the floors in `tests/vitest.coverage.config.ts` — raise a floor when you lift an area, never lower one to pass. On a pull request CI also lists the changed lines no test runs |
 | `make test-api` | OpenAPI lint and route/method contract |
 | `make test-api-breaking` | Breaking changes in `openapi/familyfi.v1.yaml` against `main`, with the pinned `oasdiff` (needs Go). CI runs it on pull requests that change `openapi/` |
 | `make db-upgrade` | Build a scratch database with the last release's migrations (or `pnpm db-upgrade <tag>`), put a row in every table, apply this checkout's migrations, and fail on a migration error, lost rows, or a result that differs from `schema.prisma` |
