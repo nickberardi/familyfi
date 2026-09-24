@@ -6,17 +6,24 @@
  * and an ordering read that needs a source zone. The mock used to throw plain errors,
  * merge on PUT and ignore the zone, so reconcile's recreate-on-404 path could never run
  * in a test; this keeps the two from drifting apart again.
+ *
+ * The cases themselves live in `src/server/unifi/contract-cases.ts`, so `pnpm spike verify`
+ * can run the same contract against a real console.
  */
 
 import { describe, expect, it } from "vitest";
 import { HttpUnifiClient, type UnifiClient } from "@/server/unifi/client";
-import { createFixtureUnifiClient, DEV_MOCK_ADMIN_POLICY_ID, DEV_MOCK_SITE_ID } from "@/server/unifi/dev-mock";
-import { UnifiHttpError } from "@/server/unifi/errors";
-import { internetBlockPolicy, toPolicyUpdate } from "@/server/unifi/payloads";
+import { UNIFI_CLIENT_CONTRACT } from "@/server/unifi/contract-cases";
+import {
+  createFixtureUnifiClient,
+  DEV_MOCK_ADMIN_POLICY_ID,
+  DEV_MOCK_INTERNAL_ZONE,
+  DEV_MOCK_SITE_ID,
+} from "@/server/unifi/dev-mock";
 import type { FirewallPolicy, FirewallPolicyWrite } from "@/server/unifi/types";
 
 const SITE = DEV_MOCK_SITE_ID;
-const MISSING = "99999999-9999-4999-8999-999999999999";
+const EXTERNAL_ZONE = "33333333-3333-4333-8333-333333333335";
 const BASE = "https://10.0.0.1/proxy/network/integration";
 
 /** An in-memory Integration API behind `fetch`, answering the requests this suite makes. */
@@ -73,67 +80,20 @@ const subjects: [string, () => UnifiClient][] = [
   ["HttpUnifiClient", httpClient],
 ];
 
-async function rejectsWithStatus(promise: Promise<unknown>, status: number) {
-  const error = await promise.then(
-    () => null,
-    (caught: unknown) => caught,
-  );
-  expect(error).toBeInstanceOf(UnifiHttpError);
-  expect((error as UnifiHttpError).status).toBe(status);
-}
-
 describe.each(subjects)("UniFi client contract: %s", (_name, make) => {
-  it("answers 404 for a policy it does not have, on read, update and delete", async () => {
-    const client = make();
-    const admin = await client.getPolicy(SITE, DEV_MOCK_ADMIN_POLICY_ID);
-    await rejectsWithStatus(client.getPolicy(SITE, MISSING), 404);
-    await rejectsWithStatus(client.updatePolicy(SITE, MISSING, toPolicyUpdate(admin)), 404);
-    await rejectsWithStatus(client.deletePolicy(SITE, MISSING), 404);
-  });
+  // The shared cases: `pnpm spike verify` runs these same ones against a real console.
+  for (const contractCase of UNIFI_CLIENT_CONTRACT) {
+    it(contractCase.name, () =>
+      contractCase.run({ client: make(), siteId: SITE, sourceZoneId: DEV_MOCK_INTERNAL_ZONE, destinationZoneId: EXTERNAL_ZONE }),
+    );
+  }
 
-  it("replaces the whole policy on update, keeping only the server's own fields", async () => {
+  it("lists the fixture's administrator policy first in its zone, and nothing for External", async () => {
     const client = make();
     const admin = await client.getPolicy(SITE, DEV_MOCK_ADMIN_POLICY_ID);
-    // A field the next write leaves out must not survive it: PUT is not a merge.
-    await client.updatePolicy(SITE, admin.id, toPolicyUpdate(admin, { ipsecFilter: "MATCH_ENCRYPTED" }));
-    const write = internetBlockPolicy({
-      name: "Replaced",
-      sourceZoneId: admin.source.zoneId,
-      destinationZoneId: "33333333-3333-4333-8333-333333333335",
-      macAddresses: ["02:00:00:00:00:09"],
-    });
-    const updated = await client.updatePolicy(SITE, admin.id, write);
-    expect(updated).toEqual({ ...write, id: admin.id, index: admin.index, metadata: admin.metadata });
-    expect(updated).not.toHaveProperty("ipsecFilter");
-    expect(await client.getPolicy(SITE, admin.id)).toEqual(updated);
-  });
-
-  it("creates a policy with a new id, and deletes it for good", async () => {
-    const client = make();
-    const admin = await client.getPolicy(SITE, DEV_MOCK_ADMIN_POLICY_ID);
-    const write = internetBlockPolicy({
-      name: "FamilyFi Contract",
-      sourceZoneId: admin.source.zoneId,
-      destinationZoneId: "33333333-3333-4333-8333-333333333335",
-      macAddresses: ["02:00:00:00:00:09"],
-    });
-    const created = await client.createPolicy(SITE, write);
-    expect(created.id).not.toBe(admin.id);
-    expect(created).toMatchObject({ ...write, metadata: { origin: "USER_DEFINED" } });
-    await client.deletePolicy(SITE, created.id);
-    await rejectsWithStatus(client.getPolicy(SITE, created.id), 404);
-  });
-
-  it("reads policy ordering only per source zone", async () => {
-    const client = make();
-    const admin = await client.getPolicy(SITE, DEV_MOCK_ADMIN_POLICY_ID);
-    await rejectsWithStatus(client.getPolicyOrdering(SITE), 400);
     const ordering = await client.getPolicyOrdering(SITE, admin.source.zoneId);
     expect(ordering.afterSystemDefined[0]).toBe(admin.id);
-    for (const id of ordering.afterSystemDefined) {
-      expect((await client.getPolicy(SITE, id)).source.zoneId, `${id} is in the zone asked for`).toBe(admin.source.zoneId);
-    }
-    const external = await client.getPolicyOrdering(SITE, "33333333-3333-4333-8333-333333333335");
+    const external = await client.getPolicyOrdering(SITE, EXTERNAL_ZONE);
     expect(external.afterSystemDefined).toEqual([]);
   });
 });

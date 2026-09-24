@@ -54,7 +54,8 @@ jobs:
       - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
       # Exit 2 when schema.prisma differs from what the migrations built: a schema edit with no migration.
       - run: pnpm db-drift
-      # Build a database with the last release's migrations, fill it, and upgrade it to these.
+      # Build a database from every supported release's migrations, fill it, and upgrade it to these,
+      # so a household that skipped releases is covered. About 30 seconds, so it runs on every push.
       - run: pnpm db-upgrade
       # Unit and integration tests in one run, failing if coverage drops below its floors.
       - run: pnpm test:coverage
