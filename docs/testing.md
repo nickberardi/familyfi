@@ -86,7 +86,7 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 Empty. An advisory that cannot be fixed yet goes in `pnpm.auditConfig.ignoreGhsas` in `package.json` and gets a row here in the same change, with the advisory, why it does not reach FamilyFi or cannot be fixed, and the date it expires. Remove both when the date passes or a fix ships.
 
 | Advisory | Package | Reason | Expires |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 
 ## What no test proves
 
