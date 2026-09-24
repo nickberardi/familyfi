@@ -57,6 +57,11 @@ function operationFor(method: string, pathTemplate: string): Operation {
   return operation;
 }
 
+/** Whether the document gives the operation a request body at all. */
+export function documentsRequestBody(method: string, pathTemplate: string): boolean {
+  return operationFor(method, pathTemplate).requestBody !== undefined;
+}
+
 /**
  * What a route handler receives: the request, and for a dynamic route its params. A
  * handler that takes no arguments, such as a public GET, is called with no request.
