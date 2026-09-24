@@ -226,7 +226,9 @@ describe("mocked spike flow", () => {
       applied.created.map((policy) => policy.id),
     );
     expect(cleanup.failed).toHaveLength(0);
-    const finalOrder = await client.getPolicyOrdering(inventory.site.id);
+    // The console keeps one ordering per source zone; the administrator's policy is in Internal.
+    const adminZone = state.policies.find((policy) => policy.id === adminId)!.source.zoneId;
+    const finalOrder = await client.getPolicyOrdering(inventory.site.id, adminZone);
     expect(finalOrder.afterSystemDefined).toEqual([adminId]);
     expect(client.calls.some((call) => call.method === "PUT" && call.path.includes("ordering"))).toBe(false);
   });
