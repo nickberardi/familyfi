@@ -144,6 +144,8 @@ const RESULT_LABEL: Record<ScenarioResult, string> = {
   skipped: "skipped",
 };
 
+const CHECK_LABEL: Record<CheckResult, string> = { pass: "pass", fail: "**fail**", "not-observed": "not observed" };
+
 function cell(text: string): string {
   return text.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
@@ -180,7 +182,7 @@ export function renderRecordMarkdown(input: VerifyRecord): string {
     lines.push("", "| Check | Kind | Result |", "| --- | --- | --- |");
     for (const check of scenario.checks) {
       const detail = check.detail ? `: ${cell(check.detail)}` : "";
-      lines.push(`| ${cell(check.name)} | ${check.kind} | ${RESULT_LABEL[check.result]}${detail} |`);
+      lines.push(`| ${cell(check.name)} | ${check.kind} | ${CHECK_LABEL[check.result]}${detail} |`);
     }
   }
   return `${lines.join("\n")}\n`;
