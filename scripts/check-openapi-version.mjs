@@ -8,7 +8,7 @@
 //   - Unchanged spec: nothing to check.
 //   - Only info.version, `description` or `summary` text changed: any semver increase; a patch is enough.
 //   - Anything else changed: at least a minor increase.
-//   - A major increase only with the `breaking-api` label (BREAKING_API_APPROVED=true).
+//   - A major increase only with the `breaking_api` label (BREAKING_API_APPROVED=true).
 //   - With that label from 1.0.0 on, a major increase. Before 1.0.0 a minor one carries
 //     the break, as semver allows for 0.y.z.
 //
@@ -118,14 +118,14 @@ export function checkVersion({ baseSpec, headSpec, breakingApproved = false }) {
   if (kind === "major" && !breakingApproved) {
     return result(
       false,
-      `info.version ${fromText} -> ${toText} is a major increase, which needs the breaking-api label. ` +
+      `info.version ${fromText} -> ${toText} is a major increase, which needs the breaking_api label. ` +
         `The operator adds it; otherwise raise the minor version instead.`,
     );
   }
   if (breakingApproved && from.major >= 1 && kind !== "major") {
     return result(
       false,
-      `The breaking-api label approves a breaking change, which from 1.0.0 on needs a major increase; ` +
+      `The breaking_api label approves a breaking change, which from 1.0.0 on needs a major increase; ` +
         `info.version went ${fromText} -> ${toText}.`,
     );
   }
