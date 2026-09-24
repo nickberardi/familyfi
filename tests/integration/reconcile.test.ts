@@ -98,6 +98,29 @@ describe("reconciliation against mocked UniFi", () => {
     expect(await prisma().device.findUnique({ where: { mac } })).toBeNull();
   });
 
+  it("recreates its own policy when the gateway no longer has it", async () => {
+    const mac = "02:00:00:00:00:01";
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const group = await createFamilyGroup();
+    await prisma().device.update({ where: { mac }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
+    await runReconcileOnce();
+    const recorded = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
+
+    // Someone removes FamilyFi's policy on the console; the group then changes.
+    client.state.policies = client.state.policies.filter((policy) => policy.id !== recorded.unifiPolicyId);
+    await prisma().group.update({ where: { id: group.id }, data: { suspensionActive: true } });
+    expect(await runReconcileOnce()).toBe(true);
+
+    const replacement = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    expect(replacement.unifiPolicyId).not.toBe(recorded.unifiPolicyId);
+    expect(replacement.lastError).toBeNull();
+    const policy = client.state.policies.find((item) => item.id === replacement.unifiPolicyId);
+    expect(policyMacs(policy ?? {})).toContain(mac);
+    expect(policy?.enabled).toBe(false);
+  });
+
   it("skips protected groups and quarantines devices when the group is deleted", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);

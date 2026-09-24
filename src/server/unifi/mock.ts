@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { UnifiClient } from "./client";
+import { UnifiHttpError } from "./errors";
 import type {
   ApplicationInfo,
   ClientOverview,
@@ -76,7 +77,7 @@ export class MockUnifiClient implements UnifiClient {
   async getNetwork(siteId: string, networkId: string): Promise<NetworkDetails> {
     this.record("GET", `/v1/sites/${siteId}/networks/${networkId}`);
     const network = this.state.networks.find((item) => item.id === networkId);
-    if (!network) throw new Error("network not found");
+    if (!network) throw notFound("GET", `/v1/sites/${siteId}/networks/${networkId}`);
     return network;
   }
 
@@ -107,7 +108,7 @@ export class MockUnifiClient implements UnifiClient {
   async getClient(siteId: string, clientId: string): Promise<ClientOverview> {
     this.record("GET", `/v1/sites/${siteId}/clients/${clientId}`);
     const client = this.state.clients.find((item) => item.id === clientId);
-    if (!client) throw new Error("client not found");
+    if (!client) throw notFound("GET", `/v1/sites/${siteId}/clients/${clientId}`);
     return client;
   }
 
@@ -119,7 +120,7 @@ export class MockUnifiClient implements UnifiClient {
   async getPolicy(siteId: string, policyId: string): Promise<FirewallPolicy> {
     this.record("GET", `/v1/sites/${siteId}/firewall/policies/${policyId}`);
     const policy = this.state.policies.find((item) => item.id === policyId);
-    if (!policy) throw new Error("policy not found");
+    if (!policy) throw notFound("GET", `/v1/sites/${siteId}/firewall/policies/${policyId}`);
     return policy;
   }
 
@@ -142,15 +143,19 @@ export class MockUnifiClient implements UnifiClient {
   async updatePolicy(siteId: string, policyId: string, body: FirewallPolicyWrite): Promise<FirewallPolicy> {
     this.record("PUT", `/v1/sites/${siteId}/firewall/policies/${policyId}`, body);
     const index = this.state.policies.findIndex((item) => item.id === policyId);
-    if (index === -1) throw new Error("policy not found");
+    if (index === -1) throw notFound("PUT", `/v1/sites/${siteId}/firewall/policies/${policyId}`);
     const current = this.state.policies[index]!;
-    const next = { ...current, ...body };
+    // PUT replaces the policy with the full write body; only server-owned fields carry over.
+    const next: FirewallPolicy = { ...body, id: current.id, index: current.index, metadata: current.metadata };
     this.state.policies[index] = next;
     return next;
   }
 
   async deletePolicy(siteId: string, policyId: string): Promise<void> {
     this.record("DELETE", `/v1/sites/${siteId}/firewall/policies/${policyId}`);
+    if (!this.state.policies.some((item) => item.id === policyId)) {
+      throw notFound("DELETE", `/v1/sites/${siteId}/firewall/policies/${policyId}`);
+    }
     this.state.policies = this.state.policies.filter((item) => item.id !== policyId);
     this.state.ordering.afterSystemDefined = this.state.ordering.afterSystemDefined.filter((id) => id !== policyId);
     this.state.ordering.beforeSystemDefined = this.state.ordering.beforeSystemDefined.filter((id) => id !== policyId);
@@ -158,10 +163,16 @@ export class MockUnifiClient implements UnifiClient {
 
   async getPolicyOrdering(siteId: string, sourceFirewallZoneId?: string): Promise<PolicyOrdering> {
     this.record("GET", `/v1/sites/${siteId}/firewall/policies/ordering`);
-    void sourceFirewallZoneId;
+    // The live console refuses an ordering read without a source zone (see spike.ts).
+    if (!sourceFirewallZoneId) {
+      throw new UnifiHttpError(400, "GET", `/v1/sites/${siteId}/firewall/policies/ordering`, "sourceFirewallZoneId is required");
+    }
+    // Each source zone has its own ordering document, listing that zone's policies.
+    const inZone = (id: string) =>
+      this.state.policies.some((policy) => policy.id === id && policy.source.zoneId === sourceFirewallZoneId);
     return {
-      afterSystemDefined: [...this.state.ordering.afterSystemDefined],
-      beforeSystemDefined: [...this.state.ordering.beforeSystemDefined],
+      afterSystemDefined: this.state.ordering.afterSystemDefined.filter(inZone),
+      beforeSystemDefined: this.state.ordering.beforeSystemDefined.filter(inZone),
     };
   }
 
@@ -182,6 +193,11 @@ export class MockUnifiClient implements UnifiClient {
   private record(method: string, path: string, body?: unknown) {
     this.calls.push(body === undefined ? { method, path } : { method, path, body });
   }
+}
+
+/** What the Integration API answers for an id it does not have, as `HttpUnifiClient` surfaces it. */
+function notFound(method: string, path: string): UnifiHttpError {
+  return new UnifiHttpError(404, method, path, "Not Found");
 }
 
 function filterCatalog(items: DpiCatalogItem[], filter?: string): DpiCatalogItem[] {

@@ -33,7 +33,7 @@ export default defineConfig({
         branches: 65,
         "src/server/unifi/**": { lines: 80, statements: 75, functions: 73, branches: 65 },
         "src/server/unifi/policy-ownership.ts": { lines: 100, statements: 100, functions: 100, branches: 100 },
-        "src/server/reconciliation.ts": { lines: 68, statements: 65, functions: 77, branches: 57 },
+        "src/server/reconciliation.ts": { lines: 69, statements: 66, functions: 77, branches: 58 },
         "src/server/auth.ts": { lines: 88, statements: 87, functions: 100, branches: 83 },
         "src/server/guard.ts": { lines: 83, statements: 87, functions: 100, branches: 100 },
         "src/server/tunnel/**": { lines: 85, statements: 81, functions: 77, branches: 74 },
