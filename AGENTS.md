@@ -45,7 +45,7 @@ docker           Dockerfile and Compose (build context is repo root)
 docs             setup, architecture, operations, API, spike operator checklist
 ```
 
-Before UI work, read local `designs/` (`Web Design.dc.html`, `Sign In.dc.html`, and the `_ds/` design-system bundle: `readme.md`, `tokens/`, `_ds_bundle.js`) when present. This file and [docs/architecture.md](docs/architecture.md) override prototype logic (including “Pause blocks internet”). Accessibility: contrast at least 4.5:1; no text under 14px rendered below 0.7 alpha. Do not click live UniFi writes unless the operator asked.
+Before UI work, read local `designs/` (`Web Design.dc.html`, `Sign In.dc.html`, and the `_ds/` design-system bundle: `readme.md`, `tokens/`, `_ds_bundle.js`) when present. This file and [docs/architecture.md](docs/architecture.md) override prototype logic (including “Pause blocks internet”). Accessibility: contrast at least 4.5:1; no text under 14px rendered below 0.7 alpha. `tests/unit/mark-contrast.test.ts` checks the colour tokens and `tests/browser/accessibility.spec.ts` runs axe (WCAG 2.1 A and AA) on every page in both viewports, with no exceptions. Do not click live UniFi writes unless the operator asked.
 
 UniFi integration: official Network Integration API with `X-API-KEY`. Local base `https://<console-ip>/proxy/network/integration`; cloud connector `https://api.ui.com/v1/connector/consoles/{consoleId}/proxy/network/integration`. Internet-block action is `BLOCK` (not `REJECT`). Spike CLI: [docs/spike/OPERATOR.md](docs/spike/OPERATOR.md).
 

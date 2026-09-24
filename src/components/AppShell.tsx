@@ -266,7 +266,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </aside>
-        <div className="ff-main flex min-w-0 flex-col">
+        {/* The page scrolls here, so it takes focus: a keyboard user can scroll content with no controls in it. */}
+        <div className="ff-main flex min-w-0 flex-col" tabIndex={0} role="region" aria-label="Page content">
           <div
             className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4 md:left-[232px] md:top-4"
             aria-live="polite"
