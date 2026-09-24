@@ -121,6 +121,66 @@ describe("reconciliation against mocked UniFi", () => {
     expect(policy?.enabled).toBe(false);
   });
 
+  it("notices a policy removed on the console even when nothing else changed", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const [recorded] = await prisma().appPolicy.findMany();
+    client.state.policies = client.state.policies.filter((policy) => policy.id !== recorded.unifiPolicyId);
+
+    await runReconcileOnce();
+    const replacement = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    expect(replacement.unifiPolicyId).not.toBe(recorded.unifiPolicyId);
+    expect(client.state.policies.some((policy) => policy.id === replacement.unifiPolicyId)).toBe(true);
+    const run = await prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } });
+    expect(run?.status).toBe("applied");
+  });
+
+  it("clears a stale record whose policy is already gone from the gateway", async () => {
+    const mac = "02:00:00:00:00:01";
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const group = await createFamilyGroup();
+    await prisma().device.update({ where: { mac }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
+    await runReconcileOnce();
+    const groupPolicy = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
+
+    // The policy is deleted on the console, then the group no longer needs one.
+    client.state.policies = client.state.policies.filter((policy) => policy.id !== groupPolicy.unifiPolicyId);
+    await prisma().device.update({ where: { mac }, data: { groupId: null, assignment: AssignmentState.quarantined } });
+    await runReconcileOnce();
+
+    expect(await prisma().appPolicy.findUnique({ where: { id: groupPolicy.id } })).toBeNull();
+    const run = await prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } });
+    expect(run?.status).toBe("applied");
+  });
+
+  it("removes a policy it created once no record points at it, and nothing else", async () => {
+    const mac = "02:00:00:00:00:01";
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const group = await createFamilyGroup();
+    await prisma().device.update({ where: { mac }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
+    await runReconcileOnce();
+    const groupPolicy = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
+
+    // A delete elsewhere dropped the record but the UniFi delete failed: the policy is orphaned.
+    await prisma().appPolicy.delete({ where: { id: groupPolicy.id } });
+    await prisma().device.update({ where: { mac }, data: { groupId: null, assignment: AssignmentState.quarantined } });
+    await prisma().group.delete({ where: { id: group.id } });
+    await runReconcileOnce();
+
+    expect(client.state.policies.some((policy) => policy.id === groupPolicy.unifiPolicyId)).toBe(false);
+    const creation = await prisma().policyOperation.findFirstOrThrow({ where: { unifiPolicyId: groupPolicy.unifiPolicyId } });
+    expect(creation.status).toBe("removed");
+    expect(client.state.policies.find((policy) => policy.id === ADMIN_POLICY_ID)?.name).toBe("Allow LAN DNS");
+    expect(client.state.policies.some((policy) => policy.id === "66666666-6666-4666-8666-666666666666")).toBe(true);
+    const run = await prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } });
+    expect(run?.status).toBe("applied");
+  });
+
   it("skips protected groups and quarantines devices when the group is deleted", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
