@@ -28,6 +28,7 @@ export function DeviceAssignSelect({
     <select
       className="w-full max-w-full rounded-[7px] border border-[var(--ff-input-line)] bg-[var(--ff-card)] px-2 py-1.5 text-[14px] disabled:opacity-50"
       value={device.groupId ?? ""}
+      aria-label={`Group for ${device.hostname ?? device.mac}`}
       disabled={busy}
       aria-busy={busy || undefined}
       onChange={(event) => {
