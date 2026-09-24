@@ -5,6 +5,7 @@ import { PUT as setGroup, DELETE as clearGroup } from "@/app/api/v1/groups/[id]/
 import { prisma } from "@/server/db";
 import { probeCategory } from "@/server/upstream/probe";
 import { authFromLogin, request } from "../helpers/http";
+import { invalidRequest } from "../helpers/openapi-responses";
 import { createFamilyGroup, resetDatabase } from "../helpers/db";
 
 const OLD_URL = "https://old.example/dns-query";
@@ -132,20 +133,20 @@ describe("resolver check schedule", () => {
 
   it("rejects a malformed probeTime", async () => {
     const auth = await login_();
-    const res = await setHousehold(request("/api/v1/upstream/resolver", {
+    const res = await setHousehold(invalidRequest(request("/api/v1/upstream/resolver", {
       auth, method: "PUT", headers: { "content-type": "application/json" },
       body: JSON.stringify({ probeTime: "25:99" }),
-    }));
+    })));
     expect(res.status).toBe(400);
     expect((await res.json()).error?.code).toBe("invalid_probe_time");
   });
 
   it("rejects an out-of-range day", async () => {
     const auth = await login_();
-    const res = await setHousehold(request("/api/v1/upstream/resolver", {
+    const res = await setHousehold(invalidRequest(request("/api/v1/upstream/resolver", {
       auth, method: "PUT", headers: { "content-type": "application/json" },
       body: JSON.stringify({ probeDays: [0, 7] }),
-    }));
+    })));
     expect(res.status).toBe(400);
   });
 

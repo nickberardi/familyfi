@@ -24,7 +24,7 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 | Suite | Needs | Covers |
 | --- | --- | --- |
 | Unit: `tests/unit`, `tests/contract` | Nothing | Pure logic, plus repository-wide rules: naming, colour contrast, icons, client/server boundary, invariants, repository hygiene, Node version |
-| Integration: `tests/integration` | PostgreSQL | Route handlers and reconciliation against a mocked UniFi. Every response is checked against the OpenAPI document; an undocumented status or a body that does not match its schema fails the test |
+| Integration: `tests/integration` | PostgreSQL | Route handlers and reconciliation against a mocked UniFi. Every request and response is checked against the OpenAPI document: a request body or path or query parameter the operation does not allow, an undocumented status, or a response body that does not match its schema fails the test |
 | Authorization matrix: `tests/integration/authorization-matrix.test.ts` | PostgreSQL | Every `/api/v1` route and method, found on disk, called as anonymous, member, administrator, recovery `admin`, and over the tunnel without a paired phone; each cell must be allowed, 401 or 403 as its table says. A route missing from the table fails it, so a new route declares its access there |
 | Browser: `tests/browser` | PostgreSQL, Chromium | Desktop and phone smoke tests on a production build with the UniFi mock, plus axe (WCAG 2.1 A and AA) on every page |
 | API contract: `scripts/check-openapi.mjs` | Nothing | Lints the OpenAPI document; every route and method exists on both sides |
@@ -48,6 +48,7 @@ The authorization matrix runs with the integration suite. When you add a route, 
   - MAC addresses in tests are locally administered (for example `02:…`);
   - fixture IPv4 addresses come from the documentation ranges `192.0.2.0/24`, `198.51.100.0/24` and `203.0.113.0/24`;
   - never commit a live UniFi response.
+- **Requests are held to the OpenAPI document too, not just responses.** `checkedHandler` in `tests/helpers/openapi-responses.ts` validates each JSON body against the operation's `requestBody` and each path and query parameter against its `parameters` before the handler runs, so a handler cannot quietly require more, or accept something different, than the spec says. A negative-path test that sends a request the document forbids, to check the 400, wraps that one request in `invalidRequest(...)`. The marker fails the test if the request is in fact valid or the handler does not answer 4xx; there is no global allowlist. A request the document allows but the handler still refuses (two equal bedtime times, say) needs no marker.
 - **The UniFi mock answers like the real API.** `tests/unit/unifi-client-contract.test.ts` runs the cases in `src/server/unifi/contract-cases.ts` against `MockUnifiClient` and `HttpUnifiClient`, and `pnpm spike verify` runs the same cases against a real console. Change the mock and those cases together.
 - **Display behaviour is shared with iOS through `tests/fixtures/display-vectors.json`.** See [Display vectors](#display-vectors).
 - **Every invariant in AGENTS.md names its tests.** A new invariant comes with them; `tests/unit/invariants.test.ts` fails when one names none or a missing file.

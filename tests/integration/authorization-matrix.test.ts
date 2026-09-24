@@ -7,6 +7,11 @@
  * The matrix checks the guard, not the handler: bodies are `{}` and ids do not exist, so
  * an allowed caller reaches validation or a 404 and nothing is written. The route's own
  * test file covers what it does once let in.
+ *
+ * Every request is still checked against the OpenAPI document. A body goes only to an
+ * operation that documents one, and a route whose placeholder request breaks the
+ * document says so with `invalidPlaceholder`, which sends it as `invalidRequest`: the
+ * check then insists the request really is invalid and every caller gets a 4xx.
  */
 
 import { readdirSync } from "node:fs";
@@ -19,6 +24,7 @@ import { prisma } from "@/server/db";
 import { tunnelHeaders } from "@/server/tunnel/phone-gateway";
 import { resetDatabase } from "../helpers/db";
 import { request } from "../helpers/http";
+import { documentsRequestBody, invalidRequest } from "../helpers/openapi-responses";
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const API_ROOT = path.join(REPO_ROOT, "src/app");
@@ -66,7 +72,7 @@ const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
  * than its neighbours suggest. It is for the maintainer to confirm or tighten; changing
  * the access here is the decision, and the route's guard must change with it.
  */
-type Entry = { access: Access; question?: string };
+type Entry = { access: Access; question?: string; invalidPlaceholder?: true };
 
 /**
  * Administrator is a flag, not a tier: it gates phone pairing and remote access
@@ -77,51 +83,51 @@ type Entry = { access: Access; question?: string };
 
 const ACCESS: Record<string, Entry> = {
   "GET /api/v1/accounts": { access: "session" },
-  "POST /api/v1/accounts": { access: "session" },
+  "POST /api/v1/accounts": { access: "session", invalidPlaceholder: true },
   "GET /api/v1/accounts/{id}": { access: "session" },
   "PUT /api/v1/accounts/{id}": { access: "session" },
   "DELETE /api/v1/accounts/{id}": { access: "session" },
-  "PUT /api/v1/accounts/{id}/password": { access: "session" },
+  "PUT /api/v1/accounts/{id}/password": { access: "session", invalidPlaceholder: true },
   "POST /api/v1/auth/login": { access: "home-network" },
   "POST /api/v1/auth/logout": { access: "csrf" },
   "GET /api/v1/auth/session": { access: "session" },
   "GET /api/v1/changes/{id}": { access: "session" },
   "GET /api/v1/connection": { access: "session" },
   "GET /api/v1/connection/devices": { access: "administrator" },
-  "DELETE /api/v1/connection/devices": { access: "administrator" },
+  "DELETE /api/v1/connection/devices": { access: "administrator", invalidPlaceholder: true },
   "DELETE /api/v1/connection/devices/{id}": { access: "administrator" },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
-  "POST /api/v1/connection/endpoints": { access: "administrator" },
+  "POST /api/v1/connection/endpoints": { access: "administrator", invalidPlaceholder: true },
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "DELETE /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "GET /api/v1/connection/identity": { access: "public" },
-  "POST /api/v1/connection/pairings": { access: "administrator" },
+  "POST /api/v1/connection/pairings": { access: "administrator", invalidPlaceholder: true },
   "GET /api/v1/connection/pairings/{id}": { access: "administrator" },
   "DELETE /api/v1/connection/pairings/{id}": { access: "administrator" },
   "POST /api/v1/connection/pairings/{id}/claim": { access: "pairing-token" },
-  "POST /api/v1/connection/pins": { access: "administrator" },
+  "POST /api/v1/connection/pins": { access: "administrator", invalidPlaceholder: true },
   "GET /api/v1/connection/tunnel": { access: "administrator" },
-  "PUT /api/v1/connection/tunnel": { access: "administrator" },
+  "PUT /api/v1/connection/tunnel": { access: "administrator", invalidPlaceholder: true },
   "GET /api/v1/devices": { access: "session" },
   "GET /api/v1/devices/{mac}": { access: "session" },
   "DELETE /api/v1/devices/{mac}": { access: "session" },
-  "PUT /api/v1/devices/{mac}/assignment": { access: "session" },
+  "PUT /api/v1/devices/{mac}/assignment": { access: "session", invalidPlaceholder: true },
   "GET /api/v1/dpi/applications": { access: "session" },
   "GET /api/v1/dpi/categories": { access: "session" },
   "GET /api/v1/groups": { access: "session" },
-  "POST /api/v1/groups": { access: "session" },
+  "POST /api/v1/groups": { access: "session", invalidPlaceholder: true },
   "GET /api/v1/groups/{id}": { access: "session" },
   "PUT /api/v1/groups/{id}": { access: "session" },
   "DELETE /api/v1/groups/{id}": { access: "session" },
-  "POST /api/v1/groups/{id}/extend": { access: "session" },
+  "POST /api/v1/groups/{id}/extend": { access: "session", invalidPlaceholder: true },
   "POST /api/v1/groups/{id}/pause": { access: "session" },
-  "PUT /api/v1/groups/{id}/resolver": { access: "session" },
+  "PUT /api/v1/groups/{id}/resolver": { access: "session", invalidPlaceholder: true },
   "DELETE /api/v1/groups/{id}/resolver": { access: "session" },
   "POST /api/v1/groups/{id}/resume": { access: "session" },
-  "PUT /api/v1/groups/{id}/schedule": { access: "session" },
+  "PUT /api/v1/groups/{id}/schedule": { access: "session", invalidPlaceholder: true },
   "GET /api/v1/health": { access: "public" },
   "GET /api/v1/rules": { access: "session" },
-  "POST /api/v1/rules": { access: "session" },
+  "POST /api/v1/rules": { access: "session", invalidPlaceholder: true },
   "GET /api/v1/rules/{id}": { access: "session" },
   "PATCH /api/v1/rules/{id}": { access: "session" },
   "DELETE /api/v1/rules/{id}": { access: "session" },
@@ -134,7 +140,7 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/sync": { access: "session" },
   "POST /api/v1/sync/retry": { access: "session" },
   "GET /api/v1/upstream/categories": { access: "session" },
-  "POST /api/v1/upstream/categories": { access: "session" },
+  "POST /api/v1/upstream/categories": { access: "session", invalidPlaceholder: true },
   "GET /api/v1/upstream/categories/{id}": { access: "session" },
   "PATCH /api/v1/upstream/categories/{id}": { access: "session" },
   "DELETE /api/v1/upstream/categories/{id}": { access: "session" },
@@ -193,8 +199,13 @@ async function signedIn(accountId: string, username: string) {
 
 /** A fresh request per cell: sign-out revokes the session it is sent with. */
 async function requestAs(caller: Caller, route: Route): Promise<Request> {
+  const placeholder = await unmarkedRequestAs(caller, route);
+  return ACCESS[route.key]?.invalidPlaceholder ? invalidRequest(placeholder) : placeholder;
+}
+
+async function unmarkedRequestAs(caller: Caller, route: Route): Promise<Request> {
   const url = route.template.replace(/\{(\w+)\}/g, (_match, name: string) => encodeURIComponent(PARAMS[name]));
-  const hasBody = route.method !== "GET" && route.method !== "DELETE";
+  const hasBody = documentsRequestBody(route.method, route.template);
   const init = {
     method: route.method,
     headers: hasBody ? { "content-type": "application/json" } : undefined,
