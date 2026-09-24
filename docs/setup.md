@@ -40,6 +40,7 @@ Phones on the LAN should use the host's LAN address, not `localhost`. HTTPS is r
 
 - Username `admin` is reserved and cannot be removed through household administration.
 - Adults granted admin access get personal usernames and passwords. Those names cannot be `admin`.
+- Every adult with a login is trusted with the household: accounts, household settings and the UniFi connection. **Admin** is a flag, not a tier. It gates only phone pairing and remote access (`/api/v1/connection/*`), and any adult can turn it on, their own included. `tests/integration/authorization-matrix.test.ts` holds each route to this.
 - Children, teens, and Things groups do not receive logins.
 - Browser sessions use an httpOnly cookie plus a CSRF cookie. Native phones must first claim an administrator-generated, five-minute pairing QR (or its manual one-time code), then call `POST /api/v1/auth/login` with `"client": "native"`, `deviceId`, and `deviceCredential`; later requests send `Authorization: Bearer`. A bare server address cannot enroll a phone.
 - Five failed attempts in 15 minutes, per username or IP, are rejected with HTTP 429.
