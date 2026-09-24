@@ -74,16 +74,20 @@ const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
  */
 type Entry = { access: Access; question?: string; invalidPlaceholder?: true };
 
-const ACCOUNT_ADMIN = "Any signed-in adult, not only an administrator, can manage accounts; a member can grant themselves or a new account administrator access.";
-const UNIFI_ADMIN = "Any signed-in adult, not only an administrator, can replace or probe the UniFi connection and its encrypted API key.";
+/**
+ * Administrator is a flag, not a tier: it gates phone pairing and remote access
+ * (`/api/v1/connection/*`) and nothing else. Every adult with a login is trusted with
+ * the household, so accounts, household settings and the UniFi connection are `session`,
+ * a member can grant themselves administrator, and that is intended.
+ */
 
 const ACCESS: Record<string, Entry> = {
   "GET /api/v1/accounts": { access: "session" },
-  "POST /api/v1/accounts": { access: "session", invalidPlaceholder: true, question: ACCOUNT_ADMIN },
+  "POST /api/v1/accounts": { access: "session", invalidPlaceholder: true },
   "GET /api/v1/accounts/{id}": { access: "session" },
-  "PUT /api/v1/accounts/{id}": { access: "session", question: ACCOUNT_ADMIN },
-  "DELETE /api/v1/accounts/{id}": { access: "session", question: ACCOUNT_ADMIN },
-  "PUT /api/v1/accounts/{id}/password": { access: "session", invalidPlaceholder: true, question: "Any signed-in adult can reset any other adult's password, an administrator's included." },
+  "PUT /api/v1/accounts/{id}": { access: "session" },
+  "DELETE /api/v1/accounts/{id}": { access: "session" },
+  "PUT /api/v1/accounts/{id}/password": { access: "session", invalidPlaceholder: true },
   "POST /api/v1/auth/login": { access: "home-network" },
   "POST /api/v1/auth/logout": { access: "csrf" },
   "GET /api/v1/auth/session": { access: "session" },
@@ -129,10 +133,10 @@ const ACCESS: Record<string, Entry> = {
   "DELETE /api/v1/rules/{id}": { access: "session" },
   "POST /api/v1/rules/{id}/off": { access: "session" },
   "GET /api/v1/settings/household": { access: "session" },
-  "PUT /api/v1/settings/household": { access: "session", question: "Any signed-in adult, not only an administrator, can change household settings." },
+  "PUT /api/v1/settings/household": { access: "session" },
   "GET /api/v1/settings/unifi": { access: "session" },
-  "PUT /api/v1/settings/unifi": { access: "session", question: UNIFI_ADMIN },
-  "POST /api/v1/settings/unifi/test": { access: "session", question: UNIFI_ADMIN },
+  "PUT /api/v1/settings/unifi": { access: "session" },
+  "POST /api/v1/settings/unifi/test": { access: "session" },
   "GET /api/v1/sync": { access: "session" },
   "POST /api/v1/sync/retry": { access: "session" },
   "GET /api/v1/upstream/categories": { access: "session" },
