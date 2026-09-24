@@ -54,6 +54,34 @@ describe("policy ownership guard", () => {
     expect(client.state.policies.find((policy) => policy.id === admin.id)?.enabled).toBe(admin.enabled);
   });
 
+  it("refuses an administrator's policy while it has others of its own on record", async () => {
+    // Evidence is per policy id: owning some policies must not make every id ours.
+    const scope = ownershipScope(await household());
+    const guarded = withPolicyOwnership(client, scope);
+    const onRecord = { connectionIdentity: scope.connectionIdentity, siteId: SITE_ID, zoneId: INTERNAL_ZONE, desiredFingerprint: "test", desiredRevision: 1 };
+    const ours = await guarded.createPolicy(SITE_ID, blockPolicy());
+    await prisma().appPolicy.create({
+      data: { ...onRecord, unifiPolicyId: ours.id, ownerScope: PolicyOwnerScope.quarantine, ipVersion: "dual" },
+    });
+    const forRule = await guarded.createPolicy(SITE_ID, blockPolicy());
+    const rule = await prisma().rule.create({ data: { kind: RuleKind.category, targetIds: [1] } });
+    await prisma().rulePolicy.create({ data: { ...onRecord, ruleId: rule.id, unifiPolicyId: forRule.id } });
+    const justCreated = await guarded.createPolicy(SITE_ID, blockPolicy());
+    await prisma().policyOperation.create({
+      data: {
+        intent: PolicyOperationIntent.create,
+        connectionIdentity: scope.connectionIdentity,
+        siteId: SITE_ID,
+        unifiPolicyId: justCreated.id,
+        status: "applied",
+      },
+    });
+
+    await expect(guarded.updatePolicy(SITE_ID, admin.id, { ...admin, enabled: false })).rejects.toThrow(PolicyOwnershipError);
+    await expect(guarded.deletePolicy(SITE_ID, admin.id)).rejects.toThrow(PolicyOwnershipError);
+    expect(writes(client)).toEqual([]);
+  });
+
   it("does not take a policy for ours because of its name", async () => {
     const guarded = withPolicyOwnership(client, ownershipScope(await household()));
     const rogue = await client.getPolicy(SITE_ID, DEV_MOCK_ROGUE_POLICY_ID);

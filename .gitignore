@@ -26,6 +26,8 @@ postgres-data/
 
 # testing
 /coverage
+/reports/
+/.stryker-tmp/
 /playwright-report/
 /test-results/
 /blob-report/
