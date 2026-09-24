@@ -53,6 +53,10 @@ jobs:
       # Exit 2 when schema.prisma differs from what the migrations built: a schema edit with no migration.
       - run: pnpm db-drift
       - run: pnpm test
+      # Again with the server clock at UTC+14: household time must never lean on the server's zone.
+      - run: pnpm test
+        env:
+          TZ: Pacific/Kiritimati
       - run: pnpm test:integration
       - run: pnpm build
 
