@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UpstreamSource } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { dueProbeRunAt, runProbeCatchUpForTests, stopUpstreamProbeForTests } from "@/server/upstream/schedule";
@@ -71,6 +71,36 @@ describe("upstream probe schedule", () => {
     ]);
     expect(results.filter(Boolean)).toHaveLength(1);
     stopUpstreamProbeForTests();
+  });
+
+  it("does not start a second sweep while one is still running", async () => {
+    await seedCategory();
+    await setHousehold({ dohProbeEnabled: true, dohProbeTime: "00:00", dohProbeLastRunAt: null });
+    // Hold the first sweep inside its DNS request until the second run has been claimed.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let inFlight!: () => void;
+    const firstRequest = new Promise<void>((resolve) => (inFlight = resolve));
+    const fetchStub = vi.fn(async () => {
+      inFlight();
+      await gate;
+      throw new Error("resolver offline");
+    });
+    vi.stubGlobal("fetch", fetchStub);
+    try {
+      const first = runProbeCatchUpForTests();
+      await firstRequest;
+      const requests = fetchStub.mock.calls.length;
+      // A later instant falls due mid-sweep: it is claimed, but no second sweep starts.
+      await setHousehold({ dohProbeLastRunAt: null });
+      expect(await runProbeCatchUpForTests()).toBe(true);
+      expect(fetchStub).toHaveBeenCalledTimes(requests);
+      release();
+      expect(await first).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      stopUpstreamProbeForTests();
+    }
   });
 
   it("never claims while checking is disabled", async () => {
