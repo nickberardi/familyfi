@@ -110,6 +110,7 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 | `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database). Every route handler response is checked against `openapi/familyfi.v1.yaml` — an undocumented status or a body that does not match its schema fails the test that produced it |
 | `make test-api` | OpenAPI lint and route/method contract |
 | `make test-api-breaking` | Breaking changes in `openapi/familyfi.v1.yaml` against `main`, with the pinned `oasdiff` (needs Go). CI runs it on pull requests that change `openapi/` |
+| `make db-upgrade` | Build a scratch database with the last release's migrations (or `pnpm db-upgrade <tag>`), put a row in every table, apply this checkout's migrations, and fail on a migration error, lost rows, or a result that differs from `schema.prisma` |
 | `make db-drift` | Fail when `prisma/schema.prisma` differs from the database its migrations built — a schema edit with no migration (run after `db-migrate`) |
 | `make test-browser` | Playwright desktop/phone smoke (`FAMILYFI_DEFAULT_PASSWORD`, running app or CI webServer). In CI a skipped test fails the run: tag a one-viewport test `@desktop` or `@phone`, and a test that cannot run in CI with a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`. A test that passes only on its retry is a flake and fails CI too. A failed run uploads its traces as the `playwright-results` artifact |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |

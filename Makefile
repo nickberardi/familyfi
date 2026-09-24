@@ -5,7 +5,7 @@ COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.y
 WITH_ENV := node scripts/with-env.mjs
 
 .PHONY: setup dev test test-api test-api-breaking test-integration test-browser spike lint typecheck build \
-	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev db-drift secrets
+	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev db-drift db-upgrade secrets
 
 setup:
 	corepack enable >/dev/null 2>&1 || true
@@ -31,6 +31,9 @@ db-migrate:
 
 db-drift:
 	$(PNPM) db-drift
+
+db-upgrade:
+	$(PNPM) db-upgrade
 
 dev:
 	node scripts/ensure-dev-port.mjs 3000
