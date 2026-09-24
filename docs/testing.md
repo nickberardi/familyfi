@@ -36,7 +36,10 @@ The authorization matrix runs with the integration suite. When you add a route, 
 ## Rules
 
 - **A bug fix ships with a test that fails without it.** Write the test first and watch it fail for the reason in the bug report.
-- **Coverage floors only go up.** They live in `tests/vitest.coverage.config.ts`. Raise a floor when you lift an area, and never lower one to pass. On a pull request, CI also lists the changed lines no test runs.
+- **Coverage floors only go up.** They live in `tests/vitest.coverage.config.ts`. Raise a floor when you lift an area, and never lower one to pass.
+- **A changed line in a security-critical path needs a test.** On a pull request, `scripts/changed-line-coverage.mjs` fails CI when a changed line no test runs is in one of `GATED_PATHS`: `src/server/unifi/**`, `auth.ts`, `guard.ts`, `quarantine.ts`, `src/server/tunnel/**` and `reconciliation.ts`, where a file-wide floor would average a new untested branch away. Elsewhere it lists those lines and the floors decide.
+  - A line no test can reach takes `// coverage-exempt: <why>` at its end, or alone on the line above. The reason is required, and the run summary lists every exemption so a reviewer sees it.
+  - Run it yourself after `make test-coverage`: `node scripts/changed-line-coverage.mjs origin/main`.
 - **Never skip your way to green.** In CI, a browser test that skips fails the run, and so does one that passes only on its retry.
   - Tag a test that belongs to one viewport `@desktop` or `@phone`.
   - A test that cannot run in CI takes a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`, with the reason.
@@ -63,7 +66,7 @@ The native iOS app, [`nickberardi/familyfi-ios`](https://github.com/nickberardi/
 
 | Workflow | When | Checks |
 | --- | --- | --- |
-| `ci.yml` | Every push and pull request | **verify:** `pnpm audit --prod --audit-level=high` (a high or critical advisory in a production dependency fails it; see [Audit allowlist](#audit-allowlist)), lint, typecheck, `test-api`, `db-drift`, `db-upgrade`, `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
+| `ci.yml` | Every push and pull request | **verify:** lint, typecheck, `test-api`, `db-drift`, `db-upgrade` from every supported release (about 30 seconds), `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only; fails on an untested changed line in a gated path), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke |
 | `codeql.yml` | Pull requests and weekly | CodeQL (`security-extended`) over the JavaScript and TypeScript; findings go to the repository's code scanning alerts. Only this job may write security events |
 | `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking-api` label; never add it yourself |

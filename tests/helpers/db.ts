@@ -105,7 +105,8 @@ export async function seedDevice(input: {
     data: {
       mac: input.mac,
       groupId: input.groupId ?? null,
-      zoneId: input.zoneId ?? INTERNAL_ZONE,
+      // `null` is a device with no firewall zone, not a request for the default.
+      zoneId: input.zoneId === undefined ? INTERNAL_ZONE : input.zoneId,
       networkId: input.networkId ?? INTERNAL_NETWORK,
       assignment: input.assignment ?? (input.groupId ? AssignmentState.assigned : AssignmentState.quarantined),
     },
