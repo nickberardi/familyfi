@@ -135,7 +135,7 @@ export type PairedPhone = {
   lastSeenAt: string | null;
   revokedAt: string | null;
   pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
-  sessions: { id: string; username: string; expiresAt: string; createdAt: string }[];
+  sessions: { id: string; username: string; client: "phone" | "watch"; expiresAt: string; createdAt: string }[];
 };
 
 export type PairingQr = {

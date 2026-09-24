@@ -28,6 +28,8 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
 | GET | `/api/v1/connection/devices` | Administrator list of paired phones, the route each paired through (`pairedVia`), and their active sessions |
 | DELETE | `/api/v1/connection/devices/{id}` | Administrator revocation; invalidates every bearer session for that phone. `?remove=true` also deletes the phone's record |
+| POST | `/api/v1/connection/watch-sessions` | A signed-in paired phone issues a separate 30-day Watch bearer session, replacing its prior Watch session |
+| DELETE | `/api/v1/connection/watch-sessions/{id}` | The provisioning phone or an administrator revokes Watch access alone |
 | DELETE | `/api/v1/connection/devices?revoked=true` | Administrator removes every revoked phone's record; active phones are untouched |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds` |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
@@ -76,6 +78,11 @@ for an enabled endpoint; the phone claims it, verifies the instance identity, st
 device credential in Keychain, and then signs in normally with its household account.
 Native bearer sessions are tied to that paired phone. Revoking the phone invalidates every
 one of its bearer sessions and requires a new pairing.
+The iPhone may provision one active Watch session without another administrator pairing.
+Watch sessions have their own bearer token, are listed under the paired phone in System → Phones,
+and may only read session, connection, group, and change state or pause, resume, and extend groups.
+The three group controls reject protected and adult Family groups for Watch sessions.
+Phone sign-out or device revocation also revokes its Watch session.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity

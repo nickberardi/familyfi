@@ -179,6 +179,56 @@ export async function createSession(input: {
   return { raw, expiresAt, csrf: randomToken(24) };
 }
 
+/** A single active Watch gets its own bearer token, attributed to its paired phone. */
+export async function createWatchSession(parent: {
+  id: string;
+  accountId: string | null;
+  deviceId: string | null;
+  username: string;
+}, watchId: string) {
+  if (!parent.accountId || !parent.deviceId) throw new Error("A paired phone session is required.");
+  const raw = randomToken();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const session = await prisma().$transaction(async (transaction) => {
+    await transaction.session.updateMany({
+      where: { deviceId: parent.deviceId, parentSessionId: { not: null }, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return transaction.session.create({
+      data: {
+        tokenHash: sha256(raw),
+        kind: SessionKind.bearer,
+        accountId: parent.accountId!,
+        deviceId: parent.deviceId!,
+        username: parent.username,
+        parentSessionId: parent.id,
+        watchId,
+        expiresAt,
+      },
+    });
+  });
+  return { sessionId: session.id, token: raw, expiresAt };
+}
+
+export function watchGroupControlAllowed(
+  session: { parentSessionId: string | null },
+  group: { protected: boolean; kind: string; familyRole: string | null },
+): boolean {
+  return !session.parentSessionId || (!group.protected && !(group.kind === "family" && group.familyRole === "adult"));
+}
+
+/** Watch credentials can only read state and control eligible groups. */
+function watchRouteAllowed(request: Request): boolean {
+  const path = new URL(request.url).pathname;
+  if (request.method === "GET") {
+    return path === "/api/v1/auth/session"
+      || path === "/api/v1/connection"
+      || path === "/api/v1/groups"
+      || /^\/api\/v1\/changes\/[^/]+$/.test(path);
+  }
+  return request.method === "POST" && /^\/api\/v1\/groups\/[^/]+\/(pause|resume|extend)$/.test(path);
+}
+
 export async function readSessionFromRequest(request: Request) {
   const header = request.headers.get("authorization");
   let raw: string | undefined;
@@ -201,6 +251,13 @@ export async function readSessionFromRequest(request: Request) {
     include: { account: true, device: true },
   });
   if (!session || session.revokedAt || session.expiresAt <= new Date() || (session.kind === SessionKind.bearer && (!session.device || session.device.revokedAt))) return null;
+  if (session.parentSessionId) {
+    const parent = await prisma().session.findUnique({
+      where: { id: session.parentSessionId },
+      select: { revokedAt: true, accountId: true, deviceId: true },
+    });
+    if (!parent || parent.revokedAt || parent.accountId !== session.accountId || parent.deviceId !== session.deviceId) return null;
+  }
   if (session.device && (!session.device.lastSeenAt || session.device.lastSeenAt < new Date(Date.now() - 15 * 60 * 1000))) {
     await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date() } });
   }
@@ -223,6 +280,9 @@ export function toPublicSession(session: {
 export async function requireSession(request: Request) {
   const session = await readSessionFromRequest(request);
   if (!session) return { session: null, error: jsonError(401, "unauthenticated", "Sign in required.") };
+  if (session.parentSessionId && !watchRouteAllowed(request)) {
+    return { session: null, error: jsonError(401, "watch_scope", "This Watch session cannot use that endpoint.") };
+  }
   return { session, error: null };
 }
 
@@ -253,8 +313,8 @@ export async function requireCsrf(request: Request) {
 export async function revokeSession(request: Request) {
   const session = await readSessionFromRequest(request);
   if (session) {
-    await prisma().session.update({
-      where: { id: session.id },
+    await prisma().session.updateMany({
+      where: { OR: [{ id: session.id }, { parentSessionId: session.id }] },
       data: { revokedAt: new Date() },
     });
   }

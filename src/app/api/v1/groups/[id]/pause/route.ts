@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { watchGroupControlAllowed } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
 import { publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
@@ -12,7 +13,7 @@ const Body = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, ctx: Ctx) {
-  return withMutation(request, async () => {
+  return withMutation(request, async (session) => {
     const { id } = await ctx.params;
     let value: unknown = {};
     try {
@@ -24,6 +25,7 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid pause request.");
     const existing = await prisma().group.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
+    if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     if (existing.protected) return jsonError(409, "protected", "Protected groups cannot be paused.");
     // Always and Scheduled both allow Pause (D1). mode=always has no bedtime schedule requirement.
     const until = parsed.data.until === undefined ? null : parsed.data.until === null ? null : new Date(parsed.data.until);

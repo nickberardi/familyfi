@@ -1663,6 +1663,54 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/watch-sessions:
+    post:
+      operationId: createWatchSession
+      tags: [Connection]
+      summary: Issue a separate Watch session from a paired iPhone
+      description: Replaces the previously active Watch session for this paired phone. The token expires after 30 days.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [watchId]
+              properties:
+                watchId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Watch session issued
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [sessionId, token, expiresAt]
+                properties:
+                  sessionId: { type: string }
+                  token: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/watch-sessions/{id}:
+    delete:
+      operationId: revokeWatchSession
+      tags: [Connection]
+      summary: Revoke a Watch session
+      description: The provisioning phone or a household administrator may revoke this session.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200": { description: Revoked, content: { application/json: { schema: { type: object, additionalProperties: false, required: [ok], properties: { ok: { type: boolean } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/v1/connection/devices/{id}:
     delete:
       operationId: revokeConnectionDevice
@@ -2190,7 +2238,18 @@ components:
             endpointId: { type: string }
             url: { type: string, format: uri }
             transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
-        sessions: { type: array, items: { type: object, additionalProperties: true } }
+        sessions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, username, client, expiresAt, createdAt]
+            properties:
+              id: { type: string }
+              username: { type: string }
+              client: { type: string, enum: [phone, watch] }
+              expiresAt: { type: string, format: date-time }
+              createdAt: { type: string, format: date-time }
     ConnectionStatus:
       type: object
       additionalProperties: false

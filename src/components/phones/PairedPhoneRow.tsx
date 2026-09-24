@@ -15,11 +15,13 @@ export function PairedPhoneRow({
   onRevoke,
   onRepair,
   onRemove,
+  onRevokeWatch,
 }: {
   phone: PairedPhone;
   onRevoke?: () => void;
   onRepair?: () => void;
   onRemove?: () => void;
+  onRevokeWatch?: (sessionId: string) => void;
 }) {
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt) : "never";
   return (
@@ -42,6 +44,20 @@ export function PairedPhoneRow({
           )}
         </div>
       </div>
+      {phone.sessions.filter((session) => session.client === "watch").map((session) => (
+        <div key={session.id} className="w-full pl-11 text-[14px] text-[var(--ff-muted)]">
+          Apple Watch · {session.username} · expires {pairedDate(session.expiresAt)}
+          {onRevokeWatch ? (
+            <button
+              type="button"
+              className="ml-3 font-semibold text-[var(--ff-danger)]"
+              onClick={() => onRevokeWatch(session.id)}
+            >
+              Revoke Watch
+            </button>
+          ) : null}
+        </div>
+      ))}
       {onRevoke ? (
         <button type="button" className="text-[14px] font-semibold text-[var(--ff-danger)]" onClick={onRevoke}>
           Revoke

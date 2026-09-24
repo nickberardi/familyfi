@@ -123,6 +123,10 @@ export default function PhonesPage() {
                   if (!window.confirm(`Revoke ${phone.displayName}? It is signed out now and must be paired again.`)) return;
                   void run(() => api(`/api/v1/connection/devices/${phone.id}`, { method: "DELETE" }));
                 }}
+                onRevokeWatch={(sessionId) => {
+                  if (!window.confirm("Revoke this Watch session? The Watch will need setup from its iPhone again.")) return;
+                  void run(() => api(`/api/v1/connection/watch-sessions/${sessionId}`, { method: "DELETE" }));
+                }}
               />
             ))
           )}
