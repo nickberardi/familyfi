@@ -27,13 +27,14 @@ export default defineConfig({
        * takes random paths and moves it by about a point and a half between runs.
        */
       thresholds: {
-        lines: 82,
-        statements: 77,
-        functions: 82,
-        branches: 65,
+        lines: 83,
+        statements: 78,
+        functions: 83,
+        branches: 66,
         "src/server/unifi/**": { lines: 80, statements: 75, functions: 73, branches: 65 },
         "src/server/unifi/policy-ownership.ts": { lines: 100, statements: 100, functions: 100, branches: 100 },
-        "src/server/reconciliation.ts": { lines: 69, statements: 66, functions: 77, branches: 58 },
+        "src/server/reconciliation.ts": { lines: 70, statements: 67, functions: 77, branches: 58 },
+        "src/server/quarantine.ts": { lines: 100, statements: 100, functions: 100, branches: 90 },
         "src/server/auth.ts": { lines: 88, statements: 87, functions: 100, branches: 83 },
         "src/server/guard.ts": { lines: 83, statements: 87, functions: 100, branches: 100 },
         "src/server/tunnel/**": { lines: 85, statements: 81, functions: 77, branches: 74 },
