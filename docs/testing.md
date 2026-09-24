@@ -25,8 +25,11 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 | --- | --- | --- |
 | Unit: `tests/unit`, `tests/contract` | Nothing | Pure logic, plus repository-wide rules: naming, colour contrast, icons, client/server boundary, invariants, repository hygiene, Node version |
 | Integration: `tests/integration` | PostgreSQL | Route handlers and reconciliation against a mocked UniFi. Every response is checked against the OpenAPI document; an undocumented status or a body that does not match its schema fails the test |
+| Authorization matrix: `tests/integration/authorization-matrix.test.ts` | PostgreSQL | Every `/api/v1` route and method, found on disk, called as anonymous, member, administrator, recovery `admin`, and over the tunnel without a paired phone; each cell must be allowed, 401 or 403 as its table says. A route missing from the table fails it, so a new route declares its access there |
 | Browser: `tests/browser` | PostgreSQL, Chromium | Desktop and phone smoke tests on a production build with the UniFi mock, plus axe (WCAG 2.1 A and AA) on every page |
 | API contract: `scripts/check-openapi.mjs` | Nothing | Lints the OpenAPI document; every route and method exists on both sides |
+
+The authorization matrix runs with the integration suite. When you add a route, add its line to `ACCESS` in that file; when a guard's access looks wrong, encode what it does today with a `question` and raise it rather than changing both in one step.
 
 `make test` runs unit then integration; `make test-coverage` runs both in one pass and fails below a coverage floor. `make test-browser` builds the app and runs Playwright the way CI does, so a skipped or flaky test fails it locally too.
 
@@ -50,9 +53,17 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 
 | Workflow | When | Checks |
 | --- | --- | --- |
-| `ci.yml` | Every push and pull request | **verify:** lint, typecheck, `test-api`, `db-drift`, `db-upgrade`, `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
+| `ci.yml` | Every push and pull request | **verify:** `pnpm audit --prod --audit-level=high` (a high or critical advisory in a production dependency fails it; see [Audit allowlist](#audit-allowlist)), lint, typecheck, `test-api`, `db-drift`, `db-upgrade`, `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke |
+| `codeql.yml` | Pull requests and weekly | CodeQL (`security-extended`) over the JavaScript and TypeScript; findings go to the repository's code scanning alerts. Only this job may write security events |
 | `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking-api` label; never add it yourself |
+
+### Audit allowlist
+
+Empty. An advisory that cannot be fixed yet goes in `pnpm.auditConfig.ignoreGhsas` in `package.json` and gets a row here in the same change, with the advisory, why it does not reach FamilyFi or cannot be fixed, and the date it expires. Remove both when the date passes or a fix ships.
+
+| Advisory | Package | Reason | Expires |
+| --- | --- | --- | --- |
 
 ## What no test proves
 
