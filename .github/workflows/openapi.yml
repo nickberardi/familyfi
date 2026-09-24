@@ -16,7 +16,7 @@ permissions:
 jobs:
   # info.version must rise with every change, so the iOS client can tell its vendored copy is stale.
   version:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -34,7 +34,7 @@ jobs:
         run: node scripts/check-openapi-version.mjs
 
   breaking:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
       - name: Breaking changes against the base branch
