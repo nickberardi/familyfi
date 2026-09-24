@@ -34,7 +34,7 @@ export function ScheduleBar({
         ))}
         <div
           className="absolute top-0 bottom-0 w-0.5 bg-[var(--ff-now)]"
-          style={{ left: localNowPercent(timezone) }}
+          style={{ left: localNowPercent(timezone, new Date()) }}
         />
       </div>
       <div className="mt-1 flex justify-between text-[14px] text-[var(--ff-muted)]">
