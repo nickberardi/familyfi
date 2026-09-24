@@ -1,6 +1,12 @@
 import type { IconName } from "./icons";
 import type { Group } from "./types";
 
+/*
+ * Display copy and state shared by every surface. The native iOS app ports this module,
+ * and `tests/fixtures/display-vectors.json` holds the cases both must pass. So nothing
+ * here reads the wall clock or the server's time zone: a function that needs the time
+ * takes `now` and the household `timezone` from its caller.
+ */
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export function accessLabel(access: string): string {
@@ -38,7 +44,7 @@ export function scheduleBands(start: string | null, end: string | null): { left:
   ];
 }
 
-export function localNowPercent(timezone: string, now = new Date()): string {
+export function localNowPercent(timezone: string, now: Date): string {
   const parts = zonedParts(now, timezone);
   return `${(((parts.hour * 60 + parts.minute) / 1440) * 100).toFixed(3)}%`;
 }
@@ -198,7 +204,7 @@ export function nextClockOnDays(
   timezone: string,
   days: number[],
   hhmm: string,
-  now = new Date(),
+  now: Date,
 ): Date | null {
   const minutes = minutesFromHhmm(hhmm);
   if (minutes === null || days.length === 0) return null;
@@ -214,7 +220,7 @@ export function nextClockOnDays(
   return null;
 }
 
-export function nextBedtimeResumeAt(group: Pick<Group, "schedule">, timezone: string, now = new Date()): Date | null {
+export function nextBedtimeResumeAt(group: Pick<Group, "schedule">, timezone: string, now: Date): Date | null {
   const { days, start, end } = group.schedule;
   if (!start || !end) return null;
   return nextClockOnDays(timezone, bedtimeEndDays(days, start, end), end, now);
@@ -225,7 +231,7 @@ export function nextBedtimeResumeAt(group: Pick<Group, "schedule">, timezone: st
  * both compared as calendar dates in the household timezone, since a UTC-day boundary
  * can fall in the middle of a local day.
  */
-export function relativeDayLabel(instant: Date, timezone: string, now = new Date()): string {
+export function relativeDayLabel(instant: Date, timezone: string, now: Date): string {
   const today = zonedParts(now, timezone);
   const target = zonedParts(instant, timezone);
   if (today.year === target.year && today.month === target.month && today.day === target.day) return "today";

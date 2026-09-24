@@ -1,0 +1,4147 @@
+{
+  "version": 1,
+  "about": "Display cases the web app and the native iOS app (nickberardi/familyfi-ios) must both pass. Each vector calls fn with the named arguments in input; instants are ISO 8601 strings and a returned instant is compared as its ISO string. See docs/testing.md.",
+  "vectors": [
+    {
+      "fn": "accessLabel",
+      "name": "available",
+      "input": {
+        "access": "available"
+      },
+      "expected": "Internet available"
+    },
+    {
+      "fn": "accessColor",
+      "name": "available",
+      "input": {
+        "access": "available"
+      },
+      "expected": "var(--ff-on)"
+    },
+    {
+      "fn": "accessLabel",
+      "name": "paused",
+      "input": {
+        "access": "paused"
+      },
+      "expected": "Paused"
+    },
+    {
+      "fn": "accessColor",
+      "name": "paused",
+      "input": {
+        "access": "paused"
+      },
+      "expected": "var(--ff-paused)"
+    },
+    {
+      "fn": "accessLabel",
+      "name": "always_on",
+      "input": {
+        "access": "always_on"
+      },
+      "expected": "Always On · Internet blocked"
+    },
+    {
+      "fn": "accessColor",
+      "name": "always_on",
+      "input": {
+        "access": "always_on"
+      },
+      "expected": "var(--ff-danger)"
+    },
+    {
+      "fn": "accessLabel",
+      "name": "blocked",
+      "input": {
+        "access": "blocked"
+      },
+      "expected": "Internet blocked (bedtime)"
+    },
+    {
+      "fn": "accessColor",
+      "name": "blocked",
+      "input": {
+        "access": "blocked"
+      },
+      "expected": "var(--ff-danger)"
+    },
+    {
+      "fn": "accessLabel",
+      "name": "protected",
+      "input": {
+        "access": "protected"
+      },
+      "expected": "Protected — FamilyFi does not block"
+    },
+    {
+      "fn": "accessColor",
+      "name": "protected",
+      "input": {
+        "access": "protected"
+      },
+      "expected": "var(--ff-muted)"
+    },
+    {
+      "fn": "accessLabel",
+      "name": "unrecognized",
+      "input": {
+        "access": "unrecognized"
+      },
+      "expected": "Internet available"
+    },
+    {
+      "fn": "accessColor",
+      "name": "unrecognized",
+      "input": {
+        "access": "unrecognized"
+      },
+      "expected": "var(--ff-on)"
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "null",
+      "input": {
+        "value": null
+      },
+      "expected": null
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "empty",
+      "input": {
+        "value": ""
+      },
+      "expected": null
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "midnight",
+      "input": {
+        "value": "00:00"
+      },
+      "expected": 0
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "evening",
+      "input": {
+        "value": "21:30"
+      },
+      "expected": 1290
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "last minute",
+      "input": {
+        "value": "23:59"
+      },
+      "expected": 1439
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "single-digit hour",
+      "input": {
+        "value": "9:30"
+      },
+      "expected": null
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "seconds",
+      "input": {
+        "value": "21:30:00"
+      },
+      "expected": null
+    },
+    {
+      "fn": "minutesFromHhmm",
+      "name": "words",
+      "input": {
+        "value": "bedtime"
+      },
+      "expected": null
+    },
+    {
+      "fn": "scheduleBands",
+      "name": "daytime window",
+      "input": {
+        "start": "09:00",
+        "end": "17:00"
+      },
+      "expected": [
+        {
+          "left": "37.500%",
+          "width": "33.333%"
+        }
+      ]
+    },
+    {
+      "fn": "scheduleBands",
+      "name": "overnight window splits at midnight",
+      "input": {
+        "start": "21:30",
+        "end": "06:45"
+      },
+      "expected": [
+        {
+          "left": "89.583%",
+          "width": "10.417%"
+        },
+        {
+          "left": "0%",
+          "width": "28.125%"
+        }
+      ]
+    },
+    {
+      "fn": "scheduleBands",
+      "name": "start equals end covers the day",
+      "input": {
+        "start": "08:00",
+        "end": "08:00"
+      },
+      "expected": [
+        {
+          "left": "0%",
+          "width": "100%"
+        }
+      ]
+    },
+    {
+      "fn": "scheduleBands",
+      "name": "ends at midnight",
+      "input": {
+        "start": "22:00",
+        "end": "00:00"
+      },
+      "expected": [
+        {
+          "left": "91.667%",
+          "width": "8.333%"
+        },
+        {
+          "left": "0%",
+          "width": "0.000%"
+        }
+      ]
+    },
+    {
+      "fn": "scheduleBands",
+      "name": "missing start",
+      "input": {
+        "start": null,
+        "end": "06:45"
+      },
+      "expected": []
+    },
+    {
+      "fn": "scheduleBands",
+      "name": "missing end",
+      "input": {
+        "start": "21:30",
+        "end": null
+      },
+      "expected": []
+    },
+    {
+      "fn": "scheduleBands",
+      "name": "malformed",
+      "input": {
+        "start": "9pm",
+        "end": "06:45"
+      },
+      "expected": []
+    },
+    {
+      "fn": "localNowPercent",
+      "name": "midnight local",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T04:00:00Z"
+      },
+      "expected": "0.000%"
+    },
+    {
+      "fn": "localNowPercent",
+      "name": "noon local",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": "50.000%"
+    },
+    {
+      "fn": "localNowPercent",
+      "name": "9:30 PM local",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": "2026-09-16T01:30:00Z"
+      },
+      "expected": "89.583%"
+    },
+    {
+      "fn": "localNowPercent",
+      "name": "UTC+14 is already tomorrow",
+      "input": {
+        "timeZone": "Pacific/Kiritimati",
+        "now": "2026-09-15T12:00:00Z"
+      },
+      "expected": "8.333%"
+    },
+    {
+      "fn": "localNowPercent",
+      "name": "UTC",
+      "input": {
+        "timeZone": "UTC",
+        "now": "2026-09-15T23:59:00Z"
+      },
+      "expected": "99.931%"
+    },
+    {
+      "fn": "roleLabel",
+      "name": "child",
+      "input": {
+        "role": "child"
+      },
+      "expected": "Child"
+    },
+    {
+      "fn": "roleLabel",
+      "name": "teen",
+      "input": {
+        "role": "teen"
+      },
+      "expected": "Teen"
+    },
+    {
+      "fn": "roleLabel",
+      "name": "adult",
+      "input": {
+        "role": "adult"
+      },
+      "expected": "Adult"
+    },
+    {
+      "fn": "roleLabel",
+      "name": "null",
+      "input": {
+        "role": null
+      },
+      "expected": ""
+    },
+    {
+      "fn": "roleLabel",
+      "name": "other",
+      "input": {
+        "role": "other"
+      },
+      "expected": ""
+    },
+    {
+      "fn": "roleTag",
+      "name": "things group",
+      "input": {
+        "group": {
+          "kind": "things",
+          "familyRole": null
+        }
+      },
+      "expected": "device group"
+    },
+    {
+      "fn": "roleTag",
+      "name": "adult",
+      "input": {
+        "group": {
+          "kind": "family",
+          "familyRole": "adult"
+        }
+      },
+      "expected": "adult"
+    },
+    {
+      "fn": "roleTag",
+      "name": "teen",
+      "input": {
+        "group": {
+          "kind": "family",
+          "familyRole": "teen"
+        }
+      },
+      "expected": "teen"
+    },
+    {
+      "fn": "roleTag",
+      "name": "child",
+      "input": {
+        "group": {
+          "kind": "family",
+          "familyRole": "child"
+        }
+      },
+      "expected": "child"
+    },
+    {
+      "fn": "roleTag",
+      "name": "family with no role",
+      "input": {
+        "group": {
+          "kind": "family",
+          "familyRole": null
+        }
+      },
+      "expected": ""
+    },
+    {
+      "fn": "roleTag",
+      "name": "things ignores a role",
+      "input": {
+        "group": {
+          "kind": "things",
+          "familyRole": "child"
+        }
+      },
+      "expected": "device group"
+    },
+    {
+      "fn": "initials",
+      "name": "two words",
+      "input": {
+        "name": "Betsy Ross"
+      },
+      "expected": "BR"
+    },
+    {
+      "fn": "initials",
+      "name": "three words keep two",
+      "input": {
+        "name": "Mary Ann Smith"
+      },
+      "expected": "MA"
+    },
+    {
+      "fn": "initials",
+      "name": "one word",
+      "input": {
+        "name": "betsy"
+      },
+      "expected": "B"
+    },
+    {
+      "fn": "initials",
+      "name": "surrounding whitespace",
+      "input": {
+        "name": "  Living   room  "
+      },
+      "expected": "LR"
+    },
+    {
+      "fn": "initials",
+      "name": "empty",
+      "input": {
+        "name": ""
+      },
+      "expected": "•"
+    },
+    {
+      "fn": "initials",
+      "name": "whitespace only",
+      "input": {
+        "name": "   "
+      },
+      "expected": "•"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "iPhone",
+      "input": {
+        "hostname": "Abby's iPhone"
+      },
+      "expected": "Phone"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "iPhone",
+      "input": {
+        "hostname": "Abby's iPhone"
+      },
+      "expected": "device-mobile"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "Apple TV before Mac",
+      "input": {
+        "hostname": "Living Room Apple TV"
+      },
+      "expected": "TV"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "Apple TV before Mac",
+      "input": {
+        "hostname": "Living Room Apple TV"
+      },
+      "expected": "television"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "Apple TV — playroom",
+      "input": {
+        "hostname": "Apple TV — playroom"
+      },
+      "expected": "TV"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "Apple TV — playroom",
+      "input": {
+        "hostname": "Apple TV — playroom"
+      },
+      "expected": "television"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "MacBook",
+      "input": {
+        "hostname": "Nick's MacBook"
+      },
+      "expected": "Computer"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "MacBook",
+      "input": {
+        "hostname": "Nick's MacBook"
+      },
+      "expected": "laptop"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "Echo",
+      "input": {
+        "hostname": "Echo — kitchen"
+      },
+      "expected": "Speaker"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "Echo",
+      "input": {
+        "hostname": "Echo — kitchen"
+      },
+      "expected": "speaker-high"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "laptop",
+      "input": {
+        "hostname": "Guest Laptop"
+      },
+      "expected": "Computer"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "laptop",
+      "input": {
+        "hostname": "Guest Laptop"
+      },
+      "expected": "laptop"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "Chromebook",
+      "input": {
+        "hostname": "Schoolroom Chromebook"
+      },
+      "expected": "Computer"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "Chromebook",
+      "input": {
+        "hostname": "Schoolroom Chromebook"
+      },
+      "expected": "laptop"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "Epson",
+      "input": {
+        "hostname": "EPSON ET-3830"
+      },
+      "expected": "Printer"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "Epson",
+      "input": {
+        "hostname": "EPSON ET-3830"
+      },
+      "expected": "printer"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "Sonos",
+      "input": {
+        "hostname": "Basement Sonos"
+      },
+      "expected": "Speaker"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "Sonos",
+      "input": {
+        "hostname": "Basement Sonos"
+      },
+      "expected": "speaker-high"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "Xbox",
+      "input": {
+        "hostname": "Playroom Xbox"
+      },
+      "expected": "Console"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "Xbox",
+      "input": {
+        "hostname": "Playroom Xbox"
+      },
+      "expected": "game-controller"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "access point",
+      "input": {
+        "hostname": "Living room AP"
+      },
+      "expected": "Network"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "access point",
+      "input": {
+        "hostname": "Living room AP"
+      },
+      "expected": "network"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "iPad",
+      "input": {
+        "hostname": "Kitchen iPad"
+      },
+      "expected": "Tablet"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "iPad",
+      "input": {
+        "hostname": "Kitchen iPad"
+      },
+      "expected": "device-tablet"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "watch",
+      "input": {
+        "hostname": "Betsy's Watch"
+      },
+      "expected": "Watch"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "watch",
+      "input": {
+        "hostname": "Betsy's Watch"
+      },
+      "expected": "watch"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "unplaceable",
+      "input": {
+        "hostname": "Unknown"
+      },
+      "expected": "Device"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "unplaceable",
+      "input": {
+        "hostname": "Unknown"
+      },
+      "expected": "question"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "empty",
+      "input": {
+        "hostname": ""
+      },
+      "expected": "Device"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "empty",
+      "input": {
+        "hostname": ""
+      },
+      "expected": "question"
+    },
+    {
+      "fn": "deviceKindLabel",
+      "name": "null",
+      "input": {
+        "hostname": null
+      },
+      "expected": "Device"
+    },
+    {
+      "fn": "deviceIcon",
+      "name": "null",
+      "input": {
+        "hostname": null
+      },
+      "expected": "question"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "midnight",
+      "input": {
+        "value": "00:00"
+      },
+      "expected": "12 AM"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "morning with minutes",
+      "input": {
+        "value": "06:45"
+      },
+      "expected": "6:45 AM"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "noon",
+      "input": {
+        "value": "12:00"
+      },
+      "expected": "12 PM"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "afternoon on the hour",
+      "input": {
+        "value": "13:00"
+      },
+      "expected": "1 PM"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "evening",
+      "input": {
+        "value": "21:30"
+      },
+      "expected": "9:30 PM"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "last minute",
+      "input": {
+        "value": "23:59"
+      },
+      "expected": "11:59 PM"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "malformed passes through",
+      "input": {
+        "value": "9pm"
+      },
+      "expected": "9pm"
+    },
+    {
+      "fn": "formatHhmm",
+      "name": "empty passes through",
+      "input": {
+        "value": ""
+      },
+      "expected": ""
+    },
+    {
+      "fn": "formatClock",
+      "name": "evening in New York",
+      "input": {
+        "date": "2026-09-15T00:00:00Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "8:00 PM"
+    },
+    {
+      "fn": "formatClock",
+      "name": "morning in New York",
+      "input": {
+        "date": "2026-09-15T10:45:00Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "6:45 AM"
+    },
+    {
+      "fn": "formatClock",
+      "name": "midnight in New York",
+      "input": {
+        "date": "2026-09-15T04:00:00Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "12:00 AM"
+    },
+    {
+      "fn": "formatClock",
+      "name": "noon UTC",
+      "input": {
+        "date": "2026-09-15T12:00:00Z",
+        "timeZone": "UTC"
+      },
+      "expected": "12:00 PM"
+    },
+    {
+      "fn": "formatClock",
+      "name": "UTC+14",
+      "input": {
+        "date": "2026-09-15T12:05:00Z",
+        "timeZone": "Pacific/Kiritimati"
+      },
+      "expected": "2:05 AM"
+    },
+    {
+      "fn": "formatClock",
+      "name": "after DST ends",
+      "input": {
+        "date": "2026-11-02T01:30:00Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "8:30 PM"
+    },
+    {
+      "fn": "dayCaption",
+      "name": "every night",
+      "input": {
+        "days": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "expected": "every night"
+    },
+    {
+      "fn": "dayCaption",
+      "name": "school nights",
+      "input": {
+        "days": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "expected": "school nights"
+    },
+    {
+      "fn": "dayCaption",
+      "name": "school nights out of order with repeats",
+      "input": {
+        "days": [
+          5,
+          3,
+          1,
+          2,
+          4,
+          4
+        ]
+      },
+      "expected": "school nights"
+    },
+    {
+      "fn": "dayCaption",
+      "name": "weekends",
+      "input": {
+        "days": [
+          6,
+          0
+        ]
+      },
+      "expected": "weekends"
+    },
+    {
+      "fn": "dayCaption",
+      "name": "other days in week order",
+      "input": {
+        "days": [
+          5,
+          1,
+          3
+        ]
+      },
+      "expected": "Mon, Wed, Fri"
+    },
+    {
+      "fn": "dayCaption",
+      "name": "one day",
+      "input": {
+        "days": [
+          3
+        ]
+      },
+      "expected": "Wed"
+    },
+    {
+      "fn": "dayCaption",
+      "name": "none",
+      "input": {
+        "days": []
+      },
+      "expected": ""
+    },
+    {
+      "fn": "dayCaption",
+      "name": "out-of-range day is dropped",
+      "input": {
+        "days": [
+          1,
+          9
+        ]
+      },
+      "expected": "Mon"
+    },
+    {
+      "fn": "scheduleCaption",
+      "name": "school-night bedtime",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "off 9:30 PM–6:45 AM, school nights"
+    },
+    {
+      "fn": "scheduleCaption",
+      "name": "every night things schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "22:00",
+            "end": "07:00"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "off 10 PM–7 AM, every night"
+    },
+    {
+      "fn": "scheduleCaption",
+      "name": "Always On",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        }
+      },
+      "expected": "Always On"
+    },
+    {
+      "fn": "scheduleCaption",
+      "name": "schedule disabled",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "no schedule"
+    },
+    {
+      "fn": "scheduleCaption",
+      "name": "no times",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1
+            ],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "no schedule"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "school-night bedtime",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "4 devices · off 9:30 PM–6:45 AM, school nights"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "every night things schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "22:00",
+            "end": "07:00"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "2 devices · off 10 PM–7 AM, every night"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "Always On",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        }
+      },
+      "expected": "4 devices · Always On"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "schedule disabled",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "4 devices · no schedule"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "no times",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1
+            ],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "4 devices · no schedule"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "one device",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 1,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "1 device · off 9:30 PM–6:45 AM, school nights"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "no devices with a bedtime",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 0,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "No devices · bedtime cannot apply on UniFi until you assign one"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "no devices in Always On",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 0,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        }
+      },
+      "expected": "No devices · Always On cannot apply on UniFi until you assign one"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "no devices and no schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 0,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": "0 devices · no schedule"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "available",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Internet available"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "bedtime blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Bedtime active · Internet blocked"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "Always On blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Always On · Internet blocked"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "paused with an end time",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": "2026-09-14T20:00:00-04:00"
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Paused until 8:00 PM"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "paused end time in another zone",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": "2026-09-15T00:00:00Z"
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "timeZone": "Pacific/Kiritimati"
+      },
+      "expected": "Paused until 2:00 PM"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "paused until resumed",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Paused until you resume"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "protected wins over paused",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": true,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Always On — never paused"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "protected",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": true,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "protected"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Always On — never paused"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "adult has no controls even when blocked",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "adult",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "No controls applied"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "things group blocked",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "timeZone": "America/New_York"
+      },
+      "expected": "Bedtime active · Internet blocked"
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "child with a bedtime",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": true
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "adult",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "adult",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": false
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "protected",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": true,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": false
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "no schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": false
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "enabled without an end",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1
+            ],
+            "start": "21:30",
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": false
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "Always On without a schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        }
+      },
+      "expected": true
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "things with a schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": true
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "things without a schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": false
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "adult role on a things group does not count",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": "adult",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": true
+    },
+    {
+      "fn": "bedtimeEndDays",
+      "name": "overnight ends the next morning",
+      "input": {
+        "days": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "start": "21:30",
+        "end": "06:45"
+      },
+      "expected": [
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "fn": "bedtimeEndDays",
+      "name": "Saturday night ends Sunday",
+      "input": {
+        "days": [
+          6
+        ],
+        "start": "22:00",
+        "end": "07:00"
+      },
+      "expected": [
+        0
+      ]
+    },
+    {
+      "fn": "bedtimeEndDays",
+      "name": "same-day window keeps its days",
+      "input": {
+        "days": [
+          1,
+          3
+        ],
+        "start": "09:00",
+        "end": "17:00"
+      },
+      "expected": [
+        1,
+        3
+      ]
+    },
+    {
+      "fn": "bedtimeEndDays",
+      "name": "start equals end rolls over",
+      "input": {
+        "days": [
+          2
+        ],
+        "start": "08:00",
+        "end": "08:00"
+      },
+      "expected": [
+        3
+      ]
+    },
+    {
+      "fn": "bedtimeEndDays",
+      "name": "malformed keeps its days",
+      "input": {
+        "days": [
+          1,
+          2
+        ],
+        "start": "late",
+        "end": "06:45"
+      },
+      "expected": [
+        1,
+        2
+      ]
+    },
+    {
+      "fn": "bedtimeEndDays",
+      "name": "no days",
+      "input": {
+        "days": [],
+        "start": "21:30",
+        "end": "06:45"
+      },
+      "expected": []
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "later the same day",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          1
+        ],
+        "hhmm": "21:30",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": "2026-09-15T01:30:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "exactly now is not next",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          1
+        ],
+        "hhmm": "21:30",
+        "now": "2026-09-15T01:30:00Z"
+      },
+      "expected": "2026-09-22T01:30:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "one minute after rolls a week",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          1
+        ],
+        "hhmm": "21:30",
+        "now": "2026-09-15T01:31:00Z"
+      },
+      "expected": "2026-09-22T01:30:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "next selected day",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          3,
+          5
+        ],
+        "hhmm": "07:00",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": "2026-09-16T11:00:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "local Monday is UTC Tuesday",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          1
+        ],
+        "hhmm": "23:00",
+        "now": "2026-09-15T02:00:00Z"
+      },
+      "expected": "2026-09-15T03:00:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "across the fall DST change",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          0
+        ],
+        "hhmm": "06:45",
+        "now": "2026-10-31T16:00:00Z"
+      },
+      "expected": "2026-11-01T11:45:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "time skipped by spring DST",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          0
+        ],
+        "hhmm": "02:30",
+        "now": "2026-03-07T16:00:00Z"
+      },
+      "expected": "2026-03-08T07:30:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "UTC+14",
+      "input": {
+        "timeZone": "Pacific/Kiritimati",
+        "days": [
+          2
+        ],
+        "hhmm": "06:45",
+        "now": "2026-09-14T12:00:00Z"
+      },
+      "expected": "2026-09-14T16:45:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "no days",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [],
+        "hhmm": "21:30",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "malformed time",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          1
+        ],
+        "hhmm": "9:30",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "nextBedtimeResumeAt",
+      "name": "Monday evening resumes Tuesday morning",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": "2026-09-15T10:45:00.000Z"
+    },
+    {
+      "fn": "nextBedtimeResumeAt",
+      "name": "Friday night resumes Saturday morning",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-19T02:00:00Z"
+      },
+      "expected": "2026-09-19T10:45:00.000Z"
+    },
+    {
+      "fn": "nextBedtimeResumeAt",
+      "name": "Saturday afternoon waits for Tuesday",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-19T18:00:00Z"
+      },
+      "expected": "2026-09-22T10:45:00.000Z"
+    },
+    {
+      "fn": "nextBedtimeResumeAt",
+      "name": "daytime window resumes the same day",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "09:00",
+            "end": "15:00"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T14:00:00Z"
+      },
+      "expected": "2026-09-14T19:00:00.000Z"
+    },
+    {
+      "fn": "nextBedtimeResumeAt",
+      "name": "UTC+14",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "Pacific/Kiritimati",
+        "now": "2026-09-14T12:00:00Z"
+      },
+      "expected": "2026-09-14T16:45:00.000Z"
+    },
+    {
+      "fn": "nextBedtimeResumeAt",
+      "name": "no schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "nextBedtimeResumeAt",
+      "name": "no days",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "relativeDayLabel",
+      "name": "same local day",
+      "input": {
+        "instant": "2026-09-15T01:00:00Z",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": "today"
+    },
+    {
+      "fn": "relativeDayLabel",
+      "name": "next local day",
+      "input": {
+        "instant": "2026-09-15T10:45:00Z",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": "tomorrow"
+    },
+    {
+      "fn": "relativeDayLabel",
+      "name": "later this week",
+      "input": {
+        "instant": "2026-09-17T10:45:00Z",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": "Thu"
+    },
+    {
+      "fn": "relativeDayLabel",
+      "name": "a week out names the weekday",
+      "input": {
+        "instant": "2026-09-21T16:00:00Z",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T16:00:00Z"
+      },
+      "expected": "Mon"
+    },
+    {
+      "fn": "relativeDayLabel",
+      "name": "UTC day boundary inside a local day",
+      "input": {
+        "instant": "2026-09-15T03:00:00Z",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": "today"
+    },
+    {
+      "fn": "relativeDayLabel",
+      "name": "UTC+14 tomorrow",
+      "input": {
+        "instant": "2026-09-14T11:00:00Z",
+        "timeZone": "Pacific/Kiritimati",
+        "now": "2026-09-13T12:00:00Z"
+      },
+      "expected": "tomorrow"
+    },
+    {
+      "fn": "relativeDayLabel",
+      "name": "across a year end",
+      "input": {
+        "instant": "2027-01-01T15:00:00Z",
+        "timeZone": "America/New_York",
+        "now": "2026-12-31T15:00:00Z"
+      },
+      "expected": "tomorrow"
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: child with a bedtime",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        },
+        {
+          "label": "Detail",
+          "href": "/family/g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: paused with an end time",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": "2026-09-14T20:00:00.000Z"
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Resume",
+          "strong": true,
+          "run": "resume"
+        },
+        {
+          "label": "Extend",
+          "run": "extend"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: paused until resumed",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Resume",
+          "strong": true,
+          "run": "resume"
+        },
+        {
+          "label": "Extend",
+          "run": "extend"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: bedtime blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        },
+        {
+          "label": "Detail",
+          "href": "/family/g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: Always On",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        },
+        {
+          "label": "Detail",
+          "href": "/family/g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: no schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1",
+          "strong": true
+        },
+        {
+          "label": "Detail",
+          "href": "/family/g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: things with a schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-t1"
+        },
+        {
+          "label": "Detail",
+          "href": "/things/t1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: things without a schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Rules",
+          "href": "/rules#group-t1",
+          "strong": true
+        },
+        {
+          "label": "Detail",
+          "href": "/things/t1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: adult",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "adult",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "View devices",
+          "href": "/family/g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: protected",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": true,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "protected"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Detail",
+          "href": "/family/g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: protected while paused",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": true,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Detail",
+          "href": "/family/g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: child with a bedtime",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: paused with an end time",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": "2026-09-14T20:00:00.000Z"
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Resume",
+          "strong": true,
+          "run": "resume"
+        },
+        {
+          "label": "Extend",
+          "run": "extend"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: paused until resumed",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Resume",
+          "strong": true,
+          "run": "resume"
+        },
+        {
+          "label": "Extend",
+          "run": "extend"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: bedtime blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: Always On",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: no schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Rules",
+          "href": "/rules#group-g1",
+          "strong": true
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: things with a schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Pause",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules#group-t1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: things without a schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Rules",
+          "href": "/rules#group-t1",
+          "strong": true
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: adult",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "adult",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "surface": "phone"
+      },
+      "expected": []
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: protected",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": true,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "protected"
+        },
+        "surface": "phone"
+      },
+      "expected": []
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: protected while paused",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": true,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "surface": "phone"
+      },
+      "expected": []
+    },
+    {
+      "fn": "pauseSheetTitle",
+      "name": "family pause",
+      "input": {
+        "group": {
+          "kind": "family",
+          "name": "Betsy"
+        },
+        "mode": "pause"
+      },
+      "expected": "Pause Betsy’s bedtime?"
+    },
+    {
+      "fn": "pauseSheetTitle",
+      "name": "things pause",
+      "input": {
+        "group": {
+          "kind": "things",
+          "name": "Living room"
+        },
+        "mode": "pause"
+      },
+      "expected": "Pause Living room’s schedule?"
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause",
+      "input": {
+        "mode": "pause"
+      },
+      "expected": "Pause suspends bedtime enforcement so internet is available from FamilyFi. Resume restores the stored schedule, which may still block during bedtime."
+    },
+    {
+      "fn": "pauseSheetTitle",
+      "name": "family extend",
+      "input": {
+        "group": {
+          "kind": "family",
+          "name": "Betsy"
+        },
+        "mode": "extend"
+      },
+      "expected": "More time for Betsy?"
+    },
+    {
+      "fn": "pauseSheetTitle",
+      "name": "things extend",
+      "input": {
+        "group": {
+          "kind": "things",
+          "name": "Living room"
+        },
+        "mode": "extend"
+      },
+      "expected": "More time for Living room?"
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "extend",
+      "input": {
+        "mode": "extend"
+      },
+      "expected": "Extending keeps the schedule suspended longer. Resume restores bedtime, which may still block."
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "pause on a school night",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 7:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 8:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until bedtime ends",
+          "note": "schedule back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T10:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "pause on a things schedule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "Living room",
+          "monogram": null,
+          "familyRole": null,
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 2,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 7:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 8:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until bedtime ends",
+          "note": "schedule back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T10:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "pause in UTC+14",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "mode": "pause",
+        "timeZone": "Pacific/Kiritimati",
+        "now": "2026-09-14T08:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 10:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 11:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until bedtime ends",
+          "note": "schedule back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-14T16:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "pause crossing midnight",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T03:45:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 12:15 AM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 12:45 AM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until bedtime ends",
+          "note": "schedule back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T10:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "Always On has no bedtime option",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "always",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": false,
+            "days": [],
+            "start": null,
+            "end": null
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "always_on"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 7:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 8:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "extend a timed pause",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": "2026-09-15T00:00:00.000Z"
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 7:30 PM",
+          "request": {
+            "kind": "extend",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 8:00 PM",
+          "request": {
+            "kind": "extend",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until bedtime ends",
+          "note": "schedule back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T10:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "extend an open-ended pause re-pauses",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": true,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "paused"
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 7:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 8:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until bedtime ends",
+          "note": "schedule back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T10:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "extend when not paused re-pauses",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "protected": false,
+          "mode": "scheduled",
+          "deviceCount": 4,
+          "schedule": {
+            "enabled": true,
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45"
+          },
+          "suspension": {
+            "active": false,
+            "until": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "schedule back at 7:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "schedule back at 8:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until bedtime ends",
+          "note": "schedule back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T10:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    }
+  ]
+}
