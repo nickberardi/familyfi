@@ -60,6 +60,7 @@ jobs:
       - run: pnpm test
         env:
           TZ: Pacific/Kiritimati
+      # Fails on a changed line no test runs in a gated path (GATED_PATHS in the script); elsewhere it reports.
       - name: Changed-line coverage
         if: github.event_name == 'pull_request'
         env:
