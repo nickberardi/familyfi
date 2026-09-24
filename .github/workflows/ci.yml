@@ -52,6 +52,8 @@ jobs:
       - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
       # Exit 2 when schema.prisma differs from what the migrations built: a schema edit with no migration.
       - run: pnpm db-drift
+      # Build a database with the last release's migrations, fill it, and upgrade it to these.
+      - run: pnpm db-upgrade
       - run: pnpm test
       # Again with the server clock at UTC+14: household time must never lean on the server's zone.
       - run: pnpm test
