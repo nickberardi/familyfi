@@ -62,8 +62,11 @@ test-api:
 test-api-breaking:
 	sh scripts/check-openapi-breaking.sh
 
+# CI's browser job: a production build served against familyfi_test, with the UniFi mock
+# and the stand-in cloudflared, so every test runs and a skip or a flake fails the run.
 test-browser:
-	$(PNPM) test:browser
+	$(PNPM) build
+	CI=1 UNIFI_MOCK=1 POSTGRES_DB=familyfi_test CLOUDFLARED_BIN=$(CURDIR)/tests/fixtures/cloudflared/cloudflared $(PNPM) test:browser
 
 spike:
 	$(PNPM) spike -- $(SPIKE_ARGS)

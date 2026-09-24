@@ -118,7 +118,7 @@ Details: [docs/licensing.md](docs/licensing.md).
 
 - Issues: [GitHub Issues](https://github.com/nberardi/familyfi/issues)
 - Security: [SECURITY.md](SECURITY.md)
-- Docs: [Setup](docs/setup.md), [Architecture](docs/architecture.md), [Operations](docs/operations.md), [API](docs/api.md)
+- Docs: [Setup](docs/setup.md), [Architecture](docs/architecture.md), [Operations](docs/operations.md), [API](docs/api.md), [Testing](docs/testing.md)
 
 ---
 

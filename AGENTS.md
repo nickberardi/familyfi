@@ -100,24 +100,26 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 
 ### Enforcement
 
-`tests/unit/naming.test.ts` fails the build on a raw colour literal, an abbreviated product prefix, a misnamed file, an unprefixed env var of ours, a `var(--ff-…)` reference with no declaration, and a Phosphor class written outside `Icon`. `tests/unit/icons.test.ts` fails it on a glyph name the installed icon font does not have, and `tests/unit/mark-contrast.test.ts` on a verdict pair under the contrast floor. These rules were written down once before and drifted anyway — the tokens existed while 71 literals sat in components — so treat the tests as the contract and this section as their explanation. Extend both together.
+`tests/unit/naming.test.ts` fails the build on a raw colour literal, an abbreviated product prefix, a misnamed file, an unprefixed env var of ours, a `var(--ff-…)` reference with no declaration, and a Phosphor class written outside `Icon`. `tests/unit/icons.test.ts` fails it on a glyph name the installed icon font does not have, and `tests/unit/mark-contrast.test.ts` on a verdict, accent, status or text colour under 4.5:1. These rules were written down once before and drifted anyway — the tokens existed while 71 literals sat in components — so treat the tests as the contract and this section as their explanation. Extend both together.
 
 ## Commands
+
+What to run before a pull request, the rules tests follow, and what CI checks are in [docs/testing.md](docs/testing.md).
 
 | Target | Behavior |
 | --- | --- |
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate, and turn on the pre-push hook |
 | `make hooks` | Turn on `.githooks/pre-push` (lint, typecheck, unit tests) in an existing clone; skip it once with `git push --no-verify` |
 | `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
-| `make test` | Unit tests, then integration tests against `familyfi_test` |
-| `make test-unit` | Unit tests only; no database needed |
-| `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database). Every route handler response is checked against `openapi/familyfi.v1.yaml` — an undocumented status or a body that does not match its schema fails the test that produced it |
-| `make test-coverage` | Unit and integration tests in one run with coverage of `src/server`, `src/lib` and `src/app/api`. Fails below the floors in `tests/vitest.coverage.config.ts` — raise a floor when you lift an area, never lower one to pass. On a pull request CI also lists the changed lines no test runs |
-| `make test-api` | OpenAPI lint and route/method contract |
-| `make test-api-breaking` | Breaking changes in `openapi/familyfi.v1.yaml` against `main`, with the pinned `oasdiff` (needs Go). CI runs it on pull requests that change `openapi/` |
-| `make db-upgrade` | Build a scratch database with the last release's migrations (or `pnpm db-upgrade <tag>`), put a row in every table, apply this checkout's migrations, and fail on a migration error, lost rows, or a result that differs from `schema.prisma` |
-| `make db-drift` | Fail when `prisma/schema.prisma` differs from the database its migrations built — a schema edit with no migration (run after `db-migrate`) |
-| `make test-browser` | Playwright desktop/phone smoke (`FAMILYFI_DEFAULT_PASSWORD`, running app or CI webServer). In CI a skipped test fails the run: tag a one-viewport test `@desktop` or `@phone`, and a test that cannot run in CI with a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`. A test that passes only on its retry is a flake and fails CI too. A failed run uploads its traces as the `playwright-results` artifact |
+| `make test-unit` | Unit tests; no database needed |
+| `make test` | Unit tests, then integration tests (PostgreSQL, always the `familyfi_test` database) |
+| `make test-coverage` | Unit and integration tests in one run; fails below the coverage floors |
+| `make test-browser` | Production build, then Playwright on desktop and phone, the way CI runs it |
+| `make test-api` | OpenAPI lint, and every route and method documented |
+| `make test-api-breaking` | Breaking OpenAPI changes against `main` (needs Go) |
+| `make db-migrate` | Apply migrations to the development database |
+| `make db-drift` | Fail when `schema.prisma` differs from what the migrations build (run after `db-migrate`) |
+| `make db-upgrade` | Upgrade a filled database from the last release (or `pnpm db-upgrade <tag>`); fail on an error, lost rows or drift |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
 | `make lint` / `make typecheck` / `make build` | Checks and production build |
 | `make docker-build` | Build `familyfi:dev` |
@@ -126,7 +128,7 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 | `make docker-down` | Stop without deleting volumes |
 | `make docker-smoke` | Build `familyfi:dev`, reject `designs/` in the image, run health/login against bundled-style external Postgres |
 
-CI: unit, OpenAPI, PostgreSQL integration with mocked UniFi, production build, Playwright. The container smoke runs on pull requests but not on pushes to `main` (image builds are slow and costly), and with CI it gates every release: `release.yml` publishes only a `v*` tag on `main` whose commit passes both. Integration tests use `familyfi_test` and never truncate the development `familyfi` database. Live IPv4 MAC block/restore was proven on a household gateway; IPv6, overnight UniFi scheduler, and a second concurrent MAC are unproven.
+The container smoke runs on pull requests but not on pushes to `main` (image builds are slow and costly), and with CI it gates every release: `release.yml` publishes only a `v*` tag on `main` whose commit passes both.
 
 ## Pull requests
 
@@ -153,6 +155,7 @@ stale the moment the second one lands, and a stale description is read as the tr
 
 ## Further reading
 
+- [docs/testing.md](docs/testing.md) — what to run, test rules, what CI checks
 - [docs/architecture.md](docs/architecture.md) — desired-block formula, reconciliation, UniFi client
 - [docs/setup.md](docs/setup.md) — environment variables and auth
 - [docs/operations.md](docs/operations.md) — backup, outages, upgrades
