@@ -18,7 +18,13 @@ async function setup() {
   expect(response.status).toBe(200);
   const auth = authFromLogin(response);
   const group = await createFamilyGroup();
-  await prisma().household.update({ where: { id: "default" }, data: { dohUrl: OLD_URL, dohProbeEnabled: true } });
+  // Every resolver change re-arms the schedule and sweeps if a run is due. With no run on
+  // record one always is, and that background sweep's real DNS request rewrites the
+  // checks these tests compare. A run recorded a day ahead leaves nothing due.
+  await prisma().household.update({
+    where: { id: "default" },
+    data: { dohUrl: OLD_URL, dohProbeEnabled: true, dohProbeLastRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+  });
   await prisma().group.update({ where: { id: group.id }, data: { dohOverrideUrl: OLD_URL } });
   const category = await prisma().upstreamCategory.create({
     data: {
