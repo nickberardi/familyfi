@@ -160,8 +160,8 @@ describe("ordering", () => {
 
 describe("sanitize", () => {
   it("replaces MACs and documentation IPs", () => {
-    expect(sanitizeUnifiText("host 8c:85:90:1a:44:0e at 203.0.113.9")).toMatch(/02:00:00:00:00:01/);
-    expect(sanitizeUnifiText("host 8c:85:90:1a:44:0e at 203.0.113.9")).toMatch(/192\.0\.2\./);
+    expect(sanitizeUnifiText("host 0a:85:90:1a:44:0e at 203.0.113.9")).toMatch(/02:00:00:00:00:01/);
+    expect(sanitizeUnifiText("host 0a:85:90:1a:44:0e at 203.0.113.9")).toMatch(/192\.0\.2\./);
   });
 });
 
