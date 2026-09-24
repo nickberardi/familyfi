@@ -140,11 +140,11 @@ describe("checkVersion", () => {
     expect(checkVersion({ baseSpec: spec("0.7.0"), headSpec: reworded(spec("0.7.0")) }).ok).toBe(false);
   });
 
-  it("allows a major increase only with the breaking-api label", () => {
+  it("allows a major increase only with the breaking_api label", () => {
     const head = withPath(spec("1.0.0"));
     const unlabelled = checkVersion({ baseSpec: spec("0.7.0"), headSpec: head });
     expect(unlabelled.ok).toBe(false);
-    expect(unlabelled.message).toContain("breaking-api");
+    expect(unlabelled.message).toContain("breaking_api");
     expect(checkVersion({ baseSpec: spec("0.7.0"), headSpec: head, breakingApproved: true }).ok).toBe(true);
   });
 

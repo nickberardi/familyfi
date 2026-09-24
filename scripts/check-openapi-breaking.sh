@@ -2,7 +2,7 @@
 # Fails when openapi/familyfi.v1.yaml makes a breaking change against the base branch.
 # Whether a breaking change ships is the operator's decision (AGENTS.md, OpenAPI
 # consumer coordination): BREAKING_API_APPROVED=true, which CI sets from the pull
-# request's `breaking-api` label, records that decision and lets the change through.
+# request's `breaking_api` label, records that decision and lets the change through.
 set -eu
 
 OASDIFF_VERSION=v1.32.1
@@ -33,10 +33,10 @@ if "$work/bin/oasdiff" breaking "$work/base-openapi.yaml" "$spec" --fail-on ERR;
   exit 0
 fi
 if [ "${BREAKING_API_APPROVED:-false}" = "true" ]; then
-  echo "The breaking changes above are approved by the breaking-api label."
-  echo "Breaking changes approved by the \`breaking-api\` label." >> "$summary"
+  echo "The breaking changes above are approved by the breaking_api label."
+  echo "Breaking changes approved by the \`breaking_api\` label." >> "$summary"
   exit 0
 fi
 echo "Breaking changes against $base_ref (above). The operator decides whether they ship:" >&2
-echo "add the breaking-api label to approve them, or make the change compatible." >&2
+echo "add the breaking_api label to approve them, or make the change compatible." >&2
 exit 1
