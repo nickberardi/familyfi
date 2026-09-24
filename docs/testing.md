@@ -78,7 +78,7 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 | `ci.yml` | Every push and pull request | **verify:** lint, typecheck, `test-api`, `db-drift`, `db-upgrade` from every supported release (about 30 seconds), `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only; fails on an untested changed line in a gated path), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke |
 | `codeql.yml` | Pull requests and weekly | CodeQL (`security-extended`) over the JavaScript and TypeScript; findings go to the repository's code scanning alerts. Only this job may write security events |
-| `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking-api` label; never add it yourself |
+| `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking_api` label; never add it yourself |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | Mutation testing. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 
 ### Audit allowlist
@@ -86,7 +86,7 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 Empty. An advisory that cannot be fixed yet goes in `pnpm.auditConfig.ignoreGhsas` in `package.json` and gets a row here in the same change, with the advisory, why it does not reach FamilyFi or cannot be fixed, and the date it expires. Remove both when the date passes or a fix ships.
 
 | Advisory | Package | Reason | Expires |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 
 ## What no test proves
 

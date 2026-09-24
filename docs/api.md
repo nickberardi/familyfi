@@ -94,8 +94,8 @@ The iOS client ([`familyfi-ios`](https://github.com/nickberardi/familyfi-ios)) v
 | Nothing in the parsed document | Nothing to check |
 | Only `description` or `summary` text | Increase; a patch is enough |
 | Anything else: a path, parameter, schema, enum value or status | Increase by at least a minor version |
-| Anything, with the `breaking-api` label | From 1.0.0 on, increase by a major version. Before 1.0.0 a minor increase carries the break, as semver allows for `0.y.z` |
+| Anything, with the `breaking_api` label | From 1.0.0 on, increase by a major version. Before 1.0.0 a minor increase carries the break, as semver allows for `0.y.z` |
 
-A major increase needs the `breaking-api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions and the iOS copy can tell which one it has. The `OpenAPI` workflow's job summary names the old and new version as a reminder to refresh `familyfi-ios/openapi/familyfi.v1.yaml`; it posts nothing outside this repository.
+A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions and the iOS copy can tell which one it has. The `OpenAPI` workflow's job summary names the old and new version as a reminder to refresh `familyfi-ios/openapi/familyfi.v1.yaml`; it posts nothing outside this repository.
 
 Run the check locally with `make test-api-version`, or against any ref with `node scripts/check-openapi-version.mjs <ref>`.
