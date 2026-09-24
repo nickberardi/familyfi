@@ -57,7 +57,11 @@ type Step =
   | { kind: "move"; mac: number; place: Place }
   | { kind: "deleteGroup"; group: number }
   | { kind: "deleteDevice"; mac: number }
-  | { kind: "quarantine"; enforced: boolean };
+  | { kind: "quarantine"; enforced: boolean }
+  /** Someone deletes one of FamilyFi's policies in the UniFi console. */
+  | { kind: "consoleDelete"; pick: number }
+  /** A delete elsewhere dropped a record but its UniFi delete failed: the policy is orphaned. */
+  | { kind: "orphan"; pick: number };
 
 const place = fc.constantFrom<Place>("internal", "iot", "elsewhere", "absent");
 const groupIndex = fc.integer({ min: 0, max: GROUP_COUNT - 1 });
@@ -99,6 +103,8 @@ const step: fc.Arbitrary<Step> = fc.oneof(
   fc.record({ kind: fc.constant("deleteGroup" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("deleteDevice" as const), mac: macIndex }),
   fc.record({ kind: fc.constant("quarantine" as const), enforced: fc.boolean() }),
+  fc.record({ kind: fc.constant("consoleDelete" as const), pick: fc.nat() }),
+  fc.record({ kind: fc.constant("orphan" as const), pick: fc.nat() }),
 );
 
 type Client = ReturnType<typeof createFixtureUnifiClient>;
@@ -189,6 +195,18 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
     case "quarantine":
       await db.household.update({ where: { id: "default" }, data: { quarantineEnforced: change.enforced } });
       return;
+    case "consoleDelete":
+    case "orphan": {
+      const records = await db.appPolicy.findMany({ where: { unifiPolicyId: { not: null } }, orderBy: { id: "asc" } });
+      if (!records.length) return;
+      const record = records[change.pick % records.length];
+      if (change.kind === "consoleDelete") {
+        client.state.policies = client.state.policies.filter((policy) => policy.id !== record.unifiPolicyId);
+      } else {
+        await db.appPolicy.delete({ where: { id: record.id } });
+      }
+      return;
+    }
   }
 }
 

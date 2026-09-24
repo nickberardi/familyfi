@@ -125,12 +125,16 @@ async function tick(owner: string): Promise<boolean> {
     const client = testClient ? withPolicyOwnership(testClient, ownershipScope(household)) : clientForHousehold(household);
     const identity = connectionIdentity(household);
     const siteId = household.unifiSiteId;
-    const [zones, networks, clients, info] = await Promise.all([
+    const [zones, networks, clients, info, gatewayPolicies] = await Promise.all([
       client.listZones(siteId),
       loadNetworkDetails(client, siteId),
       client.listClients(siteId),
       client.getInfo(),
+      client.listPolicies(siteId),
     ]);
+    // What the gateway holds right now, kept current as this pass creates and deletes, so a
+    // policy someone removed on the console is noticed even when nothing else changed.
+    const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
     void info;
     const networkClientIds = await loadNetworkClientIds(client, siteId, networks);
     const mappings = mapClientsToZones({ clients, networks, zones, networkClientIds });
@@ -211,7 +215,7 @@ async function tick(owner: string): Promise<boolean> {
           plannedKey(row.ownerScope, row.groupId, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing);
+        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -248,7 +252,7 @@ async function tick(owner: string): Promise<boolean> {
         continue;
       }
       try {
-        await client.deletePolicy(siteId, row.unifiPolicyId);
+        await deleteFromGateway(client, siteId, row.unifiPolicyId, onGateway);
         await prisma().appPolicy.delete({ where: { id: row.id } });
       } catch (error) {
         failed += 1;
@@ -334,7 +338,7 @@ async function tick(owner: string): Promise<boolean> {
         (row) => plannedDpiKey(row.ruleId, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredDpiPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing);
+        await applyDesiredDpiPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -370,7 +374,7 @@ async function tick(owner: string): Promise<boolean> {
       }
       try {
         // D3: only delete the recorded unifiPolicyId — never adopt by name prefix.
-        await client.deletePolicy(siteId, row.unifiPolicyId);
+        await deleteFromGateway(client, siteId, row.unifiPolicyId, onGateway);
         await prisma().rulePolicy.delete({ where: { id: row.id } });
       } catch (error) {
         failed += 1;
@@ -389,6 +393,10 @@ async function tick(owner: string): Promise<boolean> {
         await prisma().rule.delete({ where: { id: orphanId } }).catch(() => undefined);
       }
     }
+
+    const orphanErrors = await removeOrphanedPolicies(client, siteId, identity, onGateway);
+    failed += orphanErrors.length;
+    errors.push(...orphanErrors);
 
     const livePolicies = await prisma().appPolicy.findMany({ where: { connectionIdentity: identity, siteId } });
     const issues = coverageIssues({
@@ -460,18 +468,27 @@ async function applyDesiredPolicy(
         lastError: string | null;
       }
     | undefined,
+  onGateway: Set<string>,
 ) {
   const scope = planned.ownerScope === "group" ? PolicyOwnerScope.group : PolicyOwnerScope.quarantine;
   const appPolicyId = existing?.id;
   const unifiPolicyId = existing?.unifiPolicyId;
-  if (existing && unifiPolicyId && existing.desiredFingerprint === fingerprint && !existing.lastError) {
+  // Unchanged and still on the gateway: nothing to write. A policy removed on the console
+  // falls through and is created again below.
+  if (
+    existing &&
+    unifiPolicyId &&
+    onGateway.has(unifiPolicyId) &&
+    existing.desiredFingerprint === fingerprint &&
+    !existing.lastError
+  ) {
     await prisma().appPolicy.update({
       where: { id: existing.id },
       data: { desiredRevision: revision, observedFingerprint: fingerprint, lastError: null },
     });
     return;
   }
-  if (unifiPolicyId) {
+  if (unifiPolicyId && onGateway.has(unifiPolicyId)) {
     try {
       const current = await client.getPolicy(siteId, unifiPolicyId);
       const updated = await client.updatePolicy(siteId, unifiPolicyId, toPolicyUpdate(current, { ...write, schedule: write.schedule ?? null }));
@@ -514,6 +531,7 @@ async function applyDesiredPolicy(
     },
   });
   const created = await client.createPolicy(siteId, write);
+  onGateway.add(created.id);
   await prisma().policyOperation.update({
     where: { id: operation.id },
     data: { status: "applied", unifiPolicyId: created.id },
@@ -566,16 +584,25 @@ async function applyDesiredDpiPolicy(
         lastError: string | null;
       }
     | undefined,
+  onGateway: Set<string>,
 ) {
   const unifiPolicyId = existing?.unifiPolicyId;
-  if (existing && unifiPolicyId && existing.desiredFingerprint === fingerprint && !existing.lastError) {
+  // Unchanged and still on the gateway: nothing to write. A policy removed on the console
+  // falls through and is created again below.
+  if (
+    existing &&
+    unifiPolicyId &&
+    onGateway.has(unifiPolicyId) &&
+    existing.desiredFingerprint === fingerprint &&
+    !existing.lastError
+  ) {
     await prisma().rulePolicy.update({
       where: { id: existing.id },
       data: { desiredRevision: revision, observedFingerprint: fingerprint, lastError: null },
     });
     return;
   }
-  if (unifiPolicyId) {
+  if (unifiPolicyId && onGateway.has(unifiPolicyId)) {
     try {
       // D3: update only the recorded id — never search/adopt by FamilyFi name prefix.
       const current = await client.getPolicy(siteId, unifiPolicyId);
@@ -622,6 +649,7 @@ async function applyDesiredDpiPolicy(
     },
   });
   const created = await client.createPolicy(siteId, write);
+  onGateway.add(created.id);
   await prisma().policyOperation.update({
     where: { id: operation.id },
     data: { status: "applied", unifiPolicyId: created.id },
@@ -661,4 +689,56 @@ export function startReconciliation() {
   requestReconcile();
   const timer = setInterval(() => requestReconcile(), INTERVAL_MS);
   timer.unref?.();
+}
+
+function isNotFound(error: unknown): boolean {
+  return error instanceof UnifiHttpError && error.status === 404;
+}
+
+/** Deletes a policy FamilyFi owns. One already gone from the gateway counts as deleted. */
+async function deleteFromGateway(client: UnifiClient, siteId: string, policyId: string, onGateway: Set<string>) {
+  if (onGateway.has(policyId)) {
+    try {
+      await client.deletePolicy(siteId, policyId);
+    } catch (error) {
+      if (!isNotFound(error)) throw error;
+    }
+  }
+  onGateway.delete(policyId);
+}
+
+/**
+ * Deletes policies FamilyFi created on this console and site that no ownership record
+ * points at any more. A rule, group or console change drops its records even when the
+ * UniFi delete failed, which used to leave the policy enforcing on the gateway with
+ * nothing to clean it up. The creation record is the evidence it is ours, never its name.
+ */
+async function removeOrphanedPolicies(
+  client: UnifiClient,
+  siteId: string,
+  identity: string,
+  onGateway: Set<string>,
+): Promise<string[]> {
+  const scope = { connectionIdentity: identity, siteId };
+  const [appPolicies, rulePolicies, creations] = await Promise.all([
+    prisma().appPolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
+    prisma().rulePolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
+    prisma().policyOperation.findMany({
+      where: { ...scope, intent: PolicyOperationIntent.create, status: "applied", unifiPolicyId: { not: null } },
+    }),
+  ]);
+  const recorded = new Set([...appPolicies, ...rulePolicies].map((row) => row.unifiPolicyId));
+  const errors: string[] = [];
+  for (const creation of creations) {
+    const policyId = creation.unifiPolicyId!;
+    if (recorded.has(policyId)) continue;
+    try {
+      await deleteFromGateway(client, siteId, policyId, onGateway);
+      // Gone from the gateway and from the records: no longer evidence of anything.
+      await prisma().policyOperation.update({ where: { id: creation.id }, data: { status: "removed" } });
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return errors;
 }
