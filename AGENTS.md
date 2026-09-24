@@ -119,7 +119,7 @@ What to run before a pull request, the rules tests follow, and what CI checks ar
 | `make test-api-breaking` | Breaking OpenAPI changes against `main` (needs Go) |
 | `make db-migrate` | Apply migrations to the development database |
 | `make db-drift` | Fail when `schema.prisma` differs from what the migrations build (run after `db-migrate`) |
-| `make db-upgrade` | Upgrade a filled database from the last release (or `pnpm db-upgrade <tag>`); fail on an error, lost rows or drift |
+| `make db-upgrade` | Upgrade a filled database from every supported release (or `pnpm db-upgrade --from <tag>` / `--latest`); fail on an error, lost rows or drift, naming the release |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
 | `make lint` / `make typecheck` / `make build` | Checks and production build |
 | `make docker-build` | Build `familyfi:dev` |
