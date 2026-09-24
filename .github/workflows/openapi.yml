@@ -1,0 +1,25 @@
+name: OpenAPI
+
+# Only when the contract changes. Label changes re-run it, so adding or removing
+# `breaking-api` takes effect without a new push.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - openapi/**
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  breaking:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Breaking changes against the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BREAKING_API_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'breaking-api') }}
+        run: sh scripts/check-openapi-breaking.sh

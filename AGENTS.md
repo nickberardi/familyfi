@@ -109,6 +109,7 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 | `make test` | Unit tests, then integration tests against `familyfi_test` |
 | `make test-integration` | PostgreSQL + mocked UniFi (never the development `familyfi` database). Every route handler response is checked against `openapi/familyfi.v1.yaml` — an undocumented status or a body that does not match its schema fails the test that produced it |
 | `make test-api` | OpenAPI lint and route/method contract |
+| `make test-api-breaking` | Breaking changes in `openapi/familyfi.v1.yaml` against `main`, with the pinned `oasdiff` (needs Go). CI runs it on pull requests that change `openapi/` |
 | `make db-drift` | Fail when `prisma/schema.prisma` differs from the database its migrations built — a schema edit with no migration (run after `db-migrate`) |
 | `make test-browser` | Playwright desktop/phone smoke (`FAMILYFI_DEFAULT_PASSWORD`, running app or CI webServer). In CI a skipped test fails the run: tag a one-viewport test `@desktop` or `@phone`, and a test that cannot run in CI with a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts` |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
@@ -130,6 +131,7 @@ PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same c
 - Whenever a change modifies the OpenAPI specification, open an issue in `familyfi-ios` for the iOS client to adopt that contract change. Describe the affected endpoints and schemas, the expected client work, and any rollout or compatibility considerations.
 - Assess every requested contract change for compatibility. If the requested change would be breaking, call that out clearly before making the change. The human operator—not the agent—decides whether the breaking change is warranted or whether a compatible approach is needed; do not make that product decision on the operator's behalf.
 - Do not raise a breaking-change warning for additive or otherwise compatible contract changes. The agent's role is to identify a breaking impact when the requested work would cause one, not to speculate about or independently choose breaking changes.
+- The `OpenAPI` workflow enforces this on every pull request that changes `openapi/`: a breaking change against `main` fails it until the operator adds the `breaking-api` label. Never add that label yourself; it records the operator's decision.
 
 **A PR built from a plan carries that plan in its description, in full and verbatim.**
 Put it in a collapsed `<details>` block so it does not bury the summary. A plan records
