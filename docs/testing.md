@@ -10,7 +10,7 @@ The pre-push hook runs `make lint typecheck test-unit` on every push; `make setu
 | --- | --- |
 | Anything | `make test-coverage` |
 | Pages, components or `globals.css` | `make test-browser` |
-| An `/api/v1` route or payload | `make test-api`, with `openapi/familyfi.v1.yaml` updated in the same change. If the spec changed, `make test-api-breaking` too (needs Go) |
+| An `/api/v1` route or payload | `make test-api`, with `openapi/familyfi.v1.yaml` updated in the same change. If the spec changed, `make test-api-version` and `make test-api-breaking` (needs Go) too; see [Versioning the contract](api.md#versioning-the-contract) |
 | `prisma/schema.prisma` or a migration | `make db-migrate db-drift db-upgrade` |
 
 **Prerequisites:**
@@ -62,7 +62,7 @@ The native iOS app, [`nickberardi/familyfi-ios`](https://github.com/nickberardi/
 | --- | --- | --- |
 | `ci.yml` | Every push and pull request | **verify:** lint, typecheck, `test-api`, `db-drift`, `db-upgrade`, `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke |
-| `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking-api` label; never add it yourself |
+| `openapi.yml` | Pull requests that change `openapi/` | **version:** `info.version` is a semver increase over `main`'s that fits the change ([Versioning the contract](api.md#versioning-the-contract)); the job summary names the old and new version for the iOS client.<br>**breaking:** breaking changes against `main`. These fail until the operator adds the `breaking-api` label; never add it yourself |
 
 ## What no test proves
 
