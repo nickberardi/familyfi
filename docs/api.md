@@ -33,7 +33,7 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |
-| PUT | `/api/v1/groups/{id}/schedule` | Recurring bedtime stored on UniFi `schedule` |
+| PUT | `/api/v1/groups/{id}/schedule` | Recurring bedtime stored on UniFi `schedule`. Takes `GroupScheduleUpdate`: `start` and `end` are `HH:MM` even with `enabled: false`, so turning bedtime off keeps the window |
 | POST | `/api/v1/groups/{id}/pause` | Empty body = indefinite; `{ "until" }` = timed. Sets UniFi `enabled: false` |
 | POST | `/api/v1/groups/{id}/resume` | Clears suspension (`enabled: true`; schedule may still block) |
 | POST | `/api/v1/groups/{id}/extend` | Adds minutes to a timed pause |
@@ -83,4 +83,4 @@ or pin change requires a new administrator-generated pairing.
 
 The signed-in **System → API** page (`/reference`) renders this OpenAPI file with Swagger UI. Try it out sends the session cookie and CSRF header. `GET /openapi` returns the YAML and requires a session.
 
-CI holds the implementation to this document: `pnpm test-api` fails when a route or method is missing from it, and every response the integration tests receive must use a status documented for that route and, when JSON, match its schema.
+CI holds the implementation to this document: `pnpm test-api` fails when a route or method is missing from it, every request the integration tests send must match the route's documented body and path and query parameters, and every response they receive must use a status documented for that route and, when JSON, match its schema.

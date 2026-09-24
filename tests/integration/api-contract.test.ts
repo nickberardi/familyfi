@@ -20,6 +20,7 @@ import { GET as getUnifi } from "@/app/api/v1/settings/unifi/route";
 import { prisma } from "@/server/db";
 import { AssignmentState } from "@prisma/client";
 import { authFromLogin, request } from "../helpers/http";
+import { invalidRequest } from "../helpers/openapi-responses";
 import { INTERNAL_NETWORK, INTERNAL_ZONE, resetDatabase, seedDevice } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -290,6 +291,42 @@ describe("v1 API contracts", () => {
     expect(alwaysBody.group.mode).toBe("always");
     expect(alwaysBody.group.schedule.enabled).toBe(false);
     expect(alwaysBody.group.access).toBe("always_on");
+  });
+
+  it("schedule PUT keeps its times when bedtime is off, and refuses a schedule without them", async () => {
+    const auth = await signedIn();
+    const created = await createGroup(
+      request("/api/v1/groups", {
+        method: "POST",
+        auth,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "family", name: "Night Owl", familyRole: "teen" }),
+      }),
+    );
+    const { group } = (await created.json()) as { group: { id: string } };
+    const put = (req: Request) => putSchedule(req, { params: Promise.resolve({ id: group.id }) });
+    const scheduleRequest = (body: unknown) =>
+      request(`/api/v1/groups/${group.id}/schedule`, {
+        method: "PUT",
+        auth,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    // GroupScheduleUpdate, not Schedule: the times are required even with bedtime off.
+    const nullTimes = await put(invalidRequest(scheduleRequest({ enabled: false, days: [], start: null, end: null })));
+    expect(nullTimes.status).toBe(400);
+    const noTimes = await put(invalidRequest(scheduleRequest({ enabled: false, days: [] })));
+    expect(noTimes.status).toBe(400);
+    const sameTimes = await put(scheduleRequest({ enabled: true, days: [5, 6], start: "22:00", end: "22:00" }));
+    expect(sameTimes.status).toBe(400);
+    expect((await sameTimes.json()).error.code).toBe("invalid_schedule");
+
+    const off = await put(scheduleRequest({ enabled: false, days: [5, 6], start: "23:00", end: "07:00" }));
+    expect(off.status).toBe(200);
+    const offBody = (await off.json()) as { group: { mode: string; schedule: { enabled: boolean; start: string; end: string } } };
+    expect(offBody.group.mode).toBe("always");
+    expect(offBody.group.schedule).toMatchObject({ enabled: false, start: "23:00", end: "07:00" });
   });
 
   it("rejects pause on a protected group", async () => {

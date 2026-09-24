@@ -3,6 +3,7 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getGroup, PUT as putGroup } from "@/app/api/v1/groups/[id]/route";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { invalidRequest } from "../helpers/openapi-responses";
 import { createFamilyGroup, resetDatabase, seedDevice } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -20,16 +21,14 @@ async function signedIn(): Promise<SessionAuth> {
 }
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-const put = (auth: SessionAuth | undefined, id: string, body: unknown) =>
-  putGroup(
-    request(`/api/v1/groups/${id}`, {
-      method: "PUT",
-      auth,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-    ctx(id),
-  );
+const putRequest = (auth: SessionAuth | undefined, id: string, body: unknown) =>
+  request(`/api/v1/groups/${id}`, {
+    method: "PUT",
+    auth,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+const put = (auth: SessionAuth | undefined, id: string, body: unknown) => putGroup(putRequest(auth, id, body), ctx(id));
 
 describe("GET and PUT /api/v1/groups/{id}", () => {
   let auth: SessionAuth;
@@ -77,7 +76,7 @@ describe("GET and PUT /api/v1/groups/{id}", () => {
   it("refuses an invalid update, an unknown group, and a write without CSRF", async () => {
     const group = await createFamilyGroup("Betsy");
     expect((await put(auth, group.id, { name: "" })).status).toBe(400);
-    expect((await put(auth, group.id, { familyRole: "grandparent" })).status).toBe(400);
+    expect((await putGroup(invalidRequest(putRequest(auth, group.id, { familyRole: "grandparent" })), ctx(group.id))).status).toBe(400);
     expect((await put(auth, "missing", { name: "Nobody" })).status).toBe(404);
     const withoutCsrf = await putGroup(
       request(`/api/v1/groups/${group.id}`, {

@@ -304,7 +304,7 @@ describe("Phase 2 DPI rules", () => {
     expect(body.destination.trafficFilter.applicationFilter.applicationIds).toEqual([10001]);
 
     const off = await offRule(
-      request(`/api/v1/rules/${createdBody.rule.id}/off`, { method: "POST", auth, headers: { "content-type": "application/json" }, body: "{}" }),
+      request(`/api/v1/rules/${createdBody.rule.id}/off`, { method: "POST", auth }),
       { params: Promise.resolve({ id: createdBody.rule.id }) },
     );
     expect(off.status).toBe(200);

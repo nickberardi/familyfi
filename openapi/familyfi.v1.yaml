@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.7.0
+  version: 0.7.1
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -651,7 +651,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/Schedule" }
+            schema: { $ref: "#/components/schemas/GroupScheduleUpdate" }
       responses:
         "200":
           description: Updated
@@ -2384,6 +2384,32 @@ components:
           items: { type: integer, minimum: 0, maximum: 6 }
         start: { type: [string, "null"] }
         end: { type: [string, "null"] }
+    GroupScheduleUpdate:
+      type: object
+      additionalProperties: false
+      required: [enabled, days, start, end]
+      description: |
+        A group's bedtime as `PUT /api/v1/groups/{id}/schedule` takes it. Unlike `Schedule`,
+        `start` and `end` are always times, even with `enabled: false`: turning bedtime off
+        keeps the window, so turning it back on restores it. `start` and `end` must differ,
+        and an enabled schedule needs at least one day; the server answers 400
+        `invalid_schedule` otherwise.
+      properties:
+        enabled:
+          type: boolean
+          description: true for a bedtime window (mode scheduled); false for always-on (mode always).
+        days:
+          type: array
+          items: { type: integer, minimum: 0, maximum: 6 }
+          description: Weekdays the window starts on, 0 (Sunday) through 6 (Saturday).
+        start:
+          type: string
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          description: HH:MM, 24-hour, in the household time zone.
+        end:
+          type: string
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          description: HH:MM, 24-hour, in the household time zone.
     Suspension:
       type: object
       additionalProperties: false

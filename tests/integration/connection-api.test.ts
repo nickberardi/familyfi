@@ -21,6 +21,7 @@ import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
+import { invalidRequest } from "../helpers/openapi-responses";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
@@ -249,7 +250,7 @@ describe("certificate pins", () => {
 
       const bad = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { certificate: "nope" })));
       expect(bad.status).toBe(422);
-      const both = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { certificate, url: "https://x.home" })));
+      const both = await computePin(invalidRequest(request("/api/v1/connection/pins", json(auth, "POST", { certificate, url: "https://x.home" }))));
       expect(both.status).toBe(400);
       const plain = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { url: "http://x.home" })));
       expect(plain.status).toBe(400);
@@ -337,7 +338,7 @@ describe("removing and re-pairing phones", () => {
     await revoke(auth, a.id);
     await revoke(auth, b.id);
 
-    expect((await removeRevoked(request("/api/v1/connection/devices", { method: "DELETE", auth }))).status).toBe(400);
+    expect((await removeRevoked(invalidRequest(request("/api/v1/connection/devices", { method: "DELETE", auth })))).status).toBe(400);
     const removed = await removeRevoked(request("/api/v1/connection/devices?revoked=true", { method: "DELETE", auth }));
     expect(await removed.json()).toEqual({ removed: 2 });
     expect((await prisma().pairedDevice.findMany()).map((device) => device.id)).toEqual([keep.id]);
