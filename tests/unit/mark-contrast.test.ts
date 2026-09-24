@@ -77,10 +77,9 @@ describe("category mark contrast", () => {
     const { fill, ink } = categoryMarkStyle(state);
     const background = flatten(token(fill), CARD);
     const ratio = contrast(flatten(token(ink), background), background);
-    // `unknown` is the resting neutral and its content is a glyph, not text; darkening
-    // it further would make "we did not look" the loudest mark on the card.
-    const floor = state === "unknown" ? 3 : 4.5;
-    expect(ratio, `${state}: ${ink} on ${fill} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(floor);
+    // `unknown` used to be allowed 3:1 as a quiet glyph, but its ink also sets the state
+    // word in text pills, so it meets the same floor as every other verdict.
+    expect(ratio, `${state}: ${ink} on ${fill} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
   });
 
   /** The word under a mark is 9px, which AGENTS.md forbids below 0.7 alpha. */
@@ -90,3 +89,35 @@ describe("category mark contrast", () => {
     expect(contrast(flatten(ink, CARD), CARD)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+/**
+ * The accent is the only interactive colour, and the green reads "on" across the app, so
+ * both appear as text and as fills on every page. The browser suite checks rendered pages
+ * with axe; this catches a token change before anything renders.
+ */
+describe("interactive and status colours", () => {
+  const PAGE = token("var(--ff-page)");
+  const WHITE = literal("#ffffff");
+
+  it.each([
+    ["white text on an accent button", WHITE, "var(--ff-accent)", CARD],
+    ["white text on the hovered accent", WHITE, "var(--ff-accent-hover)", CARD],
+    ["accent text on a card", "var(--ff-accent)", "var(--ff-card)", CARD],
+    ["accent text on the page", "var(--ff-accent)", "var(--ff-page)", PAGE],
+    ["accent text on its own tint", "var(--ff-accent)", "var(--ff-accent-tint)", CARD],
+    ["on-green text on a card", "var(--ff-on)", "var(--ff-card)", CARD],
+    ["on-green text on the page", "var(--ff-on)", "var(--ff-page)", PAGE],
+    ["a person monogram on its fill", "var(--ff-person-ink)", "var(--ff-person-fill)", CARD],
+    ...(["--ff-ink-2", "--ff-ink-3", "--ff-ink-4", "--ff-locked"] as const).flatMap((ink) => [
+      [`${ink} on a card`, `var(${ink})`, "var(--ff-card)", CARD] as const,
+      [`${ink} on the page`, `var(${ink})`, "var(--ff-page)", PAGE] as const,
+      [`${ink} on a grey control`, `var(${ink})`, "var(--ff-field)", CARD] as const,
+    ]),
+  ] as const)("keeps %s at 4.5:1", (label, ink, fill, under) => {
+    const foreground = typeof ink === "string" ? token(ink) : ink;
+    const background = flatten(token(fill), under);
+    const ratio = contrast(flatten(foreground, background), background);
+    expect(ratio, `${label} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
