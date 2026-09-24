@@ -6,7 +6,7 @@
 // branch (docs/api.md, "Versioning the contract"):
 //
 //   - Unchanged spec: nothing to check.
-//   - Only `description` and `summary` text changed: any semver increase; a patch is enough.
+//   - Only info.version, `description` or `summary` text changed: any semver increase; a patch is enough.
 //   - Anything else changed: at least a minor increase.
 //   - A major increase only with the `breaking-api` label (BREAKING_API_APPROVED=true).
 //   - With that label from 1.0.0 on, a major increase. Before 1.0.0 a minor one carries
@@ -77,15 +77,18 @@ function withoutProse(node, parentKey = "") {
   return out;
 }
 
-/** "none", "prose" (only description and summary text) or "contract". */
+function withoutVersion(spec) {
+  const copy = structuredClone(spec);
+  if (copy?.info) delete copy.info.version;
+  return copy;
+}
+
+/** "none", "version" (only info.version), "prose" (description and summary text too) or "contract". */
 export function classifyChange(baseSpec, headSpec) {
-  if (JSON.stringify(baseSpec) === JSON.stringify(headSpec)) return "none";
-  const strip = (spec) => {
-    const copy = withoutProse(spec);
-    if (copy.info) delete copy.info.version;
-    return JSON.stringify(copy);
-  };
-  return strip(baseSpec) === strip(headSpec) ? "prose" : "contract";
+  const same = (strip) => JSON.stringify(strip(baseSpec)) === JSON.stringify(strip(headSpec));
+  if (same((spec) => spec)) return "none";
+  if (same(withoutVersion)) return "version";
+  return same((spec) => withoutProse(withoutVersion(spec))) ? "prose" : "contract";
 }
 
 /**
@@ -104,7 +107,7 @@ export function checkVersion({ baseSpec, headSpec, breakingApproved = false }) {
   if (!from) return result(false, `The base branch's info.version "${fromText}" is not semver; fix it there first.`);
   if (!to) return result(false, `info.version "${toText}" is not semver MAJOR.MINOR.PATCH.`);
   if (compareSemver(to, from) <= 0) {
-    const need = change === "prose" ? "a patch (or larger)" : "a minor (or larger)";
+    const need = change === "contract" ? "a minor (or larger)" : "a patch (or larger)";
     return result(
       false,
       `${SPEC} changed but info.version went from ${fromText} to ${toText}. ` +
@@ -133,7 +136,11 @@ export function checkVersion({ baseSpec, headSpec, breakingApproved = false }) {
         `at least a minor increase (${from.major}.${from.minor + 1}.0).`,
     );
   }
-  const what = change === "prose" ? "Only description or summary text changed" : "The contract changed";
+  const what = {
+    version: "Only info.version changed",
+    prose: "Only description or summary text changed",
+    contract: "The contract changed",
+  }[change];
   return result(true, `${what}; info.version ${fromText} -> ${toText} is a ${kind} increase.`);
 }
 

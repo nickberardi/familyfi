@@ -82,9 +82,9 @@ describe("classifyChange", () => {
     expect(classifyChange(spec("0.7.0"), spec("0.7.0"))).toBe("none");
   });
 
-  it("treats description and summary text, and the version itself, as prose", () => {
+  it("tells a version-only change from description and summary edits", () => {
+    expect(classifyChange(spec("0.7.0"), spec("0.7.1"))).toBe("version");
     expect(classifyChange(spec("0.7.0"), reworded(spec("0.7.1")))).toBe("prose");
-    expect(classifyChange(spec("0.7.0"), spec("0.7.1"))).toBe("prose");
   });
 
   it("treats a new path as a contract change", () => {
@@ -130,6 +130,10 @@ describe("checkVersion", () => {
   it("allows a patch increase for prose-only edits", () => {
     const outcome = checkVersion({ baseSpec: spec("0.7.0"), headSpec: reworded(spec("0.7.1")) });
     expect(outcome).toMatchObject({ ok: true, change: "prose", from: "0.7.0", to: "0.7.1" });
+  });
+
+  it("passes a version-only increase", () => {
+    expect(checkVersion({ baseSpec: spec("0.7.0"), headSpec: spec("0.8.0") })).toMatchObject({ ok: true, change: "version" });
   });
 
   it("fails prose-only edits that keep the version", () => {
