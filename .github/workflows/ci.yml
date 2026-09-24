@@ -104,3 +104,11 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install chromium --with-deps
       - run: pnpm test:browser
+      # Traces, screenshots and error context for whatever failed, to open with `playwright show-trace`.
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

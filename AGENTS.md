@@ -111,7 +111,7 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 | `make test-api` | OpenAPI lint and route/method contract |
 | `make test-api-breaking` | Breaking changes in `openapi/familyfi.v1.yaml` against `main`, with the pinned `oasdiff` (needs Go). CI runs it on pull requests that change `openapi/` |
 | `make db-drift` | Fail when `prisma/schema.prisma` differs from the database its migrations built — a schema edit with no migration (run after `db-migrate`) |
-| `make test-browser` | Playwright desktop/phone smoke (`FAMILYFI_DEFAULT_PASSWORD`, running app or CI webServer). In CI a skipped test fails the run: tag a one-viewport test `@desktop` or `@phone`, and a test that cannot run in CI with a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts` |
+| `make test-browser` | Playwright desktop/phone smoke (`FAMILYFI_DEFAULT_PASSWORD`, running app or CI webServer). In CI a skipped test fails the run: tag a one-viewport test `@desktop` or `@phone`, and a test that cannot run in CI with a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`. A test that passes only on its retry is a flake and fails CI too. A failed run uploads its traces as the `playwright-results` artifact |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
 | `make lint` / `make typecheck` / `make build` | Checks and production build |
 | `make docker-build` | Build `familyfi:dev` |
