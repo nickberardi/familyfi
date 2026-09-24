@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { formatClock, nextBedtimeResumeAt } from "@/lib/display";
+import { pauseSheetBody, pauseSheetOptions, pauseSheetTitle, type PauseSheetRequest } from "@/lib/pause-sheet";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 
@@ -21,55 +21,25 @@ export function PauseSheet({
   onClose: () => void;
 }) {
   const { mutate } = useAppData();
-  const bedtimeAt = nextBedtimeResumeAt(group, timezone);
-  const word = group.kind === "family" ? "bedtime" : "schedule";
-  const options = [
-    {
-      label: "For 30 minutes",
-      note: `schedule back at ${formatClock(untilFromMinutes(30), timezone)}`,
-      run: () => timed(30),
-    },
-    {
-      label: "For an hour",
-      note: `schedule back at ${formatClock(untilFromMinutes(60), timezone)}`,
-      run: () => timed(60),
-    },
-    ...(bedtimeAt
-      ? [
-          {
-            label: "Until bedtime ends",
-            note: `schedule back at ${formatClock(bedtimeAt, timezone)}`,
-            run: () => pauseUntil(bedtimeAt.toISOString()),
-          },
-        ]
-      : []),
-    {
-      label: "Until I resume",
-      note: "no end time",
-      run: () => pauseUntil(null),
-    },
-  ];
+  const options = pauseSheetOptions(group, mode, timezone, new Date());
 
-  async function pauseUntil(until: string | null) {
+  async function run(request: PauseSheetRequest) {
+    if (request.kind === "extend") {
+      await mutate(() =>
+        api(`/api/v1/groups/${group.id}/extend`, {
+          method: "POST",
+          body: JSON.stringify({ minutes: request.minutes }),
+        }),
+      );
+      return;
+    }
+    const until = request.kind === "pauseFor" ? untilFromMinutes(request.minutes).toISOString() : request.until;
     await mutate(() =>
       api(`/api/v1/groups/${group.id}/pause`, {
         method: "POST",
         body: JSON.stringify(until === null ? {} : { until }),
       }),
     );
-  }
-
-  async function timed(minutes: number) {
-    if (mode === "extend" && group.suspension.active && group.suspension.until) {
-      await mutate(() =>
-        api(`/api/v1/groups/${group.id}/extend`, {
-          method: "POST",
-          body: JSON.stringify({ minutes }),
-        }),
-      );
-      return;
-    }
-    await pauseUntil(untilFromMinutes(minutes).toISOString());
   }
 
   return (
@@ -80,13 +50,9 @@ export function PauseSheet({
       >
         <div className="p-[18px]">
           <div className="text-[17px] font-bold tracking-tight">
-            {mode === "extend" ? `More time for ${group.name}?` : `Pause ${group.name}’s ${word}?`}
+            {pauseSheetTitle(group, mode)}
           </div>
-          <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">
-            {mode === "extend"
-              ? "Extending keeps the schedule suspended longer. Resume restores bedtime, which may still block."
-              : "Pause suspends bedtime enforcement so internet is available from FamilyFi. Resume restores the stored schedule, which may still block during bedtime."}
-          </p>
+          <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{pauseSheetBody(mode)}</p>
         </div>
         {options.map((option) => (
           <button
@@ -94,7 +60,7 @@ export function PauseSheet({
             type="button"
             className="flex w-full items-baseline gap-2.5 border-t border-[var(--ff-line)] px-[18px] py-3 text-left"
             onClick={() => {
-              void option.run().then(onClose);
+              void run(option.request).then(onClose);
             }}
           >
             <span className="flex-1 text-[15px] font-semibold text-[var(--ff-accent)]">{option.label}</span>

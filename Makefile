@@ -4,7 +4,7 @@ FAMILYFI_IMAGE ?= ghcr.io/nberardi/familyfi:latest
 COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.yml
 WITH_ENV := node scripts/with-env.mjs
 
-.PHONY: setup hooks dev test test-unit test-coverage test-api test-api-breaking test-integration test-browser test-mutation spike lint typecheck build \
+.PHONY: setup hooks dev test test-unit test-coverage test-api test-api-breaking test-api-version test-integration test-browser test-mutation spike lint typecheck build \
 	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev db-drift db-upgrade secrets
 
 setup:
@@ -61,6 +61,9 @@ test-api:
 
 test-api-breaking:
 	sh scripts/check-openapi-breaking.sh
+
+test-api-version:
+	node scripts/check-openapi-version.mjs
 
 # CI's browser job: a production build served against familyfi_test, with the UniFi mock
 # and the stand-in cloudflared, so every test runs and a skip or a flake fails the run.
