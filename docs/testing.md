@@ -46,6 +46,15 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 - **Every invariant in AGENTS.md names its tests.** A new invariant comes with them; `tests/unit/invariants.test.ts` fails when one names none or a missing file.
 - **Household time never depends on the server's time zone.** CI runs the unit suite a second time at UTC+14 to catch this.
 
+## Mutation testing
+
+Coverage shows which lines ran; it does not show whether a test would notice if one of them were wrong. `make test-mutation` checks that. Stryker makes small deliberate bugs, one at a time: `<` becomes `<=`, a condition becomes `true`, `enabled: false` becomes `enabled: true`. It runs the tests that cover each one. A bug no test notices **survives**, and names a behaviour nothing checks.
+
+- **Scope.** It covers the code that decides what a gateway enforces: reconciliation, policy planning, policy ownership, quarantine and schedules. The list is `mutate` in `tests/stryker.config.mjs`.
+- **When it runs.** In CI it runs weekly, when `src/` or `tests/` changed that week. You can also run it by hand from the Actions tab or with `make test-mutation`.
+- **Not a gate.** It never fails a build. Read the survivors in the HTML report, `reports/mutation/index.html`, or the `mutation-report` artifact in CI. Fix a survivor with a test when it hides a real gap. Leave it when the change makes no observable difference, such as a log message.
+- **A workaround.** `scripts/stryker-vitest-names.mjs` fixes a mismatch between Stryker 10 and Vitest 5. Without it no test runs and every mutant survives. The script says when to delete it.
+
 ## What CI runs
 
 | Workflow | When | Checks |
@@ -53,6 +62,7 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 | `ci.yml` | Every push and pull request | **verify:** lint, typecheck, `test-api`, `db-drift`, `db-upgrade`, `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke |
 | `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking-api` label; never add it yourself |
+| `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | Mutation testing. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 
 ## What no test proves
 

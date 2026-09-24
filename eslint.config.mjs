@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "test-results/**",
     "coverage/**",
+    "reports/**",
+    ".stryker-tmp/**",
     "prisma/migrations/**",
   ]),
 ]);

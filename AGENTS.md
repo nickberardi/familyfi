@@ -117,6 +117,7 @@ What to run before a pull request, the rules tests follow, and what CI checks ar
 | `make test-browser` | Production build, then Playwright on desktop and phone, the way CI runs it |
 | `make test-api` | OpenAPI lint, and every route and method documented |
 | `make test-api-breaking` | Breaking OpenAPI changes against `main` (needs Go) |
+| `make test-mutation` | Mutation testing of the enforcement code; a report, never a gate |
 | `make db-migrate` | Apply migrations to the development database |
 | `make db-drift` | Fail when `schema.prisma` differs from what the migrations build (run after `db-migrate`) |
 | `make db-upgrade` | Upgrade a filled database from the last release (or `pnpm db-upgrade <tag>`); fail on an error, lost rows or drift |
