@@ -99,6 +99,8 @@ While FamilyFi is stopped or cannot reach UniFi, the gateway keeps the last appl
 
 Release images run `prisma migrate deploy` on start. Local `make dev` does the same (`migrate deploy` plus `prisma generate`) before Next listens, so a new column cannot 500 login or Settings until the process is restarted. They do not run `prisma migrate dev`.
 
+A household may skip releases: any release from v0.1.0 on upgrades straight to the newest. CI proves it on every push by filling a database built by each release since v0.1.0 and upgrading it (`pnpm db-upgrade`). The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
+
 Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Until a tag exists, use `make docker-dev-up`. Compose interpolates `POSTGRES_*` for the database service and passes `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET`, `FAMILYFI_ENCRYPTION_KEY`, and mapped `DB_*` into the app container. The image does not read a mounted `.env` file.
 
 ## Releases
