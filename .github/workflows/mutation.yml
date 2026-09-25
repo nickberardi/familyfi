@@ -1,0 +1,77 @@
+name: Mutation
+
+# Mutation testing of the code that decides what a gateway enforces. It reports and never
+# gates: see docs/testing.md. Weekly, but only when src/ or tests/ changed in the last
+# seven days, since an unchanged week would report the same survivors. Run it by hand
+# from the Actions tab at any time.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: familyfi
+          POSTGRES_PASSWORD: familyfi-ci
+          POSTGRES_DB: familyfi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U familyfi -d familyfi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      FAMILYFI_DEFAULT_PASSWORD: ci-recovery-password
+      FAMILYFI_SESSION_SECRET: ci-only-session-secret-32chars!!
+      FAMILYFI_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+      DB_MODE: external
+      DB_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: familyfi_test
+      POSTGRES_USER: familyfi
+      POSTGRES_PASSWORD: familyfi-ci
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Skip a week with no code change
+        id: changed
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || git log --since="7 days ago" --format=%H -- src tests | grep -q .; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No change under src/ or tests/ in the last seven days, so mutation testing was skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.changed.outputs.run == 'true'
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.15.1
+      - if: steps.changed.outputs.run == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - if: steps.changed.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changed.outputs.run == 'true'
+        run: pnpm test:mutation
+      - if: steps.changed.outputs.run == 'true' && !cancelled()
+        run: node scripts/mutation-summary.mjs "$GITHUB_STEP_SUMMARY"
+      # The HTML report lists every surviving mutant with its line and the tests that ran.
+      - if: steps.changed.outputs.run == 'true' && !cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 30

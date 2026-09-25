@@ -57,7 +57,7 @@ export function ResolverCard({
     if (r.probeDays.length === 0) return "No days selected — checking won't run";
     const when = `${probeScheduleWhen(r.probeDays)} at ${formatHhmm(r.probeTime)}`;
     if (!r.nextRunAt) return when;
-    return `${when} · next ${relativeDayLabel(new Date(r.nextRunAt), timezone)}`;
+    return `${when} · next ${relativeDayLabel(new Date(r.nextRunAt), timezone, new Date())}`;
   }
 
   return (

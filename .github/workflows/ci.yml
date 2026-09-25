@@ -11,7 +11,7 @@ on:
     
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:18
@@ -46,13 +46,16 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Known high or critical advisories in what ships, not in dev tooling.
+      - run: pnpm audit --prod --audit-level=high
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test-api
       - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
       # Exit 2 when schema.prisma differs from what the migrations built: a schema edit with no migration.
       - run: pnpm db-drift
-      # Build a database with the last release's migrations, fill it, and upgrade it to these.
+      # Build a database from every supported release's migrations, fill it, and upgrade it to these,
+      # so a household that skipped releases is covered. About 30 seconds, so it runs on every push.
       - run: pnpm db-upgrade
       # Unit and integration tests in one run, failing if coverage drops below its floors.
       - run: pnpm test:coverage
@@ -60,6 +63,7 @@ jobs:
       - run: pnpm test
         env:
           TZ: Pacific/Kiritimati
+      # Fails on a changed line no test runs in a gated path (GATED_PATHS in the script); elsewhere it reports.
       - name: Changed-line coverage
         if: github.event_name == 'pull_request'
         env:
@@ -70,7 +74,7 @@ jobs:
       - run: pnpm build
 
   browser:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:18

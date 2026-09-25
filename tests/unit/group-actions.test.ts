@@ -65,4 +65,24 @@ describe("groupActions", () => {
     expect(actions.map((item) => item.label)).toEqual(["Rules", "Detail"]);
     expect(actions[0]?.href).toBe("/rules#group-g1");
   });
+
+  /* `groupActionSpecs` is pinned by tests/fixtures/display-vectors.json; this checks the wiring. */
+  it("binds each tap to its handler", () => {
+    const pauseCard = groupActions(group(), "web", openPause, openExtend, mutate);
+    pauseCard[0]?.onClick?.();
+    expect(openPause).toHaveBeenCalledWith(expect.objectContaining({ id: "g1" }));
+    expect(pauseCard.slice(1).every((item) => item.onClick === undefined)).toBe(true);
+
+    const pausedCard = groupActions(
+      group({ suspension: { active: true, until: null }, access: "paused" }),
+      "phone",
+      openPause,
+      openExtend,
+      mutate,
+    );
+    pausedCard[0]?.onClick?.();
+    expect(mutate).toHaveBeenCalledTimes(1);
+    pausedCard[1]?.onClick?.();
+    expect(openExtend).toHaveBeenCalledWith(expect.objectContaining({ id: "g1" }));
+  });
 });
