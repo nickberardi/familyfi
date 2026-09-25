@@ -20,14 +20,14 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false is an emergency UniFi `enabled: false` on quarantine policies |
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |
 | GET | `/api/v1/connection` | Authenticated endpoint manifest, FamilyFi-to-UniFi status, and the account's last attributed change |
-| GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and `edgeAccess`: each route behind Cloudflare Access with how many active devices have its current token. POST adds a route the household runs; publish it through `/connection/tunnel` |
+| GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
 | POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing QR payload |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
-| GET | `/api/v1/connection/devices` | Administrator list of paired phones and Watches, the route each phone paired through (`pairedVia`), and active sessions |
+| GET | `/api/v1/connection/devices` | Administrator list of paired phones and Watches, the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
 | POST | `/api/v1/connection/devices` | A signed-in paired iPhone automatically enrolls its reachable Watch (`client: "watch"`, `clientId`) as an independent device and receives its own credential and bearer for transfer |
 | DELETE | `/api/v1/connection/devices/{id}` | Administrator or the device itself revokes that device and its sessions. Only an administrator may use `?remove=true` to delete its record |
 | DELETE | `/api/v1/connection/devices?revoked=true` | Administrator removes every revoked phone's record; active phones are untouched |
@@ -81,10 +81,12 @@ route. The token reaches a phone three ways, and no other:
 - the claim response's signed manifest; and
 - the signed manifest in `GET /api/v1/connection` for a paired device's bearer session.
 
-Inside the signed payload every endpoint carries `edgeAuth` (`none` or `serviceToken`), and a
-paired device's payload adds `edgeCredentials`: `[{ endpointId, version, clientId, clientSecret }]`
-for each enabled protected route. The unsigned `endpoints` copy keeps the plain `ConnectionEndpoint`
-shape. A browser session's manifest never carries `edgeCredentials`. `version` rises each time the
+Every route says whether Access guards it (`edgeAuth`: `none` or `serviceToken`) and the current
+token's `edgeTokenVersion`, but never the token. A paired device's signed payload adds
+`edgeCredentials`: `[{ endpointId, version, clientId, clientSecret }]` for each enabled protected
+route; a browser session's manifest never carries it. Each time a device is handed a token, its
+version is recorded, and `GET /api/v1/connection/devices` reports it as `edgeTokens`, so Pair Device
+can show who still holds an old one after a replacement. `version` rises each time the
 operator replaces the token; a phone replaces what it holds whenever a verified manifest carries a
 higher one. The phone gateway strips both headers before a request reaches the app.
 

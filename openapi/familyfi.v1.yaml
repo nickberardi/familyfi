@@ -1481,21 +1481,10 @@ paths:
       description: |
         Every saved route, enabled or not. Remote access publishes one at a time: the route in
         `GET /api/v1/connection/tunnel` `endpointId` is the only one enabled, and the only one
-        phones are handed. `edgeAccess` lists each route behind Cloudflare Access, with how many
-        active devices have its current service token. The token itself is never listed.
+        phones are handed.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
-        "200":
-          description: Endpoints
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [endpoints, edgeAccess]
-                properties:
-                  endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } }
-                  edgeAccess: { type: array, items: { $ref: "#/components/schemas/EdgeAccess" } }
+        "200": { description: Endpoints, content: { application/json: { schema: { type: object, required: [endpoints], properties: { endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } } }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
     post:
@@ -2130,10 +2119,12 @@ components:
     ConnectionEndpoint:
       type: object
       additionalProperties: false
-      required: [id, url, kind, transport, trustMode, spkiSha256, priority, enabled]
+      required: [id, url, kind, transport, trustMode, spkiSha256, priority, enabled, edgeAuth, edgeTokenVersion]
       properties:
         id: { type: string }
         url: { type: string, format: uri }
+        edgeAuth: { type: string, enum: [none, serviceToken], description: "Whether Cloudflare Access guards the route. The token itself is never served here: phones get it in the pairing QR and their signed manifest." }
+        edgeTokenVersion: { type: [integer, "null"], minimum: 1, description: "The current Access token's version, rising each time it is replaced; null without Access." }
         kind:
           type: string
           enum: [quick, domain, own]
@@ -2185,34 +2176,6 @@ components:
           properties:
             clientId: { type: string, minLength: 1, maxLength: 512 }
             clientSecret: { type: string, minLength: 1, maxLength: 512 }
-    EdgeAccess:
-      type: object
-      additionalProperties: false
-      required: [endpointId, version, clientIdHint, rotatedAt, devices]
-      description: A route behind Cloudflare Access, and which active devices have its current service token.
-      properties:
-        endpointId: { type: string }
-        version: { type: integer, minimum: 1, description: Rises each time the token is replaced. }
-        clientIdHint: { type: [string, "null"], description: "The end of the Client ID, to match against Cloudflare; null if the stored token can no longer be read." }
-        rotatedAt: { type: [string, "null"], format: date-time, description: When the token was last replaced; null before the first replacement. }
-        devices:
-          type: object
-          additionalProperties: false
-          required: [total, current, behind]
-          description: Devices not revoked and seen in the last 30 days.
-          properties:
-            total: { type: integer, minimum: 0 }
-            current: { type: integer, minimum: 0, description: How many have been handed the current version. }
-            behind:
-              type: array
-              items:
-                type: object
-                additionalProperties: false
-                required: [id, displayName, lastSeenAt]
-                properties:
-                  id: { type: string }
-                  displayName: { type: string }
-                  lastSeenAt: { type: [string, "null"], format: date-time }
     RemoteAccess:
       type: object
       additionalProperties: false
@@ -2306,7 +2269,7 @@ components:
           type: string
           description: |
             Base64url canonical manifest bytes covered by signature. The JSON holds `instanceId` and
-            `endpoints`; each endpoint also carries `edgeAuth` (`none` or `serviceToken`). For a
+            `endpoints`, the same route shape as `endpoints` here. For a
             paired device's session, and in the claim response, it also holds `edgeCredentials`:
             `[{ endpointId, version, clientId, clientSecret }]`, one per enabled route behind
             Cloudflare Access. Send `CF-Access-Client-Id` and `CF-Access-Client-Secret` to that route
@@ -2315,7 +2278,7 @@ components:
     ConnectionDevice:
       type: object
       additionalProperties: false
-      required: [id, displayName, client, enrolledAt, lastSeenAt, revokedAt, pairedVia, sessions]
+      required: [id, displayName, client, enrolledAt, lastSeenAt, revokedAt, pairedVia, edgeTokens, sessions]
       properties:
         id: { type: string }
         displayName: { type: string }
@@ -2332,6 +2295,16 @@ components:
             endpointId: { type: string }
             url: { type: string, format: uri }
             transport: { type: string, enum: [lan, tailscale, cloudflare] }
+        edgeTokens:
+          type: array
+          description: "The Cloudflare Access token version FamilyFi last handed this device, per protected route. Compare with the route's `edgeTokenVersion` to see who still holds an old token."
+          items:
+            type: object
+            additionalProperties: false
+            required: [endpointId, version]
+            properties:
+              endpointId: { type: string }
+              version: { type: integer, minimum: 1 }
         sessions:
           type: array
           items:

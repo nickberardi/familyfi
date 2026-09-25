@@ -13,7 +13,7 @@ import {
   transportLabel,
   type RemoteChoice,
 } from "@/lib/connection-routes";
-import type { ConnectionRoute, EdgeAccess, RemoteAccess } from "@/lib/types";
+import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
 import { CloudflareAdvanced } from "./CloudflareAdvanced";
@@ -62,15 +62,15 @@ function Guide({ href, children }: { href: string; children: string }) {
 export function RemoteAccessCard({
   tunnel,
   routes,
-  edgeAccess,
+  phones,
   pairedThrough,
   onTunnel,
   onChange,
 }: {
   tunnel: RemoteAccess | null;
   routes: ConnectionRoute[] | null;
-  /** Routes behind Cloudflare Access, and how far each one's token has reached. */
-  edgeAccess: EdgeAccess[];
+  /** Every paired device, to show how far a route's Cloudflare Access token has reached. */
+  phones: PairedPhone[];
   /** Active phones that paired through a route — the ones a switch away from it would strand. */
   pairedThrough: (routeId: string) => number;
   onTunnel: (tunnel: RemoteAccess) => void;
@@ -150,7 +150,7 @@ export function RemoteAccessCard({
   const isPublished = choice === publishedChoice && publishedChoice !== "off";
   const ownTransport = OWN_TRANSPORT[choice];
   const saved = ownTransport ? savedRoute(choice, routes ?? []) : undefined;
-  const access = saved ? edgeAccess.find((item) => item.endpointId === saved.id) : undefined;
+  const protectedRoute = saved?.edgeAuth === "serviceToken";
 
   async function turnOffAccess(route: ConnectionRoute) {
     if (!window.confirm("Turn off Cloudflare Access for this route in FamilyFi? Phones stop sending the token, so remove the Access application in Cloudflare too, or it turns them away.")) return;
@@ -305,7 +305,7 @@ export function RemoteAccessCard({
                 <CloudflareAdvanced
                   key={`advanced-${saved?.id ?? "new"}`}
                   route={editing ? saved : undefined}
-                  access={editing ? access : undefined}
+                  hasToken={editing && protectedRoute}
                   routes={routes ?? []}
                   onSaved={publishRoute}
                   onCancel={saved ? () => setEditing(false) : undefined}
@@ -313,8 +313,8 @@ export function RemoteAccessCard({
               ) : (
                 savedCard(
                   saved,
-                  access ? <AccessLine access={access} /> : "No Cloudflare Access: the tunnel alone guards this address",
-                  access ? (
+                  protectedRoute ? <AccessLine route={saved} phones={phones} /> : "No Cloudflare Access: the tunnel alone guards this address",
+                  protectedRoute ? (
                     <button type="button" className="font-semibold text-[var(--ff-danger)]" disabled={busy} onClick={() => void turnOffAccess(saved)}>
                       Turn off Access
                     </button>
@@ -427,8 +427,8 @@ export function RemoteAccessCard({
 }
 
 /** The Access badge, the token's version, and how far it has reached the household's phones. */
-function AccessLine({ access }: { access: EdgeAccess }) {
-  const rollout = accessRollout(access);
+function AccessLine({ route, phones }: { route: ConnectionRoute; phones: PairedPhone[] }) {
+  const rollout = accessRollout(route, phones);
   return (
     <span className="flex flex-col gap-1">
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -436,17 +436,7 @@ function AccessLine({ access }: { access: EdgeAccess }) {
           <Icon name="shield-check" size={14} />
           Cloudflare Access
         </span>
-        <span>
-          Token {access.version}
-          {access.clientIdHint ? (
-            <>
-              {" "}
-              · <span className="font-mono">{access.clientIdHint}</span>
-            </>
-          ) : (
-            " · can't be read: paste it again"
-          )}
-        </span>
+        <span>Token {route.edgeTokenVersion}</span>
       </span>
       <span data-testid="access-rollout" className={rollout.done ? undefined : "font-semibold text-[var(--ff-paused)]"}>
         {rollout.text}

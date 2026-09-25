@@ -3,7 +3,7 @@ import { accessRollout, canPin, countdown, manualPairingCode, remoteChoice, save
 import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
 function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
-  return { id, url: `https://${id}.home`, kind, transport, trustMode: "system", spkiSha256: null, priority, enabled: true };
+  return { id, url: `https://${id}.home`, kind, transport, trustMode: "system", spkiSha256: null, priority, enabled: true, edgeAuth: "none", edgeTokenVersion: null };
 }
 
 describe("connection routes", () => {
@@ -56,21 +56,34 @@ describe("connection routes", () => {
   });
 
   it("says how far a Cloudflare Access token has reached, and when the old one can go", () => {
-    const device = (displayName: string) => ({ id: displayName, displayName, lastSeenAt: null });
-    expect(accessRollout({ version: 1, devices: { total: 0, current: 0, behind: [] } })).toEqual({ done: true, text: "No active phones yet." });
-    expect(accessRollout({ version: 1, devices: { total: 2, current: 2, behind: [] } })).toEqual({ done: true, text: "Every active phone has the token." });
-    expect(accessRollout({ version: 1, devices: { total: 2, current: 1, behind: [device("Sam's iPhone")] } })).toEqual({
+    const now = Date.parse("2026-09-25T12:00:00Z");
+    const seen = new Date(now - 60_000).toISOString();
+    const phone = (displayName: string, version: number | null, extra: { revokedAt?: string; lastSeenAt?: string | null } = {}) => ({
+      displayName,
+      revokedAt: extra.revokedAt ?? null,
+      lastSeenAt: extra.lastSeenAt === undefined ? seen : extra.lastSeenAt,
+      edgeTokens: version === null ? [] : [{ endpointId: "cf", version }],
+    });
+    const first = { id: "cf", edgeTokenVersion: 1 };
+    const third = { id: "cf", edgeTokenVersion: 3 };
+    expect(accessRollout(first, [], now)).toEqual({ done: true, text: "No active phones yet." });
+    expect(accessRollout(first, [phone("A", 1), phone("B", 1)], now)).toEqual({ done: true, text: "Every active phone has the token." });
+    expect(accessRollout(first, [phone("A", 1), phone("Sam's iPhone", null)], now)).toEqual({
       done: false,
       text: "1 of 2 active phones have the token. Waiting for Sam's iPhone. Cloudflare turns them away until then.",
     });
-    expect(accessRollout({ version: 3, devices: { total: 3, current: 1, behind: [device("A"), device("B")] } })).toEqual({
+    expect(accessRollout(third, [phone("A", 2), phone("B", null), phone("C", 3)], now)).toEqual({
       done: false,
       text: "1 of 3 active phones have the new token. Waiting for A, B. Keep the old token in Cloudflare until then.",
     });
-    expect(accessRollout({ version: 3, devices: { total: 3, current: 3, behind: [] } })).toEqual({
+    // Revoked phones, and phones not seen within Cloudflare's longest grace period, are not waited for.
+    const stale = new Date(now - 31 * 24 * 60 * 60 * 1000).toISOString();
+    expect(accessRollout(third, [phone("C", 3), phone("Old", 1, { lastSeenAt: stale }), phone("Gone", 1, { revokedAt: seen }), phone("Never", null, { lastSeenAt: null })], now)).toEqual({
       done: true,
       text: "Every active phone has the new token. You can remove the old one in Cloudflare.",
     });
+    // A token handed out for another route doesn't count.
+    expect(accessRollout(first, [{ ...phone("A", null), edgeTokens: [{ endpointId: "other", version: 5 }] }], now).done).toBe(false);
   });
 
   it("builds the manual code the app parses and formats the countdown", () => {

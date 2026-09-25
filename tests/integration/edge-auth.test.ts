@@ -4,6 +4,7 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as identity } from "@/app/api/v1/connection/identity/route";
 import { GET as listEndpoints, POST as createEndpoint } from "@/app/api/v1/connection/endpoints/route";
 import { PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
+import { GET as listDevices } from "@/app/api/v1/connection/devices/route";
 import { POST as createPairing } from "@/app/api/v1/connection/pairings/route";
 import { POST as claimPairing } from "@/app/api/v1/connection/pairings/[id]/claim/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
@@ -18,7 +19,7 @@ const ROTATED = { clientId: TOKEN.clientId, clientSecret: "r0tated-fedcba9876543
 
 type Manifest = { instanceId: string; signedPayload: string; signature: string; endpoints: unknown[] };
 type Payload = { instanceId: string; endpoints: { id: string; edgeAuth: string }[]; edgeCredentials?: { endpointId: string; version: number; clientId: string; clientSecret: string }[] };
-type EdgeAccess = { endpointId: string; version: number; clientIdHint: string | null; rotatedAt: string | null; devices: { total: number; current: number; behind: { displayName: string }[] } };
+type Route = { id: string; edgeAuth: string; edgeTokenVersion: number | null };
 
 function json(auth: SessionAuth, method: string, body?: unknown): RequestInit & { auth: SessionAuth } {
   return { method, auth, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) };
@@ -85,9 +86,18 @@ async function manifestFor(auth: SessionAuth) {
   return { raw: JSON.stringify(body), payload: await verifiedPayload(body.endpointManifest) };
 }
 
-async function edgeAccess(auth: SessionAuth) {
-  const listed = (await (await listEndpoints(request("/api/v1/connection/endpoints", { auth }))).json()) as { edgeAccess: EdgeAccess[] };
-  return { raw: JSON.stringify(listed), access: listed.edgeAccess };
+/** The route as administrators see it: whether Access guards it, and its token version — never the token. */
+async function route(auth: SessionAuth, id: string) {
+  const listed = (await (await listEndpoints(request("/api/v1/connection/endpoints", { auth }))).json()) as { endpoints: Route[] };
+  return { raw: JSON.stringify(listed), route: listed.endpoints.find((item) => item.id === id)! };
+}
+
+/** The token version each device was last handed for a route, by device name. */
+async function held(auth: SessionAuth, endpointId: string) {
+  const listed = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as {
+    devices: { displayName: string; edgeTokens: { endpointId: string; version: number }[] }[];
+  };
+  return Object.fromEntries(listed.devices.map((device) => [device.displayName, device.edgeTokens.find((token) => token.endpointId === endpointId)?.version ?? null]));
 }
 
 describe("Cloudflare Access service tokens", () => {
@@ -121,10 +131,10 @@ describe("Cloudflare Access service tokens", () => {
     expect(row).toMatchObject({ edgeAuth: "serviceToken", edgeTokenVersion: 1, edgeTokenRotatedAt: null });
     expect(Buffer.from(row.edgeTokenCiphertext!).toString("utf8")).not.toContain(TOKEN.clientSecret);
 
-    const { raw, access } = await edgeAccess(auth);
-    expect(raw).not.toContain(TOKEN.clientSecret);
-    expect(raw).not.toContain(TOKEN.clientId);
-    expect(access).toEqual([{ endpointId: row.id, version: 1, clientIdHint: "…abcdef.access", rotatedAt: null, devices: { total: 0, current: 0, behind: [] } }]);
+    const listed = await route(auth, row.id);
+    expect(listed.raw).not.toContain(TOKEN.clientSecret);
+    expect(listed.raw).not.toContain(TOKEN.clientId);
+    expect(listed.route).toMatchObject({ edgeAuth: "serviceToken", edgeTokenVersion: 1 });
 
     const publicIdentity = JSON.stringify(await (await identity()).json());
     expect(publicIdentity).not.toContain(TOKEN.clientSecret);
@@ -159,8 +169,9 @@ describe("Cloudflare Access service tokens", () => {
 
     expect(qr.edgeCredential).toEqual({ version: 1, ...TOKEN });
 
-    // The strictly decoded copies stay the plain route shape; the token rides inside the signed payload.
-    expect(JSON.stringify(claimed.manifest.endpoints)).not.toContain("edgeAuth");
+    // The route says Access guards it; only the signed payload carries the token.
+    expect(claimed.manifest.endpoints).toEqual([expect.objectContaining({ id, edgeAuth: "serviceToken", edgeTokenVersion: 1 })]);
+    expect(JSON.stringify(claimed.manifest.endpoints)).not.toContain(TOKEN.clientSecret);
     const fromClaim = await verifiedPayload(claimed.manifest);
     expect(fromClaim.endpoints).toEqual([expect.objectContaining({ id, edgeAuth: "serviceToken" })]);
     expect(fromClaim.edgeCredentials).toEqual([{ endpointId: id, version: 1, ...TOKEN }]);
@@ -176,33 +187,26 @@ describe("Cloudflare Access service tokens", () => {
     expect(Buffer.from(JSON.parse(browser.raw).endpointManifest.signedPayload, "base64url").toString()).not.toContain(TOKEN.clientSecret);
   });
 
-  it("tracks a rotation until every active phone has the new token", async () => {
+  it("records which token version each device was handed, so a rotation can be followed", async () => {
     const auth = await adminAuth();
     const id = await protectedRoute(auth);
     const kitchen = await pairPhone(auth, id, "Kitchen iPhone");
-    const bedroom = await pairPhone(auth, id, "Bedroom iPhone");
-    expect((await edgeAccess(auth)).access[0].devices).toEqual({ total: 2, current: 2, behind: [] });
+    await pairPhone(auth, id, "Bedroom iPhone");
+    expect(await held(auth, id)).toEqual({ "Kitchen iPhone": 1, "Bedroom iPhone": 1 });
 
     // Saving the same token again is not a rotation.
     expect((await update(auth, id, { serviceToken: TOKEN })).status).toBe(200);
-    expect((await edgeAccess(auth)).access[0].version).toBe(1);
+    expect((await route(auth, id)).route.edgeTokenVersion).toBe(1);
 
     expect((await update(auth, id, { serviceToken: ROTATED })).status).toBe(200);
-    let access = (await edgeAccess(auth)).access[0];
-    expect(access.version).toBe(2);
-    expect(access.rotatedAt).not.toBeNull();
-    expect(access.devices).toMatchObject({ total: 2, current: 0 });
+    expect((await route(auth, id)).route.edgeTokenVersion).toBe(2);
+    expect(await held(auth, id)).toEqual({ "Kitchen iPhone": 1, "Bedroom iPhone": 1 });
 
     const picked = await manifestFor(kitchen.bearer);
     expect(picked.payload.edgeCredentials).toEqual([{ endpointId: id, version: 2, ...ROTATED }]);
-    access = (await edgeAccess(auth)).access[0];
-    expect(access.devices).toEqual({ total: 2, current: 1, behind: [expect.objectContaining({ displayName: "Bedroom iPhone" })] });
-
-    // A phone not seen for longer than any grace period, or revoked, is no longer waited for.
-    await prisma().pairedDevice.update({ where: { id: bedroom.claimed.device.id }, data: { lastSeenAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) } });
-    expect((await edgeAccess(auth)).access[0].devices).toEqual({ total: 1, current: 1, behind: [] });
-    await prisma().pairedDevice.update({ where: { id: bedroom.claimed.device.id }, data: { lastSeenAt: new Date(), revokedAt: new Date() } });
-    expect((await edgeAccess(auth)).access[0].devices).toEqual({ total: 1, current: 1, behind: [] });
+    expect(await held(auth, id)).toEqual({ "Kitchen iPhone": 2, "Bedroom iPhone": 1 });
+    const devices = JSON.stringify(await (await listDevices(request("/api/v1/connection/devices", { auth }))).json());
+    expect(devices).not.toContain(ROTATED.clientSecret);
   });
 
   it("keeps the token when an edit leaves it out, and forgets it when Access is turned off", async () => {
@@ -211,17 +215,17 @@ describe("Cloudflare Access service tokens", () => {
     await pairPhone(auth, id, "Kitchen iPhone");
 
     expect((await update(auth, id, { url: "https://home.example.com", edgeAuth: "serviceToken" })).status).toBe(200);
-    expect((await edgeAccess(auth)).access).toEqual([expect.objectContaining({ endpointId: id, version: 1 })]);
+    expect((await route(auth, id)).route).toMatchObject({ edgeAuth: "serviceToken", edgeTokenVersion: 1 });
 
     expect((await update(auth, id, { edgeAuth: "none" })).status).toBe(200);
     const row = await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id } });
     expect(row).toMatchObject({ edgeAuth: "none", edgeTokenCiphertext: null, edgeTokenIv: null, edgeTokenAuthTag: null });
     expect(await prisma().deviceEdgeToken.count({ where: { endpointId: id } })).toBe(0);
-    expect((await edgeAccess(auth)).access).toEqual([]);
+    expect((await route(auth, id)).route).toMatchObject({ edgeAuth: "none", edgeTokenVersion: null });
 
     // Turning it back on never reuses a version a phone already saw.
     expect((await update(auth, id, { serviceToken: ROTATED })).status).toBe(200);
-    expect((await edgeAccess(auth)).access[0].version).toBe(2);
+    expect((await route(auth, id)).route.edgeTokenVersion).toBe(2);
   });
 
   it("leaves an unprotected Cloudflare Tunnel route exactly as before", async () => {
