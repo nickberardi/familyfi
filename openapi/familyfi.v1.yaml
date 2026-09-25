@@ -1690,8 +1690,8 @@ paths:
     delete:
       operationId: removeRevokedConnectionDevices
       tags: [Connection]
-      summary: Remove every revoked phone's record
-      description: Requires `?revoked=true`. Active phones are never touched. Sessions, pairings and change history keep their rows with the phone reference cleared.
+      summary: Remove every revoked device record
+      description: Requires `?revoked=true`. Active devices are never touched. Sessions, pairings and change history keep their rows with the device reference cleared.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: revoked, in: query, required: true, schema: { type: string, enum: ["true"] } }, { $ref: "#/components/parameters/CsrfToken" }]
       responses:

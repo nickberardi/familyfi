@@ -37,11 +37,11 @@ export async function POST(request: Request) {
   });
 }
 
-/** `?revoked=true` removes every revoked phone's record. Active phones are never touched. */
+/** `?revoked=true` removes every revoked device record. Active devices are never touched. */
 export async function DELETE(request: Request) {
   return withAdmin(request, async () => {
     if (new URL(request.url).searchParams.get("revoked") !== "true") {
-      return jsonError(400, "invalid_request", "Only revoked phones can be removed in bulk: add ?revoked=true.");
+      return jsonError(400, "invalid_request", "Only revoked devices can be removed in bulk: add ?revoked=true.");
     }
     return Response.json({ removed: await removeRevokedDevices() });
   });
