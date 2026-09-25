@@ -64,12 +64,18 @@ describe("remote access", () => {
     return prisma().connectionEndpoint.create({ data: { url, transport, trustMode: "system", enabled } });
   }
 
+  /** The pid of the tunnel process the stand-in cloudflared most recently started. */
+  function lastTunnelPid(): number {
+    const pids = readFileSync(log, "utf8").split("\n").filter((line) => line.startsWith("pid: "));
+    return Number(pids.at(-1)!.slice(5));
+  }
+
   function cloudflaredRuns(): string {
     return (existsSync(log) ? readFileSync(log, "utf8") : "").split("\n").filter((line) => line.startsWith("argv: tunnel")).join("\n");
   }
 
-  async function waitFor(check: (tunnel: Tunnel) => boolean, label: string): Promise<Tunnel> {
-    for (let i = 0; i < 80; i++) {
+  async function waitFor(check: (tunnel: Tunnel) => boolean, label: string, tries = 80): Promise<Tunnel> {
+    for (let i = 0; i < tries; i++) {
       const current = await state();
       if (check(current)) return current;
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -241,5 +247,39 @@ describe("remote access", () => {
     await prisma().household.update({ where: { id: "default" }, data: { remoteEndpointId: quick.endpointId } });
     await resumeRemoteAccess();
     expect(await waitFor((t) => t.status === "running", "the resumed quick tunnel")).toMatchObject({ mode: "quick", endpointId: quick.endpointId });
+  });
+  it("restarts a tunnel that stops while it is still wanted", async () => {
+    await put({ mode: "quick" });
+    const first = await waitFor((t) => t.status === "running", "the quick tunnel");
+    const pid = lastTunnelPid();
+    process.kill(pid);
+
+    const stopped = await waitFor((t) => t.status === "error", "the stopped tunnel");
+    expect(stopped.error).toContain("stopped");
+    // The route stays published: phones keep its address while the tunnel comes back.
+    expect(stopped.endpointId).toBe(first.endpointId);
+    const back = await waitFor((t) => t.status === "running", "the restarted tunnel", 150);
+    expect(lastTunnelPid()).not.toBe(pid);
+    expect(back).toMatchObject({ mode: "quick", endpointId: first.endpointId });
+  });
+
+  it("stops its tunnel when another FamilyFi process takes the lease", async () => {
+    await put({ mode: "quick" });
+    await waitFor((t) => t.status === "running", "the quick tunnel");
+    await prisma().reconciliationLock.update({ where: { id: "tunnel" }, data: { owner: "some-other-process", expiresAt: new Date(Date.now() + 60_000) } });
+
+    // The lease is renewed every 20 seconds; the renewal that finds it taken stops this tunnel.
+    const lost = await waitFor((t) => t.status === "error", "the lost lease", 260);
+    expect(lost.error).toContain("Another FamilyFi process");
+    expect(lost.url).toBeNull();
+  }, 30_000);
+
+  it("refuses a hostname another route already uses", async () => {
+    const taken = await ownRoute("https://familyfi.example.com", "cloudflare", false);
+    await put({ mode: "named", hostname: "familyfi.example.com" });
+    const failed = await waitFor((t) => t.status === "error", "the refusal");
+    expect(failed.error).toBe("Another route already uses https://familyfi.example.com. Remove it first, or choose another hostname.");
+    expect(await prisma().connectionEndpoint.count({ where: { kind: "domain" } })).toBe(0);
+    expect(await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: taken.id } })).toMatchObject({ kind: "own", url: "https://familyfi.example.com" });
   });
 });

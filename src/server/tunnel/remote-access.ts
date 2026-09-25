@@ -331,7 +331,7 @@ async function saveDomainRoute(hostname: string, credential: TunnelCredential) {
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw new RemoteAccessError(`Another route already uses https://${hostname}. Remove it first, or choose another hostname.`);
-    throw error;
+    throw error; // coverage-exempt: any other database failure; a household can only cause the unique violation above
   }
 }
 
