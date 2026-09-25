@@ -3,6 +3,7 @@ import { AccountKind, ConnectionTransport, ConnectionTrustMode, PairedDeviceClie
 import { SESSION_TTL_MS } from "@/lib/constants";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
+import { edgeCredentials, recordDelivered, storedServiceToken } from "./edge-auth";
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
 const SPKI_SHA256 = /^[A-Za-z0-9_-]{43}$/;
@@ -52,14 +53,26 @@ export function isManagedRoute(endpoint: { kind: RouteKind }): boolean {
   return endpoint.kind !== RouteKind.own;
 }
 
-export async function signedEndpointManifest() {
+/**
+ * The routes phones may use, signed with the household key. Inside the signed payload each route
+ * also says whether Cloudflare Access guards it, and a paired device (`deviceId`) additionally
+ * gets those routes' service tokens — never a browser session. The unsigned `endpoints` copy keeps
+ * the plain route shape, which phones decode strictly.
+ */
+export async function signedEndpointManifest(options: { deviceId?: string | null } = {}) {
   const household = await ensureConnectionIdentity();
   const endpoints = await prisma().connectionEndpoint.findMany({ where: { householdId: household.id, enabled: true }, orderBy: [{ priority: "asc" }, { createdAt: "asc" }] });
-  const payload = JSON.stringify({ instanceId: household.instanceId, endpoints: endpoints.map(publicEndpoint) });
+  const credentials = options.deviceId ? edgeCredentials(endpoints) : [];
+  const payload = JSON.stringify({
+    instanceId: household.instanceId,
+    endpoints: endpoints.map((endpoint) => ({ ...publicEndpoint(endpoint), edgeAuth: endpoint.edgeAuth })),
+    ...(options.deviceId ? { edgeCredentials: credentials } : {}),
+  });
   const privateJwk = JSON.parse(decryptSecret({
     ciphertext: Buffer.from(household.instancePrivateKeyCiphertext!), iv: Buffer.from(household.instancePrivateKeyIv!), authTag: Buffer.from(household.instancePrivateKeyAuthTag!),
   }));
   const { createPrivateKey } = await import("node:crypto");
+  if (options.deviceId) await recordDelivered(options.deviceId, credentials);
   return {
     instanceId: household.instanceId!,
     endpoints: endpoints.map(publicEndpoint),
@@ -94,9 +107,20 @@ export async function createPairing(input: { endpointId: string; displayName: st
   const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
   const pairing = await prisma().pairing.create({ data: { endpointId: input.endpointId, displayName: input.displayName, createdByAccountId: input.createdByAccountId, replacesDeviceId: input.replacesDeviceId ?? null, tokenHash: sha256(token), expiresAt }, include: { endpoint: true } });
   const household = await ensureConnectionIdentity();
+  // A route behind Cloudflare Access is unreachable without its token, so the QR carries it: a phone
+  // pairs over the protected route itself. The token only gets past Cloudflare; pairing still needs the QR's single-use code.
+  const edgeToken = storedServiceToken(pairing.endpoint!);
   return {
     pairing,
-    qr: { version: 1, pairingId: pairing.id, token, endpoint: publicEndpoint(pairing.endpoint!), instanceId: household.instanceId, keyFingerprint: instanceFingerprint(household.instancePublicKey!) },
+    qr: {
+      version: 1,
+      pairingId: pairing.id,
+      token,
+      endpoint: publicEndpoint(pairing.endpoint!),
+      instanceId: household.instanceId,
+      keyFingerprint: instanceFingerprint(household.instancePublicKey!),
+      ...(edgeToken ? { edgeCredential: { version: pairing.endpoint!.edgeTokenVersion, ...edgeToken } } : {}),
+    },
   };
 }
 
@@ -120,7 +144,7 @@ export async function claimPairing(input: { id: string; token: string; displayNa
     return pairedDevice;
   });
   if (!device) return null;
-  return { device, credential, endpoint: publicEndpoint(pairing.endpoint), manifest: await signedEndpointManifest() };
+  return { device, credential, endpoint: publicEndpoint(pairing.endpoint), manifest: await signedEndpointManifest({ deviceId: device.id }) };
 }
 
 export async function authenticatePairedDevice(id: string, credential: string) {

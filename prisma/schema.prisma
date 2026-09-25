@@ -60,6 +60,12 @@ enum ConnectionTrustMode {
   pinned
 }
 
+/// What Cloudflare asks of a request before it reaches a route: nothing, or an Access service token.
+enum EdgeAuth {
+  none
+  serviceToken
+}
+
 enum PolicyOwnerScope {
   group
   quarantine
@@ -138,9 +144,19 @@ model ConnectionEndpoint {
   tunnelCredentialCiphertext Bytes?
   tunnelCredentialIv         Bytes?
   tunnelCredentialAuthTag    Bytes?
+  edgeAuth                   EdgeAuth @default(none)
+  /// An `own` Cloudflare route's Access service token (`{clientId, clientSecret}`), encrypted with
+  /// FAMILYFI_ENCRYPTION_KEY. Served only to phones: in the pairing QR and a paired device's manifest.
+  edgeTokenCiphertext        Bytes?
+  edgeTokenIv                Bytes?
+  edgeTokenAuthTag           Bytes?
+  /// Starts at 1 and rises each time the token is replaced, so phones and the Pair Device page can tell tokens apart.
+  edgeTokenVersion           Int      @default(0)
+  edgeTokenRotatedAt         DateTime?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   pairings     Pairing[]
+  edgeTokens   DeviceEdgeToken[]
 
   @@index([householdId, priority])
 }
@@ -158,6 +174,20 @@ model PairedDevice {
   sessions        Session[]
   pairings        Pairing[]
   authoredChanges ChangeResult[] @relation("changeActorDevice")
+  edgeTokens      DeviceEdgeToken[]
+}
+
+/// The last Access token version a device was handed for a route, so rotation can tell who still has the old one.
+model DeviceEdgeToken {
+  deviceId   String
+  device     PairedDevice       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  endpointId String
+  endpoint   ConnectionEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  version    Int
+  fetchedAt  DateTime           @default(now())
+
+  @@id([deviceId, endpointId])
+  @@index([endpointId])
 }
 
 model Pairing {

@@ -150,6 +150,17 @@ export type PairingQr = {
   endpoint: ConnectionRoute;
   instanceId: string;
   keyFingerprint: string;
+  /** Present when the route is behind Cloudflare Access: the token a phone needs to reach it. */
+  edgeCredential?: { version: number; clientId: string; clientSecret: string };
+};
+
+/** A route behind Cloudflare Access, and which active devices have its current service token. */
+export type EdgeAccess = {
+  endpointId: string;
+  version: number;
+  clientIdHint: string | null;
+  rotatedAt: string | null;
+  devices: { total: number; current: number; behind: { id: string; displayName: string; lastSeenAt: string | null }[] };
 };
 
 export type PairingState = {

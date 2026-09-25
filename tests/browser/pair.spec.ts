@@ -190,15 +190,90 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
     expect(await enabledUrls(page)).toEqual([]);
     await expect(page.getByRole("button", { name: "Pair a phone" })).toHaveCount(0);
 
-    // Advanced is not built yet (#69): it says so and offers nothing to fill in.
-    await card.getByRole("button", { name: "My domain" }).click();
-    await via.getByRole("button", { name: "Cloudflare Tunnel" }).click();
-    await card.getByRole("group", { name: "Cloudflare setup" }).getByRole("button", { name: "Advanced" }).click();
-    await expect(card.getByTestId("cloudflare-advanced")).toContainText("Coming soon");
-    await expect(card.getByLabel("Address")).toHaveCount(0);
-    await shot(page, "cloudflare-advanced");
   } finally {
     await cleanUp(page, [home, tailnet]);
+  }
+});
+
+test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a token replacement", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const stamp = Date.now();
+  const url = `https://advanced-${stamp}.example.com`;
+  const phone = `Access iPhone ${stamp}`;
+  const first = { id: `${stamp}aaaaaaaaaaaaaaaaaaaa.access`, secret: `first-${stamp}-0123456789abcdef` };
+  const second = { id: first.id, secret: `second-${stamp}-fedcba9876543210` };
+  page.on("dialog", (dialog) => void dialog.accept());
+  try {
+    await page.goto("/pair");
+    const card = page.getByTestId("remote-access");
+    await card.getByRole("button", { name: "My domain" }).click();
+    await card.getByRole("group", { name: "How phones reach home" }).getByRole("button", { name: "Cloudflare Tunnel" }).click();
+    await card.getByRole("group", { name: "Cloudflare setup" }).getByRole("button", { name: "Advanced" }).click();
+    const advanced = card.getByTestId("cloudflare-advanced");
+    await expect(advanced).toContainText("http://app:7002");
+    await expect(advanced.getByRole("link", { name: /Set up the tunnel/ })).toHaveAttribute("href", /\/wiki\/Remote-access-Cloudflare-Tunnel$/);
+
+    // Unticked, it is an ordinary trusted route.
+    await advanced.getByLabel("Address").fill(url);
+    await expect(advanced.getByLabel("Client ID")).toHaveCount(0);
+    await advanced.getByRole("button", { name: "Use this address" }).click();
+    await expect(card.getByTestId("remote-url")).toHaveText(url);
+    expect(await enabledUrls(page)).toEqual([url]);
+    await expect(card.getByTestId("saved-route")).toContainText("No Cloudflare Access");
+
+    // Ticked, it needs both halves of the token before it saves.
+    await card.getByTestId("saved-route").getByRole("button", { name: "Edit" }).click();
+    await advanced.getByLabel("Protect with Cloudflare Access").check();
+    await advanced.getByLabel("Client ID").fill(first.id);
+    await expect(advanced.getByRole("button", { name: "Use this address" })).toBeDisabled();
+    await advanced.getByLabel("Client Secret").fill(first.secret);
+    await shot(page, "cloudflare-advanced");
+    await advanced.getByRole("button", { name: "Use this address" }).click();
+    const saved = card.getByTestId("saved-route");
+    await expect(saved.getByTestId("access-badge")).toBeVisible();
+    await expect(saved).toContainText("Token 1");
+    await expect(page.locator("body")).not.toContainText(first.secret);
+
+    // The QR carries the token; a typed code can't, so only the payload is offered.
+    await page.getByRole("button", { name: "Pair a phone" }).click();
+    const pairSheet = page.getByRole("dialog", { name: "Pair a phone" });
+    await pairSheet.getByLabel("Phone", { exact: true }).fill(phone);
+    await pairSheet.getByRole("button", { name: "Show pairing code" }).click();
+    const qrSheet = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
+    await expect(qrSheet.getByTestId("pairing-code")).toHaveCount(0);
+    const payload = JSON.parse((await qrSheet.getByTestId("pairing-payload").textContent()) ?? "{}") as {
+      pairingId: string;
+      token: string;
+      edgeCredential: { version: number; clientId: string; clientSecret: string };
+    };
+    expect(payload.edgeCredential).toEqual({ version: 1, clientId: first.id, clientSecret: first.secret });
+    const claim = await page.request.post(`/api/v1/connection/pairings/${payload.pairingId}/claim`, { data: { token: payload.token, deviceName: phone } });
+    expect(claim.ok()).toBe(true);
+    const claimed = (await claim.json()) as { device: { id: string }; deviceCredential: string };
+    await page.getByRole("dialog", { name: "Phone paired" }).getByRole("button", { name: "Done" }).click();
+    const native = await page.request.post("/api/v1/auth/login", {
+      data: { username: "admin", password, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential },
+    });
+    const bearer = { authorization: `Bearer ${((await native.json()) as { token: string }).token}` };
+
+    // Replacing the token: the phone is waited for until its next manifest carries the new one.
+    await saved.getByRole("button", { name: "Edit" }).click();
+    await advanced.getByLabel("Client ID").fill(second.id);
+    await advanced.getByLabel("Client Secret").fill(second.secret);
+    await advanced.getByRole("button", { name: "Use this address" }).click();
+    await expect(saved).toContainText("Token 2");
+    await expect(saved.getByTestId("access-rollout")).toContainText(phone);
+    await expect(saved.getByTestId("access-rollout")).toContainText("Keep the old token in Cloudflare");
+    await shot(page, "cloudflare-access-rotation");
+    expect((await page.request.get("/api/v1/connection", { headers: bearer })).status()).toBe(200);
+    await page.reload();
+    await expect(page.getByTestId("saved-route").getByTestId("access-rollout")).not.toContainText(phone);
+
+    await page.getByTestId("saved-route").getByRole("button", { name: "Turn off Access" }).click();
+    await expect(page.getByTestId("saved-route")).toContainText("No Cloudflare Access");
+    await page.request.delete(`/api/v1/connection/devices/${claimed.device.id}?remove=true`, { headers: await csrf(page) });
+  } finally {
+    await cleanUp(page, [url]);
   }
 });
 

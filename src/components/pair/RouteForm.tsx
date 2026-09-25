@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import { canPin } from "@/lib/connection-routes";
 import type { ConnectionRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
@@ -34,6 +34,7 @@ function origin(value: string): string | null {
  * nobody computes it by hand, and the field stays editable as the override.
  *
  * Saving stores the route switched off; `onSaved` then publishes it through Remote access.
+ * `extra` renders more fields above the actions, and `extraBody` sends them with the route.
  */
 export function RouteForm({
   transport,
@@ -41,6 +42,9 @@ export function RouteForm({
   routes,
   onSaved,
   onCancel,
+  extra,
+  extraBody,
+  canSave = true,
 }: {
   transport: ConnectionTransport;
   /** The saved route being edited, if any. */
@@ -48,6 +52,11 @@ export function RouteForm({
   routes: readonly ConnectionRoute[];
   onSaved: (route: ConnectionRoute) => Promise<void>;
   onCancel?: () => void;
+  extra?: ReactNode;
+  /** More fields saved with the route in the same request. */
+  extraBody?: Record<string, unknown>;
+  /** False while `extra` is incomplete. */
+  canSave?: boolean;
 }) {
   const [url, setUrl] = useState(route?.url ?? "");
   const [trust, setTrust] = useState<Trust>(route?.trustMode ?? "system");
@@ -86,7 +95,7 @@ export function RouteForm({
     setError("");
     setSaving(true);
     const trustMode: Trust = pinned ? "pinned" : "system";
-    const body = { url: url.trim(), transport, trustMode, spkiSha256: pinned ? pin.trim() : null };
+    const body = { url: url.trim(), transport, trustMode, spkiSha256: pinned ? pin.trim() : null, ...extraBody };
     try {
       let saved: ConnectionRoute;
       if (route) {
@@ -216,13 +225,14 @@ export function RouteForm({
           The phone checks this address&rsquo;s certificate the ordinary way, so it needs a certificate the iPhone already trusts.
         </p>
       )}
+      {extra}
       {error ? (
         <p role="alert" className="font-semibold text-[var(--ff-danger)]">
           {error}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={PRIMARY_BUTTON} disabled={saving || !url.trim() || (pinned && !pin.trim())} onClick={() => void save()}>
+        <button type="button" className={PRIMARY_BUTTON} disabled={saving || !canSave || !url.trim() || (pinned && !pin.trim())} onClick={() => void save()}>
           {saving ? "Saving…" : "Use this address"}
         </button>
         {onCancel ? (
