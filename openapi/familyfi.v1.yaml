@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.9.0
+  version: 0.10.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -1477,21 +1477,29 @@ paths:
     get:
       operationId: listConnectionEndpoints
       tags: [Connection]
-      summary: List operator-configured endpoints
+      summary: List every route, with who runs it
+      description: |
+        Every saved route, enabled or not. Remote access publishes one at a time: the route in
+        `GET /api/v1/connection/tunnel` `endpointId` is the only one enabled, and the only one
+        phones are handed.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
-        "200": { description: Endpoints, content: { application/json: { schema: { type: object, required: [endpoints], properties: { endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } } }
+        "200": { description: Endpoints, content: { application/json: { schema: { type: object, required: [endpoints], properties: { endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpointAdmin" } } } } } } }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
     post:
       operationId: createConnectionEndpoint
       tags: [Connection]
-      summary: Add an HTTPS endpoint
+      summary: Add a route the household runs
+      description: |
+        Always `kind: own`. Save it with `enabled: false`, then publish it with
+        `PUT /api/v1/connection/tunnel` `{ "mode": "named", "endpointId": … }`, which turns every
+        other route off.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointWrite" } } } }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } }
+        "201": { description: Created, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpointAdmin" } } } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
@@ -1500,22 +1508,27 @@ paths:
     put:
       operationId: updateConnectionEndpoint
       tags: [Connection]
-      summary: Update an HTTPS endpoint
+      summary: Update a route the household runs
+      description: A `quick` or `domain` route follows FamilyFi's own tunnel and is refused with `managed_route`; change it through `PUT /api/v1/connection/tunnel`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointUpdate" } } } }
       responses:
-        "200": { description: Updated, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } }
+        "200": { description: Updated, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpointAdmin" } } } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
-        "409": { description: "`endpoint_exists` — another route already uses this address", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: "`endpoint_exists` — another route already uses this address; `managed_route` — the route follows FamilyFi's own tunnel", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
     delete:
       operationId: deleteConnectionEndpoint
       tags: [Connection]
-      summary: Delete an HTTPS endpoint
-      description: Refused while an unclaimed, unexpired pairing uses the route. Phones already paired through it keep their other routes; their `pairedVia` becomes null.
+      summary: Delete a route the household runs
+      description: |
+        Refused while an unclaimed, unexpired pairing uses the route, and for a `quick` or `domain`
+        route (`managed_route`; forget a domain with `PUT /api/v1/connection/tunnel`). Deleting the
+        published route turns remote access off. Phones already paired through it keep their other
+        routes; their `pairedVia` becomes null.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
       responses:
@@ -1523,12 +1536,12 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
-        "409": { description: "`endpoint_in_use` — a pending pairing uses this route", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: "`endpoint_in_use` — a pending pairing uses this route; `managed_route` — the route follows FamilyFi's own tunnel", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /api/v1/connection/tunnel:
     get:
       operationId: getRemoteAccess
       tags: [Connection]
-      summary: Remote access (Cloudflare quick tunnel) state
+      summary: Remote access state and the route it publishes
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: Remote access, content: { application/json: { schema: { type: object, additionalProperties: false, required: [tunnel], properties: { tunnel: { $ref: "#/components/schemas/RemoteAccess" } } } } } }
@@ -1537,18 +1550,27 @@ paths:
     put:
       operationId: setRemoteAccess
       tags: [Connection]
-      summary: Turn remote access off, on as a quick tunnel, or on with your own domain
+      summary: Choose the one route remote access publishes
       description: |
+        Every change publishes exactly one route and turns every other route off; `off` publishes
+        none. A tunnel's route is turned on once its tunnel is up, so phones are never handed an
+        address nothing answers.
+
         `quick` starts a Cloudflare quick tunnel to FamilyFi's phone-only gateway, which
         forwards only `/api/v1/*`, strips cookies, and requires a paired phone to sign in.
-        FamilyFi keeps one `cloudflare` route pointed at the tunnel's current address.
-        `off` stops the tunnel and disables that route; `forget: true` also deletes the stored
-        domain credential (the tunnel and DNS record stay in the Cloudflare account).
-        `named` with a new `hostname` starts a one-time Cloudflare sign-in: poll GET for
-        `loginUrl`, which a person opens to authorize. FamilyFi then creates a tunnel and a DNS
-        record (never overwriting an existing one), stores only that tunnel's credential
-        encrypted with FAMILYFI_ENCRYPTION_KEY, and discards the account-wide certificate.
-        `named` without a hostname runs the domain already set up.
+        FamilyFi keeps one `quick` route pointed at the tunnel's current address.
+
+        `named` is "my domain", in one of two forms:
+        - with `endpointId`: publish that `own` route (home network, Tailscale). FamilyFi runs no
+          tunnel. A `quick` or `domain` route is refused.
+        - with a new `hostname`: a one-time Cloudflare sign-in. Poll GET for `loginUrl`, which a
+          person opens to authorize. FamilyFi then creates a tunnel and a DNS record (never
+          overwriting an existing one), stores only that tunnel's credential on the `domain`
+          route, encrypted with FAMILYFI_ENCRYPTION_KEY, and discards the account-wide certificate.
+          Without either, it runs the domain already set up.
+
+        `off` with `forget: true` also deletes the `domain` route and its credential (the tunnel
+        and DNS record stay in the Cloudflare account).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       requestBody:
@@ -1559,7 +1581,7 @@ paths:
               oneOf:
                 - { type: object, additionalProperties: false, required: [mode], properties: { mode: { const: "off" }, forget: { type: boolean } } }
                 - { type: object, additionalProperties: false, required: [mode], properties: { mode: { const: quick } } }
-                - { type: object, additionalProperties: false, required: [mode], properties: { mode: { const: named }, hostname: { type: string, maxLength: 253 } } }
+                - { type: object, additionalProperties: false, required: [mode], description: "Send `hostname` or `endpointId`, never both.", properties: { mode: { const: named }, hostname: { type: string, maxLength: 253 }, endpointId: { type: string, description: "An `own` route to publish." } } }
       responses:
         "200": { description: Remote access, content: { application/json: { schema: { type: object, additionalProperties: false, required: [tunnel], properties: { tunnel: { $ref: "#/components/schemas/RemoteAccess" } } } } } }
         "400": { $ref: "#/components/responses/Error" }
@@ -2096,7 +2118,24 @@ components:
       properties:
         id: { type: string }
         url: { type: string, format: uri }
-        transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
+        transport: { type: string, enum: [lan, tailscale, cloudflare] }
+        trustMode: { type: string, enum: [system, pinned] }
+        spkiSha256: { type: [string, "null"] }
+        priority: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+    ConnectionEndpointAdmin:
+      type: object
+      additionalProperties: false
+      description: A route as the administrator sees it. Phones get `ConnectionEndpoint`, without `kind`.
+      required: [id, url, kind, transport, trustMode, spkiSha256, priority, enabled]
+      properties:
+        id: { type: string }
+        url: { type: string, format: uri }
+        kind:
+          type: string
+          enum: [quick, domain, own]
+          description: "Who runs the route: FamilyFi's quick tunnel, FamilyFi's tunnel on the household's domain, or the household."
+        transport: { type: string, enum: [lan, tailscale, cloudflare] }
         trustMode: { type: string, enum: [system, pinned] }
         spkiSha256: { type: [string, "null"] }
         priority: { type: integer, minimum: 0 }
@@ -2107,7 +2146,7 @@ components:
       required: [url, transport, trustMode]
       properties:
         url: { type: string, format: uri }
-        transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
+        transport: { type: string, enum: [lan, tailscale, cloudflare] }
         trustMode: { type: string, enum: [system, pinned] }
         spkiSha256: { type: string }
         priority: { type: integer, minimum: 0 }
@@ -2118,7 +2157,7 @@ components:
       description: "Partial update. Moving a pinned route to `system` trust must also send `spkiSha256: null`."
       properties:
         url: { type: string, format: uri }
-        transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
+        transport: { type: string, enum: [lan, tailscale, cloudflare] }
         trustMode: { type: string, enum: [system, pinned] }
         spkiSha256: { type: [string, "null"] }
         priority: { type: integer, minimum: 0, maximum: 999 }
@@ -2128,13 +2167,13 @@ components:
       additionalProperties: false
       required: [mode, status, url, error, endpointId, cloudflared, hostname, loginUrl]
       properties:
-        mode: { type: string, enum: ["off", quick, named] }
+        mode: { type: string, enum: ["off", quick, named], description: "`named` is my domain: FamilyFi's tunnel on it, or an `own` route." }
         status: { type: string, enum: ["off", signing-in, starting, running, error, unavailable] }
-        url: { type: [string, "null"], format: uri, description: The tunnel's current public address. }
+        url: { type: [string, "null"], format: uri, description: "Where phones reach home: the tunnel's current public address, or an `own` route's address." }
         error: { type: [string, "null"] }
-        endpointId: { type: [string, "null"], description: The connection route FamilyFi keeps pointed at the tunnel. }
+        endpointId: { type: [string, "null"], description: "The route remote access publishes — the only one enabled. Null while off, or before a tunnel's first route exists." }
         cloudflared: { type: [string, "null"], description: "cloudflared version on this server, or null when it is not installed." }
-        hostname: { type: [string, "null"], description: The domain hostname set up for a named tunnel. }
+        hostname: { type: [string, "null"], description: "The hostname of the `domain` route, when one is set up — even while another route is published." }
         loginUrl: { type: [string, "null"], format: uri, description: "While status is signing-in, the Cloudflare link a person opens to authorize FamilyFi." }
     ConnectionCertificatePin:
       type: object
@@ -2226,7 +2265,7 @@ components:
           properties:
             endpointId: { type: string }
             url: { type: string, format: uri }
-            transport: { type: string, enum: [lan, vpn, reverseProxy, tailscale, cloudflare] }
+            transport: { type: string, enum: [lan, tailscale, cloudflare] }
         sessions:
           type: array
           items:

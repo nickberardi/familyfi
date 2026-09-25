@@ -2,41 +2,54 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { TRANSPORTS, canPin, nextPriority } from "@/lib/connection-routes";
-import type { CertificatePin, ConnectionRoute, ConnectionTransport } from "@/lib/types";
+import { canPin } from "@/lib/connection-routes";
+import type { AdminRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
 import { Segmented } from "@/components/ui/Segmented";
-import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "./SheetFrame";
+import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
 type Trust = "system" | "pinned";
 
-function defaultUrl(): string {
-  if (typeof window === "undefined") return "https://";
-  return window.location.protocol === "https:" ? window.location.origin : "https://";
-}
+const PLACEHOLDER: Record<ConnectionTransport, string> = {
+  lan: "https://192.168.1.10:8443",
+  tailscale: "https://familyfi.your-tailnet.ts.net",
+  cloudflare: "https://familyfi.example.com",
+};
 
 function expiry(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function origin(value: string): string | null {
+  try {
+    return new URL(value.trim()).origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Add or edit a route. A pinned route is for a home-network address whose certificate
- * the iPhone would not otherwise trust; FamilyFi reads the pin from the address (or a
- * pasted certificate) so nobody computes it by hand, and the field stays editable as
- * the override.
+ * The address of a route the household runs, and for a home-network route how the phone
+ * trusts its certificate. A pinned route is for a certificate the iPhone would not
+ * otherwise trust; FamilyFi reads the pin from the address (or a pasted certificate) so
+ * nobody computes it by hand, and the field stays editable as the override.
+ *
+ * Saving stores the route switched off; `onSaved` then publishes it through Remote access.
  */
-export function RouteSheet({
+export function RouteForm({
+  transport,
   route,
   routes,
-  onClose,
   onSaved,
+  onCancel,
 }: {
-  route: ConnectionRoute | null;
-  routes: ConnectionRoute[];
-  onClose: () => void;
-  onSaved: () => void;
+  transport: ConnectionTransport;
+  /** The saved route being edited, if any. */
+  route?: AdminRoute;
+  routes: readonly AdminRoute[];
+  onSaved: (route: AdminRoute) => Promise<void>;
+  onCancel?: () => void;
 }) {
-  const [url, setUrl] = useState(route?.url ?? defaultUrl());
-  const [transport, setTransport] = useState<ConnectionTransport>(route?.transport ?? "lan");
+  const [url, setUrl] = useState(route?.url ?? "");
   const [trust, setTrust] = useState<Trust>(route?.trustMode ?? "system");
   const [pin, setPin] = useState(route?.spkiSha256 ?? "");
   const [read, setRead] = useState<CertificatePin | null>(null);
@@ -46,7 +59,6 @@ export function RouteSheet({
   const [readError, setReadError] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const note = TRANSPORTS.find((item) => item.value === transport)?.note;
   const pinned = trust === "pinned" && canPin(transport);
   const pinDiffers = pinned && read !== null && pin.trim() !== read.spkiSha256;
 
@@ -66,22 +78,36 @@ export function RouteSheet({
     }
   }
 
+  async function update(id: string, body: object) {
+    return (await api<{ endpoint: AdminRoute }>(`/api/v1/connection/endpoints/${id}`, { method: "PUT", body: JSON.stringify(body) })).endpoint;
+  }
+
   async function save() {
     setError("");
     setSaving(true);
     const trustMode: Trust = pinned ? "pinned" : "system";
     const body = { url: url.trim(), transport, trustMode, spkiSha256: pinned ? pin.trim() : null };
     try {
+      let saved: AdminRoute;
       if (route) {
-        await api(`/api/v1/connection/endpoints/${route.id}`, { method: "PUT", body: JSON.stringify(body) });
+        saved = await update(route.id, body);
       } else {
-        const { spkiSha256, ...rest } = body;
-        await api("/api/v1/connection/endpoints", {
-          method: "POST",
-          body: JSON.stringify({ ...rest, ...(spkiSha256 ? { spkiSha256 } : {}), priority: nextPriority(routes) }),
-        });
+        try {
+          const { spkiSha256, ...rest } = body;
+          saved = (
+            await api<{ endpoint: AdminRoute }>("/api/v1/connection/endpoints", {
+              method: "POST",
+              body: JSON.stringify({ ...rest, ...(spkiSha256 ? { spkiSha256 } : {}), priority: 0, enabled: false }),
+            })
+          ).endpoint;
+        } catch (caught) {
+          // The address is already saved as another of your routes: reuse it rather than refuse.
+          const existing = routes.find((item) => item.kind === "own" && item.url === origin(url));
+          if (!(caught instanceof ApiError && caught.code === "endpoint_exists" && existing)) throw caught;
+          saved = await update(existing.id, body);
+        }
       }
-      onSaved();
+      await onSaved(saved);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not save the route.");
     } finally {
@@ -90,22 +116,8 @@ export function RouteSheet({
   }
 
   return (
-    <SheetFrame
-      title={route ? "Edit route" : "Add a route"}
-      sub="An HTTPS address the FamilyFi app can use to reach this server."
-      onClose={onClose}
-      footer={
-        <>
-          <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className={PRIMARY_BUTTON} disabled={saving || !url.trim() || (pinned && !pin.trim())} onClick={() => void save()}>
-            {route ? "Save" : "Add route"}
-          </button>
-        </>
-      }
-    >
-      <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
+    <div className="flex flex-col gap-3">
+      <label className="font-semibold text-[var(--ff-muted)]">
         Address
         <input
           className={`${FIELD} font-mono`}
@@ -116,25 +128,14 @@ export function RouteSheet({
           }}
           autoComplete="off"
           spellCheck={false}
-          placeholder="https://familyfi.home:8443"
+          placeholder={PLACEHOLDER[transport]}
         />
         <span className="mt-1 block font-normal">HTTPS origin only — no path. Phones must type it exactly as saved.</span>
-      </label>
-      <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
-        How the phone gets there
-        <select className={FIELD} value={transport} onChange={(event) => setTransport(event.target.value as ConnectionTransport)}>
-          {TRANSPORTS.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <span className="mt-1 block font-normal">{note}</span>
       </label>
 
       {canPin(transport) ? (
         <div className="flex flex-col gap-2">
-          <div className="text-[14px] font-semibold text-[var(--ff-muted)]">Certificate</div>
+          <div className="font-semibold text-[var(--ff-muted)]">Certificate</div>
           <Segmented
             name="Certificate trust"
             value={trust}
@@ -150,7 +151,7 @@ export function RouteSheet({
 
       {pinned ? (
         <div className="flex flex-col gap-2.5 rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-3">
-          <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
+          <p className="leading-5 text-[var(--ff-muted)]">
             For a self-signed certificate. The phone accepts only this exact key, so a certificate renewed with a new key
             stops phones until you update the pin here.
           </p>
@@ -178,22 +179,22 @@ export function RouteSheet({
             </div>
           ) : null}
           {readError ? (
-            <p role="alert" className="text-[14px] font-semibold text-[var(--ff-danger)]">
+            <p role="alert" className="font-semibold text-[var(--ff-danger)]">
               {readError}
             </p>
           ) : null}
           {read ? (
-            <p data-testid="certificate-read" className="text-[14px] leading-5">
+            <p data-testid="certificate-read" className="leading-5">
               {read.subject} · issued by {read.issuer} · expires {expiry(read.validTo)}
             </p>
           ) : null}
           {read?.systemTrusted ? (
-            <p className="text-[14px] font-semibold text-[var(--ff-paused)]">
+            <p className="font-semibold text-[var(--ff-paused)]">
               This certificate is already trusted by devices. Choose Trusted by iPhone instead, so renewals don&rsquo;t break
               the pin.
             </p>
           ) : null}
-          <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
+          <label className="font-semibold text-[var(--ff-muted)]">
             SPKI SHA-256 pin
             <input
               className={`${FIELD} font-mono`}
@@ -205,22 +206,31 @@ export function RouteSheet({
             />
           </label>
           {pinDiffers ? (
-            <p className="text-[14px] font-semibold text-[var(--ff-paused)]">
+            <p className="font-semibold text-[var(--ff-paused)]">
               This pin differs from the certificate FamilyFi just read. Phones will refuse the route unless the pin matches.
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 text-[14px] leading-5 text-[var(--ff-muted)]">
-          The phone checks this address&rsquo;s certificate the ordinary way, so it needs a certificate the iPhone already
-          trusts.
+        <p className="rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 leading-5 text-[var(--ff-muted)]">
+          The phone checks this address&rsquo;s certificate the ordinary way, so it needs a certificate the iPhone already trusts.
         </p>
       )}
       {error ? (
-        <p role="alert" className="text-[14px] font-semibold text-[var(--ff-danger)]">
+        <p role="alert" className="font-semibold text-[var(--ff-danger)]">
           {error}
         </p>
       ) : null}
-    </SheetFrame>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={PRIMARY_BUTTON} disabled={saving || !url.trim() || (pinned && !pin.trim())} onClick={() => void save()}>
+          {saving ? "Saving…" : "Use this address"}
+        </button>
+        {onCancel ? (
+          <button type="button" className={SECONDARY_BUTTON} onClick={onCancel}>
+            Cancel
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }

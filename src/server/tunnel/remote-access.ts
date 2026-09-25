@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ConnectionTransport, ConnectionTrustMode, TunnelMode, type Household } from "@prisma/client";
+import { ConnectionTransport, ConnectionTrustMode, RouteKind, type ConnectionEndpoint } from "@prisma/client";
+import { isUniqueViolation } from "../connection";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { prisma } from "../db";
 import {
@@ -24,8 +25,14 @@ import { startPhoneGateway } from "./phone-gateway";
 
 export type RemoteAccessStatus = "off" | "signing-in" | "starting" | "running" | "error" | "unavailable";
 
+/** What the household chose: no route, FamilyFi's quick tunnel, or "My domain" (FamilyFi's tunnel on it, or a route the household runs). */
+export type RemoteAccessMode = "off" | "quick" | "named";
+
+/** The tunnel this process runs for the published route, if any. */
+type Wanted = typeof RouteKind.quick | typeof RouteKind.domain | null;
+
 export type RemoteAccessState = {
-  mode: TunnelMode;
+  mode: RemoteAccessMode;
   status: RemoteAccessStatus;
   url: string | null;
   error: string | null;
@@ -45,7 +52,7 @@ type Runtime = {
   gateway: { server: Server; port: number } | null;
   restartTimer: ReturnType<typeof setTimeout> | null;
   attempts: number;
-  wanted: TunnelMode;
+  wanted: Wanted;
   /** This process's identity for the tunnel lease. */
   owner: string;
   leaseTimer: ReturnType<typeof setInterval> | null;
@@ -63,7 +70,7 @@ const runtime: Runtime = ((globalThis as { familyfiRemoteAccess?: Runtime }).fam
   gateway: null,
   restartTimer: null,
   attempts: 0,
-  wanted: TunnelMode.off,
+  wanted: null,
   owner: randomUUID(),
   leaseTimer: null,
   exitHook: false,
@@ -71,7 +78,7 @@ const runtime: Runtime = ((globalThis as { familyfiRemoteAccess?: Runtime }).fam
 
 /**
  * Only one FamilyFi process may run the tunnel for a database. Two would each keep the
- * managed route pointed at their own address and fight over it — two dev servers do it,
+ * tunnel's route pointed at their own address and fight over it — two dev servers do it,
  * and so could an old and a new container overlapping during an upgrade. The lease is a
  * row in the same table reconciliation uses, under its own id.
  */
@@ -111,7 +118,7 @@ function keepLease() {
   runtime.leaseTimer = setInterval(() => {
     void acquireLease()
       .then((held) => {
-        if (held || runtime.wanted === TunnelMode.off) return;
+        if (held || !runtime.wanted) return;
         runtime.child?.kill();
         runtime.child = null;
         runtime.url = null;
@@ -136,52 +143,72 @@ const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 
 export class RemoteAccessError extends Error {}
 
+type Db = Parameters<Parameters<ReturnType<typeof prisma>["$transaction"]>[0]>[0];
+
 function appPort(): number {
   return Number(process.env.PORT || 3000);
 }
 
-async function household(): Promise<Household> {
-  return prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+async function publishedRoute(db: Db = prisma() as unknown as Db): Promise<ConnectionEndpoint | null> {
+  const row = await db.household.findUnique({ where: { id: "default" } });
+  return row?.remoteEndpointId ? db.connectionEndpoint.findUnique({ where: { id: row.remoteEndpointId } }) : null;
 }
 
-function storedCredential(row: Household): TunnelCredential | null {
-  if (!row.tunnelCredentialCiphertext || !row.tunnelCredentialIv || !row.tunnelCredentialAuthTag) return null;
+async function routeOfKind(kind: typeof RouteKind.quick | typeof RouteKind.domain, db: Db = prisma() as unknown as Db) {
+  return db.connectionEndpoint.findFirst({ where: { householdId: "default", kind } });
+}
+
+function storedCredential(route: ConnectionEndpoint): TunnelCredential | null {
+  if (!route.tunnelCredentialCiphertext || !route.tunnelCredentialIv || !route.tunnelCredentialAuthTag) return null;
   return parseTunnelCredential(
     decryptSecret({
-      ciphertext: Buffer.from(row.tunnelCredentialCiphertext),
-      iv: Buffer.from(row.tunnelCredentialIv),
-      authTag: Buffer.from(row.tunnelCredentialAuthTag),
+      ciphertext: Buffer.from(route.tunnelCredentialCiphertext),
+      iv: Buffer.from(route.tunnelCredentialIv),
+      authTag: Buffer.from(route.tunnelCredentialAuthTag),
     }),
   );
 }
 
-/** Points the one app-owned route at the tunnel's current address, keeping its id so phones follow. */
-async function adoptUrl(url: string) {
+/**
+ * Makes `endpointId` the one route Remote access publishes, and turns every other route
+ * off. A route you run goes on straight away; a tunnel's route waits for its tunnel, so
+ * phones are never handed an address nothing answers yet.
+ */
+async function publish(db: Db, endpointId: string | null, enable: boolean) {
+  await db.household.update({ where: { id: "default" }, data: { remoteEndpointId: endpointId } });
+  await db.connectionEndpoint.updateMany({
+    where: { householdId: "default", ...(endpointId ? { id: { not: endpointId } } : {}) },
+    data: { enabled: false },
+  });
+  if (endpointId) await db.connectionEndpoint.update({ where: { id: endpointId }, data: { enabled: enable } });
+}
+
+/**
+ * Points the quick-tunnel route at the tunnel's current address and turns it on, keeping
+ * its id so phones follow. The first quick tunnel creates the route and publishes it.
+ */
+async function adoptQuickUrl(url: string) {
   await prisma().$transaction(async (db) => {
-    const row = await db.household.findUniqueOrThrow({ where: { id: "default" } });
-    const current = row.tunnelEndpointId ? await db.connectionEndpoint.findUnique({ where: { id: row.tunnelEndpointId } }) : null;
+    if (runtime.wanted !== RouteKind.quick) return;
+    const current = await routeOfKind(RouteKind.quick, db);
     if (current) {
-      await db.connectionEndpoint.update({ where: { id: current.id }, data: { url, enabled: true } });
+      await db.connectionEndpoint.update({ where: { id: current.id }, data: { url } });
+      await publish(db, current.id, true);
       return;
     }
-    const last = await db.connectionEndpoint.aggregate({ _max: { priority: true } });
     const created = await db.connectionEndpoint.create({
-      data: {
-        url,
-        transport: ConnectionTransport.cloudflare,
-        trustMode: ConnectionTrustMode.system,
-        priority: Math.min(999, (last._max.priority ?? -10) + 10),
-      },
+      data: { url, kind: RouteKind.quick, transport: ConnectionTransport.cloudflare, trustMode: ConnectionTrustMode.system, enabled: false },
     });
-    await db.household.update({ where: { id: "default" }, data: { tunnelEndpointId: created.id } });
+    await publish(db, created.id, true);
   });
 }
 
-async function disableRoute() {
-  const row = await prisma().household.findUnique({ where: { id: "default" } });
-  if (row?.tunnelEndpointId) {
-    await prisma().connectionEndpoint.updateMany({ where: { id: row.tunnelEndpointId }, data: { enabled: false } });
-  }
+/** The domain route's address never changes; going live only turns it on. */
+async function adoptDomainRoute(id: string) {
+  await prisma().$transaction(async (db) => {
+    if (runtime.wanted !== RouteKind.domain) return;
+    await publish(db, id, true);
+  });
 }
 
 function stopAll() {
@@ -201,12 +228,12 @@ function onAdoptFailure(error: unknown) {
 }
 
 /**
- * Saves the managed route, then reports running — never the other way round, so
+ * Saves the tunnel's route, then reports running — never the other way round, so
  * "running" always means phones can already learn the address.
  */
-function goLive(url: string) {
+function goLive(url: string, adopt: () => Promise<void>) {
   runtime.attempts = 0;
-  void adoptUrl(url)
+  void adopt()
     .then(() => {
       if (runtime.url === url) runtime.status = "running";
     })
@@ -228,7 +255,7 @@ function supervise(child: ChildProcess, onChunk: (text: string) => void) {
     if (runtime.child !== child) return;
     runtime.child = null;
     runtime.url = null;
-    if (runtime.wanted === TunnelMode.off) return;
+    if (!runtime.wanted) return;
     runtime.status = "error";
     runtime.error ??= "The tunnel stopped. Retrying.";
     const delay = Math.min(60_000, 5_000 * 2 ** runtime.attempts++);
@@ -257,44 +284,67 @@ async function launch() {
   runtime.status = "starting";
   runtime.error = null;
 
-  if (runtime.wanted === TunnelMode.quick) {
+  if (runtime.wanted === RouteKind.quick) {
     supervise(startQuickTunnel(binary.bin, origin), (text) => {
       const url = quickTunnelUrl(text);
       if (url && url !== runtime.url) {
         runtime.url = url;
-        goLive(url);
+        goLive(url, () => adoptQuickUrl(url));
       }
     });
     return;
   }
 
-  const row = await household();
-  const credential = storedCredential(row);
-  if (!credential || !row.tunnelHostname) {
+  const route = await routeOfKind(RouteKind.domain);
+  const credential = route ? storedCredential(route) : null;
+  if (!route || !credential) {
     runtime.status = "error";
     runtime.error = "No domain is set up. Connect your domain again.";
     return;
   }
-  const url = `https://${row.tunnelHostname}`;
   supervise(startNamedTunnel(binary.bin, origin, credential), (text) => {
     // cloudflared registers several edge connections; the first is enough.
-    if (tunnelRegistered(text) && runtime.url !== url) {
-      runtime.url = url;
-      goLive(url);
+    if (tunnelRegistered(text) && runtime.url !== route.url) {
+      runtime.url = route.url;
+      goLive(route.url, () => adoptDomainRoute(route.id));
     }
   });
 }
 
 /**
+ * Saves the domain route: `https://<hostname>`, holding the tunnel credential. A new
+ * hostname rewrites the one domain route in place, keeping its id so phones follow.
+ */
+async function saveDomainRoute(hostname: string, credential: TunnelCredential) {
+  const secret = encryptSecret(JSON.stringify(credential));
+  const data = {
+    url: `https://${hostname}`,
+    tunnelCredentialCiphertext: new Uint8Array(secret.ciphertext),
+    tunnelCredentialIv: new Uint8Array(secret.iv),
+    tunnelCredentialAuthTag: new Uint8Array(secret.authTag),
+  };
+  try {
+    await prisma().$transaction(async (db) => {
+      const current = await routeOfKind(RouteKind.domain, db);
+      if (current) await db.connectionEndpoint.update({ where: { id: current.id }, data });
+      else await db.connectionEndpoint.create({ data: { ...data, kind: RouteKind.domain, transport: ConnectionTransport.cloudflare, trustMode: ConnectionTrustMode.system, enabled: false } });
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new RemoteAccessError(`Another route already uses https://${hostname}. Remove it first, or choose another hostname.`);
+    throw error;
+  }
+}
+
+/**
  * One-time "Use my domain" setup, the way Scrypted's cloud plugin does it: a person
  * authorizes FamilyFi in Cloudflare, FamilyFi creates a tunnel and a DNS record for
- * the hostname, keeps only that tunnel's credential (encrypted), and throws away the
- * account-wide certificate the login produced.
+ * the hostname, keeps only that tunnel's credential (encrypted, on the domain route),
+ * and throws away the account-wide certificate the login produced.
  */
 async function connectDomain(hostname: string, signal: AbortSignal) {
   const binary = findCloudflared();
   if (!binary) throw new RemoteAccessError("cloudflared is not installed on this server.");
-  const row = await household();
+  const row = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
   const home = mkdtempSync(path.join(tmpdir(), "familyfi-cloudflared-setup-"));
   try {
     runtime.status = "signing-in";
@@ -337,102 +387,122 @@ async function connectDomain(hostname: string, signal: AbortSignal) {
       );
     }
 
-    const secret = encryptSecret(JSON.stringify(credential));
-    await prisma().household.update({
-      where: { id: "default" },
-      data: {
-        tunnelMode: TunnelMode.named,
-        tunnelHostname: hostname,
-        tunnelCredentialCiphertext: new Uint8Array(secret.ciphertext),
-        tunnelCredentialIv: new Uint8Array(secret.iv),
-        tunnelCredentialAuthTag: new Uint8Array(secret.authTag),
-      },
-    });
+    await saveDomainRoute(hostname, credential);
   } finally {
     // The login certificate can create and delete tunnels and DNS across the whole zone. It never outlives setup.
     rmSync(home, { recursive: true, force: true });
   }
 }
 
+function modeOf(route: ConnectionEndpoint | null): RemoteAccessMode {
+  if (route) return route.kind === RouteKind.quick ? "quick" : "named";
+  // Nothing is published while a first quick tunnel comes up or a domain is being set up.
+  if (runtime.setup || runtime.wanted === RouteKind.domain) return "named";
+  return runtime.wanted === RouteKind.quick ? "quick" : "off";
+}
+
 export async function remoteAccessState(): Promise<RemoteAccessState> {
-  const row = await household();
+  const route = await publishedRoute();
+  const domain = await routeOfKind(RouteKind.domain);
+  const own = route?.kind === RouteKind.own;
+  const tunnelWanted = Boolean(route ? !own : runtime.wanted || runtime.setup);
   return {
-    mode: row.tunnelMode,
-    // Mode stays stored as off until a domain setup finishes, and after one fails. While setup runs,
-    // or after it failed, report what is actually happening rather than "off".
-    status: row.tunnelMode === TunnelMode.off && !runtime.setup && runtime.status !== "error" ? "off" : runtime.status,
-    url: runtime.url,
-    error: runtime.error,
-    endpointId: row.tunnelEndpointId,
+    mode: modeOf(route),
+    // A route the household runs is up as far as FamilyFi can tell. Otherwise report what the tunnel is
+    // actually doing — including a setup that failed after nothing was published — rather than "off".
+    status: own ? "running" : !tunnelWanted && runtime.status !== "error" ? "off" : runtime.status,
+    url: own ? route.url : runtime.url,
+    error: own ? null : runtime.error,
+    endpointId: route?.id ?? null,
     cloudflared: findCloudflared()?.version ?? null,
-    hostname: row.tunnelHostname,
+    hostname: domain ? new URL(domain.url).hostname : null,
     loginUrl: runtime.loginUrl,
   };
 }
 
 export type RemoteAccessChange =
-  | { mode: typeof TunnelMode.off; forget?: boolean }
-  | { mode: typeof TunnelMode.quick }
-  | { mode: typeof TunnelMode.named; hostname?: string };
+  | { mode: "off"; forget?: boolean }
+  | { mode: "quick" }
+  | { mode: "named"; hostname?: string; endpointId?: string };
+
+async function stopTunnel() {
+  runtime.wanted = null;
+  runtime.status = "off";
+  await releaseLease();
+}
+
+/** Checks a "My domain" change before anything stops, so a refused request never takes down a running tunnel. */
+async function namedTarget(change: Extract<RemoteAccessChange, { mode: "named" }>) {
+  if (change.endpointId) {
+    const route = await prisma().connectionEndpoint.findUnique({ where: { id: change.endpointId } });
+    if (!route || route.householdId !== "default") throw new RemoteAccessError("That route doesn't exist.");
+    if (route.kind !== RouteKind.own) throw new RemoteAccessError("That route belongs to FamilyFi's own tunnel. Choose Quick tunnel or your domain instead.");
+    return { own: route } as const;
+  }
+  const domain = await routeOfKind(RouteKind.domain);
+  const setUp = domain ? new URL(domain.url).hostname : null;
+  const hostname = change.hostname?.trim().toLowerCase() || setUp;
+  if (!hostname || !validHostname(hostname)) throw new RemoteAccessError("Enter a hostname on a domain in your Cloudflare account, like familyfi.example.com.");
+  // Already set up for this hostname: just run it.
+  return domain && hostname === setUp && storedCredential(domain) ? ({ domain } as const) : ({ hostname } as const);
+}
 
 export async function setRemoteAccess(change: RemoteAccessChange) {
+  const target = change.mode === "named" ? await namedTarget(change) : null;
   stopAll();
   runtime.error = null;
   runtime.attempts = 0;
 
-  if (change.mode === TunnelMode.off) {
-    runtime.wanted = TunnelMode.off;
-    runtime.status = "off";
-    await releaseLease();
-    await prisma().household.update({
-      where: { id: "default" },
-      data: {
-        tunnelMode: TunnelMode.off,
-        ...(change.forget
-          ? { tunnelHostname: null, tunnelCredentialCiphertext: null, tunnelCredentialIv: null, tunnelCredentialAuthTag: null }
-          : {}),
-      },
+  if (change.mode === "off") {
+    await stopTunnel();
+    await prisma().$transaction(async (db) => {
+      await publish(db, null, false);
+      // The credential lives on the domain route, so forgetting the domain deletes it with the route.
+      if (change.forget) await db.connectionEndpoint.deleteMany({ where: { householdId: "default", kind: RouteKind.domain } });
     });
-    await disableRoute();
     return;
   }
 
-  if (change.mode === TunnelMode.quick) {
-    runtime.wanted = TunnelMode.quick;
-    await prisma().household.update({ where: { id: "default" }, data: { tunnelMode: TunnelMode.quick } });
+  if (change.mode === "quick") {
+    runtime.wanted = RouteKind.quick;
+    const current = await routeOfKind(RouteKind.quick);
+    await prisma().$transaction((db) => publish(db, current?.id ?? null, false));
     await launch();
     return;
   }
 
-  const row = await household();
-  const hostname = change.hostname?.trim().toLowerCase() || row.tunnelHostname;
-  if (!hostname || !validHostname(hostname)) throw new RemoteAccessError("Enter a hostname on a domain in your Cloudflare account, like familyfi.example.com.");
+  // A route the household runs: publish it and run no tunnel.
+  if (target?.own) {
+    await stopTunnel();
+    await prisma().$transaction((db) => publish(db, target.own.id, true));
+    return;
+  }
 
-  // Already set up for this hostname: just run it.
-  if (hostname === row.tunnelHostname && storedCredential(row)) {
-    runtime.wanted = TunnelMode.named;
-    await prisma().household.update({ where: { id: "default" }, data: { tunnelMode: TunnelMode.named } });
+  if (target?.domain) {
+    runtime.wanted = RouteKind.domain;
+    await prisma().$transaction((db) => publish(db, target.domain.id, false));
     await launch();
     return;
   }
 
-  // New hostname: stop serving whatever ran before, then set up in the background while the page polls.
-  await prisma().household.update({ where: { id: "default" }, data: { tunnelMode: TunnelMode.off } });
-  await disableRoute();
-  runtime.wanted = TunnelMode.named;
+  // New hostname: stop publishing whatever ran before, then set up in the background while the page polls.
+  await prisma().$transaction((db) => publish(db, null, false));
+  runtime.wanted = RouteKind.domain;
   const setup = new AbortController();
   runtime.setup = setup;
   runtime.status = "signing-in";
-  void connectDomain(hostname, setup.signal)
+  void connectDomain(target!.hostname!, setup.signal)
     .then(async () => {
       if (setup.signal.aborted || runtime.setup !== setup) return;
       runtime.setup = null;
+      const route = await routeOfKind(RouteKind.domain);
+      if (route) await prisma().$transaction((db) => publish(db, route.id, false));
       await launch();
     })
     .catch((error) => {
       if (runtime.setup !== setup) return;
       runtime.setup = null;
-      runtime.wanted = TunnelMode.off;
+      runtime.wanted = null;
       runtime.status = "error";
       runtime.loginUrl = null;
       runtime.error = error instanceof Error ? error.message : String(error);
@@ -449,10 +519,10 @@ export async function startSidecarGateway(port: number) {
   console.log(`Phone-only gateway for a tunnel sidecar listening on port ${bound}.`);
 }
 
-/** Called once at boot: resumes the tunnel the household left on. */
+/** Called once at boot: resumes the tunnel behind the route the household left published. */
 export async function resumeRemoteAccess() {
-  const row = await prisma().household.findUnique({ where: { id: "default" } });
-  if (!row || row.tunnelMode === TunnelMode.off) return;
-  runtime.wanted = row.tunnelMode;
+  const route = await publishedRoute();
+  if (!route || route.kind === RouteKind.own) return;
+  runtime.wanted = route.kind;
   if (!runtime.child) await launch();
 }

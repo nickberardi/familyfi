@@ -44,16 +44,15 @@ enum PairedDeviceClient {
 
 enum ConnectionTransport {
   lan
-  vpn
-  reverseProxy
   tailscale
   cloudflare
 }
 
-enum TunnelMode {
-  off
+/// Who runs a route: FamilyFi's quick tunnel, FamilyFi's tunnel on the household's domain, or the household.
+enum RouteKind {
   quick
-  named
+  domain
+  own
 }
 
 enum ConnectionTrustMode {
@@ -115,12 +114,8 @@ model Household {
   instancePrivateKeyCiphertext Bytes?
   instancePrivateKeyIv   Bytes?
   instancePrivateKeyAuthTag Bytes?
-  tunnelMode             TunnelMode @default(off)
-  tunnelEndpointId       String?
-  tunnelHostname         String?
-  tunnelCredentialCiphertext Bytes?
-  tunnelCredentialIv     Bytes?
-  tunnelCredentialAuthTag Bytes?
+  /// The one route Remote access publishes to phones; null is Off.
+  remoteEndpointId       String?
   revision               Int       @default(0)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
@@ -133,11 +128,16 @@ model ConnectionEndpoint {
   householdId  String              @default("default")
   household    Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
   url          String              @unique
+  kind         RouteKind           @default(own)
   transport    ConnectionTransport
   trustMode    ConnectionTrustMode @default(system)
   spkiSha256   String?
   priority     Int                 @default(0)
   enabled      Boolean             @default(true)
+  /// A `domain` route's tunnel credential, encrypted with FAMILYFI_ENCRYPTION_KEY. Never served.
+  tunnelCredentialCiphertext Bytes?
+  tunnelCredentialIv         Bytes?
+  tunnelCredentialAuthTag    Bytes?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   pairings     Pairing[]

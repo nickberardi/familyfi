@@ -20,8 +20,9 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false is an emergency UniFi `enabled: false` on quarantine policies |
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |
 | GET | `/api/v1/connection` | Authenticated endpoint manifest, FamilyFi-to-UniFi status, and the account's last attributed change |
-| GET/POST | `/api/v1/connection/endpoints` | Administrator-managed HTTPS connection routes |
-| PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use` |
+| GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`). POST adds a route the household runs; publish it through `/connection/tunnel` |
+| PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
+| GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
 | POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing QR payload |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
@@ -62,15 +63,21 @@ Settings is in the web app: UniFi key replacement, managed VLANs, timezone (Gate
 ## Companion connection and HTTPS
 
 The household administrator owns connection routes. Each route is a HTTPS origin with a
-transport label (`lan`, `vpn`, `reverseProxy`, `tailscale`, or `cloudflare`) and a priority.
-FamilyFi never stores credentials for a tunnel provider.
+transport label (`lan` for any home-network address — direct, over a VPN, or behind a reverse
+proxy — `tailscale`, or `cloudflare`) and a `kind` saying who runs it: FamilyFi's `quick` tunnel,
+FamilyFi's `domain` tunnel on the household's Cloudflare domain, or the household's `own`. Phones
+see the transport only as a label and never see `kind`. The only credential FamilyFi stores for a
+tunnel provider is the `domain` route's tunnel credential, encrypted and never served.
+
+Remote access publishes one route at a time: `PUT /api/v1/connection/tunnel` turns the chosen route
+on and every other route off, so the signed manifest carries exactly that route (or none while off).
 
 `system` routes use ordinary iOS hostname and certificate-chain validation. Use them for a
 valid LAN certificate, VPN, public reverse proxy, Tailscale Serve, or Cloudflare. A `pinned`
-route is limited to direct LAN use and carries an SHA-256 SPKI pin in the pairing QR; a phone
+route is limited to `lan` and carries an SHA-256 SPKI pin in the pairing QR; a phone
 rejects every other public key. FamilyFi does not distribute a household CA.
 
-Administrators do all of this from **System → Phones** in the web app. Administrator reads need only the session; writes also need the CSRF header.
+Administrators do all of this from **System → Pair Device** in the web app. Administrator reads need only the session; writes also need the CSRF header.
 
 Pairing is separate from sign-in: an administrator generates a five-minute, single-use QR
 for an enabled endpoint; the phone claims it, verifies the instance identity, stores its
@@ -79,7 +86,7 @@ Native bearer sessions are tied to that paired phone. Revoking the phone invalid
 one of its bearer sessions and requires a new pairing.
 The iPhone may automatically enroll its reachable Watch without another administrator pairing.
 The Watch receives its own device credential and bearer token, appears as a separate device in
-System → Phones, and can be revoked there independently. Its sessions may only read session,
+System → Pair Device, and can be revoked there independently. Its sessions may only read session,
 connection, group, and change state or pause, resume, and extend groups. The three group controls
 reject protected and adult Family groups for Watch sessions. Signing out or revoking the phone does
 not revoke the Watch. Its bearer expires after 30 days; automatic renewal is a separate change.

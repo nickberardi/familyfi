@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { AccountKind, ConnectionTransport, ConnectionTrustMode, PairedDeviceClient, SessionKind, type Session } from "@prisma/client";
+import { AccountKind, ConnectionTransport, ConnectionTrustMode, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
 import { SESSION_TTL_MS } from "@/lib/constants";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -44,6 +44,19 @@ export function publicEndpoint(endpoint: {
   id: string; url: string; transport: ConnectionTransport; trustMode: ConnectionTrustMode; spkiSha256: string | null; priority: number; enabled: boolean;
 }) {
   return { id: endpoint.id, url: endpoint.url, transport: endpoint.transport, trustMode: endpoint.trustMode, spkiSha256: endpoint.spkiSha256, priority: endpoint.priority, enabled: endpoint.enabled };
+}
+
+/**
+ * The administrator's view of a route: the phone-facing fields plus who runs it. `kind`
+ * stays off the manifest and the pairing QR, and a domain route's credential is never served.
+ */
+export function adminEndpoint(endpoint: Parameters<typeof publicEndpoint>[0] & { kind: RouteKind }) {
+  return { ...publicEndpoint(endpoint), kind: endpoint.kind };
+}
+
+/** Quick and domain routes follow FamilyFi's own tunnel; only Remote access may change them. */
+export function isManagedRoute(endpoint: { kind: RouteKind }): boolean {
+  return endpoint.kind !== RouteKind.own;
 }
 
 export async function signedEndpointManifest() {
