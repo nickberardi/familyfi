@@ -33,11 +33,13 @@ case " $* " in
     esac
     echo "Added CNAME to route to tunnel" >&2; exit 0 ;;
   *" run "*)
+    echo "pid: $$" >> "$log"
     echo "cred-contents: ${TUNNEL_CRED_CONTENTS:-missing}" >> "$log"
     echo "leaked-key: ${FAMILYFI_ENCRYPTION_KEY:-none}" >> "$log"
     echo "2026-09-23T00:00:00Z INF Registered tunnel connection connIndex=0" >&2
     exec sleep 600 ;;
   *" --url "*)
+    echo "pid: $$" >> "$log"
     echo "2026-09-23T00:00:00Z INF |  https://fake-quick-tunnel-demo.trycloudflare.com  |" >&2
     exec sleep 600 ;;
 esac
