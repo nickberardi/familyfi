@@ -9,7 +9,7 @@ describe("phone-only gateway rules", () => {
   it("passes the app's API and nothing else", () => {
     expect(allowedThroughTunnel("/api/v1/connection/identity")).toBe(true);
     expect(allowedThroughTunnel("/api/v1/groups?x=1")).toBe(true);
-    for (const path of ["/", "/login", "/phones", "/reference", "/openapi", "/_next/static/x.js", "/api/v2/x", "/api/v1", undefined]) {
+    for (const path of ["/", "/login", "/pair", "/reference", "/openapi", "/_next/static/x.js", "/api/v2/x", "/api/v1", undefined]) {
       expect(allowedThroughTunnel(path)).toBe(false);
     }
   });

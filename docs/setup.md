@@ -56,88 +56,19 @@ With `UNIFI_MOCK=1` (never in production), Settings Test/Save talk to the in-pro
 
 ## Remote access with a sidecar container
 
-The easiest remote access is built in: **System → Phones → Remote access** (a quick tunnel, or
-your own Cloudflare domain). Use a sidecar instead when you already run Tailscale or manage
-Cloudflare Tunnels yourself. Add the service to `docker/docker-compose.yml` (or an override file
-next to it), then add the resulting HTTPS address as a route on the Phones page.
+The easiest remote access is built in: **System → Pair Device → Remote access** (a quick tunnel, or
+FamilyFi's Cloudflare tunnel on your own domain). Use a sidecar instead when you already run
+Tailscale, or want a VPN or reverse proxy in front of FamilyFi. Set it up with the wiki guide, then
+choose it under **My domain** and enter its HTTPS address:
 
-### Tailscale Serve
+- [Home network: VPN or reverse proxy](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network)
+  — including an NGINX sidecar next to FamilyFi.
+- [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) — a Tailscale
+  Serve sidecar; phones in your tailnet reach `https://familyfi.<your-tailnet>.ts.net`.
 
-Phones in your tailnet reach FamilyFi at `https://familyfi.<your-tailnet>.ts.net` with a
-certificate the iPhone already trusts. Your tailnet is private, like a VPN, so this serves the
-whole app — the web UI works from anywhere in the tailnet too. It never touches the public
-internet: use Serve, never Funnel.
+Anything reachable from the internet must point at FamilyFi's **phone-only gateway**
+(`FAMILYFI_PHONE_GATEWAY_PORT`, for example `http://app:7002`), never the app itself on 7001, which
+would put the web admin and its sign-in page on the internet. Never publish the gateway port on the
+host. A Cloudflare Tunnel you run yourself (**Cloudflare Tunnel → Advanced**) is coming in
+[#69](https://github.com/nickberardi/familyfi/issues/69).
 
-Before you start, turn on **MagicDNS** and **HTTPS certificates** in the Tailscale admin console,
-and create an auth key (Settings → Keys). Put it in `.env` as `TAILSCALE_AUTHKEY`.
-
-Create `docker/tailscale/serve.json`:
-
-```json
-{
-  "TCP": { "443": { "HTTPS": true } },
-  "Web": {
-    "${TS_CERT_DOMAIN}:443": { "Handlers": { "/": { "Proxy": "http://app:7001" } } }
-  }
-}
-```
-
-Add the service:
-
-```yaml
-  tailscale:
-    image: tailscale/tailscale:stable
-    restart: unless-stopped
-    hostname: familyfi
-    environment:
-      TS_AUTHKEY: ${TAILSCALE_AUTHKEY:?Set TAILSCALE_AUTHKEY in .env}
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SERVE_CONFIG: /config/serve.json
-    volumes:
-      - familyfi-tailscale:/var/lib/tailscale
-      - ./tailscale:/config:ro
-    cap_add:
-      - net_admin
-      - net_raw
-    depends_on:
-      - app
-```
-
-and `familyfi-tailscale:` under `volumes:`. Then on the Phones page add a route
-`https://familyfi.<your-tailnet>.ts.net`, transport **Tailscale Serve**, **Trusted by iPhone**.
-The phone needs the Tailscale app, signed in to the same tailnet. `${TS_CERT_DOMAIN}` is filled in
-by the Tailscale container itself; leave it as written.
-
-### Cloudflare Tunnel (token)
-
-A tunnel you manage in the Cloudflare dashboard (Zero Trust → Networks → Tunnels → Create →
-Cloudflared). This path is public, so it must reach only FamilyFi's **phone-only gateway**, never
-the app itself: pointing a tunnel at `app:7001` would put the web admin and its sign-in page on
-the internet.
-
-In `.env`, set `FAMILYFI_PHONE_GATEWAY_PORT=7002` and `CLOUDFLARE_TUNNEL_TOKEN` to the token the
-dashboard shows. Add the service:
-
-```yaml
-  cloudflared:
-    image: cloudflare/cloudflared:2026.9.1
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
-    depends_on:
-      - app
-```
-
-In the tunnel's **Public Hostname** settings, point your hostname (for example
-`familyfi.example.com`) at service `http://app:7002`. Do **not** add 7002 to the app's `ports`.
-Then on the Phones page add a route `https://familyfi.example.com`, transport **Cloudflare
-Tunnel**, **Trusted by iPhone**.
-
-Through the gateway, only the app's own API calls pass; signing in needs a paired phone, and its
-credential is checked before the password. You can put Cloudflare Access in front as well if the
-phone runs the Cloudflare One Client (see [operations](operations.md#cloudflare-access-advanced)).
-FamilyFi never sees the tunnel token — it lives only in your `.env` and the sidecar.
-
-Pin image tags (`stable`, a `cloudflared` release) rather than `latest`, so an upgrade happens
-when you choose it.

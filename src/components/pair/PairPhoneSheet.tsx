@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { countdown, manualPairingCode, sortRoutes, transportLabel } from "@/lib/connection-routes";
+import { countdown, manualPairingCode, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, PairedPhone, PairingQr, PairingState } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { QrCode } from "@/components/ui/QrCode";
@@ -39,26 +39,23 @@ function CopyRow({ label, value, testId }: { label: string; value: string; testI
 }
 
 /**
- * Pair a phone: pick a route, name the phone, then show the single-use QR. The QR is
+ * Pair a phone through the published route: name the phone, then show the single-use QR. The QR is
  * `JSON.stringify(qr)` — the exact bytes the app parses. Closing the sheet or
  * regenerating cancels a code nobody claimed, so a QR left on screen dies with it.
  */
 export function PairPhoneSheet({
-  routes,
+  route,
   replacing,
   onClose,
   onPaired,
 }: {
-  routes: ConnectionRoute[];
+  /** The one route Remote access publishes: the address the phone pairs over. */
+  route: ConnectionRoute;
   /** Re-pairing: the (usually revoked) phone this pairing replaces once it is claimed. */
   replacing?: PairedPhone | null;
   onClose: () => void;
   onPaired: () => void;
 }) {
-  const usable = sortRoutes(routes.filter((route) => route.enabled));
-  const [routeId, setRouteId] = useState(
-    usable.find((route) => route.id === replacing?.pairedVia?.endpointId)?.id ?? usable[0]?.id ?? "",
-  );
   const [name, setName] = useState(replacing?.displayName ?? "iPhone");
   const [issued, setIssued] = useState<Issued | null>(null);
   const [state, setState] = useState<PairingState | null>(null);
@@ -106,7 +103,7 @@ export function PairPhoneSheet({
       if (pending.current) await api(`/api/v1/connection/pairings/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
       const { pairing } = await api<{ pairing: Issued }>("/api/v1/connection/pairings", {
         method: "POST",
-        body: JSON.stringify({ endpointId: routeId, deviceName: name.trim(), ...(replacing ? { replacesDeviceId: replacing.id } : {}) }),
+        body: JSON.stringify({ endpointId: route.id, deviceName: name.trim(), ...(replacing ? { replacesDeviceId: replacing.id } : {}) }),
       });
       pending.current = pairing.id;
       setIssued(pairing);
@@ -134,23 +131,19 @@ export function PairPhoneSheet({
             <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>
               Cancel
             </button>
-            <button type="button" className={PRIMARY_BUTTON} disabled={busy || !routeId || !name.trim()} onClick={() => void generate()}>
+            <button type="button" className={PRIMARY_BUTTON} disabled={busy || !name.trim()} onClick={() => void generate()}>
               Show pairing code
             </button>
           </>
         }
       >
-        <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
+        <div className="text-[14px] font-semibold text-[var(--ff-muted)]">
           Route
-          <select className={FIELD} value={routeId} onChange={(event) => setRouteId(event.target.value)}>
-            {usable.map((route) => (
-              <option key={route.id} value={route.id}>
-                {route.url} · {transportLabel(route.transport)}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block font-normal">The phone must reach this address while it pairs. It learns your other routes afterwards.</span>
-        </label>
+          <div data-testid="pairing-route" className="mt-1 font-normal text-[var(--ff-ink)]">
+            <span className="font-mono break-all">{route.url}</span> · {transportLabel(route.transport)}
+          </div>
+          <span className="mt-1 block font-normal">The phone must reach this address while it pairs. Change it under Remote access.</span>
+        </div>
         <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
           Phone
           <input className={FIELD} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />

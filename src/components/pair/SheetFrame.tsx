@@ -7,7 +7,7 @@ export const SECONDARY_BUTTON =
 export const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
 
-/** The modal frame the two Phones sheets share: scrim, card, title and a footer row. */
+/** The modal frame the pairing sheets share: scrim, card, title and a footer row. */
 export function SheetFrame({
   title,
   sub,

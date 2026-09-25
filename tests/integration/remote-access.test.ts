@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
+import { resumeRemoteAccess } from "@/server/tunnel/remote-access";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -13,7 +14,7 @@ const FAKE = path.join(process.cwd(), "tests/fixtures/cloudflared/cloudflared");
 
 type Tunnel = { mode: string; status: string; url: string | null; error: string | null; hostname: string | null; loginUrl: string | null; endpointId: string | null };
 
-describe("remote access with your own domain", () => {
+describe("remote access", () => {
   let dir: string;
   let log: string;
   let auth: SessionAuth;
@@ -53,6 +54,20 @@ describe("remote access with your own domain", () => {
     return ((await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: Tunnel }).tunnel;
   }
 
+  /** The routes phones are handed: every enabled one, which must be the published one or none. */
+  async function publishedIds(): Promise<string[]> {
+    return (await prisma().connectionEndpoint.findMany({ where: { enabled: true }, select: { id: true } })).map((route) => route.id);
+  }
+
+  /** A route the household runs. Enabled by default, like a leftover the next switch must turn off. */
+  async function ownRoute(url: string, transport: "lan" | "tailscale" | "cloudflare" = "lan", enabled = true) {
+    return prisma().connectionEndpoint.create({ data: { url, transport, trustMode: "system", enabled } });
+  }
+
+  function cloudflaredRuns(): string {
+    return (existsSync(log) ? readFileSync(log, "utf8") : "").split("\n").filter((line) => line.startsWith("argv: tunnel")).join("\n");
+  }
+
   async function waitFor(check: (tunnel: Tunnel) => boolean, label: string): Promise<Tunnel> {
     for (let i = 0; i < 80; i++) {
       const current = await state();
@@ -79,11 +94,11 @@ describe("remote access with your own domain", () => {
     expect(seen.has("off")).toBe(false);
     expect(running).toMatchObject({ mode: "named", hostname: "familyfi.example.com", url: "https://familyfi.example.com", loginUrl: null });
 
+    // The domain route holds its own tunnel key, encrypted, and is the one route published.
     const route = await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: running.endpointId! } });
-    expect(route).toMatchObject({ url: "https://familyfi.example.com", transport: "cloudflare", trustMode: "system", enabled: true });
-
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    expect(Buffer.from(household.tunnelCredentialCiphertext!).toString("utf8")).not.toContain("TunnelSecret");
+    expect(route).toMatchObject({ url: "https://familyfi.example.com", kind: "domain", transport: "cloudflare", trustMode: "system", enabled: true });
+    expect(Buffer.from(route.tunnelCredentialCiphertext!).toString("utf8")).not.toContain("TunnelSecret");
+    expect(await publishedIds()).toEqual([route.id]);
 
     const calls = readFileSync(log, "utf8");
     // DNS is routed without --overwrite-dns: an existing record is never replaced.
@@ -108,9 +123,10 @@ describe("remote access with your own domain", () => {
     expect(readFileSync(log, "utf8")).not.toContain("tunnel login");
 
     await put({ mode: "off", forget: true });
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    expect(household).toMatchObject({ tunnelMode: "off", tunnelHostname: null, tunnelCredentialCiphertext: null });
-    expect(await state()).toMatchObject({ status: "off", hostname: null });
+    // Forgetting deletes the domain route, and its tunnel key with it.
+    expect(await prisma().connectionEndpoint.count({ where: { kind: "domain" } })).toBe(0);
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ remoteEndpointId: null });
+    expect(await state()).toMatchObject({ mode: "off", status: "off", hostname: null, endpointId: null });
   });
 
   it("refuses to take over a hostname that already has a DNS record", async () => {
@@ -118,8 +134,7 @@ describe("remote access with your own domain", () => {
     const failed = await waitFor((t) => t.status === "error", "the DNS refusal");
     expect(failed.error).toContain("already has a DNS record");
     expect(failed.mode).toBe("off");
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    expect(household.tunnelCredentialCiphertext).toBeNull();
+    expect(await prisma().connectionEndpoint.count({ where: { kind: "domain" } })).toBe(0);
     // The tunnel it had just created is deleted again rather than left behind.
     expect(readFileSync(log, "utf8")).toMatch(/argv: tunnel --origincert \S+ delete 11111111-2222-3333-4444-555555555555/);
   });
@@ -142,5 +157,89 @@ describe("remote access with your own domain", () => {
       expect((await put({ mode: "named", hostname })).status).toBe(400);
     }
     expect((await put({ mode: "named" })).status).toBe(400);
+  });
+  it("publishes exactly one route for each choice and turns the rest off", async () => {
+    const home = await ownRoute("https://192.168.1.10:8443");
+    const tailnet = await ownRoute("https://familyfi.tail1234.ts.net", "tailscale");
+    await ownRoute("https://leftover.home");
+
+    // A route the household runs is published straight away, with no tunnel behind it.
+    const own = await put({ mode: "named", endpointId: home.id });
+    expect(own.status).toBe(200);
+    expect(await state()).toMatchObject({ mode: "named", status: "running", url: "https://192.168.1.10:8443", endpointId: home.id, error: null });
+    expect(await publishedIds()).toEqual([home.id]);
+    expect(cloudflaredRuns()).toBe("");
+
+    // A quick tunnel's route waits for the tunnel, then is the only one on.
+    await put({ mode: "quick" });
+    expect(await publishedIds()).toEqual([]);
+    const quick = await waitFor((t) => t.status === "running", "the quick tunnel");
+    expect(quick).toMatchObject({ mode: "quick", url: "https://fake-quick-tunnel-demo.trycloudflare.com" });
+    const quickRoute = await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: quick.endpointId! } });
+    expect(quickRoute).toMatchObject({ kind: "quick", transport: "cloudflare", url: quick.url });
+    expect(await publishedIds()).toEqual([quickRoute.id]);
+
+    // Switching to another route of the household's stops the tunnel; its route stays for next time.
+    await put({ mode: "named", endpointId: tailnet.id });
+    expect(await state()).toMatchObject({ mode: "named", status: "running", endpointId: tailnet.id });
+    expect(await publishedIds()).toEqual([tailnet.id]);
+    expect(await prisma().connectionEndpoint.count({ where: { kind: "quick" } })).toBe(1);
+
+    // A second quick tunnel reuses the same route, so phones that paired through it follow.
+    await put({ mode: "quick" });
+    expect((await waitFor((t) => t.status === "running", "the quick tunnel again")).endpointId).toBe(quickRoute.id);
+
+    await put({ mode: "off" });
+    expect(await state()).toMatchObject({ mode: "off", status: "off", endpointId: null });
+    expect(await publishedIds()).toEqual([]);
+  });
+
+  it("publishes only a route the household runs, never one FamilyFi's tunnel owns", async () => {
+    await put({ mode: "quick" });
+    const quick = await waitFor((t) => t.status === "running", "the quick tunnel");
+    const home = await ownRoute("https://192.168.1.10:8443", "lan", false);
+
+    expect((await put({ mode: "named", endpointId: quick.endpointId })).status).toBe(400);
+    expect((await put({ mode: "named", endpointId: "no-such-route" })).status).toBe(400);
+    expect((await put({ mode: "named", endpointId: home.id, hostname: "familyfi.example.com" })).status).toBe(400);
+    expect((await put({ mode: "named", hostname: "localhost" })).status).toBe(400);
+    // None of the refusals touched what was published, or stopped the tunnel behind it.
+    expect(await publishedIds()).toEqual([quick.endpointId]);
+    expect(await state()).toMatchObject({ mode: "quick", status: "running", url: quick.url });
+  });
+
+  it("switches from a route the household runs back to its domain without signing in again", async () => {
+    await put({ mode: "named", hostname: "familyfi.example.com" });
+    const domain = await waitFor((t) => t.status === "running", "the domain tunnel");
+    const home = await ownRoute("https://192.168.1.10:8443");
+
+    await put({ mode: "named", endpointId: home.id });
+    // The domain stays set up while the household's own route is published.
+    expect(await state()).toMatchObject({ endpointId: home.id, hostname: "familyfi.example.com" });
+    const kept = await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: domain.endpointId! } });
+    expect(kept).toMatchObject({ kind: "domain", enabled: false });
+    expect(kept.tunnelCredentialCiphertext).not.toBeNull();
+
+    rmSync(log, { force: true });
+    await put({ mode: "named" });
+    expect(await waitFor((t) => t.status === "running", "the domain tunnel again")).toMatchObject({ endpointId: domain.endpointId, url: "https://familyfi.example.com" });
+    expect(readFileSync(log, "utf8")).not.toContain("tunnel login");
+    expect(await publishedIds()).toEqual([domain.endpointId]);
+  });
+
+  it("resumes at boot by the published route's kind", async () => {
+    const home = await ownRoute("https://192.168.1.10:8443");
+    await put({ mode: "named", endpointId: home.id });
+    rmSync(log, { force: true });
+    await resumeRemoteAccess();
+    expect(cloudflaredRuns()).toBe("");
+
+    await put({ mode: "quick" });
+    const quick = await waitFor((t) => t.status === "running", "the quick tunnel");
+    await put({ mode: "off" });
+    // As if FamilyFi restarted with the quick tunnel's route still published.
+    await prisma().household.update({ where: { id: "default" }, data: { remoteEndpointId: quick.endpointId } });
+    await resumeRemoteAccess();
+    expect(await waitFor((t) => t.status === "running", "the resumed quick tunnel")).toMatchObject({ mode: "quick", endpointId: quick.endpointId });
   });
 });

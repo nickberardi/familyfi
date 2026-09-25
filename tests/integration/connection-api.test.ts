@@ -176,7 +176,7 @@ describe("companion admin surface", () => {
     expect(duplicate.response.status).toBe(409);
     expect(duplicate.body.error).toEqual({ code: "endpoint_exists", message: "A route with this address already exists." });
 
-    const other = await addRoute(auth, "https://vpn.example.com");
+    const other = await addRoute(auth, "https://other.example.com");
     const renamed = await updateEndpoint(request(`/api/v1/connection/endpoints/${other.body.endpoint.id}`, json(auth, "PUT", { url: "https://familyfi.home:8443" })), params(other.body.endpoint.id));
     expect(renamed.status).toBe(409);
   });
@@ -217,6 +217,80 @@ describe("companion admin surface", () => {
     expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
     const after = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as Devices;
     expect(after.devices[0].pairedVia).toBeNull();
+  });
+});
+
+describe("who runs a route", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  async function managedRoute(kind: "quick" | "domain", url: string) {
+    return prisma().connectionEndpoint.create({
+      data: { url, kind, transport: "cloudflare", trustMode: "system", enabled: false, tunnelCredentialCiphertext: new Uint8Array([1, 2, 3]), tunnelCredentialIv: new Uint8Array([4]), tunnelCredentialAuthTag: new Uint8Array([5]) },
+    });
+  }
+
+  it("creates only the household's own routes, and only on the three transports", async () => {
+    const auth = await adminAuth();
+    const created = await addRoute(auth);
+    expect(created.body.endpoint).toMatchObject({ kind: "own", transport: "lan" });
+    // A client cannot claim a route is FamilyFi's own: whatever it sends, the route is the household's.
+    const claimed = await createEndpoint(request("/api/v1/connection/endpoints", json(auth, "POST", { url: "https://q.example.com", transport: "cloudflare", trustMode: "system", kind: "quick" })));
+    expect(((await claimed.json()) as { endpoint: { kind: string } }).endpoint.kind).toBe("own");
+    for (const transport of ["vpn", "reverseProxy"]) {
+      const refused = await createEndpoint(request("/api/v1/connection/endpoints", json(auth, "POST", { url: `https://${transport.toLowerCase()}.example.com`, transport, trustMode: "system" })));
+      expect(refused.status).toBe(400);
+      const update = await updateEndpoint(request(`/api/v1/connection/endpoints/${created.body.endpoint.id}`, json(auth, "PUT", { transport })), params(created.body.endpoint.id));
+      expect(update.status).toBe(400);
+    }
+    // Only a home-network route pins a certificate.
+    const pinnedTailnet = await createEndpoint(request("/api/v1/connection/endpoints", json(auth, "POST", { url: "https://familyfi.tail1234.ts.net", transport: "tailscale", trustMode: "pinned", spkiSha256: "a".repeat(43) })));
+    expect(pinnedTailnet.status).toBe(400);
+  });
+
+  it("leaves FamilyFi's tunnel routes to Remote access, and never serves a tunnel key", async () => {
+    const auth = await adminAuth();
+    const domain = await managedRoute("domain", "https://familyfi.example.com");
+    const quick = await managedRoute("quick", "https://demo.trycloudflare.com");
+    for (const route of [domain, quick]) {
+      const edit = await updateEndpoint(request(`/api/v1/connection/endpoints/${route.id}`, json(auth, "PUT", { url: "https://elsewhere.example.com" })), params(route.id));
+      expect(edit.status).toBe(409);
+      expect(((await edit.json()) as { error: { code: string } }).error.code).toBe("managed_route");
+      const removed = await deleteEndpoint(request(`/api/v1/connection/endpoints/${route.id}`, json(auth, "DELETE")), params(route.id));
+      expect(removed.status).toBe(409);
+    }
+    expect(await prisma().connectionEndpoint.count()).toBe(2);
+
+    const listed = await (await listEndpoints(request("/api/v1/connection/endpoints", { auth }))).json();
+    expect(listed).toMatchObject({ endpoints: expect.arrayContaining([expect.objectContaining({ id: domain.id, kind: "domain" }), expect.objectContaining({ id: quick.id, kind: "quick" })]) });
+    expect(JSON.stringify(listed)).not.toMatch(/tunnelCredential|ciphertext|authTag/i);
+
+    // Phones get the published route without `kind` or any key: the manifest and QR are unchanged.
+    await prisma().connectionEndpoint.update({ where: { id: domain.id }, data: { enabled: true } });
+    await prisma().household.update({ where: { id: "default" }, data: { remoteEndpointId: domain.id } });
+    const pairing = await issuePairing(auth, domain.id);
+    expect(JSON.stringify(pairing)).not.toMatch(/tunnelCredential|ciphertext|authTag|"kind"/i);
+    const claimed = await claim(pairing.id, pairing.qr.token);
+    expect(JSON.stringify(await claimed.json())).not.toMatch(/tunnelCredential|ciphertext|authTag|"kind"/i);
+  });
+
+  it("turns remote access off when the published route is deleted", async () => {
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const published = await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "named", endpointId: route })));
+    expect(((await published.json()) as { tunnel: { mode: string; endpointId: string } }).tunnel).toMatchObject({ mode: "named", endpointId: route });
+
+    expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
+    const after = (await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: { mode: string; status: string; endpointId: string | null } };
+    expect(after.tunnel).toMatchObject({ mode: "off", status: "off", endpointId: null });
+  });
+
+  it("refuses a hostname and a route together", async () => {
+    const auth = await adminAuth();
+    const route = (await addRoute(auth)).body.endpoint.id;
+    const both = await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "named", hostname: "familyfi.example.com", endpointId: route })));
+    expect(both.status).toBe(400);
   });
 });
 

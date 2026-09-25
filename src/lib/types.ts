@@ -116,7 +116,10 @@ export type UpdateCheck = {
   error: string | null;
 };
 
-export type ConnectionTransport = "lan" | "vpn" | "reverseProxy" | "tailscale" | "cloudflare";
+export type ConnectionTransport = "lan" | "tailscale" | "cloudflare";
+
+/** Who runs a route: FamilyFi's quick tunnel, FamilyFi's tunnel on the household's domain, or the household. */
+export type RouteKind = "quick" | "domain" | "own";
 
 export type ConnectionRoute = {
   id: string;
@@ -127,6 +130,9 @@ export type ConnectionRoute = {
   priority: number;
   enabled: boolean;
 };
+
+/** A route as the administrator's endpoints list returns it. Phones never see `kind`. */
+export type AdminRoute = ConnectionRoute & { kind: RouteKind };
 
 export type PairedPhone = {
   id: string;

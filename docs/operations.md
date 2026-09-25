@@ -8,21 +8,38 @@ Username `admin` with `FAMILYFI_DEFAULT_PASSWORD` remains available after person
 
 Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` after first setup). Restoring the database without that key cannot decrypt the stored UniFi credential or the persisted companion instance signing key. Ordinary `make docker-down` does not delete volumes. Do not regenerate `FAMILYFI_ENCRYPTION_KEY` once a UniFi key has been saved.
 
-## Companion access routes
+## Remote access and pairing
 
-Manage routes and pair phones from **System → Phones**. Pick a route, name the phone, and show
-the QR; the page also shows the exact server address to type in the app and a `pairingId.token`
-code for pairing without the camera. The code expires in five minutes and is cancelled when you
-close it. Revoke a lost phone from the same page; it is signed out at once and must pair again. A revoked
-phone stays listed until you **Remove** it, or use **Remove all revoked**; **Re-pair** opens a new
-code with its name filled in, and once the phone uses it the old entry disappears.
-Routes are tried top first, and a phone learns routes added after it paired from the signed
-manifest, so adding a VPN or Tailscale route later reaches every paired phone.
+**System → Pair Device** is where phones are paired and where you choose how the FamilyFi app
+reaches home. **Remote access** publishes exactly one route at a time, and turns every other
+route off:
 
-HTTPS is required for every companion route. For a self-signed LAN certificate, choose **Pin this certificate** on the route and
-**Read certificate from this address**: FamilyFi completes a TLS handshake with that address and
-stores the SHA-256 of its public key, or hashes a certificate you paste when FamilyFi cannot reach
-it. The value equals
+| Choice | Who runs it | The route phones get |
+| --- | --- | --- |
+| **Off** | — | none: phones can't reach home, and none can pair |
+| **Quick tunnel** | FamilyFi (`cloudflared`) | a `…trycloudflare.com` address that changes on restart |
+| **My domain → Home network** | you (LAN, VPN or reverse proxy) | your HTTPS address, trusted or pinned |
+| **My domain → Tailscale** | you (a Tailscale Serve sidecar) | `https://…ts.net`, trusted |
+| **My domain → Cloudflare Tunnel → Automatic** | FamilyFi (`cloudflared`) | `https://<your hostname>` on your Cloudflare domain |
+| **My domain → Cloudflare Tunnel → Advanced** | you | coming soon ([#69](https://github.com/nickberardi/familyfi/issues/69)) |
+
+Switching is one step and can be done any time. Routes you have saved stay saved, so switching back
+to one of them needs no retyping, and switching back to Automatic needs no new Cloudflare sign-in.
+Setup guides: [home network (VPN or reverse proxy)](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network)
+and [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale).
+
+**Pair a phone** uses the published route: name the phone and show the QR; the sheet also shows the
+exact server address to type in the app and a `pairingId.token` code for pairing without the
+camera. The code expires in five minutes and is cancelled when you close it. Revoke a lost phone from
+the same page; it is signed out at once and must pair again. A revoked phone stays listed until you
+**Remove** it, or use **Remove all revoked**; **Re-pair** opens a new code with its name filled in,
+and once the phone uses it the old entry disappears. A paired phone learns a newly published route
+from the signed manifest the next time it reaches FamilyFi.
+
+HTTPS is required for every route. For a self-signed home-network certificate, choose **Pin this
+certificate** and **Read certificate from this address**: FamilyFi completes a TLS handshake with
+that address and stores the SHA-256 of its public key, or hashes a certificate you paste when
+FamilyFi cannot reach it. The value equals
 
 ```sh
 openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform der \
@@ -32,21 +49,14 @@ openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform der \
 **Check** on a pinned route compares the stored pin with what the address serves now. Renewing the
 certificate with a new key breaks the pin until you update it; phones fail closed rather than
 trust the new key. A certificate the iPhone already trusts should use ordinary trust instead.
- Start with direct LAN HTTPS and either a normal
-system-trusted certificate or a pairing QR that pins the LAN server public key. A household
-that already has VPN-to-LAN or a reverse proxy simply adds its HTTPS origin as a system-trusted
-endpoint; FamilyFi does not manage the VPN, proxy, or certificate issuer.
+FamilyFi does not manage your VPN, proxy, or certificate issuer. For Tailscale, the phone must be in
+the same tailnet; use Serve, never Funnel, which would expose the household service publicly.
 
-For private remote access, add an operator-managed [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve)
-`https://…ts.net` origin as a `tailscale`/`system` endpoint. The phone must be in the same
-tailnet. Do not use Tailscale Funnel: it would expose the household service publicly.
+### Quick tunnel
 
-### Remote access (easy button)
-
-**System → Phones → Remote access** turns on a Cloudflare quick tunnel with one switch: no
-Cloudflare account, router change, DNS or certificate. FamilyFi runs the pinned `cloudflared`
-shipped in the image (never a runtime download) and keeps one `cloudflare` route pointed at the
-tunnel's address, so paired phones pick it up from the signed manifest.
+**Quick tunnel** needs no Cloudflare account, router change, DNS or certificate. FamilyFi runs the
+pinned `cloudflared` shipped in the image (never a runtime download) and keeps one `quick` route
+pointed at the tunnel's address, so paired phones pick it up from the signed manifest.
 
 The tunnel reaches only a phone-only gateway on loopback. It forwards `/api/v1/*` and nothing
 else, drops cookies, and marks each call as remote. The web app and its sign-in page are not
@@ -54,33 +64,34 @@ reachable through it. Signing in remotely requires the FamilyFi app on a paired 
 device credential is checked before the password, so the internet cannot test passwords.
 
 A quick tunnel's address changes whenever FamilyFi restarts. Phones learn the new one the next
-time they reach FamilyFi another way, usually at home. Cloudflare offers quick tunnels for
-testing, with no uptime guarantee and a 200-request concurrency limit. For a permanent address,
-use your own domain or one of the options below.
+time they reach FamilyFi another way. Cloudflare offers quick tunnels for testing, with no uptime
+guarantee and a 200-request concurrency limit. For a permanent address, use **My domain**.
 
-### Remote access on your own domain
+### Cloudflare Tunnel on your own domain (Automatic)
 
-Choose **My domain**, enter a hostname on a domain in your Cloudflare account (for example
-`familyfi.example.com`), and **Connect with Cloudflare**. FamilyFi shows a Cloudflare link; open
-it, pick the domain, and come back — the page updates by itself. FamilyFi then:
+Choose **My domain → Cloudflare Tunnel → Automatic**, enter a hostname on a domain in your
+Cloudflare account (for example `familyfi.example.com`), and **Connect with Cloudflare**. FamilyFi
+shows a Cloudflare link; open it, pick the domain, and come back — the page updates by itself.
+FamilyFi then:
 
 1. creates a tunnel named `familyfi-<instance id>` and a DNS record for the hostname. It never
    overwrites a record that already exists; choose another hostname or remove that record first;
-2. stores only that tunnel's credential, encrypted with `FAMILYFI_ENCRYPTION_KEY` like the UniFi
-   key, and passes it to `cloudflared` through its environment, never a file;
+2. stores only that tunnel's credential, on the `domain` route and encrypted with
+   `FAMILYFI_ENCRYPTION_KEY` like the UniFi key, and passes it to `cloudflared` through its
+   environment, never a file;
 3. deletes the account-wide certificate the Cloudflare sign-in produced, which could otherwise
    create and delete tunnels and DNS across the zone.
 
 The address is permanent, so phones keep working across restarts. The tunnel still reaches only
-the phone-only gateway. **Forget domain** deletes the stored credential; the tunnel and DNS
-record stay in your Cloudflare account until you remove them there. Back up
-`FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
+the phone-only gateway. **Forget domain** deletes the domain route and its credential and turns
+remote access off; the tunnel and DNS record stay in your Cloudflare account until you remove them
+there. Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
 
 ### Cloudflare Access (advanced)
 
-Cloudflare Tunnel with Access in front works as an ordinary `cloudflare`/`system` route when
-Access is satisfied by the Cloudflare One Client (WARP) on the phone. Do not place a Cloudflare
-service-token secret in a phone.
+A Cloudflare Tunnel you run yourself, optionally protected by Cloudflare Access service tokens, is
+planned in [#69](https://github.com/nickberardi/familyfi/issues/69); **Advanced** says "Coming
+soon" until then. Do not place a Cloudflare service-token secret in a phone by hand.
 
 ## Database modes
 

@@ -32,7 +32,7 @@ const NAV: { title: string; items: { href: string; label: string; icon: IconName
     title: "System",
     items: [
       { href: "/sync", label: "Sync", icon: "arrows-clockwise" },
-      { href: "/phones", label: "Phones", icon: "qr-code" },
+      { href: "/pair", label: "Pair Device", icon: "qr-code" },
       { href: "/settings", label: "Settings", icon: "gear" },
       { href: "/reference", label: "API", icon: "code" },
     ],

@@ -29,6 +29,7 @@ export type IconName =
   | "qr-code"
   // Actions
   | "copy"
+  | "arrow-square-out"
   // Device types
   | "device-tablet"
   | "laptop"

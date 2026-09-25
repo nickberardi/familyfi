@@ -1,52 +1,64 @@
 /**
- * Parent-facing copy and small pure helpers for the Phones page: how a route is named,
- * what a pairing code looks like, and how reordering maps onto priorities.
+ * Parent-facing copy and small pure helpers for the Pair Device page: how a route is
+ * named, which Remote access choice the published route stands for, and what a pairing
+ * code looks like.
  */
-import type { ConnectionRoute, ConnectionTransport } from "./types";
+import type { AdminRoute, ConnectionRoute, ConnectionTransport, RemoteAccess } from "./types";
 
-export const TRANSPORTS: readonly { value: ConnectionTransport; label: string; note: string }[] = [
-  { value: "lan", label: "Home network", note: "The phone reaches FamilyFi directly on your Wi-Fi." },
-  { value: "vpn", label: "VPN", note: "Your own VPN into the home network (Teleport, WireGuard). FamilyFi does not create it." },
-  { value: "reverseProxy", label: "Reverse proxy", note: "An HTTPS proxy you run in front of FamilyFi, with a publicly trusted certificate." },
-  { value: "tailscale", label: "Tailscale Serve", note: "A https://…ts.net address from Tailscale Serve. The phone must be in your tailnet. Never use Funnel." },
-  {
-    value: "cloudflare",
-    label: "Cloudflare Tunnel",
-    note: "Cloudflare Access must be satisfied by the Cloudflare One Client on the phone. FamilyFi never stores tunnel credentials.",
-  },
+export const TRANSPORTS: readonly { value: ConnectionTransport; label: string }[] = [
+  { value: "lan", label: "Home network" },
+  { value: "tailscale", label: "Tailscale" },
+  { value: "cloudflare", label: "Cloudflare Tunnel" },
 ];
 
 export function transportLabel(transport: string): string {
   return TRANSPORTS.find((item) => item.value === transport)?.label ?? transport;
 }
 
-/** Only a direct LAN route may pin a certificate; everything else uses ordinary trust. */
+/** Only a home-network route may pin a certificate; everything else uses ordinary trust. */
 export function canPin(transport: ConnectionTransport): boolean {
   return transport === "lan";
+}
+
+const WIKI = "https://github.com/nickberardi/familyfi/wiki";
+/** Setting up a VPN or a reverse proxy in front of FamilyFi. */
+export const HOME_NETWORK_GUIDE = `${WIKI}/Remote-access-home-network`;
+/** Running Tailscale Serve as a sidecar container. */
+export const TAILSCALE_GUIDE = `${WIKI}/Remote-access-Tailscale`;
+
+/**
+ * Everything Remote access can publish. `home`, `tailscale` and `cloudflareAdvanced` are
+ * routes the household runs; `quick` and `cloudflareAutomatic` are FamilyFi's own tunnel.
+ */
+export type RemoteChoice = "off" | "quick" | "home" | "tailscale" | "cloudflareAutomatic" | "cloudflareAdvanced";
+
+/** The transport a household-run choice saves its route with. */
+export const OWN_TRANSPORT: Partial<Record<RemoteChoice, ConnectionTransport>> = { home: "lan", tailscale: "tailscale", cloudflareAdvanced: "cloudflare" };
+
+/** Which choice the published route stands for. */
+export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, routes: readonly AdminRoute[]): RemoteChoice {
+  const route = routes.find((item) => item.id === tunnel.endpointId);
+  if (!route) {
+    // Nothing is published yet while a first quick tunnel comes up or a domain is being set up.
+    if (tunnel.mode === "quick") return "quick";
+    return tunnel.mode === "named" ? "cloudflareAutomatic" : "off";
+  }
+  if (route.kind === "quick") return "quick";
+  if (route.kind === "domain") return "cloudflareAutomatic";
+  if (route.transport === "tailscale") return "tailscale";
+  return route.transport === "cloudflare" ? "cloudflareAdvanced" : "home";
+}
+
+/** The saved route a choice would publish again, if it has one. */
+export function savedRoute(choice: RemoteChoice, routes: readonly AdminRoute[]): AdminRoute | undefined {
+  if (choice === "cloudflareAutomatic") return routes.find((route) => route.kind === "domain");
+  const transport = OWN_TRANSPORT[choice];
+  return transport ? sortRoutes(routes.filter((route) => route.kind === "own" && route.transport === transport))[0] : undefined;
 }
 
 /** Routes in the order phones try them — the same tie-break the server's manifest uses. */
 export function sortRoutes<T extends Pick<ConnectionRoute, "priority">>(routes: readonly T[]): T[] {
   return routes.map((route, index) => ({ route, index })).sort((a, b) => a.route.priority - b.route.priority || a.index - b.index).map((item) => item.route);
-}
-
-/**
- * Moves one route up or down and returns the priority changes to send. Priorities are
- * renumbered 0, 10, 20… so no two routes tie: the server breaks ties by creation time
- * and the phone by id, and a tie is the one case where the two could disagree.
- */
-export function reorderRoutes(routes: readonly ConnectionRoute[], id: string, direction: -1 | 1): { id: string; priority: number }[] {
-  const ordered = sortRoutes(routes);
-  const from = ordered.findIndex((route) => route.id === id);
-  const to = from + direction;
-  if (from < 0 || to < 0 || to >= ordered.length) return [];
-  [ordered[from], ordered[to]] = [ordered[to], ordered[from]];
-  return ordered.map((route, index) => ({ id: route.id, priority: index * 10 })).filter((change) => routes.find((route) => route.id === change.id)?.priority !== change.priority);
-}
-
-/** The next priority for a new route: after every existing one. */
-export function nextPriority(routes: readonly Pick<ConnectionRoute, "priority">[]): number {
-  return routes.length ? Math.min(999, Math.max(...routes.map((route) => route.priority)) + 10) : 0;
 }
 
 /** The manual fallback the app accepts: `pairingId.token`. It cannot carry a certificate pin. */
