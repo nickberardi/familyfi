@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { canPin } from "@/lib/connection-routes";
-import type { AdminRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
+import type { ConnectionRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
 import { Segmented } from "@/components/ui/Segmented";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
@@ -44,9 +44,9 @@ export function RouteForm({
 }: {
   transport: ConnectionTransport;
   /** The saved route being edited, if any. */
-  route?: AdminRoute;
-  routes: readonly AdminRoute[];
-  onSaved: (route: AdminRoute) => Promise<void>;
+  route?: ConnectionRoute;
+  routes: readonly ConnectionRoute[];
+  onSaved: (route: ConnectionRoute) => Promise<void>;
   onCancel?: () => void;
 }) {
   const [url, setUrl] = useState(route?.url ?? "");
@@ -79,7 +79,7 @@ export function RouteForm({
   }
 
   async function update(id: string, body: object) {
-    return (await api<{ endpoint: AdminRoute }>(`/api/v1/connection/endpoints/${id}`, { method: "PUT", body: JSON.stringify(body) })).endpoint;
+    return (await api<{ endpoint: ConnectionRoute }>(`/api/v1/connection/endpoints/${id}`, { method: "PUT", body: JSON.stringify(body) })).endpoint;
   }
 
   async function save() {
@@ -88,14 +88,14 @@ export function RouteForm({
     const trustMode: Trust = pinned ? "pinned" : "system";
     const body = { url: url.trim(), transport, trustMode, spkiSha256: pinned ? pin.trim() : null };
     try {
-      let saved: AdminRoute;
+      let saved: ConnectionRoute;
       if (route) {
         saved = await update(route.id, body);
       } else {
         try {
           const { spkiSha256, ...rest } = body;
           saved = (
-            await api<{ endpoint: AdminRoute }>("/api/v1/connection/endpoints", {
+            await api<{ endpoint: ConnectionRoute }>("/api/v1/connection/endpoints", {
               method: "POST",
               body: JSON.stringify({ ...rest, ...(spkiSha256 ? { spkiSha256 } : {}), priority: 0, enabled: false }),
             })

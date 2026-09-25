@@ -66,7 +66,7 @@ The household administrator owns connection routes. Each route is a HTTPS origin
 transport label (`lan` for any home-network address — direct, over a VPN, or behind a reverse
 proxy — `tailscale`, or `cloudflare`) and a `kind` saying who runs it: FamilyFi's `quick` tunnel,
 FamilyFi's `domain` tunnel on the household's Cloudflare domain, or the household's `own`. Phones
-see the transport only as a label and never see `kind`. The only credential FamilyFi stores for a
+see both as labels only. The only credential FamilyFi stores for a
 tunnel provider is the `domain` route's tunnel credential, encrypted and never served.
 
 Remote access publishes one route at a time: `PUT /api/v1/connection/tunnel` turns the chosen route

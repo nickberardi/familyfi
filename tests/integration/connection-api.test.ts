@@ -266,13 +266,13 @@ describe("who runs a route", () => {
     expect(listed).toMatchObject({ endpoints: expect.arrayContaining([expect.objectContaining({ id: domain.id, kind: "domain" }), expect.objectContaining({ id: quick.id, kind: "quick" })]) });
     expect(JSON.stringify(listed)).not.toMatch(/tunnelCredential|ciphertext|authTag/i);
 
-    // Phones get the published route without `kind` or any key: the manifest and QR are unchanged.
+    // Phones get the published route and never its tunnel key.
     await prisma().connectionEndpoint.update({ where: { id: domain.id }, data: { enabled: true } });
     await prisma().household.update({ where: { id: "default" }, data: { remoteEndpointId: domain.id } });
     const pairing = await issuePairing(auth, domain.id);
-    expect(JSON.stringify(pairing)).not.toMatch(/tunnelCredential|ciphertext|authTag|"kind"/i);
+    expect(JSON.stringify(pairing)).not.toMatch(/tunnelCredential|ciphertext|authTag/i);
     const claimed = await claim(pairing.id, pairing.qr.token);
-    expect(JSON.stringify(await claimed.json())).not.toMatch(/tunnelCredential|ciphertext|authTag|"kind"/i);
+    expect(JSON.stringify(await claimed.json())).not.toMatch(/tunnelCredential|ciphertext|authTag/i);
   });
 
   it("turns remote access off when the published route is deleted", async () => {

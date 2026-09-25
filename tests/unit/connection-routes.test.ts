@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { canPin, countdown, manualPairingCode, remoteChoice, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
-import type { AdminRoute, ConnectionTransport, RouteKind } from "@/lib/types";
+import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
-function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): AdminRoute {
+function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
   return { id, url: `https://${id}.home`, kind, transport, trustMode: "system", spkiSha256: null, priority, enabled: true };
 }
 

@@ -3,7 +3,7 @@
  * named, which Remote access choice the published route stands for, and what a pairing
  * code looks like.
  */
-import type { AdminRoute, ConnectionRoute, ConnectionTransport, RemoteAccess } from "./types";
+import type { ConnectionRoute, ConnectionTransport, RemoteAccess } from "./types";
 
 export const TRANSPORTS: readonly { value: ConnectionTransport; label: string }[] = [
   { value: "lan", label: "Home network" },
@@ -36,7 +36,7 @@ export type RemoteChoice = "off" | "quick" | "home" | "tailscale" | "cloudflareA
 export const OWN_TRANSPORT: Partial<Record<RemoteChoice, ConnectionTransport>> = { home: "lan", tailscale: "tailscale", cloudflareAdvanced: "cloudflare" };
 
 /** Which choice the published route stands for. */
-export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, routes: readonly AdminRoute[]): RemoteChoice {
+export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, routes: readonly ConnectionRoute[]): RemoteChoice {
   const route = routes.find((item) => item.id === tunnel.endpointId);
   if (!route) {
     // Nothing is published yet while a first quick tunnel comes up or a domain is being set up.
@@ -50,7 +50,7 @@ export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, 
 }
 
 /** The saved route a choice would publish again, if it has one. */
-export function savedRoute(choice: RemoteChoice, routes: readonly AdminRoute[]): AdminRoute | undefined {
+export function savedRoute(choice: RemoteChoice, routes: readonly ConnectionRoute[]): ConnectionRoute | undefined {
   if (choice === "cloudflareAutomatic") return routes.find((route) => route.kind === "domain");
   const transport = OWN_TRANSPORT[choice];
   return transport ? sortRoutes(routes.filter((route) => route.kind === "own" && route.transport === transport))[0] : undefined;
