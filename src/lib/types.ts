@@ -124,15 +124,13 @@ export type RouteKind = "quick" | "domain" | "own";
 export type ConnectionRoute = {
   id: string;
   url: string;
+  kind: RouteKind;
   transport: ConnectionTransport;
   trustMode: "system" | "pinned";
   spkiSha256: string | null;
   priority: number;
   enabled: boolean;
 };
-
-/** A route as the administrator's endpoints list returns it. Phones never see `kind`. */
-export type AdminRoute = ConnectionRoute & { kind: RouteKind };
 
 export type PairedPhone = {
   id: string;

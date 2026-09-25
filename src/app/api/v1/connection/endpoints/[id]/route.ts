@@ -1,6 +1,6 @@
 import { ConnectionTransport } from "@prisma/client";
 import { z } from "zod";
-import { adminEndpoint, assertEndpoint, hasPendingPairing, isManagedRoute, isUniqueViolation } from "@/server/connection";
+import { publicEndpoint, assertEndpoint, hasPendingPairing, isManagedRoute, isUniqueViolation } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
@@ -31,7 +31,7 @@ export async function PUT(request: Request, context: Ctx) {
     }
     try {
       const endpoint = await prisma().connectionEndpoint.update({ where: { id }, data: { ...parsed.data, url, transport, trustMode, spkiSha256 } });
-      return Response.json({ endpoint: adminEndpoint(endpoint) });
+      return Response.json({ endpoint: publicEndpoint(endpoint) });
     } catch (error) {
       if (isUniqueViolation(error)) return jsonError(409, "endpoint_exists", "A route with this address already exists.");
       throw error;

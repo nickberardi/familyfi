@@ -12,7 +12,7 @@ import {
   transportLabel,
   type RemoteChoice,
 } from "@/lib/connection-routes";
-import type { AdminRoute, RemoteAccess } from "@/lib/types";
+import type { ConnectionRoute, RemoteAccess } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
 import { CloudflareAdvanced } from "./CloudflareAdvanced";
@@ -66,7 +66,7 @@ export function RemoteAccessCard({
   onChange,
 }: {
   tunnel: RemoteAccess | null;
-  routes: AdminRoute[] | null;
+  routes: ConnectionRoute[] | null;
   /** Active phones that paired through a route — the ones a switch away from it would strand. */
   pairedThrough: (routeId: string) => number;
   onTunnel: (tunnel: RemoteAccess) => void;
@@ -134,7 +134,7 @@ export function RemoteAccessCard({
     setEditing(false);
   }
 
-  function publishRoute(route: AdminRoute) {
+  function publishRoute(route: ConnectionRoute) {
     if (!leaving(route.id)) return Promise.resolve();
     return put({ mode: "named", endpointId: route.id });
   }

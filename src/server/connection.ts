@@ -40,18 +40,11 @@ export function instanceFingerprint(publicKey: string): string {
   return createHash("sha256").update(Buffer.from(jwk.x, "base64url")).digest("base64url");
 }
 
+/** The fields a route is served with, to administrators and phones alike. A `domain` route's tunnel credential never is. */
 export function publicEndpoint(endpoint: {
-  id: string; url: string; transport: ConnectionTransport; trustMode: ConnectionTrustMode; spkiSha256: string | null; priority: number; enabled: boolean;
+  id: string; url: string; kind: RouteKind; transport: ConnectionTransport; trustMode: ConnectionTrustMode; spkiSha256: string | null; priority: number; enabled: boolean;
 }) {
-  return { id: endpoint.id, url: endpoint.url, transport: endpoint.transport, trustMode: endpoint.trustMode, spkiSha256: endpoint.spkiSha256, priority: endpoint.priority, enabled: endpoint.enabled };
-}
-
-/**
- * The administrator's view of a route: the phone-facing fields plus who runs it. `kind`
- * stays off the manifest and the pairing QR, and a domain route's credential is never served.
- */
-export function adminEndpoint(endpoint: Parameters<typeof publicEndpoint>[0] & { kind: RouteKind }) {
-  return { ...publicEndpoint(endpoint), kind: endpoint.kind };
+  return { id: endpoint.id, url: endpoint.url, kind: endpoint.kind, transport: endpoint.transport, trustMode: endpoint.trustMode, spkiSha256: endpoint.spkiSha256, priority: endpoint.priority, enabled: endpoint.enabled };
 }
 
 /** Quick and domain routes follow FamilyFi's own tunnel; only Remote access may change them. */

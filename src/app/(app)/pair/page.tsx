@@ -6,7 +6,7 @@ import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
 import { PairedPhoneRow } from "@/components/pair/PairedPhoneRow";
 import { RemoteAccessCard } from "@/components/pair/RemoteAccessCard";
 import { api, ApiError } from "@/lib/api";
-import type { AdminRoute, PairedPhone, RemoteAccess } from "@/lib/types";
+import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 /** Most recently seen first (the API's order); a test harness can leave hundreds behind. */
 const PHONES_SHOWN = 8;
@@ -17,7 +17,7 @@ const SUB = "Pair the FamilyFi iPhone app and choose how it reaches home.";
 
 export default function PairDevicePage() {
   const [tunnel, setTunnel] = useState<RemoteAccess | null>(null);
-  const [routes, setRoutes] = useState<AdminRoute[] | null>(null);
+  const [routes, setRoutes] = useState<ConnectionRoute[] | null>(null);
   const [phones, setPhones] = useState<PairedPhone[]>([]);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState("");
@@ -30,7 +30,7 @@ export default function PairDevicePage() {
     try {
       const [state, endpoints, devices] = await Promise.all([
         api<{ tunnel: RemoteAccess }>("/api/v1/connection/tunnel"),
-        api<{ endpoints: AdminRoute[] }>("/api/v1/connection/endpoints"),
+        api<{ endpoints: ConnectionRoute[] }>("/api/v1/connection/endpoints"),
         api<{ devices: PairedPhone[] }>("/api/v1/connection/devices"),
       ]);
       setTunnel(state.tunnel);

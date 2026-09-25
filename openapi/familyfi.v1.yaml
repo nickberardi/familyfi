@@ -1484,7 +1484,7 @@ paths:
         phones are handed.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
-        "200": { description: Endpoints, content: { application/json: { schema: { type: object, required: [endpoints], properties: { endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpointAdmin" } } } } } } }
+        "200": { description: Endpoints, content: { application/json: { schema: { type: object, required: [endpoints], properties: { endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } } }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
     post:
@@ -1499,7 +1499,7 @@ paths:
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointWrite" } } } }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpointAdmin" } } } } } }
+        "201": { description: Created, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
@@ -1514,7 +1514,7 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointUpdate" } } } }
       responses:
-        "200": { description: Updated, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpointAdmin" } } } } } }
+        "200": { description: Updated, content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
@@ -2114,19 +2114,6 @@ components:
     ConnectionEndpoint:
       type: object
       additionalProperties: false
-      required: [id, url, transport, trustMode, spkiSha256, priority, enabled]
-      properties:
-        id: { type: string }
-        url: { type: string, format: uri }
-        transport: { type: string, enum: [lan, tailscale, cloudflare] }
-        trustMode: { type: string, enum: [system, pinned] }
-        spkiSha256: { type: [string, "null"] }
-        priority: { type: integer, minimum: 0 }
-        enabled: { type: boolean }
-    ConnectionEndpointAdmin:
-      type: object
-      additionalProperties: false
-      description: A route as the administrator sees it. Phones get `ConnectionEndpoint`, without `kind`.
       required: [id, url, kind, transport, trustMode, spkiSha256, priority, enabled]
       properties:
         id: { type: string }
