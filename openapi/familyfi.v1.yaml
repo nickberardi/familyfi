@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.10.0
+  version: 0.11.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -1481,10 +1481,21 @@ paths:
       description: |
         Every saved route, enabled or not. Remote access publishes one at a time: the route in
         `GET /api/v1/connection/tunnel` `endpointId` is the only one enabled, and the only one
-        phones are handed.
+        phones are handed. `edgeAccess` lists each route behind Cloudflare Access, with how many
+        active devices have its current service token. The token itself is never listed.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
-        "200": { description: Endpoints, content: { application/json: { schema: { type: object, required: [endpoints], properties: { endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } } } } } } }
+        "200":
+          description: Endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [endpoints, edgeAccess]
+                properties:
+                  endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } }
+                  edgeAccess: { type: array, items: { $ref: "#/components/schemas/EdgeAccess" } }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
     post:
@@ -1494,7 +1505,8 @@ paths:
       description: |
         Always `kind: own`. Save it with `enabled: false`, then publish it with
         `PUT /api/v1/connection/tunnel` `{ "mode": "named", "endpointId": … }`, which turns every
-        other route off.
+        other route off. A `cloudflare` route can be put behind Cloudflare Access by sending
+        `serviceToken`; any other route is refused with `access_unsupported`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointWrite" } } } }
@@ -1503,13 +1515,17 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-        "409": { description: "`endpoint_exists` — another route already uses this address", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: "`endpoint_exists` — another route already uses this address; `access_unsupported` — only a `cloudflare` route can be behind Cloudflare Access", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /api/v1/connection/endpoints/{id}:
     put:
       operationId: updateConnectionEndpoint
       tags: [Connection]
       summary: Update a route the household runs
-      description: A `quick` or `domain` route follows FamilyFi's own tunnel and is refused with `managed_route`; change it through `PUT /api/v1/connection/tunnel`.
+      description: |
+        A `quick` or `domain` route follows FamilyFi's own tunnel and is refused with `managed_route`;
+        change it through `PUT /api/v1/connection/tunnel`. Sending a different `serviceToken`
+        replaces the Access token and raises its version; phones pick the new one up from their
+        next signed manifest. `edgeAuth: none` turns Access off.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionEndpointUpdate" } } } }
@@ -1519,7 +1535,7 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
-        "409": { description: "`endpoint_exists` — another route already uses this address; `managed_route` — the route follows FamilyFi's own tunnel", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: "`endpoint_exists` — another route already uses this address; `managed_route` — the route follows FamilyFi's own tunnel; `access_unsupported` — only a `cloudflare` route can be behind Cloudflare Access", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
     delete:
       operationId: deleteConnectionEndpoint
       tags: [Connection]
@@ -2138,6 +2154,16 @@ components:
         spkiSha256: { type: string }
         priority: { type: integer, minimum: 0 }
         enabled: { type: boolean }
+        edgeAuth: { type: string, enum: [none, serviceToken], description: "`none` turns Cloudflare Access off for the route." }
+        serviceToken:
+          type: object
+          writeOnly: true
+          additionalProperties: false
+          required: [clientId, clientSecret]
+          description: A Cloudflare Access service token for a `cloudflare` route. Stored encrypted; never returned.
+          properties:
+            clientId: { type: string, minLength: 1, maxLength: 512 }
+            clientSecret: { type: string, minLength: 1, maxLength: 512 }
     ConnectionEndpointUpdate:
       type: object
       additionalProperties: false
@@ -2149,6 +2175,44 @@ components:
         spkiSha256: { type: [string, "null"] }
         priority: { type: integer, minimum: 0, maximum: 999 }
         enabled: { type: boolean }
+        edgeAuth: { type: string, enum: [none, serviceToken], description: "`none` turns Cloudflare Access off for the route." }
+        serviceToken:
+          type: object
+          writeOnly: true
+          additionalProperties: false
+          required: [clientId, clientSecret]
+          description: A Cloudflare Access service token for a `cloudflare` route. Stored encrypted; never returned.
+          properties:
+            clientId: { type: string, minLength: 1, maxLength: 512 }
+            clientSecret: { type: string, minLength: 1, maxLength: 512 }
+    EdgeAccess:
+      type: object
+      additionalProperties: false
+      required: [endpointId, version, clientIdHint, rotatedAt, devices]
+      description: A route behind Cloudflare Access, and which active devices have its current service token.
+      properties:
+        endpointId: { type: string }
+        version: { type: integer, minimum: 1, description: Rises each time the token is replaced. }
+        clientIdHint: { type: [string, "null"], description: "The end of the Client ID, to match against Cloudflare; null if the stored token can no longer be read." }
+        rotatedAt: { type: [string, "null"], format: date-time, description: When the token was last replaced; null before the first replacement. }
+        devices:
+          type: object
+          additionalProperties: false
+          required: [total, current, behind]
+          description: Devices not revoked and seen in the last 30 days.
+          properties:
+            total: { type: integer, minimum: 0 }
+            current: { type: integer, minimum: 0, description: How many have been handed the current version. }
+            behind:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [id, displayName, lastSeenAt]
+                properties:
+                  id: { type: string }
+                  displayName: { type: string }
+                  lastSeenAt: { type: [string, "null"], format: date-time }
     RemoteAccess:
       type: object
       additionalProperties: false
@@ -2214,7 +2278,14 @@ components:
           properties:
             id: { type: string }
             expiresAt: { type: string, format: date-time }
-            qr: { type: object, additionalProperties: true }
+            qr:
+              type: object
+              additionalProperties: true
+              description: |
+                The QR payload: `version`, `pairingId`, `token`, `endpoint`, `instanceId` and
+                `keyFingerprint`. When the route is behind Cloudflare Access it also carries
+                `edgeCredential` (`version`, `clientId`, `clientSecret`), so a phone can reach the
+                route to pair.
     ConnectionPairingClaimResponse:
       type: object
       additionalProperties: false
@@ -2231,7 +2302,15 @@ components:
       properties:
         instanceId: { type: string }
         endpoints: { type: array, items: { $ref: "#/components/schemas/ConnectionEndpoint" } }
-        signedPayload: { type: string, description: Base64url canonical manifest bytes covered by signature. }
+        signedPayload:
+          type: string
+          description: |
+            Base64url canonical manifest bytes covered by signature. The JSON holds `instanceId` and
+            `endpoints`; each endpoint also carries `edgeAuth` (`none` or `serviceToken`). For a
+            paired device's session, and in the claim response, it also holds `edgeCredentials`:
+            `[{ endpointId, version, clientId, clientSecret }]`, one per enabled route behind
+            Cloudflare Access. Send `CF-Access-Client-Id` and `CF-Access-Client-Secret` to that route
+            only. A browser session never receives `edgeCredentials`.
         signature: { type: string, description: Base64url Ed25519 signature over signedPayload bytes. }
     ConnectionDevice:
       type: object

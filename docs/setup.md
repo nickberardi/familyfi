@@ -66,9 +66,38 @@ choose it under **My domain** and enter its HTTPS address:
 - [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) — a Tailscale
   Serve sidecar; phones in your tailnet reach `https://familyfi.<your-tailnet>.ts.net`.
 
+- [Your own Cloudflare Tunnel](https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Tunnel)
+  — a `cloudflared` sidecar on your domain, optionally behind Cloudflare Access (below).
+
 Anything reachable from the internet must point at FamilyFi's **phone-only gateway**
 (`FAMILYFI_PHONE_GATEWAY_PORT`, for example `http://app:7002`), never the app itself on 7001, which
 would put the web admin and its sign-in page on the internet. Never publish the gateway port on the
-host. A Cloudflare Tunnel you run yourself (**Cloudflare Tunnel → Advanced**) is coming in
-[#69](https://github.com/nickberardi/familyfi/issues/69).
+host.
+
+### Cloudflare Tunnel you run
+
+A tunnel you manage in the Cloudflare dashboard (Zero Trust → Networks → Tunnels → Create →
+Cloudflared). In `.env`, set `FAMILYFI_PHONE_GATEWAY_PORT=7002` and `CLOUDFLARE_TUNNEL_TOKEN` to the
+token the dashboard shows, and add the service:
+
+```yaml
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.1
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      - app
+```
+
+In the tunnel's **Public Hostname** settings, point your hostname (for example
+`familyfi.example.com`) at service `http://app:7002`. Do **not** add 7002 to the app's `ports`.
+Then on **Pair Device** choose **My domain → Cloudflare Tunnel → Advanced** and enter
+`https://familyfi.example.com`. FamilyFi never sees the tunnel token: it lives only in your `.env`
+and the sidecar. To put Cloudflare Access in front of it, see
+[operations](operations.md#your-own-cloudflare-tunnel-and-cloudflare-access-advanced).
+
+Pin image tags (a `cloudflared` release) rather than `latest`, so an upgrade happens when you
+choose it.
 

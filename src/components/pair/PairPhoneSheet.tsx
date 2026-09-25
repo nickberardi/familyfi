@@ -158,6 +158,8 @@ export function PairPhoneSheet({
   }
 
   const pinned = issued.qr.endpoint.trustMode === "pinned";
+  // A typed code carries neither a certificate pin nor a Cloudflare Access token.
+  const payloadOnly = pinned || Boolean(issued.qr.edgeCredential);
   return (
     <SheetFrame
       title={claimed ? "Phone paired" : "Scan with the FamilyFi app"}
@@ -200,11 +202,12 @@ export function PairPhoneSheet({
             {expired ? "This code expired. Make a new one." : `Expires in ${countdown(new Date(issued.expiresAt).getTime() - now)}`}
           </p>
           <CopyRow label="Server address in the app" value={issued.qr.endpoint.url} testId="pairing-address" />
-          {pinned ? (
+          {payloadOnly ? (
             <>
               <CopyRow label="Pairing payload" value={JSON.stringify(issued.qr)} testId="pairing-payload" />
               <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
-                This route pins a certificate, which a typed code can&rsquo;t carry. Scan the QR, or paste the whole payload.
+                {pinned ? "This route pins a certificate" : "This route is behind Cloudflare Access, whose token"}, which a typed code can&rsquo;t
+                carry. Scan the QR, or paste the whole payload.
               </p>
             </>
           ) : (

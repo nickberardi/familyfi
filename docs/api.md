@@ -20,8 +20,8 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false is an emergency UniFi `enabled: false` on quarantine policies |
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |
 | GET | `/api/v1/connection` | Authenticated endpoint manifest, FamilyFi-to-UniFi status, and the account's last attributed change |
-| GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`). POST adds a route the household runs; publish it through `/connection/tunnel` |
-| PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
+| GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and `edgeAccess`: each route behind Cloudflare Access with how many active devices have its current token. POST adds a route the household runs; publish it through `/connection/tunnel` |
+| PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
 | POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing QR payload |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
@@ -66,8 +66,34 @@ The household administrator owns connection routes. Each route is a HTTPS origin
 transport label (`lan` for any home-network address — direct, over a VPN, or behind a reverse
 proxy — `tailscale`, or `cloudflare`) and a `kind` saying who runs it: FamilyFi's `quick` tunnel,
 FamilyFi's `domain` tunnel on the household's Cloudflare domain, or the household's `own`. Phones
-see both as labels only. The only credential FamilyFi stores for a
-tunnel provider is the `domain` route's tunnel credential, encrypted and never served.
+see both as labels only. FamilyFi stores two credentials for a tunnel provider, both encrypted: the
+`domain` route's tunnel credential, which is never served, and an `own` Cloudflare route's Access
+service token, which is served only to phones (below).
+
+### Cloudflare Access service tokens
+
+An `own` route with transport `cloudflare` may sit behind Cloudflare Access. Phones then send
+`CF-Access-Client-Id` and `CF-Access-Client-Secret` to that route's origin — and to no other
+route. The token reaches a phone three ways, and no other:
+
+- the pairing QR's `edgeCredential` (`version`, `clientId`, `clientSecret`), so a phone can reach the
+  protected route to pair;
+- the claim response's signed manifest; and
+- the signed manifest in `GET /api/v1/connection` for a paired device's bearer session.
+
+Inside the signed payload every endpoint carries `edgeAuth` (`none` or `serviceToken`), and a
+paired device's payload adds `edgeCredentials`: `[{ endpointId, version, clientId, clientSecret }]`
+for each enabled protected route. The unsigned `endpoints` copy keeps the plain `ConnectionEndpoint`
+shape. A browser session's manifest never carries `edgeCredentials`. `version` rises each time the
+operator replaces the token; a phone replaces what it holds whenever a verified manifest carries a
+higher one. The phone gateway strips both headers before a request reaches the app.
+
+Cloudflare refuses a request without a valid token before it reaches FamilyFi: a **401** (with the
+Access application's "Return 401 response for Service Auth policies" on, as the operator guide
+asks), a **403**, or — if the application also has identity policies — a **302** to
+`<team>.cloudflareaccess.com`. None carries FamilyFi's JSON error body. A phone treats any of them
+as that route being unavailable and fails over; it never signs out over one. A phone that missed a
+replacement entirely is turned away until it is paired again.
 
 Remote access publishes one route at a time: `PUT /api/v1/connection/tunnel` turns the chosen route
 on and every other route off, so the signed manifest carries exactly that route (or none while off).

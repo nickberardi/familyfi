@@ -9,7 +9,7 @@ export async function GET(request: Request) {
       prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } }),
       prisma().changeResult.findFirst({ where: { actorAccountId: session.accountId ?? undefined }, orderBy: { updatedAt: "desc" } }),
     ]);
-    const manifest = await signedEndpointManifest();
+    const manifest = await signedEndpointManifest({ deviceId: session.deviceId });
     return Response.json({
       endpoints: manifest.endpoints,
       endpointManifest: manifest,

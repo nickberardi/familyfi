@@ -21,12 +21,13 @@ route off:
 | **My domain → Home network** | you (LAN, VPN or reverse proxy) | your HTTPS address, trusted or pinned |
 | **My domain → Tailscale** | you (a Tailscale Serve sidecar) | `https://…ts.net`, trusted |
 | **My domain → Cloudflare Tunnel → Automatic** | FamilyFi (`cloudflared`) | `https://<your hostname>` on your Cloudflare domain |
-| **My domain → Cloudflare Tunnel → Advanced** | you | coming soon ([#69](https://github.com/nickberardi/familyfi/issues/69)) |
+| **My domain → Cloudflare Tunnel → Advanced** | you (a `cloudflared` sidecar) | `https://<your hostname>`, trusted, optionally behind Cloudflare Access |
 
 Switching is one step and can be done any time. Routes you have saved stay saved, so switching back
 to one of them needs no retyping, and switching back to Automatic needs no new Cloudflare sign-in.
-Setup guides: [home network (VPN or reverse proxy)](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network)
-and [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale).
+Setup guides: [home network (VPN or reverse proxy)](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network),
+[Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) and
+[your own Cloudflare Tunnel](https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Tunnel).
 
 **Pair a phone** uses the published route: name the phone and show the QR; the sheet also shows the
 exact server address to type in the app and a `pairingId.token` code for pairing without the
@@ -87,11 +88,51 @@ the phone-only gateway. **Forget domain** deletes the domain route and its crede
 remote access off; the tunnel and DNS record stay in your Cloudflare account until you remove them
 there. Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
 
-### Cloudflare Access (advanced)
+### Your own Cloudflare Tunnel, and Cloudflare Access (Advanced)
 
-A Cloudflare Tunnel you run yourself, optionally protected by Cloudflare Access service tokens, is
-planned in [#69](https://github.com/nickberardi/familyfi/issues/69); **Advanced** says "Coming
-soon" until then. Do not place a Cloudflare service-token secret in a phone by hand.
+**Advanced** is a tunnel you run in your own Cloudflare account, with the `cloudflared` sidecar in
+[setup](setup.md#cloudflare-tunnel-you-run). FamilyFi doesn't manage it: it only needs the address.
+
+1. Create the tunnel, and point its public hostname at the phone-only gateway, `http://app:7002`
+   (with `FAMILYFI_PHONE_GATEWAY_PORT=7002`) — never at the app on 7001.
+2. On **Pair Device**, choose **My domain → Cloudflare Tunnel → Advanced**, enter
+   `https://<your hostname>`, and **Use this address**. Phones use it like any other trusted route.
+
+**Cloudflare Access** adds a second barrier: Cloudflare turns away any request that doesn't carry
+the route's service token, before it reaches FamilyFi. A request that gets past it still needs a
+paired phone and a signed-in account, as without Access.
+
+1. In Cloudflare Zero Trust, create a **service token**, then a **self-hosted application** for
+   your hostname with one **Service Auth** policy that includes that token. Turn on **Return 401
+   response for Service Auth policies**, so the app sees a plain refusal rather than a login page.
+   Add no identity policies to this application.
+2. On **Pair Device**, edit the Advanced route, tick **Protect with Cloudflare Access**, and paste
+   the token's Client ID and Client Secret. FamilyFi stores them encrypted with
+   `FAMILYFI_ENCRYPTION_KEY`.
+3. Pair phones as usual. The pairing QR carries the token, so a phone can reach the protected
+   address to pair; a phone already paired picks it up from its next signed manifest. Pair Device
+   shows how many active phones have it. Turn the Access policy on once they all do.
+
+The token only gets a request past Cloudflare, so it is treated as a shared key rather than a
+password: it is in the QR and on paired phones, and never in `/api/v1/connection/identity`, a
+browser's responses, or FamilyFi's logs. Anyone who sees a phone's HTTPS traffic, or a photo of a
+pairing QR, can read it; replacing it is the remedy.
+
+**Replacing the token** (a leak, or its expiry) never needs a phone outage:
+
+1. In Cloudflare, **rotate** the token's secret and pick a grace period (up to 30 days) during which
+   the old secret still works — or create a second token and add it to the same policy.
+2. Paste the new Client ID and Secret into the Advanced route. Phones pick it up the next time they
+   reach FamilyFi.
+3. Wait until Pair Device says every active phone has the new token, then remove the old token in
+   Cloudflare (or let its grace period end).
+
+A phone that stays away from FamilyFi for the whole overlap still holds the old token, so Cloudflare
+turns it away. Pair it again from Pair Device — one QR scan; its household account is unchanged.
+
+To turn Access off, use **Turn off Access** on Pair Device first, then remove the Access
+application in Cloudflare. Doing it the other way round turns every phone away until they reach
+FamilyFi another way.
 
 ## Database modes
 

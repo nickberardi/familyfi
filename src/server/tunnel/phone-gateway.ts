@@ -23,12 +23,16 @@ export function allowedThroughTunnel(url: string | undefined): boolean {
   return path.startsWith("/api/v1/");
 }
 
+const EDGE_TOKEN_HEADERS = new Set(["cf-access-client-id", "cf-access-client-secret"]);
+
 /** The headers the app sees for a tunnelled call. */
 export function tunnelHeaders(incoming: IncomingHttpHeaders): Record<string, string | string[]> {
   const headers: Record<string, string | string[]> = {};
   for (const [name, value] of Object.entries(incoming)) {
     if (value === undefined || HOP_BY_HOP.has(name)) continue;
     if (name === "cookie" || name === TUNNEL_HEADER || name === "x-forwarded-for" || name === "x-real-ip") continue;
+    // A Cloudflare Access service token is for Cloudflare alone; the app never needs it, so it can never log it.
+    if (EDGE_TOKEN_HEADERS.has(name)) continue;
     headers[name] = value;
   }
   // Cloudflare overwrites CF-Connecting-IP with the real client; X-Forwarded-For only gets

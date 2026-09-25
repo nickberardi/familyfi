@@ -37,6 +37,17 @@ describe("phone-only gateway rules", () => {
     expect(headers.authorization).toBe("Bearer t");
     expect(headers[TUNNEL_HEADER]).toBe("tunnel");
   });
+
+  it("keeps a Cloudflare Access service token away from the app", () => {
+    const headers = tunnelHeaders({
+      "cf-access-client-id": "abc.access",
+      "cf-access-client-secret": "shh",
+      authorization: "Bearer t",
+    });
+    expect(headers["cf-access-client-id"]).toBeUndefined();
+    expect(headers["cf-access-client-secret"]).toBeUndefined();
+    expect(headers.authorization).toBe("Bearer t");
+  });
 });
 
 describe("phone-only gateway", () => {
