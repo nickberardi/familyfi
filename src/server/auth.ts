@@ -1,6 +1,6 @@
 import { hash, verify } from "@node-rs/argon2";
 import { cookies } from "next/headers";
-import { AccountKind, SessionKind } from "@prisma/client";
+import { AccountKind, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { cookieValue } from "@/lib/cookie";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -179,6 +179,26 @@ export async function createSession(input: {
   return { raw, expiresAt, csrf: randomToken(24) };
 }
 
+export function watchGroupControlAllowed(
+  session: { device?: { client: PairedDeviceClient } | null },
+  group: { protected: boolean; kind: string; familyRole: string | null },
+): boolean {
+  return session.device?.client !== PairedDeviceClient.watch || (!group.protected && !(group.kind === "family" && group.familyRole === "adult"));
+}
+
+/** Watch credentials can only read state and control eligible groups. */
+function watchRouteAllowed(request: Request): boolean {
+  const path = new URL(request.url).pathname;
+  if (request.method === "GET") {
+    return path === "/api/v1/auth/session"
+      || path === "/api/v1/connection"
+      || path === "/api/v1/groups"
+      || /^\/api\/v1\/changes\/[^/]+$/.test(path);
+  }
+  if (request.method === "DELETE" && /^\/api\/v1\/connection\/devices\/[^/]+$/.test(path)) return true;
+  return request.method === "POST" && /^\/api\/v1\/groups\/[^/]+\/(pause|resume|extend)$/.test(path);
+}
+
 export async function readSessionFromRequest(request: Request) {
   const header = request.headers.get("authorization");
   let raw: string | undefined;
@@ -223,6 +243,9 @@ export function toPublicSession(session: {
 export async function requireSession(request: Request) {
   const session = await readSessionFromRequest(request);
   if (!session) return { session: null, error: jsonError(401, "unauthenticated", "Sign in required.") };
+  if (session.device?.client === PairedDeviceClient.watch && !watchRouteAllowed(request)) {
+    return { session: null, error: jsonError(401, "watch_scope", "This Watch session cannot use that endpoint.") };
+  }
   return { session, error: null };
 }
 
@@ -253,10 +276,7 @@ export async function requireCsrf(request: Request) {
 export async function revokeSession(request: Request) {
   const session = await readSessionFromRequest(request);
   if (session) {
-    await prisma().session.update({
-      where: { id: session.id },
-      data: { revokedAt: new Date() },
-    });
+    await prisma().session.updateMany({ where: { id: session.id }, data: { revokedAt: new Date() } });
   }
 }
 

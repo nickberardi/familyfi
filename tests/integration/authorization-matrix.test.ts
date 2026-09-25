@@ -49,8 +49,10 @@ type Outcome = "allowed" | "401" | "403";
  * - `csrf`: needs the CSRF cookie and header but no session (sign-out).
  * - `pairing-token`: the single-use pairing token is the credential; no session helps
  *   without it.
+ * - `paired-phone`: a native bearer tied to the phone named in the path; browser sessions
+ *   cannot issue a companion session.
  */
-type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token";
+type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "paired-phone";
 
 const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
   public: { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "allowed" },
@@ -59,6 +61,7 @@ const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
   administrator: { anonymous: "401", member: "403", administrator: "allowed", recovery: "allowed", tunnel: "401" },
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
+  "paired-phone": { anonymous: "401", member: "403", administrator: "403", recovery: "403", tunnel: "401" },
 };
 
 /**
@@ -88,6 +91,7 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/changes/{id}": { access: "session" },
   "GET /api/v1/connection": { access: "session" },
   "GET /api/v1/connection/devices": { access: "administrator" },
+  "POST /api/v1/connection/devices": { access: "paired-phone" },
   "DELETE /api/v1/connection/devices": { access: "administrator" },
   "DELETE /api/v1/connection/devices/{id}": { access: "administrator" },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
@@ -152,7 +156,7 @@ const BODIES: Record<string, unknown> = {
   "POST /api/v1/connection/pairings/{id}/claim": { token: "not-a-pairing-token", deviceName: "Matrix phone" },
 };
 
-const PARAMS: Record<string, string> = { id: "matrix-missing-id", mac: "02:00:00:00:0a:99" };
+const PARAMS: Record<string, string> = { id: "matrix-missing-id", sessionId: "matrix-missing-session", mac: "02:00:00:00:0a:99" };
 
 type Handler = (request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response>;
 type Route = { key: string; method: (typeof METHODS)[number]; template: string; handler: Handler };

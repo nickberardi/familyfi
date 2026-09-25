@@ -37,6 +37,11 @@ enum SessionKind {
   bearer
 }
 
+enum PairedDeviceClient {
+  phone
+  watch
+}
+
 enum ConnectionTransport {
   lan
   vpn
@@ -144,6 +149,8 @@ model PairedDevice {
   id              String         @id @default(cuid())
   displayName     String
   credentialHash  String         @unique
+  client          PairedDeviceClient @default(phone)
+  clientId        String?        @unique
   revokedAt       DateTime?
   lastSeenAt      DateTime?
   createdAt       DateTime       @default(now())

@@ -26,8 +26,9 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
-| GET | `/api/v1/connection/devices` | Administrator list of paired phones, the route each paired through (`pairedVia`), and their active sessions |
-| DELETE | `/api/v1/connection/devices/{id}` | Administrator revocation; invalidates every bearer session for that phone. `?remove=true` also deletes the phone's record |
+| GET | `/api/v1/connection/devices` | Administrator list of paired phones and Watches, the route each phone paired through (`pairedVia`), and active sessions |
+| POST | `/api/v1/connection/devices` | A signed-in paired iPhone automatically enrolls its reachable Watch (`client: "watch"`, `clientId`) as an independent device and receives its own credential and bearer for transfer |
+| DELETE | `/api/v1/connection/devices/{id}` | Administrator or the device itself revokes that device and its sessions. Only an administrator may use `?remove=true` to delete its record |
 | DELETE | `/api/v1/connection/devices?revoked=true` | Administrator removes every revoked phone's record; active phones are untouched |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds` |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
@@ -76,6 +77,12 @@ for an enabled endpoint; the phone claims it, verifies the instance identity, st
 device credential in Keychain, and then signs in normally with its household account.
 Native bearer sessions are tied to that paired phone. Revoking the phone invalidates every
 one of its bearer sessions and requires a new pairing.
+The iPhone may automatically enroll its reachable Watch without another administrator pairing.
+The Watch receives its own device credential and bearer token, appears as a separate device in
+System → Phones, and can be revoked there independently. Its sessions may only read session,
+connection, group, and change state or pause, resume, and extend groups. The three group controls
+reject protected and adult Family groups for Watch sessions. Signing out or revoking the phone does
+not revoke the Watch. Its bearer expires after 30 days; automatic renewal is a separate change.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity

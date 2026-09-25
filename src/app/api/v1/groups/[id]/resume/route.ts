@@ -1,4 +1,5 @@
 import { enqueueChange } from "@/server/changes";
+import { watchGroupControlAllowed } from "@/server/auth";
 import { publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
@@ -7,10 +8,11 @@ import { jsonError } from "@/server/http";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, ctx: Ctx) {
-  return withMutation(request, async () => {
+  return withMutation(request, async (session) => {
     const { id } = await ctx.params;
     const existing = await prisma().group.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
+    if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const group = await prisma().group.update({
       where: { id },
