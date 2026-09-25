@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CLOUDFLARE_GUIDE } from "@/lib/connection-routes";
-import type { ConnectionRoute, EdgeAccess } from "@/lib/types";
+import type { ConnectionRoute } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { RouteForm } from "./RouteForm";
 import { FIELD } from "./SheetFrame";
@@ -16,20 +16,20 @@ import { FIELD } from "./SheetFrame";
  */
 export function CloudflareAdvanced({
   route,
-  access,
+  hasToken = false,
   routes,
   onSaved,
   onCancel,
 }: {
   /** The saved route being edited, if any. */
   route?: ConnectionRoute;
-  /** Its Access token, when it has one. */
-  access?: EdgeAccess;
+  /** Whether the route being edited already has an Access token. */
+  hasToken?: boolean;
   routes: readonly ConnectionRoute[];
   onSaved: (route: ConnectionRoute) => Promise<void>;
   onCancel?: () => void;
 }) {
-  const [protect, setProtect] = useState(Boolean(access));
+  const [protect, setProtect] = useState(hasToken);
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const pasted = Boolean(clientId.trim() && clientSecret.trim());
@@ -37,7 +37,7 @@ export function CloudflareAdvanced({
 
   let extraBody: Record<string, unknown> = {};
   if (protect) extraBody = pasted ? { edgeAuth: "serviceToken", serviceToken: { clientId: clientId.trim(), clientSecret: clientSecret.trim() } } : { edgeAuth: "serviceToken" };
-  else if (access) extraBody = { edgeAuth: "none" };
+  else if (hasToken) extraBody = { edgeAuth: "none" };
 
   return (
     <div data-testid="cloudflare-advanced" className="flex flex-col gap-3">
@@ -53,7 +53,7 @@ export function CloudflareAdvanced({
         onSaved={onSaved}
         onCancel={onCancel}
         extraBody={extraBody}
-        canSave={!protect || pasted || (Boolean(access) && !partial)}
+        canSave={!protect || pasted || (hasToken && !partial)}
         extra={
           <div className="flex flex-col gap-2.5">
             <label className="flex items-center gap-2 font-semibold">
@@ -65,7 +65,7 @@ export function CloudflareAdvanced({
                 <p className="leading-5 text-[var(--ff-muted)]">
                   Paste the service token from your Access application&rsquo;s Service Auth policy. Phones get it in the pairing QR and
                   send it only to this address.
-                  {access ? " Leave both blank to keep the current token; paste a new one to replace it." : ""}
+                  {hasToken ? " Leave both blank to keep the current token; paste a new one to replace it." : ""}
                 </p>
                 <label className="font-semibold text-[var(--ff-muted)]">
                   Client ID
@@ -75,7 +75,7 @@ export function CloudflareAdvanced({
                     onChange={(event) => setClientId(event.target.value)}
                     autoComplete="off"
                     spellCheck={false}
-                    placeholder={access?.clientIdHint ?? "….access"}
+                    placeholder="….access"
                   />
                 </label>
                 <label className="font-semibold text-[var(--ff-muted)]">

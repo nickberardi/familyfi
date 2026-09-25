@@ -2,7 +2,7 @@ import { ConnectionTransport, ConnectionTrustMode, EdgeAuth, RouteKind } from "@
 import { z } from "zod";
 import { publicEndpoint, assertEndpoint, isUniqueViolation } from "@/server/connection";
 import { prisma } from "@/server/db";
-import { EdgeAuthError, edgeAccessList, edgeTokenUpdate } from "@/server/edge-auth";
+import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
 
@@ -15,7 +15,7 @@ const Body = z.object({
 export async function GET(request: Request) {
   return withAdmin(request, async () => {
     const endpoints = await prisma().connectionEndpoint.findMany({ where: { householdId: "default" }, orderBy: [{ priority: "asc" }, { createdAt: "asc" }] });
-    return Response.json({ endpoints: endpoints.map(publicEndpoint), edgeAccess: await edgeAccessList() });
+    return Response.json({ endpoints: endpoints.map(publicEndpoint) });
   });
 }
 

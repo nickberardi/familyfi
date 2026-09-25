@@ -6,15 +6,11 @@
  * Cloudflare still needs a paired device and a signed-in account.
  *
  * FamilyFi never holds an old token. Cloudflare keeps the old one valid through a rotation; what
- * FamilyFi tracks is which version each device was last handed, so the operator can see when
- * every phone has the new one.
+ * FamilyFi records is which version each device was last handed, which the devices list reports.
  */
 import { ConnectionTransport, EdgeAuth, RouteKind, type ConnectionEndpoint } from "@prisma/client";
 import { decryptSecret, encryptSecret, safeEqual } from "./crypto";
 import { prisma } from "./db";
-
-/** How long a device counts as in use: Cloudflare's longest grace period for a rotated secret. */
-export const ACTIVE_DEVICE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Both halves travel as HTTP header values, so only visible ASCII — never whitespace or a line break. */
 const HEADER_VALUE = /^[\x21-\x7e]{1,512}$/;
@@ -131,44 +127,4 @@ export async function recordDelivered(deviceId: string, credentials: readonly Ed
       update: { version: credential.version, fetchedAt: now },
     });
   }
-}
-
-/** Enough of a Client ID to match it against the Cloudflare dashboard, without showing it whole. */
-export function clientIdHint(clientId: string): string {
-  const id = clientId.replace(/\.access$/, "");
-  return `…${id.slice(-6)}${clientId.endsWith(".access") ? ".access" : ""}`;
-}
-
-export type EdgeAccess = {
-  endpointId: string;
-  version: number;
-  clientIdHint: string | null;
-  rotatedAt: string | null;
-  devices: { total: number; current: number; behind: { id: string; displayName: string; lastSeenAt: string | null }[] };
-};
-
-/** Each protected route's token and how many active devices have its current version. */
-export async function edgeAccessList(now = new Date()): Promise<EdgeAccess[]> {
-  const routes = await prisma().connectionEndpoint.findMany({ where: { householdId: "default", edgeAuth: EdgeAuth.serviceToken }, orderBy: { createdAt: "asc" } });
-  if (!routes.length) return [];
-  const devices = await prisma().pairedDevice.findMany({
-    where: { revokedAt: null, lastSeenAt: { gte: new Date(now.getTime() - ACTIVE_DEVICE_WINDOW_MS) } },
-    include: { edgeTokens: true },
-    orderBy: { displayName: "asc" },
-  });
-  return routes.map((route) => {
-    const token = storedServiceToken(route);
-    const behind = devices.filter((device) => !device.edgeTokens.some((row) => row.endpointId === route.id && row.version >= route.edgeTokenVersion));
-    return {
-      endpointId: route.id,
-      version: route.edgeTokenVersion,
-      clientIdHint: token ? clientIdHint(token.clientId) : null,
-      rotatedAt: route.edgeTokenRotatedAt?.toISOString() ?? null,
-      devices: {
-        total: devices.length,
-        current: devices.length - behind.length,
-        behind: behind.map((device) => ({ id: device.id, displayName: device.displayName, lastSeenAt: device.lastSeenAt?.toISOString() ?? null })),
-      },
-    };
-  });
 }

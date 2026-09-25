@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { AccountKind, ConnectionTransport, ConnectionTrustMode, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
+import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
 import { SESSION_TTL_MS } from "@/lib/constants";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -41,11 +41,18 @@ export function instanceFingerprint(publicKey: string): string {
   return createHash("sha256").update(Buffer.from(jwk.x, "base64url")).digest("base64url");
 }
 
-/** The fields a route is served with, to administrators and phones alike. A `domain` route's tunnel credential never is. */
+/**
+ * The fields a route is served with, to administrators and phones alike. A `domain` route's tunnel
+ * credential never is, and neither is an Access token: only whether one guards the route, and its version.
+ */
 export function publicEndpoint(endpoint: {
   id: string; url: string; kind: RouteKind; transport: ConnectionTransport; trustMode: ConnectionTrustMode; spkiSha256: string | null; priority: number; enabled: boolean;
+  edgeAuth: EdgeAuth; edgeTokenVersion: number;
 }) {
-  return { id: endpoint.id, url: endpoint.url, kind: endpoint.kind, transport: endpoint.transport, trustMode: endpoint.trustMode, spkiSha256: endpoint.spkiSha256, priority: endpoint.priority, enabled: endpoint.enabled };
+  return {
+    id: endpoint.id, url: endpoint.url, kind: endpoint.kind, transport: endpoint.transport, trustMode: endpoint.trustMode, spkiSha256: endpoint.spkiSha256, priority: endpoint.priority, enabled: endpoint.enabled,
+    edgeAuth: endpoint.edgeAuth, edgeTokenVersion: endpoint.edgeAuth === EdgeAuth.serviceToken ? endpoint.edgeTokenVersion : null,
+  };
 }
 
 /** Quick and domain routes follow FamilyFi's own tunnel; only Remote access may change them. */
@@ -54,10 +61,8 @@ export function isManagedRoute(endpoint: { kind: RouteKind }): boolean {
 }
 
 /**
- * The routes phones may use, signed with the household key. Inside the signed payload each route
- * also says whether Cloudflare Access guards it, and a paired device (`deviceId`) additionally
- * gets those routes' service tokens — never a browser session. The unsigned `endpoints` copy keeps
- * the plain route shape, which phones decode strictly.
+ * The routes phones may use, signed with the household key. A paired device (`deviceId`) also gets
+ * the service tokens of the routes behind Cloudflare Access — never a browser session.
  */
 export async function signedEndpointManifest(options: { deviceId?: string | null } = {}) {
   const household = await ensureConnectionIdentity();
@@ -65,7 +70,7 @@ export async function signedEndpointManifest(options: { deviceId?: string | null
   const credentials = options.deviceId ? edgeCredentials(endpoints) : [];
   const payload = JSON.stringify({
     instanceId: household.instanceId,
-    endpoints: endpoints.map((endpoint) => ({ ...publicEndpoint(endpoint), edgeAuth: endpoint.edgeAuth })),
+    endpoints: endpoints.map(publicEndpoint),
     ...(options.deviceId ? { edgeCredentials: credentials } : {}),
   });
   const privateJwk = JSON.parse(decryptSecret({

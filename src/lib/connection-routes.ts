@@ -3,7 +3,7 @@
  * named, which Remote access choice the published route stands for, and what a pairing
  * code looks like.
  */
-import type { ConnectionRoute, ConnectionTransport, EdgeAccess, RemoteAccess } from "./types";
+import type { ConnectionRoute, ConnectionTransport, PairedPhone, RemoteAccess } from "./types";
 
 export const TRANSPORTS: readonly { value: ConnectionTransport; label: string }[] = [
   { value: "lan", label: "Home network" },
@@ -28,22 +28,33 @@ export const TAILSCALE_GUIDE = `${WIKI}/Remote-access-Tailscale`;
 /** Running your own Cloudflare Tunnel, optionally behind Cloudflare Access. */
 export const CLOUDFLARE_GUIDE = `${WIKI}/Remote-access-Cloudflare-Tunnel`;
 
+/** How long a device counts as in use: Cloudflare's longest grace period for a rotated secret. */
+export const ACTIVE_DEVICE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
 /**
- * How far the current Cloudflare Access token has reached. Phones pick it up the next time they
- * reach FamilyFi; until all have it, Cloudflare must keep accepting what they hold — no Access
- * yet for a first token, the old token for a replacement — or it turns them away.
+ * How far a route's current Cloudflare Access token has reached the household's devices.
+ * Devices pick it up the next time they reach FamilyFi; until all active ones have it,
+ * Cloudflare must keep accepting what they hold — no Access yet for a first token, the old
+ * token for a replacement — or it turns them away. Revoked devices, and ones not seen within
+ * Cloudflare's longest grace period, are not waited for.
  */
-export function accessRollout(access: Pick<EdgeAccess, "version" | "devices">): { done: boolean; text: string } {
-  const { total, current, behind } = access.devices;
-  const replaced = access.version > 1;
+export function accessRollout(
+  route: Pick<ConnectionRoute, "id" | "edgeTokenVersion">,
+  devices: readonly Pick<PairedPhone, "displayName" | "revokedAt" | "lastSeenAt" | "edgeTokens">[],
+  now = Date.now(),
+): { done: boolean; text: string } {
+  const version = route.edgeTokenVersion ?? 0;
+  const active = devices.filter((device) => !device.revokedAt && device.lastSeenAt && now - new Date(device.lastSeenAt).getTime() <= ACTIVE_DEVICE_WINDOW_MS);
+  const behind = active.filter((device) => !device.edgeTokens.some((token) => token.endpointId === route.id && token.version >= version));
+  const replaced = version > 1;
   const token = replaced ? "the new token" : "the token";
-  if (!total) return { done: true, text: "No active phones yet." };
+  if (!active.length) return { done: true, text: "No active phones yet." };
   if (!behind.length) {
     return { done: true, text: `Every active phone has ${token}.${replaced ? " You can remove the old one in Cloudflare." : ""}` };
   }
   const names = behind.map((device) => device.displayName).join(", ");
   const hold = replaced ? "Keep the old token in Cloudflare until then." : "Cloudflare turns them away until then.";
-  return { done: false, text: `${current} of ${total} active phones have ${token}. Waiting for ${names}. ${hold}` };
+  return { done: false, text: `${active.length - behind.length} of ${active.length} active phones have ${token}. Waiting for ${names}. ${hold}` };
 }
 
 /**

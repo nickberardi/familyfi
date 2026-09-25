@@ -130,6 +130,10 @@ export type ConnectionRoute = {
   spkiSha256: string | null;
   priority: number;
   enabled: boolean;
+  /** Whether Cloudflare Access guards the route; the token itself is never served here. */
+  edgeAuth: "none" | "serviceToken";
+  /** The current Access token's version, or null without Access. */
+  edgeTokenVersion: number | null;
 };
 
 export type PairedPhone = {
@@ -140,6 +144,8 @@ export type PairedPhone = {
   lastSeenAt: string | null;
   revokedAt: string | null;
   pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
+  /** The Access token version FamilyFi last handed this device, per protected route. */
+  edgeTokens: { endpointId: string; version: number }[];
   sessions: { id: string; username: string; client: "phone" | "watch"; expiresAt: string; createdAt: string }[];
 };
 
@@ -152,15 +158,6 @@ export type PairingQr = {
   keyFingerprint: string;
   /** Present when the route is behind Cloudflare Access: the token a phone needs to reach it. */
   edgeCredential?: { version: number; clientId: string; clientSecret: string };
-};
-
-/** A route behind Cloudflare Access, and which active devices have its current service token. */
-export type EdgeAccess = {
-  endpointId: string;
-  version: number;
-  clientIdHint: string | null;
-  rotatedAt: string | null;
-  devices: { total: number; current: number; behind: { id: string; displayName: string; lastSeenAt: string | null }[] };
 };
 
 export type PairingState = {
