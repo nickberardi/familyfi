@@ -9,25 +9,23 @@ function pairedDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** An active phone offers Revoke; a revoked one offers Re-pair and Remove. */
+/** Each paired device has its own sessions and can be revoked independently. */
 export function PairedPhoneRow({
   phone,
   onRevoke,
   onRepair,
   onRemove,
-  onRevokeWatch,
 }: {
   phone: PairedPhone;
   onRevoke?: () => void;
   onRepair?: () => void;
   onRemove?: () => void;
-  onRevokeWatch?: (sessionId: string) => void;
 }) {
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt) : "never";
   return (
     <div data-testid="phone-row" className="flex flex-wrap items-center gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-3 first:border-t-0">
       <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-field)]">
-        <Icon name="device-mobile" size={18} />
+        <Icon name={phone.client === "watch" ? "watch" : "device-mobile"} size={18} />
       </span>
       <div className="min-w-[200px] flex-1">
         <div className="text-[14px] font-semibold">{phone.displayName}</div>
@@ -40,22 +38,13 @@ export function PairedPhoneRow({
               via <span className="font-mono">{phone.pairedVia.url}</span> · {transportLabel(phone.pairedVia.transport)}
             </>
           ) : (
-            "via a route that was removed"
+            phone.client === "watch" ? "Paired automatically from an iPhone" : "via a route that was removed"
           )}
         </div>
       </div>
-      {phone.sessions.filter((session) => session.client === "watch").map((session) => (
+      {phone.sessions.map((session) => (
         <div key={session.id} className="w-full pl-11 text-[14px] text-[var(--ff-muted)]">
-          Apple Watch · {session.username} · expires {pairedDate(session.expiresAt)}
-          {onRevokeWatch ? (
-            <button
-              type="button"
-              className="ml-3 font-semibold text-[var(--ff-danger)]"
-              onClick={() => onRevokeWatch(session.id)}
-            >
-              Revoke Watch
-            </button>
-          ) : null}
+          {session.username} · expires {pairedDate(session.expiresAt)}
         </div>
       ))}
       {onRevoke ? (

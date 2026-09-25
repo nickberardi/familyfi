@@ -1645,10 +1645,46 @@ paths:
     get:
       operationId: listConnectionDevices
       tags: [Connection]
-      summary: List paired phones and sessions
+      summary: List paired devices and sessions
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: Devices, content: { application/json: { schema: { type: object, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/ConnectionDevice" } } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: enrollConnectionDevice
+      tags: [Connection]
+      summary: Automatically pair a Watch from its signed-in paired iPhone
+      description: Creates an independent paired Watch device and its own 30-day bearer session. A previous enrollment with the same Watch clientId is revoked. Signing out or revoking the phone does not revoke the Watch.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [client, clientId]
+              properties:
+                client: { type: string, enum: [watch] }
+                clientId: { type: string, format: uuid }
+                displayName: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        "201":
+          description: Watch device enrolled and signed in
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [deviceId, deviceCredential, sessionId, token, expiresAt]
+                properties:
+                  deviceId: { type: string }
+                  deviceCredential: { type: string }
+                  sessionId: { type: string }
+                  token: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
     delete:
@@ -1663,68 +1699,16 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/connection/devices/{id}/sessions:
-    post:
-      operationId: createConnectionDeviceSession
-      tags: [Connection]
-      summary: Issue a companion session for a paired phone
-      description: A signed-in paired phone may issue a restricted Watch session for itself. Replaces its previously active Watch session. The token expires after 30 days.
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [client, clientId]
-              properties:
-                client: { type: string, enum: [watch] }
-                clientId: { type: string, format: uuid }
-      responses:
-        "201":
-          description: Watch session issued
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [sessionId, token, expiresAt]
-                properties:
-                  sessionId: { type: string }
-                  token: { type: string }
-                  expiresAt: { type: string, format: date-time }
-        "400": { $ref: "#/components/responses/Error" }
-        "401": { $ref: "#/components/responses/Error" }
-        "403": { $ref: "#/components/responses/Error" }
-  /api/v1/connection/devices/{id}/sessions/{sessionId}:
-    delete:
-      operationId: revokeConnectionDeviceSession
-      tags: [Connection]
-      summary: Revoke a companion session
-      description: The provisioning phone or a household administrator may revoke this session.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-        - { name: sessionId, in: path, required: true, schema: { type: string } }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      responses:
-        "200": { description: Revoked, content: { application/json: { schema: { type: object, additionalProperties: false, required: [ok], properties: { ok: { type: boolean } } } } } }
-        "401": { $ref: "#/components/responses/Error" }
-        "403": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
   /api/v1/connection/devices/{id}:
     delete:
       operationId: revokeConnectionDevice
       tags: [Connection]
-      summary: Revoke a paired phone and its sessions, or remove its record
+      summary: Revoke a paired device and its sessions, or remove its record
       description: |
-        Without a query this revokes the phone: every bearer session ends and it must pair
-        again. With `?remove=true` it also deletes the phone's record for good (revoking first
-        if it was still active). Sessions, pairings and change history keep their rows with the
-        phone reference cleared.
+        An administrator or the paired device itself may revoke it: every bearer session ends
+        and it must pair again. Only an administrator may use `?remove=true` to delete its record
+        for good after revoking it. Sessions, pairings and change history keep their rows with the
+        device reference cleared.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
@@ -2226,16 +2210,17 @@ components:
     ConnectionDevice:
       type: object
       additionalProperties: false
-      required: [id, displayName, enrolledAt, lastSeenAt, revokedAt, pairedVia, sessions]
+      required: [id, displayName, client, enrolledAt, lastSeenAt, revokedAt, pairedVia, sessions]
       properties:
         id: { type: string }
         displayName: { type: string }
+        client: { type: string, enum: [phone, watch] }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
         revokedAt: { type: [string, "null"], format: date-time }
         pairedVia:
           type: [object, "null"]
-          description: The route this phone paired through; null once that route is deleted.
+          description: The route this device paired through; null for automatically enrolled Watches or if that route is deleted.
           additionalProperties: false
           required: [endpointId, url, transport]
           properties:

@@ -131,6 +131,7 @@ export type ConnectionRoute = {
 export type PairedPhone = {
   id: string;
   displayName: string;
+  client: "phone" | "watch";
   enrolledAt: string;
   lastSeenAt: string | null;
   revokedAt: string | null;

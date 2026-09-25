@@ -37,6 +37,11 @@ enum SessionKind {
   bearer
 }
 
+enum PairedDeviceClient {
+  phone
+  watch
+}
+
 enum ConnectionTransport {
   lan
   vpn
@@ -144,6 +149,8 @@ model PairedDevice {
   id              String         @id @default(cuid())
   displayName     String
   credentialHash  String         @unique
+  client          PairedDeviceClient @default(phone)
+  clientId        String?        @unique
   revokedAt       DateTime?
   lastSeenAt      DateTime?
   createdAt       DateTime       @default(now())
@@ -225,15 +232,11 @@ model Session {
   userAgent String?
   deviceId  String?
   device    PairedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  /// A Watch session is issued by this signed-in phone session. Null for phone and browser sessions.
-  parentSessionId String?
-  watchId String?
   createdAt DateTime    @default(now())
 
   @@index([username])
   @@index([expiresAt])
   @@index([deviceId])
-  @@index([parentSessionId])
 }
 
 model LoginAttempt {

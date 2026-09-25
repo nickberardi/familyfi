@@ -1,4 +1,4 @@
-ALTER TABLE "Session" ADD COLUMN "parentSessionId" TEXT;
-ALTER TABLE "Session" ADD COLUMN "watchId" TEXT;
-
-CREATE INDEX "Session_parentSessionId_idx" ON "Session"("parentSessionId");
+CREATE TYPE "PairedDeviceClient" AS ENUM ('phone', 'watch');
+ALTER TABLE "PairedDevice" ADD COLUMN "client" "PairedDeviceClient" NOT NULL DEFAULT 'phone';
+ALTER TABLE "PairedDevice" ADD COLUMN "clientId" TEXT;
+CREATE UNIQUE INDEX "PairedDevice_clientId_key" ON "PairedDevice"("clientId");

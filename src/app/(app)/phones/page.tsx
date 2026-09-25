@@ -107,8 +107,8 @@ export default function PhonesPage() {
 
         <section className={CARD}>
           <div className={CARD_HEAD}>
-            <span className="text-[14px] font-semibold">Paired phones</span>
-            <span className="text-[14px] text-[var(--ff-muted)]">Revoke a lost phone to sign it out everywhere</span>
+            <span className="text-[14px] font-semibold">Paired devices</span>
+            <span className="text-[14px] text-[var(--ff-muted)]">Revoke a lost phone or Watch independently</span>
           </div>
           {active.length === 0 ? (
             <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
@@ -123,10 +123,6 @@ export default function PhonesPage() {
                   if (!window.confirm(`Revoke ${phone.displayName}? It is signed out now and must be paired again.`)) return;
                   void run(() => api(`/api/v1/connection/devices/${phone.id}`, { method: "DELETE" }));
                 }}
-                onRevokeWatch={(sessionId) => {
-                  if (!window.confirm("Revoke this Watch session? The Watch will need setup from its iPhone again.")) return;
-                  void run(() => api(`/api/v1/connection/devices/${phone.id}/sessions/${sessionId}`, { method: "DELETE" }));
-                }}
               />
             ))
           )}
@@ -136,7 +132,7 @@ export default function PhonesPage() {
               className="w-full border-t border-[var(--ff-hairline)] px-[18px] py-2.5 text-left text-[14px] font-semibold text-[var(--ff-accent)]"
               onClick={() => setShowAll((value) => !value)}
             >
-              {showAll ? "Show recent only" : `Show all ${active.length} phones`}
+              {showAll ? "Show recent only" : `Show all ${active.length} devices`}
             </button>
           ) : null}
           {revoked.length ? (
@@ -156,7 +152,7 @@ export default function PhonesPage() {
                       key={phone.id}
                       phone={phone}
                       onRepair={
-                        canPair
+                        canPair && phone.client === "phone"
                           ? () => {
                               setReplacing(phone);
                               setPairing(true);
@@ -164,7 +160,7 @@ export default function PhonesPage() {
                           : undefined
                       }
                       onRemove={() => {
-                        if (!window.confirm(`Remove ${phone.displayName} from the list? This can't be undone; the phone would need to pair again.`)) return;
+                        if (!window.confirm(`Remove ${phone.displayName} from the list? This can't be undone; setup would be needed again.`)) return;
                         void run(() => api(`/api/v1/connection/devices/${phone.id}?remove=true`, { method: "DELETE" }));
                       }}
                     />
@@ -174,7 +170,7 @@ export default function PhonesPage() {
                       type="button"
                       className="text-[14px] font-semibold text-[var(--ff-danger)]"
                       onClick={() => {
-                        if (!window.confirm(`Remove all ${revoked.length} revoked phones from the list? This can't be undone.`)) return;
+                        if (!window.confirm(`Remove all ${revoked.length} revoked devices from the list? This can't be undone.`)) return;
                         void run(() => api("/api/v1/connection/devices?revoked=true", { method: "DELETE" }));
                       }}
                     >
