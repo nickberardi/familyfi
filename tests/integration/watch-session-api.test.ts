@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { FamilyRole, GroupKind, SessionKind } from "@prisma/client";
 import { createSession } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { POST as issueWatch } from "@/app/api/v1/connection/watch-sessions/route";
-import { DELETE as revokeWatch } from "@/app/api/v1/connection/watch-sessions/[id]/route";
+import { POST as issueWatch } from "@/app/api/v1/connection/devices/[id]/sessions/route";
+import { DELETE as revokeWatch } from "@/app/api/v1/connection/devices/[id]/sessions/[sessionId]/route";
 import { GET as currentSession } from "@/app/api/v1/auth/session/route";
 import { POST as logout } from "@/app/api/v1/auth/logout/route";
 import { GET as listGroups } from "@/app/api/v1/groups/route";
@@ -29,11 +29,11 @@ async function pairedPhone() {
   return { device, auth: { cookie: "", csrf: "", token: session.raw } };
 }
 
-async function issue(auth: { cookie: string; csrf: string; token?: string }, id = watchId) {
-  return issueWatch(request("/api/v1/connection/watch-sessions", {
+async function issue(auth: { cookie: string; csrf: string; token?: string }, deviceId: string, clientId = watchId) {
+  return issueWatch(request(`/api/v1/connection/devices/${deviceId}/sessions`, {
     method: "POST", auth, headers: { "content-type": "application/json" },
-    body: JSON.stringify({ watchId: id }),
-  }));
+    body: JSON.stringify({ client: "watch", clientId }),
+  }), { params: Promise.resolve({ id: deviceId }) });
 }
 
 describe("Watch sessions", () => {
@@ -43,7 +43,7 @@ describe("Watch sessions", () => {
 
   it("issues a distinct scoped token and replaces the active Watch session", async () => {
     const phone = await pairedPhone();
-    const issued = await issue(phone.auth);
+    const issued = await issue(phone.auth, phone.device.id);
     expect(issued.status).toBe(201);
     const first = await issued.json() as { sessionId: string; token: string; expiresAt: string };
     expect(first.token).not.toBe(phone.auth.token);
@@ -54,9 +54,9 @@ describe("Watch sessions", () => {
     const denied = await household(request("/api/v1/settings/household", { auth: watchAuth }));
     expect(denied.status).toBe(401);
     expect((await denied.json() as { error: { code: string } }).error.code).toBe("watch_scope");
-    expect((await issue(watchAuth)).status).toBe(401);
+    expect((await issue(watchAuth, phone.device.id)).status).toBe(401);
 
-    const replacement = await issue(phone.auth, "7ea4417c-9157-484c-9903-97adf240715f");
+    const replacement = await issue(phone.auth, phone.device.id, "7ea4417c-9157-484c-9903-97adf240715f");
     expect(replacement.status).toBe(201);
     expect((await currentSession(request("/api/v1/auth/session", { auth: watchAuth }))).status).toBe(401);
     const second = await replacement.json() as { token: string };
@@ -65,39 +65,62 @@ describe("Watch sessions", () => {
 
   it("revokes Watch access alone, and revokes a replacement on phone sign-out", async () => {
     const phone = await pairedPhone();
-    const first = await (await issue(phone.auth)).json() as { sessionId: string; token: string };
+    const first = await (await issue(phone.auth, phone.device.id)).json() as { sessionId: string; token: string };
     const deleted = await revokeWatch(
-      request(`/api/v1/connection/watch-sessions/${first.sessionId}`, { method: "DELETE", auth: phone.auth }),
-      { params: Promise.resolve({ id: first.sessionId }) },
+      request(`/api/v1/connection/devices/${phone.device.id}/sessions/${first.sessionId}`, { method: "DELETE", auth: phone.auth }),
+      { params: Promise.resolve({ id: phone.device.id, sessionId: first.sessionId }) },
     );
     expect(deleted.status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: { cookie: "", csrf: "", token: first.token } }))).status).toBe(401);
     expect((await currentSession(request("/api/v1/auth/session", { auth: phone.auth }))).status).toBe(200);
 
-    const second = await (await issue(phone.auth)).json() as { token: string };
+    const second = await (await issue(phone.auth, phone.device.id)).json() as { token: string };
     expect((await logout(request("/api/v1/auth/logout", { method: "POST", auth: phone.auth }))).status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: { cookie: "", csrf: "", token: second.token } }))).status).toBe(401);
   });
 
   it("allows an administrator to revoke Watch access and rejects browser provisioning", async () => {
     const phone = await pairedPhone();
-    const first = await (await issue(phone.auth)).json() as { sessionId: string; token: string };
+    const first = await (await issue(phone.auth, phone.device.id)).json() as { sessionId: string; token: string };
     const loginResponse = await login(request("/api/v1/auth/login", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD }),
     }));
     const admin = authFromLogin(loginResponse);
-    expect((await issue(admin)).status).toBe(403);
+    expect((await issue(admin, phone.device.id)).status).toBe(403);
     expect((await revokeWatch(
-      request(`/api/v1/connection/watch-sessions/${first.sessionId}`, { method: "DELETE", auth: admin }),
-      { params: Promise.resolve({ id: first.sessionId }) },
+      request(`/api/v1/connection/devices/${phone.device.id}/sessions/${first.sessionId}`, { method: "DELETE", auth: admin }),
+      { params: Promise.resolve({ id: phone.device.id, sessionId: first.sessionId }) },
     )).status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: { cookie: "", csrf: "", token: first.token } }))).status).toBe(401);
   });
 
+  it("binds issuance and revocation to the paired phone in the path", async () => {
+    const phone = await pairedPhone();
+    const other = await prisma().pairedDevice.create({
+      data: { displayName: "Other phone", credentialHash: "other-phone-credential" },
+    });
+    expect((await issue(phone.auth, other.id)).status).toBe(403);
+    const invalidClient = await issueWatch(request(`/api/v1/connection/devices/${phone.device.id}/sessions`, {
+      method: "POST", auth: phone.auth, headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client: "phone", clientId: watchId }),
+    }), { params: Promise.resolve({ id: phone.device.id }) });
+    expect(invalidClient.status).toBe(400);
+
+    const issued = await (await issue(phone.auth, phone.device.id)).json() as { sessionId: string; token: string };
+    const wrongDevice = await revokeWatch(
+      request(`/api/v1/connection/devices/${other.id}/sessions/${issued.sessionId}`, { method: "DELETE", auth: phone.auth }),
+      { params: Promise.resolve({ id: other.id, sessionId: issued.sessionId }) },
+    );
+    expect(wrongDevice.status).toBe(404);
+    expect((await currentSession(request("/api/v1/auth/session", {
+      auth: { cookie: "", csrf: "", token: issued.token },
+    }))).status).toBe(200);
+  });
+
   it("expires Watch access and ends it when the paired phone is revoked", async () => {
     const phone = await pairedPhone();
-    const first = await (await issue(phone.auth)).json() as { sessionId: string; token: string };
+    const first = await (await issue(phone.auth, phone.device.id)).json() as { sessionId: string; token: string };
     await prisma().session.update({
       where: { id: first.sessionId },
       data: { expiresAt: new Date(Date.now() - 1000) },
@@ -106,7 +129,7 @@ describe("Watch sessions", () => {
       auth: { cookie: "", csrf: "", token: first.token },
     }))).status).toBe(401);
 
-    const second = await (await issue(phone.auth)).json() as { token: string };
+    const second = await (await issue(phone.auth, phone.device.id)).json() as { token: string };
     const loginResponse = await login(request("/api/v1/auth/login", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD }),
@@ -124,7 +147,7 @@ describe("Watch sessions", () => {
 
   it("allows the three controls for a child group but refuses adult and protected groups", async () => {
     const phone = await pairedPhone();
-    const issued = await (await issue(phone.auth)).json() as { token: string };
+    const issued = await (await issue(phone.auth, phone.device.id)).json() as { token: string };
     const auth = { cookie: "", csrf: "", token: issued.token };
     const child = await prisma().group.create({
       data: { kind: GroupKind.family, name: "Child", familyRole: FamilyRole.child },

@@ -125,7 +125,7 @@ export default function PhonesPage() {
                 }}
                 onRevokeWatch={(sessionId) => {
                   if (!window.confirm("Revoke this Watch session? The Watch will need setup from its iPhone again.")) return;
-                  void run(() => api(`/api/v1/connection/watch-sessions/${sessionId}`, { method: "DELETE" }));
+                  void run(() => api(`/api/v1/connection/devices/${phone.id}/sessions/${sessionId}`, { method: "DELETE" }));
                 }}
               />
             ))

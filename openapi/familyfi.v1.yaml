@@ -1663,13 +1663,15 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/connection/watch-sessions:
+  /api/v1/connection/devices/{id}/sessions:
     post:
-      operationId: createWatchSession
+      operationId: createConnectionDeviceSession
       tags: [Connection]
-      summary: Issue a separate Watch session from a paired iPhone
-      description: Replaces the previously active Watch session for this paired phone. The token expires after 30 days.
+      summary: Issue a companion session for a paired phone
+      description: A signed-in paired phone may issue a restricted Watch session for itself. Replaces its previously active Watch session. The token expires after 30 days.
       security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -1677,9 +1679,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [watchId]
+              required: [client, clientId]
               properties:
-                watchId: { type: string, format: uuid }
+                client: { type: string, enum: [watch] }
+                clientId: { type: string, format: uuid }
       responses:
         "201":
           description: Watch session issued
@@ -1696,15 +1699,16 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/connection/watch-sessions/{id}:
+  /api/v1/connection/devices/{id}/sessions/{sessionId}:
     delete:
-      operationId: revokeWatchSession
+      operationId: revokeConnectionDeviceSession
       tags: [Connection]
-      summary: Revoke a Watch session
+      summary: Revoke a companion session
       description: The provisioning phone or a household administrator may revoke this session.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
         - { $ref: "#/components/parameters/CsrfToken" }
       responses:
         "200": { description: Revoked, content: { application/json: { schema: { type: object, additionalProperties: false, required: [ok], properties: { ok: { type: boolean } } } } } }
