@@ -83,7 +83,9 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 
 ### Runners
 
-Jobs run on GitHub-hosted `ubuntu-latest`. Each job gets a new machine, so disk cleanup between jobs is not part of the workflow. The release image is the exception: `linux/amd64` also uses `ubuntu-latest`, and `linux/arm64` uses `ubuntu-24.04-arm`, because that build has to run on the architecture it publishes.
+Jobs run on the self-hosted runners. A job names an architecture only when the image it builds has to be that architecture: the pull-request image and the `linux/amd64` release image use `[self-hosted, linux, x64]`, and the `linux/arm64` release image uses GitHub-hosted `ubuntu-24.04-arm`.
+
+The self-hosted machines keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/runner-cleanup.sh`](../scripts/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and runner diagnostics older than a week. It assumes one runner per machine, so no other job is using Docker while it runs.
 
 ### Audit allowlist
 

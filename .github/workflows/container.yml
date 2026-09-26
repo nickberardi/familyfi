@@ -11,9 +11,10 @@ on:
 
 jobs:
   container:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
       - uses: docker/setup-buildx-action@v4
       - name: Build image
         uses: docker/build-push-action@v7
