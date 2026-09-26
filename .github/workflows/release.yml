@@ -47,6 +47,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
       - name: Platform pair
         run: |
           platform=${{ matrix.platform }}

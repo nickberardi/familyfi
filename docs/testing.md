@@ -81,6 +81,19 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 | `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking_api` label; never add it yourself |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | Mutation testing. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 
+### Self-hosted runners
+
+Every job except `mutation.yml` runs on self-hosted runners, which keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/runner-cleanup.sh`](../scripts/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed, and nothing needs installing on the runners. The script removes:
+
+- every unused Docker image, stopped container, anonymous volume, builder and build cache (image layers are in the GitHub Actions cache; the job's own service containers are running, so they stay);
+- the pnpm store, which `setup-node` restores from the Actions cache;
+- the Go build and module caches from installing `oasdiff`;
+- CodeQL bundles and Node versions in the tool cache not refreshed in two weeks;
+- apt's package cache from `playwright install --with-deps`;
+- `familyfi-*` temp directories in `/tmp`, and runner diagnostics older than a week.
+
+`actions/checkout` already empties the workspace. The script assumes one runner per machine, so no other job is using Docker or the caches while it runs. A new self-hosted job adds the step right after its checkout.
+
 ### Audit allowlist
 
 Empty. An advisory that cannot be fixed yet goes in `pnpm.auditConfig.ignoreGhsas` in `package.json` and gets a row here in the same change, with the advisory, why it does not reach FamilyFi or cannot be fixed, and the date it expires. Remove both when the date passes or a fix ships.

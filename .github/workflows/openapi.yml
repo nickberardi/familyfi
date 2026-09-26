@@ -19,6 +19,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
       - uses: pnpm/action-setup@v6
         with:
           version: 10.15.1
@@ -37,6 +38,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
       - name: Breaking changes against the base branch
         env:
           BASE_REF: ${{ github.base_ref }}
