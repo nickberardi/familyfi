@@ -16,10 +16,9 @@ permissions:
 jobs:
   # info.version must rise with every change, so the iOS client can tell its vendored copy is stale.
   version:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/runner-cleanup
       - uses: pnpm/action-setup@v6
         with:
           version: 10.15.1
@@ -35,10 +34,9 @@ jobs:
         run: node scripts/check-openapi-version.mjs
 
   breaking:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/runner-cleanup
       - name: Breaking changes against the base branch
         env:
           BASE_REF: ${{ github.base_ref }}
