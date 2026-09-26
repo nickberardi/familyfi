@@ -11,7 +11,7 @@ on:
     
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:18
@@ -40,6 +40,7 @@ jobs:
       POSTGRES_PASSWORD: familyfi-ci
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
       - uses: pnpm/action-setup@v6
         with:
           version: 10.15.1
@@ -76,7 +77,7 @@ jobs:
       - run: pnpm build
 
   browser:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:18
@@ -107,6 +108,7 @@ jobs:
       CLOUDFLARED_BIN: ${{ github.workspace }}/tests/fixtures/cloudflared/cloudflared
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
       - uses: pnpm/action-setup@v6
         with:
           version: 10.15.1
