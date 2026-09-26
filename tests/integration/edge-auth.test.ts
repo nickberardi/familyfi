@@ -11,6 +11,7 @@ import { GET as connection } from "@/app/api/v1/connection/route";
 import { PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { issuedPairing } from "../helpers/pairing";
 import { resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -54,9 +55,9 @@ async function protectedRoute(auth: SessionAuth) {
 
 async function pairPhone(auth: SessionAuth, endpointId: string, name: string) {
   const issued = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId, deviceName: name })));
-  const pairing = ((await issued.json()) as { pairing: { id: string; qr: { token: string; edgeCredential?: { version: number; clientId: string; clientSecret: string } } } }).pairing;
+  const pairing = await issuedPairing(issued);
   const claim = await claimPairing(
-    request(`/api/v1/connection/pairings/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.qr.token, deviceName: name }) }),
+    request(`/api/v1/connection/pairings/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: name }) }),
     params(pairing.id),
   );
   expect(claim.status).toBe(200);
@@ -69,7 +70,7 @@ async function pairPhone(auth: SessionAuth, endpointId: string, name: string) {
     }),
   );
   const bearer: SessionAuth = { cookie: "", csrf: "", token: ((await signIn.json()) as { token: string }).token };
-  return { qr: pairing.qr, claimed, bearer };
+  return { payload: pairing.payload, claimed, bearer };
 }
 
 async function verifiedPayload(manifest: Manifest): Promise<Payload> {
@@ -162,12 +163,13 @@ describe("Cloudflare Access service tokens", () => {
     expect((await addRoute(auth, { url: "https://both.example.com", transport: "cloudflare", edgeAuth: "none", serviceToken: TOKEN })).response.status).toBe(400);
   });
 
-  it("hands the token to a pairing phone in the QR and the claim, and to a paired device's manifest only", async () => {
+  it("hands the token to a pairing phone in the pairing code and the claim, and to a paired device's manifest only", async () => {
     const auth = await adminAuth();
     const id = await protectedRoute(auth);
-    const { qr, claimed, bearer } = await pairPhone(auth, id, "Kitchen iPhone");
+    const { payload, claimed, bearer } = await pairPhone(auth, id, "Kitchen iPhone");
 
-    expect(qr.edgeCredential).toEqual({ version: 1, ...TOKEN });
+    // Only what pairing needs: no route id, version or instance id — the signed manifest carries those.
+    expect(payload).toEqual({ version: 1, url: "https://familyfi.example.com", code: expect.any(String), fingerprint: expect.any(String), access: TOKEN });
 
     // The route says Access guards it; only the signed payload carries the token.
     expect(claimed.manifest.endpoints).toEqual([expect.objectContaining({ id, edgeAuth: "serviceToken", edgeTokenVersion: 1 })]);
@@ -233,8 +235,8 @@ describe("Cloudflare Access service tokens", () => {
     const created = await addRoute(auth, { url: "https://familyfi.example.com", transport: "cloudflare", enabled: false });
     const id = created.body.endpoint.id;
     expect((await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "named", endpointId: id })))).status).toBe(200);
-    const { qr, claimed, bearer } = await pairPhone(auth, id, "Kitchen iPhone");
-    expect(qr.edgeCredential).toBeUndefined();
+    const { payload, claimed, bearer } = await pairPhone(auth, id, "Kitchen iPhone");
+    expect(Object.keys(payload).sort()).toEqual(["code", "fingerprint", "url", "version"]);
     expect((await verifiedPayload(claimed.manifest)).edgeCredentials).toEqual([]);
     const phone = await manifestFor(bearer);
     expect(phone.payload.endpoints).toEqual([expect.objectContaining({ id, edgeAuth: "none" })]);

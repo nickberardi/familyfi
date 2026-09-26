@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     if (parsed.data.replacesDeviceId && !(await prisma().pairedDevice.findUnique({ where: { id: parsed.data.replacesDeviceId } }))) {
       return jsonError(404, "not_found", "The phone to re-pair no longer exists.");
     }
-    const { pairing, qr } = await createPairing({ endpointId: endpoint.id, displayName: parsed.data.deviceName, createdByAccountId: session.accountId, replacesDeviceId: parsed.data.replacesDeviceId });
-    return Response.json({ pairing: { id: pairing.id, expiresAt: pairing.expiresAt.toISOString(), qr }, }, { status: 201 });
+    const { pairing, pairingCode } = await createPairing({ endpointId: endpoint.id, displayName: parsed.data.deviceName, createdByAccountId: session.accountId, replacesDeviceId: parsed.data.replacesDeviceId });
+    return Response.json({ pairing: { id: pairing.id, expiresAt: pairing.expiresAt.toISOString(), pairingCode } }, { status: 201 });
   });
 }

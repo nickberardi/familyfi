@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.11.0
+  version: 0.12.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -2123,7 +2123,7 @@ components:
       properties:
         id: { type: string }
         url: { type: string, format: uri }
-        edgeAuth: { type: string, enum: [none, serviceToken], description: "Whether Cloudflare Access guards the route. The token itself is never served here: phones get it in the pairing QR and their signed manifest." }
+        edgeAuth: { type: string, enum: [none, serviceToken], description: "Whether Cloudflare Access guards the route. The token itself is never served here: phones get it in the pairing code and their signed manifest." }
         edgeTokenVersion: { type: [integer, "null"], minimum: 1, description: "The current Access token's version, rising each time it is replaced; null without Access." }
         kind:
           type: string
@@ -2237,18 +2237,30 @@ components:
       properties:
         pairing:
           type: object
-          required: [id, expiresAt, qr]
+          additionalProperties: false
+          required: [id, expiresAt, pairingCode]
           properties:
             id: { type: string }
             expiresAt: { type: string, format: date-time }
-            qr:
-              type: object
-              additionalProperties: true
+            pairingCode:
+              type: string
+              pattern: "^[A-Za-z0-9_-]+$"
               description: |
-                The QR payload: `version`, `pairingId`, `token`, `endpoint`, `instanceId` and
-                `keyFingerprint`. When the route is behind Cloudflare Access it also carries
-                `edgeCredential` (`version`, `clientId`, `clientSecret`), so a phone can reach the
-                route to pair.
+                The single string a phone scans as a QR or pastes: base64url, without padding, of
+                UTF-8 JSON. Version 1 is `{"version":1,"url","code","fingerprint"}` plus at most
+                one of `pin` and `access`:
+
+                - `url`: the HTTPS origin to pair over.
+                - `code`: the single-use claim, `pairingId.token`; the token after the first `.`
+                  is what `POST /connection/pairings/{id}/claim` takes.
+                - `fingerprint`: the household key fingerprint, which must equal
+                  `GET /connection/identity`'s `keyFingerprint`.
+                - `pin`: only on a pinned LAN route, the SHA-256 SPKI pin the phone holds it to.
+                - `access`: only on a route behind Cloudflare Access, the service token
+                  (`clientId`, `clientSecret`) that gets a phone past Access to pair.
+
+                Route details (id, priority, token version) are not in the code: the claim's
+                signed manifest carries them. A phone rejects any other version.
     ConnectionPairingClaimResponse:
       type: object
       additionalProperties: false
