@@ -9,7 +9,7 @@ on:
 
 jobs:
   delete-old-artifacts:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Purge Artifacts Older Than 7 Days
         uses: glassechidna/github-actions-clean-artifacts@v1
