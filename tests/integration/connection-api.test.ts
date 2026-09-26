@@ -20,6 +20,7 @@ import { TUNNEL_HEADER } from "@/lib/constants";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { issuedPairing } from "../helpers/pairing";
 import { resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -78,14 +79,22 @@ describe("companion connection API", () => {
       }),
     );
     expect(pairingResponse.status).toBe(201);
-    const pairing = (await pairingResponse.json()) as { pairing: { id: string; qr: { token: string; instanceId: string; endpoint: { spkiSha256: string } } } };
-    expect(pairing.pairing.qr.token).toBeTruthy();
-    expect(pairing.pairing.qr.endpoint.spkiSha256).toHaveLength(43);
+    const pairing = { pairing: await issuedPairing(pairingResponse) };
+    const { keyFingerprint } = (await (await identity()).json()) as { keyFingerprint: string };
+    expect(pairing.pairing.token).toBeTruthy();
+    // A pinned route carries its pin and the household's key fingerprint — nothing else about the route.
+    expect(pairing.pairing.payload).toEqual({
+      version: 1,
+      url: "https://familyfi.local",
+      code: `${pairing.pairing.id}.${pairing.pairing.token}`,
+      fingerprint: keyFingerprint,
+      pin: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
 
     const claim = await claimPairing(
       request(`/api/v1/connection/pairings/${pairing.pairing.id}/claim`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: pairing.pairing.qr.token, deviceName: "Nick's iPhone" }),
+        body: JSON.stringify({ token: pairing.pairing.token, deviceName: "Nick's iPhone" }),
       }),
       { params: Promise.resolve({ id: pairing.pairing.id }) },
     );
@@ -97,7 +106,7 @@ describe("companion connection API", () => {
     const repeatClaim = await claimPairing(
       request(`/api/v1/connection/pairings/${pairing.pairing.id}/claim`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: pairing.pairing.qr.token, deviceName: "Another phone" }),
+        body: JSON.stringify({ token: pairing.pairing.token, deviceName: "Another phone" }),
       }),
       { params: Promise.resolve({ id: pairing.pairing.id }) },
     );
@@ -136,7 +145,7 @@ async function addRoute(auth: SessionAuth, url = "https://familyfi.home:8443") {
 
 async function issuePairing(auth: SessionAuth, endpointId: string) {
   const response = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId, deviceName: "Kitchen iPhone" })));
-  return ((await response.json()) as { pairing: { id: string; qr: { token: string } } }).pairing;
+  return issuedPairing(response);
 }
 
 async function claim(id: string, token: string) {
@@ -195,7 +204,7 @@ describe("companion admin surface", () => {
 
     expect((await cancelPairing(request(`/api/v1/connection/pairings/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(200);
     expect((await cancelPairing(request(`/api/v1/connection/pairings/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(404);
-    expect((await claim(pairing.id, pairing.qr.token)).status).toBe(403);
+    expect((await claim(pairing.id, pairing.token)).status).toBe(403);
 
     expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
     expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(404);
@@ -205,7 +214,7 @@ describe("companion admin surface", () => {
     const auth = await adminAuth();
     const route = (await addRoute(auth)).body.endpoint.id;
     const pairing = await issuePairing(auth, route);
-    expect((await claim(pairing.id, pairing.qr.token)).status).toBe(200);
+    expect((await claim(pairing.id, pairing.token)).status).toBe(200);
 
     const status = await pairingStatus(request(`/api/v1/connection/pairings/${pairing.id}`, { auth }), params(pairing.id));
     expect(((await status.json()) as { pairing: { status: string; device: { displayName: string } } }).pairing).toMatchObject({ status: "claimed", device: { displayName: "Nick's iPhone" } });
@@ -271,7 +280,7 @@ describe("who runs a route", () => {
     await prisma().household.update({ where: { id: "default" }, data: { remoteEndpointId: domain.id } });
     const pairing = await issuePairing(auth, domain.id);
     expect(JSON.stringify(pairing)).not.toMatch(/tunnelCredential|ciphertext|authTag/i);
-    const claimed = await claim(pairing.id, pairing.qr.token);
+    const claimed = await claim(pairing.id, pairing.token);
     expect(JSON.stringify(await claimed.json())).not.toMatch(/tunnelCredential|ciphertext|authTag/i);
   });
 
@@ -317,7 +326,7 @@ describe("certificate pins", () => {
       expect(route.status).toBe(201);
       const created = (await route.json()) as { endpoint: { id: string } };
       const pairing = await issuePairing(auth, created.endpoint.id);
-      const claimed = await claim(pairing.id, pairing.qr.token);
+      const claimed = await claim(pairing.id, pairing.token);
       const body = (await claimed.json()) as { endpoint: { spkiSha256: string } };
       expect(body.endpoint.spkiSha256).toBe(pin.spkiSha256);
 
@@ -356,7 +365,7 @@ describe("remote access", () => {
     const auth = await adminAuth();
     const route = (await addRoute(auth)).body.endpoint.id;
     const pairing = await issuePairing(auth, route);
-    const claimed = (await (await claim(pairing.id, pairing.qr.token)).json()) as { device: { id: string }; deviceCredential: string };
+    const claimed = (await (await claim(pairing.id, pairing.token)).json()) as { device: { id: string }; deviceCredential: string };
     const phone = await tunnelLogin({ client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential });
     expect(phone.status).toBe(200);
     expect(((await phone.json()) as { tokenType: string }).tokenType).toBe("Bearer");
@@ -382,8 +391,8 @@ describe("removing and re-pairing phones", () => {
 
   async function pairPhone(auth: SessionAuth, route: string, body: Record<string, unknown> = {}) {
     const response = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId: route, deviceName: "Kitchen iPhone", ...body })));
-    const pairing = ((await response.json()) as { pairing: { id: string; qr: { token: string } } }).pairing;
-    const claimed = (await (await claim(pairing.id, pairing.qr.token)).json()) as { device: { id: string }; deviceCredential: string };
+    const pairing = await issuedPairing(response);
+    const claimed = (await (await claim(pairing.id, pairing.token)).json()) as { device: { id: string }; deviceCredential: string };
     const native = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential }) }));
     const { token } = (await native.json()) as { token: string };
     return { id: claimed.device.id, bearer: { cookie: "", csrf: "", token } };

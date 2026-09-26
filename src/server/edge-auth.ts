@@ -1,7 +1,7 @@
 /**
  * Cloudflare Access in front of a route the household runs. Cloudflare turns away any request
  * without the route's service token, so phones must carry it: FamilyFi stores the token the
- * operator pastes, encrypted, and hands it only to phones — in the pairing QR and in a paired
+ * operator pastes, encrypted, and hands it only to phones — in the pairing code and in a paired
  * device's signed manifest. It is a second barrier, not a replacement: a request that gets past
  * Cloudflare still needs a paired device and a signed-in account.
  *

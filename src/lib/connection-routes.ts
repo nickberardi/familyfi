@@ -92,11 +92,6 @@ export function sortRoutes<T extends Pick<ConnectionRoute, "priority">>(routes: 
   return routes.map((route, index) => ({ route, index })).sort((a, b) => a.route.priority - b.route.priority || a.index - b.index).map((item) => item.route);
 }
 
-/** The manual fallback the app accepts: `pairingId.token`. It cannot carry a certificate pin. */
-export function manualPairingCode(qr: { pairingId: string; token: string }): string {
-  return `${qr.pairingId}.${qr.token}`;
-}
-
 export function countdown(msRemaining: number): string {
   const seconds = Math.max(0, Math.ceil(msRemaining / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;

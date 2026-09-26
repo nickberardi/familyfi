@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessRollout, canPin, countdown, manualPairingCode, remoteChoice, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
+import { accessRollout, canPin, countdown, remoteChoice, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
 function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
@@ -86,8 +86,7 @@ describe("connection routes", () => {
     expect(accessRollout(first, [{ ...phone("A", null), edgeTokens: [{ endpointId: "other", version: 5 }] }], now).done).toBe(false);
   });
 
-  it("builds the manual code the app parses and formats the countdown", () => {
-    expect(manualPairingCode({ pairingId: "cm1", token: "a.b" })).toBe("cm1.a.b");
+  it("formats the countdown", () => {
     expect(countdown(299_001)).toBe("5:00");
     expect(countdown(61_000)).toBe("1:01");
     expect(countdown(-5)).toBe("0:00");

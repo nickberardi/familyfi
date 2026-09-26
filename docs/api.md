@@ -23,7 +23,7 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
-| POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing QR payload |
+| POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing code |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
@@ -76,8 +76,8 @@ An `own` route with transport `cloudflare` may sit behind Cloudflare Access. Pho
 `CF-Access-Client-Id` and `CF-Access-Client-Secret` to that route's origin — and to no other
 route. The token reaches a phone three ways, and no other:
 
-- the pairing QR's `edgeCredential` (`version`, `clientId`, `clientSecret`), so a phone can reach the
-  protected route to pair;
+- the pairing code's `access` (`clientId`, `clientSecret`), so a phone can reach the protected
+  route to pair;
 - the claim response's signed manifest; and
 - the signed manifest in `GET /api/v1/connection` for a paired device's bearer session.
 
@@ -102,7 +102,7 @@ on and every other route off, so the signed manifest carries exactly that route 
 
 `system` routes use ordinary iOS hostname and certificate-chain validation. Use them for a
 valid LAN certificate, VPN, public reverse proxy, Tailscale Serve, or Cloudflare. A `pinned`
-route is limited to `lan` and carries an SHA-256 SPKI pin in the pairing QR; a phone
+route is limited to `lan` and carries an SHA-256 SPKI pin in the pairing code; a phone
 rejects every other public key. FamilyFi does not distribute a household CA.
 
 Administrators do all of this from **System → Pair Device** in the web app. Administrator reads need only the session; writes also need the CSRF header.

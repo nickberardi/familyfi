@@ -29,9 +29,9 @@ Setup guides: [home network (VPN or reverse proxy)](https://github.com/nickberar
 [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) and
 [your own Cloudflare Tunnel](https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Tunnel).
 
-**Pair a phone** uses the published route: name the phone and show the QR; the sheet also shows the
-exact server address to type in the app and a `pairingId.token` code for pairing without the
-camera. The code expires in five minutes and is cancelled when you close it. Revoke a lost phone from
+**Pair a phone** uses the published route: name the phone and show the QR. The sheet also shows the
+same pairing code as text, to copy and paste in the app when the phone can't scan it — for instance
+when the sheet is open on that phone. The code carries the server address, so nothing else is typed. The code expires in five minutes and is cancelled when you close it. Revoke a lost phone from
 the same page; it is signed out at once and must pair again. A revoked phone stays listed until you
 **Remove** it, or use **Remove all revoked**; **Re-pair** opens a new code with its name filled in,
 and once the phone uses it the old entry disappears. A paired phone learns a newly published route
@@ -109,14 +109,14 @@ paired phone and a signed-in account, as without Access.
 2. On **Pair Device**, edit the Advanced route, tick **Protect with Cloudflare Access**, and paste
    the token's Client ID and Client Secret. FamilyFi stores them encrypted with
    `FAMILYFI_ENCRYPTION_KEY`.
-3. Pair phones as usual. The pairing QR carries the token, so a phone can reach the protected
+3. Pair phones as usual. The pairing code carries the token, so a phone can reach the protected
    address to pair; a phone already paired picks it up from its next signed manifest. Pair Device
    shows how many active phones have it. Turn the Access policy on once they all do.
 
 The token only gets a request past Cloudflare, so it is treated as a shared key rather than a
-password: it is in the QR and on paired phones, and never in `/api/v1/connection/identity`, a
+password: it is in the pairing code and on paired phones, and never in `/api/v1/connection/identity`, a
 browser's responses, or FamilyFi's logs. Anyone who sees a phone's HTTPS traffic, or a photo of a
-pairing QR, can read it; replacing it is the remedy.
+pairing code, can read it; replacing it is the remedy.
 
 **Replacing the token** (a leak, or its expiry) never needs a phone outage:
 

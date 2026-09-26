@@ -10,7 +10,7 @@ import { FIELD } from "./SheetFrame";
 /**
  * A Cloudflare Tunnel the household runs, pointed at FamilyFi's phone-only gateway, and
  * optionally behind Cloudflare Access. With Access on, Cloudflare turns away any request
- * without the service token; FamilyFi hands the token to phones in the pairing QR and their
+ * without the service token; FamilyFi hands the token to phones in the pairing code and their
  * signed manifest. Editing a protected route leaves the token as it is unless both halves
  * are pasted again — pasting a different token replaces it.
  */
@@ -63,7 +63,7 @@ export function CloudflareAdvanced({
             {protect ? (
               <div className="flex flex-col gap-2.5 rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-3">
                 <p className="leading-5 text-[var(--ff-muted)]">
-                  Paste the service token from your Access application&rsquo;s Service Auth policy. Phones get it in the pairing QR and
+                  Paste the service token from your Access application&rsquo;s Service Auth policy. Phones get it in the pairing code and
                   send it only to this address.
                   {hasToken ? " Leave both blank to keep the current token; paste a new one to replace it." : ""}
                 </p>

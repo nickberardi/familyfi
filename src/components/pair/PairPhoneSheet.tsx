@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { countdown, manualPairingCode, transportLabel } from "@/lib/connection-routes";
-import type { ConnectionRoute, PairedPhone, PairingQr, PairingState } from "@/lib/types";
+import { countdown, transportLabel } from "@/lib/connection-routes";
+import type { ConnectionRoute, PairedPhone, PairingState } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { QrCode } from "@/components/ui/QrCode";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "./SheetFrame";
 
-type Issued = { id: string; expiresAt: string; qr: PairingQr };
+type Issued = { id: string; expiresAt: string; pairingCode: string };
 
 function CopyRow({ label, value, testId }: { label: string; value: string; testId: string }) {
   const [copied, setCopied] = useState(false);
@@ -39,8 +39,8 @@ function CopyRow({ label, value, testId }: { label: string; value: string; testI
 }
 
 /**
- * Pair a phone through the published route: name the phone, then show the single-use QR. The QR is
- * `JSON.stringify(qr)` — the exact bytes the app parses. Closing the sheet or
+ * Pair a phone through the published route: name the phone, then show the single-use pairing code,
+ * as a QR and as text to copy. Both are the same string, the only one the app accepts. Closing the sheet or
  * regenerating cancels a code nobody claimed, so a QR left on screen dies with it.
  */
 export function PairPhoneSheet({
@@ -157,16 +157,13 @@ export function PairPhoneSheet({
     );
   }
 
-  const pinned = issued.qr.endpoint.trustMode === "pinned";
-  // A typed code carries neither a certificate pin nor a Cloudflare Access token.
-  const payloadOnly = pinned || Boolean(issued.qr.edgeCredential);
   return (
     <SheetFrame
       title={claimed ? "Phone paired" : "Scan with the FamilyFi app"}
       sub={
         claimed
           ? `${state?.device?.displayName ?? "The phone"} is paired${replacing ? " and its old entry is gone" : ""}. Sign in on the phone to finish.`
-          : "Open FamilyFi on the phone, choose Scan pairing QR, and confirm the household it shows."
+          : "Open FamilyFi on the phone and scan the QR, or copy the pairing code and paste it in the app. Then confirm the household it shows."
       }
       onClose={onClose}
       footer={
@@ -193,7 +190,7 @@ export function PairPhoneSheet({
       ) : (
         <>
           <div className="relative mx-auto">
-            <QrCode value={JSON.stringify(issued.qr)} label="Pairing QR code" />
+            <QrCode value={issued.pairingCode} label="Pairing QR code" />
             {expired ? (
               <div className="absolute inset-0 flex items-center justify-center bg-[var(--ff-card-veil)] text-[17px] font-bold">Expired</div>
             ) : null}
@@ -201,18 +198,7 @@ export function PairPhoneSheet({
           <p data-testid="pairing-countdown" className="text-center text-[14px] text-[var(--ff-muted)]">
             {expired ? "This code expired. Make a new one." : `Expires in ${countdown(new Date(issued.expiresAt).getTime() - now)}`}
           </p>
-          <CopyRow label="Server address in the app" value={issued.qr.endpoint.url} testId="pairing-address" />
-          {payloadOnly ? (
-            <>
-              <CopyRow label="Pairing payload" value={JSON.stringify(issued.qr)} testId="pairing-payload" />
-              <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
-                {pinned ? "This route pins a certificate" : "This route is behind Cloudflare Access, whose token"}, which a typed code can&rsquo;t
-                carry. Scan the QR, or paste the whole payload.
-              </p>
-            </>
-          ) : (
-            <CopyRow label="Code to type instead" value={manualPairingCode(issued.qr)} testId="pairing-code" />
-          )}
+          <CopyRow label="Pairing code" value={issued.pairingCode} testId="pairing-code" />
         </>
       )}
       {error ? (

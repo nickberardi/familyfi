@@ -24,6 +24,16 @@ async function csrf(page: Page): Promise<Record<string, string>> {
   return { "x-csrf-token": value, "content-type": "application/json" };
 }
 
+type PairingPayload = { version: number; url: string; code: string; fingerprint: string; pin?: string; access?: { clientId: string; clientSecret: string } };
+
+/** Reads a pairing code the way the phone does: base64url JSON, whose `code` is `pairingId.token`. */
+function decodePairingCode(pairingCode: string) {
+  expect(pairingCode).toMatch(/^[A-Za-z0-9_-]+$/);
+  const payload = JSON.parse(Buffer.from(pairingCode, "base64url").toString("utf8")) as PairingPayload;
+  const dot = payload.code.indexOf(".");
+  return { payload, pairingId: payload.code.slice(0, dot), token: payload.code.slice(dot + 1) };
+}
+
 async function shot(page: Page, name: string) {
   if (shots) await page.screenshot({ path: `${shots}/${test.info().project.name}-${name}.png`, fullPage: true });
 }
@@ -83,14 +93,16 @@ test("publishes a home-network route, pairs a phone through it, and revokes it",
 
     const qrSheet = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
     await expect(qrSheet.getByRole("img", { name: "Pairing QR code" })).toBeVisible();
-    await expect(qrSheet.getByTestId("pairing-address")).toHaveText(url);
     await expect(qrSheet.getByTestId("pairing-countdown")).toContainText(/Expires in [45]:\d\d/);
     await shot(page, "qr-sheet");
 
-    const code = (await qrSheet.getByTestId("pairing-code").textContent()) ?? "";
-    const dot = code.indexOf(".");
-    const claim = await page.request.post(`/api/v1/connection/pairings/${code.slice(0, dot)}/claim`, {
-      data: { token: code.slice(dot + 1), deviceName: "Playwright iPhone" },
+    // The copyable code is the one the QR carries, and it names the route the phone pairs over.
+    const { payload, pairingId, token: pairingToken } = decodePairingCode((await qrSheet.getByTestId("pairing-code").textContent()) ?? "");
+    expect(payload.url).toBe(url);
+    expect(payload.pin).toBeUndefined();
+    expect(payload.access).toBeUndefined();
+    const claim = await page.request.post(`/api/v1/connection/pairings/${pairingId}/claim`, {
+      data: { token: pairingToken, deviceName: "Playwright iPhone" },
     });
     expect(claim.ok()).toBe(true);
     const claimed = (await claim.json()) as { device: { id: string }; deviceCredential: string };
@@ -119,7 +131,7 @@ test("publishes a home-network route, pairs a phone through it, and revokes it",
   }
 });
 
-test("pins a home-network certificate from a pasted PEM and hands out the full payload", { tag: "@desktop" }, async ({ page }) => {
+test("pins a home-network certificate from a pasted PEM and puts the pin in the pairing code", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const url = `https://pinned-e2e-${Date.now()}.home`;
   const dir = mkdtempSync(path.join(tmpdir(), "familyfi-pin-e2e-"));
@@ -149,8 +161,9 @@ test("pins a home-network certificate from a pasted PEM and hands out the full p
     await page.getByRole("button", { name: "Pair a phone" }).click();
     await page.getByRole("dialog", { name: "Pair a phone" }).getByRole("button", { name: "Show pairing code" }).click();
     const qr = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
-    await expect(qr.getByTestId("pairing-payload")).toContainText('"trustMode":"pinned"');
-    await expect(qr.getByTestId("pairing-code")).toHaveCount(0);
+    const { payload } = decodePairingCode((await qr.getByTestId("pairing-code").textContent()) ?? "");
+    expect(payload.pin).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(payload.access).toBeUndefined();
     await shot(page, "pinned-qr");
     await qr.getByRole("button", { name: "Cancel" }).click();
   } finally {
@@ -234,20 +247,15 @@ test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a 
     await expect(saved).toContainText("Token 1");
     await expect(page.locator("body")).not.toContainText(first.secret);
 
-    // The QR carries the token; a typed code can't, so only the payload is offered.
+    // The pairing code carries the token, so a phone can get past Access to pair.
     await page.getByRole("button", { name: "Pair a phone" }).click();
     const pairSheet = page.getByRole("dialog", { name: "Pair a phone" });
     await pairSheet.getByLabel("Phone", { exact: true }).fill(phone);
     await pairSheet.getByRole("button", { name: "Show pairing code" }).click();
     const qrSheet = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
-    await expect(qrSheet.getByTestId("pairing-code")).toHaveCount(0);
-    const payload = JSON.parse((await qrSheet.getByTestId("pairing-payload").textContent()) ?? "{}") as {
-      pairingId: string;
-      token: string;
-      edgeCredential: { version: number; clientId: string; clientSecret: string };
-    };
-    expect(payload.edgeCredential).toEqual({ version: 1, clientId: first.id, clientSecret: first.secret });
-    const claim = await page.request.post(`/api/v1/connection/pairings/${payload.pairingId}/claim`, { data: { token: payload.token, deviceName: phone } });
+    const { payload, pairingId, token: pairingToken } = decodePairingCode((await qrSheet.getByTestId("pairing-code").textContent()) ?? "");
+    expect(payload.access).toEqual({ clientId: first.id, clientSecret: first.secret });
+    const claim = await page.request.post(`/api/v1/connection/pairings/${pairingId}/claim`, { data: { token: pairingToken, deviceName: phone } });
     expect(claim.ok()).toBe(true);
     const claimed = (await claim.json()) as { device: { id: string }; deviceCredential: string };
     await page.getByRole("dialog", { name: "Phone paired" }).getByRole("button", { name: "Done" }).click();
@@ -287,8 +295,8 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
 
   async function pairAndRevoke(name: string) {
-    const { pairing } = (await (await page.request.post("/api/v1/connection/pairings", { headers, data: { endpointId: route, deviceName: name } })).json()) as { pairing: { id: string; qr: { token: string } } };
-    const claimed = (await (await page.request.post(`/api/v1/connection/pairings/${pairing.id}/claim`, { data: { token: pairing.qr.token, deviceName: name } })).json()) as { device: { id: string } };
+    const { pairing } = (await (await page.request.post("/api/v1/connection/pairings", { headers, data: { endpointId: route, deviceName: name } })).json()) as { pairing: { id: string; pairingCode: string } };
+    const claimed = (await (await page.request.post(`/api/v1/connection/pairings/${pairing.id}/claim`, { data: { token: decodePairingCode(pairing.pairingCode).token, deviceName: name } })).json()) as { device: { id: string } };
     await page.request.delete(`/api/v1/connection/devices/${claimed.device.id}`, { headers });
   }
 
@@ -304,9 +312,8 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
     await expect(sheet.getByLabel("Phone", { exact: true })).toHaveValue(`Old phone ${tag}`);
     await expect(sheet.getByTestId("pairing-route")).toContainText(url);
     await sheet.getByRole("button", { name: "Show pairing code" }).click();
-    const code = (await page.getByTestId("pairing-code").textContent()) ?? "";
-    const dot = code.indexOf(".");
-    expect((await page.request.post(`/api/v1/connection/pairings/${code.slice(0, dot)}/claim`, { data: { token: code.slice(dot + 1), deviceName: `Old phone ${tag}` } })).ok()).toBe(true);
+    const { pairingId, token: pairingToken } = decodePairingCode((await page.getByTestId("pairing-code").textContent()) ?? "");
+    expect((await page.request.post(`/api/v1/connection/pairings/${pairingId}/claim`, { data: { token: pairingToken, deviceName: `Old phone ${tag}` } })).ok()).toBe(true);
     await expect(page.getByTestId("pairing-claimed")).toBeVisible({ timeout: 10_000 });
     await shot(page, "repaired");
     await page.getByRole("button", { name: "Done" }).click();

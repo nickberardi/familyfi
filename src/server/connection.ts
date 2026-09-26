@@ -4,6 +4,7 @@ import { SESSION_TTL_MS } from "@/lib/constants";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
 import { edgeCredentials, recordDelivered, storedServiceToken } from "./edge-auth";
+import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
 
 const PAIRING_TTL_MS = 5 * 60 * 1000;
 const SPKI_SHA256 = /^[A-Za-z0-9_-]{43}$/;
@@ -112,21 +113,19 @@ export async function createPairing(input: { endpointId: string; displayName: st
   const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
   const pairing = await prisma().pairing.create({ data: { endpointId: input.endpointId, displayName: input.displayName, createdByAccountId: input.createdByAccountId, replacesDeviceId: input.replacesDeviceId ?? null, tokenHash: sha256(token), expiresAt }, include: { endpoint: true } });
   const household = await ensureConnectionIdentity();
-  // A route behind Cloudflare Access is unreachable without its token, so the QR carries it: a phone
-  // pairs over the protected route itself. The token only gets past Cloudflare; pairing still needs the QR's single-use code.
-  const edgeToken = storedServiceToken(pairing.endpoint!);
-  return {
-    pairing,
-    qr: {
-      version: 1,
-      pairingId: pairing.id,
-      token,
-      endpoint: publicEndpoint(pairing.endpoint!),
-      instanceId: household.instanceId,
-      keyFingerprint: instanceFingerprint(household.instancePublicKey!),
-      ...(edgeToken ? { edgeCredential: { version: pairing.endpoint!.edgeTokenVersion, ...edgeToken } } : {}),
-    },
-  };
+  const endpoint = pairing.endpoint!;
+  // A route behind Cloudflare Access is unreachable without its token, so the code carries it: a phone
+  // pairs over the protected route itself. The token only gets past Cloudflare; pairing still needs the single-use code.
+  const edgeToken = storedServiceToken(endpoint);
+  const pairingCode = encodePairingCode({
+    version: PAIRING_CODE_VERSION,
+    url: endpoint.url,
+    code: `${pairing.id}.${token}`,
+    fingerprint: instanceFingerprint(household.instancePublicKey!),
+    ...(endpoint.trustMode === ConnectionTrustMode.pinned && endpoint.spkiSha256 ? { pin: endpoint.spkiSha256 } : {}),
+    ...(edgeToken ? { access: edgeToken } : {}),
+  });
+  return { pairing, pairingCode };
 }
 
 export async function claimPairing(input: { id: string; token: string; displayName: string }) {

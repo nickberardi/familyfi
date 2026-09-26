@@ -149,17 +149,6 @@ export type PairedPhone = {
   sessions: { id: string; username: string; client: "phone" | "watch"; expiresAt: string; createdAt: string }[];
 };
 
-export type PairingQr = {
-  version: number;
-  pairingId: string;
-  token: string;
-  endpoint: ConnectionRoute;
-  instanceId: string;
-  keyFingerprint: string;
-  /** Present when the route is behind Cloudflare Access: the token a phone needs to reach it. */
-  edgeCredential?: { version: number; clientId: string; clientSecret: string };
-};
-
 export type PairingState = {
   id: string;
   status: "pending" | "claimed" | "expired";
