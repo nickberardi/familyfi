@@ -226,10 +226,12 @@ async function fillEveryTable(client) {
         try {
           const { rows } = await client.query(
             `INSERT INTO "${table}" (${values.map(([name]) => `"${name}"`).join(", ")})
-             VALUES (${values.map((_, n) => `$${n + 1}`).join(", ")}) RETURNING id`,
+             VALUES (${values.map((_, n) => `$${n + 1}`).join(", ")}) RETURNING *`,
             values.map(([, value]) => value),
           );
           await client.query("RELEASE SAVEPOINT fill_row");
+          // A table keyed by a composite (`DeviceEdgeToken`) has no `id`, and nothing references
+          // it by one; its rows still count, so record the row whether or not it has an id.
           ids.push(rows[0].id);
         } catch (error) {
           await client.query("ROLLBACK TO SAVEPOINT fill_row");
