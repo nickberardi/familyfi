@@ -16,7 +16,7 @@ permissions:
 jobs:
   # info.version must rise with every change, so the iOS client can tell its vendored copy is stale.
   version:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
@@ -35,7 +35,7 @@ jobs:
         run: node scripts/check-openapi-version.mjs
 
   breaking:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
