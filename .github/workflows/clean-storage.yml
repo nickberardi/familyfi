@@ -1,0 +1,20 @@
+name: Free Cloud Storage
+
+on:
+  # Runs automatically every Sunday at midnight
+  schedule:
+    - cron: '0 0 * * 0'
+  # Allows you to trigger it manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  delete-old-artifacts:
+    runs-on: self-hosted
+    steps:
+      - name: Purge Artifacts Older Than 7 Days
+        uses: glassechidna/github-actions-clean-artifacts@v1
+        with:
+          # Use your repository's automatic authentication token
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          age: '7 days'
+          skip_tags: true
