@@ -78,6 +78,8 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/PUT/DELETE | `/api/v1/upstream/resolver` | Effective household source (`dhcp`, `doh`, or `unknown`), discovered servers, optional DoH override, and check schedule. New households default to Sunday at midnight; existing schedules remain. Turning checking off clears previous verdicts. Removing DoH resumes DHCP discovery |
 | GET/PUT/DELETE | `/api/v1/groups/{id}/resolver` | GET shows a group's effective source and discovered networks; PUT/DELETE set or remove its DoH override and invalidate affected verdicts |
 
+Both device GET responses include `presence`, `presenceCheckedAt`, `connectedAt`, `connectionType`, `accessPointName`, and `manufacturer`. Presence is `online`, `offline`, `stale_online`, `stale_offline`, or `unknown`; the last-known forms mean the successful client observation is over 90 seconds old. A failed UniFi read does not mark devices offline. Manufacturer is the public IEEE MAC registrant when resolvable, not a verified hardware model. Connection fields can be null when unavailable or offline.
+
 The `upstream` resource never returns the `change` envelope. Those rows are
 reporting only and never produce a UniFi policy, so there is nothing to reconcile —
 returning a `change` would create a `ChangeResult` that stays `pending` until an

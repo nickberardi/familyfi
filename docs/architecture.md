@@ -126,7 +126,7 @@ then read its callers and focused tests. Native feature details belong in its ow
 | Web area | Responsibility | Implementation and test starting points |
 | --- | --- | --- |
 | Family and Things | Group cards/details, membership, protection, schedules and temporary controls | [GroupGrid](../src/components/GroupGrid.tsx), [group routes](../src/app/api/v1/groups), [group API tests](../tests/integration/group-detail-api.test.ts), [display vectors](../tests/unit/display-vectors.test.ts) |
-| Devices / Unassigned | Discovery, assignment and quarantine within managed networks | [devices](../src/server/devices.ts), [quarantine](../src/server/quarantine.ts), [quarantine tests](../tests/integration/quarantine-observe.test.ts) |
+| Devices / Unassigned | Discovery, assignment, quarantine and last observed connection details within managed networks | [devices](../src/server/devices.ts), [reconciliation](../src/server/reconciliation.ts), [quarantine tests](../tests/integration/quarantine-observe.test.ts) |
 | Rules and group filter sheets | App/category enforcement rules and their schedules | [rules](../src/server/rules.ts), [DPI planner](../src/server/unifi/plan-dpi.ts), [DPI tests](../tests/integration/dpi-rules.test.ts) |
 | Categories | Domain lists, resolver configuration and DNS observations | [probe](../src/server/upstream/probe.ts), [category API tests](../tests/integration/upstream-categories-api.test.ts), [browser tests](../tests/browser/categories.spec.ts) |
 | Settings | Gateway key/network scope, household settings, roles and logins | [gateway settings](../src/server/unifi-settings.ts), [accounts](../src/server/accounts.ts), [authorization matrix](../tests/integration/authorization-matrix.test.ts) |
@@ -157,6 +157,8 @@ Days identify the local weekday a window starts. Windows are half-open. Evaluati
 ## Reconciliation
 
 A database-backed lock serializes startup, interval (~30s), and mutation-triggered runs. Overlapping writers, including container replacement, must not apply stale revisions. Interval work is discovery, membership, and Extend expiry — not bedtime start/end. Until a UniFi key is saved in Settings, reconciliation is a no-op.
+
+A successful connected-client read marks observed devices online and previously known absent devices offline, preserving their last-seen time. It also records UniFi's connection start and wired/wireless type. One site-device read per pass resolves a wireless uplink to an access point name. A failed client read leaves the previous observation intact; API responses label observations older than 90 seconds as last known. These are observations, not traffic measurements.
 
 Each pass reads the gateway's policy list. A recorded FamilyFi policy that is no longer there (someone deleted it on the console) is created again on that pass, even if nothing about its group changed; a stale record whose policy is already gone is simply cleared. A policy FamilyFi created on this console and site (an applied create operation) that no `AppPolicy` or `RulePolicy` record points at any more is deleted — that is what a failed UniFi delete during a rule, group or console change leaves behind. Its creation record is the evidence it is ours, never its name.
 

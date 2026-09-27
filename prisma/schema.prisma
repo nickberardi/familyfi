@@ -296,6 +296,11 @@ model Device {
   group      Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
   assignment AssignmentState @default(quarantined)
   lastSeenAt DateTime?
+  presenceOnline Boolean?
+  presenceCheckedAt DateTime?
+  connectedAt DateTime?
+  connectionType String?
+  accessPointName String?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 }

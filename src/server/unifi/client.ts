@@ -14,6 +14,7 @@ import type {
   NetworkReferences,
   PolicyOrdering,
   SiteOverview,
+  SiteDeviceOverview,
   UnifiPage,
 } from "./types";
 
@@ -25,6 +26,7 @@ export type UnifiClient = {
   getNetworkReferences(siteId: string, networkId: string): Promise<NetworkReferences>;
   listZones(siteId: string): Promise<FirewallZone[]>;
   listClients(siteId: string, filter?: string): Promise<ClientOverview[]>;
+  listSiteDevices(siteId: string): Promise<SiteDeviceOverview[]>;
   getClient(siteId: string, clientId: string): Promise<ClientOverview>;
   listPolicies(siteId: string): Promise<FirewallPolicy[]>;
   getPolicy(siteId: string, policyId: string): Promise<FirewallPolicy>;
@@ -103,6 +105,10 @@ export class HttpUnifiClient implements UnifiClient {
 
   async listClients(siteId: string, filter?: string): Promise<ClientOverview[]> {
     return this.paginate(`/v1/sites/${siteId}/clients`, filter);
+  }
+
+  async listSiteDevices(siteId: string): Promise<SiteDeviceOverview[]> {
+    return this.paginate(`/v1/sites/${siteId}/devices`);
   }
 
   async getClient(siteId: string, clientId: string): Promise<ClientOverview> {

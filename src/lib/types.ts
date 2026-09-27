@@ -21,6 +21,7 @@ export type Group = {
 
 export type Device = {
   mac: string;
+  manufacturer: string | null;
   hostname: string | null;
   ip: string | null;
   networkId: string | null;
@@ -28,6 +29,11 @@ export type Device = {
   groupId: string | null;
   assignment: "assigned" | "quarantined";
   lastSeenAt: string | null;
+  presence: "online" | "offline" | "stale_online" | "stale_offline" | "unknown";
+  presenceCheckedAt: string | null;
+  connectedAt: string | null;
+  connectionType: "wired" | "wireless" | "vpn" | "teleport" | null;
+  accessPointName: string | null;
   unresolved: boolean;
   inScope: boolean;
 };

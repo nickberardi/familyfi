@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
@@ -10,6 +10,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { TogglePill } from "@/components/ui/Controls";
 import { Icon } from "@/components/ui/Icon";
 import { deviceIcon, deviceKindLabel } from "@/lib/display";
+import { presenceSummary } from "@/lib/device-presence";
 import { removeDeviceLocally } from "@/lib/household-state";
 import type { Device, Group } from "@/lib/types";
 
@@ -44,6 +45,15 @@ function DevicesBody() {
   const assignGroup = groups.find((group) => group.id === assignGroupId) ?? null;
   const [filter, setFilter] = useState<FilterId>(assignGroup ? "loose" : "all");
   const [query, setQuery] = useState("");
+  const [now, setNow] = useState(() => new Date(0));
+  useEffect(() => {
+    const first = window.setTimeout(() => setNow(new Date()), 0);
+    const timer = window.setInterval(() => setNow(new Date()), 15_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, []);
   const networks = unifi?.networks ?? [];
   const unassigned = devices.filter((device) => device.assignment === "quarantined");
   const enforced = household?.quarantineEnforced === true;
@@ -173,22 +183,15 @@ function DevicesBody() {
                     key={device.mac}
                     className="ff-device-grid grid items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 hover:bg-[var(--ff-field-soft)]"
                   >
-                    {owner ? (
-                      <Link href={ownerHref(owner)} className="flex min-w-0 items-center gap-2.5">
-                        <DeviceMark hostname={device.hostname} />
-                        <DeviceIdentity device={device} networks={networks} name={name} />
-                      </Link>
-                    ) : (
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <DeviceMark hostname={device.hostname} />
-                        <DeviceIdentity device={device} networks={networks} name={name} />
-                      </div>
-                    )}
+                    <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="flex min-w-0 items-center gap-2.5" aria-label={`View details for ${name}`}>
+                      <DeviceMark hostname={device.hostname} />
+                      <DeviceIdentity device={device} networks={networks} name={name} timezone={household?.timezone ?? "UTC"} now={now} />
+                    </Link>
                     <div
                       className="hidden min-w-0 truncate text-[14px] md:block"
                       style={{ color: unassignedRow ? "var(--ff-danger)" : "var(--ff-ink)" }}
                     >
-                      {owner?.name ?? "Unassigned"}
+                      {owner ? <Link href={ownerHref(owner)}>{owner.name}</Link> : "Unassigned"}
                     </div>
                     <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] xl:block">
                       {device.ip ?? "—"}
@@ -243,16 +246,20 @@ function DeviceIdentity({
   device,
   networks,
   name,
+  timezone,
+  now,
 }: {
   device: Device;
   networks: { id: string; name: string; vlanId: number }[];
   name: string;
+  timezone: string;
+  now: Date;
 }) {
   return (
     <div className="min-w-0">
       <div className="truncate text-[14px]">{name}</div>
       <div className="mt-0.5 truncate text-[14px] text-[var(--ff-muted)]">
-        {deviceKindLabel(device.hostname)}
+        {presenceSummary(device, timezone, now)}
         <span className="lg:hidden">
           {" "}
           · {device.mac.toUpperCase()}
@@ -260,6 +267,7 @@ function DeviceIdentity({
         </span>
         {!device.inScope ? ` · ${networkLabel(device, networks)}` : ""}
       </div>
+      <div className="mt-0.5 hidden truncate text-[14px] text-[var(--ff-muted)] lg:block">{deviceKindLabel(device.hostname)}</div>
     </div>
   );
 }

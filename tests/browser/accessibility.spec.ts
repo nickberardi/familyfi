@@ -54,5 +54,8 @@ test.describe("accessibility", () => {
     await expectAccessible(page, `/family/${family!.id}`);
     await expectAccessible(page, `/things/${things!.id}`);
     await expectAccessible(page, `/categories/${categories[0].id}`);
+    const { devices } = (await (await page.request.get("/api/v1/devices")).json()) as { devices: { mac: string }[] };
+    expect(devices[0], "the mock household has a device").toBeTruthy();
+    await expectAccessible(page, `/devices/${encodeURIComponent(devices[0]!.mac)}`);
   });
 });

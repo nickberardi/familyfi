@@ -86,6 +86,8 @@ Record deliberate web choices here and native choices there, with links rather t
 - Distinguish initial loading, an empty household, a failed request and an unknown measurement. A retained result after a failed refresh is not evidence of a fresh observation.
 - Preserve keyboard access, accessible names and visible focus when composing controls. Verify desktop and phone layouts, including relevant loading, empty, pending and failure states.
 
+The Devices list leads with the observed connection status and links each identity to a read-only detail page. The detail page leads with a named presence state and connection summary, then groups identity and connection fields into two cards that stack on narrow screens. Assignment remains a separate control on the list. Last-known status names the checked time; it never looks like a fresh online result.
+
 ### Styling
 
 - Accessibility: contrast at least 4.5:1; no text under 14px rendered below 0.7 alpha. `tests/unit/mark-contrast.test.ts` checks colour tokens and `tests/browser/accessibility.spec.ts` runs axe (WCAG 2.1 A and AA) on every page in both viewports, with no exceptions.

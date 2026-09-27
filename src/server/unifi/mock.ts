@@ -13,6 +13,7 @@ import type {
   NetworkReferences,
   PolicyOrdering,
   SiteOverview,
+  SiteDeviceOverview,
   UnifiPage,
 } from "./types";
 import { UNIFI_PAGE_LIMIT } from "./types";
@@ -23,6 +24,7 @@ export type MockUnifiState = {
   networks: NetworkDetails[];
   zones: FirewallZone[];
   clients: ClientOverview[];
+  siteDevices: SiteDeviceOverview[];
   policies: FirewallPolicy[];
   ordering: PolicyOrdering;
   networkClientIds: Map<string, Set<string>>;
@@ -42,6 +44,7 @@ export function createMockUnifiState(partial: Partial<MockUnifiState> = {}): Moc
     networks: partial.networks ?? [],
     zones: partial.zones ?? [],
     clients: partial.clients ?? [],
+    siteDevices: partial.siteDevices ?? [],
     policies: partial.policies ?? [],
     ordering: partial.ordering ?? { beforeSystemDefined: [], afterSystemDefined: [] },
     networkClientIds: partial.networkClientIds ?? new Map(),
@@ -103,6 +106,11 @@ export class MockUnifiClient implements UnifiClient {
   async listClients(siteId: string): Promise<ClientOverview[]> {
     this.record("GET", `/v1/sites/${siteId}/clients`);
     return [...this.state.clients];
+  }
+
+  async listSiteDevices(siteId: string): Promise<SiteDeviceOverview[]> {
+    this.record("GET", `/v1/sites/${siteId}/devices`);
+    return [...this.state.siteDevices];
   }
 
   async getClient(siteId: string, clientId: string): Promise<ClientOverview> {
