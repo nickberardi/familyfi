@@ -103,6 +103,8 @@ Each invariant names the tests that enforce it; `tests/unit/invariants.test.ts` 
 
 PRs include validation appropriate to the change. Behaviour changes include tests; API contract changes include an OpenAPI update in the same change. An internal refactor with unchanged HTTP behaviour does not require a spec edit or version bump. The PR description explicitly lists every issue or alert it closes; use `Closes #<number>` for GitHub issues and identify security alerts by their Dependabot alert number and advisory.
 
+**Before opening a PR, spawn the `reviewer` subagent** (`.claude/agents/reviewer.md` for Claude, `.codex/agents/reviewer.toml` for Codex) with the plan or issue the change was built from. Fix every blocking finding, then spawn a fresh reviewer again, until it reports none. The agent that wrote a change never reviews it. The reviewer is two files only because Claude and Codex define subagents in different formats; `tests/unit/reviewer-agents.test.ts` keeps their instructions identical, so edit both together rather than merging them into a skill.
+
 ## OpenAPI consumer coordination
 
 - Whenever a change modifies the OpenAPI specification, open an issue in `familyfi-ios` for the iOS client to adopt that contract change. Describe the affected endpoints and schemas, the expected client work, and any rollout or compatibility considerations.
