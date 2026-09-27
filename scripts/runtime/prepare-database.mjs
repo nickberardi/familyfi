@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyDatabaseUrl } from "./print-database-url.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 function truthy(value) {
   return ["1", "true", "yes"].includes(String(value ?? "").trim().toLowerCase());
@@ -43,7 +43,7 @@ export function prepareDatabase(options = {}) {
 
   let reachable = false;
   for (let i = 0; i < attempts; i++) {
-    const ping = spawnSync(process.execPath, [path.join(root, "scripts/wait-for-db.mjs")], {
+    const ping = spawnSync(process.execPath, [path.join(root, "scripts/runtime/wait-for-db.mjs")], {
       env: process.env,
       encoding: "utf8",
     });

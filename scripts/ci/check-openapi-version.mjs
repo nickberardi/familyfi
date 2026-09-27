@@ -12,7 +12,7 @@
 //   - With that label from 1.0.0 on, a major increase. Before 1.0.0 a minor one carries
 //     the break, as semver allows for 0.y.z.
 //
-// Usage: node scripts/check-openapi-version.mjs [base-ref]
+// Usage: node scripts/ci/check-openapi-version.mjs [base-ref]
 // Without a ref it fetches origin/$BASE_REF (default main), the way CI runs it.
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";

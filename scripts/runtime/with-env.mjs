@@ -14,7 +14,7 @@ assertEnv();
 
 const [command, ...args] = process.argv.slice(2);
 if (!command) {
-  console.error("usage: node scripts/with-env.mjs <command> [...args]");
+  console.error("usage: node scripts/runtime/with-env.mjs <command> [...args]");
   process.exit(1);
 }
 

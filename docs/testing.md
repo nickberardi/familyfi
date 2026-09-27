@@ -27,7 +27,7 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 | Integration: `tests/integration` | PostgreSQL | Route handlers and reconciliation against a mocked UniFi. Every response is checked against the OpenAPI document; an undocumented status or a body that does not match its schema fails the test |
 | Authorization matrix: `tests/integration/authorization-matrix.test.ts` | PostgreSQL | Every `/api/v1` route and method, found on disk, called as anonymous, member, administrator, recovery `admin`, and over the tunnel without a paired phone; each cell must be allowed, 401 or 403 as its table says. A route missing from the table fails it, so a new route declares its access there |
 | Browser: `tests/browser` | PostgreSQL, Chromium | Desktop and phone smoke tests on a production build with the UniFi mock, plus axe (WCAG 2.1 A and AA) on every page |
-| API contract: `scripts/check-openapi.mjs` | Nothing | Lints the OpenAPI document; every route and method exists on both sides |
+| API contract: `scripts/ci/check-openapi.mjs` | Nothing | Lints the OpenAPI document; every route and method exists on both sides |
 
 The authorization matrix runs with the integration suite. When you add a route, add its line to `ACCESS` in that file; when a guard's access looks wrong, encode what it does today with a `question` and raise it rather than changing both in one step.
 
@@ -37,9 +37,9 @@ The authorization matrix runs with the integration suite. When you add a route, 
 
 - **A bug fix ships with a test that fails without it.** Write the test first and watch it fail for the reason in the bug report.
 - **Coverage floors only go up.** They live in `tests/vitest.coverage.config.ts`. Raise a floor when you lift an area, and never lower one to pass.
-- **A changed line in a security-critical path needs a test.** On a pull request, `scripts/changed-line-coverage.mjs` fails CI when a changed line no test runs is in one of `GATED_PATHS`: `src/server/unifi/**`, `auth.ts`, `guard.ts`, `quarantine.ts`, `src/server/tunnel/**` and `reconciliation.ts`, where a file-wide floor would average a new untested branch away. Elsewhere it lists those lines and the floors decide.
+- **A changed line in a security-critical path needs a test.** On a pull request, `scripts/ci/changed-line-coverage.mjs` fails CI when a changed line no test runs is in one of `GATED_PATHS`: `src/server/unifi/**`, `auth.ts`, `guard.ts`, `quarantine.ts`, `src/server/tunnel/**` and `reconciliation.ts`, where a file-wide floor would average a new untested branch away. Elsewhere it lists those lines and the floors decide.
   - A line no test can reach takes `// coverage-exempt: <why>` at its end, or alone on the line above. The reason is required, and the run summary lists every exemption so a reviewer sees it.
-  - Run it yourself after `make test-coverage`: `node scripts/changed-line-coverage.mjs origin/main`.
+  - Run it yourself after `make test-coverage`: `node scripts/ci/changed-line-coverage.mjs origin/main`.
 - **Never skip your way to green.** In CI, a browser test that skips fails the run, and so does one that passes only on its retry.
   - Tag a test that belongs to one viewport `@desktop` or `@phone`.
   - A test that cannot run in CI takes a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`, with the reason.
@@ -69,7 +69,7 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 - **Scope.** It covers the code that decides what a gateway enforces: reconciliation, policy planning, policy ownership, quarantine and schedules. The list is `mutate` in `tests/stryker.config.mjs`.
 - **When it runs.** In CI it runs weekly, when `src/` or `tests/` changed that week. You can also run it by hand from the Actions tab or with `make test-mutation`.
 - **Not a gate.** It never fails a build. Read the survivors in the HTML report, `reports/mutation/index.html`, or the `mutation-report` artifact in CI. Fix a survivor with a test when it hides a real gap. Leave it when the change makes no observable difference, such as a log message.
-- **A workaround.** `scripts/stryker-vitest-names.mjs` fixes a mismatch between Stryker 10 and Vitest 5. Without it no test runs and every mutant survives. The script says when to delete it.
+- **A workaround.** `scripts/ci/stryker-vitest-names.mjs` fixes a mismatch between Stryker 10 and Vitest 5. Without it no test runs and every mutant survives. The script says when to delete it.
 
 ## What CI runs
 
@@ -81,9 +81,20 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 | `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking_api` label; never add it yourself |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | Mutation testing. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 
-### Runners
+### Running CI locally
 
-Jobs run on the self-hosted runners. A job names an architecture only when the image it builds has to be that architecture: the pull-request image and the `linux/amd64` release image use `[self-hosted, linux, x64]`, and the `linux/arm64` release image uses GitHub-hosted `ubuntu-24.04-arm`.
+`scripts/ci.sh` runs these workflows' jobs on your machine with the same commands: `verify` and `browser` from `ci.yml`, `container`, `openapi-version` and `openapi-breaking`, and `mutation` when you name it. Each job that needs PostgreSQL gets a disposable `postgres:18` container of its own, so the development database is never touched. `--quick` runs `verify` and `container`. `make ci` calls it, with options in `CI_ARGS`.
+
+```bash
+scripts/ci.sh
+scripts/ci.sh --only browser
+```
+
+The workflows and `ci.sh` both call the helpers in `scripts/ci/`, and `tests/unit/ci-scripts.test.ts` fails when a workflow job or helper changes without `ci.sh` following. Details are in [`scripts/README.md`](../scripts/README.md).
+
+### Self-hosted runners
+
+Every job except `mutation.yml` runs on self-hosted runners, which keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed, and nothing needs installing on the runners. The script removes:
 
 The self-hosted machines keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/runner-cleanup.sh`](../scripts/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and runner diagnostics older than a week. It assumes one runner per machine, so no other job is using Docker while it runs.
 

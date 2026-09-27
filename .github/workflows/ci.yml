@@ -54,7 +54,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test-api
-      - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
+      - run: node scripts/runtime/with-env.mjs ./node_modules/.bin/prisma migrate deploy
       # Exit 2 when schema.prisma differs from what the migrations built: a schema edit with no migration.
       - run: pnpm db-drift
       # Build a database from every supported release's migrations, fill it, and upgrade it to these,
@@ -73,7 +73,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           git fetch --quiet --depth=1 origin "$BASE_REF"
-          node scripts/changed-line-coverage.mjs FETCH_HEAD "$GITHUB_STEP_SUMMARY"
+          node scripts/ci/changed-line-coverage.mjs FETCH_HEAD "$GITHUB_STEP_SUMMARY"
       - run: pnpm build
 
   browser:
@@ -117,7 +117,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/with-env.mjs ./node_modules/.bin/prisma migrate deploy
+      - run: node scripts/runtime/with-env.mjs ./node_modules/.bin/prisma migrate deploy
       - run: pnpm build
       - run: pnpm exec playwright install chromium --with-deps
       - run: pnpm test:browser

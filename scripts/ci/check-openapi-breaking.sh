@@ -3,20 +3,35 @@
 # Whether a breaking change ships is the operator's decision (AGENTS.md, OpenAPI
 # consumer coordination): BREAKING_API_APPROVED=true, which CI sets from the pull
 # request's `breaking_api` label, records that decision and lets the change through.
+#
+# Usage: sh scripts/ci/check-openapi-breaking.sh [base-ref]
+# Without a ref it fetches origin/$BASE_REF (default main), the way CI runs it. With one
+# (scripts/ci.sh passes origin/main) it compares against that ref and fetches nothing.
 set -eu
 
 OASDIFF_VERSION=v1.32.1
 spec=openapi/familyfi.v1.yaml
 base_ref="${BASE_REF:-main}"
-work="${RUNNER_TEMP:-$(mktemp -d)}"
+if [ -n "${RUNNER_TEMP:-}" ]; then
+  work="$RUNNER_TEMP"
+else
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+fi
 summary="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
-git fetch --quiet --depth=1 origin "$base_ref"
-if git diff --quiet FETCH_HEAD -- "$spec"; then
+if [ $# -gt 0 ]; then
+  base_ref="$1"
+  base="$1"
+else
+  git fetch --quiet --depth=1 origin "$base_ref"
+  base=FETCH_HEAD
+fi
+if git diff --quiet "$base" -- "$spec"; then
   echo "$spec is unchanged from $base_ref."
   exit 0
 fi
-git show "FETCH_HEAD:$spec" > "$work/base-openapi.yaml"
+git show "$base:$spec" > "$work/base-openapi.yaml"
 
 {
   echo "### OpenAPI changed"

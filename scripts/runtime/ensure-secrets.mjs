@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnvFile, resolveEnvPath } from "./print-database-url.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 export function isDefaultPasswordValid(value) {
   return typeof value === "string" && value.length >= 12;

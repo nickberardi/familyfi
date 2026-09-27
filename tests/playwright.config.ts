@@ -56,7 +56,7 @@ export default defineConfig({
   ],
   webServer: ci
     ? {
-        command: `node scripts/with-env.mjs next start --port ${port}`,
+        command: `node scripts/runtime/with-env.mjs next start --port ${port}`,
         cwd: repoRoot,
         url: `${baseURL}/api/v1/health`,
         reuseExistingServer: false,

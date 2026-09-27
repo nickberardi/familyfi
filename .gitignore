@@ -57,3 +57,6 @@ next-env.d.ts
 # vercel
 .vercel
 .phase2-unifi-dpi-schema-snippet.json
+
+# local release credentials (scripts/release.sh)
+.release.env

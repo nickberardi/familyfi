@@ -9,14 +9,14 @@
  * reach is exempted in the source, where a reviewer sees it, with a comment on the line
  * or the line above: `// coverage-exempt: <why>`. The summary lists every exemption.
  *
- * usage: node scripts/changed-line-coverage.mjs <base-ref> [summary-file]
+ * usage: node scripts/ci/changed-line-coverage.mjs <base-ref> [summary-file]
  */
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 /**
  * Code where an untested changed line fails the run, not just a report. These hold the
@@ -120,7 +120,7 @@ function cell(text) {
 function main() {
   const [base, summaryFile] = process.argv.slice(2);
   if (!base) {
-    console.error("usage: node scripts/changed-line-coverage.mjs <base-ref> [summary-file]");
+    console.error("usage: node scripts/ci/changed-line-coverage.mjs <base-ref> [summary-file]");
     process.exit(1);
   }
   const lcovPath = path.join(root, "coverage/lcov.info");

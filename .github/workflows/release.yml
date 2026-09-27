@@ -15,6 +15,8 @@ permissions:
 jobs:
   on-main:
     runs-on: self-hosted
+    outputs:
+      published: ${{ steps.local.outputs.published }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -22,15 +24,37 @@ jobs:
       - uses: ./.github/actions/runner-cleanup
       - name: Tag points at a commit on main
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      # scripts/release.sh pushes this version's images before it creates the Release that
+      # created this tag. A Release made on GitHub has no images yet, so it builds as always.
+      - name: Published by scripts/release.sh
+        id: local
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          repo="$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          token=$(curl -sf -u "$GITHUB_ACTOR:$GH_TOKEN" "https://ghcr.io/token?scope=repository:$repo:pull" | jq -r .token)
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" \
+            -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
+            "https://ghcr.io/v2/$repo/manifests/$version")
+          case "$code" in
+            200)
+              echo "::notice::ghcr.io/$repo:$version is already published (scripts/release.sh), so this run builds nothing."
+              echo "published=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "GHCR answered $code for ghcr.io/$repo:$version" >&2; exit 1 ;;
+          esac
 
   ci:
     needs: on-main
+    if: needs.on-main.outputs.published != 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
 
   container:
     needs: on-main
+    if: needs.on-main.outputs.published != 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/container.yml
@@ -122,6 +146,6 @@ jobs:
         with:
           generate_release_notes: true
           body: |
-            Image: `ghcr.io/${{ github.repository }}:${{ github.ref_name }}` (linux/amd64 and linux/arm64).
+            Image: `ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}` (linux/amd64 and linux/arm64).
 
             Licensed under the Business Source License 1.1. See LICENSE and docs/licensing.md.

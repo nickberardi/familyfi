@@ -32,7 +32,7 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
           BREAKING_API_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'breaking_api') }}
-        run: node scripts/check-openapi-version.mjs
+        run: node scripts/ci/check-openapi-version.mjs
 
   breaking:
     runs-on: self-hosted
@@ -43,4 +43,4 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
           BREAKING_API_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'breaking_api') }}
-        run: sh scripts/check-openapi-breaking.sh
+        run: sh scripts/ci/check-openapi-breaking.sh
