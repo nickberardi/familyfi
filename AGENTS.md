@@ -12,6 +12,31 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Shared instructions for Codex, Claude Code and contributors. `CLAUDE.md` imports this file. Product documentation starts at [README.md](README.md).
 
+## Start here each session
+
+1. Read this file, inspect `git status`, and establish the requested outcome and existing work.
+2. Read the [system map and key flows](docs/architecture.md#system-map) through the feature map before choosing where to change code. Follow the detailed sections relevant to the task.
+3. Use the task table below to read design, contract and validation guidance. Trace the relevant implementation, callers and tests; a previous session's summary is not a substitute for the current checkout.
+
+### Product context
+
+FamilyFi lets a household manage internet access for people and groups of things through its
+UniFi gateway. Adults use schedules, temporary pauses, device assignment and app/category rules;
+administrators also configure the gateway, accounts and companion connections. DNS category
+reports describe filtering observed through a resolver; they do not enforce it.
+
+This repository owns the web UI, server, database, HTTP contract and shared display fixtures.
+The native companion lives in [familyfi-ios](https://github.com/nickberardi/familyfi-ios).
+Read that repository's instructions and implementation for its current screens and platform
+choices; do not maintain a copy of its implementation status here. Clients share household
+semantics and the API, while each platform owns its presentation.
+
+A **Group** holds network controls for a person (`family`) or collection of equipment (`things`).
+An **Account** is a login and may be linked to a group; a family member card does not imply a login.
+A **Device** is a discovered network client; a **PairedDevice** is a phone or Watch authorized to
+call the API. A **ChangeResult** tracks an enforcement request; a **SyncRun** tracks a reconciliation
+pass. Keep these distinctions when naming features and choosing data owners.
+
 ## Working agreement
 
 1. Inspect the working tree and read the relevant implementation, callers and tests before editing. Preserve work that belongs to someone else.
@@ -26,7 +51,7 @@ Shared instructions for Codex, Claude Code and contributors. `CLAUDE.md` imports
 | --- | --- |
 | Code or naming | [Implementation and review](docs/development.md#implementation-and-review), [naming](docs/development.md#naming) when adding or renaming symbols, relevant tests |
 | Enforcement, schedules, DNS or server boundaries | [Architecture](docs/architecture.md) |
-| UI | [UI conventions](docs/development.md#styling), existing `src/components/ui` primitives, local `designs/` references when present |
+| UI | [Design system and interactions](docs/development.md#design-system-and-interactions), existing `src/components/ui` primitives, local `designs/` references when present |
 | HTTP contract or authentication | [API](docs/api.md), `openapi/familyfi.v1.yaml`, authorization matrix in `tests/integration/authorization-matrix.test.ts` |
 | Database, environment or deployment | [Setup](docs/setup.md), [operations](docs/operations.md), [naming and migration rules](docs/development.md#naming) |
 | Tests, CI or scripts | [Testing](docs/testing.md), [scripts](scripts/README.md) |

@@ -23,6 +23,13 @@ Add a rule after identifying a concrete recurring failure or a safety requiremen
 
 Keep commands, paths and claims in sync with their implementations in the same change. Label examples and unverified hardware claims. A passing instruction-link test proves a reference exists; it does not prove the underlying invariant is covered.
 
+When a feature changes, update its entry in the [architecture feature map](architecture.md#feature-map)
+and any affected flow, design decision or contract guidance. Keep each fact with its owner and link
+to it elsewhere. Native implementation details belong in the native repository. If documented intent,
+tests and implementation disagree, identify the discrepancy and resolve it within the requested scope;
+do not silently declare the existing code or an old prototype correct. Keep session findings and
+review reports in the conversation or PR, not in `docs/`.
+
 ## Naming
 
 **The rule: a name leads with the full product name, or with nothing. Never an abbreviation.** No `Fam`, `fam-` or `fam_` in identifiers. Environment variables an operator sets lead with `FAMILYFI_`; everything internal leads with nothing, because the repo is already the product.
@@ -48,6 +55,36 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 - **Renaming an env var is breaking.** The value must move with the name. `FAMILYFI_ENCRYPTION_KEY` in particular: a fresh key makes the stored UniFi API key undecryptable and Sync fails with "Unsupported state or unable to authenticate data".
 - **Renaming a model is a migration, not a schema edit.** `ALTER ... RENAME` the table, enums, columns, constraints and indexes in place so existing databases upgrade. Constraints keep their old generated names through a table rename — bring them along, then run `make db-migrate db-drift db-upgrade`. `prisma migrate status` checks migration history; `db-drift` compares the database with the schema. Never rewrite an already applied migration to rename an object.
 - **Internal naming has no legacy carve-out.** Remove obsolete internal aliases when their callers have migrated. This does not authorize breaking an HTTP contract, discarding persisted data, editing applied migrations or regenerating deployment secrets; follow the migration and API compatibility rules. A policy is ours when its id and creation evidence are on record for this console and site — never because of its name, `FamilyFi ` or any other.
+
+## Design system and interactions
+
+This section is the maintained web design guide. It should be sufficient alongside tracked source
+for UI work in a fresh clone; local `designs/` exports are optional references. A new design decision
+needed for future work belongs here when implemented, not only in a canvas or session transcript.
+
+### Design ownership
+
+| Concern | Authoritative location |
+| --- | --- |
+| Web colour, typography and spacing tokens | [globals.css](../src/app/globals.css); font loading in [layout.tsx](../src/app/layout.tsx) |
+| Reusable controls and marks | [src/components/ui](../src/components/ui); compose these before introducing a new primitive |
+| Brand artwork and its composition | [public/brand](../public/brand) and [Logo.tsx](../src/components/ui/Logo.tsx) |
+| Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/components/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts) and [shared vectors](testing.md#display-vectors) |
+| Rule and resolver verdicts | [rules.ts](../src/lib/rules.ts), [upstream.ts](../src/lib/upstream.ts) and [architecture](architecture.md#upstream-dns-categories) |
+| Native typography, navigation and adaptive layout | [Native design guide](https://github.com/nickberardi/familyfi-ios/blob/main/docs/design-system.md); read its current sources for platform details |
+
+Shared meaning must survive platform adaptation: Pause suspends enforcement, protection cannot be
+bypassed, time follows the household timezone, and unknown observations remain unknown. Native
+controls, fonts and navigation can differ; web CSS dimensions are not a native layout specification.
+Record deliberate web choices here and native choices there, with links rather than mirrored claims.
+
+### Interaction rules
+
+- Present the household task and its result in plain language. Keep gateway implementation details in diagnostic views where they help an operator act.
+- Reuse the shared action and display functions so cards, details and sheets agree on labels and available actions. Do not infer actions from colour or duplicate schedule calculations in a component.
+- Show saved configuration separately from enforcement progress. Use the existing mutation feedback and per-action change tracking described in [key flows](architecture.md#key-flows).
+- Distinguish initial loading, an empty household, a failed request and an unknown measurement. A retained result after a failed refresh is not evidence of a fresh observation.
+- Preserve keyboard access, accessible names and visible focus when composing controls. Verify desktop and phone layouts, including relevant loading, empty, pending and failure states.
 
 ### Styling
 

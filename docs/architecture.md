@@ -1,6 +1,30 @@
 # Architecture
 
 One Next.js App Router application serves the UI and `/api/v1`. All UniFi calls are server-side.
+Read the system map, ownership, key flows and feature map first; the remaining sections explain
+enforcement and DNS details. [Development conventions](development.md) owns design and coding
+rules; [API guidance](api.md) owns the shared client contract.
+
+## System map
+
+```mermaid
+flowchart LR
+  Web[Web browser] -->|Cookie session and CSRF| API[Next.js /api/v1]
+  Native[Native companion] -->|Paired device and bearer session| API
+  Native -->|Remote route| Gateway[Phone-only gateway]
+  Gateway -->|API only, cookies stripped| API
+  API --> DB[(PostgreSQL)]
+  API -->|Request reconciliation| Reconcile[Reconciler]
+  Reconcile <--> DB
+  Reconcile -->|Owned policies and discovery| UniFi[UniFi Integration API]
+  Probe[DNS probe] <--> DB
+  Probe -->|Observe filtering| DoH[Configured DoH resolver]
+```
+
+The server owns durable household state and background work. Clients display that state and
+request changes through the HTTP API. UniFi applies firewall policies; DNS probes independently
+observe resolver behaviour. Neither a browser nor a native client gets a UniFi key or talks to
+the gateway's management API.
 
 ```text
 src/app          pages, layouts, api/v1 route handlers
@@ -13,6 +37,102 @@ docker           Dockerfile and Compose files
 ```
 
 Desired household configuration lives in PostgreSQL. UniFi firewall policies are enforcement only. The application never modifies, disables, deletes, or reorders administrator-created policies, and never calls the policy ordering PUT endpoint.
+
+## Ownership and data relationships
+
+The exact fields and relations live in [schema.prisma](../prisma/schema.prisma). This is a conceptual
+map, not a second schema: one deployment serves one household, including tables without a household
+foreign key.
+
+| Concept | Owns or relates to |
+| --- | --- |
+| `Household` | Gateway configuration, managed network scope, timezone, desired revision, resolver defaults and connection identity |
+| `Group` → `Device` | Family/Things controls, schedule, suspension and protection; each discovered network device has an optional group. Unassigned devices are quarantined. |
+| `Account` → `Session` | Login identity and permissions. An account can link to a family group; group membership and authentication are separate concepts. |
+| `PairedDevice` → `Session` | Companion enrollment and device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
+| `ConnectionEndpoint`, `Pairing`, `DeviceEdgeToken` | Routes, one-time enrollment and delivery records for encrypted edge credentials; see [connection guidance](api.md#companion-connection-and-https) |
+| `Rule` → `RulePolicy`; `Group` → `AppPolicy` | Desired app/category rules and records of their UniFi policies; app policies also represent quarantine. `PolicyOperation` records external write attempts and creation evidence. |
+| `ChangeResult` → `SyncRun` | A requested revision and its outcome versus a reconciliation pass that may settle multiple requests. Actor account/device links attribute the request. |
+| `UpstreamCategory` → `UpstreamDomain`, `UpstreamCheck` | Domain lists and observed DNS results. A check belongs to a category and resolver context; an optional group selects a group override. |
+
+### Code boundaries
+
+- [Route handlers](../src/app/api/v1) validate requests and apply [authentication guards](../src/server/guard.ts). Authorization is specified per method in the [authorization matrix](../tests/integration/authorization-matrix.test.ts).
+- [src/server](../src/server) owns database access, secrets and external effects. [src/lib](../src/lib) holds client-safe types and logic; the [boundary test](../tests/unit/client-boundary.test.ts) checks transitive imports.
+- [AppDataProvider](../src/components/AppDataProvider.tsx) owns shared browser household state and mutation feedback. Pages compose it with domain components; feature-specific data may have a page-owned lifecycle.
+- [Reconciliation](../src/server/reconciliation.ts) coordinates enforcement. [Policy ownership](../src/server/unifi/policy-ownership.ts) guards all updates and deletes; planners and the UniFi client live under [src/server/unifi](../src/server/unifi).
+- The [native repository](https://github.com/nickberardi/familyfi-ios) owns its implementation and platform guidance. This repository owns the [HTTP and shared behaviour contract](api.md#shared-behaviour-and-consumer-adoption), not a copy of native screen status.
+
+## Key flows
+
+### Startup and reads
+
+[Instrumentation](../src/instrumentation.ts) runs server initialization in the Node runtime outside
+builds: it loads configuration, ensures recovery/household/seed data, starts reconciliation and DNS
+scheduling, starts update checking, and resumes configured remote access. These are server process
+responsibilities; visiting a page is not what starts enforcement.
+
+The browser's [AppDataProvider](../src/components/AppDataProvider.tsx) reads the session first, then
+groups, devices, sync, gateway settings, household settings and accounts. It refreshes periodically;
+generation checks discard superseded reads. An unauthorized session redirects to login. Initial
+read errors are shown; periodic refresh failures currently retain the previous data silently. Do not
+interpret that retained snapshot as a fresh gateway observation.
+
+### Pause from intent to feedback
+
+1. The browser selects an action through [group-actions.ts](../src/components/group-actions.ts) and submits it using [api.ts](../src/lib/api.ts), including the cookie session's CSRF header.
+2. The [pause route](../src/app/api/v1/groups/[id]/pause/route.ts) checks authentication, request shape, group existence, Watch eligibility and protection, then saves the suspension in PostgreSQL.
+3. [enqueueChange](../src/server/changes.ts) increments the household revision, creates a pending `ChangeResult` with actor attribution and requests reconciliation. The route returns the updated group and change reference. The group write and enqueue are separate operations; do not assume the entire path is one database transaction.
+4. The browser applies the returned state through [household-state.ts](../src/lib/household-state.ts) and shows saved feedback. [mutate-gate.ts](../src/lib/mutate-gate.ts) prevents a superseded mutation response from replacing a newer one.
+5. Reconciliation takes its database lock, reads current desired state and writes only owned UniFi policies. Pause disables enforcement while preserving the schedule. The run records outcomes and settles eligible changes.
+6. The browser polls this change's ID and reports applied, partial, failed or still pending, then refreshes. A polling failure leaves the saved state in place and reports a follow-up problem. A later global sync success is not proof that this particular request succeeded.
+
+Evidence: [reconciliation tests](../tests/integration/reconcile.test.ts),
+[reconciliation properties](../tests/integration/reconcile-properties.test.ts),
+[household state tests](../tests/unit/household-state.test.ts) and
+[mutation ordering tests](../tests/unit/mutate-gate.test.ts).
+
+### Pairing, sign-in and remote access
+
+An administrator creates a one-time pairing through the web Pair Device page. The companion claims
+it and subsequently signs in with its account and paired-device credential. Pairing establishes
+device trust; the account session provides user authorization. Watch enrollment gives the Watch
+its own device identity and restricted session; the server checks those restrictions on each request.
+
+Remote routes reach the [phone-only gateway](../src/server/tunnel/phone-gateway.ts), which forwards
+only API traffic, strips cookies and stamps tunnel provenance. The ordinary web UI is not exposed
+through this path. [API connection guidance](api.md#companion-connection-and-https) explains identity,
+signed manifests, pins and revocation. Evidence lives in the
+[connection tests](../tests/integration/connection-api.test.ts),
+[remote access tests](../tests/integration/remote-access.test.ts) and authorization matrix.
+
+### Saved, applied and observed
+
+| State or failure | Meaning for callers |
+| --- | --- |
+| Configuration saved | PostgreSQL holds the requested state. This alone makes no claim about UniFi. |
+| Change applied | Reconciliation reports the desired policy state applied. This is not an end-to-end traffic measurement. |
+| Partial, failed or pending change | Inspect that change and Sync. Preserve saved intent and expose the incomplete enforcement result. |
+| UniFi unavailable | Discovery and enforcement cannot be confirmed; existing gateway policies may remain. A successful database write does not repair connectivity. |
+| DNS observation | The configured resolver answered a probe. It does not establish that every device uses that resolver or that all network traffic is filtered. |
+| DNS unavailable or never checked | Report `unknown`; do not infer open access or successful blocking. |
+| Client request fails | Report the request failure. If the response was lost, the client cannot conclude from that alone whether the server saved the request. |
+
+## Feature map
+
+Web pages live under [src/app/(app)](../src/app/\(app\)). Use this map to find the owning area,
+then read its callers and focused tests. Native feature details belong in its own repository.
+
+| Web area | Responsibility | Implementation and test starting points |
+| --- | --- | --- |
+| Family and Things | Group cards/details, membership, protection, schedules and temporary controls | [GroupGrid](../src/components/GroupGrid.tsx), [group routes](../src/app/api/v1/groups), [group API tests](../tests/integration/group-detail-api.test.ts), [display vectors](../tests/unit/display-vectors.test.ts) |
+| Devices / Unassigned | Discovery, assignment and quarantine within managed networks | [devices](../src/server/devices.ts), [quarantine](../src/server/quarantine.ts), [quarantine tests](../tests/integration/quarantine-observe.test.ts) |
+| Rules and group filter sheets | App/category enforcement rules and their schedules | [rules](../src/server/rules.ts), [DPI planner](../src/server/unifi/plan-dpi.ts), [DPI tests](../tests/integration/dpi-rules.test.ts) |
+| Categories | Domain lists, resolver configuration and DNS observations | [probe](../src/server/upstream/probe.ts), [category API tests](../tests/integration/upstream-categories-api.test.ts), [browser tests](../tests/browser/categories.spec.ts) |
+| Settings | Gateway key/network scope, household settings, roles and logins | [gateway settings](../src/server/unifi-settings.ts), [accounts](../src/server/accounts.ts), [authorization matrix](../tests/integration/authorization-matrix.test.ts) |
+| Sync | Reconciliation history and per-change outcomes | [reconciliation](../src/server/reconciliation.ts), [changes](../src/server/changes.ts), [reconciliation path tests](../tests/integration/reconcile-paths.test.ts) |
+| Pair Device | Companion enrollment and remote connection management | [connection](../src/server/connection.ts), [remote access](../src/server/tunnel/remote-access.ts), [pairing browser tests](../tests/browser/pair.spec.ts) |
+| API reference | Authenticated interactive HTTP documentation | [OpenAPI](../openapi/familyfi.v1.yaml), [contract validation](testing.md) |
 
 ## Desired internet block
 

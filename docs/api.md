@@ -6,6 +6,31 @@ Browser mutations after login send `X-CSRF-Token` matching the `familyfi_csrf` c
 
 Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw UniFi keys, or firewall JSON.
 
+## Shared behaviour and consumer adoption
+
+This repository owns two distinct shared artifacts:
+
+| Artifact | What it establishes | Validation |
+| --- | --- | --- |
+| [OpenAPI specification](../openapi/familyfi.v1.yaml) | HTTP paths, request/response shapes, statuses and authentication contract | API checks and schema-validated integration responses; [authorization matrix](../tests/integration/authorization-matrix.test.ts) for caller permissions |
+| [Display vectors](../tests/fixtures/display-vectors.json) | Examples of shared labels, available actions and time-dependent display behaviour | [Vector tests](../tests/unit/display-vectors.test.ts); format and update rules in [testing](testing.md#display-vectors) |
+
+Schema compatibility does not prove behavioural compatibility. Pause/Resume meaning, protection,
+household timezone, per-action outcomes and unknown DNS verdicts must remain consistent across
+clients. The fixtures cover the functions named by their test harness; they are not evidence of
+complete UI parity, all API semantics or live gateway enforcement.
+
+For a change to either shared artifact:
+
+1. Identify the affected consumers and intended behaviour before editing. Follow the [root compatibility rules](../AGENTS.md#openapi-consumer-coordination) and [version policy](#versioning-the-contract) for HTTP changes.
+2. Change the owning implementation and applicable artifact in the same PR. Add meaningful cases for changed shared display behaviour; do not change expected results merely to accept a regression.
+3. Run the applicable [validation](testing.md). Describe changed endpoints/schemas or vector cases, the server commit/version to adopt, and any rollout dependency in the PR.
+4. For an OpenAPI change, open the required native adoption issue as specified in `AGENTS.md`. For display changes, make the behaviour and vector diff explicit in the PR so the native port can adopt them together.
+5. Use the [native repository's current adoption instructions](https://github.com/nickberardi/familyfi-ios/blob/main/AGENTS.md) for its refresh, generation and validation procedure. Keep those commands there. A passing server check does not establish that a consumer has adopted the change.
+
+Platform-specific navigation, typography and layout are owned by each implementation; use the
+[design ownership map](development.md#design-ownership) when comparing them.
+
 ## Implemented
 
 | Method | Path | Notes |
