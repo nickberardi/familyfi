@@ -12,17 +12,16 @@ import { withUpstreamLock } from "./transaction";
  * `Group`, and reuses `nextClockOnDays` (`src/lib/display.ts`), the same DST-correct
  * function behind bedtime's `nextBedtimeResumeAt`, rather than writing new time math.
  */
-export const DEFAULT_PROBE_TIME = "12:00";
-export const DEFAULT_PROBE_DAYS = [0, 1, 2, 3, 4, 5, 6];
+export const DEFAULT_PROBE_TIME = "00:00";
+export const DEFAULT_PROBE_DAYS = [0];
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running = false;
 
 /**
  * The next scheduled instant strictly after `now`. Falls back to the default schedule
- * when the stored time is malformed or every day has been cleared — `nextClockOnDays`
- * returns `null` in both cases — and, failing even that, to 24 hours out, so a bad row
- * can never stop the loop rearming.
+ * when the stored time is malformed; callers skip scheduling when no day is selected.
+ * Failing even the default, use 24 hours out so a bad row cannot stop the loop.
  */
 export function nextProbeRunAt(now: Date, timezone: string, hhmm: string, days: number[]): Date {
   return (
@@ -35,12 +34,18 @@ export function nextProbeRunAt(now: Date, timezone: string, hhmm: string, days: 
 /**
  * The most recent scheduled instant at or before `now` — the run that is currently
  * due. `nextClockOnDays` only ever returns an instant strictly after the time passed to
- * it, so this asks for the next occurrence after `now` minus a day, which lands on
- * today's occurrence once it has passed and yesterday's (or the last selected day's)
- * before that.
+ * it, so scan from eight days back to include the preceding Sunday on a weekly schedule.
  */
 export function dueProbeRunAt(now: Date, timezone: string, hhmm: string, days: number[]): Date {
-  return nextProbeRunAt(new Date(now.getTime() - 24 * 60 * 60 * 1000), timezone, hhmm, days);
+  let cursor = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+  let due = nextProbeRunAt(cursor, timezone, hhmm, days);
+  while (due.getTime() <= now.getTime()) {
+    cursor = due;
+    const next = nextProbeRunAt(cursor, timezone, hhmm, days);
+    if (next.getTime() > now.getTime()) return due;
+    due = next;
+  }
+  return due;
 }
 
 async function sweep(): Promise<void> {
@@ -90,7 +95,7 @@ async function claimAndSweepIfDue(): Promise<boolean> {
       dohProbeLastRunAt: true,
     },
   });
-  if (!household?.dohProbeEnabled) return false;
+  if (!household?.dohProbeEnabled || household.dohProbeDays.length === 0) return false;
   const due = dueProbeRunAt(now, household.timezone, household.dohProbeTime, household.dohProbeDays);
   const claimed = await withUpstreamLock(async (tx) => {
     const result = await tx.household.updateMany({
@@ -109,8 +114,9 @@ async function claimAndSweepIfDue(): Promise<boolean> {
 async function arm(): Promise<void> {
   const household = await prisma().household.findUnique({
     where: { id: "default" },
-    select: { timezone: true, dohProbeTime: true, dohProbeDays: true },
+    select: { timezone: true, dohProbeTime: true, dohProbeDays: true, dohProbeEnabled: true },
   });
+  if (!household?.dohProbeEnabled || household.dohProbeDays.length === 0) return;
   const next = nextProbeRunAt(
     new Date(),
     household?.timezone ?? "America/New_York",

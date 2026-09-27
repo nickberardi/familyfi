@@ -10,6 +10,8 @@ import {
   normalizeDomains,
   publicUpstreamCategory,
 } from "@/server/upstream-categories";
+import { refreshResolverContexts } from "@/server/upstream/discovery";
+import { withUpstreamLock } from "@/server/upstream/transaction";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -17,6 +19,7 @@ const WITH_CHILDREN = { domains: true, checks: true } as const;
 
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {
+    await refreshResolverContexts();
     const { id } = await ctx.params;
     const category = await prisma().upstreamCategory.findUnique({
       where: { id },
@@ -118,16 +121,18 @@ export async function PATCH(request: Request, ctx: Ctx) {
       ]);
     }
 
-    const category = await prisma().upstreamCategory.update({
-      where: { id },
-      data: {
-        ...(parsed.data.label !== undefined ? { label: parsed.data.label.trim() } : {}),
-        ...(parsed.data.monogram !== undefined
-          ? { monogram: parsed.data.monogram.toUpperCase() }
-          : {}),
-        ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
-      },
-      include: WITH_CHILDREN,
+    const category = await withUpstreamLock(async (tx) => {
+      if (parsed.data.enabled === false) await tx.upstreamCheck.deleteMany({ where: { categoryId: id } });
+      return tx.upstreamCategory.update({
+        where: { id },
+        data: {
+          ...(parsed.data.label !== undefined ? { label: parsed.data.label.trim() } : {}),
+          ...(parsed.data.monogram !== undefined ? { monogram: parsed.data.monogram.toUpperCase() } : {}),
+          ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
+          ...(parsed.data.enabled === false ? { disabledAt: new Date() } : {}),
+        },
+        include: WITH_CHILDREN,
+      });
     });
     return Response.json({ category: publicUpstreamCategory(category) });
   });

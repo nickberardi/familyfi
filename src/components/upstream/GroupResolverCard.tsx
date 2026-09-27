@@ -16,13 +16,13 @@ export function GroupResolverCard({
   groupId,
   groupName,
   dohOverrideUrl,
-  householdConfigured,
+  resolver,
   onChanged,
 }: {
   groupId: string;
   groupName: string;
   dohOverrideUrl: string | null;
-  householdConfigured: boolean;
+  resolver: { source: "doh" | "dhcp" | "unknown"; networks: { id: string; name: string; servers: string[]; reason: string | null }[]; reason: string | null } | null;
   onChanged: () => void;
 }) {
   const [pasting, setPasting] = useState(false);
@@ -63,7 +63,7 @@ export function GroupResolverCard({
   return (
     <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
       <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">
-        DNS-over-HTTPS
+        DNS resolver
       </h2>
       <div className="px-[18px] py-4">
         {pasting ? (
@@ -107,9 +107,8 @@ export function GroupResolverCard({
           <>
             <p className="m-0 break-all font-mono text-[13px]">{dohOverrideUrl}</p>
             <p className="mt-1 mb-0 text-[12px]" style={{ color: "var(--ff-ink-3)" }}>
-              Overrides the household default for {groupName} only — a
-              special-consideration setup. Category results here are measured through
-              this endpoint.
+              DNS-over-HTTPS override for {groupName}. Category results here are
+              measured through this endpoint.
             </p>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <button
@@ -140,10 +139,16 @@ export function GroupResolverCard({
         ) : (
           <>
             <p className="m-0 text-[12.5px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
-              {householdConfigured
-                ? "Uses the household default set in Categories."
-                : "Uses the household default, which is not set yet — add one in Categories."}
+              {resolver?.reason ? resolver.reason
+                : resolver?.source === "dhcp" ? "Uses the DNS servers assigned to this group's devices by UniFi DHCP."
+                : resolver?.source === "doh" ? "Uses the household's DNS-over-HTTPS override."
+                  : resolver?.reason ?? "Resolver information is unavailable."}
             </p>
+            {resolver?.networks.map((network) => (
+              <p key={network.id} className="mt-1 mb-0 text-[12px] text-[var(--ff-ink-3)]">
+                {network.name}: {network.reason ?? network.servers.join(", ")}
+              </p>
+            ))}
             <button
               type="button"
               disabled={busy}
@@ -155,6 +160,10 @@ export function GroupResolverCard({
             </button>
           </>
         )}
+
+        {!pasting ? <p className="mt-2 mb-0 text-[12px] text-[var(--ff-ink-3)]">
+          Checks run from the FamilyFi host. A device on another VLAN may get a different answer.
+        </p> : null}
 
         {error ? (
           <p className="mt-2 mb-0 text-[13px]" style={{ color: "var(--ff-danger)" }}>

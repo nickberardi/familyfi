@@ -31,6 +31,7 @@ export type DomainProbe = {
 };
 
 export type DohResolver = (domain: string) => Promise<DomainProbe>;
+export type WireResolver = DohResolver;
 
 /**
  * Addresses a filtering resolver returns to mean "nothing here". Emitted in the
@@ -126,6 +127,11 @@ export function dohResolver(input: {
     }
   }
 
+  return wireResolver(ask);
+}
+
+/** Apply the same filtering interpretation to DoH and plain DNS replies. */
+export function wireResolver(ask: (domain: string, type: number) => Promise<DnsResponse>): WireResolver {
   return async (domain: string): Promise<DomainProbe> => {
     try {
       const v4 = await ask(domain, TYPE_A);

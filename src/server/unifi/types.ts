@@ -34,6 +34,10 @@ export type GatewayIpv4Configuration = {
   hostIpAddress: string;
   prefixLength: number;
   additionalHostIpSubnets?: string[];
+  dhcpConfiguration?: {
+    mode: "SERVER" | "RELAY" | string;
+    dnsServerIpAddressesOverride?: string[] | null;
+  } | null;
 };
 
 export type NetworkDetails = NetworkOverview & {

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.12.0
+  version: 0.13.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -1750,7 +1750,7 @@ paths:
     get:
       operationId: getUpstreamResolver
       tags: [Upstream]
-      summary: Household DNS-over-HTTPS endpoint
+      summary: Household category-check resolver and schedule
       description: |
         Returned in full. A resolver URL is configuration rather than a credential — a
         profile id in its path lets someone spend that profile's quota, not read its
@@ -1775,9 +1775,8 @@ paths:
       tags: [Upstream]
       summary: Set the endpoint or the sweep schedule
       description: |
-        Changing the URL immediately clears household verdicts. Saving the same URL
-        or disabling checking preserves them. In-flight results from a replaced
-        endpoint are discarded.
+        A DoH URL overrides DHCP-discovered DNS. Changing the URL invalidates affected
+        verdicts. Disabling checking clears prior verdicts; manual checks remain available.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -1806,11 +1805,10 @@ paths:
     delete:
       operationId: clearUpstreamResolver
       tags: [Upstream]
-      summary: Clear the endpoint and turn checking off
+      summary: Remove the household DoH override
       description: |
-        Immediately clears household verdicts and disables automatic checking.
-        Group override verdicts are preserved. In-flight results for the removed
-        endpoint cannot restore household verdicts.
+        Returns the household to UniFi DHCP discovery without changing its check
+        schedule. Affected verdicts are invalidated.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -1835,6 +1833,24 @@ paths:
         in: path
         required: true
         schema: { type: string }
+    get:
+      operationId: getGroupResolver
+      tags: [Upstream]
+      summary: Effective category-check resolver for a group
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Effective resolver and discovered networks
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [resolver]
+                properties:
+                  resolver: { $ref: "#/components/schemas/EffectiveResolver" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
     put:
       operationId: setGroupResolver
       tags: [Upstream]
@@ -1881,7 +1897,7 @@ paths:
     delete:
       operationId: clearGroupResolver
       tags: [Upstream]
-      summary: Return this group to the household endpoint
+      summary: Return this group to the household resolver
       description: |
         Drops the group's own verdicts with the override. They describe an endpoint it
         no longer uses, and keeping them would leave a stale answer on its cards until
@@ -2687,11 +2703,15 @@ components:
         error: { type: [string, "null"] }
         groupId:
           type: [string, "null"]
-          description: The group this was measured for. Null is the household default.
+          description: The group this was measured for. Null is the household aggregate.
         results:
           type: array
           description: One entry per domain probed in this sweep. A domain removed since is absent.
           items: { $ref: "#/components/schemas/UpstreamDomainResult" }
+        source: { type: string, enum: [doh, dhcp, unknown] }
+        networks:
+          type: array
+          items: { $ref: "#/components/schemas/UpstreamNetworkCheck" }
     UpstreamCategory:
       type: object
       additionalProperties: false
@@ -2713,10 +2733,9 @@ components:
         checks:
           type: array
           description: |
-            Every verdict measured for this category — the household default plus one
-            per group with its own resolver. A card resolves its own: a group with an
-            override reads the row carrying its id, any other group reads the row with
-            a null groupId.
+            Every verdict measured for this category. DHCP discovery creates a row
+            per group so a card can report for its assigned device networks; a DoH
+            group override also uses its own row.
           items: { $ref: "#/components/schemas/UpstreamCheck" }
     UpstreamCategoryCreate:
       type: object
@@ -2755,11 +2774,55 @@ components:
         error: { type: [string, "null"] }
         groupId:
           type: [string, "null"]
-          description: The group this was measured for. Null is the household default.
+          description: The group this was measured for. Null is the household aggregate.
         results:
           type: array
           description: One entry per domain probed in this sweep. A domain removed since is absent.
           items: { $ref: "#/components/schemas/UpstreamDomainResult" }
+        source: { type: string, enum: [doh, dhcp, unknown] }
+        networks:
+          type: array
+          items: { $ref: "#/components/schemas/UpstreamNetworkCheck" }
+    UpstreamNetworkCheck:
+      type: object
+      additionalProperties: false
+      required: [id, name, verdict, error, servers]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        verdict: { type: string, enum: [blocked, partial, open, unknown] }
+        error: { type: [string, "null"] }
+        servers:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [address, verdict, error]
+            properties:
+              address: { type: string }
+              verdict: { type: string, enum: [blocked, partial, open, unknown] }
+              error: { type: [string, "null"] }
+    DiscoveredResolverNetwork:
+      type: object
+      additionalProperties: false
+      required: [id, name, servers, reason]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        servers: { type: array, items: { type: string } }
+        reason: { type: [string, "null"] }
+    EffectiveResolver:
+      type: object
+      additionalProperties: false
+      required: [configured, source, url, networks, reason]
+      properties:
+        configured: { type: boolean, description: An effective resolver was discovered or a DoH override is set. }
+        source: { type: string, enum: [doh, dhcp, unknown] }
+        url: { type: [string, "null"] }
+        networks:
+          type: array
+          items: { $ref: "#/components/schemas/DiscoveredResolverNetwork" }
+        reason: { type: [string, "null"] }
     UpstreamProbeOutcome:
       type: object
       additionalProperties: false
@@ -2776,6 +2839,11 @@ components:
       required: [configured, url, probeEnabled, probeTime, probeDays, timeoutMs, lastRunAt, nextRunAt]
       properties:
         configured: { type: boolean }
+        source: { type: string, enum: [doh, dhcp, unknown] }
+        networks:
+          type: array
+          items: { $ref: "#/components/schemas/DiscoveredResolverNetwork" }
+        reason: { type: [string, "null"] }
         url:
           type: [string, "null"]
           description: The endpoint in full, e.g. https://dns.example.com/dns-query/profile

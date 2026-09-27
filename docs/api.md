@@ -73,10 +73,10 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/upstream/categories` | Domain-list categories with their domains and last verdict, including each check's per-domain results. **No `change` object** — see below |
 | GET/PATCH/DELETE | `/api/v1/upstream/categories/{id}` | `domains` is the whole *active* list and replaces what is stored. A built-in category cannot be renamed or deleted |
 | POST | `/api/v1/upstream/categories/{id}/check` | Check one category now; 200 even when the resolver was unreachable |
-| GET | `/api/v1/upstream/checks` | Latest verdict per category |
+| GET | `/api/v1/upstream/checks` | Latest verdict per category, including source and per-network results; results older than seven days are omitted |
 | POST | `/api/v1/upstream/checks/run` | Sweep every category with checking on |
-| GET/PUT/DELETE | `/api/v1/upstream/resolver` | Household DoH endpoint, returned in full, plus the check schedule (`probeTime`, `probeDays`, `lastRunAt`, `nextRunAt`). Changing or removing the endpoint immediately clears household verdicts; changing the schedule re-arms it immediately |
-| PUT/DELETE | `/api/v1/groups/{id}/resolver` | A group's own DoH endpoint. Changing or removing it immediately clears that group's verdicts |
+| GET/PUT/DELETE | `/api/v1/upstream/resolver` | Effective household source (`dhcp`, `doh`, or `unknown`), discovered servers, optional DoH override, and check schedule. New households default to Sunday at midnight; existing schedules remain. Turning checking off clears previous verdicts. Removing DoH resumes DHCP discovery |
+| GET/PUT/DELETE | `/api/v1/groups/{id}/resolver` | GET shows a group's effective source and discovered networks; PUT/DELETE set or remove its DoH override and invalidate affected verdicts |
 
 The `upstream` resource never returns the `change` envelope. Those rows are
 reporting only and never produce a UniFi policy, so there is nothing to reconcile —

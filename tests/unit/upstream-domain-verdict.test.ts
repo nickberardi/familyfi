@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { domainVerdict, domainVerdictStyle, type UpstreamCheckRow, type UpstreamDomainRow } from "@/lib/upstream";
+import { domainVerdict, domainVerdictStyle, verdictDetailText, type UpstreamCheckRow, type UpstreamDomainRow } from "@/lib/upstream";
 
 function domain(overrides: Partial<UpstreamDomainRow> = {}): Pick<UpstreamDomainRow, "domain" | "removed"> {
   return { domain: "example.com", removed: false, ...overrides };
@@ -63,4 +63,16 @@ describe("domainVerdictStyle", () => {
     );
     expect(domainVerdictStyle(domain(), null).label).toBe("Not checked");
   });
+});
+
+it("describes a multi-server count as consensus rather than a device-wide answer", () => {
+  const measured: UpstreamCheckRow = { ...check([{ domain: "example.com", blocked: null }]),
+    source: "dhcp", networks: [{ id: "lan", name: "LAN", verdict: "partial", error: null,
+      servers: [
+        { address: "192.0.2.53", verdict: "blocked", error: null },
+        { address: "192.0.2.54", verdict: "open", error: null },
+      ] }],
+  };
+  expect(verdictDetailText(measured)).toBe("0 of 1 test domains blocked by every required DNS server");
+  expect(domainVerdict(domain(), measured)).toBe("unknown");
 });

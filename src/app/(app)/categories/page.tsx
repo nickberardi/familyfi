@@ -121,7 +121,7 @@ export default function CategoriesPage() {
             </span>
             <button
               type="button"
-              disabled={busy || !resolver?.configured}
+              disabled={busy}
               onClick={() => void runSweep()}
               className="rounded-lg px-3 py-[7px] text-[12.5px] font-semibold disabled:opacity-40"
               style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-ink)" }}

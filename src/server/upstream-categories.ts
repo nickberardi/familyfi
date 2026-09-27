@@ -25,6 +25,8 @@ export type PublicUpstreamCheck = {
   groupId: string | null;
   /** One entry per domain probed in this sweep. Domains removed since are absent. */
   results: PublicUpstreamDomainResult[];
+  source: "doh" | "dhcp" | "unknown";
+  networks: { id: string; name: string; verdict: "blocked" | "partial" | "open" | "unknown"; error: string | null; servers: { address: string; verdict: "blocked" | "partial" | "open" | "unknown"; error: string | null }[] }[];
 };
 
 export type PublicUpstreamCategory = {
@@ -74,7 +76,7 @@ export function publicUpstreamCategory(category: CategoryWithChildren): PublicUp
     domains,
     activeDomainCount,
     costNote: probeCostNote(activeDomainCount),
-    checks: (category.checks ?? []).map(publicUpstreamCheck),
+    checks: (category.checks ?? []).filter((check) => checkIsFresh(check)).map(publicUpstreamCheck),
   };
 }
 
@@ -104,6 +106,23 @@ function parseDomainResults(value: unknown): PublicUpstreamDomainResult[] {
 }
 
 export function publicUpstreamCheck(check: UpstreamCheck): PublicUpstreamCheck {
+  const context = check.resolverContext && typeof check.resolverContext === "object" && !Array.isArray(check.resolverContext)
+    ? check.resolverContext as Record<string, unknown> : {};
+  const source = context.source === "doh" || context.source === "dhcp" ? context.source : "unknown";
+  const networks = Array.isArray(check.networkResults) ? check.networkResults.flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const row = entry as Record<string, unknown>;
+    if (typeof row.id !== "string" || typeof row.name !== "string") return [];
+    const verdict = validVerdict(row.verdict);
+    const servers = Array.isArray(row.servers) ? row.servers.flatMap((server) => {
+      if (!server || typeof server !== "object" || Array.isArray(server)) return [];
+      const value = server as Record<string, unknown>;
+      return typeof value.address === "string"
+        ? [{ address: value.address, verdict: validVerdict(value.verdict), error: typeof value.error === "string" ? value.error : null }]
+        : [];
+    }) : [];
+    return [{ id: row.id, name: row.name, verdict, error: typeof row.error === "string" ? row.error : null, servers }];
+  }) : [];
   return {
     verdict: check.verdict,
     blockedCount: check.blockedCount,
@@ -112,7 +131,19 @@ export function publicUpstreamCheck(check: UpstreamCheck): PublicUpstreamCheck {
     error: check.error,
     groupId: check.groupId,
     results: parseDomainResults(check.results),
+    source,
+    networks,
   };
+}
+
+const MAX_CHECK_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function checkIsFresh(check: Pick<UpstreamCheck, "checkedAt">, now = new Date()): boolean {
+  return check.checkedAt.getTime() >= now.getTime() - MAX_CHECK_AGE_MS;
+}
+
+function validVerdict(value: unknown): PublicUpstreamCheck["verdict"] {
+  return value === "blocked" || value === "partial" || value === "open" ? value : "unknown";
 }
 
 const HOSTNAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;

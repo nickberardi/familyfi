@@ -18,6 +18,7 @@ import {
 import { MonoTile } from "@/components/ui/MonoTile";
 import { upstreamCategoryIcon } from "@/lib/upstream-domains";
 import { TextField, TogglePill } from "@/components/ui/Controls";
+import { NetworkCheckDetails } from "@/components/upstream/NetworkCheckDetails";
 
 export default function CategoryDetailPage() {
   const params = useParams<{ id: string }>();
@@ -152,9 +153,10 @@ export default function CategoryDetailPage() {
           </button>
         </div>
         <p className="mt-2 mb-0 text-[12.5px]" style={{ color: "var(--ff-ink-3)" }}>
-          {verdictDetailText(check)}
+          {check?.source === "doh" ? "DoH override · " : check?.source === "dhcp" ? "UniFi DHCP · " : ""}{verdictDetailText(check)}
           {check ? ` · checked ${checkedAgo(check.checkedAt)}` : ""}
         </p>
+        <NetworkCheckDetails check={check} />
 
         <div
           className="mt-3.5 flex flex-wrap items-center gap-2.5 pt-3.5"

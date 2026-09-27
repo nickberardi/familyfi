@@ -113,6 +113,7 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/dpi/applications": { access: "session" },
   "GET /api/v1/dpi/categories": { access: "session" },
   "GET /api/v1/groups": { access: "session" },
+  "GET /api/v1/groups/{id}/resolver": { access: "session" },
   "POST /api/v1/groups": { access: "session" },
   "GET /api/v1/groups/{id}": { access: "session" },
   "PUT /api/v1/groups/{id}": { access: "session" },

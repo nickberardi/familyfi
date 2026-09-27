@@ -108,22 +108,22 @@ function GroupEditForm({ group }: { group: Group }) {
 export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
   const router = useRouter();
   const { groups, devices, household, mutate, reload, loading } = useAppData();
-  const [resolverConfigured, setResolverConfigured] = useState(false);
+  const [groupResolver, setGroupResolver] = useState<{ source: "doh" | "dhcp" | "unknown"; networks: { id: string; name: string; servers: string[]; reason: string | null }[]; reason: string | null } | null>(null);
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
   const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
   const [upstreamCategories, setUpstreamCategories] = useState<UpstreamCategoryRow[]>([]);
 
-  // Only to tell a member card whether a household default exists to fall back to.
+  // The effective source may be this group's DoH override or its devices' networks.
   useEffect(() => {
     const start = window.setTimeout(() => {
-      void api<{ resolver: { configured: boolean } }>("/api/v1/upstream/resolver")
-        .then((res) => setResolverConfigured(res.resolver.configured))
-        .catch(() => setResolverConfigured(false));
+      void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
+        .then((res) => setGroupResolver(res.resolver))
+        .catch(() => setGroupResolver(null));
     }, 0);
     return () => window.clearTimeout(start);
-  }, []);
+  }, [id]);
 
   const loadRules = useCallback(async () => {
     try {
@@ -247,10 +247,13 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         groupId={group.id}
         groupName={group.name}
         dohOverrideUrl={group.dohOverrideUrl ?? null}
-        householdConfigured={Boolean(resolverConfigured)}
+        resolver={groupResolver}
         onChanged={() => {
           void reload();
           void loadRules();
+          void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
+            .then((res) => setGroupResolver(res.resolver))
+            .catch(() => setGroupResolver(null));
         }}
       />
       <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">

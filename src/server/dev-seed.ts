@@ -3,6 +3,7 @@ import { hashPassword } from "./auth";
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
 import { recoveryPassword, unifiMockEnabled } from "./env";
+import { refreshResolverContexts } from "./upstream/discovery";
 import {
   DEV_MOCK_API_KEY,
   DEV_MOCK_BASE_URL,
@@ -41,6 +42,7 @@ async function ensureMockUnifiConnection() {
       unifiKeyLastFour: DEV_MOCK_API_KEY.slice(-4),
       connectionStatus: "connected",
       connectionError: null,
+      dohProbeEnabled: false,
     },
   });
 }
@@ -181,7 +183,8 @@ async function ensureDummyHouseholdMembers() {
  * has to stay visibly distinct from "we looked and it is clear" — that is the pair most
  * likely to regress, and collapsing it is exactly the false assurance to avoid.
  */
-async function ensureMockUpstreamChecks() {
+export async function ensureMockUpstreamChecks() {
+  const contexts = await refreshResolverContexts();
   const measured: { slug: string; verdict: UpstreamVerdict; blockedCount: number }[] = [
     { slug: "social", verdict: UpstreamVerdict.blocked, blockedCount: 20 },
     { slug: "gaming", verdict: UpstreamVerdict.partial, blockedCount: 7 },
@@ -193,11 +196,6 @@ async function ensureMockUpstreamChecks() {
       select: { id: true },
     });
     if (!category) continue;
-    const existing = await prisma().upstreamCheck.findFirst({
-      where: { categoryId: category.id, groupId: null },
-      select: { id: true },
-    });
-    if (existing) continue;
     // Real per-domain results, not an empty array — otherwise every domain row on
     // the category detail screen reads "Not checked" no matter what the category
     // chip says, which is the exact mismatch the mock exists to catch.
@@ -211,17 +209,18 @@ async function ensureMockUpstreamChecks() {
       blocked: index < item.blockedCount,
       rcode: index < item.blockedCount ? 3 : 0,
     }));
-    await prisma().upstreamCheck.create({
-      data: {
-        categoryId: category.id,
-        groupId: null,
-        verdict: item.verdict,
-        blockedCount: item.blockedCount,
-        totalCount: domains.length,
-        results,
-        durationMs: 120,
-      },
-    });
+    for (const [groupId, context] of [[null, contexts.household], ...contexts.groups.entries()] as [string | null, typeof contexts.household][]) {
+      if (context.source === "unknown") continue;
+      await prisma().upstreamCheck.createMany({ data: [{
+        categoryId: category.id, groupId, verdict: item.verdict,
+        blockedCount: item.blockedCount, totalCount: domains.length,
+        results, durationMs: 120, resolverContext: context,
+        networkResults: context.networks.map((network) => ({
+          id: network.id, name: network.name, verdict: item.verdict, error: null,
+          servers: network.servers.map((address) => ({ address, verdict: item.verdict, error: null })),
+        })),
+      }], skipDuplicates: true });
+    }
   }
 }
 

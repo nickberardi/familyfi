@@ -31,8 +31,8 @@ test("Categories lists the seeded set and states the reporting-only stance", asy
   await expect(page.getByText("Adult", { exact: true })).toBeVisible();
   await expect(page.getByText("Video", { exact: true })).toBeVisible();
 
-  // The endpoint card explains why nothing is checked yet rather than showing a verdict.
-  await expect(page.getByText("DNS-over-HTTPS endpoint")).toBeVisible();
+  await expect(page.getByText("DNS resolver", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Using DNS servers assigned by UniFi DHCP/i)).toBeVisible();
 });
 
 test("a seeded domain strikes through on remove and comes back on restore", async ({ page }) => {
