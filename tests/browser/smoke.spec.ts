@@ -214,6 +214,29 @@ test("device assignment updates immediately", async ({ page }) => {
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
 });
 
+test("device identity opens readable connection details", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/devices");
+  const link = page.getByRole("link", { name: /^View details for / }).first();
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(page).toHaveURL(/\/devices\/[^/]+$/);
+  const identity = page.getByRole("region", { name: "Device" });
+  const connection = page.getByRole("region", { name: "Connection" });
+  await expect(identity).toBeVisible();
+  await expect(connection).toBeVisible();
+  await expect(page.getByText("MAC address")).toBeVisible();
+  await expect(page.getByText("Checked", { exact: true })).toBeVisible();
+  const first = await identity.boundingBox();
+  const second = await connection.boundingBox();
+  expect(first && second).toBeTruthy();
+  if (test.info().project.name === "phone") {
+    expect(second!.y).toBeGreaterThan(first!.y + first!.height - 2);
+  } else {
+    expect(Math.abs(second!.y - first!.y)).toBeLessThan(2);
+  }
+});
+
 test("Rules shell: protected absent and Always|Scheduled persist", async ({ page }) => {
   await signIn(page);
 

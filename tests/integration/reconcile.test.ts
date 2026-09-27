@@ -51,6 +51,65 @@ describe("reconciliation against mocked UniFi", () => {
     expect(run?.status).toBe("applied");
   });
 
+  it("records online presence, connection type, and the wireless access point", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+
+    const wireless = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    expect(wireless.presenceOnline).toBe(true);
+    expect(wireless.presenceCheckedAt).not.toBeNull();
+    expect(wireless.connectedAt?.toISOString()).toBe("2026-09-27T23:42:00.000Z");
+    expect(wireless.connectionType).toBe("wireless");
+    expect(wireless.accessPointName).toBe("Upstairs AP");
+    expect(client.calls.filter((call) => call.path.endsWith("/devices"))).toHaveLength(1);
+
+    const wired = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:02" } });
+    expect(wired.connectionType).toBe("wired");
+    expect(wired.accessPointName).toBeNull();
+  });
+
+  it("marks an absent device offline without changing last seen, then records reconnection", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const before = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+
+    const removed = client.state.clients.shift()!;
+    await runReconcileOnce();
+    const offline = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    expect(offline.presenceOnline).toBe(false);
+    expect(offline.presenceCheckedAt).not.toBeNull();
+    expect(offline.lastSeenAt).toEqual(before.lastSeenAt);
+    expect(offline.connectedAt).toBeNull();
+
+    client.state.clients.unshift(removed);
+    await runReconcileOnce();
+    const reconnected = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    expect(reconnected.presenceOnline).toBe(true);
+    expect(reconnected.connectedAt?.toISOString()).toBe("2026-09-27T23:42:00.000Z");
+  });
+
+  it("preserves the last observation when the client read fails and tolerates an unknown access point", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const before = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+
+    client.listClients = async () => { throw new Error("UniFi clients unavailable"); };
+    await runReconcileOnce();
+    const retained = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    expect(retained.presenceOnline).toBe(true);
+    expect(retained.presenceCheckedAt).toEqual(before.presenceCheckedAt);
+
+    client.listClients = async () => [...client.state.clients];
+    client.state.siteDevices = [];
+    await runReconcileOnce();
+    const unnamed = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    expect(unnamed.presenceOnline).toBe(true);
+    expect(unnamed.accessPointName).toBeNull();
+  });
+
   it("moves MACs from quarantine to a group policy on assignment", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);

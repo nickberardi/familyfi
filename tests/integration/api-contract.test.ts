@@ -41,6 +41,34 @@ describe("v1 API contracts", () => {
     await resetDatabase();
   });
 
+  it("exposes the same nullable connection details on list and single-device reads", async () => {
+    const mac = "02:00:00:00:00:01";
+    await seedDevice({ mac, networkId: INTERNAL_NETWORK, zoneId: INTERNAL_ZONE });
+    const auth = await signedIn();
+    const unknown = await getDevice(request(`/api/v1/devices/${mac}`, { auth }), { params: Promise.resolve({ mac }) });
+    expect((await unknown.json()).device.presence).toBe("unknown");
+
+    const checkedAt = new Date();
+    const connectedAt = new Date(checkedAt.getTime() - 60_000);
+    await prisma().device.update({
+      where: { mac },
+      data: { presenceOnline: true, presenceCheckedAt: checkedAt, connectedAt, connectionType: "wireless", accessPointName: "Upstairs AP" },
+    });
+    const list = await getDevices(request("/api/v1/devices", { auth }));
+    const single = await getDevice(request(`/api/v1/devices/${mac}`, { auth }), { params: Promise.resolve({ mac }) });
+    const listed = (await list.json()).devices[0];
+    const detail = (await single.json()).device;
+    expect(detail).toEqual(listed);
+    expect(detail).toMatchObject({
+      manufacturer: null,
+      presence: "online",
+      presenceCheckedAt: checkedAt.toISOString(),
+      connectedAt: connectedAt.toISOString(),
+      connectionType: "wireless",
+      accessPointName: "Upstairs AP",
+    });
+  });
+
   it("deletes known devices with mutation authorization and queues reconciliation", async () => {
     const mac = "02:00:00:00:00:01";
     const path = `/api/v1/devices/${encodeURIComponent(mac)}`;

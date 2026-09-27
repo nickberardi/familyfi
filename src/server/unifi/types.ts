@@ -71,6 +71,12 @@ export type ClientOverview = {
   ipAddress?: string;
   macAddress?: string;
   connectedAt?: string;
+  uplinkDeviceId?: string;
+};
+
+export type SiteDeviceOverview = {
+  id: string;
+  name: string;
 };
 
 export type FirewallPolicyAction = {

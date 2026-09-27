@@ -136,6 +136,14 @@ async function tick(owner: string): Promise<boolean> {
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
     void info;
+    let accessPoints = new Map<string, string>();
+    try {
+      const siteDevices = await client.listSiteDevices(siteId);
+      accessPoints = new Map(siteDevices.map((device) => [device.id, device.name]));
+    } catch (error) {
+      // Presence remains useful if UniFi cannot name the access points on this pass.
+      console.warn("UniFi access point lookup failed:", error);
+    }
     const networkClientIds = await loadNetworkClientIds(client, siteId, networks);
     const mappings = mapClientsToZones({ clients, networks, zones, networkClientIds });
     const mappingByMac = new Map(
@@ -148,15 +156,26 @@ async function tick(owner: string): Promise<boolean> {
       managedNetworkIds: household.unifiManagedNetworkIds,
     };
 
+    const observedMacs = new Set<string>();
     for (const clientRow of clients) {
       if (!clientRow.macAddress) continue;
       const mac = normalizeMac(clientRow.macAddress);
+      observedMacs.add(mac);
       const mapped = mappingByMac.get(mac);
       const existing = await prisma().device.findUnique({ where: { mac } });
       const zoneId = mapped?.sourceZoneId ?? existing?.zoneId ?? null;
       const networkId = mapped?.networkId ?? existing?.networkId ?? null;
       const seenOnManagedNetwork = networkInScope(scope, mapped?.networkId ?? null);
       if (!existing && !seenOnManagedNetwork) continue;
+      const connectionType = ["WIRED", "WIRELESS", "VPN", "TELEPORT"].includes(clientRow.type)
+        ? clientRow.type.toLowerCase()
+        : null;
+      const connectedAt = clientRow.connectedAt && !Number.isNaN(Date.parse(clientRow.connectedAt))
+        ? new Date(clientRow.connectedAt)
+        : null;
+      const accessPointName = connectionType === "wireless" && clientRow.uplinkDeviceId
+        ? accessPoints.get(clientRow.uplinkDeviceId) ?? null
+        : null;
       await prisma().device.upsert({
         where: { mac },
         create: {
@@ -167,6 +186,11 @@ async function tick(owner: string): Promise<boolean> {
           zoneId,
           assignment: AssignmentState.quarantined,
           lastSeenAt: now,
+          presenceOnline: true,
+          presenceCheckedAt: now,
+          connectedAt,
+          connectionType,
+          accessPointName,
         },
         update: {
           hostname: clientRow.name,
@@ -174,9 +198,24 @@ async function tick(owner: string): Promise<boolean> {
           networkId: mapped?.networkId ?? existing?.networkId ?? null,
           zoneId: mapped?.sourceZoneId ?? existing?.zoneId ?? null,
           lastSeenAt: now,
+          presenceOnline: true,
+          presenceCheckedAt: now,
+          connectedAt,
+          connectionType,
+          accessPointName,
         },
       });
     }
+    await prisma().device.updateMany({
+      where: { mac: { notIn: [...observedMacs] } },
+      data: {
+        presenceOnline: false,
+        presenceCheckedAt: now,
+        connectedAt: null,
+        connectionType: null,
+        accessPointName: null,
+      },
+    });
 
     const [groups, devices, appPolicies] = await Promise.all([
       prisma().group.findMany(),

@@ -2590,6 +2590,9 @@ components:
       required: [mac, assignment, unresolved, inScope]
       properties:
         mac: { type: string }
+        manufacturer:
+          type: [string, "null"]
+          description: IEEE MAC address registrant, when the address has a public assignment. Locally administered addresses have no registrant here.
         hostname: { type: [string, "null"] }
         ip: { type: [string, "null"] }
         networkId: { type: [string, "null"] }
@@ -2597,6 +2600,19 @@ components:
         groupId: { type: [string, "null"] }
         assignment: { type: string, enum: [assigned, quarantined] }
         lastSeenAt: { type: [string, "null"], format: date-time }
+        presence:
+          type: string
+          enum: [online, offline, stale_online, stale_offline, unknown]
+          description: Last connected-client observation. A result over 90 seconds old is stale, and unknown means there has been no successful check.
+        presenceCheckedAt: { type: [string, "null"], format: date-time }
+        connectedAt:
+          type: [string, "null"]
+          format: date-time
+          description: UniFi-reported start of the current connection; null when offline or unavailable.
+        connectionType: { type: [string, "null"], enum: [wired, wireless, vpn, teleport, null] }
+        accessPointName:
+          type: [string, "null"]
+          description: Name of the wireless uplink access point, when UniFi can resolve it.
         unresolved: { type: boolean }
         inScope: { type: boolean }
     ChangeSummary:

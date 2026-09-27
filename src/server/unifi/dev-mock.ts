@@ -8,6 +8,7 @@ import type {
   FirewallZone,
   NetworkDetails,
   SiteOverview,
+  SiteDeviceOverview,
   UnifiPage,
 } from "./types";
 
@@ -69,6 +70,7 @@ export function createFixtureUnifiState(options?: { friendlyNames?: boolean }): 
     networks: readJson<UnifiPage<NetworkDetails>>("networks.page.json").data,
     zones: readJson<UnifiPage<FirewallZone>>("zones.page.json").data,
     clients: readJson<UnifiPage<ClientOverview>>("clients.page.json").data,
+    siteDevices: readJson<UnifiPage<SiteDeviceOverview>>("site-devices.page.json").data,
     policies: [admin, rogue],
     ordering: { beforeSystemDefined: [], afterSystemDefined: [DEV_MOCK_ADMIN_POLICY_ID, rogue.id] },
     dpiCategories: readJson<UnifiPage<DpiCatalogItem>>("dpi-categories.page.json").data,

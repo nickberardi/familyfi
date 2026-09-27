@@ -275,7 +275,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         ) : (
           members.map((device) => (
             <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
-              <div className="min-w-0 flex-1 text-[14px]">{device.hostname ?? "Unnamed device"}</div>
+              <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{device.hostname ?? "Unnamed device"}</Link>
               <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
             </div>
           ))
