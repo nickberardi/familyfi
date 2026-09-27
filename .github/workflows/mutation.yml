@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 240
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: familyfi
           POSTGRES_PASSWORD: familyfi-ci

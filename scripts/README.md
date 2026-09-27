@@ -55,7 +55,7 @@ scripts/ci.sh --only mutation          # the weekly mutation run; takes hours
 | `openapi-breaking` | `openapi.yml` breaking | Go |
 | `mutation` | `mutation.yml`; only with `--only` | Docker |
 
-- **Database:** each job that needs PostgreSQL gets its own disposable `postgres:18` container
+- **Database:** each job that needs PostgreSQL gets its own disposable `postgres:18-alpine` container
   on a free loopback port, with `ci.yml`'s credentials, and the test-only secrets `ci.yml` sets.
   The container is removed when the job ends, fails or is interrupted, and the development
   database is never touched. `.env` still fills any variable CI leaves unset, because

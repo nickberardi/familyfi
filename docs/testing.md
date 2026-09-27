@@ -83,7 +83,7 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 
 ### Running CI locally
 
-`scripts/ci.sh` runs these workflows' jobs on your machine with the same commands: `verify` and `browser` from `ci.yml`, `container`, `openapi-version` and `openapi-breaking`, and `mutation` when you name it. Each job that needs PostgreSQL gets a disposable `postgres:18` container of its own, so the development database is never touched. `--quick` runs `verify` and `container`. `make ci` calls it, with options in `CI_ARGS`.
+`scripts/ci.sh` runs these workflows' jobs on your machine with the same commands: `verify` and `browser` from `ci.yml`, `container`, `openapi-version` and `openapi-breaking`, and `mutation` when you name it. Each job that needs PostgreSQL gets a disposable `postgres:18-alpine` container of its own, so the development database is never touched. `--quick` runs `verify` and `container`. `make ci` calls it, with options in `CI_ARGS`.
 
 ```bash
 scripts/ci.sh

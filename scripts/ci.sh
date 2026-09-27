@@ -26,7 +26,7 @@
 # Not mirrored: codeql.yml (needs the CodeQL CLI) and the runner-cleanup step, which wipes
 # Docker and caches the way a CI runner should and this machine should not.
 #
-# Each job that needs PostgreSQL gets a disposable postgres:18 container on a free loopback
+# Each job that needs PostgreSQL gets a disposable postgres:18-alpine container on a free loopback
 # port, with the credentials ci.yml uses, removed when the job ends or the script exits. The
 # development database is never touched. Values in .env still fill any variable CI leaves
 # unset (with-env.mjs reads it). Logs go to build/ci/<job>.log. See scripts/README.md.
@@ -38,7 +38,7 @@ ALL_JOBS=(verify browser container openapi-version openapi-breaking)
 QUICK_JOBS=(verify container)
 KNOWN_JOBS=" verify browser container openapi-version openapi-breaking mutation "
 PNPM_VERSION=10.15.1
-POSTGRES_IMAGE=postgres:18
+POSTGRES_IMAGE=postgres:18-alpine
 
 jobs=("${ALL_JOBS[@]}")
 skip=()
