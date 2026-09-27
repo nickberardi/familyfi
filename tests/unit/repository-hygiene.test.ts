@@ -10,13 +10,17 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync, readlinkSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const repoRoot = path.resolve(__dirname, "../..");
 const tracked = execFileSync("git", ["ls-files"], { cwd: repoRoot, encoding: "utf8" }).split("\n").filter(Boolean);
-const read = (file: string) => readFileSync(path.join(repoRoot, file), "utf8");
+const read = (file: string) => {
+  const fullPath = path.join(repoRoot, file);
+  // Git stores a symlink's target path; tracked target files are scanned separately.
+  return lstatSync(fullPath).isSymbolicLink() ? readlinkSync(fullPath) : readFileSync(fullPath, "utf8");
+};
 
 const MAC = /\b[0-9a-f]{2}(?:([:-])[0-9a-f]{2}(?:\1[0-9a-f]{2}){4})\b/gi;
 const IPV4 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
