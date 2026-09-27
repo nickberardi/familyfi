@@ -19,6 +19,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { checkedAgo, type UpstreamCheckRow } from "@/lib/upstream";
+import { NetworkCheckDetails } from "@/components/upstream/NetworkCheckDetails";
 
 export type FilterSheetState =
   | {
@@ -165,6 +166,7 @@ export function FilterSheet({
           <p className="text-[13px] leading-snug" style={{ color: "var(--ff-ink-3)" }}>
             {body}
           </p>
+          <NetworkCheckDetails check={upstream} />
           {error ? (
             <p className="text-[13px]" style={{ color: "var(--ff-danger)" }}>
               {error}

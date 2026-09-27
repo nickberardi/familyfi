@@ -4,6 +4,7 @@ import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { withUpstreamLock } from "@/server/upstream/transaction";
+import { refreshResolverContexts } from "@/server/upstream/discovery";
 import {
   normalizeDomains,
   publicUpstreamCategory,
@@ -17,6 +18,7 @@ import {
  */
 export async function GET(request: Request) {
   return withSession(request, async () => {
+    await refreshResolverContexts();
     const categories = await prisma().upstreamCategory.findMany({
       include: { domains: true, checks: true },
       orderBy: [{ source: "asc" }, { label: "asc" }],

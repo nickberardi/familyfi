@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { ensureMockUpstreamChecks } from "@/server/dev-seed";
 
 const username = process.env.FAMILYFI_RECOVERY_USERNAME ?? "admin";
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
+
+// The override test invalidates this group's measurements. Restore the mock's
+// reporting fixture for later browser specs, which share this test database.
+test.afterEach(async () => { await ensureMockUpstreamChecks(); });
 
 async function signIn(page: Page) {
   test.skip(!password, "FAMILYFI_DEFAULT_PASSWORD is required for browser tests");
@@ -25,14 +30,14 @@ test("a group can take its own resolver and hand it back", async ({ page }) => {
   const kid = await firstChild(page);
   await page.goto(`/family/${kid.id}`);
 
-  const card = page.locator("section", { has: page.getByRole("heading", { name: "DNS-over-HTTPS" }) });
+  const card = page.locator("section", { has: page.getByRole("heading", { name: "DNS resolver" }) });
   await expect(card).toBeVisible();
 
   // Leave it as found: clear any override before asserting the default state.
   if (await card.getByRole("button", { name: "Remove override" }).count()) {
     await card.getByRole("button", { name: "Remove override" }).click();
   }
-  await expect(card.getByText(/Uses the household default/i)).toBeVisible();
+  await expect(card.getByText(/Uses the DNS servers assigned/i)).toBeVisible();
 
   await card.getByRole("button", { name: "Override for this member" }).click();
   await page
@@ -45,7 +50,7 @@ test("a group can take its own resolver and hand it back", async ({ page }) => {
   await expect(card.getByRole("button", { name: "Replace" })).toBeVisible();
 
   await card.getByRole("button", { name: "Remove override" }).click();
-  await expect(card.getByText(/Uses the household default/i)).toBeVisible();
+  await expect(card.getByText(/Uses the DNS servers assigned/i)).toBeVisible();
 });
 
 test("a bad endpoint is refused with a reason", async ({ page }) => {
@@ -53,7 +58,7 @@ test("a bad endpoint is refused with a reason", async ({ page }) => {
   const kid = await firstChild(page);
   await page.goto(`/family/${kid.id}`);
 
-  const card = page.locator("section", { has: page.getByRole("heading", { name: "DNS-over-HTTPS" }) });
+  const card = page.locator("section", { has: page.getByRole("heading", { name: "DNS resolver" }) });
   if (await card.getByRole("button", { name: "Remove override" }).count()) {
     await card.getByRole("button", { name: "Remove override" }).click();
   }

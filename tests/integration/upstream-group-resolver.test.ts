@@ -3,6 +3,7 @@ import { UpstreamVerdict } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as listGroups } from "@/app/api/v1/groups/route";
 import {
+  GET as getResolver,
   DELETE as clearResolver,
   PUT as setResolver,
 } from "@/app/api/v1/groups/[id]/resolver/route";
@@ -66,6 +67,10 @@ describe("group resolver override", () => {
     const saved = await put(auth, betsy.id, { url: STRICT_URL });
     expect(saved.status).toBe(200);
     expect((await groups(auth)).find((g) => g.id === betsy.id)?.dohOverrideUrl).toBe(STRICT_URL);
+    const effective = await getResolver(request(`/api/v1/groups/${betsy.id}/resolver`, { auth }),
+      { params: Promise.resolve({ id: betsy.id }) });
+    expect(effective.status).toBe(200);
+    expect((await effective.json()).resolver).toMatchObject({ source: "doh", url: STRICT_URL, networks: [] });
 
     const cleared = await clearResolver(
       request(`/api/v1/groups/${betsy.id}/resolver`, { method: "DELETE", auth }),

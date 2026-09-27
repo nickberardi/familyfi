@@ -40,7 +40,7 @@ export function rollUpVerdict(results: DomainProbe[]): VerdictRollup {
 /** The line under the verdict chip. Mirrors the design prototype's wording. */
 export function verdictDetail(rollup: VerdictRollup, error: string | null): string {
   if (rollup.verdict === UpstreamVerdict.unknown) {
-    return error ? `Last check couldn't reach the resolver — ${error}` : "Last check couldn't reach the resolver";
+    return error ? `Last check couldn't determine a reliable answer — ${error}` : "Last check couldn't determine a reliable answer";
   }
   return `${rollup.blockedCount} of ${rollup.totalCount} test domains blocked`;
 }

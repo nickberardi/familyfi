@@ -107,11 +107,13 @@ model Household {
   unifiManagedNetworkIds String[]  @default([])
   quarantineEnforced     Boolean   @default(true)
   dohUrl                 String?
-  dohProbeEnabled        Boolean   @default(false)
-  dohProbeTime           String    @default("12:00")
-  dohProbeDays           Int[]     @default([0, 1, 2, 3, 4, 5, 6])
+  dohProbeEnabled        Boolean   @default(true)
+  dohProbeTime           String    @default("00:00")
+  dohProbeDays           Int[]     @default([0])
   dohProbeLastRunAt      DateTime?
   dohProbeTimeoutMs      Int       @default(5000)
+  dohProbeDisabledAt     DateTime?
+  upstreamResolverSnapshot Json?
   connectionStatus       String    @default("unconfigured")
   connectionError        String?
   displayName            String    @default("FamilyFi household")
@@ -225,6 +227,7 @@ model Group {
   suspensionActive Boolean         @default(false)
   suspensionUntil  DateTime?
   dohOverrideUrl   String?
+  upstreamResolverSnapshot Json?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   devices          Device[]
@@ -444,6 +447,7 @@ model UpstreamCategory {
   monogram  String
   source    UpstreamSource   @default(user)
   enabled   Boolean          @default(true)
+  disabledAt DateTime?
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   domains   UpstreamDomain[]
@@ -481,6 +485,8 @@ model UpstreamCheck {
   checkedAt    DateTime         @default(now())
   durationMs   Int
   error        String?
+  resolverContext Json?
+  networkResults Json?
 
   @@unique([categoryId, groupId])
   @@index([checkedAt])

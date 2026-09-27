@@ -72,23 +72,29 @@ export function ResolverCard({
         className="px-[18px] py-[15px] text-[14px] font-semibold"
         style={{ borderBottom: "1px solid var(--ff-hairline-card)" }}
       >
-        DNS-over-HTTPS endpoint
+        DNS resolver
       </div>
       <div className="px-[18px] py-4">
-        {resolver?.configured && !pasting ? (
+        {resolver?.url && !pasting ? (
           <p className="m-0 break-all font-mono text-[13px]">{resolver.url}</p>
         ) : null}
-        {!resolver?.configured && !pasting ? (
+        {!resolver?.url && !pasting ? (
           <p className="m-0 text-[12.5px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
-            Not set. Categories stay unchecked until you paste an endpoint.
+            {resolver?.source === "dhcp" ? "Using DNS servers assigned by UniFi DHCP."
+              : resolver?.reason ?? "Resolver information is unavailable."}
           </p>
         ) : null}
+        {resolver?.networks?.map((network) => (
+          <p key={network.id} className="mt-1 mb-0 text-[12px] text-[var(--ff-ink-3)]">
+            {network.name}: {network.reason ?? network.servers.join(", ")}
+          </p>
+        ))}
         <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
-          Queried on a schedule to check whether each category is already blocked
-          upstream. Categories keep their last result while this is off.
+          Checks run from the FamilyFi host. A device on another VLAN may get a different answer.
+          Turning checking off clears earlier results. Check now stays available.
         </p>
 
-        {resolver?.configured ? (
+        {resolver ? (
           <div className="mt-3.5 pt-3.5" style={{ borderTop: "1px solid var(--ff-hairline)" }}>
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0 flex-1">
@@ -185,11 +191,11 @@ export function ResolverCard({
               className="rounded-lg px-3 py-[7px] text-[12.5px] font-semibold"
               style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-accent)" }}
             >
-              {resolver?.configured ? "Replace" : "Paste endpoint"}
+              {resolver?.url ? "Replace DoH override" : "Add DoH override"}
             </button>
-            {resolver?.configured ? (
+            {resolver ? (
               <>
-                <button
+                {resolver.url ? <button
                   type="button"
                   disabled={busy}
                   onClick={() =>
@@ -206,7 +212,7 @@ export function ResolverCard({
                   style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-ink-2)" }}
                 >
                   {resolver.probeEnabled ? "Checking on" : "Checking off"}
-                </button>
+                </button> : null}
                 <button
                   type="button"
                   disabled={busy}

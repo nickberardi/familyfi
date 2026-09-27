@@ -1,5 +1,3 @@
-import type { Group, Household } from "@prisma/client";
-
 export class ResolverConfigError extends Error {}
 
 /**
@@ -30,39 +28,4 @@ export function normalizeResolverUrl(raw: string): string {
     throw new ResolverConfigError("That URL has no host.");
   }
   return parsed.toString();
-}
-
-export function householdResolverUrl(household: Household): string | null {
-  return household.dohUrl;
-}
-
-export function groupResolverOverride(group: Group): string | null {
-  return group.dohOverrideUrl;
-}
-
-/**
- * A group's own endpoint when it has one, otherwise the household default — the
- * "Uses the household default set in Categories" case in the design.
- *
- * This is why a verdict cannot be a single household-wide value: a group pointed at a
- * stricter resolver is filtered differently from the rest of the house, and reporting
- * the household's answer for it would be wrong in the direction that matters.
- */
-export function resolverUrlForGroup(household: Household, group: Group | null): string | null {
-  return (group && groupResolverOverride(group)) || householdResolverUrl(household);
-}
-
-/** Groups sharing an endpoint share a verdict, so a sweep runs once per distinct URL. */
-export function distinctResolvers(
-  household: Household,
-  groups: Group[],
-): { url: string; groupIds: (string | null)[] }[] {
-  const byUrl = new Map<string, (string | null)[]>();
-  const add = (url: string | null, groupId: string | null) => {
-    if (!url) return;
-    byUrl.set(url, [...(byUrl.get(url) ?? []), groupId]);
-  };
-  add(householdResolverUrl(household), null);
-  for (const group of groups) add(groupResolverOverride(group), group.id);
-  return [...byUrl.entries()].map(([url, groupIds]) => ({ url, groupIds }));
 }

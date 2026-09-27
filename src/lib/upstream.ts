@@ -30,16 +30,18 @@ export type UpstreamCheckRow = {
   totalCount: number;
   checkedAt: string;
   error: string | null;
-  /** The group this verdict was measured for. Null is the household default. */
+  /** The group this verdict was measured for. Null is the household aggregate. */
   groupId: string | null;
   /** One entry per domain probed in this sweep. Domains removed since are absent. */
   results: UpstreamDomainResult[];
+  source?: "doh" | "dhcp" | "unknown";
+  networks?: { id: string; name: string; verdict: UpstreamVerdictValue; error: string | null; servers: { address: string; verdict: UpstreamVerdictValue; error: string | null }[] }[];
 };
 
 /** What a card needs to know to resolve its own verdict. */
 export type UpstreamGroupContext = {
   id: string;
-  /** Null means this group reads the household default. */
+  /** Null means this group inherits the household resolver selection. */
   dohOverrideUrl: string | null;
 };
 
@@ -71,6 +73,9 @@ export type UpstreamResolverSettings = {
   lastRunAt: string | null;
   /** ISO instant of the next scheduled sweep, or null when checking is off. */
   nextRunAt: string | null;
+  source?: "doh" | "dhcp" | "unknown";
+  networks?: { id: string; name: string; servers: string[]; reason: string | null }[];
+  reason?: string | null;
 };
 
 type VerdictStyle = {
@@ -107,7 +112,7 @@ const VERDICT: Record<UpstreamVerdictValue, VerdictStyle> = {
   },
 };
 
-export function verdictStyle(check: UpstreamCheckRow | null): VerdictStyle {
+export function verdictStyle(check: Pick<UpstreamCheckRow, "verdict"> | null): VerdictStyle {
   return VERDICT[check?.verdict ?? "unknown"];
 }
 
@@ -141,10 +146,9 @@ export function domainVerdictStyle(
 /**
  * The verdict for a card, in that card's own resolver context.
  *
- * A group with its own endpoint is filtered differently from the rest of the house, so
- * its card must show its own answer wherever it appears — beside a sibling on Family,
- * on its own detail page, anywhere. A group without an override reads the household
- * default. Passing no group asks the household question.
+ * A DHCP-backed group reads the check for its assigned networks. A DoH override also
+ * gets a group row. A group inheriting the household DoH URL reads the household row.
+ * Passing no group asks the household question.
  *
  * This is the only place that rule lives. Read a row out of `checks` directly and a
  * card will sooner or later show someone else's answer.
@@ -157,10 +161,16 @@ export function effectiveCheck(
     // Measured for this group. Absent only until the first sweep after the override.
     return checks.find((check) => check.groupId === group.id) ?? null;
   }
+  if (group) {
+    const own = checks.find((check) => check.groupId === group.id);
+    if (own) return own;
+    const household = checks.find((check) => check.groupId === null);
+    return household?.source === "dhcp" || household?.source === "unknown" ? null : household ?? null;
+  }
   return checks.find((check) => check.groupId === null) ?? null;
 }
 
-/** Whether a card is reporting its own endpoint rather than the household's. */
+/** Whether a card is reporting its own DoH endpoint rather than an inherited resolver. */
 export function usesOwnResolver(group?: UpstreamGroupContext | null): boolean {
   return Boolean(group?.dohOverrideUrl);
 }
@@ -171,7 +181,10 @@ export function usesOwnResolver(group?: UpstreamGroupContext | null): boolean {
  */
 export function verdictDetailText(check: UpstreamCheckRow | null): string {
   if (!check) return "Not checked yet";
-  if (check.verdict === "unknown") return "Last check couldn't reach the resolver";
+  if (check.verdict === "unknown") return "Last check couldn't determine a reliable answer";
+  if (check.source === "dhcp" && (check.networks?.reduce((total, network) => total + network.servers.length, 0) ?? 0) > 1) {
+    return `${check.blockedCount} of ${check.totalCount} test domains blocked by every required DNS server`;
+  }
   return `${check.blockedCount} of ${check.totalCount} test domains blocked`;
 }
 
@@ -195,7 +208,7 @@ export function sourceNoteText(source: "seed" | "user"): string {
 export function enabledNoteText(enabled: boolean): string {
   return enabled
     ? "Checked on every sweep"
-    : "Not checked — domains are kept, nothing is blocked or unblocked";
+    : "Automatic checks off — earlier results cleared; Check now is available";
 }
 
 /** Coarse relative age, enough to judge whether a verdict is worth trusting. */

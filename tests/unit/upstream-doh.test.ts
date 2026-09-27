@@ -448,7 +448,7 @@ describe("verdict rollup", () => {
       "1 of 2 test domains blocked",
     );
     expect(verdictDetail(rollUpVerdict([probe("a", null)]), null)).toBe(
-      "Last check couldn't reach the resolver",
+      "Last check couldn't determine a reliable answer",
     );
   });
 });

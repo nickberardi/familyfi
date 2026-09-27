@@ -18,7 +18,7 @@ flowchart LR
   Reconcile <--> DB
   Reconcile -->|Owned policies and discovery| UniFi[UniFi Integration API]
   Probe[DNS probe] <--> DB
-  Probe -->|Observe filtering| DoH[Configured DoH resolver]
+  Probe -->|Observe filtering| DoH[DoH override or UniFi DHCP DNS servers]
 ```
 
 The server owns durable household state and background work. Clients display that state and
@@ -114,7 +114,7 @@ signed manifests, pins and revocation. Evidence lives in the
 | Change applied | Reconciliation reports the desired policy state applied. This is not an end-to-end traffic measurement. |
 | Partial, failed or pending change | Inspect that change and Sync. Preserve saved intent and expose the incomplete enforcement result. |
 | UniFi unavailable | Discovery and enforcement cannot be confirmed; existing gateway policies may remain. A successful database write does not repair connectivity. |
-| DNS observation | The configured resolver answered a probe. It does not establish that every device uses that resolver or that all network traffic is filtered. |
+| DNS observation | A configured DoH override or DHCP-discovered resolver answered a probe from the FamilyFi host. A device on another VLAN may receive a different answer. |
 | DNS unavailable or never checked | Report `unknown`; do not infer open access or successful blocking. |
 | Client request fails | Report the request failure. If the response was lost, the client cannot conclude from that alone whether the server saved the request. |
 
@@ -208,8 +208,8 @@ Mocks and fixtures do not prove enforcement. `UNIFI_MOCK=1` routes Settings and 
 
 ## Upstream DNS categories
 
-A second, independent signal: domain-list categories resolved through the household's
-own DoH endpoint to report whether something already blocks them. **Reporting only.**
+A second, independent signal: domain-list categories resolved through the DNS servers
+UniFi DHCP gives managed networks, or an explicit DoH override. **Reporting only.**
 Nothing here creates, changes or deletes a UniFi policy, so these routes return no
 `change` object and never enqueue reconciliation. UniFi remains the sole enforcement
 path.
@@ -219,7 +219,7 @@ A verdict has four values and the fourth carries the weight. Every canary blocke
 the category `unknown` regardless of the rest. A failed query is a failure to observe,
 not an observation: reporting `open` off a failed sweep would tell a parent nothing is
 filtered when the truth is that we do not know, and reporting `blocked` would be a false
-assurance. No configured endpoint, an unreachable one and an empty list are all
+assurance. Unknown DHCP configuration, an unreachable server and an empty list are all
 `unknown` for the same reason.
 
 The same rule holds one level down. Each `UpstreamCheck` keeps the raw per-domain
@@ -247,7 +247,7 @@ category. Its id, label, source, enabled setting, domains and checks are preserv
 The move and seed creation share a transaction; repeated boots do not move it again.
 
 The sweep runs on a household-local wall-clock schedule — `Household.dohProbeTime`
-("HH:MM") and `dohProbeDays` (0 Sunday–6 Saturday, all seven by default) evaluated
+("HH:MM") and `dohProbeDays` (0 Sunday–6 Saturday, Sunday by default) evaluated
 against `Household.timezone` — not an interval counted from the last boot. A single
 `setTimeout` is re-armed after each fire (`src/server/upstream/schedule.ts`), reusing
 `nextClockOnDays` (`src/lib/display.ts`), the same DST-correct function behind bedtime's
@@ -293,14 +293,13 @@ are driven by the same `UpstreamCheck` row, so a colour cannot mean "the resolve
 this" on one screen and "nothing blocks this" on the next; the chips used to paint
 *blocked* green, which collided head-on with green meaning all-clear on a mark.
 
-A verdict belongs to a resolver, not to a category. A group may carry its own endpoint
-(`Group.dohOverrideUrl`), and `UpstreamCheck` is keyed `(categoryId, groupId)` with a
-null group meaning the household default — so a card reports for the devices it actually
-has rather than for the rest of the house. `effectiveCheck()` is the only place that
-resolution happens; a card asks with its own group, and reading a row out of the array
-directly is how a card ends up showing someone else's answer. Between setting an
-override and the next sweep a group has no row, and that reports as "not checked"
-rather than borrowing the household's.
+A verdict belongs to a resolver, not to a category. `UpstreamCheck` is keyed
+`(categoryId, groupId)` with a null group meaning the household aggregate. DHCP-backed
+groups have their own rows for the networks holding their devices; a group with
+`Group.dohOverrideUrl` has a row for its endpoint. A group inheriting household DoH
+uses the household row. `effectiveCheck()` applies that choice wherever the group
+appears. Between setting an override and the next sweep a group has no row, and that
+reports as "not checked" rather than borrowing the household's.
 
 The unique index is written by hand as `NULLS NOT DISTINCT`: Postgres treats every NULL
 as distinct, so the plain index Prisma generates would let a sweep and a "Check now"
@@ -308,15 +307,22 @@ each insert their own household row. Sweeps run once per distinct endpoint, so g
 sharing an override share a pass. The override changes what FamilyFi *asks about* a
 group — pointing its devices at that resolver is a DHCP or client-side job.
 
-Changing or removing an endpoint clears its checks in the same transaction. Merely
-turning checking off, or saving the same URL, keeps the last result. Probe writes and
+DHCP discovery uses each managed network's `SERVER`-mode addresses, or that network's
+gateway address when UniFi selects DNS automatically. Relay and missing DHCP settings
+are unknown. Each assigned server is checked; group results cover the networks holding
+its assigned devices. Differing complete answers are partial, and an unavailable server
+makes the aggregate unknown. Group DoH overrides win over household DoH overrides, which
+win over discovery. Each check stores its source and network/server snapshot.
+
+Changing a resolver or turning checking off clears affected checks. A manual check can
+run while automatic checking is off; results older than seven days are hidden. Probe writes and
 resolver edits share a short household row lock, so a check cannot race its first insert
 or restore a result after an endpoint change. DNS I/O runs outside the transaction;
 before storing a result the probe verifies that its endpoint is still configured.
 
-Transport is RFC 8484 wire format (`application/dns-message`) over POST, which every
-conforming resolver must accept, so the probe works against any DoH endpoint rather
-than the subset that also serves the non-standard `application/dns-json` API.
+DoH uses RFC 8484 wire format (`application/dns-message`) over POST. DHCP-discovered
+servers use plain DNS over UDP 53, retrying a truncated answer over TCP 53. Both
+transports share wire decoding and blocked-response interpretation.
 
 **Every query carries an EDNS(0) OPT record, and that is load-bearing.** A resolver
 only returns an OPT record when the query sent one, and the RFC 8914 Extended DNS Error

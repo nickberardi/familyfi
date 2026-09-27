@@ -4,6 +4,8 @@ import { GET as getHousehold, PUT as setHousehold, DELETE as clearHousehold } fr
 import { PUT as setGroup, DELETE as clearGroup } from "@/app/api/v1/groups/[id]/resolver/route";
 import { prisma } from "@/server/db";
 import { probeCategory } from "@/server/upstream/probe";
+import { refreshResolverContexts } from "@/server/upstream/discovery";
+import { publicUpstreamCategory } from "@/server/upstream-categories";
 import { authFromLogin, request } from "../helpers/http";
 import { createFamilyGroup, resetDatabase } from "../helpers/db";
 
@@ -26,6 +28,7 @@ async function setup() {
     data: { dohUrl: OLD_URL, dohProbeEnabled: true, dohProbeLastRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
   });
   await prisma().group.update({ where: { id: group.id }, data: { dohOverrideUrl: OLD_URL } });
+  await refreshResolverContexts();
   const category = await prisma().upstreamCategory.create({
     data: {
       slug: "test", label: "Test", monogram: "T", source: "user",
@@ -61,12 +64,29 @@ describe("resolver verdict invalidation", () => {
     expect(rows[0]!.groupId).toBe(owner === "household" ? group.id : null);
   });
 
-  it.each(["household", "group"] as const)("preserves %s checks when the URL does not change", async (owner) => {
+  it.each(["household", "group"] as const)("preserves %s checks when the URL does not change, then clears them when checking stops", async (owner) => {
     const { change } = await setup();
     const before = await prisma().upstreamCheck.findMany({ orderBy: { id: "asc" } });
     await change(owner, "PUT", { url: OLD_URL });
-    await change("household", "PUT", { probeEnabled: false });
     expect(await prisma().upstreamCheck.findMany({ orderBy: { id: "asc" } })).toEqual(before);
+    await change("household", "PUT", { probeEnabled: false });
+    expect(await prisma().upstreamCheck.count()).toBe(0);
+  });
+
+  it("allows a manual check while automatic checking is off, then hides it after seven days", async () => {
+    const { category, change } = await setup();
+    await change("household", "PUT", { probeEnabled: false });
+    await probeCategory(category.id, { resolve: async (domain) => ({ domain, blocked: true, rcode: 3, answers: [] }) });
+    const current = await prisma().upstreamCategory.findUniqueOrThrow({
+      where: { id: category.id }, include: { domains: true, checks: true },
+    });
+    expect(publicUpstreamCategory(current).checks).toHaveLength(1);
+    await prisma().upstreamCheck.updateMany({ where: { categoryId: category.id },
+      data: { checkedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) } });
+    const stale = await prisma().upstreamCategory.findUniqueOrThrow({
+      where: { id: category.id }, include: { domains: true, checks: true },
+    });
+    expect(publicUpstreamCategory(stale).checks).toEqual([]);
   });
 
   it.each([

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -6,6 +7,7 @@ import { parseHm } from "@/lib/schedule";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
 import { DEFAULT_PROBE_DAYS, DEFAULT_PROBE_TIME, nextProbeRunAt, rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 import { withUpstreamLock } from "@/server/upstream/transaction";
+import { refreshResolverContexts, type ResolverContext } from "@/server/upstream/discovery";
 
 const SELECT = {
   dohUrl: true,
@@ -25,12 +27,15 @@ function serialize(household: {
   dohProbeLastRunAt: Date | null;
   dohProbeTimeoutMs: number;
   timezone: string;
-}) {
+}, context: ResolverContext) {
   const probeTime = household.dohProbeTime ?? DEFAULT_PROBE_TIME;
   const probeDays = household.dohProbeDays ?? DEFAULT_PROBE_DAYS;
   return {
-    configured: Boolean(household.dohUrl),
+    configured: context.source !== "unknown" && !context.reason,
     url: household.dohUrl ?? null,
+    source: context.source,
+    networks: context.networks,
+    reason: context.reason,
     probeEnabled: household.dohProbeEnabled,
     probeTime,
     probeDays,
@@ -50,6 +55,7 @@ function serialize(household: {
  */
 export async function GET(request: Request) {
   return withSession(request, async () => {
+    const context = (await refreshResolverContexts()).household;
     const household = await prisma().household.findUnique({ where: { id: "default" }, select: SELECT });
     return Response.json({
       resolver: serialize(
@@ -62,6 +68,7 @@ export async function GET(request: Request) {
           dohProbeTimeoutMs: 5000,
           timezone: "America/New_York",
         },
+        context,
       ),
     });
   });
@@ -106,11 +113,14 @@ export async function PUT(request: Request) {
       if (url !== undefined && url !== existing.dohUrl) {
         await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
       }
+      if (parsed.data.probeEnabled === false) await tx.upstreamCheck.deleteMany();
       return tx.household.update({
         where: { id: "default" },
         data: {
           ...(url !== undefined ? { dohUrl: url } : {}),
+          ...(url !== undefined && url !== existing.dohUrl ? { upstreamResolverSnapshot: Prisma.DbNull } : {}),
           ...(parsed.data.probeEnabled !== undefined ? { dohProbeEnabled: parsed.data.probeEnabled } : {}),
+          ...(parsed.data.probeEnabled === false ? { dohProbeDisabledAt: new Date() } : {}),
           ...(parsed.data.probeTime !== undefined ? { dohProbeTime: parsed.data.probeTime } : {}),
           ...(parsed.data.probeDays !== undefined ? { dohProbeDays: parsed.data.probeDays } : {}),
           ...(parsed.data.timeoutMs !== undefined ? { dohProbeTimeoutMs: parsed.data.timeoutMs } : {}),
@@ -119,20 +129,22 @@ export async function PUT(request: Request) {
       });
     });
     rescheduleUpstreamProbe();
-    return Response.json({ resolver: serialize(household) });
+    const context = (await refreshResolverContexts()).household;
+    return Response.json({ resolver: serialize(household, context) });
   });
 }
 
-/** Clearing an endpoint invalidates its verdicts immediately, even with checking off. */
+/** Removing a DoH override returns to DHCP discovery without changing the check schedule. */
 export async function DELETE(request: Request) {
   return withMutation(request, async () => {
     await withUpstreamLock(async (tx) => {
       await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
       await tx.household.update({
         where: { id: "default" },
-        data: { dohUrl: null, dohProbeEnabled: false },
+        data: { dohUrl: null, upstreamResolverSnapshot: Prisma.DbNull },
       });
     });
+    await refreshResolverContexts();
     rescheduleUpstreamProbe();
     return Response.json({ ok: true });
   });

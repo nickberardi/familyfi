@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PROBE_DAYS, DEFAULT_PROBE_TIME, dueProbeRunAt, nextProbeRunAt } from "@/server/upstream/schedule";
 
+it("defaults to Sunday midnight and finds the preceding weekly run", () => {
+  expect(DEFAULT_PROBE_DAYS).toEqual([0]);
+  expect(DEFAULT_PROBE_TIME).toBe("00:00");
+  const monday = new Date("2026-09-28T16:00:00.000Z");
+  expect(dueProbeRunAt(monday, "America/New_York", DEFAULT_PROBE_TIME, DEFAULT_PROBE_DAYS).toISOString())
+    .toBe("2026-09-27T04:00:00.000Z");
+  expect(nextProbeRunAt(monday, "America/New_York", DEFAULT_PROBE_TIME, DEFAULT_PROBE_DAYS).toISOString())
+    .toBe("2026-10-04T04:00:00.000Z");
+});
+
 const NY = "America/New_York";
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const WEEKDAYS = [1, 2, 3, 4, 5];
@@ -54,7 +64,7 @@ describe("nextProbeRunAt", () => {
   it("falls back to the default schedule when every day is cleared", () => {
     const now = new Date("2026-09-17T14:00:00Z");
     const next = nextProbeRunAt(now, NY, "12:00", []);
-    expect(next.toISOString()).toBe(nextProbeRunAt(now, NY, "12:00", DEFAULT_PROBE_DAYS).toISOString());
+    expect(next.toISOString()).toBe(nextProbeRunAt(now, NY, DEFAULT_PROBE_TIME, DEFAULT_PROBE_DAYS).toISOString());
   });
 
   it("handles UTC directly", () => {

@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { publicGroup } from "@/server/groups";
-import { readJson, withMutation } from "@/server/guard";
+import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
 import { withUpstreamLock } from "@/server/upstream/transaction";
+import { refreshResolverContexts } from "@/server/upstream/discovery";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -18,6 +20,20 @@ type Ctx = { params: Promise<{ id: string }> };
  * No `enqueueChange`: nothing here reaches UniFi.
  */
 const Body = z.object({ url: z.string().min(1) });
+
+export async function GET(request: Request, ctx: Ctx) {
+  return withSession(request, async () => {
+    const { id } = await ctx.params;
+    const group = await prisma().group.findUnique({ where: { id }, select: { id: true } });
+    if (!group) return jsonError(404, "not_found", "Group not found.");
+    const contexts = await refreshResolverContexts();
+    const context = contexts.groups.get(id)!;
+    return Response.json({ resolver: {
+      configured: context.source !== "unknown" && !context.reason,
+      source: context.source, url: context.url, networks: context.networks, reason: context.reason,
+    } });
+  });
+}
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
@@ -49,8 +65,12 @@ export async function PUT(request: Request, ctx: Ctx) {
       if (current.dohOverrideUrl !== url) {
         await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
       }
-      return tx.group.update({ where: { id }, data: { dohOverrideUrl: url } });
+      return tx.group.update({ where: { id }, data: {
+        dohOverrideUrl: url,
+        ...(current.dohOverrideUrl !== url ? { upstreamResolverSnapshot: Prisma.DbNull } : {}),
+      } });
     });
+    await refreshResolverContexts();
     return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
   });
 }
@@ -72,8 +92,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
     });
     const group = await withUpstreamLock(async (tx) => {
       await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
-      return tx.group.update({ where: { id }, data: { dohOverrideUrl: null } });
+      return tx.group.update({ where: { id }, data: { dohOverrideUrl: null, upstreamResolverSnapshot: Prisma.DbNull } });
     });
+    await refreshResolverContexts();
     return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
   });
 }

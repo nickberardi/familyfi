@@ -16,7 +16,8 @@
       "ipv4Configuration": {
         "hostIpAddress": "192.0.2.1",
         "prefixLength": 24,
-        "autoScaleEnabled": false
+        "autoScaleEnabled": false,
+        "dhcpConfiguration": { "mode": "SERVER", "dnsServerIpAddressesOverride": ["192.0.2.53"] }
       }
     },
     {
@@ -31,7 +32,8 @@
       "ipv4Configuration": {
         "hostIpAddress": "198.51.100.1",
         "prefixLength": 24,
-        "autoScaleEnabled": false
+        "autoScaleEnabled": false,
+        "dhcpConfiguration": { "mode": "SERVER", "dnsServerIpAddressesOverride": ["198.51.100.53"] }
       }
     }
   ]

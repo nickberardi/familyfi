@@ -39,6 +39,9 @@ export default defineConfig({
   testDir: "./browser",
   outputDir: path.join(repoRoot, "test-results"),
   fullyParallel: false,
+  // Browser specs share one mock household and mutate its groups and resolver.
+  // Run them in order so one spec cannot invalidate another's measured fixture.
+  workers: ci ? 1 : undefined,
   forbidOnly: ci,
   // One retry records a trace (`on-first-retry`); a test that needed it is a flake and
   // fails the run rather than passing quietly.

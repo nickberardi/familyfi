@@ -12,6 +12,7 @@ import {
 } from "@/app/api/v1/upstream/categories/[id]/route";
 import { prisma } from "@/server/db";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
+import { refreshResolverContexts } from "@/server/upstream/discovery";
 import { domainVerdict, effectiveCheck, type UpstreamCheckRow } from "@/lib/upstream";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
@@ -77,6 +78,7 @@ describe("upstream categories API", () => {
   beforeEach(async () => {
     await resetDatabase();
     await ensureUpstreamCategories();
+    await refreshResolverContexts();
   });
 
   it("lists seeded categories with their domains and a cost note", async () => {
@@ -181,7 +183,7 @@ describe("upstream categories API", () => {
     }
   });
 
-  it("keeps the last verdict when checking is turned off", async () => {
+  it("clears the last verdict when checking is turned off", async () => {
     const auth = await signedIn();
     const video = await bySlug(auth, "video");
     await prisma().upstreamCheck.create({
@@ -199,11 +201,7 @@ describe("upstream categories API", () => {
     expect(response.status).toBe(200);
     const after = (await response.json()).category as PublicCategory;
     expect(after.enabled).toBe(false);
-    // The household verdict, resolved the way a card resolves it.
-    const held = effectiveCheck(after.checks);
-    expect(held?.verdict).toBe("partial");
-    expect(held?.blockedCount).toBe(6);
-    expect(held?.groupId).toBeNull();
+    expect(effectiveCheck(after.checks)).toBeNull();
   });
 
   it("refuses to rename or delete a built-in category", async () => {

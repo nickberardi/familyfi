@@ -142,7 +142,7 @@ describe("upstream probe", () => {
     const [outcome] = await probeCategory(id);
 
     expect(outcome!.verdict).toBe(UpstreamVerdict.unknown);
-    expect((await checkFor(id, null))?.error).toMatch(/endpoint/i);
+    expect((await checkFor(id, null))?.error).toMatch(/UniFi network settings/i);
   });
 
   it("does not query a struck-through domain but does query an added one", async () => {
