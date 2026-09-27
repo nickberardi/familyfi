@@ -96,14 +96,7 @@ The workflows and `ci.sh` both call the helpers in `scripts/ci/`, and `tests/uni
 
 Every job except `mutation.yml` runs on self-hosted runners, which keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed, and nothing needs installing on the runners. The script removes:
 
-- every unused Docker image, stopped container, anonymous volume, builder and build cache (image layers are in the GitHub Actions cache; the job's own service containers are running, so they stay);
-- the pnpm store, which `setup-node` restores from the Actions cache;
-- the Go build and module caches from installing `oasdiff`;
-- CodeQL bundles and Node versions in the tool cache not refreshed in two weeks;
-- apt's package cache from `playwright install --with-deps`;
-- `familyfi-*` temp directories in `/tmp`, and runner diagnostics older than a week.
-
-`actions/checkout` already empties the workspace. The script assumes one runner per machine, so no other job is using Docker or the caches while it runs. A new self-hosted job adds the step right after its checkout.
+The self-hosted machines keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/runner-cleanup.sh`](../scripts/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and runner diagnostics older than a week. It assumes one runner per machine, so no other job is using Docker while it runs.
 
 ### Audit allowlist
 

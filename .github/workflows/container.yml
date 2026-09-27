@@ -1,7 +1,7 @@
 name: Container
 
-# Pull requests, not pushes to main: the image build is slow and costly in Actions
-# minutes, and a merged PR already passed it. It also gates every release (see release.yml).
+# Pull requests, not pushes to main: the image build is slow, and a merged PR
+# already passed it. It also gates every release (see release.yml).
 on:
   pull_request:
     branches:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   container:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
