@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { DeviceAssignSelect, networkLabel } from "@/components/DeviceAssign";
+import { GuestAccessCard } from "@/components/GuestAccessCard";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { TogglePill } from "@/components/ui/Controls";
@@ -114,6 +115,8 @@ function DevicesBody() {
           />
         </section>
         ) : null}
+
+        <GuestAccessCard />
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">

@@ -67,6 +67,43 @@ export type ClientOverview = {
   ipAddress?: string;
   macAddress?: string;
   connectedAt?: string;
+  access?: {
+    type: string;
+    authorized?: boolean;
+    authorization?: GuestAuthorization;
+  };
+};
+
+export type GuestAuthorization = {
+  authorizationMethod: "API" | "VOUCHER" | "OTHER";
+  authorizedAt: string;
+  expiresAt: string;
+};
+
+export type GuestActionResponse = {
+  action: "AUTHORIZE_GUEST_ACCESS" | "UNAUTHORIZE_GUEST_ACCESS";
+  grantedAuthorization?: GuestAuthorization;
+  revokedAuthorization?: GuestAuthorization;
+};
+
+export type HotspotVoucher = {
+  id: string;
+  code: string;
+  createdAt: string;
+  timeLimitMinutes: number;
+  authorizedGuestLimit?: number;
+  authorizedGuestCount: number;
+  activatedAt?: string;
+  expiresAt?: string;
+  expired: boolean;
+};
+
+export type WifiBroadcast = {
+  id: string;
+  enabled: boolean;
+  type: string;
+  network?: { type: string; networkId?: string };
+  hotspotConfiguration?: { type: string };
 };
 
 export type FirewallPolicyAction = {

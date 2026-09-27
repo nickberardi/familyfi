@@ -297,6 +297,36 @@ model Device {
   updatedAt  DateTime        @updatedAt
 }
 
+model GuestPass {
+  id                 String   @id @default(cuid())
+  connectionIdentity String
+  siteId             String
+  clientId           String
+  mac                String
+  networkId          String
+  status             String   @default("pending")
+  authorizedAt       DateTime?
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([connectionIdentity, siteId, clientId])
+}
+
+model GuestVoucher {
+  id                 String   @id @default(cuid())
+  connectionIdentity String
+  siteId             String
+  unifiVoucherId     String?  @unique
+  timeLimitMinutes   Int
+  status             String   @default("pending")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([connectionIdentity, siteId])
+}
+
 model AppPolicy {
   id                  String           @id @default(cuid())
   connectionIdentity  String

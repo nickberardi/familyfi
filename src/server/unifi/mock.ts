@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import type { UnifiClient } from "./client";
 import { UnifiHttpError } from "./errors";
 import type {
@@ -8,12 +8,15 @@ import type {
   FirewallPolicy,
   FirewallPolicyWrite,
   FirewallZone,
+  GuestActionResponse,
+  HotspotVoucher,
   NetworkDetails,
   NetworkOverview,
   NetworkReferences,
   PolicyOrdering,
   SiteOverview,
   UnifiPage,
+  WifiBroadcast,
 } from "./types";
 import { UNIFI_PAGE_LIMIT } from "./types";
 
@@ -23,6 +26,8 @@ export type MockUnifiState = {
   networks: NetworkDetails[];
   zones: FirewallZone[];
   clients: ClientOverview[];
+  wifiBroadcasts: WifiBroadcast[];
+  vouchers: HotspotVoucher[];
   policies: FirewallPolicy[];
   ordering: PolicyOrdering;
   networkClientIds: Map<string, Set<string>>;
@@ -42,6 +47,8 @@ export function createMockUnifiState(partial: Partial<MockUnifiState> = {}): Moc
     networks: partial.networks ?? [],
     zones: partial.zones ?? [],
     clients: partial.clients ?? [],
+    wifiBroadcasts: partial.wifiBroadcasts ?? [],
+    vouchers: partial.vouchers ?? [],
     policies: partial.policies ?? [],
     ordering: partial.ordering ?? { beforeSystemDefined: [], afterSystemDefined: [] },
     networkClientIds: partial.networkClientIds ?? new Map(),
@@ -110,6 +117,67 @@ export class MockUnifiClient implements UnifiClient {
     const client = this.state.clients.find((item) => item.id === clientId);
     if (!client) throw notFound("GET", `/v1/sites/${siteId}/clients/${clientId}`);
     return client;
+  }
+
+  async authorizeGuest(siteId: string, clientId: string, timeLimitMinutes: number): Promise<GuestActionResponse> {
+    const path = `/v1/sites/${siteId}/clients/${clientId}/actions`;
+    this.record("POST", path, { action: "AUTHORIZE_GUEST_ACCESS", timeLimitMinutes });
+    const client = this.state.clients.find((item) => item.id === clientId);
+    if (!client) throw notFound("POST", path);
+    if (client.access?.type !== "GUEST") throw new UnifiHttpError(400, "POST", path, "Client must be a guest");
+    const authorizedAt = new Date();
+    const grantedAuthorization = {
+      authorizationMethod: "API" as const,
+      authorizedAt: authorizedAt.toISOString(),
+      expiresAt: new Date(authorizedAt.getTime() + timeLimitMinutes * 60_000).toISOString(),
+    };
+    const revokedAuthorization = client.access.authorization;
+    client.access = { type: "GUEST", authorized: true, authorization: grantedAuthorization };
+    return { action: "AUTHORIZE_GUEST_ACCESS", grantedAuthorization, ...(revokedAuthorization ? { revokedAuthorization } : {}) };
+  }
+
+  async unauthorizeGuest(siteId: string, clientId: string): Promise<GuestActionResponse> {
+    const path = `/v1/sites/${siteId}/clients/${clientId}/actions`;
+    this.record("POST", path, { action: "UNAUTHORIZE_GUEST_ACCESS" });
+    const client = this.state.clients.find((item) => item.id === clientId);
+    if (!client) throw notFound("POST", path);
+    const revokedAuthorization = client.access?.authorization;
+    if (client.access?.type !== "GUEST" || !revokedAuthorization) {
+      throw new UnifiHttpError(400, "POST", path, "Guest is not authorized");
+    }
+    client.access = { type: "GUEST", authorized: false };
+    return { action: "UNAUTHORIZE_GUEST_ACCESS", revokedAuthorization };
+  }
+
+  async listWifiBroadcasts(siteId: string): Promise<WifiBroadcast[]> {
+    this.record("GET", `/v1/sites/${siteId}/wifi/broadcasts`);
+    return [...this.state.wifiBroadcasts];
+  }
+
+  async listVouchers(siteId: string): Promise<HotspotVoucher[]> {
+    this.record("GET", `/v1/sites/${siteId}/hotspot/vouchers`);
+    return [...this.state.vouchers];
+  }
+
+  async createVoucher(siteId: string, timeLimitMinutes: number): Promise<HotspotVoucher> {
+    this.record("POST", `/v1/sites/${siteId}/hotspot/vouchers`, {
+      count: 1, name: "FamilyFi guest", authorizedGuestLimit: 1, timeLimitMinutes,
+    });
+    const voucher: HotspotVoucher = {
+      id: randomUUID(), code: String(randomInt(1_000_000_000, 10_000_000_000)),
+      createdAt: new Date().toISOString(), timeLimitMinutes,
+      authorizedGuestLimit: 1, authorizedGuestCount: 0, expired: false,
+    };
+    this.state.vouchers.push(voucher);
+    return voucher;
+  }
+
+  async deleteVoucher(siteId: string, voucherId: string): Promise<number> {
+    const path = `/v1/sites/${siteId}/hotspot/vouchers/${voucherId}`;
+    this.record("DELETE", path);
+    if (!this.state.vouchers.some((item) => item.id === voucherId)) throw notFound("DELETE", path);
+    this.state.vouchers = this.state.vouchers.filter((item) => item.id !== voucherId);
+    return 1;
   }
 
   async listPolicies(siteId: string): Promise<FirewallPolicy[]> {

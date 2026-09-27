@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.12.0
+  version: 0.13.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -27,6 +27,8 @@ tags:
     description: Family and Things
   - name: Devices
     description: Assigned and quarantined devices
+  - name: Guests
+    description: Temporary access on a separate UniFi guest network
   - name: Sync
     description: Reconciliation and per-action change status
   - name: DPI
@@ -1155,6 +1157,139 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/guests:
+    get:
+      operationId: listGuests
+      tags: [Guests]
+      summary: List eligible visitors and FamilyFi-issued guest access
+      description: Live state is unavailable or unknown when UniFi cannot confirm it. Guest access is separate from reconciliation.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Guest access snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Guests" }
+        "401": { $ref: "#/components/responses/Error" }
+  /api/v1/guest-passes:
+    post:
+      operationId: createGuestPass
+      tags: [Guests]
+      summary: Authorize a visiting client for a limited time
+      description: Client must be a live guest on an excluded guest network and must not be a known household device. Does not enqueue reconciliation.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [clientId, timeLimitMinutes]
+              properties:
+                clientId: { type: string, minLength: 1 }
+                timeLimitMinutes: { type: integer, minimum: 1, maximum: 1440 }
+      responses:
+        "201":
+          description: Guest access confirmed by UniFi
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [pass]
+                properties:
+                  pass: { $ref: "#/components/schemas/GuestPass" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/v1/guest-passes/{id}:
+    delete:
+      operationId: revokeGuestPass
+      tags: [Guests]
+      summary: Revoke a FamilyFi-issued guest pass early
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Guest pass revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [pass]
+                properties:
+                  pass: { $ref: "#/components/schemas/GuestPass" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/v1/guest-vouchers:
+    post:
+      operationId: createGuestVoucher
+      tags: [Guests]
+      summary: Create one single-use hotspot voucher
+      description: Voucher time starts at first redemption. All captive-portal networks must be outside FamilyFi's managed scope. Does not enqueue reconciliation.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [timeLimitMinutes]
+              properties:
+                timeLimitMinutes: { type: integer, minimum: 1, maximum: 1440 }
+      responses:
+        "201":
+          description: Voucher created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [voucher]
+                properties:
+                  voucher: { $ref: "#/components/schemas/GuestVoucher" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/v1/guest-vouchers/{id}:
+    delete:
+      operationId: revokeGuestVoucher
+      tags: [Guests]
+      summary: Delete a FamilyFi-issued voucher
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Voucher revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [voucher]
+                properties:
+                  voucher: { $ref: "#/components/schemas/GuestVoucher" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
   /api/v1/sync:
     get:
       operationId: getSync
@@ -2583,6 +2718,56 @@ components:
         lastSeenAt: { type: [string, "null"], format: date-time }
         unresolved: { type: boolean }
         inScope: { type: boolean }
+    Guests:
+      type: object
+      additionalProperties: false
+      required: [status, reason, voucherAvailable, clients, passes, vouchers]
+      properties:
+        status: { type: string, enum: [ready, unconfigured, unavailable] }
+        reason: { type: [string, "null"], enum: [unifi_unconfigured, unifi_unavailable, no_guest_network, managed_overlap, null] }
+        voucherAvailable: { type: boolean }
+        clients:
+          type: array
+          items: { $ref: "#/components/schemas/GuestClient" }
+        passes:
+          type: array
+          items: { $ref: "#/components/schemas/GuestPass" }
+        vouchers:
+          type: array
+          items: { $ref: "#/components/schemas/GuestVoucher" }
+    GuestClient:
+      type: object
+      additionalProperties: false
+      required: [id, name, mac, networkId, authorized]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        mac: { type: string }
+        networkId: { type: string }
+        authorized: { type: boolean }
+    GuestPass:
+      type: object
+      additionalProperties: false
+      required: [id, clientId, mac, networkId, status, authorizedAt, expiresAt]
+      properties:
+        id: { type: string }
+        clientId: { type: string }
+        mac: { type: string }
+        networkId: { type: string }
+        status: { type: string, enum: [active, expired, revoked, unknown] }
+        authorizedAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+    GuestVoucher:
+      type: object
+      additionalProperties: false
+      required: [id, code, timeLimitMinutes, status, activatedAt, expiresAt]
+      properties:
+        id: { type: string }
+        code: { type: [string, "null"] }
+        timeLimitMinutes: { type: integer }
+        status: { type: string, enum: [unused, active, expired, revoked, unknown] }
+        activatedAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
     ChangeSummary:
       type: object
       additionalProperties: false

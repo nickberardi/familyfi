@@ -67,6 +67,9 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |
+| GET | `/api/v1/guests` | Eligible live guest clients, FamilyFi-issued passes and vouchers, and setup/availability state. An unknown live state is never shown as active |
+| POST/DELETE | `/api/v1/guest-passes`, `/api/v1/guest-passes/{id}` | Authorize an eligible visitor for 1–1440 minutes or revoke that FamilyFi-issued pass; direct UniFi action, no reconciliation `change` |
+| POST/DELETE | `/api/v1/guest-vouchers`, `/api/v1/guest-vouchers/{id}` | Create one single-use hotspot code or revoke a FamilyFi-issued code; time begins on first redemption; no reconciliation `change` |
 | GET | `/api/v1/sync` | Revision, last run, app-owned policy counts, recent changes |
 | POST | `/api/v1/sync/retry` | Enqueue another run |
 | GET | `/api/v1/changes/{id}` | Per-action status |

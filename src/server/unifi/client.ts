@@ -9,12 +9,15 @@ import type {
   FirewallPolicy,
   FirewallPolicyWrite,
   FirewallZone,
+  GuestActionResponse,
+  HotspotVoucher,
   NetworkDetails,
   NetworkOverview,
   NetworkReferences,
   PolicyOrdering,
   SiteOverview,
   UnifiPage,
+  WifiBroadcast,
 } from "./types";
 
 export type UnifiClient = {
@@ -26,6 +29,12 @@ export type UnifiClient = {
   listZones(siteId: string): Promise<FirewallZone[]>;
   listClients(siteId: string, filter?: string): Promise<ClientOverview[]>;
   getClient(siteId: string, clientId: string): Promise<ClientOverview>;
+  authorizeGuest(siteId: string, clientId: string, timeLimitMinutes: number): Promise<GuestActionResponse>;
+  unauthorizeGuest(siteId: string, clientId: string): Promise<GuestActionResponse>;
+  listWifiBroadcasts(siteId: string): Promise<WifiBroadcast[]>;
+  listVouchers(siteId: string): Promise<HotspotVoucher[]>;
+  createVoucher(siteId: string, timeLimitMinutes: number): Promise<HotspotVoucher>;
+  deleteVoucher(siteId: string, voucherId: string): Promise<number>;
   listPolicies(siteId: string): Promise<FirewallPolicy[]>;
   getPolicy(siteId: string, policyId: string): Promise<FirewallPolicy>;
   createPolicy(siteId: string, body: FirewallPolicyWrite): Promise<FirewallPolicy>;
@@ -107,6 +116,43 @@ export class HttpUnifiClient implements UnifiClient {
 
   async getClient(siteId: string, clientId: string): Promise<ClientOverview> {
     return this.request("GET", `/v1/sites/${siteId}/clients/${clientId}`);
+  }
+
+  async authorizeGuest(siteId: string, clientId: string, timeLimitMinutes: number): Promise<GuestActionResponse> {
+    return this.request("POST", `/v1/sites/${siteId}/clients/${clientId}/actions`, {
+      action: "AUTHORIZE_GUEST_ACCESS",
+      timeLimitMinutes,
+    });
+  }
+
+  async unauthorizeGuest(siteId: string, clientId: string): Promise<GuestActionResponse> {
+    return this.request("POST", `/v1/sites/${siteId}/clients/${clientId}/actions`, {
+      action: "UNAUTHORIZE_GUEST_ACCESS",
+    });
+  }
+
+  async listWifiBroadcasts(siteId: string): Promise<WifiBroadcast[]> {
+    return this.paginate(`/v1/sites/${siteId}/wifi/broadcasts`);
+  }
+
+  async listVouchers(siteId: string): Promise<HotspotVoucher[]> {
+    return this.paginate(`/v1/sites/${siteId}/hotspot/vouchers`);
+  }
+
+  async createVoucher(siteId: string, timeLimitMinutes: number): Promise<HotspotVoucher> {
+    const result = await this.request<{ vouchers: HotspotVoucher[] }>("POST", `/v1/sites/${siteId}/hotspot/vouchers`, {
+      count: 1,
+      name: "FamilyFi guest",
+      authorizedGuestLimit: 1,
+      timeLimitMinutes,
+    });
+    if (result.vouchers.length !== 1) throw new Error("UniFi did not return exactly one voucher.");
+    return result.vouchers[0]!;
+  }
+
+  async deleteVoucher(siteId: string, voucherId: string): Promise<number> {
+    const result = await this.request<{ vouchersDeleted: number }>("DELETE", `/v1/sites/${siteId}/hotspot/vouchers/${encodeURIComponent(voucherId)}`);
+    return result.vouchersDeleted;
   }
 
   async listPolicies(siteId: string): Promise<FirewallPolicy[]> {
