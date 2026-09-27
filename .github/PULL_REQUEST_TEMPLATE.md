@@ -13,13 +13,24 @@ note anything that shipped differently. See "Pull requests" in AGENTS.md.
 
 _No plan — direct change._
 
-### Test plan
+### Validation
 
-<!-- What to run for which change: docs/testing.md -->
+<!-- Follow docs/testing.md. Record actual commands and results; explain any unavailable checks. Documentation-only changes do not need application coverage or a build. -->
 
-- [ ] `make lint typecheck test-coverage` passes
-- [ ] `make test-browser` passes, or the change does not touch the UI
-- [ ] `make test-api` passes, or no route or payload changed. A spec change has an issue in `familyfi-ios`
-- [ ] `make db-migrate db-drift db-upgrade` passes, or the change has no migration
-- [ ] A bug fix comes with a test that fails without the fix
+| Check | Result |
+| --- | --- |
+| | |
+
+- [ ] Behaviour changes have tests; a bug regression test failed before the fix
+- [ ] Applicable checks in `docs/testing.md` ran; any missing evidence is stated above
+- [ ] API contract changes include the spec, version checks and a linked `familyfi-ios` issue; breaking changes have the operator's decision
+- [ ] Migration changes pass migration, drift and upgrade checks
+- [ ] Final diff reviewed for duplicated behaviour, unnecessary abstractions, hidden errors and stale docs
+- [ ] Any changed test expectations, exclusions or suppressions are justified below
 - [ ] No secrets, live UniFi responses, or `/designs/` files included
+
+### Issues and remaining risks
+
+<!-- List every issue closed as Closes #number; identify Dependabot alerts by number and advisory. Include any iOS coordination issue. State relevant limitations or "None". Mark non-applicable checklist items explicitly. -->
+
+None.

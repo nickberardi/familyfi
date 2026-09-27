@@ -1,10 +1,35 @@
 # API
 
-The web UI and any future native client use `/api/v1`. The source of truth is [`openapi/familyfi.v1.yaml`](../openapi/familyfi.v1.yaml). Mutations return a `change` object (`changeId` + `revision`); poll `GET /api/v1/changes/{id}` for that action. Global last-sync success is not proof that your change applied.
+The web UI and native clients use `/api/v1`. The source of truth is [`openapi/familyfi.v1.yaml`](../openapi/familyfi.v1.yaml). Mutations that enqueue reconciliation return a `change` object (`changeId` + `revision`); poll `GET /api/v1/changes/{id}` for that action. Consult the endpoint schema: authentication, pairing and other operations that do not enqueue reconciliation have their own response shapes. Global last-sync success is not proof that your change applied.
 
 Browser mutations after login send `X-CSRF-Token` matching the `familyfi_csrf` cookie. Native clients send `Authorization: Bearer`.
 
 Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw UniFi keys, or firewall JSON.
+
+## Shared behaviour and consumer adoption
+
+This repository owns two distinct shared artifacts:
+
+| Artifact | What it establishes | Validation |
+| --- | --- | --- |
+| [OpenAPI specification](../openapi/familyfi.v1.yaml) | HTTP paths, request/response shapes, statuses and authentication contract | API checks and schema-validated integration responses; [authorization matrix](../tests/integration/authorization-matrix.test.ts) for caller permissions |
+| [Display vectors](../tests/fixtures/display-vectors.json) | Examples of shared labels, available actions and time-dependent display behaviour | [Vector tests](../tests/unit/display-vectors.test.ts); format and update rules in [testing](testing.md#display-vectors) |
+
+Schema compatibility does not prove behavioural compatibility. Pause/Resume meaning, protection,
+household timezone, per-action outcomes and unknown DNS verdicts must remain consistent across
+clients. The fixtures cover the functions named by their test harness; they are not evidence of
+complete UI parity, all API semantics or live gateway enforcement.
+
+For a change to either shared artifact:
+
+1. Identify the affected consumers and intended behaviour before editing. Follow the [root compatibility rules](../AGENTS.md#openapi-consumer-coordination) and [version policy](#versioning-the-contract) for HTTP changes.
+2. Change the owning implementation and applicable artifact in the same PR. Add meaningful cases for changed shared display behaviour; do not change expected results merely to accept a regression.
+3. Run the applicable [validation](testing.md). Describe changed endpoints/schemas or vector cases, the server commit/version to adopt, and any rollout dependency in the PR.
+4. For an OpenAPI change, open the required native adoption issue as specified in `AGENTS.md`. For display changes, make the behaviour and vector diff explicit in the PR so the native port can adopt them together.
+5. Use the [native repository's current adoption instructions](https://github.com/nickberardi/familyfi-ios/blob/main/AGENTS.md) for its refresh, generation and validation procedure. Keep those commands there. A passing server check does not establish that a consumer has adopted the change.
+
+Platform-specific navigation, typography and layout are owned by each implementation; use the
+[design ownership map](development.md#design-ownership) when comparing them.
 
 ## Implemented
 
@@ -53,7 +78,7 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/PUT/DELETE | `/api/v1/upstream/resolver` | Household DoH endpoint, returned in full, plus the check schedule (`probeTime`, `probeDays`, `lastRunAt`, `nextRunAt`). Changing or removing the endpoint immediately clears household verdicts; changing the schedule re-arms it immediately |
 | PUT/DELETE | `/api/v1/groups/{id}/resolver` | A group's own DoH endpoint. Changing or removing it immediately clears that group's verdicts |
 
-The `upstream` resource is the one exception to the `change` envelope. Those rows are
+The `upstream` resource never returns the `change` envelope. Those rows are
 reporting only and never produce a UniFi policy, so there is nothing to reconcile —
 returning a `change` would create a `ChangeResult` that stays `pending` until an
 unrelated sync runs, and never settles at all while UniFi is unconfigured.

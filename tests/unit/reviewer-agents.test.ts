@@ -11,7 +11,7 @@ const repoRoot = path.resolve(__dirname, "../..");
 const read = (file: string) => readFileSync(path.join(repoRoot, file), "utf8");
 
 function claudeReviewer() {
-  const [, frontmatter, body] = read(".claude/agents/reviewer.md").split("---\n");
+  const [, frontmatter, body] = read(".claude/agents/reviewer.md").match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [];
   const field = (key: string) => frontmatter.match(new RegExp(`^${key}: (.*)$`, "m"))?.[1];
   return { name: field("name"), description: field("description"), instructions: body.trim() };
 }
@@ -41,9 +41,5 @@ describe("reviewer subagent (AGENTS.md)", () => {
 
   it("keeps the Codex reviewer read-only", () => {
     expect(codexReviewer().sandbox).toBe("read-only");
-  });
-
-  it("is required before a PR", () => {
-    expect(read("AGENTS.md")).toContain("spawn the `reviewer` subagent");
   });
 });

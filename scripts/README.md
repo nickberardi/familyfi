@@ -21,12 +21,15 @@ scripts/
 Run the scripts from anywhere in the repo; each one finds the repo root itself. `make ci` and
 `make release` call them too, with `CI_ARGS` and `RELEASE_ARGS` for options.
 
+Agents can use the [validation](../.agents/skills/validate-change/SKILL.md) and [release](../.agents/skills/release/SKILL.md) skills to select and complete these workflows. This page remains the command reference.
+
 ## `ci.sh`
 
 Runs the jobs of `.github/workflows/ci.yml`, `container.yml`, `openapi.yml` and `mutation.yml`
-with the same commands, in the same order. Each job is named after the workflow job it
-mirrors, and `tests/unit/ci-scripts.test.ts` fails when a workflow gains, loses or renames a
-job or a helper without `ci.sh` following.
+using local equivalents of the workflow commands. Each job is named after the workflow job it
+mirrors. `tests/unit/ci-scripts.test.ts` checks job names, referenced helpers and script paths.
+It does not compare every command, option or environment variable; review those together
+when either execution path changes.
 
 ```sh
 scripts/ci.sh                          # verify, browser, container and both OpenAPI checks
@@ -42,7 +45,7 @@ scripts/ci.sh --only mutation          # the weekly mutation run; takes hours
 | `--only JOB…` | run only these jobs |
 | `--skip JOB…` | leave these jobs out |
 | `--base REF` | what changed-line coverage and the OpenAPI checks compare against (default `origin/main`); nothing is fetched |
-| `--breaking-api` | approve breaking OpenAPI changes, as the `breaking_api` label does in CI |
+| `--breaking-api` | reflects an operator-approved breaking change locally; agents must not set it to bypass a failure. CI still requires the operator's `breaking_api` label |
 | `--keep-going` | keep running after a job fails, then report every failure |
 | `-h`, `--help` | print usage |
 
@@ -69,6 +72,8 @@ scripts/ci.sh --only mutation          # the weekly mutation run; takes hours
 
 ## `release.sh`
 
+Publishing requires the operator's request. `--skip-ci` and `--allow-dirty` are explicit operator exceptions, never normal agent workflow. A script accepting an option does not authorize using it.
+
 Does what `.github/workflows/release.yml` does, from this machine: checks that `HEAD` is on
 `origin/main`, runs `ci.sh --quick`, builds `linux/amd64` and `linux/arm64` in one `buildx`
 build, pushes them to GHCR, and creates the GitHub Release with generated notes. Creating the
@@ -76,7 +81,6 @@ Release creates the tag on GitHub at `HEAD`.
 
 ```sh
 scripts/release.sh --tag v0.12.1               # ci.sh --quick, build, push, publish
-scripts/release.sh --tag v0.12.1 --skip-ci
 scripts/release.sh --tag v0.12.1 --no-push     # build both architectures, publish nothing
 ```
 

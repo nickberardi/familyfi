@@ -153,33 +153,26 @@ Release images run `prisma migrate deploy` on start. Local `make dev` does the s
 
 A household may skip releases: any release from v0.1.0 on upgrades straight to the newest. CI proves it on every push by filling a database built by each release since v0.1.0 and upgrading it (`pnpm db-upgrade`). The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/ci/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
 
-Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Until a tag exists, use `make docker-dev-up`. Compose interpolates `POSTGRES_*` for the database service and passes `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET`, `FAMILYFI_ENCRYPTION_KEY`, and mapped `DB_*` into the app container. The image does not read a mounted `.env` file.
+Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose interpolates `POSTGRES_*` for the database service and passes `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET`, `FAMILYFI_ENCRYPTION_KEY`, and mapped `DB_*` into the app container. The image does not read a mounted `.env` file.
 
 ## Releases
 
-`package.json` is `0.3.0`. Publish that version with an annotated git tag that matches semver, then push the tag. Do not use `v0.3`; the release workflow’s Docker tags need a full `MAJOR.MINOR.PATCH`.
+Publishing requires the operator's request. Use the version in `package.json` and `openapi/familyfi.v1.yaml`; the release tag must be `v` followed by that full `MAJOR.MINOR.PATCH` version. Confirm all three match before publishing. Never copy an old version from a documentation example.
 
-```bash
-git checkout main
-git pull
-git tag -a v0.3.0 -m "FamilyFi 0.3.0"
-git push origin v0.3.0
-```
-
-Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml): a multi-arch image (`linux/amd64` and `linux/arm64`) to `ghcr.io/nickberardi/familyfi` (`0.3.0`, `0.3`, and `latest`) and a GitHub Release with generated notes. After the first package appears, link it to the repository in GitHub Packages if GHCR is not yet public.
+For a tag-based release, create and push an annotated tag on the intended commit on `main`. Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml). For an unpublished image tag, it requires CI and container smoke, builds `linux/amd64` and `linux/arm64` images at `ghcr.io/nickberardi/familyfi`, and creates a GitHub Release with generated notes. Stable tags publish the full version, its major/minor tag and `latest`. If the image tag already exists, the workflow assumes local publication and skips these jobs; image existence alone does not prove checks passed.
 
 Bump `package.json` and `openapi/familyfi.v1.yaml` `info.version` together before a later tag, so Settings, the sign-in screen, and `GET /api/v1/health` show the same number as the image tag. `tests/unit/version.test.ts` fails the build when the two drift apart.
 
 Each release's notes cite the latest verification record for every scenario in [testing.md](testing.md#what-no-test-proves), linking the file under `docs/verification/`, or say "not run" for a scenario that has none. Run `pnpm spike verify` on a console first when the release changes how FamilyFi writes policies.
 
-Every release so far is a **pre-release** on GitHub. The workflow does not set that flag, so mark the release as a pre-release after it is created, until the project reaches 1.0.
+Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does not set that flag, so the operator must mark it after creation. The local release script sets it automatically. Verification links in release notes also require review; the current publishers do not collect those records automatically.
 
 ### Local release
 
 `scripts/release.sh` publishes a release from your machine, without the runners: it checks that `HEAD` is on `origin/main`, runs `scripts/ci.sh --quick`, builds and pushes both architectures to GHCR with the same tags, and creates the GitHub Release, marked a pre-release below 1.0.
 
 ```bash
-scripts/release.sh --tag v0.3.0
+scripts/release.sh --tag vX.Y.Z  # replace with the matching package/spec version
 ```
 
 It logs in to GHCR with `GHCR_TOKEN` (from the environment or a gitignored `.release.env`), or with `gh auth token` once `gh auth refresh -s write:packages` has granted that scope. Creating the Release creates the tag, which starts `release.yml`; its `on-main` job finds the version's images already on GHCR and skips the rest. Options and details are in [`scripts/README.md`](../scripts/README.md#releasesh).

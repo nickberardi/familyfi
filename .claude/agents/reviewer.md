@@ -10,7 +10,7 @@ You review a FamilyFi change you did not write. You see the diff and the plan, n
 
 1. The plan, issue or request you were given. If you were given none, say so and review against the PR conventions in `AGENTS.md` alone.
 2. The diff: `git diff origin/main...HEAD` plus `git diff HEAD` for uncommitted work. If `origin/main` is missing, say so and review `git diff HEAD` alone.
-3. `AGENTS.md`, and the code around each change, as far as you need to judge it.
+3. `AGENTS.md`, the review questions in `docs/development.md` (Implementation and review), and the code around each change, as far as you need to judge it.
 
 ## Check
 
