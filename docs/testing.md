@@ -8,10 +8,13 @@ The pre-push hook runs `make lint typecheck test-unit` on every push; `make setu
 
 | You changed | Run |
 | --- | --- |
-| Anything | `make test-coverage` |
+| Documentation only | Check changed links, paths and commands against the repo; `git diff --check`. For agent instructions, also run `pnpm exec vitest run --config tests/vitest.config.ts tests/unit/invariants.test.ts`. No application build or database is needed. |
+| Code, dependencies, configuration or tooling | `make lint typecheck test-coverage` |
 | Pages, components or `globals.css` | `make test-browser` |
-| An `/api/v1` route or payload | `make test-api`, with `openapi/familyfi.v1.yaml` updated in the same change. If the spec changed, `make test-api-breaking` too (needs Go) |
+| An `/api/v1` route or payload | `make test-api` and relevant integration tests. Update `openapi/familyfi.v1.yaml` when HTTP behaviour changes; an internal refactor alone needs no spec edit. For spec changes also run `make test-api-version test-api-breaking` (breaking check needs Go) and coordinate iOS as required in `AGENTS.md`. |
 | `prisma/schema.prisma` or a migration | `make db-migrate db-drift db-upgrade`. `db-upgrade` upgrades a filled database from every supported release, so a household that skipped releases is covered; `pnpm db-upgrade --from v0.5.0` or `--latest` runs one start point while you iterate |
+
+Start with focused tests while iterating; the table is the handoff requirement. The pre-push hook still runs its checks on every push, including documentation changes. If a required check cannot run, report the command, blocker and unverified behaviour. Do not bypass it or claim the change is fully verified. CI remains the merge check.
 
 **Prerequisites:**
 - PostgreSQL. `make setup` starts one with Docker.
@@ -29,13 +32,15 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 | Browser: `tests/browser` | PostgreSQL, Chromium | Desktop and phone smoke tests on a production build with the UniFi mock, plus axe (WCAG 2.1 A and AA) on every page |
 | API contract: `scripts/ci/check-openapi.mjs` | Nothing | Lints the OpenAPI document; every route and method exists on both sides |
 
-The authorization matrix runs with the integration suite. When you add a route, add its line to `ACCESS` in that file; when a guard's access looks wrong, encode what it does today with a `question` and raise it rather than changing both in one step.
+The authorization matrix runs with the integration suite. When you add a route, add its line to `ACCESS` in that file. An unexpected permission is a finding, not a reason to make the expected value match the implementation. Record ambiguous access with a `question` and raise it. For an authorized access change, update the guard, matrix, contract and negative tests together; apply the API compatibility rules first.
 
 `make test` runs unit then integration; `make test-coverage` runs both in one pass and fails below a coverage floor. `make test-browser` builds the app and runs Playwright the way CI does, so a skipped or flaky test fails it locally too.
 
 ## Rules
 
 - **A bug fix ships with a test that fails without it.** Write the test first and watch it fail for the reason in the bug report.
+- Assert outcomes and meaningful failure cases. Test a fix through its public boundary when practical; do not mirror its algorithm in the assertion or mock the behaviour being fixed.
+- Do not change expected values, delete assertions, broaden mocks, add exclusions or insert suppressions merely to pass. A changed expectation must trace to an intentional behaviour change. Explain any new coverage exemption, CI exclusion or lint/type suppression in the PR and include the remaining risk.
 - **Coverage floors only go up.** They live in `tests/vitest.coverage.config.ts`. Raise a floor when you lift an area, and never lower one to pass.
 - **A changed line in a security-critical path needs a test.** On a pull request, `scripts/ci/changed-line-coverage.mjs` fails CI when a changed line no test runs is in one of `GATED_PATHS`: `src/server/unifi/**`, `auth.ts`, `guard.ts`, `quarantine.ts`, `src/server/tunnel/**` and `reconciliation.ts`, where a file-wide floor would average a new untested branch away. Elsewhere it lists those lines and the floors decide.
   - A line no test can reach takes `// coverage-exempt: <why>` at its end, or alone on the line above. The reason is required, and the run summary lists every exemption so a reviewer sees it.
@@ -78,25 +83,25 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 | `ci.yml` | Every push and pull request | **verify:** lint, typecheck, `test-api`, `db-drift`, `db-upgrade` from every supported release (about 30 seconds), `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only; fails on an untested changed line in a gated path), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke |
 | `codeql.yml` | Pull requests and weekly | CodeQL (`security-extended`) over the JavaScript and TypeScript; findings go to the repository's code scanning alerts. Only this job may write security events |
-| `openapi.yml` | Pull requests that change `openapi/` | Breaking changes against `main`. These fail until the operator adds the `breaking_api` label; never add it yourself |
+| `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | Mutation testing. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 
 ### Running CI locally
 
-`scripts/ci.sh` runs these workflows' jobs on your machine with the same commands: `verify` and `browser` from `ci.yml`, `container`, `openapi-version` and `openapi-breaking`, and `mutation` when you name it. Each job that needs PostgreSQL gets a disposable `postgres:18-alpine` container of its own, so the development database is never touched. `--quick` runs `verify` and `container`. `make ci` calls it, with options in `CI_ARGS`.
+`scripts/ci.sh` runs local equivalents of these workflows' jobs: `verify` and `browser` from `ci.yml`, `container`, `openapi-version` and `openapi-breaking`, and `mutation` when you name it. Each job that needs PostgreSQL gets a disposable `postgres:18-alpine` container of its own, so the development database is never touched. `--quick` runs `verify` and `container`. `make ci` calls it, with options in `CI_ARGS`.
 
 ```bash
 scripts/ci.sh
 scripts/ci.sh --only browser
 ```
 
-The workflows and `ci.sh` both call the helpers in `scripts/ci/`, and `tests/unit/ci-scripts.test.ts` fails when a workflow job or helper changes without `ci.sh` following. Details are in [`scripts/README.md`](../scripts/README.md).
+The workflows and `ci.sh` both call helpers in `scripts/ci/`. `tests/unit/ci-scripts.test.ts` checks job names, helper references and script paths; it does not prove the two paths run identical commands or settings. Details are in [`scripts/README.md`](../scripts/README.md).
 
 ### Self-hosted runners
 
-Every job except `mutation.yml` runs on self-hosted runners, which keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed, and nothing needs installing on the runners. The script removes:
+Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. It assumes one runner per machine. Some jobs use GitHub-hosted runners; the workflow files define placement.
 
-The self-hosted machines keep their disk between jobs. Left alone, image builds fill it until a job dies with `No space left on device`, often without uploading its logs. So every self-hosted job that checks out the repository runs [`scripts/runner-cleanup.sh`](../scripts/runner-cleanup.sh) next, through `.github/actions/runner-cleanup`, before any setup step. A job starts on a clean disk whatever the last one left, even if it crashed. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and runner diagnostics older than a week. It assumes one runner per machine, so no other job is using Docker while it runs.
+**Never run this cleanup script on a development machine.** Local work must clean only resources created by that task; `scripts/ci.sh` deliberately omits runner cleanup.
 
 ### Audit allowlist
 

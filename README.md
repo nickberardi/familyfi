@@ -1,14 +1,14 @@
 # FamilyFi
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-green)](LICENSE)
-[![GitHub last commit](https://img.shields.io/github/last-commit/nberardi/familyfi)](https://github.com/nberardi/familyfi/commits)
-[![GitHub Stars](https://img.shields.io/github/stars/nberardi/familyfi)](https://github.com/nberardi/familyfi/stargazers)
+[![GitHub last commit](https://img.shields.io/github/last-commit/nickberardi/familyfi)](https://github.com/nickberardi/familyfi/commits)
+[![GitHub Stars](https://img.shields.io/github/stars/nickberardi/familyfi)](https://github.com/nickberardi/familyfi/stargazers)
 
 Family internet controls for a UniFi gateway. One deployment, one household.
 
 UniFi gives you firewall policies and client lists, but bedtime, pause-for-homework, and “who owns this new iPad?” are still a pile of rules you have to remember. FamilyFi is the household layer: groups of people and things, schedules, and quarantined unknowns. It stores what you want, then enforces it with **app-owned** UniFi firewall policies. Your own policies are never modified, disabled, deleted, or reordered.
 
-The first client is a responsive web app / PWA. A native app is planned later against the same `/api/v1` API.
+The responsive web app / PWA and the companion [iOS project](https://github.com/nickberardi/familyfi-ios) share the `/api/v1` contract.
 
 **[Setup](docs/setup.md)** • **[Operations](docs/operations.md)** • **[API](docs/api.md)** • **[Licensing](docs/licensing.md)**
 
@@ -43,10 +43,10 @@ Phones on the LAN should use the host’s LAN address, not `localhost`. HTTPS is
 
 ### Quick start (Docker)
 
-Until a published GHCR tag exists, build locally:
+To build the Docker image locally:
 
 ```bash
-git clone https://github.com/nberardi/familyfi.git
+git clone https://github.com/nickberardi/familyfi.git
 cd familyfi
 cp .env.example .env
 # Set POSTGRES_PASSWORD. Recovery password and crypto secrets are generated on first setup if omitted.
@@ -56,7 +56,7 @@ make docker-logs   # look for username: admin and the recovery password
 
 Open http://localhost:7001 (override with `FAMILYFI_PORT`). Compose starts the app and PostgreSQL together. For an existing server when you are not using that stack, set `DB_MODE=external` and the `DB_*` values.
 
-After a GHCR release (`git tag -a v0.1.0` then `git push origin v0.1.0`; see [docs/operations.md](docs/operations.md)):
+To install a published GHCR image (see [releases](docs/operations.md#releases)):
 
 ```bash
 cp .env.example .env
@@ -116,7 +116,7 @@ Details: [docs/licensing.md](docs/licensing.md).
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/nberardi/familyfi/issues)
+- Issues: [GitHub Issues](https://github.com/nickberardi/familyfi/issues)
 - Security: [SECURITY.md](SECURITY.md)
 - Docs: [Setup](docs/setup.md), [Architecture](docs/architecture.md), [Operations](docs/operations.md), [API](docs/api.md), [Testing](docs/testing.md)
 

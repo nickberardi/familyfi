@@ -162,9 +162,9 @@ blocks the whole domain list, a tint when it blocks part of it. Green is a measu
 all-clear. Grey is "we have not looked". Both blocking states read the word *blocked*
 and the partial one reads *partial*; the two that are not blocking carry no word at all.
 
-Green and grey are separate states on purpose. Both mean nothing is blocking, but only
-green is a claim about the resolver, and a category we never measured must not borrow
-it — that false assurance is the thing this whole feature exists to avoid. It is also
+Green and grey are separate states on purpose. Green means the probe observed no upstream
+block; grey means the upstream result is unknown. A category we never measured must not borrow
+green — that false assurance is the thing this whole feature exists to avoid. It is also
 why an app mark, which has no resolver behind it, reports grey rather than green
 (`appMarkState()`).
 

@@ -10,7 +10,42 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # FamilyFi agent notes
 
-Human-facing product docs live in [README.md](README.md) and `docs/`. This file is for coding agents and contributors working in the repo.
+Shared instructions for Codex, Claude Code and contributors. `CLAUDE.md` imports this file. Product documentation starts at [README.md](README.md).
+
+## Working agreement
+
+1. Inspect the working tree and read the relevant implementation, callers and tests before editing. Preserve work that belongs to someone else.
+2. For changes spanning behaviour or module boundaries, state the intended outcome, affected areas and validation before implementation. Small, clear fixes can proceed directly. Keep a durable plan for work that spans sessions; record decisions and deviations.
+3. Make the smallest complete change that satisfies the request. Reuse existing behaviour and primitives. Avoid speculative abstractions, dependencies and configuration. Read [development conventions](docs/development.md#implementation-and-review) before code changes.
+4. Write a regression test for a bug and observe it fail for the reported reason. Run focused checks while iterating, then the applicable checks in [testing.md](docs/testing.md). Do not weaken tests, coverage, types or lint rules to make a change pass.
+5. Review the final diff for correctness, unnecessary complexity, stale documentation and unintended changes. Report what changed, the commands run and their results, and any remaining uncertainty. Never describe an unrun check as passed.
+
+## Read for your task
+
+| Task | Read before editing |
+| --- | --- |
+| Code or naming | [Implementation and review](docs/development.md#implementation-and-review), [naming](docs/development.md#naming) when adding or renaming symbols, relevant tests |
+| Enforcement, schedules, DNS or server boundaries | [Architecture](docs/architecture.md) |
+| UI | [UI conventions](docs/development.md#styling), existing `src/components/ui` primitives, local `designs/` references when present |
+| HTTP contract or authentication | [API](docs/api.md), `openapi/familyfi.v1.yaml`, authorization matrix in `tests/integration/authorization-matrix.test.ts` |
+| Database, environment or deployment | [Setup](docs/setup.md), [operations](docs/operations.md), [naming and migration rules](docs/development.md#naming) |
+| Tests, CI or scripts | [Testing](docs/testing.md), [scripts](scripts/README.md) |
+| Live UniFi verification | [Operator checklist](docs/spike/OPERATOR.md), only when the operator requested live work |
+
+For UI references, read `Web Design.dc.html`, `Sign In.dc.html`, and the `_ds/` bundle's `readme.md`, `tokens/` and `_ds_bundle.js` when available. They are optional local references, never dependencies. Repository rules, current components and tokens, and architecture take precedence over prototype behaviour, sizes, colours and delivery mechanisms. Missing `designs/` does not block UI work.
+
+## Repository skills
+
+- [Validate a change](.agents/skills/validate-change/SKILL.md): select and run checks before handoff or reproduce a CI failure.
+- [Release](.agents/skills/release/SKILL.md): prepare or publish a release when requested by the operator.
+
+All repository skills live in `.agents/skills/`. `.claude/skills` is a directory symlink to it, so new skills are automatically shared with Claude Code. Add and edit skills only under `.agents/skills/`; maintain one definition per workflow. Skills reference the existing docs and scripts; they do not replace the rules below.
+
+## Stack and layout
+
+Next.js App Router + TypeScript, React, Tailwind, Prisma/PostgreSQL. `src/app` holds pages and routes; `src/components` shared UI; `src/server` database, authentication and enforcement; `src/lib` client-safe types and pure logic. `prisma` owns schema and migrations, `openapi` the HTTP contract, `tests` validation, `scripts` tooling and startup, and `docker` deployment.
+
+Use `make setup` for a new development environment, `make dev` to run it, and `make lint typecheck test-unit` for fast code checks. Setup and dev can migrate the development database; use a task-owned database for disposable work. The complete [command reference](docs/development.md#commands) explains side effects; [testing.md](docs/testing.md) selects checks by change.
 
 ## Invariants
 
@@ -30,115 +65,18 @@ Each invariant names the tests that enforce it; `tests/unit/invariants.test.ts` 
 - Upstream DNS categories are reporting only — they never create a UniFi policy, so their routes return no `change` and never enqueue reconciliation. `src/lib/upstream-domains.ts` is a seed reconciled into the database at boot, not runtime data; the probe reads the database. A verdict of `unknown` means we could not look, and must never be shown or stored as `open`. *Tests:* `tests/integration/upstream-checks-api.test.ts`, `tests/integration/upstream-categories-api.test.ts`, `tests/unit/upstream-domain-verdict.test.ts`, `tests/integration/upstream-seed.test.ts`.
 - Do not commit `/designs/`, `.env`, UniFi keys, or unsanitized household API dumps. `designs/` is local-only UI reference; public code must not import from it. *Tests:* `tests/unit/repository-hygiene.test.ts`.
 
-## Stack and layout
+## Resource and change safety
 
-Next.js App Router + TypeScript, React, Tailwind, Prisma/PostgreSQL, OpenAPI under `openapi/`. Makefile targets mirror GitHub Actions.
-
-```text
-src/app          pages, layouts, api/v1 route handlers
-src/components   shared UI
-src/server       env, database, auth, schedule, UniFi, reconciliation
-src/lib          client-safe constants and types
-prisma           PostgreSQL schema and migrations
-openapi          versioned HTTP contract
-tests            unit, integration, contract, browser
-scripts          ci.sh and release.sh; ci/ helpers, runtime/ startup, spike/ (scripts/README.md)
-docker           Dockerfile and Compose (build context is repo root)
-docs             setup, architecture, operations, API, spike operator checklist
-```
-
-Before UI work, read local `designs/` (`Web Design.dc.html`, `Sign In.dc.html`, and the `_ds/` design-system bundle: `readme.md`, `tokens/`, `_ds_bundle.js`) when present. This file and [docs/architecture.md](docs/architecture.md) override prototype logic (including “Pause blocks internet”). Accessibility: contrast at least 4.5:1; no text under 14px rendered below 0.7 alpha. `tests/unit/mark-contrast.test.ts` checks the colour tokens and `tests/browser/accessibility.spec.ts` runs axe (WCAG 2.1 A and AA) on every page in both viewports, with no exceptions. Do not click live UniFi writes unless the operator asked.
-
-UniFi integration: official Network Integration API with `X-API-KEY`. Local base `https://<console-ip>/proxy/network/integration`; cloud connector `https://api.ui.com/v1/connector/consoles/{consoleId}/proxy/network/integration`. Internet-block action is `BLOCK` (not `REJECT`). Spike CLI: [docs/spike/OPERATOR.md](docs/spike/OPERATOR.md).
-
-## Naming
-
-**The rule: a name leads with the full product name, or with nothing. Never an abbreviation.** No `Fam`, `fam-` or `fam_` in identifiers. Environment variables an operator sets lead with `FAMILYFI_`; everything internal leads with nothing, because the repo is already the product.
-
-CSS custom properties are the one place an abbreviation is right: `:root` is a global namespace shared with the browser and any library, so tokens take a short `--ff-` prefix to stay readable at the density they are used. That prefix is closed — do not coin others.
-
-| Layer | Convention | Example |
-| --- | --- | --- |
-| React components | `PascalCase.tsx`, one component per concept | `RuleRow.tsx`, `GroupCard.tsx` |
-| Logic modules (`lib/`, `server/`) | `kebab-case.ts` | `rule-rows.ts`, `unifi-settings.ts` |
-| Directories | lowercase, no separators | `components/ui`, `server/unifi` |
-| Functions, variables, props | `camelCase` | `buildRuleRows`, `parentFacingRuleLabel` |
-| Module constants | `SCREAMING_SNAKE` | `SESSION_TTL_MS`, `CURATED_CATEGORY_SLOTS` |
-| Prisma models / tables | `PascalCase`, singular | `Rule`, `RulePolicy`, `SyncRun` |
-| Columns and JSON fields | `camelCase` | `suspensionActive`, `targetIds` |
-| Prisma enum values | `lowercase` | `family`, `scheduled`, `quarantined` |
-| API paths | lowercase, plural, `{id}` | `/api/v1/groups/{id}/pause` |
-| Our env vars | `FAMILYFI_` + purpose | `FAMILYFI_ENCRYPTION_KEY` |
-| CSS tokens | `--ff-` + kebab role | `--ff-hairline-card`, `--ff-ink-3` |
-
-- **`camelCase` runs unbroken from column to JSON.** The schema uses Prisma defaults with zero `@map`/`@@map`, so a Postgres column, a Prisma field, a TypeScript property and an API response field are the same string. Do not introduce a snake_case boundary; it would buy nothing and cost a translation layer.
-- **The prefix marks public surface, not ownership.** It belongs on variables an operator sets to run a real deployment — the ones documented in `.env.example`, the README and `docs/`, where a name like `DEFAULT_PASSWORD` would be ambiguous in a shared shell or a Compose file. Two kinds of variable take no prefix: those configuring an external system, which keep that system's convention (`POSTGRES_*`, `DB_*`, `UNIFI_API_KEY`, `GITHUB_*`, and framework contracts like `DATABASE_URL`, `PORT`, `NODE_ENV`); and development-, test- or CI-only flags, which are never part of a deployment. `UNIFI_MOCK`, `KILL_PORT`, `SKIP_DB_PREPARE`, `CLOUDFLARED_BIN` (tests only: a stand-in `cloudflared`), and `BASE_REF` and `BREAKING_API_APPROVED` (the OpenAPI checks' base branch and `breaking_api` label) are the second kind — ours, but local or internal plumbing, so they stay bare. Today that leaves `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET`, `FAMILYFI_ENCRYPTION_KEY`, `FAMILYFI_PORT`, `FAMILYFI_IMAGE` and `FAMILYFI_PHONE_GATEWAY_PORT` as the whole prefixed set.
-- **Renaming an env var is breaking.** The value must move with the name. `FAMILYFI_ENCRYPTION_KEY` in particular: a fresh key makes the stored UniFi API key undecryptable and Sync fails with "Unsupported state or unable to authenticate data".
-- **Renaming a model is a migration, not a schema edit.** `ALTER ... RENAME` the table, enums, columns, constraints and indexes in place so existing databases upgrade. Constraints keep their old generated names through a table rename — bring them along, then confirm `prisma migrate status` reports no drift.
-- **There is no legacy carve-out.** FamilyFi is pre-release, so nothing in the repo exists to stay compatible with an older name. A policy is ours when its id and creation evidence are on record for this console and site — never because of its name, `FamilyFi ` or any other. If you find yourself adding a second, older name to stay compatible with, delete the old name instead.
-
-### Styling
-
-- **Never write a raw colour literal.** Every colour is a `--ff-*` token in `src/app/globals.css`; add a token rather than inlining `rgba(...)` or a hex. The only exception is `themeColor` in `src/app/layout.tsx`, which the browser reads before CSS exists.
-- Prefer a shared primitive in `src/components/ui` over a fourth copy of the same control. If you are writing a segmented control, a mark, a day picker or a pill, one already exists.
-- The Card System's density ladder is 44 / 32 / 24 px marks — comfortable, compact, dense. Never a fourth size.
-- **The verdict palette is one system.** Five states — `rule`, `blocked`, `partial`, `open`, `unknown` — each with an ink, a fill and a line under `--ff-verdict-*`. The colour answers *who* is blocking, which is why none of them borrows the accent. Never restyle a verdict locally and never reuse those colours for something that is not a verdict. `unknown` means we could not look; it must never read as `open`.
-
-### Type
-
-**Inter** carries every UI size and **JetBrains Mono** the machine column — MAC addresses, IPs, policy names, endpoints, timestamps. Both are loaded by `next/font` in `src/app/layout.tsx`, which downloads them at build time and serves them from the deployment, so a household gateway never reaches Google Fonts at runtime. `--ff-font`, `--ff-font-display` and `--ff-font-mono` are the only names to use; `@theme` forwards Tailwind's `font-sans`/`font-mono` to them, so `font-mono` on an identifier is correct and a hand-written stack is not.
-
-### Brand
-
-The mark is **artwork, not geometry**. `src/components/ui/Logo.tsx` composes `public/brand/shield-family.png` (the shield with the family inside), `shield-check-light.png` / `-deep.png` (the small check shield that dots the **i** of Fi, cut once per ground so it never traps the wrong colour) and `app-icon.png` (the shield on its navy tile, also the favicon and the web manifest icon). Only the wordmark is live text, so it can invert. **Never redraw or approximate the shield** — place the file.
-
-The brand ground is a separate palette from the product UI: deep navy `--ff-brand-deep`, azure `--ff-brand-cyan`, declared under the brand-layer comment at the foot of `:root` in `globals.css`. It belongs to the mark, the app icon, the splash and marketing. The accent blue stays the only interactive colour; nothing clickable may take the brand cyan.
-
-### Iconography
-
-FamilyFi's own iconography is typographic and geometric — monograms inside `Mark`, the CSS shapes in `CategoryGlyph`, chevrons — and that covers everything the product invented. Everything the world already named (a phone, a printer, a gear) comes from **Phosphor Regular**, imported once in `src/app/layout.tsx` from the `@phosphor-icons/web` package rather than a CDN.
-
-`src/components/ui/Icon.tsx` is the only place that may write a `ph ph-…` class, and `IconName` in `src/lib/icons.ts` is the closed set of glyphs it accepts. A name Phosphor does not have renders as *nothing at all*, which is why the union is checked against the shipped stylesheet in `tests/unit/icons.test.ts`. Do not mix in a second icon pack, and do not hand-draw a replacement for a glyph Phosphor has. Named apps keep short monograms rather than real logos — a licensing decision, not a style one. Emoji are never used.
-
-### Enforcement
-
-`tests/unit/naming.test.ts` fails the build on a raw colour literal, an abbreviated product prefix, a misnamed file, an unprefixed env var of ours, a `var(--ff-…)` reference with no declaration, and a Phosphor class written outside `Icon`. `tests/unit/icons.test.ts` fails it on a glyph name the installed icon font does not have, and `tests/unit/mark-contrast.test.ts` on a verdict, accent, status or text colour under 4.5:1. These rules were written down once before and drifted anyway — the tokens existed while 71 literals sat in components — so treat the tests as the contract and this section as their explanation. Extend both together.
-
-## Commands
-
-What to run before a pull request, the rules tests follow, and what CI checks are in [docs/testing.md](docs/testing.md).
-
-| Target | Behavior |
-| --- | --- |
-| `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate, and turn on the pre-push hook |
-| `make hooks` | Turn on `.githooks/pre-push` (lint, typecheck, unit tests) in an existing clone; skip it once with `git push --no-verify` |
-| `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
-| `make ci` | `scripts/ci.sh`: the CI workflows' jobs on this machine, each with a disposable PostgreSQL (`CI_ARGS=--quick` for verify and container) |
-| `make release` | `scripts/release.sh`: CI, then build, push and publish a release from this machine (`RELEASE_ARGS="--tag vX.Y.Z"`) |
-| `make test-unit` | Unit tests; no database needed |
-| `make test` | Unit tests, then integration tests (PostgreSQL, always the `familyfi_test` database) |
-| `make test-coverage` | Unit and integration tests in one run; fails below the coverage floors |
-| `make test-browser` | Production build, then Playwright on desktop and phone, the way CI runs it |
-| `make test-api` | OpenAPI lint, and every route and method documented |
-| `make test-api-breaking` | Breaking OpenAPI changes against `main` (needs Go) |
-| `make test-api-version` | OpenAPI `info.version` is a semver increase over `main` that fits the change |
-| `make test-mutation` | Mutation testing of the enforcement code; a report, never a gate |
-| `make db-migrate` | Apply migrations to the development database |
-| `make db-drift` | Fail when `schema.prisma` differs from what the migrations build (run after `db-migrate`) |
-| `make db-upgrade` | Upgrade a filled database from every supported release (or `pnpm db-upgrade --from <tag>` / `--latest`); fail on an error, lost rows or drift, naming the release |
-| `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
-| `make lint` / `make typecheck` / `make build` | Checks and production build |
-| `make docker-build` | Build `familyfi:dev` |
-| `make docker-dev-up` | Locally built image plus Compose PostgreSQL |
-| `make docker-up` | GHCR image plus Compose PostgreSQL |
-| `make docker-down` | Stop without deleting volumes |
-| `make docker-smoke` | Build `familyfi:dev`, reject `designs/` in the image, run health/login against bundled-style external Postgres |
-
-The container smoke runs on pull requests but not on pushes to `main` (image builds are slow and costly), and with CI it gates every release: `release.yml` publishes only a `v*` tag on `main` whose commit passes both.
+- Track worktrees, temporary directories, servers and containers created for this task. Use `trap` or `finally` for cleanup. Stop only resources this task started.
+- Before a large build, check free disk space. Below 20 GiB, clean this task's disposable output first or report the shortage. At completion remove disposable output no longer needed for review; report retained large artifacts with path and size.
+- Never delete another task's worktree, shared cache, Docker volume, simulator or model data. Remove a task-created worktree only when inactive and its status confirms no work will be lost; use the environment's managed-worktree tool when applicable, otherwise `git worktree remove`. Leave the current checkout in place.
+- Never run `scripts/ci/runner-cleanup.sh` on a development machine; it removes shared Docker and cache data.
+- Live UniFi writes, publishing and deployment require the user's request. A test or release checklist is not authorization to change a household gateway or publish a release.
+- Do not bypass checks with `--no-verify`, `--skip-ci`, `--allow-dirty`, `--breaking-api` or `BREAKING_API_APPROVED` unless the operator explicitly authorized that exception. Report any exception and its missing evidence.
 
 ## Pull requests
 
-PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same change. The PR description explicitly lists every issue or alert it closes; use `Closes #<number>` for GitHub issues and identify security alerts by their Dependabot alert number and advisory.
+PRs include validation appropriate to the change. Behaviour changes include tests; API contract changes include an OpenAPI update in the same change. An internal refactor with unchanged HTTP behaviour does not require a spec edit or version bump. The PR description explicitly lists every issue or alert it closes; use `Closes #<number>` for GitHub issues and identify security alerts by their Dependabot alert number and advisory.
 
 ## OpenAPI consumer coordination
 
@@ -146,6 +84,8 @@ PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same c
 - Assess every requested contract change for compatibility. If the requested change would be breaking, call that out clearly before making the change. The human operator—not the agent—decides whether the breaking change is warranted or whether a compatible approach is needed; do not make that product decision on the operator's behalf.
 - Do not raise a breaking-change warning for additive or otherwise compatible contract changes. The agent's role is to identify a breaking impact when the requested work would cause one, not to speculate about or independently choose breaking changes.
 - The `OpenAPI` workflow enforces this on every pull request that changes `openapi/`: a breaking change against `main` fails it until the operator adds the `breaking_api` label. Never add that label yourself; it records the operator's decision.
+
+## Plans in pull requests
 
 **A PR built from a plan carries that plan in its description, in full and verbatim.**
 Put it in a collapsed `<details>` block so it does not bury the summary. A plan records
@@ -158,12 +98,3 @@ what changed and why — the deviations are usually the most interesting part of
 
 Keep the description current with the branch. A body written for the first commit is
 stale the moment the second one lands, and a stale description is read as the truth.
-
-## Further reading
-
-- [docs/testing.md](docs/testing.md) — what to run, test rules, what CI checks
-- [docs/architecture.md](docs/architecture.md) — desired-block formula, reconciliation, UniFi client
-- [docs/setup.md](docs/setup.md) — environment variables and auth
-- [docs/operations.md](docs/operations.md) — backup, outages, upgrades
-- [docs/api.md](docs/api.md) — `/api/v1` and OpenAPI
-- [docs/licensing.md](docs/licensing.md), [CONTRIBUTING.md](CONTRIBUTING.md)

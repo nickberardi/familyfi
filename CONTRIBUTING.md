@@ -4,7 +4,7 @@ See [docs/licensing.md](docs/licensing.md). Sending a pull request accepts the c
 
 Do not send patches that assume MIT/Apache terms, and do not commit `/designs/`, `.env` files, UniFi keys, or unsanitized household API responses.
 
-PRs should include tests and, for any `/api/v1` change, an OpenAPI update in the same change. **A bug fix ships with a test that fails without it.**
+Follow the workflow in [AGENTS.md](AGENTS.md) and the [development conventions](docs/development.md). PRs include validation appropriate to the change, tests for behaviour changes, and an OpenAPI update when the HTTP contract changes. An internal API refactor with unchanged HTTP behaviour needs no spec edit. **A bug fix ships with a test that fails without it.**
 
 [docs/testing.md](docs/testing.md) says what to run for your change and the rules tests follow. `make setup` (or `make hooks` in an existing clone) turns on a pre-push hook that runs lint, typecheck and the unit tests.
 

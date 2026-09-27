@@ -1,6 +1,6 @@
 # API
 
-The web UI and any future native client use `/api/v1`. The source of truth is [`openapi/familyfi.v1.yaml`](../openapi/familyfi.v1.yaml). Mutations return a `change` object (`changeId` + `revision`); poll `GET /api/v1/changes/{id}` for that action. Global last-sync success is not proof that your change applied.
+The web UI and native clients use `/api/v1`. The source of truth is [`openapi/familyfi.v1.yaml`](../openapi/familyfi.v1.yaml). Mutations that enqueue reconciliation return a `change` object (`changeId` + `revision`); poll `GET /api/v1/changes/{id}` for that action. Consult the endpoint schema: authentication, pairing and other operations that do not enqueue reconciliation have their own response shapes. Global last-sync success is not proof that your change applied.
 
 Browser mutations after login send `X-CSRF-Token` matching the `familyfi_csrf` cookie. Native clients send `Authorization: Bearer`.
 
@@ -53,7 +53,7 @@ Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw U
 | GET/PUT/DELETE | `/api/v1/upstream/resolver` | Household DoH endpoint, returned in full, plus the check schedule (`probeTime`, `probeDays`, `lastRunAt`, `nextRunAt`). Changing or removing the endpoint immediately clears household verdicts; changing the schedule re-arms it immediately |
 | PUT/DELETE | `/api/v1/groups/{id}/resolver` | A group's own DoH endpoint. Changing or removing it immediately clears that group's verdicts |
 
-The `upstream` resource is the one exception to the `change` envelope. Those rows are
+The `upstream` resource never returns the `change` envelope. Those rows are
 reporting only and never produce a UniFi policy, so there is nothing to reconcile —
 returning a `change` would create a `ChangeResult` that stays `pending` until an
 unrelated sync runs, and never settles at all while UniFi is unconfigured.
