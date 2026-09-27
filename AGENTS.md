@@ -140,6 +140,8 @@ The container smoke runs on pull requests but not on pushes to `main` (image bui
 
 PRs include tests and, for any `/api/v1` change, an OpenAPI update in the same change. The PR description explicitly lists every issue or alert it closes; use `Closes #<number>` for GitHub issues and identify security alerts by their Dependabot alert number and advisory.
 
+**Before opening a PR, spawn the `reviewer` subagent** (`.claude/agents/reviewer.md` for Claude, `.codex/agents/reviewer.toml` for Codex) with the plan or issue the change was built from. Fix every blocking finding, then spawn a fresh reviewer again, until it reports none. The agent that wrote a change never reviews it. `tests/unit/reviewer-agents.test.ts` keeps the two definitions identical.
+
 ## OpenAPI consumer coordination
 
 - Whenever a change modifies the OpenAPI specification, open an issue in `familyfi-ios` for the iOS client to adopt that contract change. Describe the affected endpoints and schemas, the expected client work, and any rollout or compatibility considerations.
