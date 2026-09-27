@@ -136,7 +136,7 @@ async function tick(owner: string): Promise<boolean> {
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
     void info;
-    let accessPoints = new Map<string, string>();
+    let accessPoints: Map<string, string> | null = null;
     try {
       const siteDevices = await client.listSiteDevices(siteId);
       accessPoints = new Map(siteDevices.map((device) => [device.id, device.name]));
@@ -174,7 +174,9 @@ async function tick(owner: string): Promise<boolean> {
         ? new Date(clientRow.connectedAt)
         : null;
       const accessPointName = connectionType === "wireless" && clientRow.uplinkDeviceId
-        ? accessPoints.get(clientRow.uplinkDeviceId) ?? null
+        ? accessPoints === null
+          ? existing?.accessPointName ?? null
+          : accessPoints.get(clientRow.uplinkDeviceId) ?? null
         : null;
       await prisma().device.upsert({
         where: { mac },
