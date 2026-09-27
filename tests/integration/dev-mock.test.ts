@@ -4,7 +4,10 @@ import { prisma } from "@/server/db";
 import { ensureDevDummyData, DEV_SEED_ADULT_USERNAME } from "@/server/dev-seed";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { saveUnifiConnection } from "@/server/unifi-settings";
-import { DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
+import {
+  DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, DEV_MOCK_INTERNAL_NETWORK, DEV_MOCK_IOT_NETWORK,
+  resetDevMockClientForTests,
+} from "@/server/unifi/dev-mock";
 import { resetDatabase } from "../helpers/db";
 
 describe("dev UniFi mock household", () => {
@@ -39,6 +42,9 @@ describe("dev UniFi mock household", () => {
 
   it("seeds groups, an adult login, and assigned devices for UI work", async () => {
     await ensureDevDummyData();
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    expect(household.unifiManageAllNetworks).toBe(false);
+    expect(household.unifiManagedNetworkIds).toEqual([DEV_MOCK_INTERNAL_NETWORK, DEV_MOCK_IOT_NETWORK]);
     const groups = await prisma().group.findMany({ orderBy: { name: "asc" } });
     // One group per comfortable-card layout: protected adult, scheduled child and
     // teen, a paused member, and things groups with and without a schedule.

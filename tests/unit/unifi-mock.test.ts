@@ -4,7 +4,10 @@ import { unifiMockEnabled, unifiMockRequested, loadEnv } from "@/server/env";
 import { MockUnifiClient } from "@/server/unifi/mock";
 import { clientForHousehold, probeClient } from "@/server/unifi/connection";
 import { HttpUnifiClient } from "@/server/unifi/client";
-import { resetDevMockClientForTests, getSharedDevMockClient } from "@/server/unifi/dev-mock";
+import {
+  DEV_MOCK_GUEST_NETWORK, DEV_MOCK_INTERNAL_NETWORK, DEV_MOCK_IOT_NETWORK,
+  createFixtureUnifiClient, resetDevMockClientForTests, getSharedDevMockClient,
+} from "@/server/unifi/dev-mock";
 import { unifiMockBanner } from "@/server/startup-banner";
 
 const validEnv = {
@@ -74,6 +77,23 @@ describe("UNIFI_MOCK", () => {
     const policies = await again.listPolicies("11111111-1111-4111-8111-111111111111");
     expect(policies.some((policy) => policy.id === created.id)).toBe(true);
     expect(getSharedDevMockClient().state.clients.some((client) => client.name === "Kids iPad")).toBe(true);
+  });
+
+  it("offers a separate hotspot and a mock voucher for the development guest flow", async () => {
+    const mock = createFixtureUnifiClient({ friendlyNames: true, guestDemo: true });
+    const portal = (await mock.listWifiBroadcasts("site"))[0];
+    expect(portal).toMatchObject({
+      enabled: true,
+      network: { type: "SPECIFIC", networkId: DEV_MOCK_GUEST_NETWORK },
+      hotspotConfiguration: { type: "CAPTIVE_PORTAL" },
+    });
+    expect([DEV_MOCK_INTERNAL_NETWORK, DEV_MOCK_IOT_NETWORK]).not.toContain(DEV_MOCK_GUEST_NETWORK);
+    const visitor = mock.state.clients.find((client) => client.name === "Visitor iPad");
+    expect(visitor?.access).toEqual({ type: "GUEST", authorized: false });
+    expect(mock.state.networkClientIds.get(DEV_MOCK_GUEST_NETWORK)?.has(visitor!.id)).toBe(true);
+    const voucher = await mock.createVoucher("site", 120);
+    expect(voucher).toMatchObject({ timeLimitMinutes: 120, authorizedGuestLimit: 1, authorizedGuestCount: 0 });
+    expect((await mock.listVouchers("site")).map((item) => item.id)).toContain(voucher.id);
   });
 
   it("uses HttpUnifiClient when the flag is off", () => {

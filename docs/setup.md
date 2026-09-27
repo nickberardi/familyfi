@@ -32,6 +32,8 @@ Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a te
 
 Set `UNIFI_MOCK=1` in `.env` and restart `make dev`. The app fakes the Network Integration API with synthetic fixtures, seeds a small household (Pat / Betsy / Sam / Living Room, three devices), and encrypts the dummy key `mock-unifi-key` so Settings looks connected. Sign in as `admin` or `pat` (same `FAMILYFI_DEFAULT_PASSWORD`). Use this for UI work (adding a user, jittery buttons, layout). Turn the flag off before pointing at a real gateway. Mocks do not prove firewall enforcement.
 
+The development mock also includes a separate Visitor Wi-Fi hotspot and a waiting Visitor iPad. To try vouchers, open **Devices → Guest access**, choose **Create voucher**, select a duration, then choose **Create code**. The generated code appears with **Copy code** and **Revoke** controls. It is a mock code: there is no captive portal to redeem it. The mock's codes live in server memory; after a restart, existing database records show an unknown voucher status. Use a disposable local database for repeated trials. If the button is disabled in an existing mock household, open Settings and select only LAN and IoT as managed networks; the guest network must remain excluded.
+
 If Docker is unavailable, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`.
 
 Phones on the LAN should use the host's LAN address, not `localhost`. HTTPS is required for a deployed PWA and for secure cookies in production.
@@ -100,4 +102,3 @@ and the sidecar. To put Cloudflare Access in front of it, see
 
 Pin image tags (a `cloudflared` release) rather than `latest`, so an upgrade happens when you
 choose it.
-
