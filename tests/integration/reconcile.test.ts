@@ -103,11 +103,19 @@ describe("reconciliation against mocked UniFi", () => {
     expect(retained.presenceCheckedAt).toEqual(before.presenceCheckedAt);
 
     client.listClients = async () => [...client.state.clients];
+    client.listSiteDevices = async () => { throw new Error("UniFi access points unavailable"); };
+    await runReconcileOnce();
+    const retainedAccessPoint = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    expect(retainedAccessPoint.presenceOnline).toBe(true);
+    expect(retainedAccessPoint.accessPointName).toBe("Upstairs AP");
+
+    client.listSiteDevices = async () => [...client.state.siteDevices];
     client.state.siteDevices = [];
     await runReconcileOnce();
     const unnamed = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
     expect(unnamed.presenceOnline).toBe(true);
     expect(unnamed.accessPointName).toBeNull();
+
   });
 
   it("moves MACs from quarantine to a group policy on assignment", async () => {

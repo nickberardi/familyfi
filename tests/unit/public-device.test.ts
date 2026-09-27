@@ -1,7 +1,7 @@
 import { AssignmentState } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { publicDevice } from "@/server/devices";
-import { macRegistrant } from "@/server/mac-vendor";
+import { macRegistrant, macRegistrantForPrefix } from "@/server/mac-vendor";
 
 const NOW = new Date("2026-09-27T20:00:00.000Z");
 
@@ -39,6 +39,11 @@ describe("public device observation", () => {
     expect(macRegistrant("02:00:00:00:00:01")).toBeNull();
     expect(macRegistrant("invalid")).toBeNull();
     expect(publicDevice(row(), undefined, NOW).manufacturer).toBeNull();
+  });
+
+  it("resolves a known IEEE registrant and leaves an unlisted public prefix unknown", () => {
+    expect(macRegistrantForPrefix("00000C")).toBe("Cisco Systems, Inc");
+    expect(macRegistrantForPrefix("000833")).toBeNull();
   });
 
 });
