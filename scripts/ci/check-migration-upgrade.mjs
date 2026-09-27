@@ -22,9 +22,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { applyDatabaseUrl } from "./print-database-url.mjs";
+import { applyDatabaseUrl } from "../runtime/print-database-url.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 /**
  * The oldest release a household may upgrade from. Every release from v0.1.0 on is a

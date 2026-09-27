@@ -6,7 +6,7 @@ import {
   parseReleaseTags,
   scratchDatabaseName,
   supportedReleases,
-} from "../../scripts/check-migration-upgrade.mjs";
+} from "../../scripts/ci/check-migration-upgrade.mjs";
 
 const LS_REMOTE = [
   "aaa1\trefs/tags/v0.1.0",

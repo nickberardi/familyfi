@@ -7,7 +7,7 @@ import {
   isGated,
   parseChangedLines,
   parseLcov,
-} from "../../scripts/changed-line-coverage.mjs";
+} from "../../scripts/ci/changed-line-coverage.mjs";
 
 describe("changed-line coverage gate", () => {
   it("gates the security-critical server paths and nothing else", () => {

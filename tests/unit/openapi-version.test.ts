@@ -5,7 +5,7 @@ import {
   classifyChange,
   compareSemver,
   parseSemver,
-} from "../../scripts/check-openapi-version.mjs";
+} from "../../scripts/ci/check-openapi-version.mjs";
 
 type Spec = Record<string, unknown>;
 

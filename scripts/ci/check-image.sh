@@ -19,4 +19,14 @@ if ! grep -q 'openapi/familyfi.v1.yaml' "$tmp/files"; then
   exit 1
 fi
 
+if grep -E '^/?app/scripts/(ci|spike)/' "$tmp/files"; then
+  echo "image contains CI or spike scripts; only scripts/runtime/ belongs in it" >&2
+  exit 1
+fi
+
+if ! grep -qE '^/?app/scripts/runtime/with-env.mjs$' "$tmp/files"; then
+  echo "image is missing scripts/runtime/" >&2
+  exit 1
+fi
+
 echo "image hygiene ok"

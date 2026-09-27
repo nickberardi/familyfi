@@ -61,7 +61,7 @@ After a GHCR release (`git tag -a v0.1.0` then `git push origin v0.1.0`; see [do
 ```bash
 cp .env.example .env
 # Set POSTGRES_PASSWORD.
-make docker-up     # pulls ghcr.io/nberardi/familyfi
+make docker-up     # pulls ghcr.io/nickberardi/familyfi
 ```
 
 `make docker-down` stops containers and keeps database volumes.

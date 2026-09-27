@@ -7,7 +7,7 @@ import {
   isDefaultPasswordValid,
   isEncryptionKeyValid,
   isSessionSecretValid,
-} from "../../scripts/ensure-secrets.mjs";
+} from "../../scripts/runtime/ensure-secrets.mjs";
 
 describe("ensureSecrets", () => {
   it("writes recovery password and crypto secrets when missing", () => {

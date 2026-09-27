@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { DATA_DIR, resolveEnvPath } from "../../scripts/print-database-url.mjs";
+import { DATA_DIR, resolveEnvPath } from "../../scripts/runtime/print-database-url.mjs";
 
 describe("resolveEnvPath", () => {
   it("uses repo-root .env when the standard data dir is absent", () => {

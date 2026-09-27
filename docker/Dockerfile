@@ -3,7 +3,7 @@ WORKDIR /app
 RUN npm install -g pnpm@10.15.1
 COPY package.json pnpm-lock.yaml prisma.config.ts ./
 COPY prisma ./prisma
-COPY scripts/print-database-url.mjs ./scripts/print-database-url.mjs
+COPY scripts/runtime/print-database-url.mjs ./scripts/runtime/print-database-url.mjs
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
@@ -36,13 +36,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/scripts/runtime ./scripts/runtime
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/openapi ./openapi
 COPY --from=build /app/.env.example ./.env.example
-COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh \
   && groupadd --system familyfi \
   && useradd --system --gid familyfi --home-dir /app familyfi \

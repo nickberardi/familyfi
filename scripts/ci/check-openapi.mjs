@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import YAML from "yaml";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const specPath = path.join(root, "openapi/familyfi.v1.yaml");
 
 if (!fs.existsSync(specPath)) {

@@ -129,7 +129,7 @@ CI holds the implementation to this document: `pnpm test-api` fails when a route
 
 ## Versioning the contract
 
-The iOS client ([`familyfi-ios`](https://github.com/nickberardi/familyfi-ios)) vendors a copy of `openapi/familyfi.v1.yaml` and generates its client from it, so `info.version` is how it tells that its copy is stale. Every pull request that changes the document raises `info.version`, and `package.json`'s version with it (`tests/unit/version.test.ts` keeps the two equal). `scripts/check-openapi-version.mjs` enforces the rule against the base branch:
+The iOS client ([`familyfi-ios`](https://github.com/nickberardi/familyfi-ios)) vendors a copy of `openapi/familyfi.v1.yaml` and generates its client from it, so `info.version` is how it tells that its copy is stale. Every pull request that changes the document raises `info.version`, and `package.json`'s version with it (`tests/unit/version.test.ts` keeps the two equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
 
 | The pull request changes | `info.version` must |
 | --- | --- |
@@ -140,4 +140,4 @@ The iOS client ([`familyfi-ios`](https://github.com/nickberardi/familyfi-ios)) v
 
 A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions and the iOS copy can tell which one it has. The `OpenAPI` workflow's job summary names the old and new version as a reminder to refresh `familyfi-ios/openapi/familyfi.v1.yaml`; it posts nothing outside this repository.
 
-Run the check locally with `make test-api-version`, or against any ref with `node scripts/check-openapi-version.mjs <ref>`.
+Run the check locally with `make test-api-version`, or against any ref with `node scripts/ci/check-openapi-version.mjs <ref>`.

@@ -169,7 +169,7 @@ function routeFiles(dir: string): string[] {
   });
 }
 
-/** The OpenAPI template for a route file, derived the way `scripts/check-openapi.mjs` does. */
+/** The OpenAPI template for a route file, derived the way `scripts/ci/check-openapi.mjs` does. */
 function templateFor(file: string): string {
   return `/${path.relative(API_ROOT, path.dirname(file)).split(path.sep).join("/").replace(/\[([^\]]+)\]/g, "{$1}")}`;
 }

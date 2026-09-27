@@ -1,5 +1,5 @@
 import { defineConfig } from "prisma/config";
-import { applyDatabaseUrl } from "./scripts/print-database-url.mjs";
+import { applyDatabaseUrl } from "./scripts/runtime/print-database-url.mjs";
 
 applyDatabaseUrl();
 

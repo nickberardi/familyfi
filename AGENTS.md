@@ -42,7 +42,7 @@ src/lib          client-safe constants and types
 prisma           PostgreSQL schema and migrations
 openapi          versioned HTTP contract
 tests            unit, integration, contract, browser
-scripts          spike, env, image/smoke checks
+scripts          ci.sh and release.sh; ci/ helpers, runtime/ startup, spike/ (scripts/README.md)
 docker           Dockerfile and Compose (build context is repo root)
 docs             setup, architecture, operations, API, spike operator checklist
 ```
@@ -113,6 +113,8 @@ What to run before a pull request, the rules tests follow, and what CI checks ar
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate, and turn on the pre-push hook |
 | `make hooks` | Turn on `.githooks/pre-push` (lint, typecheck, unit tests) in an existing clone; skip it once with `git push --no-verify` |
 | `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [docs/setup.md](docs/setup.md)). |
+| `make ci` | `scripts/ci.sh`: the CI workflows' jobs on this machine, each with a disposable PostgreSQL (`CI_ARGS=--quick` for verify and container) |
+| `make release` | `scripts/release.sh`: CI, then build, push and publish a release from this machine (`RELEASE_ARGS="--tag vX.Y.Z"`) |
 | `make test-unit` | Unit tests; no database needed |
 | `make test` | Unit tests, then integration tests (PostgreSQL, always the `familyfi_test` database) |
 | `make test-coverage` | Unit and integration tests in one run; fails below the coverage floors |

@@ -28,8 +28,8 @@ jobs:
           cache-from: type=gha,scope=linux-amd64
           cache-to: type=gha,mode=max,scope=linux-amd64
       - name: Image hygiene
-        run: sh scripts/check-image.sh familyfi:ci
+        run: sh scripts/ci/check-image.sh familyfi:ci
       - name: Container smoke
         env:
           FAMILYFI_IMAGE: familyfi:ci
-        run: sh scripts/container-smoke.sh
+        run: sh scripts/ci/container-smoke.sh

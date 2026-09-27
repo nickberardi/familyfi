@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const dist = path.join(root, "node_modules/@stryker-mutator/vitest-runner/dist/src");
 const spaced = "return nameParts.join(' ').trim();";
 const vitest = "return nameParts.filter((part) => part).join(' > ');";
@@ -25,7 +25,7 @@ for (const name of ["test-helpers.js", "stryker-setup.js"]) {
   const source = readFileSync(file, "utf8");
   if (source.includes(vitest)) continue;
   if (!source.includes(spaced)) {
-    console.error(`${file} no longer builds test names the way scripts/stryker-vitest-names.mjs expects; see its comment.`);
+    console.error(`${file} no longer builds test names the way scripts/ci/stryker-vitest-names.mjs expects; see its comment.`);
     process.exit(1);
   }
   writeFileSync(file, source.replace(spaced, vitest));

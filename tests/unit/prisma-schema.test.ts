@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertPrismaClientMatchesSchema, SchemaMismatchError } from "@/server/db";
 import { missingClientFields, modelFieldsFromPrismaSchema } from "@/server/prisma-schema";
-import { shouldPrepareDatabase } from "../../scripts/prepare-database.mjs";
+import { shouldPrepareDatabase } from "../../scripts/runtime/prepare-database.mjs";
 
 describe("modelFieldsFromPrismaSchema", () => {
   const schema = `

@@ -8,7 +8,7 @@ const OTHER_HANDLER_EXPORT = /export\s+(?:const|let|var|function)\s+(GET|POST|PU
  * Wraps every exported handler in `src/app/api/**\/route.ts` with `checkedHandler`, so
  * each response an integration test receives is checked against the OpenAPI document
  * without the test doing anything. The OpenAPI path comes from the file path, the same
- * way `scripts/check-openapi.mjs` derives it.
+ * way `scripts/ci/check-openapi.mjs` derives it.
  */
 export function openapiResponses(repoRoot: string): Plugin {
   const apiRoot = path.join(repoRoot, "src/app");

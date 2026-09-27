@@ -67,7 +67,7 @@ jobs:
       - if: steps.changed.outputs.run == 'true'
         run: pnpm test:mutation
       - if: steps.changed.outputs.run == 'true' && !cancelled()
-        run: node scripts/mutation-summary.mjs "$GITHUB_STEP_SUMMARY"
+        run: node scripts/ci/mutation-summary.mjs "$GITHUB_STEP_SUMMARY"
       # The HTML report lists every surviving mutant with its line and the tests that ran.
       - if: steps.changed.outputs.run == 'true' && !cancelled()
         uses: actions/upload-artifact@v7
