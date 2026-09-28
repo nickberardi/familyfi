@@ -99,7 +99,7 @@ The workflows and `ci.sh` both call helpers in `scripts/ci/`. `tests/unit/ci-scr
 
 ### Self-hosted runners
 
-Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. It assumes one runner per machine. Some jobs use GitHub-hosted runners; the workflow files define placement.
+Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. Two agents share a machine, so while another job is running the script leaves the shared Docker daemon and any shared Go or pnpm cache alone. Each runner service keeps its own Go and pnpm caches. Some jobs use GitHub-hosted runners; the workflow files define placement.
 
 **Never run this cleanup script on a development machine.** Local work must clean only resources created by that task; `scripts/ci.sh` deliberately omits runner cleanup.
 
