@@ -3,6 +3,7 @@ import { randomToken } from "./crypto";
 import { prisma } from "./db";
 import { env } from "./env";
 import { normalizeMac } from "./mac";
+import { macRegistrants } from "./mac-vendor";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/spike";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
 import { withPolicyOwnership } from "./unifi/policy-ownership";
@@ -31,6 +32,18 @@ let queued = false;
 let pumping = false;
 let autoReconcile = true;
 let testClient: UnifiClient | undefined;
+let registrantWarning = false;
+
+/** The IEEE registrant for this pass, or the last recorded one when the registry cannot be read. */
+function recordedManufacturer(mac: string, previous: string | null): string | null {
+  try {
+    return macRegistrants().forMac(mac);
+  } catch (error) {
+    if (!registrantWarning) console.warn("MAC registrant database unavailable:", error);
+    registrantWarning = true;
+    return previous;
+  }
+}
 
 export function setReconcileClientForTests(client?: UnifiClient) {
   testClient = client;
@@ -178,6 +191,7 @@ async function tick(owner: string): Promise<boolean> {
           ? existing?.accessPointName ?? null
           : accessPoints.get(clientRow.uplinkDeviceId) ?? null
         : null;
+      const manufacturer = recordedManufacturer(mac, existing?.manufacturer ?? null);
       await prisma().device.upsert({
         where: { mac },
         create: {
@@ -193,6 +207,7 @@ async function tick(owner: string): Promise<boolean> {
           connectedAt,
           connectionType,
           accessPointName,
+          manufacturer,
         },
         update: {
           hostname: clientRow.name,
@@ -205,6 +220,7 @@ async function tick(owner: string): Promise<boolean> {
           connectedAt,
           connectionType,
           accessPointName,
+          manufacturer,
         },
       });
     }

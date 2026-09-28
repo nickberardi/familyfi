@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AssignmentState, FamilyRole, GroupKind } from "@prisma/client";
 import { UnifiHttpError } from "@/server/unifi/errors";
 import { prisma } from "@/server/db";
@@ -14,6 +14,18 @@ import {
   seedDevice,
 } from "../helpers/db";
 import { fixtureUnifiClient, policyMacs } from "../helpers/unifi-world";
+import type { MacRegistrants } from "@/server/mac-vendor";
+
+// Tests may not contain a vendor-assigned MAC, so a stand-in registry names a private one.
+const registrantsOverride = vi.hoisted(() => ({ open: null as null | (() => MacRegistrants) }));
+vi.mock("@/server/mac-vendor", async (importActual) => {
+  const actual = await importActual<typeof import("@/server/mac-vendor")>();
+  return {
+    ...actual,
+    macRegistrants: (...args: Parameters<typeof actual.macRegistrants>) =>
+      registrantsOverride.open ? registrantsOverride.open() : actual.macRegistrants(...args),
+  };
+});
 
 describe("reconciliation against mocked UniFi", () => {
   beforeEach(async () => {
@@ -116,6 +128,30 @@ describe("reconciliation against mocked UniFi", () => {
     expect(unnamed.presenceOnline).toBe(true);
     expect(unnamed.accessPointName).toBeNull();
 
+  });
+
+  it("records the manufacturer at sync and keeps it while the registry is unreadable", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    registrantsOverride.open = () => ({
+      forPrefix: () => null,
+      forMac: (mac) => (mac === "02:00:00:00:00:01" ? "Example Registrant" : null),
+    });
+    try {
+      await runReconcileOnce();
+      expect((await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } })).manufacturer).toBe("Example Registrant");
+      expect((await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:02" } })).manufacturer).toBeNull();
+
+      registrantsOverride.open = () => { throw new Error("registry unreadable"); };
+      await runReconcileOnce();
+      expect((await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } })).manufacturer).toBe("Example Registrant");
+    } finally {
+      registrantsOverride.open = null;
+    }
+
+    // The committed registry never names a locally administered address.
+    await runReconcileOnce();
+    expect((await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } })).manufacturer).toBeNull();
   });
 
   it("moves MACs from quarantine to a group policy on assignment", async () => {

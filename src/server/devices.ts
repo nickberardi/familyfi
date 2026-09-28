@@ -1,6 +1,5 @@
 import { AssignmentState } from "@prisma/client";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
-import { macRegistrant } from "./mac-vendor";
 
 export function deviceScope(household: {
   unifiManageAllNetworks: boolean;
@@ -27,6 +26,7 @@ export function publicDevice(
     connectedAt: Date | null;
     connectionType: string | null;
     accessPointName: string | null;
+    manufacturer: string | null;
   },
   scope?: NetworkScope,
   now = new Date(),
@@ -41,7 +41,7 @@ export function publicDevice(
       : stale ? "stale_offline" : "offline";
   return {
     mac: device.mac,
-    manufacturer: macRegistrant(device.mac),
+    manufacturer: device.manufacturer,
     hostname: device.hostname,
     ip: device.ip,
     networkId: device.networkId,

@@ -13,6 +13,7 @@ scripts/
 │                      the migration upgrade check, mutation helpers, runner-cleanup
 ├── release.sh         CI, then build, push and publish a release from this machine
 ├── doh-probe.mjs      ask a DNS-over-HTTPS endpoint which transports it actually serves
+├── update-mac-vendors.py  rebuild the committed IEEE MAC registrant database; run on request
 ├── spike/             UniFi integration spike CLI (make spike; docs/spike/OPERATOR.md)
 └── runtime/           with-env, validate-env, docker-entrypoint and the rest of startup;
                        the only part of scripts/ the container image carries

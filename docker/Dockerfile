@@ -41,6 +41,8 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/openapi ./openapi
+# Read from disk during sync, never imported into a route bundle (src/server/mac-vendor.ts).
+COPY --from=build /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite
 COPY --from=build /app/.env.example ./.env.example
 COPY scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh \

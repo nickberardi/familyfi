@@ -1,7 +1,6 @@
 import { AssignmentState } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { publicDevice } from "@/server/devices";
-import { macRegistrant, macRegistrantForPrefix } from "@/server/mac-vendor";
 
 const NOW = new Date("2026-09-27T20:00:00.000Z");
 
@@ -20,6 +19,7 @@ function row(overrides: Partial<Parameters<typeof publicDevice>[0]> = {}): Param
     connectedAt: null,
     connectionType: null,
     accessPointName: null,
+    manufacturer: null,
     ...overrides,
   };
 }
@@ -35,15 +35,9 @@ describe("public device observation", () => {
     expect(publicDevice(row({ presenceOnline: false, presenceCheckedAt: old }), undefined, NOW).presence).toBe("stale_offline");
   });
 
-  it("does not infer a manufacturer from a private or malformed MAC", () => {
-    expect(macRegistrant("02:00:00:00:00:01")).toBeNull();
-    expect(macRegistrant("invalid")).toBeNull();
+  it("returns the manufacturer recorded at sync without consulting the registry", () => {
     expect(publicDevice(row(), undefined, NOW).manufacturer).toBeNull();
-  });
-
-  it("resolves a known IEEE registrant and leaves an unlisted public prefix unknown", () => {
-    expect(macRegistrantForPrefix("00000C")).toBe("Cisco Systems, Inc");
-    expect(macRegistrantForPrefix("000833")).toBeNull();
+    expect(publicDevice(row({ manufacturer: "Example Registrant" }), undefined, NOW).manufacturer).toBe("Example Registrant");
   });
 
 });
