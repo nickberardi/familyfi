@@ -45,6 +45,9 @@ remove_tree() {
 # Docker is one daemon for every agent. Pruning it while another job builds deletes
 # that job's cache and its Go-unrelated image layers.
 if command -v docker >/dev/null 2>&1 && [ "$others" -eq 0 ]; then
+  # Test databases of a job killed before scripts/test.py could remove them; prune skips running containers.
+  ids=$(docker ps -aq --filter label=familyfi.test-run 2>/dev/null || true)
+  [ -z "$ids" ] || docker rm --force --volumes $ids >/dev/null 2>&1 || true
   docker buildx rm --all-inactive --force >/dev/null 2>&1 || true
   docker builder prune --all --force >/dev/null || true
   docker system prune --all --force --volumes >/dev/null || true

@@ -3,8 +3,10 @@ PNPM ?= npx --yes pnpm@10.15.1
 FAMILYFI_IMAGE ?= ghcr.io/nickberardi/familyfi:latest
 COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.yml
 WITH_ENV := node scripts/runtime/with-env.mjs
+# Tests and checks run through one harness; these targets are aliases for it (scripts/README.md).
+TEST := scripts/test.py
 
-.PHONY: setup hooks dev ci release test test-unit test-coverage test-api test-api-breaking test-api-version test-integration test-browser test-mutation spike lint typecheck build \
+.PHONY: setup hooks dev release test test-unit test-coverage test-api test-api-breaking test-api-version test-integration test-browser test-mutation spike lint typecheck build \
 	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev db-drift db-upgrade secrets
 
 setup:
@@ -34,63 +36,56 @@ db-migrate:
 	$(WITH_ENV) ./node_modules/.bin/prisma migrate deploy
 
 db-drift:
-	$(PNPM) db-drift
+	$(TEST) check db-drift
 
 db-upgrade:
-	$(PNPM) db-upgrade
+	$(TEST) check db-upgrade
 
 dev:
 	node scripts/runtime/ensure-dev-port.mjs 3000
 	$(PNPM) dev
-
-# The CI workflows' jobs on this machine; CI_ARGS passes options, e.g. CI_ARGS=--quick.
-ci:
-	scripts/ci.sh $(CI_ARGS)
 
 # Build, push and publish a release from this machine, e.g. RELEASE_ARGS="--tag v0.12.1".
 release:
 	scripts/release.sh $(RELEASE_ARGS)
 
 test:
-	$(PNPM) test
-	$(MAKE) test-integration
+	$(TEST) run --platform host
 
 test-unit:
-	$(PNPM) test
+	$(TEST) run --platform host --layer unit
 
 test-coverage:
-	POSTGRES_DB=familyfi_test $(PNPM) test:coverage
+	$(TEST) run --platform host --coverage
 
 test-integration:
-	POSTGRES_DB=familyfi_test $(PNPM) test:integration
+	$(TEST) run --layer integration
 
 test-api:
-	$(PNPM) test-api
+	$(TEST) check api
 
 test-api-breaking:
-	sh scripts/ci/check-openapi-breaking.sh origin/main
+	$(TEST) check api-breaking
 
 test-api-version:
-	node scripts/ci/check-openapi-version.mjs origin/main
+	$(TEST) check api-version
 
-# CI's browser job: a production build served against familyfi_test, with the UniFi mock
-# and the stand-in cloudflared, so every test runs and a skip or a flake fails the run.
+# CI's browser job: a production build, then desktop and phone, each against its own database.
 test-browser:
-	$(PNPM) build
-	CI=1 UNIFI_MOCK=1 POSTGRES_DB=familyfi_test CLOUDFLARED_BIN=$(CURDIR)/tests/fixtures/cloudflared/cloudflared $(PNPM) test:browser
+	$(TEST) run --layer ui
 
 # Weekly in CI, and by hand. Report: reports/mutation/index.html.
 test-mutation:
-	POSTGRES_DB=familyfi_test $(PNPM) test:mutation
+	$(TEST) check mutation
 
 spike:
 	$(PNPM) spike -- $(SPIKE_ARGS)
 
 lint:
-	$(PNPM) lint
+	$(TEST) check lint
 
 typecheck:
-	$(PNPM) typecheck
+	$(TEST) check typecheck
 
 build:
 	$(PNPM) build

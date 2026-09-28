@@ -10,34 +10,9 @@ on:
   workflow_call:
     
 jobs:
+  # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
   verify:
     runs-on: self-hosted
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: familyfi
-          POSTGRES_PASSWORD: familyfi-ci
-          POSTGRES_DB: familyfi_test
-        ports:
-          # Container port only, so GitHub picks a free host port. Two agents
-          # on one machine would both fail if this were fixed at 5432.
-          - 5432/tcp
-        options: >-
-          --health-cmd "pg_isready -U familyfi -d familyfi_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-    env:
-      FAMILYFI_DEFAULT_PASSWORD: ci-recovery-password
-      FAMILYFI_SESSION_SECRET: ci-only-session-secret-32chars!!
-      FAMILYFI_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
-      DB_MODE: external
-      DB_HOST: 127.0.0.1
-      POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
-      POSTGRES_DB: familyfi_test
-      POSTGRES_USER: familyfi
-      POSTGRES_PASSWORD: familyfi-ci
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
@@ -48,64 +23,43 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - run: pnpm install --frozen-lockfile
-      # Known high or critical advisories in what ships, not in dev tooling.
-      - run: pnpm audit --prod --audit-level=high
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test-api
-      - run: node scripts/runtime/with-env.mjs ./node_modules/.bin/prisma migrate deploy
-      # Exit 2 when schema.prisma differs from what the migrations built: a schema edit with no migration.
-      - run: pnpm db-drift
-      # Build a database from every supported release's migrations, fill it, and upgrade it to these,
-      # so a household that skipped releases is covered. About 30 seconds, so it runs on every push.
-      - run: pnpm db-upgrade
-      # Unit and integration tests in one run, failing if coverage drops below its floors.
-      - run: pnpm test:coverage
+      # Audit: known high or critical advisories in what ships. db-drift: exit 2 when schema.prisma
+      # differs from what the migrations built. db-upgrade: a database from every supported
+      # release upgraded to these migrations, so a household that skipped releases is covered.
+      - run: scripts/test.py check audit lint typecheck api db-drift db-upgrade catalog
+      # Unit, integration and harness tests in one run, failing if coverage drops below its floors.
+      - id: tests
+        run: scripts/test.py run --platform host --coverage
       # The unit suite again with the server clock at UTC+14: household time must never lean on the server's zone.
-      - run: pnpm test
-        env:
-          TZ: Pacific/Kiritimati
+      - run: scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
       # Fails on a changed line no test runs in a gated path (GATED_PATHS in the script); elsewhere it reports.
       - name: Changed-line coverage
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
+          RUN_ID: ${{ steps.tests.outputs.run_id }}
         run: |
           git fetch --quiet --depth=1 origin "$BASE_REF"
-          node scripts/ci/changed-line-coverage.mjs FETCH_HEAD "$GITHUB_STEP_SUMMARY"
-      - run: pnpm build
+          scripts/test.py check coverage --run-id "$RUN_ID" --base FETCH_HEAD
+      - run: scripts/test.py build
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-results
+          path: |
+            build/test-runs/**/results.json
+            build/test-runs/**/summary.md
+            build/test-runs/**/plan.json
+            build/test-runs/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   browser:
     runs-on: self-hosted
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: familyfi
-          POSTGRES_PASSWORD: familyfi-ci
-          POSTGRES_DB: familyfi_test
-        ports:
-          - 5432/tcp
-        options: >-
-          --health-cmd "pg_isready -U familyfi -d familyfi_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-    env:
-      CI: "1"
-      FAMILYFI_DEFAULT_PASSWORD: ci-recovery-password
-      FAMILYFI_SESSION_SECRET: ci-only-session-secret-32chars!!
-      FAMILYFI_ENCRYPTION_KEY: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
-      DB_MODE: external
-      DB_HOST: 127.0.0.1
-      POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
-      POSTGRES_DB: familyfi_test
-      POSTGRES_USER: familyfi
-      POSTGRES_PASSWORD: familyfi-ci
-      PLAYWRIGHT_PORT: "3100"
-      UNIFI_MOCK: "1"
-      CLOUDFLARED_BIN: ${{ github.workspace }}/tests/fixtures/cloudflared/cloudflared
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
@@ -116,16 +70,22 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/runtime/with-env.mjs ./node_modules/.bin/prisma migrate deploy
-      - run: pnpm build
       - run: pnpm exec playwright install chromium --with-deps
-      - run: pnpm test:browser
+      # A production build, then desktop and phone, each against its own database and server.
+      - run: scripts/test.py run --layer ui
       # Traces, screenshots and error context for whatever failed, to open with `playwright show-trace`.
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-results
-          path: test-results/
+          path: |
+            build/test-runs/**/results.json
+            build/test-runs/**/summary.md
+            build/test-runs/**/*.log
+            build/test-runs/**/test-results/**
           if-no-files-found: ignore
           retention-days: 7

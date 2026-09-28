@@ -118,32 +118,33 @@ FamilyFi's own iconography is typographic and geometric — monograms inside `Ma
 
 ## Commands
 
-What to run before a pull request, the rules tests follow, and what CI checks are in [testing.md](testing.md).
+What to run before a pull request, the rules tests follow, and what CI checks are in [testing.md](testing.md). Tests and checks run through `scripts/test.py`, and the `make` test and check targets below are aliases for it; its selections (one test, a category, a layer, a platform) are in [scripts/README.md](../scripts/README.md#testpy). Every run starts its own PostgreSQL containers and removes them afterwards, so tests never touch the development database.
 
 | Target | Behavior |
 | --- | --- |
 | `make setup` | Install, create `.env` if missing, start the dev database when Docker is available, migrate, and turn on the pre-push hook |
 | `make hooks` | Turn on `.githooks/pre-push` (lint, typecheck, unit tests) in an existing clone |
 | `make dev` | Next.js on port 3000. For UI work without a UniFi console, set `UNIFI_MOCK=1` in `.env` first (dummy household; see [setup.md](setup.md)). |
-| `make ci` | `scripts/ci.sh`: the CI workflows' jobs on this machine, each with a disposable PostgreSQL (`CI_ARGS=--quick` for verify and container) |
-| `make release` | `scripts/release.sh`: CI, then build, push and publish a release from this machine (`RELEASE_ARGS="--tag vX.Y.Z"`) |
-| `make test-unit` | Unit tests; no database needed |
-| `make test` | Unit tests, then integration tests (PostgreSQL, always the `familyfi_test` database) |
-| `make test-coverage` | Unit and integration tests in one run; fails below the coverage floors |
-| `make test-browser` | Production build, then Playwright on desktop and phone, the way CI runs it |
-| `make test-api` | OpenAPI lint, and every route and method documented |
-| `make test-api-breaking` | Breaking OpenAPI changes against `main` (needs Go) |
-| `make test-api-version` | OpenAPI `info.version` is a semver increase over `main` that fits the change |
-| `make test-mutation` | Mutation testing of the enforcement code; a report, never a gate |
+| `make release` | `scripts/release.sh`: checks and tests, then build, push and publish a release from this machine (`RELEASE_ARGS="--tag vX.Y.Z"`) |
+| `make test-unit` | `scripts/test.py run --platform host --layer unit`: unit and harness tests; no database |
+| `make test` | `run --platform host`: unit, integration and harness tests |
+| `make test-integration` | `run --layer integration` |
+| `make test-coverage` | `run --platform host --coverage`: unit and integration tests in one run; fails below the coverage floors |
+| `make test-browser` | `run --layer ui`: production build, then Playwright on desktop and phone, the way CI runs it |
+| `make test-api` | `check api`: OpenAPI lint, and every route and method documented |
+| `make test-api-breaking` | `check api-breaking`: breaking OpenAPI changes against `origin/main` (needs Go) |
+| `make test-api-version` | `check api-version`: OpenAPI `info.version` is a semver increase over `origin/main` that fits the change |
+| `make test-mutation` | `check mutation`: mutation testing of the enforcement code; a report, never a gate |
 | `make db-migrate` | Apply migrations to the development database |
-| `make db-drift` | Compare the configured database with `schema.prisma` and fail on drift (run after `db-migrate`) |
-| `make db-upgrade` | Upgrade a filled database from every supported release (or `pnpm db-upgrade --from <tag>` / `--latest`); fail on an error, lost rows or drift, naming the release |
+| `make db-drift` | `check db-drift`: migrate a fresh database and fail where `schema.prisma` differs from it |
+| `make db-upgrade` | `check db-upgrade`: upgrade a filled database from every supported release; fail on an error, lost rows or drift, naming the release. `pnpm db-upgrade --from <tag>` or `--latest` runs one start point against the development database while you iterate |
 | `make spike` | UniFi integration spike CLI (`SPIKE_ARGS=discover`, `apply`, `disable`, `cleanup`) |
-| `make lint` / `make typecheck` / `make build` | Checks and production build |
+| `make lint` / `make typecheck` | `check lint` / `check typecheck` |
+| `make build` | Production build |
 | `make docker-build` | Build `familyfi:dev` |
 | `make docker-dev-up` | Locally built image plus Compose PostgreSQL |
 | `make docker-up` | GHCR image plus Compose PostgreSQL |
 | `make docker-down` | Stop without deleting volumes |
 | `make docker-smoke` | Build `familyfi:dev`, reject `designs/` in the image, run health/login against bundled-style external Postgres |
 
-The container smoke runs on pull requests but not on ordinary pushes to `main`. For an unpublished release tag on `main`, `release.yml` requires CI and container smoke before building images. If the image tag already exists, the workflow skips those jobs and publishing; the local release path runs `ci.sh --quick` by default. See [operations](operations.md#releases) and [scripts](../scripts/README.md#releasesh).
+The container smoke runs on pull requests but not on ordinary pushes to `main`. For an unpublished release tag on `main`, `release.yml` requires CI and container smoke before building images. If the image tag already exists, the workflow skips those jobs and publishing; the local release path runs the same checks and tests through `scripts/test.py` by default. See [operations](operations.md#releases) and [scripts](../scripts/README.md#releasesh).

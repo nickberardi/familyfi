@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Publish a release from this machine: what .github/workflows/release.yml does, without the runners.
 #
-#   scripts/release.sh --tag v0.12.1               # ci.sh --quick, build, push, publish
+#   scripts/release.sh --tag v0.12.1               # checks and tests, build, push, publish
 #   scripts/release.sh --tag v0.12.1 --skip-ci
 #   scripts/release.sh --tag v0.12.1 --no-push     # build both architectures, publish nothing
 #
 # Options:
 #   --tag vX.Y.Z    the release to publish; must start with v, and must not exist on GitHub yet
-#   --skip-ci       don't run scripts/ci.sh --quick first
+#   --skip-ci       don't run the checks and tests (ci.yml's verify job, and container.yml) first
 #   --no-push       build only: no GHCR login, no push, no GitHub Release
 #   --allow-dirty   allow uncommitted changes in the working tree (the build uses them)
 #   -h, --help      print this help
@@ -66,9 +66,14 @@ repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || die "gh could n
 image="ghcr.io/$(tr '[:upper:]' '[:lower:]' <<<"$repo")"
 sha=$(git rev-parse HEAD)
 
-# The ci and container jobs.
+# ci.yml's verify job and container.yml, through the same harness. ci.yml's browser job and
+# the OpenAPI checks are not repeated here.
 if ((run_ci)); then
-  scripts/ci.sh --quick
+  npx --yes "pnpm@$(node -p 'require("./package.json").packageManager.split("@")[1]')" install --frozen-lockfile
+  scripts/test.py check audit lint typecheck api db-drift db-upgrade catalog container
+  scripts/test.py run --platform host --coverage
+  scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
+  scripts/test.py build
 fi
 
 # A private Docker config, so the GHCR login and the builder never outlive this run. It

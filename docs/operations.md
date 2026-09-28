@@ -169,7 +169,7 @@ Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does
 
 ### Local release
 
-`scripts/release.sh` publishes a release from your machine, without the runners: it checks that `HEAD` is on `origin/main`, runs `scripts/ci.sh --quick`, builds and pushes both architectures to GHCR with the same tags, and creates the GitHub Release, marked a pre-release below 1.0.
+`scripts/release.sh` publishes a release from your machine, without the runners: it checks that `HEAD` is on `origin/main`, runs the checks and tests of `ci.yml`'s verify job and `container.yml` through `scripts/test.py`, builds and pushes both architectures to GHCR with the same tags, and creates the GitHub Release, marked a pre-release below 1.0.
 
 ```bash
 scripts/release.sh --tag vX.Y.Z  # replace with the matching package/spec version

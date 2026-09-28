@@ -1,64 +1,72 @@
 /**
- * `scripts/ci.sh` repeats the CI workflows' jobs for a run on this machine, and
- * `scripts/release.sh` repeats release.yml. A mirror drifts the moment one side
- * changes alone, so this holds them together: every workflow job has a ci.sh job
- * of the same name and the reverse, every helper a workflow calls is one ci.sh
- * calls, and every `scripts/…` path anything names exists after a move.
+ * `scripts/test.py` is the one way tests and checks run: for people, agents, the pre-push
+ * hook and the workflows. This holds the callers to it: the workflows that run tests call
+ * no runner of their own, every helper any workflow calls is one the harness calls too,
+ * the Makefile's test targets stay aliases for it, and every `scripts/…` path anything
+ * names exists after a move. `scripts/release.sh` repeats release.yml.
  */
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import YAML from "yaml";
 
 const repoRoot = path.resolve(__dirname, "../..");
 const read = (file: string) => readFileSync(path.join(repoRoot, file), "utf8");
+const workflows = readdirSync(path.join(repoRoot, ".github/workflows")).map((f) => `.github/workflows/${f}`);
+const harness = readdirSync(path.join(repoRoot, "scripts/testing"))
+  .filter((f) => f.endsWith(".py"))
+  .map((f) => read(`scripts/testing/${f}`))
+  .join("\n");
 
-/** Workflows ci.sh mirrors. codeql.yml needs the CodeQL CLI and release.yml is release.sh's. */
-const MIRRORED = ["ci", "container", "openapi", "mutation"];
+/** Workflows whose tests and checks run through the harness. container.yml keeps its build action for the layer cache. */
+const THROUGH_HARNESS = [".github/workflows/ci.yml", ".github/workflows/mutation.yml", ".github/workflows/requested-tests.yml"];
 
-/** A workflow's job keeps its name in ci.sh; ci.yml's jobs and a job named after its workflow stay bare. */
-function ciJobName(workflow: string, job: string): string {
-  return workflow === "ci" || job === workflow ? job : `${workflow}-${job}`;
-}
+/** A test runner or check called directly, which would be a second execution path. */
+const DIRECT_RUN =
+  /\bpnpm (?:run )?(?:test|lint|typecheck|build|audit|test-api|db-drift|db-upgrade)\b|\bvitest\b|\bplaywright test\b|\bstryker\b|prisma migrate/;
+
+const SCRIPT_PATH = /scripts\/[\w./-]+\.(?:sh|mjs|ts|py)/g;
+const HELPER = /scripts\/ci\/[\w.-]+\.(?:sh|mjs)/g;
 
 function runScript(script: string, ...args: string[]) {
   return spawnSync("bash", [path.join(repoRoot, script), ...args], { cwd: repoRoot, encoding: "utf8" });
 }
 
-function ciShJobs(): string[] {
-  const help = runScript("scripts/ci.sh", "--help").stdout;
-  const line = help.split("\n").find((l) => l.startsWith("Jobs:"));
-  expect(line, "ci.sh --help has a Jobs: line").toBeDefined();
-  return line!.replace("Jobs:", "").trim().split(/\s+/);
-}
-
-const SCRIPT_PATH = /scripts\/[\w./-]+\.(?:sh|mjs|ts)/g;
-
-describe("scripts/ci.sh mirrors the CI workflows", () => {
-  const workflowJobs = MIRRORED.flatMap((workflow) => {
-    const doc = YAML.parse(read(`.github/workflows/${workflow}.yml`)) as { jobs: Record<string, unknown> };
-    return Object.keys(doc.jobs).map((job) => ciJobName(workflow, job));
-  });
-
-  it("has a job for every workflow job, and no job the workflows lack", () => {
-    expect(new Set(ciShJobs())).toEqual(new Set(workflowJobs));
-  });
-
-  it("calls every helper the mirrored workflows call", () => {
-    const ciSh = read("scripts/ci.sh");
-    for (const workflow of MIRRORED) {
-      for (const [helper] of read(`.github/workflows/${workflow}.yml`).matchAll(SCRIPT_PATH)) {
-        expect(ciSh, `${workflow}.yml calls ${helper}; ci.sh does not`).toContain(helper);
+describe("the workflows run tests through scripts/test.py", () => {
+  it("call no test runner or check of their own", () => {
+    for (const workflow of THROUGH_HARNESS) {
+      const steps = read(workflow)
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("#"));
+      for (const line of steps) {
+        expect(line, `${workflow} runs this outside scripts/test.py`).not.toMatch(DIRECT_RUN);
       }
+      expect(read(workflow), `${workflow} never calls the harness`).toContain("scripts/test.py");
     }
   });
 
-  it("prints its help, and refuses an unknown job or option", () => {
-    expect(runScript("scripts/ci.sh", "--help").status).toBe(0);
-    expect(runScript("scripts/ci.sh", "--only", "no-such-job").status).toBe(2);
-    expect(runScript("scripts/ci.sh", "--no-such-option").status).toBe(2);
+  it("call only helpers the harness calls too, so a local check is the CI check", () => {
+    for (const workflow of workflows) {
+      for (const [helper] of read(workflow).matchAll(HELPER)) {
+        expect(harness, `${workflow} calls ${helper}; scripts/testing does not`).toContain(helper);
+      }
+    }
+  });
+});
+
+describe("the Makefile", () => {
+  it("keeps its test and check targets as aliases for scripts/test.py", () => {
+    const makefile = read("Makefile");
+    const aliases = ["test", "test-unit", "test-coverage", "test-integration", "test-browser", "test-api",
+      "test-api-breaking", "test-api-version", "test-mutation", "lint", "typecheck", "db-drift", "db-upgrade"];
+    for (const target of aliases) {
+      const recipe = makefile.match(new RegExp(`^${target}:\\n((?:\\t.*\\n)+)`, "m"));
+      expect(recipe, `make ${target}`).not.toBeNull();
+      for (const line of recipe![1].trim().split("\n")) {
+        expect(line.trim(), `make ${target}`).toMatch(/^\$\(TEST\) (?:run|check) /);
+      }
+    }
   });
 });
 
@@ -71,18 +79,20 @@ describe("scripts/release.sh", () => {
 });
 
 describe("scripts/ paths", () => {
-  const workflows = readdirSync(path.join(repoRoot, ".github/workflows")).map((f) => `.github/workflows/${f}`);
   const sources = [
     ...workflows,
     ".github/actions/runner-cleanup/action.yml",
+    ".githooks/pre-push",
     "package.json",
     "Makefile",
     "docker/Dockerfile",
     "prisma.config.ts",
     "tests/playwright.config.ts",
-    "scripts/ci.sh",
     "scripts/release.sh",
     "scripts/runtime/docker-entrypoint.sh",
+    ...readdirSync(path.join(repoRoot, "scripts/testing"))
+      .filter((f) => f.endsWith(".py"))
+      .map((f) => `scripts/testing/${f}`),
   ];
 
   it("exist wherever they are named", () => {

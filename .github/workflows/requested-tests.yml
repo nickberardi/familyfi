@@ -1,0 +1,70 @@
+name: Requested tests
+
+# Any selection scripts/test.py accepts, run by hand from the Actions tab. Pull requests
+# already run everything through ci.yml; this is for a focused rerun or a category.
+on:
+  workflow_dispatch:
+    inputs:
+      selectors:
+        description: 'Optional test identities or paths, separated by spaces; quote one with spaces in it'
+        default: ''
+      category:
+        description: 'Optional feature categories, separated by commas'
+        default: ''
+      layers:
+        description: 'unit,integration,ui (empty selects all layers)'
+        default: ''
+      platforms:
+        description: 'host,desktop,phone,all'
+        default: 'all'
+
+permissions:
+  contents: read
+
+jobs:
+  requested-tests:
+    runs-on: self-hosted
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.15.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium --with-deps
+      - name: Run requested selection
+        env:
+          SELECTORS: ${{ inputs.selectors }}
+          CATEGORY: ${{ inputs.category }}
+          LAYERS: ${{ inputs.layers }}
+          PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          python3 - <<'PY'
+          import os, shlex, subprocess, sys
+          command = [sys.executable, 'scripts/test.py', 'run', '--platform', os.environ['PLATFORMS']]
+          for name, option in [('CATEGORY', '--category'), ('LAYERS', '--layer')]:
+              if os.environ[name]:
+                  command.extend([option, os.environ[name]])
+          command.extend(['--', *shlex.split(os.environ['SELECTORS'])])
+          sys.exit(subprocess.run(command).returncode)
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: requested-test-results
+          path: |
+            build/test-runs/**/results.json
+            build/test-runs/**/summary.md
+            build/test-runs/**/plan.json
+            build/test-runs/**/*.log
+            build/test-runs/**/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7

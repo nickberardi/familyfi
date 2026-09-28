@@ -1,26 +1,27 @@
 # Testing
 
-Run these locally before a pull request; CI runs the same checks, listed at the end.
+Run these locally before a pull request; CI runs the same checks, listed at the end. Every test and check runs through one harness, `scripts/test.py`, for people, agents, the pre-push hook and CI alike. The `make` targets below are aliases for it; its selections (one test, a category, a layer, a platform), outputs and run lifecycle are in [scripts/README.md](../scripts/README.md#testpy).
 
 ## What to run
 
-The pre-push hook runs `make lint typecheck test-unit` on every push; `make setup` turns it on, and `make hooks` does so in an existing clone. Before you open a pull request, also run the rows your change touches:
+The pre-push hook runs lint, typecheck and the unit tests on every push; `make setup` turns it on, and `make hooks` does so in an existing clone. Before you open a pull request, also run the rows your change touches:
 
 | You changed | Run |
 | --- | --- |
-| Documentation only | Check changed links, paths and commands against the repo; `git diff --check`. For agent instructions, also run `pnpm exec vitest run --config tests/vitest.config.ts tests/unit/invariants.test.ts`. No application build or database is needed. |
+| Documentation only | Check changed links, paths and commands against the repo; `git diff --check`. For agent instructions, also run `scripts/test.py run tests/unit/invariants.test.ts`. No application build or database is needed. |
 | Code, dependencies, configuration or tooling | `make lint typecheck test-coverage` |
 | Pages, components or `globals.css` | `make test-browser` |
 | An `/api/v1` route or payload | `make test-api` and relevant integration tests. Update `openapi/familyfi.v1.yaml` when HTTP behaviour changes; an internal refactor alone needs no spec edit. For spec changes also run `make test-api-version test-api-breaking` (breaking check needs Go) and coordinate iOS as required in `AGENTS.md`. |
-| `prisma/schema.prisma` or a migration | `make db-migrate db-drift db-upgrade`. `db-upgrade` upgrades a filled database from every supported release, so a household that skipped releases is covered; `pnpm db-upgrade --from v0.5.0` or `--latest` runs one start point while you iterate |
+| `prisma/schema.prisma` or a migration | `make db-drift db-upgrade`. `db-drift` migrates a fresh database and compares it with the schema; `db-upgrade` upgrades a filled database from every supported release, so a household that skipped releases is covered. `pnpm db-upgrade --from v0.5.0` or `--latest` runs one start point against the development database while you iterate |
 
-Start with focused tests while iterating; the table is the handoff requirement. The pre-push hook still runs its checks on every push, including documentation changes. If a required check cannot run, report the command, blocker and unverified behaviour. Do not bypass it or claim the change is fully verified. CI remains the merge check.
+Start with focused tests while iterating (`scripts/test.py list` finds them; `run <file>` or `run --category <name>` runs them); the table is the handoff requirement. The pre-push hook still runs its checks on every push, including documentation changes. If a required check cannot run, report the command, blocker and unverified behaviour. Do not bypass it or claim the change is fully verified. CI remains the merge check.
 
 **Prerequisites:**
-- PostgreSQL. `make setup` starts one with Docker.
+- Python 3.11 or newer on `PATH`, for `scripts/test.py`.
+- Docker, for integration tests, browser tests and database checks. Each run starts its own PostgreSQL containers and removes them afterwards.
 - Chromium for the browser tests, installed once with `pnpm exec playwright install chromium`.
 
-Tests always use the `familyfi_test` database, which they create on first run. `resetDatabase` refuses any other database, so your development data is never touched.
+Tests always use a `familyfi_test` database in the run's own container. `resetDatabase` refuses any other database, and the harness never points a test at the development database.
 
 ## The suites
 
@@ -31,10 +32,11 @@ Tests always use the `familyfi_test` database, which they create on first run. `
 | Authorization matrix: `tests/integration/authorization-matrix.test.ts` | PostgreSQL | Every `/api/v1` route and method, found on disk, called as anonymous, member, administrator, recovery `admin`, and over the tunnel without a paired phone; each cell must be allowed, 401 or 403 as its table says. A route missing from the table fails it, so a new route declares its access there |
 | Browser: `tests/browser` | PostgreSQL, Chromium | Desktop and phone smoke tests on a production build with the UniFi mock, plus axe (WCAG 2.1 A and AA) on every page |
 | API contract: `scripts/ci/check-openapi.mjs` | Nothing | Lints the OpenAPI document; every route and method exists on both sides |
+| Harness: `scripts/tests` | Python | The test harness itself: selection, planning, result mapping, resource ownership and cleanup |
 
 The authorization matrix runs with the integration suite. When you add a route, add its line to `ACCESS` in that file. An unexpected permission is a finding, not a reason to make the expected value match the implementation. Record ambiguous access with a `question` and raise it. For an authorized access change, update the guard, matrix, contract and negative tests together; apply the API compatibility rules first.
 
-`make test` runs unit then integration; `make test-coverage` runs both in one pass and fails below a coverage floor. `make test-browser` builds the app and runs Playwright the way CI does, so a skipped or flaky test fails it locally too.
+`make test` runs the host platform: unit, integration and harness tests. `make test-coverage` does the same in one coverage pass and fails below a coverage floor. `make test-browser` builds the app and runs Playwright on desktop and phone the way CI does. Anywhere, a skipped test, a test that passed only on a retry, or a selected test with no result fails the run.
 
 ## Rules
 
@@ -44,8 +46,8 @@ The authorization matrix runs with the integration suite. When you add a route, 
 - **Coverage floors only go up.** They live in `tests/vitest.coverage.config.ts`. Raise a floor when you lift an area, and never lower one to pass.
 - **A changed line in a security-critical path needs a test.** On a pull request, `scripts/ci/changed-line-coverage.mjs` fails CI when a changed line no test runs is in one of `GATED_PATHS`: `src/server/unifi/**`, `auth.ts`, `guard.ts`, `quarantine.ts`, `src/server/tunnel/**` and `reconciliation.ts`, where a file-wide floor would average a new untested branch away. Elsewhere it lists those lines and the floors decide.
   - A line no test can reach takes `// coverage-exempt: <why>` at its end, or alone on the line above. The reason is required, and the run summary lists every exemption so a reviewer sees it.
-  - Run it yourself after `make test-coverage`: `node scripts/ci/changed-line-coverage.mjs origin/main`.
-- **Never skip your way to green.** In CI, a browser test that skips fails the run, and so does one that passes only on its retry.
+  - Run it yourself after `make test-coverage`: `scripts/test.py check coverage --run-id <run-id>`, with the run ID that run printed.
+- **Never skip your way to green.** A test that skips fails the run, and so does a browser test that passes only on its retry.
   - Tag a test that belongs to one viewport `@desktop` or `@phone`.
   - A test that cannot run in CI takes a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`, with the reason.
   - Never skip, disable or quarantine a failing test.
@@ -55,6 +57,7 @@ The authorization matrix runs with the integration suite. When you add a route, 
   - never commit a live UniFi response.
 - **The UniFi mock answers like the real API.** `tests/unit/unifi-client-contract.test.ts` runs the cases in `src/server/unifi/contract-cases.ts` against `MockUnifiClient` and `HttpUnifiClient`, and `pnpm spike verify` runs the same cases against a real console. Change the mock and those cases together.
 - **Display behaviour is shared with iOS through `tests/fixtures/display-vectors.json`.** See [Display vectors](#display-vectors).
+- **Every test has a category.** A new test file needs an entry in `scripts/testing/catalog.json`, keyed by its path, so `--category` finds it; every run and `check catalog` fail on an uncategorized test or an entry that names none. Pick existing categories where they fit.
 - **Every invariant in AGENTS.md names its tests.** A new invariant comes with them; `tests/unit/invariants.test.ts` fails when one names none or a missing file.
 - **Household time never depends on the server's time zone.** CI runs the unit suite a second time at UTC+14 to catch this.
 
@@ -78,30 +81,38 @@ Coverage shows which lines ran; it does not show whether a test would notice if 
 
 ## What CI runs
 
+The workflows that run tests call `scripts/test.py`, so a local run is the CI run. `tests/unit/ci-scripts.test.ts` fails when one of them calls a test runner itself, or when any workflow calls a `scripts/ci/` helper the harness does not.
+
 | Workflow | When | Checks |
 | --- | --- | --- |
-| `ci.yml` | Every push and pull request | **verify:** lint, typecheck, `test-api`, `db-drift`, `db-upgrade` from every supported release (about 30 seconds), `test:coverage`, the unit suite again at `TZ=Pacific/Kiritimati`, changed-line coverage (pull requests only; fails on an untested changed line in a gated path), production build.<br>**browser:** Playwright in both viewports. A failed run uploads its traces as `playwright-results` |
-| `container.yml` | Pull requests | Image build, image hygiene, container smoke |
+| `ci.yml` | Every push and pull request | **verify:** `check audit lint typecheck api db-drift db-upgrade catalog`; `run --platform host --coverage` (unit, integration and harness tests, and the coverage floors); the unit suite again with `--timezone Pacific/Kiritimati`; `check coverage` for changed lines (pull requests only; fails on an untested changed line in a gated path); `build`.<br>**browser:** `run --layer ui`: Playwright on desktop and phone. A failed job uploads the run's results, logs and traces as `playwright-results` |
+| `container.yml` | Pull requests | Image build, image hygiene, container smoke; the same helpers as `check container`, with the build action's layer cache |
 | `codeql.yml` | Pull requests and weekly | CodeQL (`security-extended`) over the JavaScript and TypeScript; findings go to the repository's code scanning alerts. Only this job may write security events |
-| `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
-| `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | Mutation testing. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
+| `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`, with the helpers `check api-version` and `check api-breaking` call. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
+| `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | `check mutation`. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
+| `requested-tests.yml` | By hand | Any selection `run` accepts: test identities, categories, layers and platforms. Uploads the run's results |
 
-### Running CI locally
+### Running CI's jobs locally
 
-`scripts/ci.sh` runs local equivalents of these workflows' jobs: `verify` and `browser` from `ci.yml`, `container`, `openapi-version` and `openapi-breaking`, and `mutation` when you name it. Each job that needs PostgreSQL gets a disposable `postgres:18-alpine` container of its own, so the development database is never touched. `--quick` runs `verify` and `container`. `make ci` calls it, with options in `CI_ARGS`.
+Run the same commands the jobs run. Each run starts and removes its own PostgreSQL containers, so the development database is never touched, and prints its run ID and results directory.
 
 ```bash
-scripts/ci.sh
-scripts/ci.sh --only browser
+scripts/test.py check audit lint typecheck api db-drift db-upgrade catalog
+scripts/test.py run --platform host --coverage
+scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
+scripts/test.py check coverage --run-id <run-id>
+scripts/test.py build
+scripts/test.py run --layer ui
+scripts/test.py check container api-version api-breaking
 ```
 
-The workflows and `ci.sh` both call helpers in `scripts/ci/`. `tests/unit/ci-scripts.test.ts` checks job names, helper references and script paths; it does not prove the two paths run identical commands or settings. Details are in [`scripts/README.md`](../scripts/README.md).
+CodeQL needs its own CLI and is not mirrored.
 
 ### Self-hosted runners
 
-Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup. The script removes unused Docker data, the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. Two agents share a machine, so while another job is running the script leaves the shared Docker daemon and any shared Go or pnpm cache alone. Each runner service keeps its own Go and pnpm caches. Some jobs use GitHub-hosted runners; the workflow files define placement.
+Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup. The script removes unused Docker data, test databases a killed job left running (containers labelled `familyfi.test-run`), the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. Two agents share a machine, so while another job is running the script leaves the shared Docker daemon and any shared Go or pnpm cache alone. Each runner service keeps its own Go and pnpm caches. Some jobs use GitHub-hosted runners; the workflow files define placement.
 
-**Never run this cleanup script on a development machine.** Local work must clean only resources created by that task; `scripts/ci.sh` deliberately omits runner cleanup.
+**Never run this cleanup script on a development machine.** Local work must clean only resources created by that task; `scripts/test.py` removes only what its own run recorded and never runs runner cleanup.
 
 ### Audit allowlist
 
