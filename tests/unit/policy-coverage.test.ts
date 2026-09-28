@@ -18,7 +18,7 @@ describe("policy coverage", () => {
         groupId: "betsy",
         groupName: "Betsy",
         kind: "no_members",
-        message: "Betsy has rules but no assigned devices, so a UniFi policy cannot be created.",
+        message: "Betsy has no assigned devices, so its UniFi policies cannot be created.",
       },
     ]);
     expect(issues.every((issue) => !isWriteFailure(issue))).toBe(true);

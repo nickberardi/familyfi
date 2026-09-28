@@ -35,6 +35,7 @@ beforeAll(async () => {
       ('always-paused-timed', 'things', 'Console', false, 'always', false, '{}', NULL, NULL, true, '${UNTIL}', now()),
       ('always-paused-ended', 'things', 'Tablet', false, 'always', false, '{}', NULL, NULL, true, '2020-01-01T00:00:00.000Z', now()),
       ('half-scheduled', 'family', 'Ava', false, 'scheduled', true, '{1}', NULL, NULL, false, NULL, now()),
+      ('no-days', 'family', 'Lee', false, 'scheduled', true, '{}', '21:00', '07:00', false, NULL, now()),
       ('protected', 'family', 'Pat', true, 'always', false, '{}', NULL, NULL, false, NULL, now());
     INSERT INTO "AppPolicy" ("id", "connectionIdentity", "siteId", "unifiPolicyId", "ownerScope", "groupId", "zoneId", "ipVersion", "desiredFingerprint", "desiredRevision", "updatedAt") VALUES
       ('ap-bedtime', 'console', 'site', 'pol-bedtime', 'group', 'bedtime', 'zone', 'dual', 'fp', 3, now()),
@@ -43,7 +44,8 @@ beforeAll(async () => {
     INSERT INTO "Rule" ("id", "kind", "scope", "groupId", "networkIds", "targetIds", "enabled", "mode", "scheduleEnabled", "scheduleDays", "scheduleStart", "scheduleEnd", "updatedAt") VALUES
       ('video', 'category', 'group', 'bedtime', '{}', '{4}', true, 'scheduled', true, '{0,1,2,3,4,5,6}', '19:00', '21:00', now()),
       ('apps', 'app', 'network', NULL, '{net}', '{10001}', true, 'always', false, '{}', NULL, NULL, now()),
-      ('broken', 'category', 'group', 'bedtime', '{}', '{8}', true, 'scheduled', true, '{1}', NULL, NULL, now());
+      ('broken', 'category', 'group', 'bedtime', '{}', '{8}', true, 'scheduled', true, '{1}', NULL, NULL, now()),
+      ('no-days', 'category', 'group', 'bedtime', '{}', '{11}', true, 'scheduled', true, '{}', '19:00', '21:00', now());
     INSERT INTO "RulePolicy" ("id", "ruleId", "connectionIdentity", "siteId", "unifiPolicyId", "zoneId", "desiredFingerprint", "desiredRevision", "updatedAt") VALUES
       ('rp-video', 'video', 'console', 'site', 'pol-video', 'zone', 'fp', 3, now());
   `);
@@ -110,6 +112,8 @@ describe("household rules migration", () => {
       "bedtime-paused": [false, null, true, UNTIL],
       // A schedule with no times blocked all day, like always.
       "half-scheduled": [true, null, false, null],
+      // One with times but no days has no window to keep, so it stays blocked like always.
+      "no-days": [true, null, false, null],
       protected: [false, null, false, null],
     });
   });
@@ -125,6 +129,7 @@ describe("household rules migration", () => {
     expect([byId.apps?.name, byId.apps?.mode, byId.apps?.groups]).toEqual(["Apps on networks", "always", null]);
     // A scheduled rule with no times was enforced all day.
     expect([byId.broken?.name, byId.broken?.mode, byId.broken?.windows]).toEqual(["Gaming for Betsy", "always", null]);
+    expect([byId["no-days"]?.name, byId["no-days"]?.mode, byId["no-days"]?.windows]).toEqual(["VPN for Betsy", "always", null]);
     const [policy] = await rows<{ windowKey: string; windowId: string }>(`
       SELECT p."windowKey", w."id" AS "windowId" FROM "RulePolicy" p JOIN "RuleWindow" w ON w."ruleId" = p."ruleId" WHERE p."id" = 'rp-video'`);
     expect(policy?.windowKey).toBe(policy?.windowId);

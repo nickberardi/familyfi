@@ -2718,7 +2718,8 @@ components:
           enum: [available, blocked, paused, allowed, protected]
           description: |
             paused = a pause blocks all internet; blocked = an internet rule's window is
-            active; allowed = an allowance lifts an active window; available otherwise.
+            active; allowed = an allowance is in effect, lifting any internet window until
+            it ends (whether or not a window is active now); available otherwise.
         dohOverrideUrl:
           type: [string, "null"]
           description: |

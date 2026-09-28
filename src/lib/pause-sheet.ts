@@ -25,16 +25,22 @@ export function pauseSheetTitle(group: Pick<Group, "name">, mode: PauseSheetMode
   return mode === "extend" ? `Keep all internet off for ${group.name} longer?` : `Pause all internet for ${group.name}?`;
 }
 
-export function pauseSheetBody(group: Pick<Group, "kind" | "deviceCount">, mode: PauseSheetMode): string {
+/** `deviceNames` are the group's devices' known names; the first one names the devices. */
+export function pauseSheetBody(group: Pick<Group, "kind" | "deviceCount">, mode: PauseSheetMode, deviceNames: string[] = []): string {
   if (mode === "extend") return "Every device stays offline for longer. Resume brings internet back sooner.";
-  const devices =
-    group.deviceCount === 1
+  const named = deviceNames.find((name) => name.trim())?.trim();
+  const others = group.deviceCount - 1;
+  const devices = named
+    ? others > 0
+      ? `${named} and ${others} other ${others === 1 ? "device" : "devices"} lose`
+      : `${named} loses`
+    : group.deviceCount === 1
       ? "Its 1 device loses"
       : group.deviceCount === 0
         ? "Devices you assign lose"
         : `All ${group.deviceCount} of its devices lose`;
   const outside = group.kind === "family" ? "Cellular data is not affected." : "The local network still works.";
-  return `${devices} all internet until you resume or the time runs out. ${outside}`;
+  return `${devices} all internet. Category, app and website rules stay as they are. ${outside}`;
 }
 
 export function pauseSheetOptions(

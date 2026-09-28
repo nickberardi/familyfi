@@ -255,6 +255,32 @@ describe("household rules", () => {
     expect(policy?.schedule).toBeFalsy();
   });
 
+  it("keeps a shared rule editable after one of its groups is protected", async () => {
+    const auth = await signedIn();
+    const emma = await child();
+    const parent = await prisma().group.create({ data: { kind: GroupKind.family, name: "Pat", familyRole: FamilyRole.adult } });
+    const created = await postRule(auth, {
+      name: "School nights",
+      kind: "internet",
+      groupIds: [emma.id, parent.id],
+      mode: "scheduled",
+      windows: [{ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" }],
+    });
+    expect(created.status).toBe(201);
+    const { rule } = (await created.json()) as { rule: PublicRule };
+    await prisma().group.update({ where: { id: parent.id }, data: { protected: true } });
+
+    // Renaming or turning off the rule doesn't add the protected group, so it is allowed.
+    expect((await patch(auth, rule.id, { name: "Lights out" })).status).toBe(200);
+    expect((await patch(auth, rule.id, { enabled: false })).status).toBe(200);
+    // The protected group can be taken off the rule…
+    const removed = await patch(auth, rule.id, { groupIds: [emma.id] });
+    expect(removed.status).toBe(200);
+    expect(((await removed.json()) as { rule: PublicRule }).rule.groupIds).toEqual([emma.id]);
+    // …but not added back.
+    expect((await patch(auth, rule.id, { groupIds: [emma.id, parent.id] })).status).toBe(409);
+  });
+
   it("rejects rules that are not complete", async () => {
     const auth = await signedIn();
     const emma = await child();

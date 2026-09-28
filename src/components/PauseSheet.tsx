@@ -22,7 +22,8 @@ export function PauseSheet({
   timezone: string;
   onClose: () => void;
 }) {
-  const { mutate, rules } = useAppData();
+  const { mutate, rules, devices } = useAppData();
+  const deviceNames = devices.filter((device) => device.groupId === group.id).map((device) => device.hostname ?? "");
   const options = pauseSheetOptions(group, internetWindowsForGroup(rules, group.id), mode, timezone, new Date());
 
   async function run(request: PauseSheetRequest) {
@@ -64,7 +65,7 @@ export function PauseSheet({
           <h2 id="pause-sheet-title" className="text-[17px] font-bold tracking-tight">
             {pauseSheetTitle(group, mode)}
           </h2>
-          <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{pauseSheetBody(group, mode)}</p>
+          <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{pauseSheetBody(group, mode, deviceNames)}</p>
         </div>
         {options.map((option) => (
           <button

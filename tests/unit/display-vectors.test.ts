@@ -49,7 +49,7 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
   relativeDayLabel: (i) => display.relativeDayLabel(at(i.instant), i.timeZone, at(i.now)),
   groupActionSpecs: (i) => groupActionsModule.groupActionSpecs(i.group as Group, i.surface),
   pauseSheetTitle: (i) => pauseSheet.pauseSheetTitle(i.group, i.mode),
-  pauseSheetBody: (i) => pauseSheet.pauseSheetBody(i.group, i.mode),
+  pauseSheetBody: (i) => pauseSheet.pauseSheetBody(i.group, i.mode, i.deviceNames),
   pauseSheetOptions: (i) => pauseSheet.pauseSheetOptions(i.group, i.windows, i.mode, i.timeZone, at(i.now)),
   windowTitle: (i) => ruleWindows.windowTitle(i.window),
   isWindowActive: (i) => ruleWindows.isWindowActive(i.window, at(i.now), i.timeZone),

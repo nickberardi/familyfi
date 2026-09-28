@@ -66,7 +66,8 @@ SELECT "id", "groupId" FROM "Rule" WHERE "groupId" IS NOT NULL;
 INSERT INTO "RuleWindow" ("id", "ruleId", "position", "name", "days", "start", "end")
 SELECT 'rw_' || replace(gen_random_uuid()::text, '-', ''), "id", 0, '', "scheduleDays", "scheduleStart", "scheduleEnd"
 FROM "Rule"
-WHERE "mode" = 'scheduled' AND "scheduleEnabled" AND "scheduleStart" IS NOT NULL AND "scheduleEnd" IS NOT NULL;
+WHERE "mode" = 'scheduled' AND "scheduleEnabled" AND "scheduleStart" IS NOT NULL AND "scheduleEnd" IS NOT NULL
+  AND cardinality("scheduleDays") > 0;
 
 UPDATE "RulePolicy" AS p SET "windowKey" = w."id"
 FROM "RuleWindow" AS w WHERE w."ruleId" = p."ruleId";
@@ -87,7 +88,7 @@ SELECT
   g."scheduleEnd" AS "end"
 FROM "Group" AS g
 WHERE NOT g."protected" AND g."mode" = 'scheduled' AND g."scheduleEnabled"
-  AND g."scheduleStart" IS NOT NULL AND g."scheduleEnd" IS NOT NULL;
+  AND g."scheduleStart" IS NOT NULL AND g."scheduleEnd" IS NOT NULL AND cardinality(g."scheduleDays") > 0;
 
 -- A group's bedtime becomes an internet rule with one window called Bedtime.
 INSERT INTO "Rule" ("id", "name", "kind", "scope", "networkIds", "targetIds", "domains", "enabled", "mode", "createdAt", "updatedAt")

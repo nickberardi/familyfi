@@ -319,23 +319,47 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
   const tv = body.groups.find((group) => group.name === "Living Room");
   expect(tv, "UNIFI_MOCK seed must include the Living Room things group").toBeTruthy();
 
-  await page.goto(`/things/${tv!.id}`);
-  const zone = page.getByRole("heading", { name: /^All internet · / });
-  await expect(zone).toBeVisible();
-  await page.getByRole("button", { name: "Pause all internet" }).click();
-  const sheet = page.getByRole("dialog", { name: `Pause all internet for ${tv!.name}?` });
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByText(/loses? all internet until you resume/)).toBeVisible();
-  const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/pause`));
-  await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
-  expect((await paused).ok()).toBeTruthy();
-  await expect(page.getByRole("heading", { name: "All internet · off" })).toBeVisible();
-  await expect(page.getByText(/All internet paused until/).first()).toBeVisible();
+  // A no-internet window offers "Allow internet now" instead of a pause, so turn the
+  // seeded TV rule off while this runs: the test must not depend on the time of day.
+  const rulesRes = await page.request.get("/api/v1/rules");
+  const { rules } = (await rulesRes.json()) as { rules: { id: string; kind: string; enabled: boolean; groupIds: string[] }[] };
+  const internetRules = rules.filter((rule) => rule.kind === "internet" && rule.enabled && rule.groupIds.includes(tv!.id));
+  const setEnabled = async (enabled: boolean) => {
+    for (const rule of internetRules) {
+      const response = await page.request.patch(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page), data: { enabled } });
+      expect(response.ok()).toBeTruthy();
+    }
+  };
+  await setEnabled(false);
+  try {
+    await page.goto(`/things/${tv!.id}`);
+    const zone = page.getByRole("heading", { name: /^All internet · / });
+    await expect(zone).toBeVisible();
+    await page.getByRole("button", { name: "Pause all internet" }).click();
+    const sheet = page.getByRole("dialog", { name: `Pause all internet for ${tv!.name}?` });
+    await expect(sheet).toBeVisible();
+    // The confirmation names a device and says the other rules keep applying.
+    const devicesRes = await page.request.get("/api/v1/devices");
+    const { devices } = (await devicesRes.json()) as { devices: { groupId: string | null; hostname: string | null }[] };
+    const named = devices.find((device) => device.groupId === tv!.id && device.hostname?.trim());
+    expect(named, "UNIFI_MOCK seed must name a Living Room device").toBeTruthy();
+    await expect(sheet.getByText(named!.hostname!.trim(), { exact: false })).toBeVisible();
+    await expect(sheet.getByText(/Category, app and website rules stay as they are/)).toBeVisible();
+    const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/pause`));
+    await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
+    expect((await paused).ok()).toBeTruthy();
+    await expect(page.getByRole("heading", { name: "All internet · off" })).toBeVisible();
+    await expect(page.getByText(/All internet paused until/).first()).toBeVisible();
 
-  const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/resume`));
-  await page.locator('[aria-live="polite"]').getByRole("button", { name: "Undo" }).click();
-  expect((await resumed).ok()).toBeTruthy();
-  await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+    const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/resume`));
+    await page.locator('[aria-live="polite"]').getByRole("button", { name: "Undo" }).click();
+    expect((await resumed).ok()).toBeTruthy();
+    await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+  } finally {
+    // Leave the group as the seed had it, even when a step above failed.
+    await page.request.post(`/api/v1/groups/${tv!.id}/resume`, { headers: await csrfHeaders(page) });
+    await setEnabled(true);
+  }
 });
 
 test("Websites rule blocks named domains, with the encrypted DNS caveat", async ({ page }) => {

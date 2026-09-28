@@ -58,7 +58,7 @@ export function coverageIssues(input: {
       groupId: group.id,
       groupName: group.name,
       kind: "no_members",
-      message: `${group.name} has rules but no assigned devices, so a UniFi policy cannot be created.`,
+      message: `${group.name} has no assigned devices, so its UniFi policies cannot be created.`,
     });
   }
   return issues;

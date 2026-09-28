@@ -104,7 +104,16 @@ export class RuleInputError extends Error {
  * Validates a whole rule: the create body, or the stored rule with an update's fields laid
  * over it. Throws a RuleInputError the route turns into its response.
  */
-export async function validateRule(input: RuleInput, networkScope: () => Promise<{ scope: NetworkScope; known?: Set<string> }>): Promise<RuleInput> {
+/**
+ * `linkedGroupIds` are the groups the rule already covers. A group protected after it
+ * joined stays linked (planning leaves protected devices out), so the rule stays editable;
+ * only adding a protected group is refused.
+ */
+export async function validateRule(
+  input: RuleInput,
+  networkScope: () => Promise<{ scope: NetworkScope; known?: Set<string> }>,
+  linkedGroupIds: string[] = [],
+): Promise<RuleInput> {
   const name = input.name.trim();
   if (!name || name.length > MAX_RULE_NAME) {
     throw new RuleInputError(400, "invalid_name", `A rule needs a name of 1 to ${MAX_RULE_NAME} characters.`);
@@ -141,7 +150,7 @@ export async function validateRule(input: RuleInput, networkScope: () => Promise
     }
     const groups = await prisma().group.findMany({ where: { id: { in: groupIds } } });
     if (groups.length !== groupIds.length) throw new RuleInputError(404, "not_found", "Group not found.");
-    if (groups.some((group) => group.protected)) {
+    if (groups.some((group) => group.protected && !linkedGroupIds.includes(group.id))) {
       throw new RuleInputError(409, "protected", "Protected groups cannot have rules.");
     }
   } else {

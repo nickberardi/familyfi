@@ -3096,7 +3096,7 @@
           "deviceCount": 4
         }
       },
-      "expected": "All 4 of its devices lose all internet until you resume or the time runs out. Cellular data is not affected."
+      "expected": "All 4 of its devices lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
     },
     {
       "fn": "pauseSheetTitle",
@@ -4415,7 +4415,7 @@
         },
         "mode": "pause"
       },
-      "expected": "Its 1 device loses all internet until you resume or the time runs out. Cellular data is not affected."
+      "expected": "Its 1 device loses all internet. Category, app and website rules stay as they are. Cellular data is not affected."
     },
     {
       "fn": "pauseSheetBody",
@@ -4427,7 +4427,7 @@
         },
         "mode": "pause"
       },
-      "expected": "All 7 of its devices lose all internet until you resume or the time runs out. The local network still works."
+      "expected": "All 7 of its devices lose all internet. Category, app and website rules stay as they are. The local network still works."
     },
     {
       "fn": "pauseSheetBody",
@@ -4439,7 +4439,54 @@
         },
         "mode": "pause"
       },
-      "expected": "Devices you assign lose all internet until you resume or the time runs out. Cellular data is not affected."
+      "expected": "Devices you assign lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause names the first device",
+      "input": {
+        "group": {
+          "kind": "family",
+          "deviceCount": 2
+        },
+        "mode": "pause",
+        "deviceNames": [
+          "Cassie's iPhone",
+          "Cassie's iPad"
+        ]
+      },
+      "expected": "Cassie's iPhone and 1 other device lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause names its only device",
+      "input": {
+        "group": {
+          "kind": "things",
+          "deviceCount": 1
+        },
+        "mode": "pause",
+        "deviceNames": [
+          "Living room TV"
+        ]
+      },
+      "expected": "Living room TV loses all internet. Category, app and website rules stay as they are. The local network still works."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause skips unnamed devices",
+      "input": {
+        "group": {
+          "kind": "family",
+          "deviceCount": 3
+        },
+        "mode": "pause",
+        "deviceNames": [
+          "",
+          "Kids iPad"
+        ]
+      },
+      "expected": "Kids iPad and 2 other devices lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
     },
     {
       "fn": "pauseSheetOptions",
