@@ -129,11 +129,7 @@ function main() {
     process.exit(1);
   }
 
-  const diff = execFileSync("git", ["diff", "--unified=0", base, "--", "src"], {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 16 * 1024 * 1024, // Source snapshots can exceed Node's 1 MiB default.
-  });
+  const diff = execFileSync("git", ["diff", "--unified=0", base, "--", "src"], { cwd: root, encoding: "utf8" });
   const { executable, uncovered, exempt } = assess({
     changed: parseChangedLines(diff),
     hits: parseLcov(readFileSync(lcovPath, "utf8")),

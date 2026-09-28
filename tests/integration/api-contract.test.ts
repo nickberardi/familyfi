@@ -52,7 +52,7 @@ describe("v1 API contracts", () => {
     const connectedAt = new Date(checkedAt.getTime() - 60_000);
     await prisma().device.update({
       where: { mac },
-      data: { presenceOnline: true, presenceCheckedAt: checkedAt, connectedAt, connectionType: "wireless", accessPointName: "Upstairs AP" },
+      data: { presenceOnline: true, presenceCheckedAt: checkedAt, connectedAt, connectionType: "wireless", accessPointName: "Upstairs AP", manufacturer: "Example Registrant" },
     });
     const list = await getDevices(request("/api/v1/devices", { auth }));
     const single = await getDevice(request(`/api/v1/devices/${mac}`, { auth }), { params: Promise.resolve({ mac }) });
@@ -60,7 +60,7 @@ describe("v1 API contracts", () => {
     const detail = (await single.json()).device;
     expect(detail).toEqual(listed);
     expect(detail).toMatchObject({
-      manufacturer: null,
+      manufacturer: "Example Registrant",
       presence: "online",
       presenceCheckedAt: checkedAt.toISOString(),
       connectedAt: connectedAt.toISOString(),

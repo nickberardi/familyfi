@@ -301,6 +301,7 @@ model Device {
   connectedAt DateTime?
   connectionType String?
   accessPointName String?
+  manufacturer String?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 }
