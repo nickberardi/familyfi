@@ -41,8 +41,10 @@ describe("upstream probe schedule", () => {
 
   it("claims and sweeps when the scheduled instant has passed with no run recorded", async () => {
     await seedCategory();
-    await setHousehold({ dohProbeEnabled: true, dohProbeTime: "00:00", dohProbeLastRunAt: null });
-    const expectedDue = dueProbeRunAt(new Date(), "America/New_York", "00:00", [0, 1, 2, 3, 4, 5, 6]);
+    // Every day, so the most recent due instant is today's midnight whatever weekday the test runs on.
+    const everyDay = [0, 1, 2, 3, 4, 5, 6];
+    await setHousehold({ dohProbeEnabled: true, dohProbeTime: "00:00", dohProbeDays: everyDay, dohProbeLastRunAt: null });
+    const expectedDue = dueProbeRunAt(new Date(), "America/New_York", "00:00", everyDay);
     const claimed = await runProbeCatchUpForTests();
     expect(claimed).toBe(true);
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
