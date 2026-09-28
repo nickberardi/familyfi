@@ -59,8 +59,8 @@ importers:
         specifier: ^1.63.0
         version: 1.63.0
       '@redocly/cli':
-        specifier: ^2.53.3
-        version: 2.53.3
+        specifier: ^2.54.3
+        version: 2.54.3
       '@stryker-mutator/core':
         specifier: ^10.0.0
         version: 10.0.0(@types/node@26.6.2)
@@ -1245,8 +1245,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@redocly/cli@2.53.3':
-    resolution: {integrity: sha512-hzNAWzHCOZ05vwRx0ehTxNeJaxxizjGV505eKtfs9MR/8ieD/8lYhAK4GF5FaqRRwOEpLO0PvzQwBSKYXmxhRA==}
+  '@redocly/cli@2.54.3':
+    resolution: {integrity: sha512-tgjCjKm9NjcbN0N04dylwUw8eZzematq07JHm+dVyPkAfA/eZEN57En7jpUYrPvwOb53MJLfDB/0qJ5iz/4eHQ==}
     engines: {node: '>=22.12.0 || >=20.19.0 <21.0.0', npm: '>=10'}
     hasBin: true
 
@@ -4830,7 +4830,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@redocly/cli@2.53.3': {}
+  '@redocly/cli@2.54.3': {}
 
   '@rollup/rollup-android-arm-eabi@4.63.5':
     optional: true
