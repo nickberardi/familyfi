@@ -1,8 +1,9 @@
 const ACTION: Record<string, string> = {
-  pause: "Pause schedule",
-  resume: "Resume schedule",
+  pause: "Pause all internet",
+  resume: "Resume internet",
   extend: "Extend pause",
-  schedule: "Update bedtime",
+  allow: "Allow internet",
+  rule: "Update rule",
   group: "Update group",
   assignment: "Assign device",
   unifi: "Update UniFi settings",

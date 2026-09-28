@@ -3,7 +3,6 @@ import {
   assertSchedule,
   extendSuspensionUntil,
   inRecurringWindow,
-  isDesiredBlocked,
 } from "@/lib/schedule";
 
 const zone = "America/New_York";
@@ -122,45 +121,8 @@ describe("schedule windows across time zones", () => {
   });
 });
 
-describe("protection and pause", () => {
-  const bedtime = { enabled: true, days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" };
+describe("pause", () => {
   const now = at("2026-09-14T22:10:00-04:00");
-
-  it("does not block protected groups", () => {
-    expect(
-      isDesiredBlocked({
-        protected: true,
-        schedule: bedtime,
-        suspension: { active: false, until: null },
-        now,
-        timezone: zone,
-      }),
-    ).toBe(false);
-  });
-
-  it("pause suspends schedule enforcement", () => {
-    expect(
-      isDesiredBlocked({
-        protected: false,
-        schedule: bedtime,
-        suspension: { active: true, until: at("2026-09-14T23:00:00-04:00") },
-        now,
-        timezone: zone,
-      }),
-    ).toBe(false);
-  });
-
-  it("expired pause restores the schedule", () => {
-    expect(
-      isDesiredBlocked({
-        protected: false,
-        schedule: bedtime,
-        suspension: { active: true, until: at("2026-09-14T22:00:00-04:00") },
-        now,
-        timezone: zone,
-      }),
-    ).toBe(true);
-  });
 
   it("extends from the later of now and the existing expiry", () => {
     const existing = at("2026-09-14T23:00:00-04:00");

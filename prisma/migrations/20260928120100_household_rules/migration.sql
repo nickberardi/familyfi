@@ -126,8 +126,12 @@ WHERE "id" IN (SELECT "groupId" FROM "_bedtime") AND "suspensionActive";
 
 -- Any other unprotected group was blocked at all times unless paused. Blocking all
 -- internet is what a pause means now, so it stays blocked until someone resumes it.
--- One its parent had paused was online, and stays online.
-UPDATE "Group" SET "suspensionActive" = NOT "suspensionActive", "suspensionUntil" = NULL
+-- One paused with no end was online for good, and stays online. A timed pause was
+-- online only until its end (or had already ended); nothing can block again at that
+-- time now, so it is blocked straight away rather than left online for good.
+UPDATE "Group" SET
+  "suspensionActive" = NOT ("suspensionActive" AND "suspensionUntil" IS NULL),
+  "suspensionUntil" = NULL
 WHERE NOT "protected" AND "id" NOT IN (SELECT "groupId" FROM "_bedtime");
 
 DROP TABLE "_bedtime";

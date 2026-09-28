@@ -38,10 +38,10 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 
 | Layer | Convention | Example |
 | --- | --- | --- |
-| React components | `PascalCase.tsx`, one component per concept | `RuleRow.tsx`, `GroupCard.tsx` |
-| Logic modules (`lib/`, `server/`) | `kebab-case.ts` | `rule-rows.ts`, `unifi-settings.ts` |
+| React components | `PascalCase.tsx`, one component per concept | `RuleEditor.tsx`, `GroupCard.tsx` |
+| Logic modules (`lib/`, `server/`) | `kebab-case.ts` | `rule-writes.ts`, `unifi-settings.ts` |
 | Directories | lowercase, no separators | `components/ui`, `server/unifi` |
-| Functions, variables, props | `camelCase` | `buildRuleRows`, `parentFacingRuleLabel` |
+| Functions, variables, props | `camelCase` | `ruleWritePlan`, `parentFacingRuleLabel` |
 | Module constants | `SCREAMING_SNAKE` | `SESSION_TTL_MS`, `CURATED_CATEGORY_SLOTS` |
 | Prisma models / tables | `PascalCase`, singular | `Rule`, `RulePolicy`, `SyncRun` |
 | Columns and JSON fields | `camelCase` | `suspensionActive`, `targetIds` |

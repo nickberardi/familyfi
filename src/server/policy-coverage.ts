@@ -73,7 +73,7 @@ export async function storedCoverage(input: {
   now: Date;
   deviceInScope: (networkId: string | null) => boolean;
   policyScope?: { connectionIdentity: string; siteId: string };
-}): Promise<{ issues: CoverageIssue[]; pausePolicies: number; rulePolicies: number; policyErrors: number }> {
+}): Promise<{ issues: CoverageIssue[] }> {
   const { prisma } = await import("./db");
   const { isSuspended } = await import("@/lib/schedule");
   const [groups, devices, rules, pauses, rulePolicies] = await Promise.all([
@@ -96,11 +96,5 @@ export async function storedCoverage(input: {
       ...rulePolicies.map((row) => ({ ...row, groupIds: ruleGroups.get(row.ruleId) ?? [] })),
     ],
   });
-  const recorded = [...pauses, ...rulePolicies];
-  return {
-    issues,
-    pausePolicies: pauses.filter((row) => row.unifiPolicyId).length,
-    rulePolicies: rulePolicies.filter((row) => row.unifiPolicyId).length,
-    policyErrors: recorded.filter((row) => row.lastError).length,
-  };
+  return { issues };
 }

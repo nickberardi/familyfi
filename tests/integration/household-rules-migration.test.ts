@@ -32,6 +32,8 @@ beforeAll(async () => {
       ('bedtime-paused', 'family', 'Sam', false, 'scheduled', true, '{0,1,2,3,4,5,6}', '22:00', '07:00', true, '${UNTIL}', now()),
       ('always', 'things', 'TV', false, 'always', false, '{}', NULL, NULL, false, NULL, now()),
       ('always-paused', 'family', 'Robin', false, 'always', false, '{}', NULL, NULL, true, NULL, now()),
+      ('always-paused-timed', 'things', 'Console', false, 'always', false, '{}', NULL, NULL, true, '${UNTIL}', now()),
+      ('always-paused-ended', 'things', 'Tablet', false, 'always', false, '{}', NULL, NULL, true, '2020-01-01T00:00:00.000Z', now()),
       ('half-scheduled', 'family', 'Ava', false, 'scheduled', true, '{1}', NULL, NULL, false, NULL, now()),
       ('protected', 'family', 'Pat', true, 'always', false, '{}', NULL, NULL, false, NULL, now());
     INSERT INTO "AppPolicy" ("id", "connectionIdentity", "siteId", "unifiPolicyId", "ownerScope", "groupId", "zoneId", "ipVersion", "desiredFingerprint", "desiredRevision", "updatedAt") VALUES
@@ -97,8 +99,12 @@ describe("household rules migration", () => {
     expect(state).toEqual({
       // Always blocked: now paused until someone resumes it, on its old policy.
       always: [true, null, false, null],
-      // Paused while always blocked meant online: it stays online.
+      // Paused with no end while always blocked meant online for good: it stays online.
       "always-paused": [false, null, false, null],
+      // A timed pause was online only until its end; that end can't block again, so it blocks now.
+      "always-paused-timed": [true, null, false, null],
+      // A pause that had already ended left the group blocked: it stays blocked.
+      "always-paused-ended": [true, null, false, null],
       bedtime: [false, null, false, null],
       // A paused bedtime gave internet back until then: an allowance until the same time.
       "bedtime-paused": [false, null, true, UNTIL],

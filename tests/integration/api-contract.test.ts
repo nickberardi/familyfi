@@ -20,7 +20,7 @@ import { GET as getUnifi } from "@/app/api/v1/settings/unifi/route";
 import { prisma } from "@/server/db";
 import { AssignmentState } from "@prisma/client";
 import { authFromLogin, request } from "../helpers/http";
-import { INTERNAL_NETWORK, INTERNAL_ZONE, resetDatabase, seedDevice } from "../helpers/db";
+import { createFamilyGroup, INTERNAL_NETWORK, INTERNAL_ZONE, resetDatabase, seedDevice } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
@@ -237,6 +237,23 @@ describe("v1 API contracts", () => {
     const device = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
     expect(device.assignment).toBe(AssignmentState.quarantined);
     expect(device.groupId).toBeNull();
+  });
+
+  it("counts rule policies with app-owned policies on the sync page, and their errors as failing", async () => {
+    const auth = await signedIn();
+    const group = await createFamilyGroup("Sync");
+    const rule = await prisma().rule.findFirstOrThrow({ where: { groups: { some: { groupId: group.id } } }, include: { windows: true } });
+    const owned = { connectionIdentity: "console", siteId: "site", zoneId: INTERNAL_ZONE, desiredFingerprint: "fp", desiredRevision: 1 };
+    await prisma().appPolicy.create({ data: { ...owned, unifiPolicyId: "pol-quarantine", ownerScope: "quarantine", ipVersion: "dual" } });
+    await prisma().rulePolicy.create({
+      data: { ...owned, ruleId: rule.id, windowKey: rule.windows[0]!.id, unifiPolicyId: "pol-bedtime", lastError: "UniFi PUT failed: 400" },
+    });
+
+    const sync = await getSync(request("/api/v1/sync", { auth }));
+    expect(sync.status).toBe(200);
+    const body = (await sync.json()) as { appPolicyCount: number; failingCount: number };
+    expect(body.appPolicyCount).toBe(2);
+    expect(body.failingCount).toBe(1);
   });
 
   it("starts a group with no internet rule, and pauses and resumes all its internet", async () => {

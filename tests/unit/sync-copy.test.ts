@@ -3,7 +3,9 @@ import { changeActionLabel, changeResultLabel, relativeSweep, issueActionLabel, 
 
 describe("sync copy", () => {
   it("maps change scopes to parent-facing actions", () => {
-    expect(changeActionLabel("pause")).toBe("Pause schedule");
+    expect(changeActionLabel("pause")).toBe("Pause all internet");
+    expect(changeActionLabel("allow")).toBe("Allow internet");
+    expect(changeActionLabel("rule")).toBe("Update rule");
     expect(changeActionLabel("retry")).toBe("Reconcile sweep");
     expect(changeActionLabel("assignment")).toBe("Assign device");
   });
