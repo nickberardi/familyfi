@@ -9,7 +9,6 @@ import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
 import { GroupFilterMarks } from "@/components/FilterMarks";
 import { PauseSheet } from "@/components/PauseSheet";
-import { FilterSchedule } from "@/components/GroupCard";
 import { useFilterCatalog } from "@/components/GroupGrid";
 import { InternetZone } from "@/components/InternetZone";
 import { GroupResolverCard } from "@/components/upstream/GroupResolverCard";
@@ -132,100 +131,103 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   const windows = internetWindowsForGroup(rules, group.id);
 
   return (
-    <div className="flex flex-col gap-5 p-4 md:p-6">
+    <div className="flex flex-col gap-4 p-4 md:p-6">
       <header>
-        <Link href={kind === "family" ? "/family" : "/things"} className="text-[14px] font-semibold text-[var(--ff-accent)]">
-          Back
+        <Link href={kind === "family" ? "/family" : "/things"} className="w-fit text-[14px] font-semibold text-[var(--ff-accent)]">
+          ← Back to {kind === "family" ? "Family" : "Things"}
         </Link>
         <h1 className="mt-2 text-[21px] font-bold tracking-tight">{group.name}</h1>
-        <p className="mt-1 text-[14px]" style={{ color: accessColor(group.access) }}>
-          {cardStateLabel(group, windows, timezone, new Date())}
-        </p>
       </header>
-      <GroupEditForm key={group.id} group={group} />
-      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-        <div className="flex items-baseline border-b border-[var(--ff-hairline-card)] px-[18px] py-4">
-          <h2 className="flex-1 text-[14px] font-semibold">Current state</h2>
-          <Link href={`/rules?group=${group.id}`} className="text-[14px] font-semibold text-[var(--ff-accent)]">
-            Rules
-          </Link>
-        </div>
-        <div className="p-3">
-          <p className="mb-3 px-1.5 text-[14px] text-[var(--ff-muted)]">{cardNoteLine(group, windows)}</p>
-          <InternetZone
-            group={group}
-            windows={windows}
-            timezone={timezone}
-            surface="web"
-            onPause={() => setSheet("pause")}
-            onExtend={() => setSheet("extend")}
+      <div className="grid grid-cols-1 items-start gap-[18px] md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))]">
+        <div className="flex min-w-0 flex-col gap-[18px]">
+          <GroupEditForm key={group.id} group={group} />
+          <GroupResolverCard
+            groupId={group.id}
+            groupName={group.name}
+            dohOverrideUrl={group.dohOverrideUrl ?? null}
+            resolver={groupResolver}
+            onChanged={() => {
+              void reload();
+              void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
+                .then((res) => setGroupResolver(res.resolver))
+                .catch(() => setGroupResolver(null));
+            }}
           />
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+            <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
+            {members.length === 0 ? (
+              <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
+                No devices assigned.
+                {group.internetRuleIds.length || group.suspension.active ? (
+                  <>
+                    {" "}
+                    Its rules cannot apply on UniFi until you{" "}
+                    <Link href={`/devices?assign=${id}`} className="font-semibold text-[var(--ff-accent)]">
+                      assign a device
+                    </Link>
+                    .
+                  </>
+                ) : null}
+              </p>
+            ) : (
+              members.map((device) => (
+                <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
+                  <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{device.hostname ?? "Unnamed device"}</Link>
+                  <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
+                </div>
+              ))
+            )}
+          </section>
+          <button
+            type="button"
+            className="self-start text-[14px] font-semibold text-[var(--ff-danger)]"
+            onClick={() =>
+              void mutate(async () => {
+                const result = await api<{ change: { changeId: string } }>(`/api/v1/groups/${id}`, { method: "DELETE" });
+                router.replace(kind === "family" ? "/family" : "/things");
+                return { ...result, removedGroupId: id };
+              })
+            }
+          >
+            Delete group (devices become quarantined)
+          </button>
         </div>
-        {!group.protected ? (
-          <>
-            <GroupFilterMarks
-              group={group}
-              rules={rules}
-              catalogNames={catalogNames}
-              upstreamCategories={upstreamCategories}
-              timezone={timezone}
-              showAppAdd
-              onRulesChanged={() => void reload()}
-            />
-            <FilterSchedule group={group} rules={rules} catalogNames={catalogNames} timezone={timezone} />
-          </>
-        ) : null}
-      </section>
-      <GroupResolverCard
-        groupId={group.id}
-        groupName={group.name}
-        dohOverrideUrl={group.dohOverrideUrl ?? null}
-        resolver={groupResolver}
-        onChanged={() => {
-          void reload();
-          void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
-            .then((res) => setGroupResolver(res.resolver))
-            .catch(() => setGroupResolver(null));
-        }}
-      />
-      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-        <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
-        {members.length === 0 ? (
-          <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
-            No devices assigned.
-            {group.internetRuleIds.length || group.suspension.active ? (
+        <div className="flex min-w-0 flex-col gap-[18px]">
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+            <div className="px-[18px] pt-4 pb-3">
+              <h2 className="flex items-center gap-1.5 text-[14px] font-normal" style={{ color: accessColor(group.access) }}>
+                <span className="h-[7px] w-[7px] rounded-full" style={{ background: accessColor(group.access) }} />
+                {cardStateLabel(group, windows, timezone, new Date())}
+              </h2>
+              <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
+            </div>
+            <div className="px-3 pb-3">
+              <InternetZone
+                group={group}
+                windows={windows}
+                timezone={timezone}
+                surface="web"
+                onPause={() => setSheet("pause")}
+                onExtend={() => setSheet("extend")}
+                editHref={`/rules?group=${group.id}`}
+              />
+            </div>
+            {!group.protected ? (
               <>
-                {" "}
-                Its rules cannot apply on UniFi until you{" "}
-                <Link href={`/devices?assign=${id}`} className="font-semibold text-[var(--ff-accent)]">
-                  assign a device
-                </Link>
-                .
+                <GroupFilterMarks
+                  group={group}
+                  rules={rules}
+                  catalogNames={catalogNames}
+                  upstreamCategories={upstreamCategories}
+                  timezone={timezone}
+                  showAppAdd
+                  onRulesChanged={() => void reload()}
+                />
               </>
             ) : null}
-          </p>
-        ) : (
-          members.map((device) => (
-            <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
-              <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{device.hostname ?? "Unnamed device"}</Link>
-              <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
-            </div>
-          ))
-        )}
-      </section>
-      <button
-        type="button"
-        className="self-start text-[14px] font-semibold text-[var(--ff-danger)]"
-        onClick={() =>
-          void mutate(async () => {
-            const result = await api<{ change: { changeId: string } }>(`/api/v1/groups/${id}`, { method: "DELETE" });
-            router.replace(kind === "family" ? "/family" : "/things");
-            return { ...result, removedGroupId: id };
-          })
-        }
-      >
-        Delete group (devices become quarantined)
-      </button>
+          </section>
+        </div>
+      </div>
       {sheet ? <PauseSheet group={group} mode={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
     </div>
   );

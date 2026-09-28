@@ -41,7 +41,7 @@ import { FilterSheet, type FilterSheetState } from "@/components/filters/FilterS
 import { AddAppSheet } from "@/components/filters/AddAppSheet";
 import type { Group } from "@/lib/types";
 
-function SectionLabel({ children }: { children: ReactNode }) {
+export function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <div className="text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ color: "var(--ff-ink-2)" }}>
       {children}
@@ -50,7 +50,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 /** A 34px mark with its label and state word beneath, per the Card System. */
-function MarkButton({
+export function MarkButton({
   label,
   state,
   onClick,
@@ -89,6 +89,31 @@ function MarkButton({
       </span>
     </button>
   );
+}
+
+/** A curated category slot as a group sees it: its rule, its resolver's verdict and its mark state. */
+export type CategorySlotState = {
+  slot: (typeof CURATED_CATEGORY_SLOTS)[number];
+  rule: Rule | undefined;
+  check: ReturnType<typeof effectiveCheck>;
+  blocking: boolean;
+  state: CategoryMarkState;
+};
+
+export function categorySlotStates(
+  group: Group,
+  rules: Rule[],
+  upstreamCategories: UpstreamCategoryRow[],
+  timezone: string,
+): CategorySlotState[] {
+  return CURATED_CATEGORY_SLOTS.map((slot) => {
+    const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
+    // A rule blocking *right now* wins; otherwise this group's resolver decides.
+    const upstream = upstreamCategoryForSlot(upstreamCategories, slot.slot);
+    const check = upstream ? effectiveCheck(upstream.checks, group) : null;
+    const blocking = ruleActivelyBlocking(rule, timezone);
+    return { slot, rule, check, blocking, state: categoryMarkState(blocking, check) };
+  });
 }
 
 export function GroupFilterMarks({
@@ -131,7 +156,7 @@ export function GroupFilterMarks({
         data-testid={`filter-marks-${group.id}`}
       >
         <div className="px-[18px] pt-2">
-          <SectionLabel>Categories · each blocks only its own traffic</SectionLabel>
+          <SectionLabel>Category rules</SectionLabel>
           <div className="flex flex-wrap gap-3.5 py-2">
             {CURATED_CATEGORY_SLOTS.map((slot) => {
               const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);

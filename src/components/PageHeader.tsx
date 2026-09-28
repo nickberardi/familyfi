@@ -8,12 +8,15 @@ export function PageHeader({
   actionHref,
   actionLabel,
   onAction,
+  secondary,
 }: {
   title: string;
   sub: string;
   actionHref?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** A second, lesser header action, before the primary one. */
+  secondary?: ReactNode;
 }) {
   const { toggle } = useNavDrawer();
   let action: ReactNode = null;
@@ -54,6 +57,7 @@ export function PageHeader({
         <h1 className="m-0 text-[21px] font-bold tracking-tight">{title}</h1>
         <p className="mt-0.5 text-[14px] text-[var(--ff-muted)]">{sub}</p>
       </div>
+      {secondary}
       {action}
     </header>
   );

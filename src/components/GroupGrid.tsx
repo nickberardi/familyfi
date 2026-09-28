@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
-import { GroupFilterMarks } from "./FilterMarks";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
 import { GroupCard } from "./GroupCard";
 import { PageHeader } from "./PageHeader";
@@ -82,20 +81,10 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
               timezone={timezone}
               rules={rules}
               catalogNames={catalogNames}
+              upstreamCategories={upstreamCategories}
               onPause={() => setSheet({ group, mode: "pause" })}
               onExtend={() => setSheet({ group, mode: "extend" })}
-              filterMarks={
-                group.protected ? undefined : (
-                  <GroupFilterMarks
-                    group={group}
-                    rules={rules}
-                    catalogNames={catalogNames}
-                    upstreamCategories={upstreamCategories}
-                    timezone={timezone}
-                    onRulesChanged={() => void reload()}
-                  />
-                )
-              }
+              onRulesChanged={() => void reload()}
             />
           ))
         )}

@@ -25,6 +25,7 @@ export function InternetZone({
   surface,
   onPause,
   onExtend,
+  editHref,
 }: {
   group: Group;
   windows: InternetWindow[];
@@ -32,6 +33,8 @@ export function InternetZone({
   surface: "phone" | "web";
   onPause: () => void;
   onExtend: () => void;
+  /** Where "Edit internet rule" goes; omitted where the page already links to rules. */
+  editHref?: string;
 }) {
   const { mutate } = useAppData();
   const now = new Date();
@@ -49,7 +52,14 @@ export function InternetZone({
   const actions = groupActions(group, surface, onPause, onExtend, mutate).filter((action) => action.onClick);
   const bands: TimelineBand[] = internetDayBands(group, windows, now, timezone);
   const timeline = (
-    <DayTimeline bands={bands} timezone={timezone} label={`${group.name}’s internet today`} />
+    <>
+      <DayTimeline bands={bands} timezone={timezone} label={`${group.name}’s internet today`} />
+      {editHref ? (
+        <Link href={editHref} className="self-end text-[14px] font-semibold text-[var(--ff-accent)]">
+          Edit internet rule
+        </Link>
+      ) : null}
+    </>
   );
 
   if (state.state === "no_rule") {

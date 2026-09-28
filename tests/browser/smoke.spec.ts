@@ -299,7 +299,10 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
     // The card's internet zone shows both windows on today's bar, by name.
     await page.goto("/family");
     const card = page.locator("article").filter({ has: page.getByText(child!.name, { exact: true }) }).first();
+    // Cards start closed: the header opens the zones.
     const bar = card.getByRole("group", { name: `${child!.name}’s internet today` });
+    await expect(bar).toHaveCount(0);
+    await card.locator("button[aria-expanded=false]").first().click();
     await expect(bar.getByRole("button", { name: /^Bed, / }).first()).toBeVisible();
     await bar.getByRole("button", { name: /^Study, / }).click();
     await expect(card.getByText(`${ruleName} rule · Study`)).toBeVisible();
@@ -386,17 +389,19 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const marks = page.getByTestId(`filter-marks-${child!.id}`);
   await expect(marks).toBeVisible();
 
-  // Ensure Video starts Off (turn off if a prior run left it On).
-  if (await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).count()) {
-    await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
-    const turnOffSheet = page.getByRole("dialog");
-    await expect(turnOffSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
-    const offRes = page.waitForResponse(
-      (response) => response.request().method() === "POST" && /\/api\/v1\/rules\/[^/]+\/off/.test(response.url()),
-    );
-    await turnOffSheet.getByRole("button", { name: "Turn off" }).click();
-    expect((await offRes).ok()).toBeTruthy();
+  // Ensure Video starts Off (turn off a rule a prior run left on).
+  const rulesRes = await page.request.get("/api/v1/rules");
+  expect(rulesRes.ok()).toBeTruthy();
+  const { rules } = (await rulesRes.json()) as {
+    rules: { id: string; kind: string; enabled: boolean; groupIds: string[]; targetIds: number[] }[];
+  };
+  for (const rule of rules) {
+    if (rule.kind === "category" && rule.enabled && rule.groupIds.includes(child!.id) && rule.targetIds.includes(4)) {
+      const off = await page.request.post(`/api/v1/rules/${rule.id}/off`, { headers: await csrfHeaders(page) });
+      expect(off.ok()).toBeTruthy();
+    }
   }
+  await page.reload();
   // Video is left unmeasured by the mock seed, so with no rule it must read "not
   // blocked" — a mark with no verdict must never imply one. Social and Gaming carry
   // seeded verdicts and are asserted in upstream-marks.spec.
@@ -407,9 +412,13 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   // Protected: no marks
   await expect(page.getByTestId(`filter-marks-${protectedGroup!.id}`)).toHaveCount(0);
 
-  // Off → Create policy. With nothing measured the sheet must not claim anything
-  // about DNS either way.
+  // A mark opens the card on that category. With no rule and nothing measured, the
+  // zone and the sheet must not claim anything about DNS either way.
+  const card = page.locator("article").filter({ has: marks });
   await marks.getByRole("button", { name: /Video not blocked/i }).click();
+  await expect(card.locator("button[aria-expanded=true]")).toBeVisible();
+  await expect(card.getByText("· no rule · not checked")).toBeVisible();
+  await card.getByRole("button", { name: "Add rule" }).click();
   const offSheet = page.getByRole("dialog");
   await expect(offSheet.getByRole("heading", { name: /Nothing's blocking Video yet/i })).toBeVisible();
   await expect(offSheet.getByText(/DNS/i)).toHaveCount(0);
@@ -425,10 +434,14 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await offSheet.getByRole("button", { name: "Create policy" }).click();
   expect((await create).ok()).toBeTruthy();
 
-  await expect(marks.getByRole("button", { name: /Video blocked by FamilyFi/i })).toBeVisible();
+  // The focused zone now shows the rule, with a way to edit it.
+  await expect(card.getByRole("heading", { name: "Video · blocked" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "Edit rule" })).toBeVisible();
 
-  // On → Turn off
-  await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
+  // On the group's page, the mark opens the sheet: On → Turn off
+  await page.goto(`/family/${child!.id}`);
+  const detailMarks = page.getByTestId(`filter-marks-${child!.id}`);
+  await detailMarks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
   const onSheet = page.getByRole("dialog");
   await expect(onSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
   await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeVisible();
@@ -437,10 +450,9 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   );
   await onSheet.getByRole("button", { name: "Turn off" }).click();
   expect((await off).ok()).toBeTruthy();
-  await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
+  await expect(detailMarks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
 
   // GroupDetail: App + present
-  await page.goto(`/family/${child!.id}`);
   await expect(page.getByRole("button", { name: "Add app filter" })).toBeVisible();
   // No Category +
   await expect(page.getByRole("button", { name: "Add category filter" })).toHaveCount(0);

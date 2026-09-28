@@ -155,6 +155,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
   }
 
   async function save() {
+    if (busy) return;
     const problem = validate();
     if (problem) {
       setError(problem);
@@ -213,7 +214,24 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
 
   return (
     <>
-      <PageHeader title={title} sub={summary} onAction={() => void save()} actionLabel={saved ? "Save" : "Create rule"} />
+      <PageHeader
+        title={title}
+        sub={summary}
+        onAction={() => void save()}
+        actionLabel={saved ? "Save" : "Create rule"}
+        secondary={
+          saved ? (
+            <button
+              type="button"
+              className="rounded-lg px-3.5 py-2 text-[14px] font-semibold"
+              style={{ background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Delete rule…
+            </button>
+          ) : null
+        }
+      />
       <form
         className="flex max-w-[760px] flex-col gap-4 p-4 md:p-6"
         onSubmit={(event) => {
@@ -492,24 +510,6 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
           <Writes writes={writes} />
         </Section>
 
-        <div className="flex flex-wrap gap-2">
-          <button type="submit" disabled={busy} className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50">
-            {saved ? "Save" : "Create rule"}
-          </button>
-          <Link href={back} className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]">
-            Cancel
-          </Link>
-          {saved ? (
-            <button
-              type="button"
-              className="ml-auto rounded-lg px-3.5 py-2 text-[14px] font-semibold"
-              style={{ background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }}
-              onClick={() => setConfirmDelete(true)}
-            >
-              Delete rule…
-            </button>
-          ) : null}
-        </div>
       </form>
 
       {confirmDelete && saved ? (

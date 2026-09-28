@@ -31,6 +31,8 @@ export type IconName =
   | "copy"
   | "arrow-square-out"
   | "plus"
+  | "caret-up"
+  | "caret-down"
   // Rule kinds
   | "globe-simple"
   | "app-window"
