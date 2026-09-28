@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { watchGroupControlAllowed } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
-import { publicGroup } from "@/server/groups";
+import { groupInclude, publicGroup } from "@/server/groups";
 import { extendSuspensionUntil } from "@/lib/schedule";
 import { prisma } from "@/server/db";
 import { readJson, withMutation } from "@/server/guard";
@@ -32,7 +32,7 @@ export async function POST(request: Request, ctx: Ctx) {
     const group = await prisma().group.update({
       where: { id },
       data: { suspensionUntil: until },
-      include: { _count: { select: { devices: true } } },
+      include: groupInclude,
     });
     const change = await enqueueChange("extend");
     return Response.json({ group: publicGroup(group, household.timezone), change });

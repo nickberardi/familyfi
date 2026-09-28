@@ -1,4 +1,4 @@
-import { AssignmentState, GroupKind, FamilyRole } from "@prisma/client";
+import { AssignmentState, GroupKind, FamilyRole, RuleKind, RuleMode } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { ensureHousehold, ensureRecoveryAccount } from "@/server/auth";
 import { setAutoReconcileForTests, setReconcileClientForTests } from "@/server/reconciliation";
@@ -79,18 +79,32 @@ export async function configureConnectedHousehold(input?: {
   });
 }
 
+/** A child with a school-night Bedtime internet rule, 21:30–06:45 Monday to Friday. */
 export async function createFamilyGroup(name = "Betsy", role: FamilyRole = FamilyRole.child) {
-  return prisma().group.create({
+  const group = await prisma().group.create({
+    data: { kind: GroupKind.family, name, familyRole: role },
+  });
+  await createInternetRule([group.id]);
+  return group;
+}
+
+/** An internet rule with one window per entry (Bedtime, school nights, by default). */
+export async function createInternetRule(
+  groupIds: string[],
+  windows: { name?: string; days: number[]; start: string; end: string }[] = [
+    { name: "Bedtime", days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" },
+  ],
+  name = "Bedtime",
+) {
+  return prisma().rule.create({
     data: {
-      kind: GroupKind.family,
       name,
-      familyRole: role,
-      mode: "scheduled",
-      scheduleEnabled: true,
-      scheduleDays: [1, 2, 3, 4, 5],
-      scheduleStart: "21:30",
-      scheduleEnd: "06:45",
+      kind: RuleKind.internet,
+      mode: RuleMode.scheduled,
+      groups: { create: groupIds.map((groupId) => ({ groupId })) },
+      windows: { create: windows.map((window, position) => ({ position, name: window.name ?? "", days: window.days, start: window.start, end: window.end })) },
     },
+    include: { windows: true },
   });
 }
 

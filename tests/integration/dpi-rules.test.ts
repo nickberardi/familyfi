@@ -54,7 +54,7 @@ describe("Phase 2 DPI rules", () => {
           request("/api/v1/rules", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ kind: "category", groupId: "x", targetIds: [4] }),
+            body: JSON.stringify({ name: "Video", kind: "category", groupIds: ["x"], targetIds: [4], mode: "always" }),
           }),
         )
       ).status,
@@ -103,7 +103,7 @@ describe("Phase 2 DPI rules", () => {
         method: "POST",
         auth,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "category", groupId: protectedGroup.id, targetIds: [4] }),
+        body: JSON.stringify({ name: "Video", kind: "category", groupIds: [protectedGroup.id], targetIds: [4], mode: "always" }),
       }),
     );
     expect(denied.status).toBe(409);
@@ -127,8 +127,9 @@ describe("Phase 2 DPI rules", () => {
 
     const rule = await prisma().rule.create({
       data: {
+        name: "Video",
         kind: RuleKind.category,
-        groupId: group.id,
+        groups: { create: [{ groupId: group.id }] },
         targetIds: [4],
         enabled: true,
         mode: RuleMode.always,
@@ -172,8 +173,8 @@ describe("Phase 2 DPI rules", () => {
     expect(updateCall).toBeTruthy();
     expect((updateCall!.body as { enabled: boolean }).enabled).toBe(false);
 
-    // Internet AppPolicy should exist; capture ids before category delete.
-    const internetBefore = await prisma().appPolicy.findMany();
+    // The group's internet rule has its own policies; capture ids before category delete.
+    const internetBefore = await prisma().rulePolicy.findMany({ where: { ruleId: { not: rule.id } } });
     const internetUnifiIds = new Set(
       internetBefore.map((row) => row.unifiPolicyId).filter((id): id is string => Boolean(id)),
     );
@@ -186,7 +187,7 @@ describe("Phase 2 DPI rules", () => {
     await client.deletePolicy("11111111-1111-4111-8111-111111111111", dpiPolicyId);
     await prisma().rule.delete({ where: { id: rule.id } });
     // Recreate empty — ensure internet untouched
-    const internetAfter = await prisma().appPolicy.findMany();
+    const internetAfter = await prisma().rulePolicy.findMany();
     expect(internetAfter.map((r) => r.unifiPolicyId).sort()).toEqual([...internetUnifiIds].sort());
     expect(client.state.policies.some((p) => p.id === ADMIN_POLICY_ID)).toBe(true);
     expect(client.state.policies.some((p) => p.id === dpiPolicyId)).toBe(false);
@@ -229,8 +230,9 @@ describe("Phase 2 DPI rules", () => {
         auth,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          name: "Messaging",
           kind: "category",
-          groupId: group.id,
+          groupIds: [group.id],
           targetIds: [messaging!.categoryId],
           mode: "always",
         }),
@@ -281,7 +283,7 @@ describe("Phase 2 DPI rules", () => {
         method: "POST",
         auth,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "app", groupId: group.id, targetIds: [10001], mode: "always" }),
+        body: JSON.stringify({ name: "Fixture apps", kind: "app", groupIds: [group.id], targetIds: [10001], mode: "always" }),
       }),
     );
     expect(created.status).toBe(201);
@@ -326,7 +328,7 @@ describe("Phase 2 DPI rules", () => {
       { params: Promise.resolve({ id: createdBody.rule.id }) },
     );
     expect(deleted.status).toBe(200);
-    expect(await prisma().rule.count()).toBe(0);
+    expect(await prisma().rule.count({ where: { id: createdBody.rule.id } })).toBe(0);
     expect(client.state.policies.some((p) => p.id === ADMIN_POLICY_ID)).toBe(true);
   });
 });

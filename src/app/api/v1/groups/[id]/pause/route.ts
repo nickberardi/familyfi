@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { watchGroupControlAllowed } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
-import { publicGroup } from "@/server/groups";
+import { groupInclude, publicGroup, sessionActor } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -27,13 +27,22 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!existing) return jsonError(404, "not_found", "Group not found.");
     if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     if (existing.protected) return jsonError(409, "protected", "Protected groups cannot be paused.");
-    // Always and Scheduled both allow Pause (D1). mode=always has no bedtime schedule requirement.
+    // A pause blocks all internet now; it replaces any allowance.
     const until = parsed.data.until === undefined ? null : parsed.data.until === null ? null : new Date(parsed.data.until);
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const group = await prisma().group.update({
       where: { id },
-      data: { suspensionActive: true, suspensionUntil: until },
-      include: { _count: { select: { devices: true } } },
+      data: {
+        suspensionActive: true,
+        suspensionUntil: until,
+        suspendedByAccountId: sessionActor(session).accountId,
+        suspendedByName: sessionActor(session).name,
+        allowActive: false,
+        allowUntil: null,
+        allowedByAccountId: null,
+        allowedByName: null,
+      },
+      include: groupInclude,
     });
     const change = await enqueueChange("pause");
     return Response.json({ group: publicGroup(group, household.timezone), change });

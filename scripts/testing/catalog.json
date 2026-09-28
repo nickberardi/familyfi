@@ -117,12 +117,6 @@
         "display"
       ]
     },
-    "tests/unit/group-mode.test.ts": {
-      "categories": [
-        "groups",
-        "schedules"
-      ]
-    },
     "tests/unit/household-state.test.ts": {
       "categories": [
         "groups",
@@ -203,7 +197,7 @@
         "trust"
       ]
     },
-    "tests/unit/plan-dpi.test.ts": {
+    "tests/unit/plan-rules.test.ts": {
       "categories": [
         "rules",
         "sync"
@@ -249,6 +243,13 @@
     "tests/unit/rules.test.ts": {
       "categories": [
         "rules"
+      ]
+    },
+    "tests/unit/rule-windows.test.ts": {
+      "categories": [
+        "schedules",
+        "rules",
+        "display"
       ]
     },
     "tests/unit/schedule.test.ts": {
@@ -388,12 +389,6 @@
         "pairing"
       ]
     },
-    "tests/integration/d11-mode.test.ts": {
-      "categories": [
-        "groups",
-        "database"
-      ]
-    },
     "tests/integration/dev-mock.test.ts": {
       "categories": [
         "unifi"
@@ -409,6 +404,13 @@
         "rules"
       ]
     },
+    "tests/integration/rules-api.test.ts": {
+      "categories": [
+        "rules",
+        "schedules",
+        "groups"
+      ]
+    },
     "tests/integration/edge-auth.test.ts": {
       "categories": [
         "trust"
@@ -416,6 +418,13 @@
     },
     "tests/integration/group-detail-api.test.ts": {
       "categories": [
+        "groups"
+      ]
+    },
+    "tests/integration/household-rules-migration.test.ts": {
+      "categories": [
+        "database",
+        "rules",
         "groups"
       ]
     },

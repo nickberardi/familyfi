@@ -1,8 +1,6 @@
-import { AssignmentState, GroupKind, GroupMode } from "@prisma/client";
-import { isSuspended, type Schedule, type Suspension } from "@/lib/schedule";
-import { groupPolicyName, quarantinePolicyName } from "./names";
-import { toUnifiSchedule } from "./schedule-map";
-import type { UnifiFirewallSchedule } from "./types";
+import { AssignmentState, GroupKind } from "@prisma/client";
+import { isSuspended, type Suspension } from "@/lib/schedule";
+import { pausePolicyName, quarantinePolicyName } from "./names";
 
 export type PlannedPolicy = {
   key: string;
@@ -12,7 +10,6 @@ export type PlannedPolicy = {
   destinationZoneId: string;
   macAddresses: string[];
   enabled: boolean;
-  schedule?: UnifiFirewallSchedule;
   name: string;
 };
 
@@ -21,11 +18,6 @@ export type PlanGroup = {
   name: string;
   kind: GroupKind;
   protected: boolean;
-  mode: GroupMode;
-  scheduleEnabled: boolean;
-  scheduleDays: number[];
-  scheduleStart: string | null;
-  scheduleEnd: string | null;
   suspensionActive: boolean;
   suspensionUntil: Date | null;
 };
@@ -62,7 +54,8 @@ export function planPolicies(input: {
     if (owner.startsWith("group:")) {
       const group = groups.get(device.groupId!);
       if (!group) owner = "quarantine";
-      else if (group.protected) continue;
+      // A group's own policy is its pause: it exists only while the group is paused.
+      else if (group.protected || !paused(group, input.now)) continue;
     }
     if (device.inScope === false) {
       if (owner.startsWith("group:")) retainOwners.add(owner);
@@ -97,17 +90,14 @@ export function planPolicies(input: {
     const groupId = bucket.owner.slice("group:".length);
     const group = groups.get(groupId);
     if (!group || group.protected) continue;
-    const schedule = groupSchedule(group);
-    const suspension: Suspension = { active: group.suspensionActive, until: group.suspensionUntil };
     policies.push({
       key: bucket.owner + "|" + bucket.zoneId,
       ownerScope: "group",
       groupId,
       zoneId: bucket.zoneId,
       macAddresses: bucket.macs,
-      enabled: !isSuspended(suspension, input.now),
-      schedule: schedule ? toUnifiSchedule(schedule) : undefined,
-      name: groupPolicyName({
+      enabled: true,
+      name: pausePolicyName({
         name: group.name,
         kind: group.kind,
         zoneName: input.zoneNames?.[bucket.zoneId] ?? bucket.zoneId,
@@ -119,16 +109,9 @@ export function planPolicies(input: {
   return { policies, retainOwners };
 }
 
-/** Always → null (omit UniFi schedule). Scheduled → recurring window. */
-function groupSchedule(group: PlanGroup): Schedule | null {
-  if (group.mode === "always") return null;
-  if (!group.scheduleEnabled || !group.scheduleStart || !group.scheduleEnd) return null;
-  return {
-    enabled: true,
-    days: group.scheduleDays,
-    start: group.scheduleStart,
-    end: group.scheduleEnd,
-  };
+function paused(group: PlanGroup, now: Date): boolean {
+  const suspension: Suspension = { active: group.suspensionActive, until: group.suspensionUntil };
+  return isSuspended(suspension, now);
 }
 
 export function plannedKey(ownerScope: "group" | "quarantine", groupId: string | null, zoneId: string): string {

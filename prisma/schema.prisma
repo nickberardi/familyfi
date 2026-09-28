@@ -11,11 +11,6 @@ enum GroupKind {
   things
 }
 
-enum GroupMode {
-  always
-  scheduled
-}
-
 enum FamilyRole {
   child
   teen
@@ -219,13 +214,17 @@ model Group {
   monogram         String?
   familyRole       FamilyRole?
   protected        Boolean         @default(false)
-  mode             GroupMode       @default(always)
-  scheduleEnabled  Boolean         @default(false)
-  scheduleDays     Int[]           @default([])
-  scheduleStart    String?
-  scheduleEnd      String?
+  /// A pause blocks all internet for the group now, until `suspensionUntil` or until resumed.
   suspensionActive Boolean         @default(false)
   suspensionUntil  DateTime?
+  /// Who paused it, as they were named then. Not a relation: Account already refers to Group.
+  suspendedByAccountId String?
+  suspendedByName  String?
+  /// An allowance lifts the group's internet-rule windows until `allowUntil`, or until cancelled.
+  allowActive      Boolean         @default(false)
+  allowUntil       DateTime?
+  allowedByAccountId String?
+  allowedByName    String?
   dohOverrideUrl   String?
   upstreamResolverSnapshot Json?
   createdAt        DateTime        @default(now())
@@ -233,7 +232,7 @@ model Group {
   devices          Device[]
   accounts         Account[]
   appPolicies      AppPolicy[]
-  rules            Rule[]
+  rules            RuleGroup[]
   upstreamChecks   UpstreamCheck[]
 }
 
@@ -379,6 +378,8 @@ model ReconciliationLock {
 enum RuleKind {
   category
   app
+  internet
+  domain
 }
 
 enum RuleMode {
@@ -392,31 +393,57 @@ enum RuleScope {
 }
 
 model Rule {
-  id              String       @id @default(cuid())
-  kind            RuleKind
-  scope           RuleScope    @default(group)
-  groupId         String?
-  group           Group?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  networkIds      String[]     @default([])
-  targetIds       Int[]
-  enabled         Boolean      @default(true)
-  mode            RuleMode     @default(always)
-  scheduleEnabled Boolean      @default(false)
-  scheduleDays    Int[]        @default([])
-  scheduleStart   String?
-  scheduleEnd     String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  policies        RulePolicy[]
+  id               String       @id @default(cuid())
+  /// What the household calls it; UniFi policy names follow it.
+  name             String
+  /// Name the UniFi policies "FamilyFi Rule <id>" instead of after the rule.
+  useGeneratedName Boolean      @default(false)
+  kind             RuleKind
+  scope            RuleScope    @default(group)
+  networkIds       String[]     @default([])
+  targetIds        Int[]        @default([])
+  domains          String[]     @default([])
+  enabled          Boolean      @default(true)
+  mode             RuleMode     @default(always)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  groups           RuleGroup[]
+  windows          RuleWindow[]
+  policies         RulePolicy[]
 
-  @@index([groupId])
   @@index([scope])
+}
+
+model RuleGroup {
+  ruleId  String
+  rule    Rule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([ruleId, groupId])
+  @@index([groupId])
+}
+
+/// One recurring window of a scheduled rule. Each window is its own UniFi policy.
+model RuleWindow {
+  id       String @id @default(cuid())
+  ruleId   String
+  rule     Rule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  position Int
+  name     String @default("")
+  days     Int[]
+  start    String
+  end      String
+
+  @@index([ruleId])
 }
 
 model RulePolicy {
   id                  String    @id @default(cuid())
   ruleId              String
   rule                Rule      @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  /// The RuleWindow id this policy enforces, or "always" for an always-on rule.
+  windowKey           String    @default("always")
   connectionIdentity  String
   siteId              String
   unifiPolicyId       String?   @unique
@@ -430,7 +457,7 @@ model RulePolicy {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  @@unique([ruleId, connectionIdentity, siteId, zoneId])
+  @@unique([ruleId, windowKey, connectionIdentity, siteId, zoneId])
   @@index([connectionIdentity, siteId])
 }
 

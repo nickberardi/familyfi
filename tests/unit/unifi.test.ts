@@ -9,11 +9,11 @@ import { MockUnifiClient, createMockUnifiState } from "@/server/unifi/mock";
 import { mapClientsToZones, selectExternalZone } from "@/server/unifi/mapping";
 import { orderedPolicyIds, relativeOrderPreserved } from "@/server/unifi/ordering";
 import { internetBlockPolicy, spikePolicyName, toPolicyUpdate } from "@/server/unifi/payloads";
-import { toUnifiSchedule, unifiPolicyEnabled } from "@/server/unifi/schedule-map";
+import { toUnifiSchedule } from "@/server/unifi/schedule-map";
 import { sanitizeUnifiText } from "@/server/unifi/sanitize";
 import { applyInternetBlocks, discoverInventory, setPoliciesEnabled, deletePolicies } from "@/server/unifi/spike";
 import { planPolicies } from "@/server/unifi/plan";
-import { AssignmentState, GroupKind, GroupMode } from "@prisma/client";
+import { AssignmentState, GroupKind } from "@prisma/client";
 import { UNIFI_PAGE_LIMIT } from "@/server/unifi/types";
 import type { ClientOverview, FirewallPolicy, FirewallZone, NetworkDetails, UnifiPage } from "@/server/unifi/types";
 
@@ -104,35 +104,6 @@ describe("UniFi schedule mapping", () => {
 
   it("omits schedule when the group has none", () => {
     expect(toUnifiSchedule({ enabled: false, days: [], start: "21:00", end: "07:00" })).toBeUndefined();
-  });
-
-  it("pauses with enabled false and leaves quarantine on unless overridden", () => {
-    const now = new Date("2026-09-14T18:00:00Z");
-    expect(
-      unifiPolicyEnabled({
-        ownerScope: "group",
-        protected: false,
-        suspension: { active: true, until: null },
-        now,
-      }),
-    ).toBe(false);
-    expect(
-      unifiPolicyEnabled({
-        ownerScope: "quarantine",
-        protected: false,
-        suspension: { active: true, until: null },
-        now,
-      }),
-    ).toBe(true);
-    expect(
-      unifiPolicyEnabled({
-        ownerScope: "quarantine",
-        protected: false,
-        suspension: { active: false, until: null },
-        now,
-        quarantineEnforced: false,
-      }),
-    ).toBe(false);
   });
 });
 
@@ -242,14 +213,10 @@ describe("planPolicies", () => {
     name: "Betsy",
     kind: GroupKind.family,
     protected: false,
-    mode: GroupMode.scheduled,
-    scheduleEnabled: true,
-    scheduleDays: [1, 2, 3, 4, 5],
-    scheduleStart: "21:00",
-    scheduleEnd: "07:00",
     suspensionActive: false,
     suspensionUntil: null as Date | null,
   };
+  const paused = { ...child, suspensionActive: true };
 
   it("emits one always-on quarantine policy per source zone", () => {
     const { policies } = planPolicies({
@@ -265,7 +232,7 @@ describe("planPolicies", () => {
       ],
     });
     expect(policies).toHaveLength(2);
-    expect(policies.every((policy) => policy.ownerScope === "quarantine" && policy.enabled && !policy.schedule)).toBe(true);
+    expect(policies.every((policy) => policy.ownerScope === "quarantine" && policy.enabled)).toBe(true);
     expect(policies.find((policy) => policy.zoneId === "z1")?.macAddresses).toEqual(["aa:aa:aa:aa:aa:01", "aa:aa:aa:aa:aa:03"]);
     expect(policies.every((policy) => policy.destinationZoneId === destinationZoneId)).toBe(true);
     expect(policies.find((policy) => policy.zoneId === "z1")?.name).toBe("FamilyFi Quarantine Internal Devices");
@@ -287,70 +254,25 @@ describe("planPolicies", () => {
     expect(policies[0]?.enabled).toBe(false);
   });
 
-  it("skips protected groups and keeps bedtime schedule while Pause sets enabled false", () => {
-    const { policies } = planPolicies({
-      installId: "default",
-      now,
-      destinationZoneId,
-      zoneNames: { z1: "Internal" },
-      groups: [
-        child,
-        { ...child, id: "adult", protected: true },
-      ],
-      devices: [
-        { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" },
-        { mac: "aa:aa:aa:aa:aa:99", assignment: AssignmentState.assigned, groupId: "adult", zoneId: "z1" },
-      ],
-    });
-    expect(policies).toHaveLength(1);
-    expect(policies[0]?.enabled).toBe(true);
-    expect(policies[0]?.name).toBe("FamilyFi Betsy's Internet Access");
-    expect(policies[0]?.schedule?.mode).toBe("EVERY_WEEK");
+  it("plans a group's policy only while it is paused: an unscheduled block, never a protected group", () => {
+    const devices = [
+      { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" },
+      { mac: "aa:aa:aa:aa:aa:99", assignment: AssignmentState.assigned, groupId: "adult", zoneId: "z1" },
+    ];
+    const plan = (groups: (typeof child)[], at = now) =>
+      planPolicies({ installId: "default", now: at, destinationZoneId, zoneNames: { z1: "Internal" }, groups, devices }).policies;
 
-    const paused = planPolicies({
-      installId: "default",
-      now,
-      destinationZoneId,
-      groups: [{ ...child, suspensionActive: true, suspensionUntil: new Date("2026-09-14T18:00:00Z") }],
-      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" }],
-    });
-    expect(paused.policies[0]?.enabled).toBe(false);
-    expect(paused.policies[0]?.schedule?.mode).toBe("EVERY_WEEK");
-  });
+    expect(plan([child, { ...paused, id: "adult", protected: true }])).toEqual([]);
 
-  it("Always mode omits UniFi schedule; Pause disables; Resume restores permanent block", () => {
-    const always = { ...child, mode: GroupMode.always, scheduleEnabled: false };
-    const { policies } = planPolicies({
-      installId: "default",
-      now,
-      destinationZoneId,
-      zoneNames: { z1: "Internal" },
-      groups: [always],
-      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" }],
-    });
-    expect(policies).toHaveLength(1);
-    expect(policies[0]?.enabled).toBe(true);
-    expect(policies[0]?.schedule).toBeUndefined();
+    const [policy, ...rest] = plan([paused, { ...paused, id: "adult", protected: true }]);
+    expect(rest).toEqual([]);
+    expect(policy).toMatchObject({ ownerScope: "group", groupId: "kid", enabled: true, name: "FamilyFi Betsy's Internet Pause" });
+    expect(policy).not.toHaveProperty("schedule");
 
-    const paused = planPolicies({
-      installId: "default",
-      now,
-      destinationZoneId,
-      groups: [{ ...always, suspensionActive: true, suspensionUntil: null }],
-      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" }],
-    });
-    expect(paused.policies[0]?.enabled).toBe(false);
-    expect(paused.policies[0]?.schedule).toBeUndefined();
-
-    const resumed = planPolicies({
-      installId: "default",
-      now,
-      destinationZoneId,
-      groups: [{ ...always, suspensionActive: false, suspensionUntil: null }],
-      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" }],
-    });
-    expect(resumed.policies[0]?.enabled).toBe(true);
-    expect(resumed.policies[0]?.schedule).toBeUndefined();
+    const timed = { ...paused, suspensionUntil: new Date("2026-09-14T18:00:00Z") };
+    const adult = { ...child, id: "adult", protected: true };
+    expect(plan([timed, adult])).toHaveLength(1);
+    expect(plan([timed, adult], new Date("2026-09-14T18:00:00Z"))).toEqual([]);
   });
 
   it("does not drop existing owners when a MAC has no zone", () => {
@@ -358,7 +280,7 @@ describe("planPolicies", () => {
       installId: "default",
       now,
       destinationZoneId,
-      groups: [child],
+      groups: [paused],
       devices: [
         { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: null },
         { mac: "aa:aa:aa:aa:aa:02", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" },
@@ -371,7 +293,7 @@ describe("planPolicies", () => {
       installId: "default",
       now,
       destinationZoneId,
-      groups: [child],
+      groups: [paused],
       devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: null }],
     });
     expect(unresolvedOnly.policies).toHaveLength(0);
@@ -383,7 +305,7 @@ describe("planPolicies", () => {
       installId: "default",
       now,
       destinationZoneId,
-      groups: [{ ...child, id: "adult", protected: true }],
+      groups: [{ ...paused, id: "adult", protected: true }],
       devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "adult", zoneId: null }],
     });
     expect(planned.policies).toHaveLength(0);

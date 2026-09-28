@@ -2,7 +2,7 @@ import { FamilyRole } from "@prisma/client";
 import { z } from "zod";
 import { AssignmentState } from "@prisma/client";
 import { enqueueChange } from "@/server/changes";
-import { publicGroup } from "@/server/groups";
+import { groupInclude, publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -23,7 +23,7 @@ export async function GET(request: Request, ctx: Ctx) {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const group = await prisma().group.findUnique({
       where: { id },
-      include: { _count: { select: { devices: true } } },
+      include: groupInclude,
     });
     if (!group) return jsonError(404, "not_found", "Group not found.");
     return Response.json({ group: publicGroup(group, household.timezone) });
@@ -48,7 +48,7 @@ export async function PUT(request: Request, ctx: Ctx) {
         familyRole: parsed.data.familyRole === undefined ? undefined : (parsed.data.familyRole as FamilyRole | null),
         protected: parsed.data.protected,
       },
-      include: { _count: { select: { devices: true } } },
+      include: groupInclude,
     });
     const change = await enqueueChange("group");
     return Response.json({ group: publicGroup(group, household.timezone), change });
@@ -64,8 +64,12 @@ export async function DELETE(request: Request, ctx: Ctx) {
       where: { groupId: id },
       data: { groupId: null, assignment: AssignmentState.quarantined },
     });
-    // Delete recorded DPI UniFi policies before cascading Rule rows (D3).
-    const rules = await prisma().rule.findMany({ where: { groupId: id }, include: { policies: true } });
+    // A rule that covered only this group goes with it. Delete its recorded UniFi
+    // policies before the Rule rows cascade (D3). Rules shared with other groups stay.
+    const rules = await prisma().rule.findMany({
+      where: { scope: "group", groups: { some: { groupId: id }, every: { groupId: id } } },
+      include: { policies: true },
+    });
     const household = await prisma().household.findUnique({ where: { id: "default" } });
     if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
       try {
@@ -87,7 +91,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
       }
     }
     await prisma().rulePolicy.deleteMany({ where: { ruleId: { in: rules.map((r) => r.id) } } });
-    await prisma().rule.deleteMany({ where: { groupId: id } });
+    await prisma().rule.deleteMany({ where: { id: { in: rules.map((r) => r.id) } } });
     await prisma().group.delete({ where: { id } });
     const change = await enqueueChange("group");
     return Response.json({ ok: true, change });

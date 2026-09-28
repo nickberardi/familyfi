@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import { AssignmentState, FamilyRole, GroupKind, GroupMode } from "@prisma/client";
+import { AssignmentState, FamilyRole, GroupKind, RuleKind, RuleMode } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { createFixtureUnifiClient } from "@/server/unifi/dev-mock";
@@ -32,9 +32,18 @@ type Place = keyof typeof PLACES | "absent";
 
 type GroupSpec = {
   protected: boolean;
-  mode: GroupMode;
-  schedule: { days: number[]; start: string; end: string } | null;
   paused: boolean;
+  allowed: boolean;
+};
+
+type WindowSpec = { name: string; days: number[]; start: string; end: string };
+
+type RuleSpec = {
+  kind: "internet" | "category";
+  groups: number[];
+  always: boolean;
+  windows: WindowSpec[];
+  enabled: boolean;
 };
 
 type World = {
@@ -42,6 +51,7 @@ type World = {
   managed: string[];
   quarantineEnforced: boolean;
   groups: GroupSpec[];
+  rules: RuleSpec[];
   places: Place[];
   /** Each device's group once discovered, or null to leave it in quarantine. */
   assignments: (number | null)[];
@@ -53,7 +63,10 @@ type Step =
   | { kind: "protect"; group: number; value: boolean }
   | { kind: "pause"; group: number }
   | { kind: "resume"; group: number }
-  | { kind: "mode"; group: number; mode: GroupMode }
+  | { kind: "allow"; group: number }
+  | { kind: "disallow"; group: number }
+  | { kind: "toggleRule"; pick: number }
+  | { kind: "renameRule"; pick: number }
   | { kind: "move"; mac: number; place: Place }
   | { kind: "deleteGroup"; group: number }
   | { kind: "deleteDevice"; mac: number }
@@ -72,20 +85,26 @@ const world: fc.Arbitrary<World> = fc.record({
   managed: fc.subarray([INTERNAL_NETWORK, IOT_NETWORK]),
   quarantineEnforced: fc.boolean(),
   groups: fc.array(
+    fc.record({ protected: fc.boolean(), paused: fc.boolean(), allowed: fc.boolean() }),
+    { minLength: GROUP_COUNT, maxLength: GROUP_COUNT },
+  ),
+  rules: fc.array(
     fc.record({
-      protected: fc.boolean(),
-      mode: fc.constantFrom(GroupMode.always, GroupMode.scheduled),
-      schedule: fc.option(
+      kind: fc.constantFrom<RuleSpec["kind"]>("internet", "category"),
+      groups: fc.subarray([0, 1, 2]),
+      always: fc.boolean(),
+      windows: fc.array(
         fc.record({
+          name: fc.constantFrom("", "Homework", "Bedtime"),
           days: fc.subarray([0, 1, 2, 3, 4, 5, 6], { minLength: 1 }),
           start: fc.constantFrom("21:00", "21:30", "13:00"),
           end: fc.constantFrom("06:45", "07:00", "15:00"),
         }),
-        { nil: null },
+        { minLength: 1, maxLength: 2 },
       ),
-      paused: fc.boolean(),
+      enabled: fc.boolean(),
     }),
-    { minLength: GROUP_COUNT, maxLength: GROUP_COUNT },
+    { maxLength: 3 },
   ),
   places: fc.array(place, { minLength: MACS.length, maxLength: MACS.length }),
   assignments: fc.array(fc.option(groupIndex, { nil: null, freq: 3 }), { minLength: MACS.length, maxLength: MACS.length }),
@@ -98,7 +117,10 @@ const step: fc.Arbitrary<Step> = fc.oneof(
   fc.record({ kind: fc.constant("protect" as const), group: groupIndex, value: fc.boolean() }),
   fc.record({ kind: fc.constant("pause" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("resume" as const), group: groupIndex }),
-  fc.record({ kind: fc.constant("mode" as const), group: groupIndex, mode: fc.constantFrom(GroupMode.always, GroupMode.scheduled) }),
+  fc.record({ kind: fc.constant("allow" as const), group: groupIndex }),
+  fc.record({ kind: fc.constant("disallow" as const), group: groupIndex }),
+  fc.record({ kind: fc.constant("toggleRule" as const), pick: fc.nat() }),
+  fc.record({ kind: fc.constant("renameRule" as const), pick: fc.nat() }),
   fc.record({ kind: fc.constant("move" as const), mac: macIndex, place }),
   fc.record({ kind: fc.constant("deleteGroup" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("deleteDevice" as const), mac: macIndex }),
@@ -140,16 +162,28 @@ async function build(spec: World): Promise<{ client: Client; groupIds: string[];
         familyRole: FamilyRole.child,
         name: `Group ${n}`,
         protected: group.protected,
-        mode: group.mode,
-        scheduleEnabled: group.schedule !== null,
-        scheduleDays: group.schedule?.days ?? [],
-        scheduleStart: group.schedule?.start ?? null,
-        scheduleEnd: group.schedule?.end ?? null,
         suspensionActive: group.paused,
         suspensionUntil: group.paused ? PAUSED_UNTIL() : null,
+        allowActive: group.allowed,
+        allowUntil: group.allowed ? PAUSED_UNTIL() : null,
       },
     });
     groupIds.push(row.id);
+  }
+  for (const [n, rule] of spec.rules.entries()) {
+    // An internet rule always has windows: all-day blocking is a pause.
+    const always = rule.kind === "category" && rule.always;
+    await prisma().rule.create({
+      data: {
+        name: `Rule ${n}`,
+        kind: rule.kind === "internet" ? RuleKind.internet : RuleKind.category,
+        targetIds: rule.kind === "internet" ? [] : [4],
+        enabled: rule.enabled,
+        mode: always ? RuleMode.always : RuleMode.scheduled,
+        groups: { create: [...new Set(rule.groups)].map((index) => ({ groupId: groupIds[index]! })) },
+        windows: { create: always ? [] : rule.windows.map((window, position) => ({ ...window, position })) },
+      },
+    });
   }
   setReconcileClientForTests(client);
   return { client, groupIds, admin };
@@ -180,9 +214,23 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
     case "resume":
       await db.group.updateMany({ where: { id: groupId! }, data: { suspensionActive: false, suspensionUntil: null } });
       return;
-    case "mode":
-      await db.group.updateMany({ where: { id: groupId! }, data: { mode: change.mode } });
+    case "allow":
+      await db.group.updateMany({ where: { id: groupId! }, data: { allowActive: true, allowUntil: PAUSED_UNTIL() } });
       return;
+    case "disallow":
+      await db.group.updateMany({ where: { id: groupId! }, data: { allowActive: false, allowUntil: null } });
+      return;
+    case "toggleRule":
+    case "renameRule": {
+      const rules = await db.rule.findMany({ orderBy: { id: "asc" } });
+      if (!rules.length) return;
+      const rule = rules[change.pick % rules.length]!;
+      await db.rule.update({
+        where: { id: rule.id },
+        data: change.kind === "toggleRule" ? { enabled: !rule.enabled } : { name: `${rule.name} renamed` },
+      });
+      return;
+    }
     case "move":
       placeClient(client, change.mac, change.place);
       return;
@@ -197,13 +245,18 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
       return;
     case "consoleDelete":
     case "orphan": {
-      const records = await db.appPolicy.findMany({ where: { unifiPolicyId: { not: null } }, orderBy: { id: "asc" } });
+      const records = [
+        ...(await db.appPolicy.findMany({ where: { unifiPolicyId: { not: null } }, orderBy: { id: "asc" } })).map((row) => ({ table: "app" as const, row })),
+        ...(await db.rulePolicy.findMany({ where: { unifiPolicyId: { not: null } }, orderBy: { id: "asc" } })).map((row) => ({ table: "rule" as const, row })),
+      ];
       if (!records.length) return;
-      const record = records[change.pick % records.length];
+      const record = records[change.pick % records.length]!;
       if (change.kind === "consoleDelete") {
-        client.state.policies = client.state.policies.filter((policy) => policy.id !== record.unifiPolicyId);
+        client.state.policies = client.state.policies.filter((policy) => policy.id !== record.row.unifiPolicyId);
+      } else if (record.table === "app") {
+        await db.appPolicy.delete({ where: { id: record.row.id } });
       } else {
-        await db.appPolicy.delete({ where: { id: record.id } });
+        await db.rulePolicy.delete({ where: { id: record.row.id } });
       }
       return;
     }
@@ -213,17 +266,20 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
 /** Every rule the gateway must satisfy after a reconcile, checked from scratch. */
 async function checkGateway(client: Client, admin: Map<string, string>) {
   const db = prisma();
-  const [household, groups, devices, records] = await Promise.all([
+  const [household, groups, devices, records, rules, ruleRecords] = await Promise.all([
     db.household.findUniqueOrThrow({ where: { id: "default" } }),
     db.group.findMany(),
     db.device.findMany(),
     db.appPolicy.findMany(),
+    db.rule.findMany({ include: { groups: true, windows: true } }),
+    db.rulePolicy.findMany(),
   ]);
+  const now = new Date();
 
   // Administrator policies: untouched, byte for byte, whatever they are named.
   for (const [id, snapshot] of admin) {
-    const now = client.state.policies.find((policy) => policy.id === id);
-    expect(now && JSON.stringify(now), `administrator policy ${id}`).toBe(snapshot);
+    const current = client.state.policies.find((policy) => policy.id === id);
+    expect(current && JSON.stringify(current), `administrator policy ${id}`).toBe(snapshot);
   }
   for (const call of client.calls.filter((call) => WRITES.has(call.method))) {
     expect(call.path, "ordering is never written").not.toMatch(/ordering/);
@@ -233,51 +289,82 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
   // Ownership: every policy FamilyFi added is on record, and every record is on the gateway.
   const byId = new Map(client.state.policies.map((policy) => [policy.id, policy]));
   const recorded = new Map(records.filter((row) => row.unifiPolicyId).map((row) => [row.unifiPolicyId!, row]));
+  const ruleRecorded = new Map(ruleRecords.filter((row) => row.unifiPolicyId).map((row) => [row.unifiPolicyId!, row]));
   for (const policy of client.state.policies) {
-    if (!admin.has(policy.id)) expect(recorded.has(policy.id), `unrecorded policy ${policy.name}`).toBe(true);
+    if (!admin.has(policy.id)) expect(recorded.has(policy.id) || ruleRecorded.has(policy.id), `unrecorded policy ${policy.name}`).toBe(true);
   }
-  for (const id of recorded.keys()) expect(byId.has(id), `record ${id} points at no policy`).toBe(true);
+  for (const id of [...recorded.keys(), ...ruleRecorded.keys()]) expect(byId.has(id), `record ${id} points at no policy`).toBe(true);
   const owners = [...recorded.values()].map((row) => `${row.ownerScope}:${row.groupId}|${row.zoneId}`);
   expect(new Set(owners).size, "one policy per owner and zone").toBe(owners.length);
+  const ruleOwners = [...ruleRecorded.values()].map((row) => `${row.ruleId}:${row.windowKey}|${row.zoneId}`);
+  expect(new Set(ruleOwners).size, "one policy per rule window and zone").toBe(ruleOwners.length);
 
   const ours = [...recorded.entries()].map(([id, row]) => ({ row, policy: byId.get(id)! }));
+  const ourRules = [...ruleRecorded.entries()].map(([id, row]) => ({ row, policy: byId.get(id)! }));
   const inScope = (networkId: string | null) =>
     household.unifiManageAllNetworks || (networkId !== null && household.unifiManagedNetworkIds.includes(networkId));
   const groupById = new Map(groups.map((group) => [group.id, group]));
+  const active = (on: boolean, until: Date | null) => on && (!until || until > now);
+  const paused = (group: (typeof groups)[number]) => active(group.suspensionActive, group.suspensionUntil);
+  const allowed = (group: (typeof groups)[number]) => active(group.allowActive, group.allowUntil);
 
-  // Membership: a managed device sits in exactly the policy it belongs to, or in none.
   for (const device of devices) {
-    // Off a managed network, or in no known zone: its group's policy is kept on purpose.
+    // Off a managed network, or in no known zone: its group's policies are kept on purpose.
     if (!inScope(device.networkId) || !device.zoneId) continue;
     const group = device.assignment === AssignmentState.assigned && device.groupId ? groupById.get(device.groupId) : undefined;
     const holding = ours.filter(({ policy }) => policyMacs(policy).includes(device.mac));
+    const holdingRules = ourRules.filter(({ policy }) => policyMacs(policy).includes(device.mac));
     if (group?.protected) {
-      expect(holding.map(({ policy }) => policy.name), `${device.mac} in protected ${group.name}`).toEqual([]);
+      expect([...holding, ...holdingRules].map(({ policy }) => policy.name), `${device.mac} in protected ${group.name}`).toEqual([]);
       continue;
     }
-    expect(holding.length, `${device.mac} policies: ${holding.map(({ policy }) => policy.name).join(", ")}`).toBe(1);
-    const [{ row }] = holding;
-    expect(row.zoneId).toBe(device.zoneId);
-    if (group) expect([row.ownerScope, row.groupId]).toEqual(["group", group.id]);
-    else expect(row.ownerScope).toBe("quarantine");
+    if (!group) {
+      // Quarantine: its zone's quarantine policy, and no rule.
+      expect(holding.map(({ row }) => [row.ownerScope, row.zoneId]), `${device.mac} quarantine`).toEqual([["quarantine", device.zoneId]]);
+      expect(holdingRules, `${device.mac} quarantined but in a rule`).toEqual([]);
+      continue;
+    }
+    // Its group's pause policy while paused, and never another group's.
+    expect(holding.map(({ row }) => [row.ownerScope, row.groupId, row.zoneId]), `${device.mac} pause`).toEqual(
+      paused(group) ? [["group", group.id, device.zoneId]] : [],
+    );
+    // One policy per window of every rule covering its group, in its zone. An allowance
+    // takes it out of internet rules, unless no one is left and the policy is disabled.
+    for (const rule of rules.filter((rule) => rule.groups.some((link) => link.groupId === group.id))) {
+      const keys = rule.mode === RuleMode.always ? ["always"] : rule.windows.map((window) => window.id);
+      for (const key of keys) {
+        const found = ourRules.filter(({ row }) => row.ruleId === rule.id && row.windowKey === key && row.zoneId === device.zoneId);
+        expect(found.length, `${rule.name} ${key} policy in ${device.zoneId}`).toBe(1);
+        const { policy } = found[0]!;
+        const inside = policyMacs(policy).includes(device.mac);
+        if (rule.kind === RuleKind.internet && allowed(group)) {
+          expect(!inside || !policy.enabled, `${device.mac} allowed but held by ${policy.name}`).toBe(true);
+        } else {
+          expect(inside, `${device.mac} missing from ${policy.name}`).toBe(true);
+          expect(policy.enabled, `${policy.name} enabled`).toBe(rule.enabled);
+        }
+      }
+    }
   }
 
-  // Enforcement: pause disables a group's policies but keeps its schedule; quarantine
-  // follows the household switch.
+  // Enforcement: a pause is an unscheduled block, quarantine follows the household
+  // switch, and a rule's windows are UniFi schedules named after the rule.
   for (const { row, policy } of ours) {
     if (row.ownerScope === "quarantine") {
       expect(policy.enabled, `quarantine ${policy.name}`).toBe(household.quarantineEnforced);
       continue;
     }
-    const group = row.groupId ? groupById.get(row.groupId) : undefined;
-    if (!group) continue;
-    const paused = group.suspensionActive && (!group.suspensionUntil || group.suspensionUntil > new Date());
-    expect(policy.enabled, `${group.name} paused=${paused}`).toBe(!paused);
-    const schedule =
-      group.mode === GroupMode.scheduled && group.scheduleEnabled && group.scheduleStart && group.scheduleEnd
-        ? toUnifiSchedule({ enabled: true, days: group.scheduleDays, start: group.scheduleStart, end: group.scheduleEnd })
-        : undefined;
-    expect((policy as FirewallPolicy).schedule ?? undefined, `${group.name} schedule`).toEqual(schedule);
+    expect(policy.enabled, `pause ${policy.name}`).toBe(true);
+    expect((policy as FirewallPolicy).schedule ?? undefined, `pause ${policy.name} schedule`).toBeUndefined();
+  }
+  for (const { row, policy } of ourRules) {
+    const rule = rules.find((item) => item.id === row.ruleId);
+    if (!rule) continue;
+    if (!rule.enabled) expect(policy.enabled, `${policy.name} off`).toBe(false);
+    expect(policy.name.startsWith(`FamilyFi ${rule.name}`), policy.name).toBe(true);
+    const window = rule.windows.find((item) => item.id === row.windowKey);
+    const schedule = window ? toUnifiSchedule({ enabled: true, days: window.days, start: window.start, end: window.end }) : undefined;
+    expect((policy as FirewallPolicy).schedule ?? undefined, `${policy.name} schedule`).toEqual(schedule);
   }
 }
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.14.0
+  version: 0.15.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -637,49 +637,17 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/schedule:
-    put:
-      operationId: updateGroupSchedule
-      tags: [Groups]
-      summary: Set recurring bedtime
-      description: Persisted to UniFi policy schedule. Does not toggle enabled at window edges.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/GroupId" }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/Schedule" }
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
   /api/v1/groups/{id}/pause:
     post:
       operationId: pauseGroup
       tags: [Groups]
-      summary: Pause internet policy (Always or Scheduled)
-      description: Sets UniFi policy enabled false for Always or Scheduled modes. Omit until for an indefinite pause. Protected groups still return 409.
+      summary: Pause all internet for a group
+      description: |
+        Blocks all internet for every device in the group now, until `until` or until
+        resumed; omit `until` for an indefinite pause. FamilyFi writes an unscheduled
+        block policy that exists only while the group is paused. Records who paused and
+        ends any allowance. Category, app and website rules are unchanged. Protected
+        groups return 409.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/GroupId" }
@@ -719,7 +687,10 @@ paths:
     post:
       operationId: resumeGroup
       tags: [Groups]
-      summary: Resume internet policy (Always or Scheduled)
+      summary: Resume internet after a pause
+      description: |
+        Ends the pause. The group's internet rules still apply, so a window active now
+        keeps blocking until it ends or an allowance lifts it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/GroupId" }
@@ -727,6 +698,81 @@ paths:
       responses:
         "200":
           description: Resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/allow:
+    post:
+      operationId: allowGroup
+      tags: [Groups]
+      summary: Let a group online during its internet rules' windows
+      description: |
+        An allowance lifts the group's internet-rule windows until `until`: its devices
+        leave those rules' UniFi policies. Omit `until` to allow until the windows active
+        now end (409 `not_in_window` when none is active); `null` allows until cancelled.
+        Category, app and website rules keep applying. Ends any pause and records who
+        allowed it.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: cancelGroupAllowance
+      tags: [Groups]
+      summary: End an allowance
+      description: The group's internet rules apply again.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/GroupId" }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Allowance ended
           content:
             application/json:
               schema:
@@ -850,8 +896,8 @@ paths:
     get:
       operationId: listRules
       tags: [Rules]
-      summary: List category, app, and network-scoped rules
-      description: Internet parents are group schedule/mode rows, not returned here.
+      summary: List rules
+      description: Every rule, household-wide. `groupId` narrows to the rules covering that group.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: groupId
@@ -876,10 +922,12 @@ paths:
     post:
       operationId: createRule
       tags: [Rules]
-      summary: Create a category or app rule
+      summary: Create a rule
       description: |
-        Group/MAC scope only in Phase 2. Protected groups are rejected.
-        Stores UniFi DPI integer ids (no free-text category/app names in policy bodies).
+        A rule blocks all internet, DPI categories, apps or websites for one or more
+        groups (or managed networks), always or in named recurring windows. Each window
+        is its own UniFi policy. Protected groups are rejected. Category and app rules
+        store UniFi DPI integer ids.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -889,10 +937,17 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/RuleCreate" }
             examples:
+              bedtime:
+                value:
+                  name: School nights
+                  kind: internet
+                  groupIds: [grp_example]
+                  mode: scheduled
+                  windows: [{ name: "", days: [0, 1, 2, 3, 4], start: "21:00", end: "07:00" }]
               category:
-                value: { kind: category, groupId: grp_example, targetIds: [4], mode: always }
-              app:
-                value: { kind: app, groupId: grp_example, targetIds: [10001], mode: always }
+                value: { name: TV video evenings, kind: category, groupIds: [grp_tv], targetIds: [4], mode: scheduled, windows: [{ name: After school, days: [1, 2, 3, 4, 5], start: "16:00", end: "18:00" }] }
+              website:
+                value: { name: No TikTok, kind: domain, groupIds: [grp_example], domains: [tiktok.com], mode: always }
       responses:
         "201":
           description: Created
@@ -943,7 +998,11 @@ paths:
       operationId: updateRule
       tags: [Rules]
       summary: Update a rule
-      description: Update mode, schedule, enabled, or target ids. Internet policies are never mutated here.
+      description: |
+        Changes any field except `kind` and `scope`. `windows` replaces the whole list:
+        a window sent with its `id` keeps its UniFi policy (renamed or rescheduled in
+        place), one without an id is new, and a stored window left out is removed with
+        its policy.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -977,10 +1036,10 @@ paths:
     delete:
       operationId: deleteRule
       tags: [Rules]
-      summary: Delete a category or app rule
+      summary: Delete a rule
       description: |
-        Deletes the rule and its recorded UniFi policy ids only.
-        Internet AppPolicy rows are never touched.
+        Deletes the rule and the UniFi policies recorded for it, by id only. A group's
+        pause policy is never touched.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -1006,7 +1065,7 @@ paths:
       operationId: turnOffRule
       tags: [Rules]
       summary: Turn off a rule
-      description: Sets desired enabled false (UniFi Pause). Does not change Internet group policy.
+      description: Sets desired enabled false; the rule's policies stay on the gateway, disabled. A group's pause is unchanged.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -2453,20 +2512,58 @@ components:
         candidates:
           type: array
           items: { $ref: "#/components/schemas/CuratedCategoryCandidate" }
+    RuleWindow:
+      type: object
+      additionalProperties: false
+      required: [id, name, days, start, end]
+      description: |
+        One recurring window, and one UniFi policy. `days` are the days it starts on
+        (0 = Sunday); a window may cross midnight, so 22:00–06:00 on Friday ends Saturday.
+      properties:
+        id: { type: string }
+        name: { type: string, maxLength: 30, description: "Empty means \"Window n\" in policy names." }
+        days:
+          type: array
+          minItems: 1
+          items: { type: integer, minimum: 0, maximum: 6 }
+        start: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        end: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+    RuleWindowInput:
+      type: object
+      additionalProperties: false
+      required: [days, start, end]
+      properties:
+        id: { type: string, description: "A stored window's id, to keep its UniFi policy. Omit for a new window." }
+        name: { type: string, maxLength: 30 }
+        days:
+          type: array
+          minItems: 1
+          items: { type: integer, minimum: 0, maximum: 6 }
+        start: { type: string }
+        end: { type: string }
+    RuleKind:
+      type: string
+      enum: [internet, category, app, domain]
+      description: |
+        internet = all internet on every covered device; category / app = UniFi DPI ids in
+        `targetIds`; domain = the websites in `domains` and their subdomains, matched by
+        the gateway from DNS lookups (encrypted DNS can get around it).
     Rule:
       type: object
       additionalProperties: false
-      required: [id, kind, scope, groupId, networkIds, targetIds, enabled, mode, schedule, internet]
+      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, mode, windows, useGeneratedName, policyNames]
       properties:
         id: { type: string }
-        kind: { type: string, enum: [category, app] }
+        name: { type: string, minLength: 1, maxLength: 60 }
+        kind: { $ref: "#/components/schemas/RuleKind" }
         scope:
           type: string
           enum: [group, network]
-          description: group = member/Things MAC source; network = Settings-managed NETWORK source
-        groupId:
-          type: [string, "null"]
-          description: Required when scope=group; null for network-scoped rules
+          description: group = the covered groups' devices by MAC; network = Settings-managed NETWORK source
+        groupIds:
+          type: array
+          items: { type: string }
+          description: The groups the rule covers when scope=group; empty for network scope
         networkIds:
           type: array
           items: { type: string, format: uuid }
@@ -2474,28 +2571,46 @@ components:
         targetIds:
           type: array
           items: { type: integer }
-          minItems: 1
           maxItems: 100
+          description: DPI ids for category and app rules; empty otherwise
+        domains:
+          type: array
+          items: { type: string }
+          maxItems: 100
+          description: Website domains for domain rules; empty otherwise
         enabled: { type: boolean }
-        mode: { type: string, enum: [always, scheduled] }
-        schedule: { $ref: "#/components/schemas/Schedule" }
-        internet:
-          type: boolean
-          enum: [false]
-          description: Category/app rules are never Internet parents.
+        mode:
+          type: string
+          enum: [always, scheduled]
+          description: always = one policy with no schedule (never for internet rules); scheduled = one policy per window
+        windows:
+          type: array
+          items: { $ref: "#/components/schemas/RuleWindow" }
+          description: Empty when mode=always
+        useGeneratedName: { type: boolean, description: "Name its UniFi policies \"FamilyFi Rule <id>\" instead of after the rule." }
+        policyNames:
+          type: array
+          items: { type: string, maxLength: 100 }
+          description: |
+            What UniFi's policy table shows for the rule in the Internal zone, one per
+            policy: "FamilyFi " and the rule name, then " – " and the window name when it
+            has more than one window. Another zone's policy adds " (<zone>)".
     RuleCreate:
       type: object
       additionalProperties: false
-      required: [kind, targetIds]
+      required: [name, kind, mode]
       properties:
-        kind: { type: string, enum: [category, app] }
+        name: { type: string, minLength: 1, maxLength: 60 }
+        kind: { $ref: "#/components/schemas/RuleKind" }
         scope:
           type: string
           enum: [group, network]
           default: group
-          description: Omit or group for member scope; network requires managed networkIds (D9)
-        groupId:
-          type: string
+          description: Omit or group for member scope; network requires managed networkIds (D9) and is not allowed for internet rules
+        groupIds:
+          type: array
+          items: { type: string }
+          minItems: 1
           description: Required when scope is group (default)
         networkIds:
           type: array
@@ -2504,63 +2619,106 @@ components:
           description: Required when scope=network; must be Settings-managed (or any site network when manage-all)
         targetIds:
           type: array
-          items: { type: integer }
+          items: { type: integer, minimum: 0 }
           minItems: 1
           maxItems: 100
-        enabled: { type: boolean }
+          description: Required for category and app rules
+        domains:
+          type: array
+          items: { type: string }
+          minItems: 1
+          maxItems: 100
+          description: Required for domain rules. A pasted URL is reduced to its host.
+        enabled: { type: boolean, default: true }
         mode: { type: string, enum: [always, scheduled] }
-        schedule: { $ref: "#/components/schemas/Schedule" }
+        windows:
+          type: array
+          items: { $ref: "#/components/schemas/RuleWindowInput" }
+          minItems: 1
+          maxItems: 12
+          description: Required when mode=scheduled
+        useGeneratedName: { type: boolean, default: false }
     RuleUpdate:
       type: object
       additionalProperties: false
       properties:
-        targetIds:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        groupIds:
           type: array
-          items: { type: integer }
+          items: { type: string }
           minItems: 1
-          maxItems: 100
         networkIds:
           type: array
           items: { type: string, format: uuid }
           minItems: 1
           description: Only valid for network-scoped rules; managed ids only
+        targetIds:
+          type: array
+          items: { type: integer, minimum: 0 }
+          minItems: 1
+          maxItems: 100
+        domains:
+          type: array
+          items: { type: string }
+          minItems: 1
+          maxItems: 100
         enabled: { type: boolean }
         mode: { type: string, enum: [always, scheduled] }
-        schedule: { $ref: "#/components/schemas/Schedule" }
-    Schedule:
-      type: object
-      additionalProperties: false
-      required: [enabled, days, start, end]
-      properties:
-        enabled: { type: boolean }
-        days:
+        windows:
           type: array
-          items: { type: integer, minimum: 0, maximum: 6 }
-        start: { type: [string, "null"] }
-        end: { type: [string, "null"] }
+          items: { $ref: "#/components/schemas/RuleWindowInput" }
+          maxItems: 12
+        useGeneratedName: { type: boolean }
+    Actor:
+      type: [object, "null"]
+      additionalProperties: false
+      required: [accountId, name]
+      description: Who made the change, when known.
+      properties:
+        accountId: { type: [string, "null"] }
+        name: { type: string }
     Suspension:
       type: object
       additionalProperties: false
-      required: [active, until]
+      required: [active, until, by]
+      description: A pause blocks all internet for the group until `until`, or until resumed when null.
       properties:
         active: { type: boolean }
         until: { type: [string, "null"], format: date-time }
+        by: { $ref: "#/components/schemas/Actor" }
+    Allowance:
+      type: object
+      additionalProperties: false
+      required: [active, until, by]
+      description: An allowance lifts the group's internet-rule windows until `until`, or until cancelled when null.
+      properties:
+        active: { type: boolean }
+        until: { type: [string, "null"], format: date-time }
+        by: { $ref: "#/components/schemas/Actor" }
     Group:
       type: object
       additionalProperties: false
-      required: [id, kind, name, protected, mode, deviceCount, schedule, suspension, access, dohOverrideUrl]
+      required: [id, kind, name, protected, deviceCount, suspension, allowance, internetRuleIds, access, dohOverrideUrl]
       properties:
         id: { type: string }
         kind: { type: string, enum: [family, things] }
         name: { type: string }
         monogram: { type: [string, "null"] }
-        familyRole: { type: [string, "null"], enum: [child, teen, adult] }
+        familyRole: { type: [string, "null"], enum: [child, teen, adult, null] }
         protected: { type: boolean }
-        mode: { type: string, enum: [always, scheduled], description: "always = permanent internet block (UniFi schedule omitted); scheduled = bedtime window" }
         deviceCount: { type: integer, minimum: 0 }
-        schedule: { $ref: "#/components/schemas/Schedule" }
         suspension: { $ref: "#/components/schemas/Suspension" }
-        access: { type: string, enum: [available, blocked, paused, protected, always_on] }
+        allowance: { $ref: "#/components/schemas/Allowance" }
+        internetRuleIds:
+          type: array
+          items: { type: string }
+          description: The group's internet rules. Empty means nothing limits its internet.
+        access:
+          type: string
+          enum: [available, blocked, paused, allowed, protected]
+          description: |
+            paused = a pause blocks all internet; blocked = an internet rule's window is
+            active; allowed = an allowance lifts an active window; available otherwise.
         dohOverrideUrl:
           type: [string, "null"]
           description: |
@@ -2582,7 +2740,7 @@ components:
       properties:
         name: { type: string }
         monogram: { type: [string, "null"] }
-        familyRole: { type: [string, "null"], enum: [child, teen, adult] }
+        familyRole: { type: [string, "null"], enum: [child, teen, adult, null] }
         protected: { type: boolean }
     Device:
       type: object

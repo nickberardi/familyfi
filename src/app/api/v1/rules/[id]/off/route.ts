@@ -2,22 +2,20 @@ import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { publicRule } from "@/server/rules";
+import { publicRule, ruleInclude } from "@/server/rules";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** Per-rule off — desired enabled:false (UniFi Pause semantics). Internet policy untouched. */
+/** Turns a rule off: its policies stay, disabled. A group's pause is untouched. */
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const existing = await prisma().rule.findUnique({ where: { id }, include: { group: true } });
+    const existing = await prisma().rule.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Rule not found.");
-    if (existing.group?.protected) {
-      return jsonError(409, "protected", "Protected groups cannot have category or app rules.");
-    }
     const rule = await prisma().rule.update({
       where: { id },
       data: { enabled: false },
+      include: ruleInclude,
     });
     const change = await enqueueChange("rule");
     return Response.json({ rule: publicRule(rule), change });

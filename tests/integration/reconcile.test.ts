@@ -154,7 +154,7 @@ describe("reconciliation against mocked UniFi", () => {
     expect((await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } })).manufacturer).toBeNull();
   });
 
-  it("moves MACs from quarantine to a group policy on assignment", async () => {
+  it("moves MACs from quarantine to the group's rule policies on assignment", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
     await runReconcileOnce();
@@ -165,7 +165,7 @@ describe("reconciliation against mocked UniFi", () => {
     });
     await runReconcileOnce();
 
-    const groupPolicy = client.state.policies.find((policy) => policy.name.includes("Betsy"));
+    const groupPolicy = client.state.policies.find((policy) => policy.name === "FamilyFi Bedtime");
     expect(policyMacs(groupPolicy ?? {})).toContain("02:00:00:00:00:01");
     const quarantine = client.state.policies.filter((policy) => policy.name.includes("Quarantine"));
     expect(quarantine.some((policy) => policyMacs(policy).includes("02:00:00:00:00:01"))).toBe(false);
@@ -182,7 +182,7 @@ describe("reconciliation against mocked UniFi", () => {
       data: { groupId: group.id, assignment: AssignmentState.assigned },
     });
     await runReconcileOnce();
-    expect(client.state.policies.some((policy) => policy.name.includes("Betsy") && policyMacs(policy).includes(mac))).toBe(true);
+    expect(client.state.policies.some((policy) => policy.name === "FamilyFi Bedtime" && policyMacs(policy).includes(mac))).toBe(true);
 
     await prisma().device.delete({ where: { mac } });
     await runReconcileOnce();
@@ -190,7 +190,7 @@ describe("reconciliation against mocked UniFi", () => {
     expect(rediscovered.id).not.toBe(assigned.id);
     expect(rediscovered.groupId).toBeNull();
     expect(rediscovered.assignment).toBe(AssignmentState.quarantined);
-    expect(client.state.policies.some((policy) => policy.name.includes("Betsy") && policyMacs(policy).includes(mac))).toBe(false);
+    expect(client.state.policies.some((policy) => policy.name === "FamilyFi Bedtime" && policyMacs(policy).includes(mac))).toBe(false);
     expect(client.state.policies.some((policy) => policy.name.includes("Quarantine") && policyMacs(policy).includes(mac))).toBe(true);
     expect(client.state.policies.find((policy) => policy.id === ADMIN_POLICY_ID)?.name).toBe("Allow LAN DNS");
     expect(client.calls.some((call) => (call.method === "PUT" || call.method === "DELETE") && call.path.includes(ADMIN_POLICY_ID))).toBe(false);
@@ -209,19 +209,19 @@ describe("reconciliation against mocked UniFi", () => {
     const group = await createFamilyGroup();
     await prisma().device.update({ where: { mac }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
     await runReconcileOnce();
-    const recorded = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
+    const recorded = await prisma().rulePolicy.findFirstOrThrow();
 
-    // Someone removes FamilyFi's policy on the console; the group then changes.
+    // Someone removes FamilyFi's policy on the console; the rule then changes.
     client.state.policies = client.state.policies.filter((policy) => policy.id !== recorded.unifiPolicyId);
-    await prisma().group.update({ where: { id: group.id }, data: { suspensionActive: true } });
+    await prisma().rule.update({ where: { id: recorded.ruleId }, data: { name: "School nights" } });
     expect(await runReconcileOnce()).toBe(true);
 
-    const replacement = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    const replacement = await prisma().rulePolicy.findUniqueOrThrow({ where: { id: recorded.id } });
     expect(replacement.unifiPolicyId).not.toBe(recorded.unifiPolicyId);
     expect(replacement.lastError).toBeNull();
     const policy = client.state.policies.find((item) => item.id === replacement.unifiPolicyId);
     expect(policyMacs(policy ?? {})).toContain(mac);
-    expect(policy?.enabled).toBe(false);
+    expect(policy?.name).toBe("FamilyFi School nights");
   });
 
   it("notices a policy removed on the console even when nothing else changed", async () => {
@@ -247,14 +247,14 @@ describe("reconciliation against mocked UniFi", () => {
     const group = await createFamilyGroup();
     await prisma().device.update({ where: { mac }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
     await runReconcileOnce();
-    const groupPolicy = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
+    const groupPolicy = await prisma().rulePolicy.findFirstOrThrow();
 
     // The policy is deleted on the console, then the group no longer needs one.
     client.state.policies = client.state.policies.filter((policy) => policy.id !== groupPolicy.unifiPolicyId);
     await prisma().device.update({ where: { mac }, data: { groupId: null, assignment: AssignmentState.quarantined } });
     await runReconcileOnce();
 
-    expect(await prisma().appPolicy.findUnique({ where: { id: groupPolicy.id } })).toBeNull();
+    expect(await prisma().rulePolicy.findUnique({ where: { id: groupPolicy.id } })).toBeNull();
     const run = await prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } });
     expect(run?.status).toBe("applied");
   });
@@ -267,10 +267,10 @@ describe("reconciliation against mocked UniFi", () => {
     const group = await createFamilyGroup();
     await prisma().device.update({ where: { mac }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
     await runReconcileOnce();
-    const groupPolicy = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
+    const groupPolicy = await prisma().rulePolicy.findFirstOrThrow();
 
     // A delete elsewhere dropped the record but the UniFi delete failed: the policy is orphaned.
-    await prisma().appPolicy.delete({ where: { id: groupPolicy.id } });
+    await prisma().rulePolicy.delete({ where: { id: groupPolicy.id } });
     await prisma().device.update({ where: { mac }, data: { groupId: null, assignment: AssignmentState.quarantined } });
     await prisma().group.delete({ where: { id: group.id } });
     await runReconcileOnce();
@@ -337,8 +337,9 @@ describe("reconciliation against mocked UniFi", () => {
     await runReconcileOnce();
     const refreshed = await prisma().group.findUniqueOrThrow({ where: { id: group.id } });
     expect(refreshed.suspensionActive).toBe(false);
-    const policy = client.state.policies.find((item) => item.name.includes("Betsy"));
-    expect(policy?.enabled).toBe(true);
+    // The pause has ended, so its policy is gone; the bedtime rule's stays enabled.
+    expect(client.state.policies.some((item) => item.name.includes("Betsy"))).toBe(false);
+    expect(client.state.policies.find((item) => item.name === "FamilyFi Bedtime")?.enabled).toBe(true);
     expect(await prisma().device.findUnique({ where: { mac: "aa:aa:aa:aa:aa:99" } })).toBeTruthy();
   });
 

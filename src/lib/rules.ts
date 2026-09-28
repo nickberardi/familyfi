@@ -1,17 +1,43 @@
 /** Client-safe rule helpers + curated slots (mirrors server curated-categories). */
 
+export type RuleKind = "internet" | "category" | "app" | "domain";
+
+export type RuleWindow = { id?: string; name: string; days: number[]; start: string; end: string };
+
 export type Rule = {
   id: string;
-  kind: "category" | "app";
+  name: string;
+  kind: RuleKind;
   scope: "group" | "network";
-  groupId: string | null;
+  groupIds: string[];
   networkIds: string[];
   targetIds: number[];
+  domains: string[];
   enabled: boolean;
   mode: "always" | "scheduled";
-  schedule: { enabled: boolean; days: number[]; start: string | null; end: string | null };
-  internet: false;
+  windows: (RuleWindow & { id: string })[];
+  useGeneratedName: boolean;
+  policyNames: string[];
 };
+
+export const MAX_RULE_NAME = 60;
+export const MAX_WINDOW_NAME = 30;
+export const MAX_RULE_WINDOWS = 12;
+export const MAX_RULE_DOMAINS = 100;
+
+const HOSTNAME = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/;
+
+/**
+ * "https://www.TikTok.com/foryou" → "www.tiktok.com". The gateway blocks a domain and its
+ * subdomains. Null when what is left is not a hostname with a dot.
+ */
+export function normalizeDomain(raw: string): string | null {
+  let value = raw.trim().toLowerCase();
+  value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
+  value = value.replace(/[/?#].*$/, "").replace(/:\d+$/, "").replace(/\.$/, "");
+  if (value.startsWith("*.")) value = value.slice(2);
+  return HOSTNAME.test(value) ? value : null;
+}
 
 export type CuratedSlot = "video" | "social" | "gaming" | "vpn" | "messaging";
 
@@ -36,7 +62,12 @@ export const CURATED_CATEGORY_SLOTS: readonly CuratedCategorySlot[] = [
 ] as const;
 
 export function groupScopedRules(rules: Rule[], groupId: string): Rule[] {
-  return rules.filter((rule) => rule.scope === "group" && rule.groupId === groupId);
+  return rules.filter((rule) => rule.scope === "group" && rule.groupIds.includes(groupId));
+}
+
+/** The group's internet rules, oldest first. */
+export function internetRulesForGroup(rules: Rule[], groupId: string): Rule[] {
+  return groupScopedRules(rules, groupId).filter((rule) => rule.kind === "internet");
 }
 
 /** Find the category rule for a curated slot (prefer enabled). */
@@ -67,7 +98,7 @@ export function parentFacingRuleLabel(
     const single = catalogNames.get(`${rule.kind}:${rule.targetIds[0]}`);
     if (single) return single;
   }
-  return rule.kind === "category" ? "Category" : "App";
+  return rule.kind === "category" ? "Category" : rule.kind === "app" ? "App" : rule.name;
 }
 
 export function glyphForAppName(name: string): string {

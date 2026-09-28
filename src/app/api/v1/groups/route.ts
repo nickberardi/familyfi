@@ -1,7 +1,7 @@
 import { FamilyRole, GroupKind } from "@prisma/client";
 import { z } from "zod";
 import { enqueueChange } from "@/server/changes";
-import { publicGroup } from "@/server/groups";
+import { groupInclude, publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -17,7 +17,7 @@ const Create = z.object({
 export async function GET(request: Request) {
   return withSession(request, async () => {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    const groups = await prisma().group.findMany({ include: { _count: { select: { devices: true } } }, orderBy: { createdAt: "asc" } });
+    const groups = await prisma().group.findMany({ include: groupInclude, orderBy: { createdAt: "asc" } });
     return Response.json({ groups: groups.map((group) => publicGroup(group, household.timezone)) });
   });
 }
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         familyRole: parsed.data.familyRole as FamilyRole | undefined,
         protected: parsed.data.protected ?? false,
       },
-      include: { _count: { select: { devices: true } } },
+      include: groupInclude,
     });
     const change = await enqueueChange("group");
     return Response.json({ group: publicGroup(group, household.timezone), change }, { status: 201 });

@@ -1,6 +1,6 @@
 import { enqueueChange } from "@/server/changes";
 import { watchGroupControlAllowed } from "@/server/auth";
-import { publicGroup } from "@/server/groups";
+import { groupInclude, publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -16,8 +16,8 @@ export async function POST(request: Request, ctx: Ctx) {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const group = await prisma().group.update({
       where: { id },
-      data: { suspensionActive: false, suspensionUntil: null },
-      include: { _count: { select: { devices: true } } },
+      data: { suspensionActive: false, suspensionUntil: null, suspendedByAccountId: null, suspendedByName: null },
+      include: groupInclude,
     });
     const change = await enqueueChange("resume");
     return Response.json({ group: publicGroup(group, household.timezone), change });

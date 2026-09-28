@@ -64,7 +64,7 @@ describe("policy ownership guard", () => {
       data: { ...onRecord, unifiPolicyId: ours.id, ownerScope: PolicyOwnerScope.quarantine, ipVersion: "dual" },
     });
     const forRule = await guarded.createPolicy(SITE_ID, blockPolicy());
-    const rule = await prisma().rule.create({ data: { kind: RuleKind.category, targetIds: [1] } });
+    const rule = await prisma().rule.create({ data: { name: "Rule", kind: RuleKind.category, targetIds: [1] } });
     await prisma().rulePolicy.create({ data: { ...onRecord, ruleId: rule.id, unifiPolicyId: forRule.id } });
     const justCreated = await guarded.createPolicy(SITE_ID, blockPolicy());
     await prisma().policyOperation.create({
@@ -117,7 +117,7 @@ describe("policy ownership guard", () => {
     const scope = ownershipScope(await household());
     const guarded = withPolicyOwnership(client, scope);
     const forRule = await guarded.createPolicy(SITE_ID, blockPolicy());
-    const rule = await prisma().rule.create({ data: { kind: RuleKind.category, targetIds: [1] } });
+    const rule = await prisma().rule.create({ data: { name: "Rule", kind: RuleKind.category, targetIds: [1] } });
     await prisma().rulePolicy.create({
       data: {
         ruleId: rule.id,

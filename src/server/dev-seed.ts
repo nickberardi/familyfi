@@ -1,4 +1,4 @@
-import { AccountKind, AssignmentState, FamilyRole, GroupKind, UpstreamVerdict } from "@prisma/client";
+import { AccountKind, AssignmentState, FamilyRole, GroupKind, RuleKind, RuleMode, UpstreamVerdict } from "@prisma/client";
 import { hashPassword } from "./auth";
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
@@ -55,28 +55,10 @@ async function ensureDummyHouseholdMembers() {
     data: { kind: GroupKind.family, name: "Pat", familyRole: FamilyRole.adult, protected: true },
   });
   const child = await prisma().group.create({
-    data: {
-      kind: GroupKind.family,
-      name: "Betsy",
-      familyRole: FamilyRole.child,
-      mode: "scheduled",
-      scheduleEnabled: true,
-      scheduleDays: [1, 2, 3, 4, 5],
-      scheduleStart: "21:30",
-      scheduleEnd: "06:45",
-    },
+    data: { kind: GroupKind.family, name: "Betsy", familyRole: FamilyRole.child },
   });
   const teen = await prisma().group.create({
-    data: {
-      kind: GroupKind.family,
-      name: "Sam",
-      familyRole: FamilyRole.teen,
-      mode: "scheduled",
-      scheduleEnabled: true,
-      scheduleDays: [0, 1, 2, 3, 4, 5, 6],
-      scheduleStart: "22:30",
-      scheduleEnd: "07:00",
-    },
+    data: { kind: GroupKind.family, name: "Sam", familyRole: FamilyRole.teen },
   });
   // Paused, so the card's paused ink and its Resume/Extend actions are visible.
   const paused = await prisma().group.create({
@@ -84,32 +66,20 @@ async function ensureDummyHouseholdMembers() {
       kind: GroupKind.family,
       name: "Robin",
       familyRole: FamilyRole.teen,
-      mode: "scheduled",
-      scheduleEnabled: true,
-      scheduleDays: [1, 2, 3, 4, 5],
-      scheduleStart: "22:00",
-      scheduleEnd: "06:30",
       suspensionActive: true,
       suspensionUntil: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      suspendedByName: "Pat",
     },
   });
   // A things group carries the 44px monogram tile a person's card goes without.
   const things = await prisma().group.create({
-    data: {
-      kind: GroupKind.things,
-      name: "Living Room",
-      monogram: "TV",
-      mode: "scheduled",
-      scheduleEnabled: true,
-      scheduleDays: [0, 1, 2, 3, 4, 5, 6],
-      scheduleStart: "23:00",
-      scheduleEnd: "07:00",
-    },
+    data: { kind: GroupKind.things, name: "Living Room", monogram: "TV" },
   });
-  // No devices and no schedule — the emptiest comfortable card there is.
+  // No devices and no rules: the emptiest card, and the "no internet rule" state.
   await prisma().group.create({
     data: { kind: GroupKind.things, name: "Smart Home", monogram: "IOT" },
   });
+  await seedRules({ child: child.id, teen: teen.id, paused: paused.id, things: things.id });
 
   const password = recoveryPassword();
   await prisma().account.create({
@@ -172,6 +142,62 @@ async function ensureDummyHouseholdMembers() {
       },
     ],
   });
+}
+
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+const SCHOOL_DAYS = [1, 2, 3, 4, 5];
+const SCHOOL_NIGHTS = [0, 1, 2, 3, 4];
+
+/**
+ * One rule of every shape the Rules page and the cards draw: internet windows (two for
+ * one child, a rule shared by two teens, two windows in one rule for the TV), a category
+ * schedule on a group with no internet rule of its own kind (the TV's Video, US-7), an
+ * always-on website rule, and a group with no rule at all.
+ */
+async function seedRules(groups: { child: string; teen: string; paused: string; things: string }) {
+  const rule = (input: {
+    name: string;
+    kind: RuleKind;
+    groupIds: string[];
+    windows?: { name: string; days: number[]; start: string; end: string }[];
+    targetIds?: number[];
+    domains?: string[];
+  }) =>
+    prisma().rule.create({
+      data: {
+        name: input.name,
+        kind: input.kind,
+        targetIds: input.targetIds ?? [],
+        domains: input.domains ?? [],
+        mode: input.windows ? RuleMode.scheduled : RuleMode.always,
+        groups: { create: input.groupIds.map((groupId) => ({ groupId })) },
+        windows: { create: (input.windows ?? []).map((window, position) => ({ ...window, position })) },
+      },
+    });
+  await rule({ name: "Bedtime", kind: RuleKind.internet, groupIds: [groups.child], windows: [{ name: "Bedtime", days: EVERY_DAY, start: "21:30", end: "06:45" }] });
+  await rule({ name: "Homework", kind: RuleKind.internet, groupIds: [groups.child], windows: [{ name: "Homework", days: SCHOOL_DAYS, start: "15:00", end: "18:00" }] });
+  await rule({ name: "School nights", kind: RuleKind.internet, groupIds: [groups.teen, groups.paused], windows: [{ name: "", days: SCHOOL_NIGHTS, start: "22:30", end: "07:00" }] });
+  await rule({
+    name: "TV downtime",
+    kind: RuleKind.internet,
+    groupIds: [groups.things],
+    windows: [
+      { name: "Dinner", days: EVERY_DAY, start: "18:00", end: "20:00" },
+      { name: "Overnight", days: EVERY_DAY, start: "23:00", end: "07:00" },
+    ],
+  });
+  await rule({
+    name: "TV video evenings",
+    kind: RuleKind.category,
+    groupIds: [groups.things],
+    targetIds: [4],
+    windows: [
+      { name: "After school", days: SCHOOL_DAYS, start: "16:00", end: "18:00" },
+      { name: "Late", days: EVERY_DAY, start: "21:00", end: "23:00" },
+    ],
+  });
+  await rule({ name: "Late gaming", kind: RuleKind.category, groupIds: [groups.teen], targetIds: [8], windows: [{ name: "Late", days: EVERY_DAY, start: "21:00", end: "23:00" }] });
+  await rule({ name: "No TikTok", kind: RuleKind.domain, groupIds: [groups.teen, groups.paused], domains: ["tiktok.com", "tiktokcdn.com"] });
 }
 
 /**

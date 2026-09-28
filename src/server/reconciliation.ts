@@ -10,18 +10,11 @@ import { withPolicyOwnership } from "./unifi/policy-ownership";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
-import {
-  dpiAppBlockPolicy,
-  dpiAppNetworkBlockPolicy,
-  dpiCategoryBlockPolicy,
-  dpiCategoryNetworkBlockPolicy,
-  internetBlockPolicy,
-  toPolicyUpdate,
-} from "./unifi/payloads";
+import { internetBlockPolicy, toPolicyUpdate } from "./unifi/payloads";
 import { networkInScope } from "./unifi/scope";
-import { coverageIssues, isWriteFailure } from "./policy-coverage";
+import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
-import { planDpiPolicies, plannedDpiKey, type PlannedDpiPolicy } from "./unifi/plan-dpi";
+import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicyWrite } from "./unifi/types";
 
@@ -122,7 +115,11 @@ async function tick(owner: string): Promise<boolean> {
   const now = new Date();
   await prisma().group.updateMany({
     where: { suspensionActive: true, suspensionUntil: { not: null, lte: now } },
-    data: { suspensionActive: false, suspensionUntil: null },
+    data: { suspensionActive: false, suspensionUntil: null, suspendedByAccountId: null, suspendedByName: null },
+  });
+  await prisma().group.updateMany({
+    where: { allowActive: true, allowUntil: { not: null, lte: now } },
+    data: { allowActive: false, allowUntil: null, allowedByAccountId: null, allowedByName: null },
   });
 
   const household = await prisma().household.findUnique({ where: { id: "default" } });
@@ -264,7 +261,6 @@ async function tick(owner: string): Promise<boolean> {
         destinationZoneId: planned.destinationZoneId,
         macAddresses: planned.macAddresses,
         enabled: planned.enabled,
-        schedule: planned.schedule,
       });
       const fingerprint = policyFingerprint(write);
       const existing = appPolicies.find(
@@ -321,15 +317,19 @@ async function tick(owner: string): Promise<boolean> {
       }
     }
 
-    const rules = await prisma().rule.findMany();
+    const rules = await prisma().rule.findMany({ include: { groups: true, windows: true } });
     const rulePolicies = await prisma().rulePolicy.findMany({
       where: { connectionIdentity: identity, siteId },
     });
-    const { policies: desiredDpi, retainRuleIds, orphanRuleIds } = planDpiPolicies({
-      now,
+    const { policies: desiredRules, retainRuleIds, orphanRuleIds } = planRulePolicies({
       destinationZoneId: external.id,
       zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
-      groups,
+      groups: groups.map((group) => ({
+        id: group.id,
+        kind: group.kind,
+        protected: group.protected,
+        allowed: group.allowActive && (group.allowUntil === null || now < group.allowUntil),
+      })),
       devices: devices.map((device) => ({
         ...device,
         inScope: networkInScope(scope, device.networkId),
@@ -340,62 +340,18 @@ async function tick(owner: string): Promise<boolean> {
         zoneId: network.zoneId ?? null,
       })),
       networkScope: scope,
-      rules: rules.map((rule) => ({
-        ...rule,
-        groupId: rule.groupId,
-        networkIds: rule.networkIds,
-        scope: rule.scope,
-      })),
+      rules: rules.map((rule) => ({ ...rule, groupIds: rule.groups.map((link) => link.groupId) })),
     });
-    const desiredDpiKeys = new Set(desiredDpi.map((item) => item.key));
+    const desiredRuleKeys = new Set(desiredRules.map((item) => item.key));
 
-    for (const planned of desiredDpi) {
-      const write =
-        planned.sourceType === "NETWORK"
-          ? planned.kind === "category"
-            ? dpiCategoryNetworkBlockPolicy({
-                name: planned.name,
-                sourceZoneId: planned.zoneId,
-                destinationZoneId: planned.destinationZoneId,
-                networkIds: planned.networkIds,
-                applicationCategoryIds: planned.targetIds,
-                enabled: planned.enabled,
-                schedule: planned.schedule,
-              })
-            : dpiAppNetworkBlockPolicy({
-                name: planned.name,
-                sourceZoneId: planned.zoneId,
-                destinationZoneId: planned.destinationZoneId,
-                networkIds: planned.networkIds,
-                applicationIds: planned.targetIds,
-                enabled: planned.enabled,
-                schedule: planned.schedule,
-              })
-          : planned.kind === "category"
-            ? dpiCategoryBlockPolicy({
-                name: planned.name,
-                sourceZoneId: planned.zoneId,
-                destinationZoneId: planned.destinationZoneId,
-                macAddresses: planned.macAddresses,
-                applicationCategoryIds: planned.targetIds,
-                enabled: planned.enabled,
-                schedule: planned.schedule,
-              })
-            : dpiAppBlockPolicy({
-                name: planned.name,
-                sourceZoneId: planned.zoneId,
-                destinationZoneId: planned.destinationZoneId,
-                macAddresses: planned.macAddresses,
-                applicationIds: planned.targetIds,
-                enabled: planned.enabled,
-                schedule: planned.schedule,
-              });
+    for (const planned of desiredRules) {
+      const write = rulePolicyWrite(planned);
       const fingerprint = policyFingerprint(write);
       const existing = rulePolicies.find(
-        (row) => plannedDpiKey(row.ruleId, row.zoneId) === planned.key && row.connectionIdentity === identity,
+        (row) => plannedRuleKey(row.ruleId, row.windowKey, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredDpiPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
+        await applyDesiredRulePolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -408,6 +364,7 @@ async function tick(owner: string): Promise<boolean> {
           await prisma().rulePolicy.create({
             data: {
               ruleId: planned.ruleId,
+              windowKey: planned.windowKey,
               connectionIdentity: identity,
               siteId,
               zoneId: planned.zoneId,
@@ -422,8 +379,8 @@ async function tick(owner: string): Promise<boolean> {
     }
 
     for (const row of rulePolicies) {
-      const key = plannedDpiKey(row.ruleId, row.zoneId);
-      if (desiredDpiKeys.has(key)) continue;
+      const key = plannedRuleKey(row.ruleId, row.windowKey, row.zoneId);
+      if (desiredRuleKeys.has(key)) continue;
       if (retainRuleIds.has(row.ruleId)) continue;
       if (!row.unifiPolicyId) {
         await prisma().rulePolicy.delete({ where: { id: row.id } });
@@ -455,14 +412,10 @@ async function tick(owner: string): Promise<boolean> {
     failed += orphanErrors.length;
     errors.push(...orphanErrors);
 
-    const livePolicies = await prisma().appPolicy.findMany({ where: { connectionIdentity: identity, siteId } });
-    const issues = coverageIssues({
-      groups,
-      devices: devices.map((device) => ({
-        ...device,
-        inScope: networkInScope(scope, device.networkId),
-      })),
-      policies: livePolicies,
+    const { issues } = await storedCoverage({
+      now,
+      deviceInScope: (networkId) => networkInScope(scope, networkId),
+      policyScope: { connectionIdentity: identity, siteId },
     });
     for (const issue of issues.filter(isWriteFailure)) {
       failed += 1;
@@ -625,12 +578,12 @@ async function applyDesiredPolicy(
 }
 
 
-async function applyDesiredDpiPolicy(
+async function applyDesiredRulePolicy(
   client: UnifiClient,
   siteId: string,
   identity: string,
   revision: number,
-  planned: PlannedDpiPolicy,
+  planned: PlannedRulePolicy,
   write: FirewallPolicyWrite,
   fingerprint: string,
   existing:
@@ -682,6 +635,7 @@ async function applyDesiredDpiPolicy(
         await prisma().rulePolicy.create({
           data: {
             ruleId: planned.ruleId,
+            windowKey: planned.windowKey,
             connectionIdentity: identity,
             siteId,
             zoneId: planned.zoneId,
@@ -728,6 +682,7 @@ async function applyDesiredDpiPolicy(
   await prisma().rulePolicy.create({
     data: {
       ruleId: planned.ruleId,
+      windowKey: planned.windowKey,
       connectionIdentity: identity,
       siteId,
       unifiPolicyId: created.id,

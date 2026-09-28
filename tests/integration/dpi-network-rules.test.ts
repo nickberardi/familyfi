@@ -66,10 +66,12 @@ describe("Phase 3 network-scoped DPI", () => {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
+              name: "Video",
               kind: "category",
               scope: "network",
               networkIds: [INTERNAL_NETWORK],
               targetIds: [4],
+              mode: "always",
             }),
           }),
         )
@@ -85,10 +87,12 @@ describe("Phase 3 network-scoped DPI", () => {
         auth,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          name: "Video",
           kind: "category",
           scope: "network",
           networkIds: [IOT_NETWORK],
           targetIds: [4],
+          mode: "always",
         }),
       }),
     );
@@ -106,10 +110,12 @@ describe("Phase 3 network-scoped DPI", () => {
         auth,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          name: "Video",
           kind: "category",
           scope: "network",
           networkIds: [INTERNAL_NETWORK],
           targetIds: [4],
+          mode: "always",
         }),
       }),
     );
@@ -128,6 +134,7 @@ describe("Phase 3 network-scoped DPI", () => {
         auth,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          name: "Video",
           kind: "category",
           scope: "network",
           networkIds: [INTERNAL_NETWORK],
@@ -138,10 +145,10 @@ describe("Phase 3 network-scoped DPI", () => {
     );
     expect(created.status).toBe(201);
     const createdBody = (await created.json()) as {
-      rule: { id: string; scope: string; networkIds: string[]; groupId: string | null };
+      rule: { id: string; scope: string; networkIds: string[]; groupIds: string[] };
     };
     expect(createdBody.rule.scope).toBe("network");
-    expect(createdBody.rule.groupId).toBeNull();
+    expect(createdBody.rule.groupIds).toEqual([]);
     expect(createdBody.rule.networkIds).toEqual([INTERNAL_NETWORK]);
 
     expect(await runReconcileOnce()).toBe(true);
@@ -206,9 +213,9 @@ describe("Phase 3 network-scoped DPI", () => {
 
     const rule = await prisma().rule.create({
       data: {
+        name: "Network rule",
         kind: RuleKind.category,
         scope: RuleScope.network,
-        groupId: null,
         networkIds: [INTERNAL_NETWORK, IOT_NETWORK],
         targetIds: [8],
         enabled: true,
@@ -217,9 +224,9 @@ describe("Phase 3 network-scoped DPI", () => {
     });
     const orphanOnly = await prisma().rule.create({
       data: {
+        name: "Network rule",
         kind: RuleKind.app,
         scope: RuleScope.network,
-        groupId: null,
         networkIds: [IOT_NETWORK],
         targetIds: [10001],
         enabled: true,
@@ -248,6 +255,7 @@ describe("Phase 3 network-scoped DPI", () => {
     const auth = await signedIn();
     await prisma().rule.create({
       data: {
+        name: "Network rule",
         kind: RuleKind.category,
         scope: RuleScope.network,
         networkIds: [INTERNAL_NETWORK],
@@ -272,6 +280,7 @@ describe("Phase 3 network-scoped DPI", () => {
     const auth = await signedIn();
     await prisma().rule.create({
       data: {
+        name: "Network rule",
         kind: RuleKind.category,
         scope: RuleScope.network,
         networkIds: [INTERNAL_NETWORK],
