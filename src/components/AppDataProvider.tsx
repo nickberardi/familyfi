@@ -12,7 +12,11 @@ import {
   type MutationPayload,
 } from "@/lib/household-state";
 import { beginMutate, canCommitMutate, type MutateGate } from "@/lib/mutate-gate";
+import type { Rule } from "@/lib/rules";
 import type { Account, Device, Group, Session, SyncStatus, UnifiSettings } from "@/lib/types";
+
+/** A notice that can take its change back, such as the Undo after a pause. */
+export type NoticeAction = { label: string; run: () => Promise<unknown> };
 
 type Household = HouseholdPublic;
 
@@ -20,6 +24,8 @@ type AppData = {
   session: Session | null;
   groups: Group[];
   devices: Device[];
+  /** Every household rule. Cards read their internet windows and category schedules from it. */
+  rules: Rule[];
   sync: SyncStatus | null;
   unifi: UnifiSettings | null;
   household: Household | null;
@@ -27,10 +33,12 @@ type AppData = {
   loading: boolean;
   error: string;
   notice: string;
+  noticeAction: NoticeAction | null;
   reload: () => Promise<void>;
   mutate: (
     run: () => Promise<unknown>,
     optimistic?: (state: HouseholdLists) => HouseholdLists,
+    feedback?: { notice: string; action?: NoticeAction },
   ) => Promise<MutationPayload | undefined>;
   dismissFeedback: () => void;
   busy: boolean;
@@ -42,6 +50,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [unifi, setUnifi] = useState<UnifiSettings | null>(null);
   const [household, setHousehold] = useState<Household | null>(null);
@@ -49,6 +58,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeAction, setNoticeAction] = useState<NoticeAction | null>(null);
   const [busy, setBusy] = useState(false);
   const listsRef = useRef<HouseholdLists>({ groups: [], devices: [] });
   const loadGen = useRef(0);
@@ -64,6 +74,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const dismissFeedback = useCallback(() => {
     setError("");
     setNotice("");
+    setNoticeAction(null);
   }, []);
 
   const commitLists = useCallback((next: HouseholdLists) => {
@@ -85,9 +96,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
       throw err;
     }
-    const [groupsRes, devicesRes, syncRes, unifiRes, householdRes, accountsRes] = await Promise.all([
+    const [groupsRes, devicesRes, rulesRes, syncRes, unifiRes, householdRes, accountsRes] = await Promise.all([
       api<{ groups: Group[] }>("/api/v1/groups"),
       api<{ devices: Device[] }>("/api/v1/devices"),
+      api<{ rules: Rule[] }>("/api/v1/rules"),
       api<SyncStatus>("/api/v1/sync"),
       api<{ unifi: UnifiSettings }>("/api/v1/settings/unifi"),
       api<{ household: Household }>("/api/v1/settings/household"),
@@ -98,6 +110,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setSession(sessionRes.session);
     setGroups(groupsRes.groups);
     setDevices(devicesRes.devices);
+    setRules(rulesRes.rules);
     setSync(syncRes);
     setUnifi(unifiRes.unifi);
     setHousehold(householdRes.household);
@@ -129,14 +142,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!notice || error) return;
-    const timer = window.setTimeout(() => setNotice(""), 6000);
+    // A notice with an Undo stays long enough to use it.
+    const timer = window.setTimeout(() => {
+      setNotice("");
+      setNoticeAction(null);
+    }, noticeAction ? 12_000 : 6000);
     return () => window.clearTimeout(timer);
-  }, [notice, error]);
+  }, [notice, error, noticeAction]);
 
   const mutate = useCallback(
-    async (run: () => Promise<unknown>, optimistic?: (state: HouseholdLists) => HouseholdLists) => {
+    async (
+      run: () => Promise<unknown>,
+      optimistic?: (state: HouseholdLists) => HouseholdLists,
+      feedback?: { notice: string; action?: NoticeAction },
+    ) => {
       setError("");
       setNotice("");
+      setNoticeAction(null);
       const previous = listsRef.current;
       const token = beginMutate(mutateGate.current);
       bumpBusy(1);
@@ -154,6 +176,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         flushSync(() => {
           commitLists(applyMutationResult(listsRef.current, result));
           if (result.household) setHousehold(result.household);
+          if (result.rule) setRules((current) => upsertRule(current, result.rule!));
+          if (result.removedRuleId) setRules((current) => current.filter((rule) => rule.id !== result.removedRuleId));
           if (result.unifi) setUnifi(result.unifi);
           if (result.account) {
             setAccounts((current) => {
@@ -165,7 +189,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             });
           }
         });
-        setNotice("Saved.");
+        setNotice(feedback?.notice ?? "Saved.");
+        setNoticeAction(feedback?.action ?? null);
         if (result.change?.changeId) {
           void waitForChange(result.change.changeId)
             .then(async (change) => {
@@ -173,7 +198,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               if (change.status === "failed") setError(change.error ?? "That change did not apply.");
               else if (change.status === "partial") setNotice(change.error ?? "Reconcile finished with issues.");
               else if (change.status === "pending") setNotice(change.error ?? "Still applying.");
-              else {
+              else if (feedback) {
+                // Keep the change's own notice, and its Undo, once the gateway has it.
+                setError("");
+              } else {
                 setError("");
                 setNotice("Saved. The gateway has the current desired state.");
               }
@@ -206,6 +234,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       session,
       groups,
       devices,
+      rules,
       sync,
       unifi,
       household,
@@ -213,6 +242,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       notice,
+      noticeAction,
       reload,
       mutate,
       dismissFeedback,
@@ -222,6 +252,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       session,
       groups,
       devices,
+      rules,
       sync,
       unifi,
       household,
@@ -229,6 +260,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       notice,
+      noticeAction,
       reload,
       mutate,
       dismissFeedback,
@@ -237,6 +269,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+function upsertRule(rules: Rule[], rule: Rule): Rule[] {
+  const index = rules.findIndex((item) => item.id === rule.id);
+  if (index === -1) return [...rules, rule];
+  const next = rules.slice();
+  next[index] = rule;
+  return next;
 }
 
 export function useAppData(): AppData {

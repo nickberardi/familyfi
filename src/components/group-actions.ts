@@ -13,39 +13,35 @@ export type GroupActionSpec = {
   label: string;
   href?: string;
   strong?: boolean;
-  run?: "pause" | "resume" | "extend";
+  run?: "pause" | "resume" | "extend" | "allow" | "disallow";
 };
 
+/**
+ * The group's internet actions. Each names its scope — all internet on every device in
+ * the group — so it is never mistaken for a category control.
+ */
 export function groupActionSpecs(group: Group, surface: "phone" | "web"): GroupActionSpec[] {
   const href = group.kind === "family" ? `/family/${group.id}` : `/things/${group.id}`;
-  const scheduleHref = `/rules#group-${group.id}`;
-  const scheduleWord = "Rules";
+  const rules: GroupActionSpec = { label: "Rules", href: `/rules?group=${group.id}` };
   const detail: GroupActionSpec = {
     label: group.kind === "family" && group.familyRole === "adult" ? "View devices" : "Detail",
     href,
   };
 
-  if (group.protected || (group.kind === "family" && group.familyRole === "adult")) {
-    return surface === "phone" ? [] : [detail];
-  }
+  if (!canPauseGroup(group)) return surface === "phone" ? [] : [detail];
 
   if (group.suspension.active) {
-    return [
-      { label: "Resume", strong: true, run: "resume" },
-      { label: "Extend", run: "extend" },
-      { label: scheduleWord, href: scheduleHref },
-    ];
+    return [{ label: "Resume internet", strong: true, run: "resume" }, { label: "More time", run: "extend" }, rules];
   }
-
-  if (!canPauseGroup(group)) {
-    const actions: GroupActionSpec[] = [{ label: scheduleWord, href: scheduleHref, strong: true }];
-    if (surface === "web") actions.push(detail);
-    return actions;
+  if (group.access === "blocked") {
+    // An internet rule's window is blocking: let the group online until it ends.
+    return [{ label: "Allow internet now", strong: true, run: "allow" }, rules];
   }
-
-  const pause: GroupActionSpec = { label: "Pause", strong: true, run: "pause" };
-  if (surface === "phone") return [pause, { label: scheduleWord, href: scheduleHref }];
-  return [pause, { label: scheduleWord, href: scheduleHref }, detail];
+  if (group.access === "allowed") {
+    return [{ label: "Resume schedule", strong: true, run: "disallow" }, { label: "Pause all internet", run: "pause" }, rules];
+  }
+  const pause: GroupActionSpec = { label: "Pause all internet", strong: true, run: "pause" };
+  return surface === "phone" ? [pause, rules] : [pause, rules, detail];
 }
 
 export function groupActions(
@@ -59,6 +55,8 @@ export function groupActions(
     pause: () => openPause(group),
     resume: () => void mutate(() => api(`/api/v1/groups/${group.id}/resume`, { method: "POST" })),
     extend: () => openExtend(group),
+    allow: () => void mutate(() => api(`/api/v1/groups/${group.id}/allow`, { method: "POST", body: "{}" })),
+    disallow: () => void mutate(() => api(`/api/v1/groups/${group.id}/allow`, { method: "DELETE" })),
   };
   return groupActionSpecs(group, surface).map(({ run, ...action }) =>
     run ? { ...action, onClick: handlers[run] } : action,

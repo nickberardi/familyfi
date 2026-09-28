@@ -152,6 +152,34 @@ describe("planRulePolicies", () => {
   });
 });
 
+describe("network-scoped rules", () => {
+  const plan = (rule: PlanRule) =>
+    planRulePolicies({
+      destinationZoneId: "ext",
+      groups: [],
+      devices: [],
+      networks: [
+        { id: "net-a", name: "Family", zoneId: "zone-1" },
+        { id: "net-z", name: "Unzoned", zoneId: null },
+      ],
+      networkScope: { manageAllNetworks: true, managedNetworkIds: [] },
+      rules: [rule],
+    });
+
+  it("blocks websites for a whole network", () => {
+    const { policies } = plan(rule({ kind: RuleKind.domain, scope: RuleScope.network, groupIds: [], networkIds: ["net-a"], targetIds: [], domains: ["example.com"] }));
+    const write = rulePolicyWrite(policies[0]!);
+    expect(write.source.trafficFilter).toEqual({ type: "NETWORK", networkFilter: { matchOpposite: false, networkIds: ["net-a"] } });
+    expect(write.destination.trafficFilter).toEqual({ type: "DOMAIN", domainFilter: { type: "DOMAINS", domains: ["example.com"] } });
+  });
+
+  it("retains a rule's policies while one of its networks has no zone", () => {
+    const { policies, retainRuleIds } = plan(rule({ scope: RuleScope.network, groupIds: [], networkIds: ["net-a", "net-z"] }));
+    expect(policies.map((policy) => policy.networkIds)).toEqual([["net-a"]]);
+    expect(retainRuleIds.has("r1")).toBe(true);
+  });
+});
+
 describe("rulePolicyWrite", () => {
   it("blocks all traffic for an internet rule and matches domains for a website rule", () => {
     const [internet] = plan([tvDowntime]).policies;

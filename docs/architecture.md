@@ -47,11 +47,11 @@ foreign key.
 | Concept | Owns or relates to |
 | --- | --- |
 | `Household` | Gateway configuration, managed network scope, timezone, desired revision, resolver defaults and connection identity |
-| `Group` → `Device` | Family/Things controls, schedule, suspension and protection; each discovered network device has an optional group. Unassigned devices are quarantined. |
+| `Group` → `Device` | Family/Things controls: pause, allowance and protection; each discovered network device has an optional group. Unassigned devices are quarantined. |
 | `Account` → `Session` | Login identity and permissions. An account can link to a family group; group membership and authentication are separate concepts. |
 | `PairedDevice` → `Session` | Companion enrollment and device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
 | `ConnectionEndpoint`, `Pairing`, `DeviceEdgeToken` | Routes, one-time enrollment and delivery records for encrypted edge credentials; see [connection guidance](api.md#companion-connection-and-https) |
-| `Rule` → `RulePolicy`; `Group` → `AppPolicy` | Desired app/category rules and records of their UniFi policies; app policies also represent quarantine. `PolicyOperation` records external write attempts and creation evidence. |
+| `Rule` → `RuleGroup`, `RuleWindow`, `RulePolicy`; `Group` → `AppPolicy` | A household rule blocks all internet, a DPI category, apps or websites for one or more groups (or managed networks), always or in named windows; `RulePolicy` records one UniFi policy per window and zone. A group's `AppPolicy` is its pause policy, and app policies also represent quarantine. `PolicyOperation` records external write attempts and creation evidence. |
 | `ChangeResult` → `SyncRun` | A requested revision and its outcome versus a reconciliation pass that may settle multiple requests. Actor account/device links attribute the request. |
 | `UpstreamCategory` → `UpstreamDomain`, `UpstreamCheck` | Domain lists and observed DNS results. A check belongs to a category and resolver context; an optional group selects a group override. |
 
@@ -84,7 +84,7 @@ interpret that retained snapshot as a fresh gateway observation.
 2. The [pause route](../src/app/api/v1/groups/[id]/pause/route.ts) checks authentication, request shape, group existence, Watch eligibility and protection, then saves the suspension in PostgreSQL.
 3. [enqueueChange](../src/server/changes.ts) increments the household revision, creates a pending `ChangeResult` with actor attribution and requests reconciliation. The route returns the updated group and change reference. The group write and enqueue are separate operations; do not assume the entire path is one database transaction.
 4. The browser applies the returned state through [household-state.ts](../src/lib/household-state.ts) and shows saved feedback. [mutate-gate.ts](../src/lib/mutate-gate.ts) prevents a superseded mutation response from replacing a newer one.
-5. Reconciliation takes its database lock, reads current desired state and writes only owned UniFi policies. Pause disables enforcement while preserving the schedule. The run records outcomes and settles eligible changes.
+5. Reconciliation takes its database lock, reads current desired state and writes only owned UniFi policies. A pause creates the group's unscheduled block policy; resume deletes it. The run records outcomes and settles eligible changes.
 6. The browser polls this change's ID and reports applied, partial, failed or still pending, then refreshes. A polling failure leaves the saved state in place and reports a follow-up problem. A later global sync success is not proof that this particular request succeeded.
 
 Evidence: [reconciliation tests](../tests/integration/reconcile.test.ts),
@@ -125,9 +125,9 @@ then read its callers and focused tests. Native feature details belong in its ow
 
 | Web area | Responsibility | Implementation and test starting points |
 | --- | --- | --- |
-| Family and Things | Group cards/details, membership, protection, schedules and temporary controls | [GroupGrid](../src/components/GroupGrid.tsx), [group routes](../src/app/api/v1/groups), [group API tests](../tests/integration/group-detail-api.test.ts), [display vectors](../tests/unit/display-vectors.test.ts) |
+| Family and Things | Group cards/details, membership, protection, the internet zone (pause, allowance, today's timeline) and category marks | [GroupGrid](../src/components/GroupGrid.tsx), [InternetZone](../src/components/InternetZone.tsx), [group routes](../src/app/api/v1/groups), [group API tests](../tests/integration/group-detail-api.test.ts), [display vectors](../tests/unit/display-vectors.test.ts) |
 | Devices / Unassigned | Discovery, assignment, quarantine and last observed connection details within managed networks | [devices](../src/server/devices.ts), [reconciliation](../src/server/reconciliation.ts), [quarantine tests](../tests/integration/quarantine-observe.test.ts) |
-| Rules and group filter sheets | App/category enforcement rules and their schedules | [rules](../src/server/rules.ts), [DPI planner](../src/server/unifi/plan-dpi.ts), [DPI tests](../tests/integration/dpi-rules.test.ts) |
+| Rules and group filter sheets | Household rules (internet, category, app, website), their windows, groups and UniFi policy names | [rules](../src/server/rules.ts), [rule planner](../src/server/unifi/plan-rules.ts), [rule editor](../src/components/rules/RuleEditor.tsx), [rules API tests](../tests/integration/rules-api.test.ts), [DPI tests](../tests/integration/dpi-rules.test.ts) |
 | Categories | Domain lists, resolver configuration and DNS observations | [probe](../src/server/upstream/probe.ts), [category API tests](../tests/integration/upstream-categories-api.test.ts), [browser tests](../tests/browser/categories.spec.ts) |
 | Settings | Gateway key/network scope, household settings, roles and logins | [gateway settings](../src/server/unifi-settings.ts), [accounts](../src/server/accounts.ts), [authorization matrix](../tests/integration/authorization-matrix.test.ts) |
 | Sync | Reconciliation history and per-change outcomes | [reconciliation](../src/server/reconciliation.ts), [changes](../src/server/changes.ts), [reconciliation path tests](../tests/integration/reconcile-paths.test.ts) |
@@ -136,19 +136,21 @@ then read its callers and focused tests. Native feature details belong in its ow
 
 ## Desired internet block
 
-For an assigned device:
+A group's internet is shaped by three things, in this order ([internetState](../src/lib/rule-windows.ts)):
 
 ```text
-suspended = suspension.active && (until is null || now < until)
+paused  = suspension.active && (suspension.until is null || now < suspension.until)
+allowed = allowance.active && (allowance.until is null || now < allowance.until)
 blocked = !group.protected
-          && schedule.enabled
-          && !suspended
-          && inRecurringWindow(now, schedule, household.timezone)
+          && (paused || (!allowed && any internet-rule window is active))
 ```
 
-Pause suspends schedule enforcement. Resume clears the suspension and evaluates the stored schedule, which may still allow internet outside bedtime. Quarantined devices (null `groupId`) are desired-blocked independently of schedules.
+- **Pause** blocks all internet for every device in the group now, until a time or until resumed. It is a FamilyFi-owned unscheduled BLOCK policy for the group that exists only while the pause lasts; resume (or expiry) deletes it. It records who paused.
+- **Internet rules** are optional. Each window of an enabled internet rule is its own UniFi policy carrying that window's recurring `schedule`; UniFi starts and ends it, never a clock-driven `enabled` write. A group with no internet rule is not limited, and says so.
+- **An allowance** lifts the group's internet-rule windows until a time (by default when the windows active now end): its devices leave those rules' policies. A policy left with nobody keeps its devices and is disabled, so ending the allowance does not create it again. A pause replaces an allowance.
+- **Category, app and website rules** are separate policies, and neither a pause nor an allowance changes them. While an internet window is active they are covered anyway.
 
-That formula is UI/API desired state. UniFi enforcement: persist `schedule` on app-owned policies for recurring bedtime; Pause/Resume is PUT `enabled`; the only clock-driven `enabled` write is Extend/timed-Pause expiry. Membership, quarantine, and protection still go through reconciliation.
+Quarantined devices (null `groupId`) are desired-blocked independently of rules. Timed pause and allowance expiry are the only clock-driven writes; membership, quarantine and protection still go through reconciliation.
 
 Discovery and quarantine only include clients whose UniFi **network (VLAN)** is in the household allowlist (`manageAllNetworks` or `managedNetworkIds`). New devices on other VLANs are not ingested and are not added to quarantine policies. Assigned devices that roam off a managed network are left out of FamilyFi policies until they return. UniFi still applies a MAC policy to every VLAN that shares that **firewall zone**; pick networks whose zones match what you want to enforce.
 
@@ -156,7 +158,7 @@ Days identify the local weekday a window starts. Windows are half-open. Evaluati
 
 ## Reconciliation
 
-A database-backed lock serializes startup, interval (~30s), and mutation-triggered runs. Overlapping writers, including container replacement, must not apply stale revisions. Interval work is discovery, membership, and Extend expiry — not bedtime start/end. Until a UniFi key is saved in Settings, reconciliation is a no-op.
+A database-backed lock serializes startup, interval (~30s), and mutation-triggered runs. Overlapping writers, including container replacement, must not apply stale revisions. Interval work is discovery, membership, and pause and allowance expiry — not window start/end. Until a UniFi key is saved in Settings, reconciliation is a no-op.
 
 A successful connected-client read marks observed devices online and previously known absent devices offline, preserving their last-seen time. It also records UniFi's connection start and wired/wireless type. One site-device read per pass resolves a wireless uplink to an access point name. The pass also records each device's IEEE MAC registrant from `src/server/mac-registrants.sqlite`, a committed, indexed snapshot that `scripts/update-mac-vendors.py` rebuilds on request and that records its source hashes. Only reconciliation opens it, read-only, so requests never load it; if it cannot be read, the last recorded manufacturer stays. A failed client read leaves the previous observation intact; API responses label observations older than 90 seconds as last known. These are observations, not traffic measurements.
 
@@ -179,7 +181,7 @@ Official client overview/details do not include `networkId`. Mapping:
 2. Else match `client.ipAddress` to gateway network `ipv4Configuration.hostIpAddress` + `prefixLength` (and `additionalHostIpSubnets`)
 3. Zone via `network.zoneId` and/or `zone.networkIds`
 
-Destination zone: first of External, WAN, Internet (case-insensitive). Source: one policy per source zone. IP scope: `IPV4_AND_IPV6` with no protocol filter. IPv6 blocking, overnight UniFi scheduler windows, and a second concurrent MAC are unproven; do not claim dual-stack blocking.
+Destination zone: first of External, WAN, Internet (case-insensitive). Source: one policy per source zone, and per window of a rule. A rule's policies are named `FamilyFi <rule name>`, with ` – <window name>` once it has more than one window and ` (<zone>)` outside the Internal zone, clipped to UniFi's 100 characters ([policy-names.ts](../src/lib/policy-names.ts)); a rename is a PUT of the same policy. Website rules use a `DOMAIN` destination filter (`domainFilter: { type: "DOMAINS", domains }`), which the gateway matches from DNS lookups, so encrypted DNS can get around it. IP scope: `IPV4_AND_IPV6` with no protocol filter. IPv6 blocking, overnight UniFi scheduler windows, and a second concurrent MAC are unproven; do not claim dual-stack blocking.
 
 ### Curated category slots
 
@@ -252,8 +254,8 @@ The sweep runs on a household-local wall-clock schedule — `Household.dohProbeT
 ("HH:MM") and `dohProbeDays` (0 Sunday–6 Saturday, Sunday by default) evaluated
 against `Household.timezone` — not an interval counted from the last boot. A single
 `setTimeout` is re-armed after each fire (`src/server/upstream/schedule.ts`), reusing
-`nextClockOnDays` (`src/lib/display.ts`), the same DST-correct function behind bedtime's
-`nextBedtimeResumeAt`. A restart is not itself a trigger: at boot, and on every timer
+`nextClockOnDays` (`src/lib/display.ts`), the same DST-correct function behind a rule
+window's next start and end. A restart is not itself a trigger: at boot, and on every timer
 fire, the process claims the currently-due scheduled instant with a conditional update
 (`dohProbeLastRunAt IS NULL OR < due`) inside the existing upstream lock before
 sweeping. This is what lets a restart shortly after the scheduled time still catch up
@@ -272,9 +274,9 @@ reports the downstream status — the DNS verdict for that group's resolver.
 Actively blocking is not the same as enabled. A scheduled rule outside its window is
 switched on and blocking nothing, so it neither claims the mark nor hides a resolver
 that genuinely is blocking. `ruleActivelyBlocking()` evaluates that against the
-household timezone through the same `inRecurringWindow` the desired-block formula uses,
-which is why `schedule.ts` lives in `src/lib` — one implementation, reachable from both
-sides. A malformed schedule evaluates to not-blocking rather than throwing: claiming a
+household timezone through the same `isWindowActive` the desired-block formula uses,
+which is why `rule-windows.ts` lives in `src/lib` — one implementation, reachable from
+both sides. A malformed schedule evaluates to not-blocking rather than throwing: claiming a
 block we cannot verify is the worse of the two failures. `categoryMarkState()` is that
 rule and nothing else implements it.
 

@@ -1,7 +1,8 @@
 /**
  * `tests/fixtures/display-vectors.json` is the display behaviour the web app and the
  * native iOS app (nickberardi/familyfi-ios, `App/Display/*`) must both show: labels,
- * states, card actions and the pause sheet. iOS replays the same file against its port,
+ * states, card actions, the pause sheet, and rule windows with the internet state and
+ * day timeline built from them. iOS replays the same file against its port,
  * so this test runs every vector against the TypeScript and fails when either drifts.
  * Change display behaviour and the vectors change in the same pull request.
  */
@@ -12,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import * as groupActionsModule from "@/components/group-actions";
 import * as display from "@/lib/display";
 import * as pauseSheet from "@/lib/pause-sheet";
+import * as ruleWindows from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
 
 type Vector = { fn: string; name: string; input: Record<string, unknown>; expected: unknown };
@@ -29,7 +31,6 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
   accessLabel: (i) => display.accessLabel(i.access),
   accessColor: (i) => display.accessColor(i.access),
   minutesFromHhmm: (i) => display.minutesFromHhmm(i.value),
-  scheduleBands: (i) => display.scheduleBands(i.start, i.end),
   localNowPercent: (i) => display.localNowPercent(i.timeZone, at(i.now)),
   roleLabel: (i) => display.roleLabel(i.role),
   roleTag: (i) => display.roleTag(i.group),
@@ -38,19 +39,27 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
   deviceIcon: (i) => display.deviceIcon(i.hostname),
   formatHhmm: (i) => display.formatHhmm(i.value),
   formatClock: (i) => display.formatClock(at(i.date), i.timeZone),
-  dayCaption: (i) => display.dayCaption(i.days),
-  scheduleCaption: (i) => display.scheduleCaption(i.group),
-  cardNoteLine: (i) => display.cardNoteLine(i.group),
-  cardStateLabel: (i) => display.cardStateLabel(i.group, i.timeZone),
+  daysLabel: (i) => display.daysLabel(i.days),
+  windowTimes: (i) => display.windowTimes(i.start, i.end),
+  cardNoteLine: (i) => display.cardNoteLine(i.group, i.windows),
+  cardStateLabel: (i) => display.cardStateLabel(i.group, i.windows, i.timeZone, at(i.now)),
   canPauseGroup: (i) => display.canPauseGroup(i.group),
   bedtimeEndDays: (i) => display.bedtimeEndDays(i.days, i.start, i.end),
   nextClockOnDays: (i) => iso(display.nextClockOnDays(i.timeZone, i.days, i.hhmm, at(i.now))),
-  nextBedtimeResumeAt: (i) => iso(display.nextBedtimeResumeAt(i.group, i.timeZone, at(i.now))),
   relativeDayLabel: (i) => display.relativeDayLabel(at(i.instant), i.timeZone, at(i.now)),
   groupActionSpecs: (i) => groupActionsModule.groupActionSpecs(i.group as Group, i.surface),
   pauseSheetTitle: (i) => pauseSheet.pauseSheetTitle(i.group, i.mode),
-  pauseSheetBody: (i) => pauseSheet.pauseSheetBody(i.mode),
-  pauseSheetOptions: (i) => pauseSheet.pauseSheetOptions(i.group, i.mode, i.timeZone, at(i.now)),
+  pauseSheetBody: (i) => pauseSheet.pauseSheetBody(i.group, i.mode),
+  pauseSheetOptions: (i) => pauseSheet.pauseSheetOptions(i.group, i.windows, i.mode, i.timeZone, at(i.now)),
+  windowTitle: (i) => ruleWindows.windowTitle(i.window),
+  isWindowActive: (i) => ruleWindows.isWindowActive(i.window, at(i.now), i.timeZone),
+  windowEndsAt: (i) => iso(ruleWindows.windowEndsAt(i.window, at(i.now), i.timeZone)),
+  nextWindowStart: (i) => iso(ruleWindows.nextWindowStart(i.window, at(i.now), i.timeZone)),
+  windowDayBands: (i) => ruleWindows.windowDayBands(i.window, i.weekday),
+  windowOverlaps: (i) => ruleWindows.windowOverlaps(i.windows),
+  internetState: (i) => ruleWindows.internetState(i.group, i.windows, at(i.now), i.timeZone),
+  internetDayBands: (i) => ruleWindows.internetDayBands(i.group, i.windows, at(i.now), i.timeZone),
+  localWeekday: (i) => ruleWindows.localWeekday(at(i.now), i.timeZone),
 };
 
 /**
@@ -62,7 +71,7 @@ const EXCLUDED: Record<string, string> = {
   groupActions: "binds React callbacks",
 };
 
-const MODULES = { display, groupActions: groupActionsModule, pauseSheet };
+const MODULES = { display, groupActions: groupActionsModule, pauseSheet, ruleWindows };
 
 describe("display vectors", () => {
   it("is version 1 with unique names per function", () => {

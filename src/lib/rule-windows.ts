@@ -210,7 +210,8 @@ function localParts(now: Date, timeZone: string): { weekday: number; minutes: nu
   return { weekday: WEEKDAYS.indexOf(get("weekday")), minutes: Number(get("hour")) * 60 + Number(get("minute")) };
 }
 
-function localWeekday(now: Date, timeZone: string): number {
+/** The household's day of the week at `now`, 0 = Sunday. */
+export function localWeekday(now: Date, timeZone: string): number {
   return localParts(now, timeZone).weekday;
 }
 

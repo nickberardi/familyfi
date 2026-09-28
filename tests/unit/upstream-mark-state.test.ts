@@ -15,12 +15,12 @@ const ZONE = "America/New_York";
 function rule(overrides: Partial<{
   enabled: boolean;
   mode: "always" | "scheduled";
-  schedule: { enabled: boolean; days: number[]; start: string | null; end: string | null };
+  windows: { name: string; days: number[]; start: string; end: string }[];
 }> = {}) {
   return {
     enabled: true,
     mode: "scheduled" as const,
-    schedule: { enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" },
+    windows: [{ name: "Bedtime", days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" }],
     ...overrides,
   };
 }
@@ -70,9 +70,15 @@ describe("actively blocking", () => {
     expect(ruleActivelyBlocking(rule(), "Asia/Tokyo", inWindow)).toBe(false);
   });
 
+  it("blocks while any of its windows is active", () => {
+    const homework = { name: "Homework", days: [4], start: "14:00", end: "16:00" };
+    expect(ruleActivelyBlocking(rule({ windows: [homework] }), ZONE, outOfWindow)).toBe(true);
+    expect(ruleActivelyBlocking(rule({ windows: [rule().windows[0]!, homework] }), ZONE, inWindow)).toBe(true);
+  });
+
   it("treats a missing or malformed schedule as not blocking rather than throwing", () => {
-    expect(ruleActivelyBlocking(rule({ schedule: { enabled: false, days: [], start: null, end: null } }), ZONE, inWindow)).toBe(false);
-    expect(ruleActivelyBlocking(rule({ schedule: { enabled: true, days: [1], start: "nope", end: "06:45" } }), ZONE, inWindow)).toBe(false);
+    expect(ruleActivelyBlocking(rule({ windows: [] }), ZONE, inWindow)).toBe(false);
+    expect(ruleActivelyBlocking(rule({ windows: [{ name: "", days: [1], start: "nope", end: "06:45" }] }), ZONE, inWindow)).toBe(false);
     expect(ruleActivelyBlocking(undefined, ZONE, inWindow)).toBe(false);
   });
 });

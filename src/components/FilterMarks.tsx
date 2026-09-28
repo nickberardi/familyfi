@@ -3,10 +3,10 @@
 /**
  * Category and app filter marks on a comfortable card.
  *
- * Card System: every comfortable card can carry two more rows below the band —
- * a fixed category catalog and open-ended app rules. Each mark is its own
- * policy with its own popover; the card-level Pause/Schedule pair stays with
- * Internet alone.
+ * Card System: every comfortable card can carry two more rows below its internet
+ * zone — a fixed category catalog and open-ended app rules. Each mark is its own
+ * rule with its own popover; Pause, Resume and Allow stay with all internet alone,
+ * in the zone above, so a category control never reads as a device-wide one.
  *
  * A mark shows whichever thing is actually blocking the category. A FamilyFi rule
  * blocking right now wins and renders in red, the same red as the sheet's Turn off;
@@ -131,7 +131,7 @@ export function GroupFilterMarks({
         data-testid={`filter-marks-${group.id}`}
       >
         <div className="px-[18px] pt-2">
-          <SectionLabel>Category Rules</SectionLabel>
+          <SectionLabel>Categories · each blocks only its own traffic</SectionLabel>
           <div className="flex flex-wrap gap-3.5 py-2">
             {CURATED_CATEGORY_SLOTS.map((slot) => {
               const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);

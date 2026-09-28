@@ -152,7 +152,7 @@ function NavGroups({
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, devices, sync, unifi, mutate, loading, error, notice, busy, dismissFeedback } = useAppData();
+  const { session, devices, sync, unifi, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
   // Closing on a route change is the drawer's own signal, same as the design's
   // `pickAndClose` on each item — but this also catches the back button, a redirect,
@@ -279,6 +279,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 style={{ color: error ? "var(--ff-danger)" : "var(--ff-on)" }}
               >
                 <span className="min-w-0 flex-1">{error || notice}</span>
+                {!error && noticeAction ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const action = noticeAction;
+                      dismissFeedback();
+                      void mutate(action.run);
+                    }}
+                    className="flex-none rounded px-1.5 text-[14px] font-semibold text-[var(--ff-accent)]"
+                  >
+                    {noticeAction.label}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={dismissFeedback}

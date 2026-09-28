@@ -1,13 +1,6 @@
 /** Client-safe types and presentation for upstream categories. */
 
-import { inRecurringWindow } from "@/lib/schedule";
-
-type RuleScheduleShape = {
-  enabled: boolean;
-  days: number[];
-  start: string | null;
-  end: string | null;
-};
+import { isWindowActive, type RuleWindowSpec } from "@/lib/rule-windows";
 
 export type UpstreamVerdictValue = "blocked" | "partial" | "open" | "unknown";
 
@@ -262,16 +255,14 @@ export type CategoryMarkState = "rule" | "blocked" | "partial" | "open" | "unkno
  * of the two failures.
  */
 export function ruleActivelyBlocking(
-  rule: { enabled: boolean; mode: "always" | "scheduled"; schedule: RuleScheduleShape } | undefined,
+  rule: { enabled: boolean; mode: "always" | "scheduled"; windows: RuleWindowSpec[] } | undefined,
   timezone: string,
   now = new Date(),
 ): boolean {
   if (!rule?.enabled) return false;
   if (rule.mode === "always") return true;
-  const { enabled, days, start, end } = rule.schedule;
-  if (!enabled || !start || !end) return false;
   try {
-    return inRecurringWindow(now, { enabled, days, start, end }, timezone);
+    return rule.windows.some((window) => isWindowActive(window, now, timezone));
   } catch {
     return false;
   }

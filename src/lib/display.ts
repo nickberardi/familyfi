@@ -1,4 +1,5 @@
 import type { IconName } from "./icons";
+import { internetState, type InternetWindow } from "./rule-windows";
 import type { Group } from "./types";
 
 /*
@@ -10,16 +11,16 @@ import type { Group } from "./types";
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export function accessLabel(access: string): string {
-  if (access === "paused") return "Paused";
-  if (access === "always_on") return "Always On · Internet blocked";
-  if (access === "blocked") return "Internet blocked (bedtime)";
+  if (access === "paused") return "Paused · all internet off";
+  if (access === "blocked") return "No internet · scheduled";
+  if (access === "allowed") return "Online · allowed during a schedule";
   if (access === "protected") return "Protected — FamilyFi does not block";
   return "Internet available";
 }
 
 export function accessColor(access: string): string {
   if (access === "paused") return "var(--ff-paused)";
-  if (access === "always_on" || access === "blocked") return "var(--ff-danger)";
+  if (access === "blocked") return "var(--ff-accent)";
   if (access === "protected") return "var(--ff-muted)";
   return "var(--ff-on)";
 }
@@ -29,19 +30,6 @@ export function minutesFromHhmm(value: string | null): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
   if (!match) return null;
   return Number(match[1]) * 60 + Number(match[2]);
-}
-
-export function scheduleBands(start: string | null, end: string | null): { left: string; width: string }[] {
-  const from = minutesFromHhmm(start);
-  const to = minutesFromHhmm(end);
-  if (from === null || to === null) return [];
-  const pct = (n: number) => `${((n / 1440) * 100).toFixed(3)}%`;
-  if (from === to) return [{ left: "0%", width: "100%" }];
-  if (from < to) return [{ left: pct(from), width: pct(to - from) }];
-  return [
-    { left: pct(from), width: pct(1440 - from) },
-    { left: "0%", width: pct(to) },
-  ];
 }
 
 export function localNowPercent(timezone: string, now: Date): string {
@@ -147,49 +135,63 @@ export function formatClock(date: Date, timezone: string): string {
   }).format(date);
 }
 
-export function dayCaption(days: number[]): string {
+/** "Every day", "Mon–Fri", "Weekends", or the days listed, for the days a window starts on. */
+export function daysLabel(days: number[]): string {
   const unique = [...new Set(days)].sort((a, b) => a - b);
-  if (unique.length === 7) return "every night";
-  if (unique.join() === "1,2,3,4,5") return "school nights";
-  if (unique.join() === "0,6") return "weekends";
+  const key = unique.join();
+  if (key === "0,1,2,3,4,5,6") return "Every day";
+  if (key === "1,2,3,4,5") return "Mon–Fri";
+  if (key === "0,1,2,3,4") return "Sun–Thu";
+  if (key === "0,6") return "Weekends";
+  if (key === "5,6") return "Fri–Sat";
   return unique.map((day) => WEEKDAYS[day] ?? "").filter(Boolean).join(", ");
 }
 
-export function scheduleCaption(group: Pick<Group, "kind" | "mode" | "schedule">): string {
-  if (group.mode === "always") return "Always On";
-  const { enabled, days, start, end } = group.schedule;
-  if (!enabled || !start || !end) return "no schedule";
-  const word = group.kind === "family" ? "off" : "off";
-  return `${word} ${formatHhmm(start)}–${formatHhmm(end)}, ${dayCaption(days)}`;
+/** "9:30 PM–6:45 AM". */
+export function windowTimes(start: string, end: string): string {
+  return `${formatHhmm(start)}–${formatHhmm(end)}`;
 }
 
-export function cardNoteLine(group: Group): string {
-  if (group.deviceCount === 0 && (group.mode === "always" || group.schedule.enabled)) {
-    return group.mode === "always"
-      ? "No devices · Always On cannot apply on UniFi until you assign one"
-      : "No devices · bedtime cannot apply on UniFi until you assign one";
+/** The line under a card's name: its devices, and how many internet windows it has. */
+export function cardNoteLine(group: Group, windows: InternetWindow[]): string {
+  if (group.deviceCount === 0 && (group.internetRuleIds.length > 0 || group.suspension.active)) {
+    return "No devices · rules cannot apply on UniFi until you assign one";
   }
   const devices = `${group.deviceCount} ${group.deviceCount === 1 ? "device" : "devices"}`;
-  return `${devices} · ${scheduleCaption(group)}`;
+  if (group.protected) return devices;
+  if (windows.length === 0) return `${devices} · no internet rule`;
+  return `${devices} · ${windows.length} internet ${windows.length === 1 ? "window" : "windows"}`;
 }
 
-export function cardStateLabel(group: Group, timezone: string): string {
+/**
+ * What the group's internet is doing now, naming the scope and its source: a pause
+ * (and who paused), the window blocking it, an allowance, or the next window.
+ */
+export function cardStateLabel(group: Group, windows: InternetWindow[], timezone: string, now: Date): string {
   if (group.protected) return "Always On — never paused";
-  if (group.kind === "family" && group.familyRole === "adult") return "No controls applied";
-  if (group.access === "paused") {
-    if (group.suspension.until) return `Paused until ${formatClock(new Date(group.suspension.until), timezone)}`;
-    return "Paused until you resume";
+  const state = internetState(group, windows, now, timezone);
+  const by = (actor: { name: string } | null) => (actor ? ` by ${actor.name}` : "");
+  const until = (at: string | null, open: string) => (at ? `until ${formatClock(new Date(at), timezone)}` : open);
+  switch (state.state) {
+    case "paused":
+      return `All internet paused ${until(state.until, "until resumed")}${by(state.by)}`;
+    case "blocked":
+      return `No internet · ${state.window} ${until(state.until, "")}`.trimEnd();
+    case "allowed":
+      return `Online · allowed ${until(state.until, "until you resume the schedule")}${by(state.by)}`;
+    case "online":
+      return state.next ? `Online · ${state.next.window} at ${formatClock(new Date(state.next.at), timezone)}` : "Online";
+    case "no_rule":
+      if (group.kind === "family" && group.familyRole === "adult") return "No controls applied";
+      return "Online · no internet rule";
+    default:
+      return "Online";
   }
-  if (group.access === "always_on") return "Always On · Internet blocked";
-  if (group.access === "blocked") return "Bedtime active · Internet blocked";
-  return "Internet available";
 }
 
 export function canPauseGroup(group: Group): boolean {
   if (group.protected) return false;
-  if (group.kind === "family" && group.familyRole === "adult") return false;
-  if (group.mode === "always") return true;
-  return group.schedule.enabled && Boolean(group.schedule.start && group.schedule.end);
+  return !(group.kind === "family" && group.familyRole === "adult");
 }
 
 export function bedtimeEndDays(days: number[], start: string, end: string): number[] {
@@ -218,12 +220,6 @@ export function nextClockOnDays(
     if (days.includes(seen.weekday) && instant.getTime() > now.getTime()) return instant;
   }
   return null;
-}
-
-export function nextBedtimeResumeAt(group: Pick<Group, "schedule">, timezone: string, now: Date): Date | null {
-  const { days, start, end } = group.schedule;
-  if (!start || !end) return null;
-  return nextClockOnDays(timezone, bedtimeEndDays(days, start, end), end, now);
 }
 
 /**

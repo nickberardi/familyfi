@@ -14,7 +14,9 @@
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
+import { daysLabel, windowTimes } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -101,9 +103,10 @@ export function FilterSheet({
           api("/api/v1/rules", {
             method: "POST",
             body: JSON.stringify({
+              name: `${state.name} for ${group.name}`.slice(0, 60),
               kind: "category",
               scope: "group",
-              groupId: group.id,
+              groupIds: [group.id],
               targetIds: [state.categoryId],
               mode: "always",
             }),
@@ -133,8 +136,12 @@ export function FilterSheet({
         ? `Partially blocked (DNS)`
         : `Nothing's blocking ${state.name} yet`;
 
+  const shared = (state.rule?.groupIds.length ?? 0) > 1;
+  const windows = state.rule?.mode === "scheduled" ? state.rule.windows : [];
   const body = on
-    ? `Its own policy, its own controls — scoped to ${state.name} only.`
+    ? `Its own policy, its own controls — scoped to ${state.name} only. Everything else stays on.${
+        shared ? ` Turning it off turns “${state.rule!.name}” off for every group it covers.` : ""
+      }`
     : scheduledIdle
       ? `${state.name} has a FamilyFi policy on a schedule, and this is not one of its hours.${
           upstreamBlocked ? " Its DNS resolver is blocking it anyway right now." : ""
@@ -166,6 +173,16 @@ export function FilterSheet({
           <p className="text-[13px] leading-snug" style={{ color: "var(--ff-ink-3)" }}>
             {body}
           </p>
+          {windows.length ? (
+            <ul className="text-[13px] leading-snug" style={{ color: "var(--ff-ink-2)" }}>
+              {windows.map((window) => (
+                <li key={window.id}>
+                  {window.name ? `${window.name} · ` : ""}
+                  {windowTimes(window.start, window.end)} · {daysLabel(window.days)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <NetworkCheckDetails check={upstream} />
           {error ? (
             <p className="text-[13px]" style={{ color: "var(--ff-danger)" }}>
@@ -185,6 +202,17 @@ export function FilterSheet({
           >
             {on ? "Turn off" : "Create policy"}
           </button>
+          <Link
+            href={
+              state.rule
+                ? `/rules/${state.rule.id}`
+                : `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`
+            }
+            className="text-center text-[14px] font-semibold"
+            style={{ color: "var(--ff-accent)" }}
+          >
+            {state.rule ? "Edit rule and schedule" : "Schedule it instead"}
+          </Link>
         </div>
         <button
           type="button"

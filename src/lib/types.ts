@@ -1,4 +1,7 @@
-export type GroupAccess = "available" | "blocked" | "paused" | "protected" | "always_on";
+export type GroupAccess = "available" | "blocked" | "paused" | "allowed" | "protected";
+
+/** Who paused a group or allowed it online, as they were named then. */
+export type Actor = { accountId: string | null; name: string } | null;
 
 export type Group = {
   id: string;
@@ -7,10 +10,13 @@ export type Group = {
   monogram: string | null;
   familyRole: "child" | "teen" | "adult" | null;
   protected: boolean;
-  mode: "always" | "scheduled";
   deviceCount: number;
-  schedule: { enabled: boolean; days: number[]; start: string | null; end: string | null };
-  suspension: { active: boolean; until: string | null };
+  /** A pause blocks all internet until `until`, or until resumed. */
+  suspension: { active: boolean; until: string | null; by: Actor };
+  /** An allowance lifts the group's internet-rule windows until `until`. */
+  allowance: { active: boolean; until: string | null; by: Actor };
+  /** The group's internet rules; empty when nothing limits its internet. */
+  internetRuleIds: string[];
   access: GroupAccess;
   /**
    * This group's own DNS-over-HTTPS endpoint, or null to read the household default.

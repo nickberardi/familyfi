@@ -145,7 +145,7 @@ Users should not edit Compose YAML to pick a server.
 
 ## Outages
 
-While FamilyFi is stopped or cannot reach UniFi, the gateway keeps the last applied policies **including UniFi policy schedules**. Recurring bedtime can still start and end. A timed Pause/Extend can outlast its expiry until FamilyFi PUTs `enabled: true`. New devices on **managed** VLANs can have internet until the next successful quarantine reconciliation. Unmanaged VLANs are never ingested. Startup reconciliation applies current desired state; it does not replay missed transitions.
+While FamilyFi is stopped or cannot reach UniFi, the gateway keeps the last applied policies **including UniFi policy schedules**. Rule windows can still start and end. A timed pause can outlast its expiry until FamilyFi deletes its pause policy, and an allowance until FamilyFi puts the group's devices back in its internet rules. New devices on **managed** VLANs can have internet until the next successful quarantine reconciliation. Unmanaged VLANs are never ingested. Startup reconciliation applies current desired state; it does not replay missed transitions.
 
 ## Upgrades
 

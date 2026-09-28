@@ -168,7 +168,7 @@ describe("household rules", () => {
     await runReconcileOnce();
     const kept = client.state.policies.find((policy) => policy.id === original!.id);
     expect(kept?.name).toBe("FamilyFi Kids – lights out – School nights");
-    expect(kept?.schedule?.repeatOnDays).toEqual(["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"]);
+    expect((kept?.schedule as { repeatOnDays?: string[] } | undefined)?.repeatOnDays).toEqual(["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"]);
     expect(policiesNamed(client, "FamilyFi Kids – lights out").map((policy) => policy.name)).toEqual([
       "FamilyFi Kids – lights out – School nights",
       "FamilyFi Kids – lights out – Weekend",

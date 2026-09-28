@@ -60,10 +60,13 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |
-| PUT | `/api/v1/groups/{id}/schedule` | Recurring bedtime stored on UniFi `schedule` |
-| POST | `/api/v1/groups/{id}/pause` | Empty body = indefinite; `{ "until" }` = timed. Sets UniFi `enabled: false` |
-| POST | `/api/v1/groups/{id}/resume` | Clears suspension (`enabled: true`; schedule may still block) |
+| POST | `/api/v1/groups/{id}/pause` | Blocks all internet for the group now. Empty body = until resumed; `{ "until" }` = timed. Records who paused and ends any allowance |
+| POST | `/api/v1/groups/{id}/resume` | Ends the pause; the group's internet rules still apply |
 | POST | `/api/v1/groups/{id}/extend` | Adds minutes to a timed pause |
+| POST/DELETE | `/api/v1/groups/{id}/allow` | An allowance lifts the group's internet-rule windows until `until` (default: when the active windows end; 409 when none is active). DELETE ends it. Category, app and website rules keep applying |
+| GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list |
+| GET/PATCH/DELETE | `/api/v1/rules/{id}` | PATCH changes anything but `kind` and `scope`; `windows` replaces the list, and a window sent with its `id` keeps its UniFi policy. DELETE removes the rule's recorded policies |
+| POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled |
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |

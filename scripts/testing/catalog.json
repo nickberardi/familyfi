@@ -234,12 +234,6 @@
         "repository"
       ]
     },
-    "tests/unit/rule-rows.test.ts": {
-      "categories": [
-        "rules",
-        "display"
-      ]
-    },
     "tests/unit/rules.test.ts": {
       "categories": [
         "rules"
@@ -248,6 +242,12 @@
     "tests/unit/rule-windows.test.ts": {
       "categories": [
         "schedules",
+        "rules",
+        "display"
+      ]
+    },
+    "tests/unit/rule-writes.test.ts": {
+      "categories": [
         "rules",
         "display"
       ]
@@ -596,7 +596,19 @@
         "devices"
       ]
     },
-    "tests/browser/smoke.spec.ts > Rules shell: protected absent and Always|Scheduled persist": {
+    "tests/browser/smoke.spec.ts > Rules: a two-window internet rule across midnight, named in UniFi, on the card": {
+      "categories": [
+        "rules",
+        "schedules"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > Pause all internet names its scope and can be undone": {
+      "categories": [
+        "groups",
+        "schedules"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > Websites rule blocks named domains, with the encrypted DNS caveat": {
       "categories": [
         "rules"
       ]

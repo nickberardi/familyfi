@@ -6,7 +6,7 @@
 
 Family internet controls for a UniFi gateway. One deployment, one household.
 
-UniFi gives you firewall policies and client lists, but bedtime, pause-for-homework, and “who owns this new iPad?” are still a pile of rules you have to remember. FamilyFi is the household layer: groups of people and things, schedules, and quarantined unknowns. It stores what you want, then enforces it with **app-owned** UniFi firewall policies. Your own policies are never modified, disabled, deleted, or reordered.
+UniFi gives you firewall policies and client lists, but bedtime, no-internet-during-homework, and “who owns this new iPad?” are still a pile of rules you have to remember. FamilyFi is the household layer: groups of people and things, rules and their schedules, and quarantined unknowns. It stores what you want, then enforces it with **app-owned** UniFi firewall policies. Your own policies are never modified, disabled, deleted, or reordered.
 
 The responsive web app / PWA and the companion [iOS project](https://github.com/nickberardi/familyfi-ios) share the `/api/v1` contract.
 
@@ -18,9 +18,13 @@ The responsive web app / PWA and the companion [iOS project](https://github.com/
 
 Put devices into groups that match the house. **Family** groups are people (child, teen, or adult). **Things** are TVs, computers, smart-home kits — anything that is not a person. Every assigned device belongs to exactly one group. Protection is per group: a protected group is exempt from FamilyFi blocking (your UniFi rules still apply).
 
-### Bedtime schedules
+### Rules and schedules
 
-Each group can have a recurring internet window. FamilyFi writes that schedule onto the UniFi policy, so the gateway can start and end bedtime even if FamilyFi is briefly down. Pause is not a “cut the internet” button: it suspends schedule enforcement so internet is available from FamilyFi’s point of view. Resume puts the schedule back, which may still block if it is bedtime. Timed pause and extend are supported.
+A rule blocks all internet, a category (Video, Social, Gaming…), apps or websites for one or more groups — always, or in named windows such as Homework 3–6 PM on weekdays and Bedtime 10 PM–6 AM. Each window is its own UniFi policy carrying its schedule, so the gateway starts and ends it even if FamilyFi is briefly down, and each is named after the rule and window so UniFi's policy table reads the way your household talks. An internet rule is optional: a TV can have a Video schedule and nothing else. Website rules match domains from DNS lookups, so a device using encrypted DNS can get around them.
+
+### Pause and allow
+
+**Pause all internet** cuts off every device in a group now, for a while or until you resume, and says who paused it. During a scheduled no-internet window, **Allow internet now** lets the group back online until the window ends; category and website rules still apply. Each card shows today's no-internet time — windows, pauses and allowances — with where each came from.
 
 ### Unassigned devices
 
@@ -81,8 +85,8 @@ Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docke
 
 1. Sign in as **admin** with the recovery password printed in the server log (`make docker-logs` or the `make dev` terminal).
 2. In Settings, paste a UniFi Network Integration API key. For a local console with a private CA, enable insecure TLS. Choose **manage all networks** or a VLAN allowlist; the default is none until you pick.
-3. Align the household timezone with the UniFi console clock so bedtime windows match wall time.
-4. Assign devices to Family or Things groups and set schedules.
+3. Align the household timezone with the UniFi console clock so rule windows match wall time.
+4. Assign devices to Family or Things groups and add rules.
 
 `FAMILYFI_DEFAULT_PASSWORD` is the permanent recovery credential for username `admin`. Changing it in `.env` takes effect on the next `admin` sign-in. Create personal adult accounts for everyday use; they do not remove `admin`.
 

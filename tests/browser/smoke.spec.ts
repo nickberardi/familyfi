@@ -136,6 +136,9 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
   await expect(page).toHaveURL(/\/family\/(?!new$)[^/]+$/);
   await expect(page.getByText("Group not found.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  // A new person has no internet rule, and the page says so rather than implying one.
+  await expect(page.getByRole("heading", { name: "All internet · no rule" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
 
   const renamed = `${name} Jr`;
   await page.getByLabel("Name").fill(renamed);
@@ -148,7 +151,8 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
 
   await page.getByLabel(/Protected/).check();
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("Protected groups do not use Pause or bedtime.")).toBeVisible();
+  await expect(page.getByText(/Protected — FamilyFi never blocks/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pause all internet" })).toHaveCount(0);
 
   await page.goto("/family/does-not-exist");
   await expect(page.getByText("Loading household…")).toHaveCount(0);
@@ -237,102 +241,124 @@ test("device identity opens readable connection details", async ({ page }) => {
   }
 });
 
-test("Rules shell: protected absent and Always|Scheduled persist", async ({ page }) => {
+test("Rules: a two-window internet rule across midnight, named in UniFi, on the card", async ({ page }) => {
   await signIn(page);
 
   const groupsRes = await page.request.get("/api/v1/groups");
   expect(groupsRes.ok()).toBeTruthy();
   const body = (await groupsRes.json()) as {
-    groups: {
-      id: string;
-      name: string;
-      kind: string;
-      protected: boolean;
-      familyRole: string | null;
-    }[];
+    groups: { id: string; name: string; kind: string; protected: boolean; familyRole: string | null }[];
   };
-
   const protectedGroup = body.groups.find((group) => group.protected);
   expect(protectedGroup, "UNIFI_MOCK seed must include a protected group").toBeTruthy();
-
-  // Prefer distinct seeded kids per project to reduce desktop/phone schedule races.
+  // Distinct seeded kids per project, so desktop and phone never edit the same group.
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
-  const child =
-    body.groups.find((group) => !group.protected && group.kind === "family" && group.name === preferredName) ??
-    body.groups.find(
-      (group) =>
-        !group.protected && group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"),
-    );
-  expect(child, "UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
+  const child = body.groups.find((group) => !group.protected && group.kind === "family" && group.name === preferredName);
+  expect(child, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+  const ruleName = `QA lights out ${test.info().project.name} ${Date.now() % 100000}`;
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
-  await expect(page.locator(`#group-${protectedGroup!.id}`)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Schedules" })).toHaveCount(0);
+  // Seeded household rules, with the kind stated in words.
+  await expect(page.getByText("All internet · every device").first()).toBeVisible();
+  // The protected adult never appears as something to filter by.
+  await expect(page.getByRole("navigation", { name: "Show rules for" }).getByRole("link", { name: protectedGroup!.name })).toHaveCount(0);
 
-  if (test.info().project.name !== "phone") {
-    await expect(page.getByRole("link", { name: "Schedules" })).toHaveCount(0);
+  await page.goto(`/rules/new?group=${child!.id}`);
+  await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
+  await page.getByLabel("Rule name").fill(ruleName);
+  await page.getByLabel("Window 1 name").fill("Bed");
+  await page.getByRole("button", { name: "+ Add window" }).click();
+  await page.getByLabel("Window 2 name").fill("Study");
+  // Two windows: each policy is named after the rule, then its window.
+  await expect(page.getByText("Names in UniFi · one policy per window")).toBeVisible();
+  await expect(page.getByText(`${ruleName} – Bed`)).toHaveCount(2);
+  await expect(page.getByText(`${ruleName} – Study`)).toHaveCount(2);
+  // The first window already crosses midnight (9 PM–7 AM); the second overlaps nothing.
+  await expect(page.getByText(/overlap\./)).toHaveCount(0);
+
+  const created = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().endsWith("/api/v1/rules"),
+  );
+  await page.getByRole("button", { name: "Create rule" }).last().click();
+  const createdRes = await created;
+  expect(createdRes.ok()).toBeTruthy();
+  const { rule } = (await createdRes.json()) as { rule: { id: string; policyNames: string[]; windows: { start: string; end: string }[] } };
+  expect(rule.policyNames).toEqual([`FamilyFi ${ruleName} – Bed`, `FamilyFi ${ruleName} – Study`]);
+  expect(rule.windows.map((window) => [window.start, window.end])).toEqual([
+    ["21:00", "07:00"],
+    ["15:00", "18:00"],
+  ]);
+
+  try {
+    // Scoped to the child, the new rule is listed with both windows.
+    await expect(page).toHaveURL(new RegExp(`/rules\\?group=${child!.id}`));
+    await expect(page.getByRole("heading", { name: ruleName })).toBeVisible();
+
+    // The card's internet zone shows both windows on today's bar, by name.
+    await page.goto("/family");
+    const card = page.locator("article").filter({ has: page.getByText(child!.name, { exact: true }) }).first();
+    const bar = card.getByRole("group", { name: `${child!.name}’s internet today` });
+    await expect(bar.getByRole("button", { name: /^Bed, / }).first()).toBeVisible();
+    await bar.getByRole("button", { name: /^Study, / }).click();
+    await expect(card.getByText(`${ruleName} rule · Study`)).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
   }
+});
 
-  const row = page.locator(`#group-${child!.id}`);
-  await expect(row).toBeVisible();
-  await expect(row.getByText("Internet").filter({ visible: true })).toBeVisible();
-  // Internet parent is undeletable; nested Category/App rows may expose Delete.
-  await expect(row.getByRole("button", { name: /^Delete Internet/i })).toHaveCount(0);
+test("Pause all internet names its scope and can be undone", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const groupsRes = await page.request.get("/api/v1/groups");
+  const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string; deviceCount: number }[] };
+  // The Living Room TV group, so the family cards other tests use are left alone.
+  const tv = body.groups.find((group) => group.name === "Living Room");
+  expect(tv, "UNIFI_MOCK seed must include the Living Room things group").toBeTruthy();
 
-  const modeOf = (scope: ReturnType<Page["locator"]>) =>
-    scope.getByRole("group", { name: "Internet rule mode" }).filter({ visible: true });
+  await page.goto(`/things/${tv!.id}`);
+  const zone = page.getByRole("heading", { name: /^All internet · / });
+  await expect(zone).toBeVisible();
+  await page.getByRole("button", { name: "Pause all internet" }).click();
+  const sheet = page.getByRole("dialog", { name: `Pause all internet for ${tv!.name}?` });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText(/loses? all internet until you resume/)).toBeVisible();
+  const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/pause`));
+  await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
+  expect((await paused).ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "All internet · off" })).toBeVisible();
+  await expect(page.getByText(/All internet paused until/).first()).toBeVisible();
 
-  async function clickMode(enabled: boolean) {
-    const mode = modeOf(page.locator(`#group-${child!.id}`));
-    const label = enabled ? "Scheduled" : "Always";
-    const put = page.waitForResponse(
-      (response) =>
-        response.request().method() === "PUT" &&
-        response.url().includes(`/api/v1/groups/${child!.id}/schedule`),
-    );
-    await mode.getByRole("button", { name: label }).click();
-    const res = await put;
-    expect(res.ok()).toBeTruthy();
-    expect((res.request().postDataJSON() as { enabled: boolean }).enabled).toBe(enabled);
-  }
+  const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/resume`));
+  await page.locator('[aria-live="polite"]').getByRole("button", { name: "Undo" }).click();
+  expect((await resumed).ok()).toBeTruthy();
+  await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+});
 
-  async function expectMode(enabled: boolean) {
-    const mode = modeOf(page.locator(`#group-${child!.id}`));
-    await expect(mode.getByRole("button", { name: "Always" })).toHaveAttribute(
-      "aria-pressed",
-      enabled ? "false" : "true",
-    );
-    await expect(mode.getByRole("button", { name: "Scheduled" })).toHaveAttribute(
-      "aria-pressed",
-      enabled ? "true" : "false",
-    );
-  }
+test("Websites rule blocks named domains, with the encrypted DNS caveat", async ({ page }) => {
+  await signIn(page);
+  const groupsRes = await page.request.get("/api/v1/groups");
+  const body = (await groupsRes.json()) as { groups: { id: string; name: string }[] };
+  const child = body.groups.find((group) => group.name === (test.info().project.name === "phone" ? "Sam" : "Betsy"));
+  const ruleName = `QA sites ${test.info().project.name} ${Date.now() % 100000}`;
 
-  // Seed starts scheduled; if a prior run left Always, nudge to Scheduled first so Always PUT fires.
-  const initialScheduled =
-    (await modeOf(row).getByRole("button", { name: "Scheduled" }).getAttribute("aria-pressed")) === "true";
-  if (!initialScheduled) {
-    await clickMode(true);
-    await page.goto("/rules");
-  }
-
-  await clickMode(false);
-  await page.goto("/rules");
-  await expectMode(false);
-
-  await clickMode(true);
-  await page.goto("/rules");
-  await expectMode(true);
-
-  // Phase 3: Network chips from Settings managed networks (manage-all in UNIFI_MOCK seed).
-  await page.getByRole("button", { name: "Add" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
-  const networkTab = dialog.getByRole("button", { name: "Network", exact: true });
-  await expect(networkTab).toBeEnabled();
-  await networkTab.click();
-  await expect(dialog.getByRole("group", { name: "Managed networks" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.goto(`/rules/new?group=${child!.id}`);
+  await page.getByRole("button", { name: "Websites" }).click();
+  await expect(page.getByText(/a device using encrypted DNS can get around this/)).toBeVisible();
+  await page.getByRole("button", { name: "Always", exact: true }).click();
+  await page.getByLabel("Rule name").fill(ruleName);
+  await page.getByLabel("Add a website").fill("https://www.Example.com/watch");
+  await page.getByLabel("Add a website").press("Enter");
+  await expect(page.getByRole("button", { name: "Remove www.example.com" })).toBeVisible();
+  const created = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().endsWith("/api/v1/rules"),
+  );
+  await page.getByRole("button", { name: "Create rule" }).last().click();
+  const res = await created;
+  expect(res.ok()).toBeTruthy();
+  const { rule } = (await res.json()) as { rule: { id: string; domains: string[]; mode: string } };
+  expect([rule.domains, rule.mode]).toEqual([["www.example.com"], "always"]);
+  await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
 });
 
 test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without a resolver", async ({ page }) => {
@@ -419,25 +445,14 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   // No Category +
   await expect(page.getByRole("button", { name: "Add category filter" })).toHaveCount(0);
 
-  // Soft polish on Rules
-  await page.goto("/rules");
-  await expect(page.getByText(/Always keeps the block on until you turn it off/i)).toBeVisible();
-  await expect(page.getByText(/permanent block/i)).toHaveCount(0);
-  await page.getByRole("button", { name: "Add" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
-  // Soft polish: Network empty helper must be visible when Network tab is disabled.
-  // With UNIFI_MOCK manage-all, Network is enabled — assert curated chips hide raw ids.
-  const curated = dialog.getByRole("group", { name: "Curated category slots" });
+  // The rule editor names categories, never raw DPI ids.
+  await page.goto("/rules/new?kind=category");
+  const curated = page.getByRole("group", { name: "Category" });
   await expect(curated.getByRole("button", { name: /Video/i })).toBeVisible();
   await expect(curated.getByText(/\(\s*4\s*\)/)).toHaveCount(0);
-  await expect(curated.getByText(/\(\s*24\s*\)/)).toHaveCount(0);
-  await expect(curated.getByText(/\(\s*8\s*\)/)).toHaveCount(0);
-  await expect(page.getByText(/Checking/i)).toHaveCount(0);
-  await expect(page.getByText(/Already blocked \(DNS\)/i)).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByText(/permanent block/i)).toHaveCount(0);
 
-  // Soft polish: Network empty helper when Network tab disabled (desktop only — avoids settings races).
+  // Network scope needs managed networks (desktop only — avoids settings races).
   if (test.info().project.name === "desktop") {
     const unifiGet = await page.request.get("/api/v1/settings/unifi");
     expect(unifiGet.ok()).toBeTruthy();
@@ -451,12 +466,9 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
         data: { manageAllNetworks: false, managedNetworkIds: [] },
       });
       expect(put.ok()).toBeTruthy();
-      await page.goto("/rules");
-      await page.getByRole("button", { name: "Add" }).click();
-      const emptyDialog = page.getByRole("dialog");
-      await expect(emptyDialog.getByRole("button", { name: "Network", exact: true })).toBeDisabled();
-      await expect(emptyDialog.getByTestId("network-scope-empty-helper")).toBeVisible();
-      await emptyDialog.getByRole("button", { name: "Cancel" }).click();
+      // With no managed networks, a rule can only cover people and things.
+      await page.goto("/rules/new?kind=category");
+      await expect(page.getByRole("button", { name: "Whole networks" })).toHaveCount(0);
     } finally {
       await page.request.put("/api/v1/settings/unifi", {
         headers: await csrfHeaders(page),
