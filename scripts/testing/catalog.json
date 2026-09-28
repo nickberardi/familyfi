@@ -1,0 +1,602 @@
+{
+  "version": 1,
+  "categories": [
+    "accessibility",
+    "accounts",
+    "categories",
+    "contracts",
+    "database",
+    "devices",
+    "display",
+    "groups",
+    "navigation",
+    "pairing",
+    "repository",
+    "rules",
+    "runtime",
+    "schedules",
+    "sessions",
+    "settings",
+    "sync",
+    "test-infrastructure",
+    "trust",
+    "unifi"
+  ],
+  "entries": {
+    "scripts/tests/": {
+      "categories": [
+        "test-infrastructure"
+      ]
+    },
+    "tests/contract/openapi.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
+    "tests/unit/accounts.test.ts": {
+      "categories": [
+        "accounts"
+      ]
+    },
+    "tests/unit/changed-line-coverage.test.ts": {
+      "categories": [
+        "test-infrastructure"
+      ]
+    },
+    "tests/unit/ci-scripts.test.ts": {
+      "categories": [
+        "test-infrastructure"
+      ]
+    },
+    "tests/unit/client-boundary.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
+    "tests/unit/connection-routes.test.ts": {
+      "categories": [
+        "trust"
+      ]
+    },
+    "tests/unit/cookie.test.ts": {
+      "categories": [
+        "sessions"
+      ]
+    },
+    "tests/unit/crypto.test.ts": {
+      "categories": [
+        "settings",
+        "unifi"
+      ]
+    },
+    "tests/unit/database-url.test.ts": {
+      "categories": [
+        "database",
+        "runtime"
+      ]
+    },
+    "tests/unit/device-presence.test.ts": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/unit/display-vectors.test.ts": {
+      "categories": [
+        "display"
+      ]
+    },
+    "tests/unit/display.test.ts": {
+      "categories": [
+        "display"
+      ]
+    },
+    "tests/unit/dpi-payloads.test.ts": {
+      "categories": [
+        "rules",
+        "unifi"
+      ]
+    },
+    "tests/unit/ensure-secrets.test.ts": {
+      "categories": [
+        "runtime"
+      ]
+    },
+    "tests/unit/env-path.test.ts": {
+      "categories": [
+        "runtime"
+      ]
+    },
+    "tests/unit/env.test.ts": {
+      "categories": [
+        "runtime"
+      ]
+    },
+    "tests/unit/group-actions.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
+    },
+    "tests/unit/group-mode.test.ts": {
+      "categories": [
+        "groups",
+        "schedules"
+      ]
+    },
+    "tests/unit/household-state.test.ts": {
+      "categories": [
+        "groups",
+        "devices"
+      ]
+    },
+    "tests/unit/icons.test.ts": {
+      "categories": [
+        "repository",
+        "display"
+      ]
+    },
+    "tests/unit/invariants.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
+    "tests/unit/mac-registrants.test.ts": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/unit/mac.test.ts": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/unit/mark-contrast.test.ts": {
+      "categories": [
+        "accessibility",
+        "categories"
+      ]
+    },
+    "tests/unit/migration-upgrade.test.ts": {
+      "categories": [
+        "database"
+      ]
+    },
+    "tests/unit/mutate-gate.test.ts": {
+      "categories": [
+        "groups",
+        "devices"
+      ]
+    },
+    "tests/unit/names.test.ts": {
+      "categories": [
+        "unifi",
+        "sync"
+      ]
+    },
+    "tests/unit/naming.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
+    "tests/unit/node-version.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
+    "tests/unit/openapi-version.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
+    "tests/unit/origin.test.ts": {
+      "categories": [
+        "sessions"
+      ]
+    },
+    "tests/unit/pairing-code.test.ts": {
+      "categories": [
+        "pairing"
+      ]
+    },
+    "tests/unit/phone-gateway.test.ts": {
+      "categories": [
+        "trust"
+      ]
+    },
+    "tests/unit/plan-dpi.test.ts": {
+      "categories": [
+        "rules",
+        "sync"
+      ]
+    },
+    "tests/unit/policy-coverage.test.ts": {
+      "categories": [
+        "sync"
+      ]
+    },
+    "tests/unit/prisma-schema.test.ts": {
+      "categories": [
+        "database"
+      ]
+    },
+    "tests/unit/public-device.test.ts": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/unit/quarantine.test.ts": {
+      "categories": [
+        "devices",
+        "sync"
+      ]
+    },
+    "tests/unit/repository-hygiene.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
+    "tests/unit/reviewer-agents.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
+    "tests/unit/rule-rows.test.ts": {
+      "categories": [
+        "rules",
+        "display"
+      ]
+    },
+    "tests/unit/rules.test.ts": {
+      "categories": [
+        "rules"
+      ]
+    },
+    "tests/unit/schedule.test.ts": {
+      "categories": [
+        "schedules"
+      ]
+    },
+    "tests/unit/scope.test.ts": {
+      "categories": [
+        "unifi",
+        "sync"
+      ]
+    },
+    "tests/unit/settings-copy.test.ts": {
+      "categories": [
+        "settings"
+      ]
+    },
+    "tests/unit/spike-verify.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
+    "tests/unit/spki.test.ts": {
+      "categories": [
+        "trust"
+      ]
+    },
+    "tests/unit/startup-banner.test.ts": {
+      "categories": [
+        "runtime"
+      ]
+    },
+    "tests/unit/sync-copy.test.ts": {
+      "categories": [
+        "sync",
+        "display"
+      ]
+    },
+    "tests/unit/unifi-client-contract.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
+    "tests/unit/unifi-client-surface.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
+    "tests/unit/unifi-host.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
+    "tests/unit/unifi-mock.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
+    "tests/unit/unifi.test.ts": {
+      "categories": [
+        "unifi",
+        "sync"
+      ]
+    },
+    "tests/unit/update-check.test.ts": {
+      "categories": [
+        "settings"
+      ]
+    },
+    "tests/unit/upstream-doh.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/unit/upstream-domain-verdict.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/unit/upstream-domains.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/unit/upstream-effective-check.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/unit/upstream-freshness.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/unit/upstream-mark-state.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/unit/upstream-plain-dns.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/unit/upstream-schedule.test.ts": {
+      "categories": [
+        "categories",
+        "schedules"
+      ]
+    },
+    "tests/unit/version.test.ts": {
+      "categories": [
+        "runtime"
+      ]
+    },
+    "tests/integration/api-contract.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
+    "tests/integration/auth-api.test.ts": {
+      "categories": [
+        "sessions",
+        "accounts"
+      ]
+    },
+    "tests/integration/authorization-matrix.test.ts": {
+      "categories": [
+        "sessions",
+        "contracts"
+      ]
+    },
+    "tests/integration/connection-api.test.ts": {
+      "categories": [
+        "trust",
+        "pairing"
+      ]
+    },
+    "tests/integration/d11-mode.test.ts": {
+      "categories": [
+        "groups",
+        "database"
+      ]
+    },
+    "tests/integration/dev-mock.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
+    "tests/integration/dpi-network-rules.test.ts": {
+      "categories": [
+        "rules"
+      ]
+    },
+    "tests/integration/dpi-rules.test.ts": {
+      "categories": [
+        "rules"
+      ]
+    },
+    "tests/integration/edge-auth.test.ts": {
+      "categories": [
+        "trust"
+      ]
+    },
+    "tests/integration/group-detail-api.test.ts": {
+      "categories": [
+        "groups"
+      ]
+    },
+    "tests/integration/policy-ownership.test.ts": {
+      "categories": [
+        "sync",
+        "unifi"
+      ]
+    },
+    "tests/integration/quarantine-observe.test.ts": {
+      "categories": [
+        "devices",
+        "sync"
+      ]
+    },
+    "tests/integration/reconcile-paths.test.ts": {
+      "categories": [
+        "sync"
+      ]
+    },
+    "tests/integration/reconcile-properties.test.ts": {
+      "categories": [
+        "sync",
+        "schedules"
+      ]
+    },
+    "tests/integration/reconcile.test.ts": {
+      "categories": [
+        "sync"
+      ]
+    },
+    "tests/integration/remote-access.test.ts": {
+      "categories": [
+        "trust"
+      ]
+    },
+    "tests/integration/reset-database.test.ts": {
+      "categories": [
+        "test-infrastructure",
+        "database"
+      ]
+    },
+    "tests/integration/unifi-key-storage.test.ts": {
+      "categories": [
+        "settings",
+        "unifi"
+      ]
+    },
+    "tests/integration/unifi-test-api.test.ts": {
+      "categories": [
+        "settings",
+        "unifi"
+      ]
+    },
+    "tests/integration/upstream-categories-api.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/integration/upstream-checks-api.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/integration/upstream-dhcp-probe.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/integration/upstream-group-resolver.test.ts": {
+      "categories": [
+        "categories",
+        "groups"
+      ]
+    },
+    "tests/integration/upstream-probe-schedule.test.ts": {
+      "categories": [
+        "categories",
+        "schedules"
+      ]
+    },
+    "tests/integration/upstream-probe.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/integration/upstream-resolver-api.test.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/integration/upstream-seed.test.ts": {
+      "categories": [
+        "categories",
+        "database"
+      ]
+    },
+    "tests/integration/watch-device-api.test.ts": {
+      "categories": [
+        "pairing",
+        "devices"
+      ]
+    },
+    "tests/browser/accessibility.spec.ts": {
+      "categories": [
+        "accessibility"
+      ]
+    },
+    "tests/browser/categories.spec.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/browser/group-resolver.spec.ts": {
+      "categories": [
+        "groups",
+        "categories"
+      ]
+    },
+    "tests/browser/mobile-nav.spec.ts": {
+      "categories": [
+        "navigation"
+      ]
+    },
+    "tests/browser/pair.spec.ts": {
+      "categories": [
+        "pairing",
+        "trust"
+      ]
+    },
+    "tests/browser/upstream-marks.spec.ts": {
+      "categories": [
+        "categories"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > sign-in and household pages": {
+      "categories": [
+        "navigation",
+        "sessions"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > settings shows available, current, and unavailable update checks": {
+      "categories": [
+        "settings"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > create person lands on a seeded detail page that can be edited": {
+      "categories": [
+        "groups"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > create things group lands on a seeded detail page that can be edited": {
+      "categories": [
+        "groups"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > desktop Sync summary keeps four cards on one row": {
+      "categories": [
+        "sync"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > device assignment updates immediately": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > device identity opens readable connection details": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > Rules shell: protected absent and Always|Scheduled persist": {
+      "categories": [
+        "rules"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > Phase 4: card marks, filter sheets, soft polish, no upstream claim without a resolver": {
+      "categories": [
+        "categories",
+        "groups"
+      ]
+    }
+  }
+}

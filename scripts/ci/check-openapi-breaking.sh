@@ -6,7 +6,7 @@
 #
 # Usage: sh scripts/ci/check-openapi-breaking.sh [base-ref]
 # Without a ref it fetches origin/$BASE_REF (default main), the way CI runs it. With one
-# (scripts/ci.sh passes origin/main) it compares against that ref and fetches nothing.
+# (scripts/test.py passes origin/main) it compares against that ref and fetches nothing.
 set -eu
 
 OASDIFF_VERSION=v1.32.1

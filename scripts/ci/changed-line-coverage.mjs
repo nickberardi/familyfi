@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Which lines a pull request changed in measured code that no test runs. Reads the
- * coverage run's coverage/lcov.info and the diff against a base, and reports each
+ * Which lines a pull request changed in measured code that no test runs. Reads a
+ * coverage run's lcov.info and the diff against a base, and reports each
  * uncovered changed line as a GitHub annotation plus a summary.
  *
  * In the paths `GATED_PATHS` lists, an uncovered changed line fails the run (exit 1).
@@ -9,7 +9,9 @@
  * reach is exempted in the source, where a reviewer sees it, with a comment on the line
  * or the line above: `// coverage-exempt: <why>`. The summary lists every exemption.
  *
- * usage: node scripts/ci/changed-line-coverage.mjs <base-ref> [summary-file]
+ * usage: node scripts/ci/changed-line-coverage.mjs [--lcov <file>] <base-ref> [summary-file]
+ * `scripts/test.py check coverage --run-id <id>` calls it with that run's lcov; without
+ * `--lcov` it reads coverage/lcov.info.
  */
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
@@ -118,14 +120,19 @@ function cell(text) {
 }
 
 function main() {
-  const [base, summaryFile] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  let lcovPath = path.join(root, "coverage/lcov.info");
+  if (args[0] === "--lcov") {
+    lcovPath = path.resolve(args[1] ?? "");
+    args.splice(0, 2);
+  }
+  const [base, summaryFile] = args;
   if (!base) {
-    console.error("usage: node scripts/ci/changed-line-coverage.mjs <base-ref> [summary-file]");
+    console.error("usage: node scripts/ci/changed-line-coverage.mjs [--lcov <file>] <base-ref> [summary-file]");
     process.exit(1);
   }
-  const lcovPath = path.join(root, "coverage/lcov.info");
   if (!existsSync(lcovPath)) {
-    console.error("coverage/lcov.info is missing: run pnpm test:coverage first.");
+    console.error(`${path.relative(root, lcovPath)} is missing: run scripts/test.py run --platform host --coverage first.`);
     process.exit(1);
   }
 

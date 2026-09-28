@@ -70,7 +70,7 @@ All repository skills live in `.agents/skills/`. `.claude/skills` is a directory
 
 Next.js App Router + TypeScript, React, Tailwind, Prisma/PostgreSQL. `src/app` holds pages and routes; `src/components` shared UI; `src/server` database, authentication and enforcement; `src/lib` client-safe types and pure logic. `prisma` owns schema and migrations, `openapi` the HTTP contract, `tests` validation, `scripts` tooling and startup, and `docker` deployment.
 
-Use `make setup` for a new development environment, `make dev` to run it, and `make lint typecheck test-unit` for fast code checks. Setup and dev can migrate the development database; use a task-owned database for disposable work. The complete [command reference](docs/development.md#commands) explains side effects; [testing.md](docs/testing.md) selects checks by change.
+Use `make setup` for a new development environment, `make dev` to run it, and `make lint typecheck test-unit` for fast code checks. Tests and checks run through `scripts/test.py` (Python 3.11+), which the `make` test targets alias; it selects by test, category, layer or platform and owns a fresh database per run. Setup and dev can migrate the development database; tests never do. The complete [command reference](docs/development.md#commands) explains side effects; [testing.md](docs/testing.md) selects checks by change.
 
 ## Invariants
 

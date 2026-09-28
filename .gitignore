@@ -39,6 +39,7 @@ postgres-data/
 /dist
 
 # logs and machine-specific files
+__pycache__/
 logs/
 *.log
 npm-debug.log*
