@@ -12,26 +12,64 @@ report() {
 
 report
 
-# Docker: builders left by jobs that died before setup-buildx-action's post step, then
-# unused images, stopped containers, networks, anonymous volumes and build cache. The
-# job's own service containers are running, so they and their images stay.
-if command -v docker >/dev/null 2>&1; then
+# Two agents on one machine share Docker and, without per-runner paths, $HOME.
+# A sibling job's cleanup must not delete the toolchain that job is compiling with.
+runner_root=""
+if [ -n "${RUNNER_WORKSPACE:-}" ]; then
+  runner_root=$(CDPATH= cd "$(dirname "$(dirname "$RUNNER_WORKSPACE")")" && pwd)
+fi
+others=0
+if command -v pgrep >/dev/null 2>&1; then
+  workers=$(pgrep -c -x Runner.Worker 2>/dev/null || true)
+  if [ "${workers:-0}" -gt 1 ]; then
+    others=1
+  fi
+fi
+
+# Only this runner's directory. A shared path is removed only when this job is alone.
+remove_tree() {
+  dir=$1
+  [ -n "$dir" ] && [ -d "$dir" ] || return 0
+  if [ -n "$runner_root" ]; then
+    case "$dir" in
+      "$runner_root"/*) ;;
+      *) [ "$others" -eq 0 ] || return 0 ;;
+    esac
+  else
+    [ "$others" -eq 0 ] || return 0
+  fi
+  chmod -R u+w "$dir" 2>/dev/null || true
+  rm -rf "$dir"
+}
+
+# Docker is one daemon for every agent. Pruning it while another job builds deletes
+# that job's cache and its Go-unrelated image layers.
+if command -v docker >/dev/null 2>&1 && [ "$others" -eq 0 ]; then
   docker buildx rm --all-inactive --force >/dev/null 2>&1 || true
   docker builder prune --all --force >/dev/null || true
   docker system prune --all --force --volumes >/dev/null || true
 fi
 
 # pnpm's store only grows; setup-node restores it from the Actions cache on every install.
-rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/pnpm/store"
+if [ -n "${npm_config_store_dir:-}" ]; then
+  remove_tree "$npm_config_store_dir"
+else
+  [ "$others" -eq 0 ] && rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/pnpm/store"
+fi
 
 # Go build and module caches from installing oasdiff, including GOTOOLCHAIN=auto toolchains.
-# Module files are read-only, so make them writable before removing them.
-for dir in "$HOME/.cache/go-build" "${GOPATH:-$HOME/go}/pkg/mod"; do
-  if [ -d "$dir" ]; then
-    chmod -R u+w "$dir" 2>/dev/null || true
-    rm -rf "$dir"
-  fi
-done
+# The toolchain is a directory inside the module cache; deleting a shared one mid-build
+# makes compile disappear. Private caches are set on each runner service.
+if [ -n "${GOMODCACHE:-}" ]; then
+  remove_tree "$GOMODCACHE"
+else
+  remove_tree "${GOPATH:-$HOME/go}/pkg/mod"
+fi
+if [ -n "${GOCACHE:-}" ]; then
+  remove_tree "$GOCACHE"
+else
+  remove_tree "$HOME/.cache/go-build"
+fi
 
 # Tool downloads (CodeQL bundles, Node versions) not refreshed in two weeks; the setup
 # step that still needs one downloads it again.
