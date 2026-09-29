@@ -76,6 +76,7 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
 const EXCLUDED: Record<string, string> = {
   // Wires `groupActionSpecs` to callbacks and the API client; the vectors pin the specs.
   groupActions: "binds React callbacks",
+  internetRulePath: "builds an API path; each client owns its own URLs",
 };
 
 const MODULES = { display, groupActions: groupActionsModule, pauseSheet, ruleActions, ruleWindows };

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.18.0
+  version: 0.19.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -638,196 +638,6 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/pause:
-    post:
-      operationId: pauseGroup
-      tags: [Groups]
-      summary: Pause all internet for a group
-      description: |
-        Blocks all internet for every device in the group now, until `until` or until
-        resumed; omit `until` for an indefinite pause. FamilyFi writes an unscheduled
-        block policy that exists only while the group is paused. Records who paused and
-        ends any allowance. Category, app and website rules are unchanged.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/GroupId" }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                until:
-                  type: [string, "null"]
-                  format: date-time
-      responses:
-        "200":
-          description: Paused
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/resume:
-    post:
-      operationId: resumeGroup
-      tags: [Groups]
-      summary: Resume internet after a pause
-      description: |
-        Ends the pause. The group's internet rules still apply, so a window active now
-        keeps blocking until it ends or an allowance lifts it.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/GroupId" }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      responses:
-        "200":
-          description: Resumed
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/allow:
-    post:
-      operationId: allowGroup
-      tags: [Groups]
-      summary: Let a group online during its internet rules' windows
-      description: |
-        An allowance lifts the group's internet-rule windows until `until`: its devices
-        leave those rules' UniFi policies. Omit `until` to allow until the active windows
-        end, or until cancelled when one is an always-on rule (409 `not_in_window` when
-        none is active); `null` allows until cancelled.
-        Category, app and website rules keep applying. Ends any pause and records who
-        allowed it.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/GroupId" }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                until:
-                  type: [string, "null"]
-                  format: date-time
-      responses:
-        "200":
-          description: Allowed
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-    delete:
-      operationId: cancelGroupAllowance
-      tags: [Groups]
-      summary: End an allowance
-      description: The group's internet rules apply again.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/GroupId" }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      responses:
-        "200":
-          description: Allowance ended
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/extend:
-    post:
-      operationId: extendGroupPause
-      tags: [Groups]
-      summary: Extend a timed pause
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/GroupId" }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [minutes]
-              properties:
-                minutes: { type: integer, minimum: 1 }
-      responses:
-        "200":
-          description: Extended
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
 
   /api/v1/dpi/categories:
     get:
@@ -1354,6 +1164,14 @@ paths:
         - name: ruleId
           in: path
           required: true
+          description: |
+            A rule the group has, or the reserved `internet`: the group's built-in rule "this
+            group has internet". The verbs mean the same to it. `pause` suspends it, so all
+            internet is blocked now (a hidden always-on block rule is enabled until `until` or
+            until resumed); `resume` ends that; `extend` adds time to it; `allow` overrides the
+            group's internet rules until `until` (default: each rule's active windows end; 409
+            `not_in_window` when none is blocking); `disallow` ends that. Pause and allow
+            replace each other. The response carries `group` instead of `rule`.
           schema: { type: string }
         - { $ref: "#/components/parameters/CsrfToken" }
       requestBody:
@@ -1373,12 +1191,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required: [rule, change]
-                properties:
-                  rule: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
+                oneOf:
+                  - type: object
+                    additionalProperties: false
+                    required: [rule, change]
+                    description: A rule id
+                    properties:
+                      rule: { $ref: "#/components/schemas/Rule" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
+                  - type: object
+                    additionalProperties: false
+                    required: [group, change]
+                    description: The reserved id `internet`
+                    properties:
+                      group: { $ref: "#/components/schemas/Group" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -1405,6 +1232,14 @@ paths:
         - name: ruleId
           in: path
           required: true
+          description: |
+            A rule the group has, or the reserved `internet`: the group's built-in rule "this
+            group has internet". The verbs mean the same to it. `pause` suspends it, so all
+            internet is blocked now (a hidden always-on block rule is enabled until `until` or
+            until resumed); `resume` ends that; `extend` adds time to it; `allow` overrides the
+            group's internet rules until `until` (default: each rule's active windows end; 409
+            `not_in_window` when none is blocking); `disallow` ends that. Pause and allow
+            replace each other. The response carries `group` instead of `rule`.
           schema: { type: string }
         - { $ref: "#/components/parameters/CsrfToken" }
       responses:
@@ -1413,12 +1248,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required: [rule, change]
-                properties:
-                  rule: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
+                oneOf:
+                  - type: object
+                    additionalProperties: false
+                    required: [rule, change]
+                    description: A rule id
+                    properties:
+                      rule: { $ref: "#/components/schemas/Rule" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
+                  - type: object
+                    additionalProperties: false
+                    required: [group, change]
+                    description: The reserved id `internet`
+                    properties:
+                      group: { $ref: "#/components/schemas/Group" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -1441,6 +1285,14 @@ paths:
         - name: ruleId
           in: path
           required: true
+          description: |
+            A rule the group has, or the reserved `internet`: the group's built-in rule "this
+            group has internet". The verbs mean the same to it. `pause` suspends it, so all
+            internet is blocked now (a hidden always-on block rule is enabled until `until` or
+            until resumed); `resume` ends that; `extend` adds time to it; `allow` overrides the
+            group's internet rules until `until` (default: each rule's active windows end; 409
+            `not_in_window` when none is blocking); `disallow` ends that. Pause and allow
+            replace each other. The response carries `group` instead of `rule`.
           schema: { type: string }
         - { $ref: "#/components/parameters/CsrfToken" }
       requestBody:
@@ -1459,12 +1311,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required: [rule, change]
-                properties:
-                  rule: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
+                oneOf:
+                  - type: object
+                    additionalProperties: false
+                    required: [rule, change]
+                    description: A rule id
+                    properties:
+                      rule: { $ref: "#/components/schemas/Rule" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
+                  - type: object
+                    additionalProperties: false
+                    required: [group, change]
+                    description: The reserved id `internet`
+                    properties:
+                      group: { $ref: "#/components/schemas/Group" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -1491,6 +1352,14 @@ paths:
         - name: ruleId
           in: path
           required: true
+          description: |
+            A rule the group has, or the reserved `internet`: the group's built-in rule "this
+            group has internet". The verbs mean the same to it. `pause` suspends it, so all
+            internet is blocked now (a hidden always-on block rule is enabled until `until` or
+            until resumed); `resume` ends that; `extend` adds time to it; `allow` overrides the
+            group's internet rules until `until` (default: each rule's active windows end; 409
+            `not_in_window` when none is blocking); `disallow` ends that. Pause and allow
+            replace each other. The response carries `group` instead of `rule`.
           schema: { type: string }
         - { $ref: "#/components/parameters/CsrfToken" }
       requestBody:
@@ -1510,12 +1379,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required: [rule, change]
-                properties:
-                  rule: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
+                oneOf:
+                  - type: object
+                    additionalProperties: false
+                    required: [rule, change]
+                    description: A rule id
+                    properties:
+                      rule: { $ref: "#/components/schemas/Rule" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
+                  - type: object
+                    additionalProperties: false
+                    required: [group, change]
+                    description: The reserved id `internet`
+                    properties:
+                      group: { $ref: "#/components/schemas/Group" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -1542,6 +1420,14 @@ paths:
         - name: ruleId
           in: path
           required: true
+          description: |
+            A rule the group has, or the reserved `internet`: the group's built-in rule "this
+            group has internet". The verbs mean the same to it. `pause` suspends it, so all
+            internet is blocked now (a hidden always-on block rule is enabled until `until` or
+            until resumed); `resume` ends that; `extend` adds time to it; `allow` overrides the
+            group's internet rules until `until` (default: each rule's active windows end; 409
+            `not_in_window` when none is blocking); `disallow` ends that. Pause and allow
+            replace each other. The response carries `group` instead of `rule`.
           schema: { type: string }
         - { $ref: "#/components/parameters/CsrfToken" }
       responses:
@@ -1550,12 +1436,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required: [rule, change]
-                properties:
-                  rule: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
+                oneOf:
+                  - type: object
+                    additionalProperties: false
+                    required: [rule, change]
+                    description: A rule id
+                    properties:
+                      rule: { $ref: "#/components/schemas/Rule" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
+                  - type: object
+                    additionalProperties: false
+                    required: [group, change]
+                    description: The reserved id `internet`
+                    properties:
+                      group: { $ref: "#/components/schemas/Group" }
+                      change: { $ref: "#/components/schemas/ChangeSummary" }
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -3177,7 +3072,7 @@ components:
       type: object
       additionalProperties: false
       required: [active, until, by]
-      description: A pause blocks all internet for the group until `until`, or until resumed when null.
+      description: Read-only, derived from the group's built-in `internet` rule. A pause blocks all internet for the group until `until`, or until resumed when null.
       properties:
         active: { type: boolean }
         until: { type: [string, "null"], format: date-time }
@@ -3186,7 +3081,7 @@ components:
       type: object
       additionalProperties: false
       required: [active, until, by]
-      description: An allowance lifts the group's internet-rule windows until `until`, or until cancelled when null.
+      description: Read-only, derived from the group's internet rules. An allowance lifts every enabled internet rule of the group until `until`, or until disallowed when null.
       properties:
         active: { type: boolean }
         until: { type: [string, "null"], format: date-time }

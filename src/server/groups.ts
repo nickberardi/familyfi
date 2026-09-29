@@ -1,5 +1,5 @@
 import { FamilyRole, GroupKind, Prisma } from "@prisma/client";
-import { internetState, type InternetWindow } from "@/lib/rule-windows";
+import { internetState, isWindowActive, type InternetWindow } from "@/lib/rule-windows";
 import { isSuspended } from "@/lib/schedule";
 import { ruleInternetWindows } from "./rules";
 
@@ -53,23 +53,26 @@ export function sessionActor(session: { accountId?: string | null; username: str
 }
 
 export function groupAccess(group: GroupWithRules, now: Date, timezone: string): GroupAccess {
-  const state = internetState(internetGroup(group, now), internetWindows(group, now), now, timezone).state;
+  const state = internetState(internetGroup(group, now, timezone), internetWindows(group, now), now, timezone).state;
   if (state === "online" || state === "no_rule") return "available";
   return state;
 }
 
 /**
  * The group's pause and allowance, read from the rules that carry them. A pause is its
- * built-in block rule while enabled. An allowance is every enabled internet rule of the
- * group lifted as an allowance for this group, until the earliest of their ends.
+ * built-in block rule while enabled. An allowance is an allowance lift on any enabled
+ * internet rule of the group, provided no other internet rule is blocking it now; it lasts
+ * until the earliest of the lifts' ends.
  */
-function internetGroup(group: GroupWithRules, now: Date) {
+function internetGroup(group: GroupWithRules, now: Date, timezone: string) {
   const block = blockRuleOf(group);
   const blocking = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
   const links = internetLinks(group).filter(({ rule }) => rule.enabled);
-  const allowed = links.length > 0 && links.every(({ link }) => link.pauseKind === "allow" && lifted(link, now));
-  const ends = links.map(({ link }) => link.pauseUntil).filter((end): end is Date => end !== null);
-  const first = links[0]?.link;
+  const allows = links.filter(({ link }) => link.pauseKind === "allow" && lifted(link, now));
+  const stillBlocked = internetWindows(group, now).some((window) => isWindowActive(window, now, timezone));
+  const allowed = allows.length > 0 && !stillBlocked;
+  const ends = allows.map(({ link }) => link.pauseUntil).filter((end): end is Date => end !== null);
+  const first = allows[0]?.link;
   return {
     suspension: {
       active: blocking,
@@ -85,7 +88,7 @@ function internetGroup(group: GroupWithRules, now: Date) {
 }
 
 export function publicGroup(group: GroupWithRules, timezone: string, now = new Date()) {
-  const internet = internetGroup(group, now);
+  const internet = internetGroup(group, now, timezone);
   return {
     id: group.id,
     kind: group.kind as GroupKind,

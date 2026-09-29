@@ -46,7 +46,7 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 | Prisma models / tables | `PascalCase`, singular | `Rule`, `RulePolicy`, `SyncRun` |
 | Columns and JSON fields | `camelCase` | `suspensionActive`, `targetIds` |
 | Prisma enum values | `lowercase` | `family`, `scheduled`, `quarantined` |
-| API paths | lowercase, plural, `{id}` | `/api/v1/groups/{id}/pause` |
+| API paths | lowercase, plural, `{id}` | `/api/v1/groups/{id}/rules/{ruleId}/pause` |
 | Our env vars | `FAMILYFI_` + purpose | `FAMILYFI_ENCRYPTION_KEY` |
 | CSS tokens | `--ff-` + kebab role | `--ff-hairline-card`, `--ff-ink-3` |
 

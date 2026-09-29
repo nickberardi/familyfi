@@ -75,7 +75,7 @@ describe("dev UniFi mock household", () => {
     expect(devices.filter((row) => row.assignment === AssignmentState.assigned)).toHaveLength(4);
     await ensureDevDummyData();
     expect(await prisma().group.count()).toBe(6);
-    expect(await prisma().rule.count()).toBe(7);
+    expect(await prisma().rule.count()).toBe(8);
     expect(await prisma().account.count({ where: { username: DEV_SEED_ADULT_USERNAME } })).toBe(1);
   });
 });
