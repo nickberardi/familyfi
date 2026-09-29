@@ -13,6 +13,11 @@ export const groupInclude = {
 
 export type GroupWithRules = Prisma.GroupGetPayload<{ include: typeof groupInclude }>;
 
+/** The group's built-in rule: an always-on block, enabled while the group is paused. */
+export function blockRuleOf(group: Pick<GroupWithRules, "rules">) {
+  return group.rules.map((link) => link.rule).find((rule) => rule.systemGroupId !== null);
+}
+
 /**
  * The windows of the group's enabled internet rules, in rule then window order, leaving out
  * a rule that is paused or allowed, for everyone or for this group alone.
@@ -23,14 +28,14 @@ export function internetWindows(group: Pick<GroupWithRules, "rules">, now: Date)
     .flatMap(({ rule }) => ruleInternetWindows(rule));
 }
 
-function lifted(state: { pauseActive: boolean; pauseUntil: Date | null }, now: Date) {
+export function lifted(state: { pauseActive: boolean; pauseUntil: Date | null }, now: Date) {
   return isSuspended({ active: state.pauseActive, until: state.pauseUntil }, now);
 }
 
-function internetLinks(group: Pick<GroupWithRules, "rules">) {
+export function internetLinks(group: Pick<GroupWithRules, "rules">) {
   return group.rules
     .map((link) => ({ rule: link.rule, link }))
-    .filter(({ rule }) => rule.kind === "internet")
+    .filter(({ rule }) => rule.kind === "internet" && rule.systemGroupId === null)
     .sort((a, b) => a.rule.createdAt.getTime() - b.rule.createdAt.getTime());
 }
 
@@ -48,28 +53,39 @@ export function sessionActor(session: { accountId?: string | null; username: str
 }
 
 export function groupAccess(group: GroupWithRules, now: Date, timezone: string): GroupAccess {
-  const state = internetState(internetGroup(group), internetWindows(group, now), now, timezone).state;
+  const state = internetState(internetGroup(group, now), internetWindows(group, now), now, timezone).state;
   if (state === "online" || state === "no_rule") return "available";
   return state;
 }
 
-function internetGroup(group: GroupWithRules) {
+/**
+ * The group's pause and allowance, read from the rules that carry them. A pause is its
+ * built-in block rule while enabled. An allowance is every enabled internet rule of the
+ * group lifted as an allowance for this group, until the earliest of their ends.
+ */
+function internetGroup(group: GroupWithRules, now: Date) {
+  const block = blockRuleOf(group);
+  const blocking = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
+  const links = internetLinks(group).filter(({ rule }) => rule.enabled);
+  const allowed = links.length > 0 && links.every(({ link }) => link.pauseKind === "allow" && lifted(link, now));
+  const ends = links.map(({ link }) => link.pauseUntil).filter((end): end is Date => end !== null);
+  const first = links[0]?.link;
   return {
     suspension: {
-      active: group.suspensionActive,
-      until: group.suspensionUntil?.toISOString() ?? null,
-      by: actor(group.suspendedByAccountId, group.suspendedByName),
+      active: blocking,
+      until: blocking ? (block!.expiresAt?.toISOString() ?? null) : null,
+      by: blocking ? actor(block!.blockedByAccountId, block!.blockedByName) : null,
     },
     allowance: {
-      active: group.allowActive,
-      until: group.allowUntil?.toISOString() ?? null,
-      by: actor(group.allowedByAccountId, group.allowedByName),
+      active: allowed,
+      until: allowed && ends.length ? new Date(Math.min(...ends.map((end) => end.getTime()))).toISOString() : null,
+      by: allowed && first ? actor(first.pausedByAccountId, first.pausedByName) : null,
     },
   };
 }
 
 export function publicGroup(group: GroupWithRules, timezone: string, now = new Date()) {
-  const internet = internetGroup(group);
+  const internet = internetGroup(group, now);
   return {
     id: group.id,
     kind: group.kind as GroupKind,

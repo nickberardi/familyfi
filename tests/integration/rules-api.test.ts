@@ -8,9 +8,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AssignmentState, FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getGroup } from "@/app/api/v1/groups/[id]/route";
-import { POST as pause } from "@/app/api/v1/groups/[id]/pause/route";
-import { POST as resume } from "@/app/api/v1/groups/[id]/resume/route";
-import { DELETE as disallow, POST as allow } from "@/app/api/v1/groups/[id]/allow/route";
 import { POST as createRule } from "@/app/api/v1/rules/route";
 import { POST as allowRule } from "@/app/api/v1/rules/[id]/allow/route";
 import { POST as disallowRule } from "@/app/api/v1/rules/[id]/disallow/route";
@@ -81,10 +78,16 @@ async function patch(auth: SessionAuth, id: string, body: object) {
   );
 }
 
-async function groupAction(handler: typeof pause, auth: SessionAuth, id: string, method = "POST", body = "{}") {
+/** The group's built-in `internet` rule: pause blocks all internet, allow overrides its internet rules. */
+const pause = pauseGroupRule;
+const resume = resumeGroupRule;
+const allow = allowGroupRule;
+const disallow = disallowGroupRule;
+
+async function groupAction(handler: typeof pauseGroupRule, auth: SessionAuth, id: string, _method = "POST", body = "{}") {
   return handler(
-    request(`/api/v1/groups/${id}/x`, { method, auth, headers: { "content-type": "application/json" }, body: method === "DELETE" ? undefined : body }),
-    { params: Promise.resolve({ id }) },
+    request(`/api/v1/groups/${id}/rules/internet/x`, { method: "POST", auth, headers: { "content-type": "application/json" }, body }),
+    { params: Promise.resolve({ id, ruleId: "internet" }) },
   );
 }
 
@@ -410,6 +413,7 @@ describe("household rules", () => {
   it("lets a pause replace an allowance", async () => {
     const auth = await signedIn();
     const emma = await child();
+    await postRule(auth, { name: "Grounded", kind: "internet", groupIds: [emma.id], mode: "always" });
     await groupAction(allow, auth, emma.id, "POST", JSON.stringify({ until: null }));
     const paused = await groupAction(pause, auth, emma.id);
     const group = ((await paused.json()) as { group: PublicGroup }).group;

@@ -24,12 +24,9 @@ describe("network scope", () => {
 });
 
 describe("planPolicies network scope", () => {
-  const now = new Date("2026-09-14T16:00:00Z");
-
   it("does not quarantine MACs that are out of VLAN scope", () => {
     const planned = planPolicies({
       installId: "default",
-      now,
       destinationZoneId: "ext",
       groups: [],
       devices: [
@@ -54,38 +51,17 @@ describe("planPolicies network scope", () => {
     expect(planned.retainOwners.size).toBe(0);
   });
 
-  it("retains a paused group's policy when an assigned MAC roams off a managed VLAN", () => {
+  it("plans no policy of its own for an assigned MAC, in or out of scope", () => {
     const planned = planPolicies({
       installId: "default",
-      now,
       destinationZoneId: "ext",
-      groups: [
-        {
-          id: "kid",
-          name: "Betsy",
-          kind: GroupKind.family,
-          suspensionActive: true,
-          suspensionUntil: null,
-        },
-      ],
+      groups: [{ id: "kid" }],
       devices: [
-        {
-          mac: "aa:aa:aa:aa:aa:01",
-          assignment: AssignmentState.assigned,
-          groupId: "kid",
-          zoneId: "z-iot",
-          inScope: false,
-        },
-        {
-          mac: "aa:aa:aa:aa:aa:02",
-          assignment: AssignmentState.assigned,
-          groupId: "kid",
-          zoneId: "z1",
-          inScope: true,
-        },
+        { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z-iot", inScope: false },
+        { mac: "aa:aa:aa:aa:aa:02", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1", inScope: true },
       ],
     });
-    expect(planned.retainOwners.has("group:kid")).toBe(true);
-    expect(planned.policies[0]?.macAddresses).toEqual(["aa:aa:aa:aa:aa:02"]);
+    expect(planned.policies).toEqual([]);
+    expect(planned.retainOwners.size).toBe(0);
   });
 });

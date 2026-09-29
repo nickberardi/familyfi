@@ -114,13 +114,10 @@ async function tick(owner: string): Promise<boolean> {
   if (!(await acquireLock(owner))) return false;
   try {
   const now = new Date();
-  await prisma().group.updateMany({
-    where: { suspensionActive: true, suspensionUntil: { not: null, lte: now } },
-    data: { suspensionActive: false, suspensionUntil: null, suspendedByAccountId: null, suspendedByName: null },
-  });
-  await prisma().group.updateMany({
-    where: { allowActive: true, allowUntil: { not: null, lte: now } },
-    data: { allowActive: false, allowUntil: null, allowedByAccountId: null, allowedByName: null },
+  // A group's own pause ends: its built-in block rule is switched off, and its policies go.
+  await prisma().rule.updateMany({
+    where: { systemGroupId: { not: null }, enabled: true, expiresAt: { not: null, lte: now } },
+    data: { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null },
   });
   await prisma().rule.updateMany({
     where: { pauseActive: true, pauseUntil: { not: null, lte: now } },
@@ -248,7 +245,6 @@ async function tick(owner: string): Promise<boolean> {
     ]);
     const { policies: desired, retainOwners } = planPolicies({
       installId: household.id,
-      now,
       destinationZoneId: external.id,
       zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
       groups,
@@ -337,7 +333,6 @@ async function tick(owner: string): Promise<boolean> {
       groups: groups.map((group) => ({
         id: group.id,
         kind: group.kind,
-        allowed: group.allowActive && (group.allowUntil === null || now < group.allowUntil),
       })),
       devices: devices.map((device) => ({
         ...device,
@@ -353,6 +348,7 @@ async function tick(owner: string): Promise<boolean> {
         ...rule,
         groupIds: rule.groups.map((link) => link.groupId),
         paused: isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now),
+        system: rule.systemGroupId !== null,
         liftedGroupIds: rule.groups
           .filter((link) => isSuspended({ active: link.pauseActive, until: link.pauseUntil }, now))
           .map((link) => link.groupId),

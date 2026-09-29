@@ -1,6 +1,5 @@
-import { AssignmentState, GroupKind } from "@prisma/client";
-import { isSuspended, type Suspension } from "@/lib/schedule";
-import { pausePolicyName, quarantinePolicyName } from "./names";
+import { AssignmentState } from "@prisma/client";
+import { quarantinePolicyName } from "./names";
 
 export type PlannedPolicy = {
   key: string;
@@ -13,13 +12,7 @@ export type PlannedPolicy = {
   name: string;
 };
 
-export type PlanGroup = {
-  id: string;
-  name: string;
-  kind: GroupKind;
-  suspensionActive: boolean;
-  suspensionUntil: Date | null;
-};
+export type PlanGroup = { id: string };
 
 function ownerKey(device: PlanDevice): string | null {
   if (device.assignment === AssignmentState.quarantined || !device.groupId) return "quarantine";
@@ -36,7 +29,6 @@ export type PlanDevice = {
 
 export function planPolicies(input: {
   installId: string;
-  now: Date;
   destinationZoneId: string;
   zoneNames?: Record<string, string>;
   groups: PlanGroup[];
@@ -44,8 +36,8 @@ export function planPolicies(input: {
   quarantineEnforced?: boolean;
 }): { policies: PlannedPolicy[]; retainOwners: Set<string> } {
   const groups = new Map(input.groups.map((group) => [group.id, group]));
-  const buckets = new Map<string, { owner: string; zoneId: string; macs: string[] }>();
   const retainOwners = new Set<string>();
+  const buckets = new Map<string, { owner: string; zoneId: string; macs: string[] }>();
 
   for (const device of input.devices) {
     let owner = ownerKey(device);
@@ -53,13 +45,10 @@ export function planPolicies(input: {
     if (owner.startsWith("group:")) {
       const group = groups.get(device.groupId!);
       if (!group) owner = "quarantine";
-      // A group's own policy is its pause: it exists only while the group is paused.
-      else if (!paused(group, input.now)) continue;
+      // A group's devices are covered by its rules' policies, not by a policy of the group's own.
+      else continue;
     }
-    if (device.inScope === false) {
-      if (owner.startsWith("group:")) retainOwners.add(owner);
-      continue;
-    }
+    if (device.inScope === false) continue;
     if (!device.zoneId) {
       retainOwners.add(owner);
       continue;
@@ -84,33 +73,10 @@ export function planPolicies(input: {
         enabled: input.quarantineEnforced !== false,
         name: quarantinePolicyName(input.zoneNames?.[bucket.zoneId] ?? bucket.zoneId),
       });
-      continue;
     }
-    const groupId = bucket.owner.slice("group:".length);
-    const group = groups.get(groupId);
-    if (!group) continue;
-    policies.push({
-      key: bucket.owner + "|" + bucket.zoneId,
-      ownerScope: "group",
-      groupId,
-      zoneId: bucket.zoneId,
-      macAddresses: bucket.macs,
-      enabled: true,
-      name: pausePolicyName({
-        name: group.name,
-        kind: group.kind,
-        zoneName: input.zoneNames?.[bucket.zoneId] ?? bucket.zoneId,
-      }),
-      destinationZoneId: input.destinationZoneId,
-    });
   }
 
   return { policies, retainOwners };
-}
-
-function paused(group: PlanGroup, now: Date): boolean {
-  const suspension: Suspension = { active: group.suspensionActive, until: group.suspensionUntil };
-  return isSuspended(suspension, now);
 }
 
 export function plannedKey(ownerScope: "group" | "quarantine", groupId: string | null, zoneId: string): string {

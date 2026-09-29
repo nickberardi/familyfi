@@ -207,20 +207,11 @@ describe("mocked spike flow", () => {
 
 describe("planPolicies", () => {
   const destinationZoneId = "ext";
-  const now = new Date("2026-09-14T16:00:00Z");
-  const child = {
-    id: "kid",
-    name: "Betsy",
-    kind: GroupKind.family,
-    suspensionActive: false,
-    suspensionUntil: null as Date | null,
-  };
-  const paused = { ...child, suspensionActive: true };
+  const child = { id: "kid" };
 
   it("emits one always-on quarantine policy per source zone", () => {
     const { policies } = planPolicies({
       installId: "default",
-      now,
       destinationZoneId,
       zoneNames: { z1: "Internal", z2: "IoT" },
       groups: [child],
@@ -241,7 +232,6 @@ describe("planPolicies", () => {
   it("disables quarantine policies when enforcement is off", () => {
     const { policies } = planPolicies({
       installId: "default",
-      now,
       destinationZoneId,
       zoneNames: { z1: "Internal" },
       groups: [child],
@@ -253,49 +243,31 @@ describe("planPolicies", () => {
     expect(policies[0]?.enabled).toBe(false);
   });
 
-  it("plans a group's policy only while it is paused: an unscheduled block", () => {
-    const devices = [
-      { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" },
-      { mac: "aa:aa:aa:aa:aa:99", assignment: AssignmentState.assigned, groupId: "adult", zoneId: "z1" },
-    ];
-    const plan = (groups: (typeof child)[], at = now) =>
-      planPolicies({ installId: "default", now: at, destinationZoneId, zoneNames: { z1: "Internal" }, groups, devices }).policies;
-
-    expect(plan([child, { ...child, id: "adult" }])).toEqual([]);
-
-    const [policy, ...rest] = plan([paused, { ...child, id: "adult" }]);
-    expect(rest).toEqual([]);
-    expect(policy).toMatchObject({ ownerScope: "group", groupId: "kid", enabled: true, name: "FamilyFi Betsy's Internet Pause" });
-    expect(policy).not.toHaveProperty("schedule");
-
-    const timed = { ...paused, suspensionUntil: new Date("2026-09-14T18:00:00Z") };
-    const adult = { ...child, id: "adult" };
-    expect(plan([timed, adult])).toHaveLength(1);
-    expect(plan([timed, adult], new Date("2026-09-14T18:00:00Z"))).toEqual([]);
-  });
-
-  it("does not drop existing owners when a MAC has no zone", () => {
-    const planned = planPolicies({
+  it("plans no policy of a group's own: its devices are covered by its rules' policies", () => {
+    const { policies } = planPolicies({
       installId: "default",
-      now,
       destinationZoneId,
-      groups: [paused],
+      zoneNames: { z1: "Internal" },
+      groups: [child, { id: "adult" }],
       devices: [
-        { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: null },
-        { mac: "aa:aa:aa:aa:aa:02", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" },
+        { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" },
+        { mac: "aa:aa:aa:aa:aa:99", assignment: AssignmentState.assigned, groupId: "adult", zoneId: "z1" },
       ],
     });
-    expect(planned.retainOwners.has("group:kid")).toBe(true);
-    expect(planned.policies[0]?.macAddresses).toEqual(["aa:aa:aa:aa:aa:02"]);
+    expect(policies).toEqual([]);
+  });
 
-    const unresolvedOnly = planPolicies({
+  it("does not drop the quarantine owner when a MAC has no zone", () => {
+    const planned = planPolicies({
       installId: "default",
-      now,
       destinationZoneId,
-      groups: [paused],
-      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: null }],
+      groups: [],
+      devices: [
+        { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.quarantined, groupId: null, zoneId: null },
+        { mac: "aa:aa:aa:aa:aa:02", assignment: AssignmentState.quarantined, groupId: null, zoneId: "z1" },
+      ],
     });
-    expect(unresolvedOnly.policies).toHaveLength(0);
-    expect(unresolvedOnly.retainOwners.has("group:kid")).toBe(true);
+    expect(planned.retainOwners.has("quarantine")).toBe(true);
+    expect(planned.policies[0]?.macAddresses).toEqual(["aa:aa:aa:aa:aa:02"]);
   });
 });

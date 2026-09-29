@@ -10,12 +10,7 @@ const device = (mac: string, groupId: string, zoneId = "zone-1") => ({
   inScope: true,
 });
 
-const group = (id: string, patch: Partial<{ allowed: boolean }> = {}) => ({
-  id,
-  kind: GroupKind.family,
-  allowed: false,
-  ...patch,
-});
+const group = (id: string) => ({ id, kind: GroupKind.family });
 
 const rule = (patch: Partial<PlanRule>): PlanRule => ({
   id: "r1",
@@ -29,6 +24,7 @@ const rule = (patch: Partial<PlanRule>): PlanRule => ({
   domains: [],
   enabled: true,
   paused: false,
+  system: false,
   liftedGroupIds: [],
   mode: RuleMode.always,
   windows: [],
@@ -79,8 +75,19 @@ describe("planRulePolicies", () => {
     expect(policies.map((policy) => [policy.enabled, policy.macAddresses])).toEqual([[false, ["02:00:00:00:00:01"]]]);
   });
 
-  it("disables a paused rule even when its group is also allowed", () => {
-    const { policies } = plan([{ ...tvDowntime, paused: true }], [group("g1", { allowed: true })]);
+  it("plans a group's built-in pause rule only while it is enabled, as an unscheduled block", () => {
+    const block = rule({ id: "block", name: "Betsy's Internet Pause", kind: RuleKind.internet, targetIds: [], system: true, enabled: true });
+    const [policy, ...rest] = plan([block]).policies;
+    expect(rest).toEqual([]);
+    expect(policy).toMatchObject({ enabled: true, name: "FamilyFi Betsy's Internet Pause", macAddresses: ["02:00:00:00:00:01"] });
+    expect(policy).not.toHaveProperty("schedule");
+    // Off, it has no policy at all, unlike an ordinary rule that is switched off.
+    expect(plan([{ ...block, enabled: false }]).policies).toEqual([]);
+    expect(plan([{ ...block, system: false, enabled: false }]).policies).toHaveLength(1);
+  });
+
+  it("disables a paused rule even when its group is also lifted", () => {
+    const { policies } = plan([{ ...tvDowntime, paused: true, liftedGroupIds: ["g1"] }]);
     expect(policies.every((policy) => !policy.enabled)).toBe(true);
   });
 
@@ -117,10 +124,10 @@ describe("planRulePolicies", () => {
     ]);
   });
 
-  it("leaves a group with an allowance out of its internet rules only", () => {
-    const groups = [group("g1", { allowed: true }), group("g2")];
+  it("leaves a group out of the rule it is lifted for, and only that rule", () => {
+    const groups = [group("g1"), group("g2")];
     const devices = [device("02:00:00:00:00:01", "g1"), device("02:00:00:00:00:02", "g2")];
-    const internet = { ...tvDowntime, groupIds: ["g1", "g2"] };
+    const internet = { ...tvDowntime, groupIds: ["g1", "g2"], liftedGroupIds: ["g1"] };
     const video = rule({ id: "video", groupIds: ["g1", "g2"] });
     const { policies } = plan([internet, video], groups, devices);
     const macs = (id: string) => policies.filter((policy) => policy.ruleId === id).map((policy) => [policy.macAddresses, policy.enabled]);
@@ -132,19 +139,19 @@ describe("planRulePolicies", () => {
   });
 
   it("keeps a policy with no one left disabled rather than dropping it", () => {
-    const { policies } = plan([tvDowntime], [group("g1", { allowed: true })]);
+    const { policies } = plan([{ ...tvDowntime, liftedGroupIds: ["g1"] }]);
     expect(policies.map((policy) => [policy.macAddresses, policy.enabled])).toEqual([
       [["02:00:00:00:00:01"], false],
       [["02:00:00:00:00:01"], false],
     ]);
   });
 
-  it("plans an always-on internet rule as one unscheduled policy an allowance lifts, and never one on networks", () => {
+  it("plans an always-on internet rule as one unscheduled policy a lift takes a group out of, and never one on networks", () => {
     const always = { ...tvDowntime, mode: RuleMode.always, windows: [] };
     expect(plan([always]).policies.map((policy) => [policy.windowKey, policy.name, policy.schedule, policy.enabled])).toEqual([
       ["always", "FamilyFi TV downtime", undefined, true],
     ]);
-    expect(plan([always], [group("g1", { allowed: true })]).policies.map((policy) => policy.enabled)).toEqual([false]);
+    expect(plan([{ ...always, liftedGroupIds: ["g1"] }]).policies.map((policy) => policy.enabled)).toEqual([false]);
     const network = { ...always, id: "net", scope: RuleScope.network, networkIds: ["net-a"] };
     expect(plan([network]).policies).toEqual([]);
   });

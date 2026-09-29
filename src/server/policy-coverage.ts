@@ -65,8 +65,8 @@ export function coverageIssues(input: {
 }
 
 /**
- * The coverage inputs as stored: which groups need a policy (paused, or covered by an
- * enabled rule) and which recorded policies cover each group. `policies` narrows to one
+ * The coverage inputs as stored: which groups need a policy (covered by an
+ * enabled rule, which includes a paused group's built-in block rule) and which recorded policies cover each group. `policies` narrows to one
  * console and site when reconciliation asks.
  */
 export async function storedCoverage(input: {
@@ -75,12 +75,10 @@ export async function storedCoverage(input: {
   policyScope?: { connectionIdentity: string; siteId: string };
 }): Promise<{ issues: CoverageIssue[] }> {
   const { prisma } = await import("./db");
-  const { isSuspended } = await import("@/lib/schedule");
-  const [groups, devices, rules, pauses, rulePolicies] = await Promise.all([
+  const [groups, devices, rules, rulePolicies] = await Promise.all([
     prisma().group.findMany(),
     prisma().device.findMany(),
     prisma().rule.findMany({ include: { groups: true } }),
-    prisma().appPolicy.findMany({ where: { ...input.policyScope, ownerScope: "group" } }),
     prisma().rulePolicy.findMany({ where: input.policyScope }),
   ]);
   const ruleGroups = new Map(rules.map((rule) => [rule.id, rule.groups.map((link) => link.groupId)]));
@@ -88,11 +86,10 @@ export async function storedCoverage(input: {
   const issues = coverageIssues({
     groups: groups.map((group) => ({
       ...group,
-      enforced: ruled.has(group.id) || isSuspended({ active: group.suspensionActive, until: group.suspensionUntil }, input.now),
+      enforced: ruled.has(group.id),
     })),
     devices: devices.map((device) => ({ ...device, inScope: input.deviceInScope(device.networkId) })),
     policies: [
-      ...pauses.map((row) => ({ ...row, groupIds: row.groupId ? [row.groupId] : [] })),
       ...rulePolicies.map((row) => ({ ...row, groupIds: ruleGroups.get(row.ruleId) ?? [] })),
     ],
   });

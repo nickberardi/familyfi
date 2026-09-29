@@ -329,13 +329,19 @@ describe("reconciliation against mocked UniFi", () => {
       zoneId: null,
       networkId: INTERNAL_NETWORK,
     });
-    await prisma().group.update({
-      where: { id: group.id },
-      data: { suspensionActive: true, suspensionUntil: new Date(Date.now() - 60_000) },
+    await prisma().rule.create({
+      data: {
+        name: "Betsy's Internet Pause",
+        kind: "internet",
+        mode: "always",
+        systemGroupId: group.id,
+        expiresAt: new Date(Date.now() - 60_000),
+        groups: { create: { groupId: group.id } },
+      },
     });
     await runReconcileOnce();
-    const refreshed = await prisma().group.findUniqueOrThrow({ where: { id: group.id } });
-    expect(refreshed.suspensionActive).toBe(false);
+    const refreshed = await prisma().rule.findFirstOrThrow({ where: { systemGroupId: group.id } });
+    expect([refreshed.enabled, refreshed.expiresAt]).toEqual([false, null]);
     // The pause has ended, so its policy is gone; the bedtime rule's stays enabled.
     expect(client.state.policies.some((item) => item.name.includes("Betsy"))).toBe(false);
     expect(client.state.policies.find((item) => item.name === "FamilyFi Bedtime")?.enabled).toBe(true);

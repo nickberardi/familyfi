@@ -213,17 +213,6 @@ model Group {
   name             String
   monogram         String?
   familyRole       FamilyRole?
-  /// A pause blocks all internet for the group now, until `suspensionUntil` or until resumed.
-  suspensionActive Boolean         @default(false)
-  suspensionUntil  DateTime?
-  /// Who paused it, as they were named then. Not a relation: Account already refers to Group.
-  suspendedByAccountId String?
-  suspendedByName  String?
-  /// An allowance lifts the group's internet-rule windows until `allowUntil`, or until cancelled.
-  allowActive      Boolean         @default(false)
-  allowUntil       DateTime?
-  allowedByAccountId String?
-  allowedByName    String?
   dohOverrideUrl   String?
   upstreamResolverSnapshot Json?
   createdAt        DateTime        @default(now())
@@ -232,6 +221,7 @@ model Group {
   accounts         Account[]
   appPolicies      AppPolicy[]
   rules            RuleGroup[]
+  systemRule       Rule?           @relation("SystemRule")
   upstreamChecks   UpstreamCheck[]
 }
 
@@ -417,6 +407,15 @@ model Rule {
   /// Who paused it, as they were named then.
   pausedByAccountId String?
   pausedByName     String?
+  /// Set on the one built-in rule a group's own pause uses: an always-on block that is
+  /// enabled while the group is paused, until `expiresAt` or until resumed. Hidden from
+  /// the rule list; its policies exist only while it is enabled.
+  systemGroupId    String?      @unique
+  systemGroup      Group?       @relation("SystemRule", fields: [systemGroupId], references: [id], onDelete: Cascade)
+  expiresAt        DateTime?
+  /// Who started the block, as they were named then.
+  blockedByAccountId String?
+  blockedByName    String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   groups           RuleGroup[]

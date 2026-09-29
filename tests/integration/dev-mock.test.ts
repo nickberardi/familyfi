@@ -51,9 +51,10 @@ describe("dev UniFi mock household", () => {
       "Smart Home",
     ]);
     const paused = groups.find((group) => group.name === "Robin");
-    expect(paused?.suspensionActive).toBe(true);
+    const block = await prisma().rule.findFirstOrThrow({ where: { systemGroupId: paused!.id } });
+    expect([block.enabled, block.blockedByName]).toEqual([true, "Pat"]);
     expect(groups.find((group) => group.name === "Smart Home")?.monogram).toBe("IOT");
-    const rules = await prisma().rule.findMany({ include: { groups: true, windows: true }, orderBy: { name: "asc" } });
+    const rules = await prisma().rule.findMany({ where: { systemGroupId: null }, include: { groups: true, windows: true }, orderBy: { name: "asc" } });
     const byName = new Map(groups.map((group) => [group.id, group.name]));
     expect(rules.map((rule) => [rule.name, rule.kind, rule.groups.map((link) => byName.get(link.groupId)).sort(), rule.windows.length])).toEqual([
       ["Bedtime", "internet", ["Betsy"], 1],

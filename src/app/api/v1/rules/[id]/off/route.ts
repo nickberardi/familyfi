@@ -12,7 +12,7 @@ export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
     const existing = await prisma().rule.findUnique({ where: { id } });
-    if (!existing) return jsonError(404, "not_found", "Rule not found.");
+    if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     const rule = await prisma().rule.update({
       where: { id },
       data: { enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },

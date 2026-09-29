@@ -145,6 +145,28 @@ function placeClient(client: Client, mac: number, where: Place) {
   client.state.clients.push({ id, name: `device ${mac}`, type: "WIRELESS", ipAddress: PLACES[where].ip(mac), macAddress: MACS[mac] });
 }
 
+/** A group's own pause: its built-in always-on block rule, enabled until it ends. */
+async function setBlock(groupId: string, on: boolean) {
+  const db = prisma();
+  const data = { enabled: on, expiresAt: on ? PAUSED_UNTIL() : null };
+  const existing = await db.rule.findUnique({ where: { systemGroupId: groupId } });
+  if (existing) {
+    await db.rule.update({ where: { id: existing.id }, data });
+  } else if (on) {
+    await db.rule.create({
+      data: { ...data, name: `Pause ${groupId}`, kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: groupId, groups: { create: { groupId } } },
+    });
+  }
+}
+
+/** A group's allowance: an allowance lift on each of its own internet rules. */
+async function setAllowance(groupId: string, on: boolean) {
+  await prisma().ruleGroup.updateMany({
+    where: { groupId, rule: { kind: RuleKind.internet, systemGroupId: null }, ...(on ? {} : { pauseKind: "allow" as const }) },
+    data: on ? { pauseActive: true, pauseUntil: PAUSED_UNTIL(), pauseKind: "allow" } : { pauseActive: false, pauseUntil: null },
+  });
+}
+
 async function build(spec: World): Promise<{ client: Client; groupIds: string[]; admin: Map<string, string> }> {
   await resetDatabase();
   await configureConnectedHousehold({ manageAllNetworks: spec.manageAll, managedNetworkIds: spec.managed });
@@ -166,13 +188,10 @@ async function build(spec: World): Promise<{ client: Client; groupIds: string[];
         kind: GroupKind.family,
         familyRole: FamilyRole.child,
         name: `Group ${n}`,
-        suspensionActive: group.paused,
-        suspensionUntil: group.paused ? PAUSED_UNTIL() : null,
-        allowActive: group.allowed,
-        allowUntil: group.allowed ? PAUSED_UNTIL() : null,
       },
     });
     groupIds.push(row.id);
+    if (group.paused) await setBlock(row.id, true);
   }
   for (const [n, rule] of spec.rules.entries()) {
     // Either kind may be always on: one unscheduled policy instead of one per window.
@@ -189,6 +208,7 @@ async function build(spec: World): Promise<{ client: Client; groupIds: string[];
       },
     });
   }
+  for (const [n, group] of spec.groups.entries()) if (group.allowed) await setAllowance(groupIds[n]!, true);
   setReconcileClientForTests(client);
   return { client, groupIds, admin };
 }
@@ -210,16 +230,16 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
       return;
     }
     case "pause":
-      await db.group.updateMany({ where: { id: groupId! }, data: { suspensionActive: true, suspensionUntil: PAUSED_UNTIL() } });
+      await setBlock(groupId!, true);
       return;
     case "resume":
-      await db.group.updateMany({ where: { id: groupId! }, data: { suspensionActive: false, suspensionUntil: null } });
+      await setBlock(groupId!, false);
       return;
     case "allow":
-      await db.group.updateMany({ where: { id: groupId! }, data: { allowActive: true, allowUntil: PAUSED_UNTIL() } });
+      await setAllowance(groupId!, true);
       return;
     case "disallow":
-      await db.group.updateMany({ where: { id: groupId! }, data: { allowActive: false, allowUntil: null } });
+      await setAllowance(groupId!, false);
       return;
     case "pauseRule":
     case "resumeRule": {
@@ -260,9 +280,14 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
     case "move":
       placeClient(client, change.mac, change.place);
       return;
-    case "deleteGroup":
+    case "deleteGroup": {
+      // The route takes a group's built-in rule off the gateway before its rows cascade.
+      const block = groupId ? await db.rule.findUnique({ where: { systemGroupId: groupId }, include: { policies: true } }) : null;
+      const gone = new Set(block?.policies.map((policy) => policy.unifiPolicyId) ?? []);
+      client.state.policies = client.state.policies.filter((policy) => !gone.has(policy.id));
       await db.group.deleteMany({ where: { id: groupId! } });
       return;
+    }
     case "deleteDevice":
       await db.device.deleteMany({ where: { mac: MACS[change.mac] } });
       return;
@@ -331,8 +356,6 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
     household.unifiManageAllNetworks || (networkId !== null && household.unifiManagedNetworkIds.includes(networkId));
   const groupById = new Map(groups.map((group) => [group.id, group]));
   const active = (on: boolean, until: Date | null) => on && (!until || until > now);
-  const paused = (group: (typeof groups)[number]) => active(group.suspensionActive, group.suspensionUntil);
-  const allowed = (group: (typeof groups)[number]) => active(group.allowActive, group.allowUntil);
   const rulePaused = (rule: (typeof rules)[number]) => active(rule.pauseActive, rule.pauseUntil);
 
   for (const device of devices) {
@@ -347,23 +370,25 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
       expect(holdingRules, `${device.mac} quarantined but in a rule`).toEqual([]);
       continue;
     }
-    // Its group's pause policy while paused, and never another group's.
-    expect(holding.map(({ row }) => [row.ownerScope, row.groupId, row.zoneId]), `${device.mac} pause`).toEqual(
-      paused(group) ? [["group", group.id, device.zoneId]] : [],
-    );
-    // One policy per window of every rule covering its group, in its zone. An allowance
-    // takes it out of internet rules, and a lift on its link out of that rule, unless no one
-    // is left and the policy is disabled.
+    // A group has no policy of its own: its pause is a rule, so no group policy holds it.
+    expect(holding, `${device.mac} held by a group policy`).toEqual([]);
+    // One policy per window of every rule covering its group, in its zone; a group's
+    // built-in pause rule only while it is enabled. A lift on its link takes it out of that
+    // rule, unless no one is left and the policy is disabled.
     for (const rule of rules.filter((rule) => rule.groups.some((link) => link.groupId === group.id))) {
       const keys = rule.mode === RuleMode.always ? ["always"] : rule.windows.map((window) => window.id);
       for (const key of keys) {
         const found = ourRules.filter(({ row }) => row.ruleId === rule.id && row.windowKey === key && row.zoneId === device.zoneId);
+        if (rule.systemGroupId && !rule.enabled) {
+          expect(found, `${rule.name} is off, so it has no policy`).toEqual([]);
+          continue;
+        }
         expect(found.length, `${rule.name} ${key} policy in ${device.zoneId}`).toBe(1);
         const { policy } = found[0]!;
         const inside = policyMacs(policy).includes(device.mac);
         const link = rule.groups.find((item) => item.groupId === group.id);
         const linkLifted = Boolean(link && active(link.pauseActive, link.pauseUntil));
-        if ((rule.kind === RuleKind.internet && allowed(group)) || linkLifted) {
+        if (linkLifted) {
           expect(!inside || !policy.enabled, `${device.mac} allowed but held by ${policy.name}`).toBe(true);
         } else {
           expect(inside, `${device.mac} missing from ${policy.name}`).toBe(true);
