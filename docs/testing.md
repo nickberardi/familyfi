@@ -87,7 +87,6 @@ The workflows that run tests call `scripts/test.py`, so a local run is the CI ru
 | --- | --- | --- |
 | `ci.yml` | Every push and pull request | **verify:** `check audit lint typecheck api db-drift db-upgrade catalog`; `run --platform host --coverage` (unit, integration and harness tests, and the coverage floors); the unit suite again with `--timezone Pacific/Kiritimati`; `check coverage` for changed lines (pull requests only; fails on an untested changed line in a gated path); `build`.<br>**browser:** `run --layer ui`: Playwright on desktop and phone. A failed job uploads the run's results, logs and traces as `playwright-results` |
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke; the same helpers as `check container`, with the build action's layer cache |
-| `codeql.yml` | Pull requests and weekly | CodeQL (`security-extended`) over the JavaScript and TypeScript; findings go to the repository's code scanning alerts. Only this job may write security events |
 | `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`, with the helpers `check api-version` and `check api-breaking` call. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | `check mutation`. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 | `requested-tests.yml` | By hand | Any selection `run` accepts: test identities, categories, layers and platforms. Uploads the run's results |
@@ -106,7 +105,7 @@ scripts/test.py run --layer ui
 scripts/test.py check container api-version api-breaking
 ```
 
-CodeQL needs its own CLI and is not mirrored.
+CodeQL runs through the repository's GitHub default setup (Settings → Code security), not a workflow, so it is not mirrored locally.
 
 ### Self-hosted runners
 

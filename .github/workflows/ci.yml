@@ -74,7 +74,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install chromium --with-deps
+      - run: pnpm exec playwright install chromium
       # A production build, then desktop and phone, each against its own database and server.
       - run: scripts/test.py run --layer ui
       # Traces, screenshots and error context for whatever failed, to open with `playwright show-trace`.
