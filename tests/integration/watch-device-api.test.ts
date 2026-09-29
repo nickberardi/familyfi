@@ -16,7 +16,10 @@ import { DELETE as disallow, POST as allow } from "@/app/api/v1/groups/[id]/allo
 import { GET as listRules, POST as createRule } from "@/app/api/v1/rules/route";
 import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
 import { POST as allowRule } from "@/app/api/v1/rules/[id]/allow/route";
+import { POST as disallowRule } from "@/app/api/v1/rules/[id]/disallow/route";
 import { POST as extendRule } from "@/app/api/v1/rules/[id]/extend/route";
+import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
+import { POST as allowGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/allow/route";
 import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
 import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
@@ -184,6 +187,11 @@ describe("independent Watch device", () => {
     expect((await extendRule(request(path("extend"), { method: "POST", auth, headers: json, body: JSON.stringify({ minutes: 30 }) }), ctx)).status).toBe(200);
     expect((await resumeRule(request(path("resume"), { method: "POST", auth }), ctx)).status).toBe(200);
     expect((await allowRule(request(path("allow"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), ctx)).status).toBe(200);
+    expect((await disallowRule(request(path("disallow"), { method: "POST", auth }), ctx)).status).toBe(200);
+    const nested = { params: Promise.resolve({ id: group.id, ruleId: created.id }) };
+    const nestedPath = (action: string) => `/api/v1/groups/${group.id}/rules/${created.id}/${action}`;
+    expect((await pauseGroupRule(request(nestedPath("pause"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), nested)).status).toBe(200);
+    expect((await allowGroupRule(request(nestedPath("allow"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), nested)).status).toBe(200);
     expect((await turnOffRule(request(path("off"), { method: "POST", auth }), ctx)).status).toBe(200);
     expect((await turnOnRule(request(path("on"), { method: "POST", auth }), ctx)).status).toBe(200);
 

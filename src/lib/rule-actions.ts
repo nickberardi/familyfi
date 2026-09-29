@@ -9,7 +9,7 @@ import { rulePaused, ruleInternetWindows, type Rule } from "./rules";
 export type RuleActionSpec = {
   label: string;
   strong?: boolean;
-  run: "pause" | "resume" | "extend" | "allow";
+  run: "pause" | "resume" | "extend" | "allow" | "disallow";
 };
 
 /**
@@ -18,6 +18,9 @@ export type RuleActionSpec = {
  */
 export function ruleActionSpecs(rule: Rule, timezone: string, now: Date): RuleActionSpec[] {
   if (!rule.enabled) return [];
+  if (rulePaused(rule, now) && rule.pause.kind === "allow") {
+    return [{ label: "Resume schedule", strong: true, run: "disallow" }, { label: "Pause rule", run: "pause" }];
+  }
   if (rulePaused(rule, now)) {
     return [
       { label: "Resume rule", strong: true, run: "resume" },
@@ -33,6 +36,26 @@ export function ruleActionSpecs(rule: Rule, timezone: string, now: Date): RuleAc
 /** The line a paused rule's card shows, "Paused until 1:30 AM by Nick"; null when it is not paused. */
 export function ruleStateLine(rule: Pick<Rule, "pause">, timezone: string, now: Date): string | null {
   if (!rulePaused(rule, now)) return null;
-  const until = rule.pause.until ? `until ${formatClock(new Date(rule.pause.until), timezone)}` : "until resumed";
-  return `Paused ${until}${rule.pause.by ? ` by ${rule.pause.by.name}` : ""}`;
+  const allowed = rule.pause.kind === "allow";
+  const until = rule.pause.until ? `until ${formatClock(new Date(rule.pause.until), timezone)}` : allowed ? "until you resume the schedule" : "until resumed";
+  return `${allowed ? "Allowed" : "Paused"} ${until}${rule.pause.by ? ` by ${rule.pause.by.name}` : ""}`;
+}
+
+/**
+ * One line per group the rule is lifted for alone, "Paused for Emma until 8:00 PM"; empty
+ * when there are none. `groupNames` maps a group id to its name.
+ */
+export function ruleGroupStateLines(
+  rule: Pick<Rule, "groupPauses">,
+  groupNames: Record<string, string>,
+  timezone: string,
+  now: Date,
+): string[] {
+  return rule.groupPauses
+    .filter((item) => rulePaused({ pause: item.pause }, now))
+    .map((item) => {
+      const line = ruleStateLine({ pause: item.pause }, timezone, now)!;
+      const at = line.indexOf(" ");
+      return `${line.slice(0, at)} for ${groupNames[item.groupId] ?? "a deleted group"}${line.slice(at)}`;
+    });
 }

@@ -67,6 +67,8 @@ type Step =
   | { kind: "renameRule"; pick: number }
   | { kind: "pauseRule"; pick: number }
   | { kind: "resumeRule"; pick: number }
+  | { kind: "liftGroupRule"; pick: number; group: number }
+  | { kind: "unliftGroupRule"; pick: number; group: number }
   | { kind: "move"; mac: number; place: Place }
   | { kind: "deleteGroup"; group: number }
   | { kind: "deleteDevice"; mac: number }
@@ -122,6 +124,8 @@ const step: fc.Arbitrary<Step> = fc.oneof(
   fc.record({ kind: fc.constant("renameRule" as const), pick: fc.nat() }),
   fc.record({ kind: fc.constant("pauseRule" as const), pick: fc.nat() }),
   fc.record({ kind: fc.constant("resumeRule" as const), pick: fc.nat() }),
+  fc.record({ kind: fc.constant("liftGroupRule" as const), pick: fc.nat(), group: groupIndex }),
+  fc.record({ kind: fc.constant("unliftGroupRule" as const), pick: fc.nat(), group: groupIndex }),
   fc.record({ kind: fc.constant("move" as const), mac: macIndex, place }),
   fc.record({ kind: fc.constant("deleteGroup" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("deleteDevice" as const), mac: macIndex }),
@@ -231,6 +235,17 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
       });
       return;
     }
+    case "liftGroupRule":
+    case "unliftGroupRule": {
+      const rules = await db.rule.findMany({ orderBy: { id: "asc" } });
+      if (!rules.length || !groupId) return;
+      const rule = rules[change.pick % rules.length]!;
+      await db.ruleGroup.updateMany({
+        where: { ruleId: rule.id, groupId },
+        data: change.kind === "liftGroupRule" ? { pauseActive: true, pauseUntil: PAUSED_UNTIL() } : { pauseActive: false, pauseUntil: null },
+      });
+      return;
+    }
     case "toggleRule":
     case "renameRule": {
       const rules = await db.rule.findMany({ orderBy: { id: "asc" } });
@@ -337,7 +352,8 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
       paused(group) ? [["group", group.id, device.zoneId]] : [],
     );
     // One policy per window of every rule covering its group, in its zone. An allowance
-    // takes it out of internet rules, unless no one is left and the policy is disabled.
+    // takes it out of internet rules, and a lift on its link out of that rule, unless no one
+    // is left and the policy is disabled.
     for (const rule of rules.filter((rule) => rule.groups.some((link) => link.groupId === group.id))) {
       const keys = rule.mode === RuleMode.always ? ["always"] : rule.windows.map((window) => window.id);
       for (const key of keys) {
@@ -345,7 +361,9 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
         expect(found.length, `${rule.name} ${key} policy in ${device.zoneId}`).toBe(1);
         const { policy } = found[0]!;
         const inside = policyMacs(policy).includes(device.mac);
-        if (rule.kind === RuleKind.internet && allowed(group)) {
+        const link = rule.groups.find((item) => item.groupId === group.id);
+        const linkLifted = Boolean(link && active(link.pauseActive, link.pauseUntil));
+        if ((rule.kind === RuleKind.internet && allowed(group)) || linkLifted) {
           expect(!inside || !policy.enabled, `${device.mac} allowed but held by ${policy.name}`).toBe(true);
         } else {
           expect(inside, `${device.mac} missing from ${policy.name}`).toBe(true);

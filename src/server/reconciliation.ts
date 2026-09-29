@@ -126,6 +126,10 @@ async function tick(owner: string): Promise<boolean> {
     where: { pauseActive: true, pauseUntil: { not: null, lte: now } },
     data: { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
   });
+  await prisma().ruleGroup.updateMany({
+    where: { pauseActive: true, pauseUntil: { not: null, lte: now } },
+    data: { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
+  });
 
   const household = await prisma().household.findUnique({ where: { id: "default" } });
   if (!household || household.connectionStatus === "unconfigured" || !household.unifiSiteId) return true;
@@ -349,6 +353,9 @@ async function tick(owner: string): Promise<boolean> {
         ...rule,
         groupIds: rule.groups.map((link) => link.groupId),
         paused: isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now),
+        liftedGroupIds: rule.groups
+          .filter((link) => isSuspended({ active: link.pauseActive, until: link.pauseUntil }, now))
+          .map((link) => link.groupId),
       })),
     });
     const desiredRuleKeys = new Set(desiredRules.map((item) => item.key));

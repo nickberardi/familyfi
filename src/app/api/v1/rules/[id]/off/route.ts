@@ -1,3 +1,4 @@
+import { RuleLiftKind } from "@prisma/client";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
@@ -14,7 +15,7 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!existing) return jsonError(404, "not_found", "Rule not found.");
     const rule = await prisma().rule.update({
       where: { id },
-      data: { enabled: false, pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
+      data: { enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
       include: ruleInclude,
     });
     const change = await enqueueChange("rule");

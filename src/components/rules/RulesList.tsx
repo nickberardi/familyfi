@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { daysLabel, windowTimes } from "@/lib/display";
-import { ruleActionSpecs, ruleStateLine } from "@/lib/rule-actions";
+import { ruleActionSpecs, ruleGroupStateLines, ruleStateLine } from "@/lib/rule-actions";
 import { CURATED_CATEGORY_SLOTS, rulePaused, ruleBlocksLabel, windowSegments, type Rule, type RuleWindow } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { useFilterCatalog } from "@/components/GroupGrid";
@@ -25,6 +25,7 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
   const scope = one(use(searchParams).group) ?? null;
   const { rules, groups, unifi, household, mutate } = useAppData();
   const [sheet, setSheet] = useState<{ rule: Rule; mode: "pause" | "extend" } | null>(null);
+  const groupNames = Object.fromEntries(groups.map((group) => [group.id, group.name]));
   const timezone = household?.timezone ?? "America/New_York";
   const now = new Date();
   const { catalogNames } = useFilterCatalog();
@@ -44,7 +45,7 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
       { notice: `${rule.name} turned ${rule.enabled ? "off" : "on"}. FamilyFi writes it to the gateway next.` },
     );
 
-  const run = (rule: Rule, action: "pause" | "resume" | "extend" | "allow") => {
+  const run = (rule: Rule, action: "pause" | "resume" | "extend" | "allow" | "disallow") => {
     if (action === "pause" || action === "extend") return setSheet({ rule, mode: action });
     void mutate(() => api(`/api/v1/rules/${rule.id}/${action}`, { method: "POST", body: action === "allow" ? "{}" : undefined }));
   };
@@ -129,7 +130,7 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
                   </dd>
                 </dl>
               </Link>
-              <RuleActions rule={rule} timezone={timezone} now={now} run={run} />
+              <RuleActions rule={rule} timezone={timezone} now={now} groupNames={groupNames} run={run} />
             </article>
           ))}
         </div>
@@ -159,19 +160,26 @@ function RuleActions({
   rule,
   timezone,
   now,
+  groupNames,
   run,
 }: {
   rule: Rule;
   timezone: string;
   now: Date;
-  run: (rule: Rule, action: "pause" | "resume" | "extend" | "allow") => void;
+  groupNames: Record<string, string>;
+  run: (rule: Rule, action: "pause" | "resume" | "extend" | "allow" | "disallow") => void;
 }) {
   const state = ruleStateLine(rule, timezone, now);
   const actions = ruleActionSpecs(rule, timezone, now);
-  if (!state && actions.length === 0) return null;
+  const overrides = ruleGroupStateLines(rule, groupNames, timezone, now);
+  if (!state && overrides.length === 0 && actions.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-2 border-t border-[var(--ff-line)] px-4 py-3">
-      {state ? <span className="mr-auto text-[14px] text-[var(--ff-ink-2)]">{state}</span> : <span className="mr-auto" />}
+      <div className="mr-auto flex flex-col text-[14px] text-[var(--ff-ink-2)]">
+        {[...(state ? [state] : []), ...overrides].map((line) => (
+          <span key={line}>{line}</span>
+        ))}
+      </div>
       {actions.map((action) => (
         <button
           key={action.label}

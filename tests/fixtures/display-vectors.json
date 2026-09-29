@@ -5477,8 +5477,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5521,8 +5523,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "scheduled",
           "windows": [
             {
@@ -5576,8 +5580,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "scheduled",
           "windows": [
             {
@@ -5636,11 +5642,13 @@
           "pause": {
             "active": true,
             "until": "2026-09-15T17:00:00Z",
+            "kind": "pause",
             "by": {
               "accountId": "a1",
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5658,6 +5666,104 @@
         {
           "label": "More time",
           "run": "extend"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "allowed until its window ends",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T17:00:00Z",
+            "kind": "allow",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Resume schedule",
+          "strong": true,
+          "run": "disallow"
+        },
+        {
+          "label": "Pause rule",
+          "run": "pause"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "allowed until disallowed",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": null,
+            "kind": "allow",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Resume schedule",
+          "strong": true,
+          "run": "disallow"
+        },
+        {
+          "label": "Pause rule",
+          "run": "pause"
         }
       ]
     },
@@ -5683,11 +5789,13 @@
           "pause": {
             "active": true,
             "until": null,
+            "kind": "pause",
             "by": {
               "accountId": "a1",
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5726,11 +5834,13 @@
           "pause": {
             "active": true,
             "until": "2026-09-15T15:00:00Z",
+            "kind": "pause",
             "by": {
               "accountId": "a1",
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5773,8 +5883,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5807,8 +5919,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5841,11 +5955,13 @@
           "pause": {
             "active": true,
             "until": "2026-09-15T17:30:00Z",
+            "kind": "pause",
             "by": {
               "accountId": "a1",
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5878,11 +5994,13 @@
           "pause": {
             "active": true,
             "until": null,
+            "kind": "pause",
             "by": {
               "accountId": "a1",
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5915,8 +6033,10 @@
           "pause": {
             "active": true,
             "until": "2026-09-15T17:30:00Z",
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5926,6 +6046,84 @@
         "now": "2026-09-15T16:00:00Z"
       },
       "expected": "Paused until 1:30 PM"
+    },
+    {
+      "fn": "ruleStateLine",
+      "name": "allowed with an end time by Nick",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T17:30:00Z",
+            "kind": "allow",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": "Allowed until 1:30 PM by Nick"
+    },
+    {
+      "fn": "ruleStateLine",
+      "name": "allowed until disallowed",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": null,
+            "kind": "allow",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": "Allowed until you resume the schedule by Nick"
     },
     {
       "fn": "ruleStateLine",
@@ -5949,11 +6147,13 @@
           "pause": {
             "active": true,
             "until": "2026-09-15T15:00:00Z",
+            "kind": "pause",
             "by": {
               "accountId": "a1",
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -5963,6 +6163,277 @@
         "now": "2026-09-15T16:00:00Z"
       },
       "expected": null
+    },
+    {
+      "fn": "ruleGroupStateLines",
+      "name": "no group overrides",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "groupNames": {
+          "g1": "Emma",
+          "g2": "Ava"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": []
+    },
+    {
+      "fn": "ruleGroupStateLines",
+      "name": "one group paused with an end time",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          },
+          "groupPauses": [
+            {
+              "groupId": "g1",
+              "pause": {
+                "active": true,
+                "until": "2026-09-15T17:30:00Z",
+                "kind": "pause",
+                "by": {
+                  "accountId": "a1",
+                  "name": "Nick"
+                }
+              }
+            }
+          ],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "groupNames": {
+          "g1": "Emma",
+          "g2": "Ava"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        "Paused for Emma until 1:30 PM by Nick"
+      ]
+    },
+    {
+      "fn": "ruleGroupStateLines",
+      "name": "two groups, one allowed until disallowed",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          },
+          "groupPauses": [
+            {
+              "groupId": "g1",
+              "pause": {
+                "active": true,
+                "until": "2026-09-15T17:30:00Z",
+                "kind": "pause",
+                "by": {
+                  "accountId": "a1",
+                  "name": "Nick"
+                }
+              }
+            },
+            {
+              "groupId": "g2",
+              "pause": {
+                "active": true,
+                "until": null,
+                "kind": "allow",
+                "by": {
+                  "accountId": "a1",
+                  "name": "Nick"
+                }
+              }
+            }
+          ],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "groupNames": {
+          "g1": "Emma",
+          "g2": "Ava"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        "Paused for Emma until 1:30 PM by Nick",
+        "Allowed for Ava until you resume the schedule by Nick"
+      ]
+    },
+    {
+      "fn": "ruleGroupStateLines",
+      "name": "an override that already ended",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          },
+          "groupPauses": [
+            {
+              "groupId": "g1",
+              "pause": {
+                "active": true,
+                "until": "2026-09-15T15:00:00Z",
+                "kind": "pause",
+                "by": {
+                  "accountId": "a1",
+                  "name": "Nick"
+                }
+              }
+            }
+          ],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "groupNames": {
+          "g1": "Emma",
+          "g2": "Ava"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": []
+    },
+    {
+      "fn": "ruleGroupStateLines",
+      "name": "a deleted group",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          },
+          "groupPauses": [
+            {
+              "groupId": "gone",
+              "pause": {
+                "active": true,
+                "until": "2026-09-15T17:30:00Z",
+                "kind": "pause",
+                "by": {
+                  "accountId": "a1",
+                  "name": "Nick"
+                }
+              }
+            }
+          ],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "groupNames": {
+          "g1": "Emma",
+          "g2": "Ava"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        "Paused for a deleted group until 1:30 PM by Nick"
+      ]
     },
     {
       "fn": "rulePauseSheetTitle",
@@ -6063,8 +6534,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -6141,8 +6614,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "scheduled",
           "windows": [
             {
@@ -6235,8 +6710,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "scheduled",
           "windows": [
             {
@@ -6337,8 +6814,10 @@
           "pause": {
             "active": false,
             "until": null,
+            "kind": "pause",
             "by": null
           },
+          "groupPauses": [],
           "mode": "scheduled",
           "windows": [
             {
@@ -6475,6 +6954,7 @@
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,
@@ -6551,11 +7031,13 @@
           "pause": {
             "active": true,
             "until": null,
+            "kind": "pause",
             "by": {
               "accountId": "a1",
               "name": "Nick"
             }
           },
+          "groupPauses": [],
           "mode": "always",
           "windows": [],
           "useGeneratedName": false,

@@ -132,11 +132,17 @@ const ACCESS: Record<string, Entry> = {
   "PATCH /api/v1/rules/{id}": { access: "session" },
   "DELETE /api/v1/rules/{id}": { access: "session" },
   "POST /api/v1/rules/{id}/allow": { access: "session" },
+  "POST /api/v1/rules/{id}/disallow": { access: "session" },
   "POST /api/v1/rules/{id}/extend": { access: "session" },
   "POST /api/v1/rules/{id}/off": { access: "session" },
   "POST /api/v1/rules/{id}/on": { access: "session" },
   "POST /api/v1/rules/{id}/pause": { access: "session" },
   "POST /api/v1/rules/{id}/resume": { access: "session" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/allow": { access: "session" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/disallow": { access: "session" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/extend": { access: "session" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/pause": { access: "session" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/resume": { access: "session" },
   "GET /api/v1/settings/household": { access: "session" },
   "PUT /api/v1/settings/household": { access: "session" },
   "GET /api/v1/settings/unifi": { access: "session" },
@@ -163,7 +169,7 @@ const BODIES: Record<string, unknown> = {
   "POST /api/v1/connection/pairings/{id}/claim": { token: "not-a-pairing-token", deviceName: "Matrix phone" },
 };
 
-const PARAMS: Record<string, string> = { id: "matrix-missing-id", sessionId: "matrix-missing-session", mac: "02:00:00:00:0a:99" };
+const PARAMS: Record<string, string> = { id: "matrix-missing-id", ruleId: "matrix-missing-rule", sessionId: "matrix-missing-session", mac: "02:00:00:00:0a:99" };
 
 type Handler = (request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response>;
 type Route = { key: string; method: (typeof METHODS)[number]; template: string; handler: Handler };

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.17.0
+  version: 0.18.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -1064,11 +1064,12 @@ paths:
       tags: [Rules]
       summary: Pause a rule (lift it for a while)
       description: |
-        Lifts the rule for every group it covers, from now until `until` or until resumed;
-        omit `until` for an indefinite pause. The rule's policies stay on the gateway,
-        disabled, so resuming only turns them back on. Records who paused it and replaces an
-        earlier pause or allowance. A rule that is off answers 409 `rule_off`; an `until` in
-        the past answers 400. A group's own pause is separate and unchanged.
+        Suspends the rule for every group it covers, from now until `until` or until resumed;
+        omit `until` for an indefinite pause. The rule's policies stay on the gateway, disabled.
+        Records who paused it and replaces an earlier pause or allowance. A rule that is off
+        answers 409 `rule_off`; an `until` in the past answers 400. A group's own pause is
+        separate and unchanged. To suspend the rule for one group only, use
+        `/groups/{id}/rules/{ruleId}/pause`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1113,9 +1114,10 @@ paths:
     post:
       operationId: resumeRule
       tags: [Rules]
-      summary: Resume a rule after a pause or allowance
+      summary: Resume a rule after a pause
       description: |
-        Ends the pause or allowance: the rule blocks again. Always succeeds.
+        Ends a pause: the rule blocks again. An allowance is ended by `disallow`; resuming
+        while there is no pause, or an allowance, changes nothing and still returns 200.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1147,8 +1149,8 @@ paths:
       tags: [Rules]
       summary: Extend a timed rule pause
       description: |
-        Adds `minutes` to a timed pause. 409 `not_paused` when the rule is not paused,
-        `indefinite` when the pause has no end, `rule_off` when the rule is off.
+        Adds `minutes` to a timed pause. 409 `not_paused` when the rule is not paused (an allowance
+        is not extended), `indefinite` when the pause has no end, `rule_off` when the rule is off.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1194,10 +1196,10 @@ paths:
       tags: [Rules]
       summary: Allow a rule while its window is blocking
       description: |
-        Lifts the rule until `until`, the same state as a pause. Omit `until` to allow until the
-        windows active now end, or until resumed for an always-on rule (409 `not_in_window` when
-        none is active); `null` allows until resumed. 409 `rule_off` when the rule is off.
-        Resume ends it: rules have no `DELETE /allow`.
+        Overrides the rule until `until`: its policies are disabled, like a pause, but the state is
+        an allowance. Omit `until` to allow until the windows active now end, or until disallowed for
+        an always-on rule (409 `not_in_window` when none is active); `null` allows until disallowed.
+        409 `rule_off` when the rule is off. Ends with `disallow`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1237,6 +1239,39 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
         "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}/disallow:
+    post:
+      operationId: disallowRule
+      tags: [Rules]
+      summary: End a rule allowance
+      description: |
+        Ends an allowance: the rule blocks again. A pause is ended by `resume`; disallowing while
+        there is no allowance, or a pause, changes nothing and still returns 200.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
   /api/v1/rules/{id}/on:
     post:
@@ -1302,6 +1337,230 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
         "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/pause:
+    post:
+      operationId: pauseGroupRule
+      tags: [Rules]
+      summary: Pause a rule for one group
+      description: |
+        Suspends the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request, states and errors as `/rules/{id}/pause`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/resume:
+    post:
+      operationId: resumeGroupRule
+      tags: [Rules]
+      summary: Resume a rule for one group
+      description: |
+        Ends a pause for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/extend:
+    post:
+      operationId: extendGroupRulePause
+      tags: [Rules]
+      summary: Extend a rule pause for one group
+      description: |
+        Adds `minutes` to a timed pause for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Errors as `/rules/{id}/extend`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/allow:
+    post:
+      operationId: allowGroupRule
+      tags: [Rules]
+      summary: Allow a rule for one group
+      description: |
+        Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/disallow:
+    post:
+      operationId: disallowGroupRule
+      tags: [Rules]
+      summary: End a rule allowance for one group
+      description: |
+        Ends an allowance for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
   /api/v1/devices:
     get:
@@ -2764,7 +3023,7 @@ components:
     Rule:
       type: object
       additionalProperties: false
-      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, pause, mode, windows, useGeneratedName, policyNames]
+      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 60 }
@@ -2793,6 +3052,16 @@ components:
           description: Website domains for domain rules; empty otherwise
         enabled: { type: boolean }
         pause: { $ref: "#/components/schemas/RulePause" }
+        groupPauses:
+          type: array
+          description: The same lift for one group alone; only the active ones.
+          items:
+            type: object
+            additionalProperties: false
+            required: [groupId, pause]
+            properties:
+              groupId: { type: string }
+              pause: { $ref: "#/components/schemas/RulePause" }
         mode:
           type: string
           enum: [always, scheduled]
@@ -2894,13 +3163,15 @@ components:
     RulePause:
       type: object
       additionalProperties: false
-      required: [active, until, by]
+      required: [active, until, kind, by]
       description: |
-        A pause or allowance lifts the rule for every group it covers until `until`, or until
-        resumed when null. Never set through create or update.
+        A pause suspends a rule and an allowance overrides it; either lifts the rule until
+        `until`, or until ended when null. On a rule it covers every group; in `groupPauses`
+        it covers one group. Never set through create or update.
       properties:
         active: { type: boolean }
         until: { type: [string, "null"], format: date-time }
+        kind: { type: string, enum: [pause, allow] }
         by: { $ref: "#/components/schemas/Actor" }
     Suspension:
       type: object
