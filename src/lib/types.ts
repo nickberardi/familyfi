@@ -117,6 +117,7 @@ export type UpdateCheck = {
   currentVersion: string;
   latestVersion: string | null;
   releaseUrl: string | null;
+  releaseNotes: string | null;
   checkedAt: string | null;
   lastSuccessfulAt: string | null;
   error: string | null;

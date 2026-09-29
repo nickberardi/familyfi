@@ -6,6 +6,7 @@ const GITHUB_RELEASE_PAGE_URL = "https://github.com/nickberardi/familyfi/release
 const RELEASE_PAGE_SIZE = 100;
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const UPDATE_CHECK_TIMEOUT_MS = 10_000;
+const RELEASE_NOTES_MAX_CHARS = 20_000;
 
 /** A non-secret, process-local snapshot exposed through the health endpoint. */
 export type UpdateCheckSnapshot = UpdateCheck;
@@ -22,6 +23,7 @@ type GitHubRelease = {
   draft?: unknown;
   prerelease?: unknown;
   tag_name?: unknown;
+  body?: unknown;
 };
 
 export type UpdateCheckRefreshOptions = {
@@ -150,6 +152,13 @@ async function fetchReleases(fetchImpl: typeof fetch, signal: AbortSignal): Prom
   }
 }
 
+/** The markdown body GitHub holds for a tag, bounded; null when the release has none. */
+function releaseNotesFor(releases: GitHubRelease[], tag: string): string | null {
+  const body = releases.find((release) => release.tag_name === tag)?.body;
+  if (typeof body !== "string" || !body.trim()) return null;
+  return body.trim().slice(0, RELEASE_NOTES_MAX_CHARS);
+}
+
 function initialSnapshot(): UpdateCheckSnapshot {
   return {
     status: "pending",
@@ -157,6 +166,7 @@ function initialSnapshot(): UpdateCheckSnapshot {
     currentVersion: APP_VERSION,
     latestVersion: null,
     releaseUrl: null,
+    releaseNotes: null,
     checkedAt: null,
     lastSuccessfulAt: null,
     error: null,
@@ -198,6 +208,7 @@ export function createUpdateChecker(): UpdateChecker {
           currentVersion: APP_VERSION,
           latestVersion: latest?.version ?? null,
           releaseUrl: latest ? `${GITHUB_RELEASE_PAGE_URL}/${encodeURIComponent(latest.tag)}` : null,
+          releaseNotes: latest ? releaseNotesFor(releases, latest.tag) : null,
           checkedAt,
           lastSuccessfulAt: checkedAt,
           error: null,
@@ -209,6 +220,7 @@ export function createUpdateChecker(): UpdateChecker {
           currentVersion: APP_VERSION,
           latestVersion: null,
           releaseUrl: null,
+          releaseNotes: null,
           checkedAt: now().toISOString(),
           lastSuccessfulAt: snapshot.lastSuccessfulAt,
           error: safeFailureMessage(error),

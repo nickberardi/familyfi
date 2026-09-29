@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { UpdateCheck } from "@/lib/types";
@@ -38,7 +39,7 @@ export function useUpdateCheck(): UpdateCheck | null {
 
 /** The sidebar's "Update available" alert. Renders nothing unless a newer release is published. */
 export function UpdateAlert({ update }: { update: UpdateCheck | null }) {
-  if (!update?.available || !update.latestVersion || !update.releaseUrl) return null;
+  if (!update?.available || !update.latestVersion) return null;
   const latest = appVersionLabel(update.latestVersion);
   return (
     <section
@@ -52,14 +53,12 @@ export function UpdateAlert({ update }: { update: UpdateCheck | null }) {
       <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">
         {latest} is ready. You&rsquo;re on {appVersionLabel(update.currentVersion)}.
       </p>
-      <a
-        href={update.releaseUrl}
-        target="_blank"
-        rel="noreferrer"
+      <Link
+        href="/update"
         className="mt-2 block w-full rounded-[6px] bg-[var(--ff-accent)] py-1.5 text-center text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
       >
-        View release
-      </a>
+        Update
+      </Link>
     </section>
   );
 }

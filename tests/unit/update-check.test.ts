@@ -48,6 +48,28 @@ describe("GitHub release update check", () => {
     });
   });
 
+  it("carries the latest release's notes, bounded, and null when it has none", async () => {
+    const withNotes = await createUpdateChecker().refresh({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse([
+          { tag_name: "v999.0.0", body: "## New\n- Something" },
+          { tag_name: "v998.0.0", body: "## Old\n- Other" },
+        ]),
+      ),
+    });
+    expect(withNotes.releaseNotes).toBe("## New\n- Something");
+
+    const long = await createUpdateChecker().refresh({
+      fetchImpl: vi.fn(async () => jsonResponse([{ tag_name: "v999.0.0", body: "x".repeat(30_000) }])),
+    });
+    expect(long.releaseNotes).toHaveLength(20_000);
+
+    const none = await createUpdateChecker().refresh({
+      fetchImpl: vi.fn(async () => jsonResponse([{ tag_name: "v999.0.0", body: "  " }])),
+    });
+    expect(none.releaseNotes).toBeNull();
+  });
+
   it("reports no update when GitHub has no applicable published release", async () => {
     const checker = createUpdateChecker();
     const snapshot = await checker.refresh({

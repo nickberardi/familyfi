@@ -75,6 +75,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
     currentVersion: "0.5.1",
     latestVersion: "0.6.0",
     releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
+    releaseNotes: "## New\n- Pair Device page\n\n## Fixed\n- Quarantine pill wording",
     checkedAt: "2026-09-22T12:00:00.000Z",
     lastSuccessfulAt: "2026-09-22T12:00:00.000Z",
     error: null,
@@ -94,10 +95,15 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   await page.goto("/family");
   const alert = page.getByRole("region", { name: "Update available" });
   await expect(alert).toContainText("v0.6.0 is ready. You’re on v0.5.1.");
-  await expect(alert.getByRole("link", { name: "View release" })).toHaveAttribute(
+  await alert.getByRole("link", { name: "Update" }).click();
+  await expect(page).toHaveURL(/\/update$/);
+  const notes = page.getByRole("region", { name: "Release notes" });
+  await expect(notes).toContainText("Pair Device page");
+  await expect(notes.getByRole("link", { name: "View on GitHub" })).toHaveAttribute(
     "href",
     "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
   );
+  await expect(page.getByRole("button", { name: /Install v0\.6\.0/ })).toBeDisabled();
 
   // Settings no longer carries the update check; the alert is the one place it appears.
   await page.goto("/settings");
@@ -120,6 +126,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
     available: null,
     latestVersion: null,
     releaseUrl: null,
+    releaseNotes: null,
     error: "GitHub release check failed.",
   };
   await page.reload();

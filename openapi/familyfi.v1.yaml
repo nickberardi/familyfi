@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.14.0
+  version: 0.15.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -67,6 +67,7 @@ paths:
                       currentVersion: "0.1.0"
                       latestVersion: "0.2.0"
                       releaseUrl: https://github.com/nickberardi/familyfi/releases/tag/v0.2.0
+                      releaseNotes: "## New\n- Pair Device page"
                       checkedAt: "2026-09-22T12:00:00.000Z"
                       lastSuccessfulAt: "2026-09-22T12:00:00.000Z"
                       error: null
@@ -1988,7 +1989,7 @@ components:
     UpdateCheck:
       type: object
       additionalProperties: false
-      required: [status, available, currentVersion, latestVersion, releaseUrl, checkedAt, lastSuccessfulAt, error]
+      required: [status, available, currentVersion, latestVersion, releaseUrl, releaseNotes, checkedAt, lastSuccessfulAt, error]
       description: Process-local GitHub release metadata. An error here does not degrade FamilyFi or database readiness.
       properties:
         status:
@@ -2007,6 +2008,9 @@ components:
           type: [string, "null"]
           format: uri
           description: Canonical GitHub URL for latestVersion, if one exists.
+        releaseNotes:
+          type: [string, "null"]
+          description: Markdown body of the latestVersion release as published on GitHub, capped at 20,000 characters; null when there is no release or it has no notes.
         checkedAt:
           type: [string, "null"]
           format: date-time
