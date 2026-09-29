@@ -83,8 +83,10 @@ fi
 # Packages apt downloaded for `playwright install --with-deps`, when sudo needs no password.
 sudo -n apt-get clean >/dev/null 2>&1 || true
 
-# Temp files from the test suite, container smoke and release digests.
-find /tmp -maxdepth 1 -user "$(id -u)" \( -name 'familyfi-*' -o -name 'digests' \) -exec rm -rf {} + 2>/dev/null || true
+# Temp files from the test suite, container smoke and release digests. Only stale ones: runners
+# share /tmp, and another job's cleanup must not delete a directory a running job is using
+# (db-upgrade lost its config that way). Six hours outlasts the longest job.
+find /tmp -maxdepth 1 -user "$(id -u)" -mmin +360 \( -name 'familyfi-*' -o -name 'digests' \) -exec rm -rf {} + 2>/dev/null || true
 
 # Runner diagnostics older than a week. RUNNER_WORKSPACE is <runner>/_work/<repository>.
 if [ -n "${RUNNER_WORKSPACE:-}" ]; then
