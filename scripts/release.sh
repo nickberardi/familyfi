@@ -70,7 +70,7 @@ if [[ -n "$remote_commit" ]]; then
   [[ "$remote_commit" == "$(git rev-parse HEAD)" ]] ||
     die "$tag on GitHub is $remote_commit, not HEAD (git switch --detach $tag)"
   newest=$(git ls-remote --tags --refs --sort=-v:refname origin 'v*' | sed 's#.*refs/tags/##' |
-    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
 fi
 if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
   [[ "$(git rev-parse "$tag^{commit}")" == "$(git rev-parse HEAD)" ]] || die "local tag $tag is not HEAD"
@@ -130,11 +130,13 @@ fi
 
 # The ghcr and manifest jobs, as one multi-platform build.
 tags=(--tag "$image:$version")
-if [[ -n "$remote_commit" && "$tag" != "${newest:-}" ]]; then
-  # Rebuilding an older release must not move households on :latest back to it.
-  echo "==> $tag is not the newest release ($newest); :$major.$minor and :latest are left as they are"
-elif [[ -z "$prerelease" ]]; then
-  tags+=(--tag "$image:$major.$minor" --tag "$image:latest")
+if [[ -z "$prerelease" ]]; then
+  if [[ -n "$remote_commit" && "$tag" != "$newest" ]]; then
+    # Rebuilding an older release must not move households on :latest back to it.
+    echo "==> $tag is not the newest release ($newest); :$major.$minor and :latest are left as they are"
+  else
+    tags+=(--tag "$image:$major.$minor" --tag "$image:latest")
+  fi
 fi
 if ((push)); then output=(--push); else output=(--output type=cacheonly); fi
 docker buildx create --name "$builder" --driver docker-container >/dev/null
