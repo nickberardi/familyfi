@@ -53,23 +53,23 @@ export async function runGroupInternet(
     const fields = { enabled: true, expiresAt: end, blockedByAccountId: actor.accountId, blockedByName: actor.name };
     await prisma().$transaction(async (tx) => {
       const data = { ...fields, name: pauseRuleName(existing) };
-      if (block) await tx.rule.update({ where: { id: block.id }, data });
-      else {
-        await tx.rule.create({
-          data: {
-            ...data,
-            kind: RuleKind.internet,
-            scope: RuleScope.group,
-            mode: RuleMode.always,
-            systemGroupId: groupId,
-            groups: { create: { groupId } },
-          },
-        });
-      }
+      // Upserted on the unique group id, so two first pauses at once do not collide.
+      await tx.rule.upsert({
+        where: { systemGroupId: groupId },
+        update: data,
+        create: {
+          ...data,
+          kind: RuleKind.internet,
+          scope: RuleScope.group,
+          mode: RuleMode.always,
+          systemGroupId: groupId,
+          groups: { create: { groupId } },
+        },
+      });
       await tx.ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
     });
   } else if (action === "resume") {
-    if (block && blocking) await prisma().rule.update({ where: { id: block.id }, data: BLOCK_CLEARED });
+    await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
   } else if (action === "extend") {
     if (!block || !blocking) return jsonError(409, "not_paused", "Extend requires an active pause.");
     if (!block.expiresAt) return jsonError(409, "indefinite", "An indefinite pause has no expiry to extend.");
@@ -80,8 +80,11 @@ export async function runGroupInternet(
   } else if (action === "allow") {
     const requested = until(body.until);
     if (requested instanceof Response) return requested;
-    // A rule already paused, or lifted for this group, is not blocking it.
-    const rules = internetLinks(existing).filter(({ rule, link }) => rule.enabled && !lifted(rule, now) && !lifted(link, now));
+    // A rule already paused, or paused for this group, is not blocking it. One this group is
+    // already allowed is included, so an allowance can be given a new time.
+    const rules = internetLinks(existing).filter(
+      ({ rule, link }) => rule.enabled && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
+    );
     const ends = new Map(
       rules.map(({ rule }) => [rule.id, activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone)] as const),
     );
@@ -101,7 +104,8 @@ export async function runGroupInternet(
           },
         });
       }
-      if (block && blocking) await tx.rule.update({ where: { id: block.id }, data: BLOCK_CLEARED });
+      // Read and cleared here, so a pause that lands meanwhile is replaced, not left beside the allow.
+      await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     });
   } else {
     await clearAllowances();
