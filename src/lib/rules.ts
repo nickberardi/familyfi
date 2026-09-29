@@ -109,6 +109,24 @@ export function glyphForAppName(name: string): string {
 }
 
 /** The windows of the group's enabled internet rules, with the rule each came from. */
+export type InternetRulePreset = { name: string; days: number[]; start: string; end: string; label: string };
+
+/**
+ * One-tap internet rules offered to a group with none. Only children and teens get them;
+ * adults and things start from a custom schedule.
+ */
+export function internetRulePresets(group: { kind: "family" | "things"; familyRole: string | null }): InternetRulePreset[] {
+  if (group.kind !== "family") return [];
+  const bedtime = { name: "Bedtime", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00", label: "Bedtime 9 PM–7 AM" };
+  if (group.familyRole === "child") {
+    return [bedtime, { name: "Homework", days: [1, 2, 3, 4, 5], start: "15:00", end: "18:00", label: "Homework 3–6 PM" }];
+  }
+  if (group.familyRole === "teen") {
+    return [bedtime, { name: "School nights", days: [0, 1, 2, 3, 4], start: "23:00", end: "06:00", label: "School nights 11 PM–6 AM" }];
+  }
+  return [];
+}
+
 export function internetWindowsForGroup(rules: Rule[], groupId: string): InternetWindow[] {
   return internetRulesForGroup(rules, groupId)
     .filter((rule) => rule.enabled && rule.mode === "scheduled")

@@ -5,13 +5,12 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { formatClock } from "@/lib/display";
 import { internetDayBands, internetState, type InternetWindow } from "@/lib/rule-windows";
+import { internetRulePresets, type InternetRulePreset } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { useAppData } from "./AppDataProvider";
 import { DayTimeline, type TimelineBand } from "./DayTimeline";
 import { groupActions } from "./group-actions";
-
-const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 
 /**
  * The group's device-wide controls, kept apart from its category marks: whether all of
@@ -179,16 +178,8 @@ function ZoneHeading({
 /** One tap to a common internet rule; anything else goes to the rule editor. */
 function Presets({ group }: { group: Group }) {
   const { mutate } = useAppData();
-  const presets =
-    group.kind === "things"
-      ? [{ name: "Overnight", days: EVERY_DAY, start: "23:00", end: "07:00", label: "Overnight 11 PM–7 AM" }]
-      : [
-          { name: "Bedtime", days: EVERY_DAY, start: "21:00", end: "07:00", label: "Bedtime 9 PM–7 AM" },
-          group.familyRole === "teen"
-            ? { name: "School nights", days: [0, 1, 2, 3, 4], start: "23:00", end: "06:00", label: "School nights 11 PM–6 AM" }
-            : { name: "Homework", days: [1, 2, 3, 4, 5], start: "15:00", end: "18:00", label: "Homework 3–6 PM" },
-        ];
-  const add = (preset: (typeof presets)[number]) =>
+  const presets = internetRulePresets(group);
+  const add = (preset: InternetRulePreset) =>
     void mutate(
       () =>
         api("/api/v1/rules", {
