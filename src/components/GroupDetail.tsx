@@ -122,7 +122,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   }
   const members = devices.filter((device) => device.groupId === id);
   const timezone = household?.timezone ?? "America/New_York";
-  const windows = internetWindowsForGroup(rules, group.id);
+  const windows = internetWindowsForGroup(rules, group.id, new Date());
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">

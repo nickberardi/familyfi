@@ -1,10 +1,9 @@
 import { z } from "zod";
-import { watchGroupControlAllowed } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
 import { groupInclude, internetWindows, publicGroup, sessionActor } from "@/server/groups";
-import { isWindowActive, windowEndsAt } from "@/lib/rule-windows";
 import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
+import { activeWindowsEnd } from "@/server/rules";
 import { jsonError } from "@/server/http";
 
 const Body = z.object({
@@ -31,17 +30,14 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid allow request.");
     const existing = await prisma().group.findUnique({ where: { id }, include: groupInclude });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
-    if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const now = new Date();
-    const active = internetWindows(existing).filter((window) => isWindowActive(window, now, household.timezone));
-    if (parsed.data.until === undefined && active.length === 0) {
+    // By default until the active windows end; an always-on rule never does, so until resumed.
+    const defaultUntil = activeWindowsEnd(internetWindows(existing, now), now, household.timezone);
+    if (parsed.data.until === undefined && defaultUntil === undefined) {
       return jsonError(409, "not_in_window", "No internet rule is blocking this group now.");
     }
-    // By default until the active windows end; an always-on rule never does, so until resumed.
-    const ends = active.map((window) => windowEndsAt(window, now, household.timezone));
-    const defaultUntil = ends.some((end) => end === null) ? null : ends.reduce<Date | null>((latest, end) => (!latest || end!.getTime() > latest.getTime() ? end : latest), null);
-    const until = parsed.data.until === undefined ? defaultUntil : parsed.data.until === null ? null : new Date(parsed.data.until);
+    const until = parsed.data.until === undefined ? defaultUntil ?? null : parsed.data.until === null ? null : new Date(parsed.data.until);
     if (until && until.getTime() <= now.getTime()) return jsonError(400, "invalid_request", "until must be in the future.");
     const group = await prisma().group.update({
       where: { id },
@@ -64,11 +60,10 @@ export async function POST(request: Request, ctx: Ctx) {
 
 /** Ends an allowance: the group's internet rules apply again. */
 export async function DELETE(request: Request, ctx: Ctx) {
-  return withMutation(request, async (session) => {
+  return withMutation(request, async () => {
     const { id } = await ctx.params;
     const existing = await prisma().group.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
-    if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const group = await prisma().group.update({
       where: { id },

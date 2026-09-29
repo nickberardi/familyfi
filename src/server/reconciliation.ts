@@ -1,4 +1,5 @@
 import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope } from "@prisma/client";
+import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
 import { prisma } from "./db";
 import { env } from "./env";
@@ -120,6 +121,10 @@ async function tick(owner: string): Promise<boolean> {
   await prisma().group.updateMany({
     where: { allowActive: true, allowUntil: { not: null, lte: now } },
     data: { allowActive: false, allowUntil: null, allowedByAccountId: null, allowedByName: null },
+  });
+  await prisma().rule.updateMany({
+    where: { pauseActive: true, pauseUntil: { not: null, lte: now } },
+    data: { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
   });
 
   const household = await prisma().household.findUnique({ where: { id: "default" } });
@@ -340,7 +345,11 @@ async function tick(owner: string): Promise<boolean> {
         zoneId: network.zoneId ?? null,
       })),
       networkScope: scope,
-      rules: rules.map((rule) => ({ ...rule, groupIds: rule.groups.map((link) => link.groupId) })),
+      rules: rules.map((rule) => ({
+        ...rule,
+        groupIds: rule.groups.map((link) => link.groupId),
+        paused: isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now),
+      })),
     });
     const desiredRuleKeys = new Set(desiredRules.map((item) => item.key));
 

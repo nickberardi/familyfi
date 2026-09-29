@@ -6,7 +6,7 @@ import { publicRule, ruleInclude } from "@/server/rules";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** Turns a rule off: its policies stay, disabled, and any pause on it ends. A group's pause is untouched. */
+/** Ends a pause or allowance: the rule blocks again. */
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
@@ -14,10 +14,10 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!existing) return jsonError(404, "not_found", "Rule not found.");
     const rule = await prisma().rule.update({
       where: { id },
-      data: { enabled: false, pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
+      data: { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
       include: ruleInclude,
     });
-    const change = await enqueueChange("rule");
+    const change = await enqueueChange("resume");
     return Response.json({ rule: publicRule(rule), change });
   });
 }

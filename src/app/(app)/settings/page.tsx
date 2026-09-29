@@ -357,7 +357,7 @@ export default function SettingsPage() {
           <div className="flex flex-wrap items-baseline gap-2.5 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
             <span className="text-[14px] font-semibold">Household</span>
             <span className="text-[14px] text-[var(--ff-muted)]">
-              Children and teens get pause and schedules · adults can be admins with their own login
+              Everyone can be paused and given schedules · adults can be admins with their own login
             </span>
           </div>
           {recovery ? (

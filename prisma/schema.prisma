@@ -404,6 +404,12 @@ model Rule {
   domains          String[]     @default([])
   enabled          Boolean      @default(true)
   mode             RuleMode     @default(always)
+  /// A pause lifts the rule for every group it covers until `pauseUntil`, or until resumed.
+  pauseActive      Boolean      @default(false)
+  pauseUntil       DateTime?
+  /// Who paused it, as they were named then.
+  pausedByAccountId String?
+  pausedByName     String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   groups           RuleGroup[]

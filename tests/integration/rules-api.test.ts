@@ -12,6 +12,12 @@ import { POST as pause } from "@/app/api/v1/groups/[id]/pause/route";
 import { POST as resume } from "@/app/api/v1/groups/[id]/resume/route";
 import { DELETE as disallow, POST as allow } from "@/app/api/v1/groups/[id]/allow/route";
 import { POST as createRule } from "@/app/api/v1/rules/route";
+import { POST as allowRule } from "@/app/api/v1/rules/[id]/allow/route";
+import { POST as extendRule } from "@/app/api/v1/rules/[id]/extend/route";
+import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
+import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
+import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
+import { POST as resumeRule } from "@/app/api/v1/rules/[id]/resume/route";
 import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
@@ -31,6 +37,8 @@ type PublicRule = {
   groupIds: string[];
   domains: string[];
   mode: string;
+  enabled: boolean;
+  pause: { active: boolean; until: string | null; by: { name: string } | null };
   windows: { id: string; name: string; days: number[]; start: string; end: string }[];
   policyNames: string[];
 };
@@ -71,6 +79,21 @@ async function groupAction(handler: typeof pause, auth: SessionAuth, id: string,
     request(`/api/v1/groups/${id}/x`, { method, auth, headers: { "content-type": "application/json" }, body: method === "DELETE" ? undefined : body }),
     { params: Promise.resolve({ id }) },
   );
+}
+
+async function ruleAction(handler: typeof pauseRule, auth: SessionAuth, id: string, body: object | null = {}) {
+  return handler(
+    request(`/api/v1/rules/${id}/x`, { method: "POST", auth, headers: { "content-type": "application/json" }, body: body === null ? undefined : JSON.stringify(body) }),
+    { params: Promise.resolve({ id }) },
+  );
+}
+
+async function ruleOf(response: Response): Promise<PublicRule> {
+  return ((await response.json()) as { rule: PublicRule }).rule;
+}
+
+async function errorCode(response: Response): Promise<[number, string]> {
+  return [response.status, ((await response.json()) as { error: { code: string } }).error.code];
 }
 
 async function readGroup(auth: SessionAuth, id: string): Promise<PublicGroup> {
@@ -373,5 +396,152 @@ describe("household rules", () => {
     const group = ((await paused.json()) as { group: PublicGroup }).group;
     expect(group.allowance).toEqual({ active: false, until: null, by: null });
     expect(group.access).toBe("paused");
+  });
+
+  describe("rule pause, resume, extend and allow", () => {
+    const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+
+    /** A Video rule and a bedtime rule for one child, reconciled onto the gateway. */
+    async function videoAndBedtime(auth: SessionAuth) {
+      const emma = await child();
+      const video = await ruleOf(await postRule(auth, { name: "TV Video", kind: "category", groupIds: [emma.id], targetIds: [4], mode: "always" }));
+      const bedtime = await ruleOf(
+        await postRule(auth, {
+          name: "Homework",
+          kind: "internet",
+          groupIds: [emma.id],
+          mode: "scheduled",
+          windows: [{ days: EVERY_DAY, start: utcClock(-60), end: utcClock(60) }],
+        }),
+      );
+      await runReconcileOnce();
+      return { emma, video, bedtime };
+    }
+
+    it("lifts a rule until a time and puts it back on resume, leaving its policies in place", async () => {
+      const auth = await signedIn();
+      const { video } = await videoAndBedtime(auth);
+      const [policy] = policiesNamed(client, "FamilyFi TV Video");
+      expect(policy?.enabled).toBe(true);
+
+      const until = inMinutes(30);
+      const paused = await ruleOf(await ruleAction(pauseRule, auth, video.id, { until: until.toISOString() }));
+      expect(paused.pause).toEqual({ active: true, until: until.toISOString(), by: { accountId: expect.anything(), name: "Recovery admin" } });
+      expect(paused.enabled).toBe(true);
+      await runReconcileOnce();
+      const lifted = client.state.policies.find((item) => item.id === policy!.id);
+      expect([lifted?.enabled, policyMacs(lifted!)]).toEqual([false, [MAC]]);
+
+      const extended = await ruleOf(await ruleAction(extendRule, auth, video.id, { minutes: 15 }));
+      expect(new Date(extended.pause.until!).getTime()).toBe(until.getTime() + 15 * 60_000);
+
+      const resumed = await ruleOf(await ruleAction(resumeRule, auth, video.id, null));
+      expect(resumed.pause).toEqual({ active: false, until: null, by: null });
+      await runReconcileOnce();
+      expect(client.state.policies.find((item) => item.id === policy!.id)?.enabled).toBe(true);
+      expect(policiesNamed(client, "FamilyFi TV Video")).toHaveLength(1);
+    });
+
+    it("lets an indefinite pause run until resumed", async () => {
+      const auth = await signedIn();
+      const { video } = await videoAndBedtime(auth);
+      const paused = await ruleOf(await ruleAction(pauseRule, auth, video.id));
+      expect([paused.pause.active, paused.pause.until]).toEqual([true, null]);
+      expect(await errorCode(await ruleAction(extendRule, auth, video.id, { minutes: 15 }))).toEqual([409, "indefinite"]);
+    });
+
+    it("allows a rule until its active window ends, and an always-on rule until resumed", async () => {
+      const auth = await signedIn();
+      const { emma, video, bedtime } = await videoAndBedtime(auth);
+      const allowed = await ruleOf(await ruleAction(allowRule, auth, bedtime.id));
+      expect(Math.abs(new Date(allowed.pause.until!).getTime() - inMinutes(60).getTime())).toBeLessThan(2 * 60_000);
+      await runReconcileOnce();
+      expect(policiesNamed(client, "FamilyFi Homework")[0]?.enabled).toBe(false);
+      // The group's own state no longer counts the lifted bedtime as blocking.
+      expect((await readGroup(auth, emma.id)).access).toBe("available");
+
+      const always = await ruleOf(await ruleAction(allowRule, auth, video.id));
+      expect([always.pause.active, always.pause.until]).toEqual([true, null]);
+    });
+
+    it("refuses to allow a rule that is not blocking, unless given a time", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      const later = await ruleOf(
+        await postRule(auth, {
+          name: "Later",
+          kind: "internet",
+          groupIds: [emma.id],
+          mode: "scheduled",
+          windows: [{ days: EVERY_DAY, start: utcClock(120), end: utcClock(180) }],
+        }),
+      );
+      expect(await errorCode(await ruleAction(allowRule, auth, later.id))).toEqual([409, "not_in_window"]);
+      const explicit = await ruleAction(allowRule, auth, later.id, { until: inMinutes(30).toISOString() });
+      expect(explicit.status).toBe(200);
+    });
+
+    it("answers 409 for a rule that is off, or a pause that is not there to extend", async () => {
+      const auth = await signedIn();
+      const { video } = await videoAndBedtime(auth);
+      expect(await errorCode(await ruleAction(extendRule, auth, video.id, { minutes: 15 }))).toEqual([409, "not_paused"]);
+
+      await ruleAction(pauseRule, auth, video.id);
+      const off = await ruleOf(await ruleAction(turnOffRule, auth, video.id, null));
+      // Off and paused never overlap: turning a rule off ends its pause.
+      expect([off.enabled, off.pause.active]).toEqual([false, false]);
+      for (const handler of [pauseRule, allowRule]) {
+        expect(await errorCode(await ruleAction(handler, auth, video.id))).toEqual([409, "rule_off"]);
+      }
+      expect(await errorCode(await ruleAction(extendRule, auth, video.id, { minutes: 15 }))).toEqual([409, "rule_off"]);
+      // Resume always succeeds.
+      expect((await ruleAction(resumeRule, auth, video.id, null)).status).toBe(200);
+
+      const on = await ruleOf(await ruleAction(turnOnRule, auth, video.id, null));
+      expect(on.enabled).toBe(true);
+    });
+
+    it("rejects a pause that ends in the past, and unknown rules", async () => {
+      const auth = await signedIn();
+      const { video } = await videoAndBedtime(auth);
+      expect(await errorCode(await ruleAction(pauseRule, auth, video.id, { until: inMinutes(-5).toISOString() }))).toEqual([400, "invalid_request"]);
+      expect((await ruleAction(pauseRule, auth, "missing")).status).toBe(404);
+    });
+
+    it("cannot be set by editing a rule, and turning a rule off through an edit ends the pause", async () => {
+      const auth = await signedIn();
+      const { video } = await videoAndBedtime(auth);
+      const rejected = await patch(auth, video.id, { pause: { active: true, until: null, by: null } });
+      expect(rejected.status).toBe(400);
+      await ruleAction(pauseRule, auth, video.id);
+      const edited = await ruleOf(await patch(auth, video.id, { name: "TV Video 2" }));
+      expect(edited.pause.active).toBe(true);
+      const off = await ruleOf(await patch(auth, video.id, { enabled: false }));
+      expect(off.pause.active).toBe(false);
+    });
+
+    it("clears an expired pause on the next tick", async () => {
+      const auth = await signedIn();
+      const { video } = await videoAndBedtime(auth);
+      await ruleAction(pauseRule, auth, video.id, { until: inMinutes(30).toISOString() });
+      await prisma().rule.update({ where: { id: video.id }, data: { pauseUntil: inMinutes(-1) } });
+      await runReconcileOnce();
+      const stored = await prisma().rule.findUniqueOrThrow({ where: { id: video.id } });
+      expect([stored.pauseActive, stored.pauseUntil, stored.pausedByName]).toEqual([false, null, null]);
+      expect(policiesNamed(client, "FamilyFi TV Video")[0]?.enabled).toBe(true);
+    });
+
+    it("makes a paused internet rule not blocking, so allowing the group is refused", async () => {
+      const auth = await signedIn();
+      const { emma, bedtime } = await videoAndBedtime(auth);
+      expect((await readGroup(auth, emma.id)).access).toBe("blocked");
+      await ruleAction(pauseRule, auth, bedtime.id);
+      const group = await readGroup(auth, emma.id);
+      expect([group.access, group.internetRuleIds]).toEqual(["available", [bedtime.id]]);
+      expect((await groupAction(allow, auth, emma.id)).status).toBe(409);
+      // A group's own pause still blocks while its rule is paused.
+      await groupAction(pause, auth, emma.id);
+      expect((await readGroup(auth, emma.id)).access).toBe("paused");
+    });
   });
 });

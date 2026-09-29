@@ -1,7 +1,8 @@
 import { Prisma, RuleKind, RuleMode, RuleScope } from "@prisma/client";
 import { z } from "zod";
 import { rulePolicyNames } from "@/lib/policy-names";
-import { MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain } from "@/lib/rules";
+import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain } from "@/lib/rules";
+import { isWindowActive, windowEndsAt, type InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
 import { prisma } from "./db";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
@@ -27,6 +28,11 @@ export function publicRule(rule: RuleWithWindows) {
     targetIds: [...rule.targetIds],
     domains: [...rule.domains],
     enabled: rule.enabled,
+    pause: {
+      active: rule.pauseActive,
+      until: rule.pauseUntil?.toISOString() ?? null,
+      by: rule.pausedByName ? { accountId: rule.pausedByAccountId, name: rule.pausedByName } : null,
+    },
     mode: rule.mode,
     windows: windows.map((window) => ({
       id: window.id,
@@ -39,6 +45,27 @@ export function publicRule(rule: RuleWithWindows) {
     /** What UniFi's policy table shows for this rule, one per policy in the Internal zone. */
     policyNames: rulePolicyNames({ ...rule, windows }),
   };
+}
+
+/** The rule's windows as the schedule sees them: an always-on rule is one window with no end. */
+export function ruleInternetWindows(rule: Pick<RuleWithWindows, "name" | "mode" | "windows">): InternetWindow[] {
+  return rule.mode === RuleMode.always
+    ? [alwaysWindow(rule.name)]
+    : [...rule.windows]
+        .sort((a, b) => a.position - b.position)
+        .map((window) => ({ name: window.name, days: window.days, start: window.start, end: window.end, ruleName: rule.name }));
+}
+
+/**
+ * Until when the windows active now last: the latest end, or null when one never ends.
+ * Undefined when none is active. Shared by a group's and a rule's allow.
+ */
+export function activeWindowsEnd(windows: InternetWindow[], now: Date, timezone: string): Date | null | undefined {
+  const active = windows.filter((window) => isWindowActive(window, now, timezone));
+  if (active.length === 0) return undefined;
+  const ends = active.map((window) => windowEndsAt(window, now, timezone));
+  if (ends.some((end) => end === null)) return null;
+  return ends.reduce<Date | null>((latest, end) => (!latest || end!.getTime() > latest.getTime() ? end : latest), null);
 }
 
 const WindowBody = z.object({
@@ -238,6 +265,8 @@ export async function saveRule(input: RuleInput, existingId?: string): Promise<R
       domains: input.domains,
       enabled: input.enabled,
       mode: input.mode,
+      // Off and paused never overlap: turning a rule off ends its pause.
+      ...(input.enabled ? {} : { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null }),
     };
     const rule = existingId
       ? await tx.rule.update({ where: { id: existingId }, data })

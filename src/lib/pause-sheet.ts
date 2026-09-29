@@ -1,5 +1,6 @@
 import { formatClock } from "./display";
-import { nextWindowStart, windowEndsAt, windowTitle, type InternetWindow } from "./rule-windows";
+import { isWindowActive, nextWindowStart, windowEndsAt, windowTitle, type InternetWindow } from "./rule-windows";
+import type { Rule } from "./rules";
 import type { Group } from "./types";
 
 export type PauseSheetMode = "pause" | "extend";
@@ -72,6 +73,62 @@ export function pauseSheetOptions(
             label: `Until ${windowTitle(next.window)} ends`,
             note: `back at ${formatClock(nextEnd, timezone)}`,
             request: { kind: "pauseUntil", until: nextEnd.toISOString() } as const,
+          },
+        ]
+      : []),
+    { label: "Until I resume", note: "no end time", request: { kind: "pauseUntil", until: null } },
+  ];
+}
+
+/*
+ * The same sheet for a rule. A rule pause lifts the rule for every group it covers, so the
+ * copy says the rule stops blocking rather than that internet goes off.
+ */
+
+export function rulePauseSheetTitle(rule: Pick<Rule, "name">, mode: PauseSheetMode): string {
+  return mode === "extend" ? `Keep ${rule.name} paused longer?` : `Pause ${rule.name}?`;
+}
+
+export function rulePauseSheetBody(rule: Pick<Rule, "groupIds" | "scope">, mode: PauseSheetMode): string {
+  if (mode === "extend") return "The rule stays lifted for longer. Resume brings it back sooner.";
+  const covered =
+    rule.scope === "network"
+      ? "everything on its networks"
+      : rule.groupIds.length === 1
+        ? "the group it covers"
+        : `all ${rule.groupIds.length} groups it covers`;
+  return `The rule stops blocking for ${covered}. Other rules, and any pause on a group, stay as they are.`;
+}
+
+export function rulePauseSheetOptions(
+  rule: Pick<Rule, "pause">,
+  windows: InternetWindow[],
+  mode: PauseSheetMode,
+  timezone: string,
+  now: Date,
+): PauseSheetOption[] {
+  const extending = mode === "extend" && rule.pause.active && Boolean(rule.pause.until);
+  const timed = (label: string, minutes: number): PauseSheetOption => ({
+    label,
+    note: `blocks again at ${formatClock(new Date(now.getTime() + minutes * 60_000), timezone)}`,
+    request: extending ? { kind: "extend", minutes } : { kind: "pauseFor", minutes },
+  });
+  // A window is blocking now: lift the rule until the last active one ends.
+  const active = windows
+    .filter((window) => isWindowActive(window, now, timezone))
+    .map((window) => ({ window, end: windowEndsAt(window, now, timezone) }));
+  const last = active.some((item) => item.end === null)
+    ? null
+    : active.reduce<(typeof active)[number] | null>((latest, item) => (!latest || item.end!.getTime() > latest.end!.getTime() ? item : latest), null);
+  return [
+    timed("For 30 minutes", 30),
+    timed("For an hour", 60),
+    ...(last
+      ? [
+          {
+            label: `Until ${windowTitle(last.window)} ends`,
+            note: `blocks again at ${formatClock(last.end!, timezone)}`,
+            request: { kind: "pauseUntil", until: last.end!.toISOString() } as const,
           },
         ]
       : []),

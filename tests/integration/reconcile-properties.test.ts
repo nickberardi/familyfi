@@ -65,6 +65,8 @@ type Step =
   | { kind: "disallow"; group: number }
   | { kind: "toggleRule"; pick: number }
   | { kind: "renameRule"; pick: number }
+  | { kind: "pauseRule"; pick: number }
+  | { kind: "resumeRule"; pick: number }
   | { kind: "move"; mac: number; place: Place }
   | { kind: "deleteGroup"; group: number }
   | { kind: "deleteDevice"; mac: number }
@@ -118,6 +120,8 @@ const step: fc.Arbitrary<Step> = fc.oneof(
   fc.record({ kind: fc.constant("disallow" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("toggleRule" as const), pick: fc.nat() }),
   fc.record({ kind: fc.constant("renameRule" as const), pick: fc.nat() }),
+  fc.record({ kind: fc.constant("pauseRule" as const), pick: fc.nat() }),
+  fc.record({ kind: fc.constant("resumeRule" as const), pick: fc.nat() }),
   fc.record({ kind: fc.constant("move" as const), mac: macIndex, place }),
   fc.record({ kind: fc.constant("deleteGroup" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("deleteDevice" as const), mac: macIndex }),
@@ -213,6 +217,20 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
     case "disallow":
       await db.group.updateMany({ where: { id: groupId! }, data: { allowActive: false, allowUntil: null } });
       return;
+    case "pauseRule":
+    case "resumeRule": {
+      const rules = await db.rule.findMany({ orderBy: { id: "asc" } });
+      if (!rules.length) return;
+      const rule = rules[change.pick % rules.length]!;
+      await db.rule.update({
+        where: { id: rule.id },
+        data:
+          change.kind === "pauseRule"
+            ? { pauseActive: true, pauseUntil: PAUSED_UNTIL() }
+            : { pauseActive: false, pauseUntil: null },
+      });
+      return;
+    }
     case "toggleRule":
     case "renameRule": {
       const rules = await db.rule.findMany({ orderBy: { id: "asc" } });
@@ -300,6 +318,7 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
   const active = (on: boolean, until: Date | null) => on && (!until || until > now);
   const paused = (group: (typeof groups)[number]) => active(group.suspensionActive, group.suspensionUntil);
   const allowed = (group: (typeof groups)[number]) => active(group.allowActive, group.allowUntil);
+  const rulePaused = (rule: (typeof rules)[number]) => active(rule.pauseActive, rule.pauseUntil);
 
   for (const device of devices) {
     // Off a managed network, or in no known zone: its group's policies are kept on purpose.
@@ -330,7 +349,7 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
           expect(!inside || !policy.enabled, `${device.mac} allowed but held by ${policy.name}`).toBe(true);
         } else {
           expect(inside, `${device.mac} missing from ${policy.name}`).toBe(true);
-          expect(policy.enabled, `${policy.name} enabled`).toBe(rule.enabled);
+          expect(policy.enabled, `${policy.name} enabled`).toBe(rule.enabled && !rulePaused(rule));
         }
       }
     }
@@ -349,7 +368,7 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
   for (const { row, policy } of ourRules) {
     const rule = rules.find((item) => item.id === row.ruleId);
     if (!rule) continue;
-    if (!rule.enabled) expect(policy.enabled, `${policy.name} off`).toBe(false);
+    if (!rule.enabled || rulePaused(rule)) expect(policy.enabled, `${policy.name} off or paused`).toBe(false);
     expect(policy.name.startsWith(`FamilyFi ${rule.name}`), policy.name).toBe(true);
     const window = rule.windows.find((item) => item.id === row.windowKey);
     const schedule = window ? toUnifiSchedule({ enabled: true, days: window.days, start: window.start, end: window.end }) : undefined;

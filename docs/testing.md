@@ -63,7 +63,7 @@ The authorization matrix runs with the integration suite. When you add a route, 
 
 ## Display vectors
 
-The native iOS app, [`nickberardi/familyfi-ios`](https://github.com/nickberardi/familyfi-ios), ports the display logic by hand: `src/lib/display.ts`, `groupActionSpecs` in `src/components/group-actions.ts`, the pause sheet in `src/lib/pause-sheet.ts`, and rule windows with the internet state and day timeline in `src/lib/rule-windows.ts`. `tests/fixtures/display-vectors.json` is the set of cases both must pass, and iOS replays the same file against its port.
+The native iOS app, [`nickberardi/familyfi-ios`](https://github.com/nickberardi/familyfi-ios), ports the display logic by hand: `src/lib/display.ts`, `groupActionSpecs` in `src/components/group-actions.ts`, the pause sheet in `src/lib/pause-sheet.ts`, rule actions and state line in `src/lib/rule-actions.ts`, and rule windows with the internet state and day timeline in `src/lib/rule-windows.ts`. `tests/fixtures/display-vectors.json` is the set of cases both must pass, and iOS replays the same file against its port.
 
 - Each vector is `{ "fn", "name", "input", "expected" }`: call `fn` with the named arguments in `input` and compare to `expected`. Instants are ISO 8601 strings, and a returned instant is compared as its ISO string. The file carries a `version`; bump it when the format changes, not when cases do.
 - Inputs are plain JSON and pin everything the output depends on: a vector that needs the time names `now` and `timeZone`, never the wall clock. So a display function takes `now` from its caller rather than defaulting to `new Date()`.

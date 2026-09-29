@@ -1,6 +1,7 @@
-import { FamilyRole, GroupKind, Prisma, RuleMode } from "@prisma/client";
+import { FamilyRole, GroupKind, Prisma } from "@prisma/client";
 import { internetState, type InternetWindow } from "@/lib/rule-windows";
-import { alwaysWindow } from "@/lib/rules";
+import { isSuspended } from "@/lib/schedule";
+import { ruleInternetWindows } from "./rules";
 
 export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
@@ -12,17 +13,11 @@ export const groupInclude = {
 
 export type GroupWithRules = Prisma.GroupGetPayload<{ include: typeof groupInclude }>;
 
-/** The windows of the group's enabled internet rules, in rule then window order. */
-export function internetWindows(group: Pick<GroupWithRules, "rules">): InternetWindow[] {
+/** The windows of the group's enabled, unpaused internet rules, in rule then window order. */
+export function internetWindows(group: Pick<GroupWithRules, "rules">, now: Date): InternetWindow[] {
   return internetRules(group)
-    .filter((rule) => rule.enabled)
-    .flatMap((rule) =>
-      rule.mode === RuleMode.always
-        ? [alwaysWindow(rule.name)]
-        : [...rule.windows]
-            .sort((a, b) => a.position - b.position)
-            .map((window) => ({ name: window.name, days: window.days, start: window.start, end: window.end, ruleName: rule.name })),
-    );
+    .filter((rule) => rule.enabled && !isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now))
+    .flatMap(ruleInternetWindows);
 }
 
 function internetRules(group: Pick<GroupWithRules, "rules">) {
@@ -42,7 +37,7 @@ export function sessionActor(session: { accountId?: string | null; username: str
 }
 
 export function groupAccess(group: GroupWithRules, now: Date, timezone: string): GroupAccess {
-  const state = internetState(internetGroup(group), internetWindows(group), now, timezone).state;
+  const state = internetState(internetGroup(group), internetWindows(group, now), now, timezone).state;
   if (state === "online" || state === "no_rule") return "available";
   return state;
 }

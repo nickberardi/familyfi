@@ -12,6 +12,15 @@ import { GET as household } from "@/app/api/v1/settings/household/route";
 import { POST as pause } from "@/app/api/v1/groups/[id]/pause/route";
 import { POST as resume } from "@/app/api/v1/groups/[id]/resume/route";
 import { POST as extend } from "@/app/api/v1/groups/[id]/extend/route";
+import { DELETE as disallow, POST as allow } from "@/app/api/v1/groups/[id]/allow/route";
+import { GET as listRules, POST as createRule } from "@/app/api/v1/rules/route";
+import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
+import { POST as allowRule } from "@/app/api/v1/rules/[id]/allow/route";
+import { POST as extendRule } from "@/app/api/v1/rules/[id]/extend/route";
+import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
+import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
+import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
+import { POST as resumeRule } from "@/app/api/v1/rules/[id]/resume/route";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
@@ -137,30 +146,53 @@ describe("independent Watch device", () => {
     expect((await authenticatePairedDevice(watch.deviceId, watch.deviceCredential))?.id).toBe(watch.deviceId);
   });
 
-  it("allows three controls for child and things groups but refuses adult groups", async () => {
+  it("lets a Watch pause, resume, extend and allow adult, child and things groups alike", async () => {
     const phone = await pairedPhone();
-    const watch = await enrolledWatch(phone.auth);
-    const auth = bearer(watch.token);
-    const child = await prisma().group.create({ data: { kind: GroupKind.family, name: "Child", familyRole: FamilyRole.child } });
-    const adult = await prisma().group.create({ data: { kind: GroupKind.family, name: "Adult", familyRole: FamilyRole.adult } });
-    const things = await prisma().group.create({ data: { kind: GroupKind.things, name: "Living Room" } });
+    const auth = bearer((await enrolledWatch(phone.auth)).token);
+    const groups = [
+      await prisma().group.create({ data: { kind: GroupKind.family, name: "Child", familyRole: FamilyRole.child } }),
+      await prisma().group.create({ data: { kind: GroupKind.family, name: "Adult", familyRole: FamilyRole.adult } }),
+      await prisma().group.create({ data: { kind: GroupKind.things, name: "Living Room" } }),
+    ];
     const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const path = (id: string, action: string) => `/api/v1/groups/${id}/${action}`;
+    const json = { "content-type": "application/json" };
     const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-    expect((await pause(request(path(child.id, "pause"), {
-      method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ until }),
-    }), ctx(child.id))).status).toBe(200);
-    expect((await extend(request(path(child.id, "extend"), {
-      method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes: 30 }),
-    }), ctx(child.id))).status).toBe(200);
-    expect((await resume(request(path(child.id, "resume"), { method: "POST", auth }), ctx(child.id))).status).toBe(200);
-    expect((await pause(request(path(adult.id, "pause"), { method: "POST", auth }), ctx(adult.id))).status).toBe(403);
-    expect((await resume(request(path(adult.id, "resume"), { method: "POST", auth }), ctx(adult.id))).status).toBe(403);
-    expect((await extend(request(path(adult.id, "extend"), {
-      method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes: 30 }),
-    }), ctx(adult.id))).status).toBe(403);
-    expect((await pause(request(path(things.id, "pause"), {
-      method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ until }),
-    }), ctx(things.id))).status).toBe(200);
+    for (const group of groups) {
+      const path = (action: string) => `/api/v1/groups/${group.id}/${action}`;
+      expect((await pause(request(path("pause"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), ctx(group.id))).status).toBe(200);
+      expect((await extend(request(path("extend"), { method: "POST", auth, headers: json, body: JSON.stringify({ minutes: 30 }) }), ctx(group.id))).status).toBe(200);
+      expect((await resume(request(path("resume"), { method: "POST", auth }), ctx(group.id))).status).toBe(200);
+      expect((await allow(request(path("allow"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), ctx(group.id))).status).toBe(200);
+      expect((await disallow(request(path("allow"), { method: "DELETE", auth }), ctx(group.id))).status).toBe(200);
+    }
+  });
+
+  it("lets a Watch list rules and control them, but not create, edit or delete them", async () => {
+    const phone = await pairedPhone();
+    const auth = bearer((await enrolledWatch(phone.auth)).token);
+    const group = await prisma().group.create({ data: { kind: GroupKind.family, name: "Child", familyRole: FamilyRole.child } });
+    const created = await prisma().rule.create({
+      data: { name: "TV Video", kind: "category", targetIds: [4], groups: { create: { groupId: group.id } } },
+    });
+    const ctx = { params: Promise.resolve({ id: created.id }) };
+    const json = { "content-type": "application/json" };
+    const path = (action: string) => `/api/v1/rules/${created.id}/${action}`;
+    const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    expect((await listRules(request("/api/v1/rules", { auth }))).status).toBe(200);
+    expect((await pauseRule(request(path("pause"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), ctx)).status).toBe(200);
+    expect((await extendRule(request(path("extend"), { method: "POST", auth, headers: json, body: JSON.stringify({ minutes: 30 }) }), ctx)).status).toBe(200);
+    expect((await resumeRule(request(path("resume"), { method: "POST", auth }), ctx)).status).toBe(200);
+    expect((await allowRule(request(path("allow"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), ctx)).status).toBe(200);
+    expect((await turnOffRule(request(path("off"), { method: "POST", auth }), ctx)).status).toBe(200);
+    expect((await turnOnRule(request(path("on"), { method: "POST", auth }), ctx)).status).toBe(200);
+
+    const scope = async (response: Response) => {
+      expect(response.status).toBe(401);
+      expect(((await response.json()) as { error: { code: string } }).error.code).toBe("watch_scope");
+    };
+    await scope(await createRule(request("/api/v1/rules", { method: "POST", auth, headers: json, body: "{}" })));
+    await scope(await patchRule(request(`/api/v1/rules/${created.id}`, { method: "PATCH", auth, headers: json, body: "{}" }), ctx));
+    await scope(await deleteRule(request(`/api/v1/rules/${created.id}`, { method: "DELETE", auth }), ctx));
   });
 });

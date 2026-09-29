@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { watchGroupControlAllowed } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
 import { groupInclude, publicGroup, sessionActor } from "@/server/groups";
 import { prisma } from "@/server/db";
@@ -25,7 +24,6 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid pause request.");
     const existing = await prisma().group.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
-    if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     // A pause blocks all internet now; it replaces any allowance.
     const until = parsed.data.until === undefined ? null : parsed.data.until === null ? null : new Date(parsed.data.until);
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });

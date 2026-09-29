@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { watchGroupControlAllowed } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
 import { groupInclude, publicGroup } from "@/server/groups";
 import { extendSuspensionUntil } from "@/lib/schedule";
@@ -14,7 +13,7 @@ const Body = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, ctx: Ctx) {
-  return withMutation(request, async (session) => {
+  return withMutation(request, async () => {
     const { id } = await ctx.params;
     const body = await readJson(request);
     if (!body.ok) return body.response;
@@ -22,7 +21,6 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!parsed.success) return jsonError(400, "invalid_request", "minutes must be a positive integer.");
     const existing = await prisma().group.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
-    if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     if (!existing.suspensionActive) return jsonError(409, "not_paused", "Extend requires an active pause.");
     if (!existing.suspensionUntil) {
       return jsonError(409, "indefinite", "An indefinite pause has no expiry to extend.");

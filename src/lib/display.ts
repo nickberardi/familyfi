@@ -186,10 +186,6 @@ export function cardStateLabel(group: Group, windows: InternetWindow[], timezone
   }
 }
 
-export function canPauseGroup(group: Group): boolean {
-  return !(group.kind === "family" && group.familyRole === "adult");
-}
-
 export function bedtimeEndDays(days: number[], start: string, end: string): number[] {
   const from = minutesFromHhmm(start);
   const to = minutesFromHhmm(end);

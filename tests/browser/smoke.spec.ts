@@ -373,6 +373,38 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   }
 });
 
+test("Rules: pause a rule from its card and resume it", async ({ page }) => {
+  await signIn(page);
+  const groupsRes = await page.request.get("/api/v1/groups");
+  const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string }[] };
+  const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
+  const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
+  expect(child, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+  const ruleName = `QA pause ${test.info().project.name} ${Date.now() % 100000}`;
+  const created = await page.request.post("/api/v1/rules", {
+    headers: await csrfHeaders(page),
+    data: { name: ruleName, kind: "category", groupIds: [child!.id], targetIds: [4], mode: "always" },
+  });
+  expect(created.ok()).toBeTruthy();
+  const { rule } = (await created.json()) as { rule: { id: string } };
+
+  try {
+    await page.goto(`/rules?group=${child!.id}`);
+    const card = page.locator("article").filter({ has: page.getByRole("heading", { name: ruleName }) });
+    await card.getByRole("button", { name: "Pause rule" }).click();
+    await page.getByRole("button", { name: /For 30 minutes/ }).click();
+    await expect(card.getByText(/^Paused until .* by /)).toBeVisible();
+    // The toggle still reads On: pausing is not turning the rule off.
+    await expect(card.getByRole("switch", { name: ruleName })).toBeChecked();
+
+    await card.getByRole("button", { name: "Resume rule" }).click();
+    await expect(card.getByText(/^Paused until/)).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Pause rule" })).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+  }
+});
+
 test("Pause all internet names its scope and can be undone", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");

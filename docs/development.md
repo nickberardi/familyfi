@@ -69,7 +69,7 @@ needed for future work belongs here when implemented, not only in a canvas or se
 | Web colour, typography and spacing tokens | [globals.css](../src/app/globals.css); font loading in [layout.tsx](../src/app/layout.tsx) |
 | Reusable controls and marks | [src/components/ui](../src/components/ui); compose these before introducing a new primitive |
 | Brand artwork and its composition | [public/brand](../public/brand) and [Logo.tsx](../src/components/ui/Logo.tsx) |
-| Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/components/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts) and [shared vectors](testing.md#display-vectors) |
+| Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/components/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts), [rule-actions.ts](../src/lib/rule-actions.ts) and [shared vectors](testing.md#display-vectors) |
 | Rule and resolver verdicts | [rules.ts](../src/lib/rules.ts), [upstream.ts](../src/lib/upstream.ts) and [architecture](architecture.md#upstream-dns-categories) |
 | Native typography, navigation and adaptive layout | [Native design guide](https://github.com/nickberardi/familyfi-ios/blob/main/docs/design-system.md); read its current sources for platform details |
 

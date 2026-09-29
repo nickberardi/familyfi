@@ -612,6 +612,12 @@
         "schedules"
       ]
     },
+    "tests/browser/smoke.spec.ts > Rules: pause a rule from its card and resume it": {
+      "categories": [
+        "rules",
+        "schedules"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Pause all internet names its scope and can be undone": {
       "categories": [
         "groups",
