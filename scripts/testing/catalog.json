@@ -557,7 +557,7 @@
         "sessions"
       ]
     },
-    "tests/browser/smoke.spec.ts > settings shows available, current, and unavailable update checks": {
+    "tests/browser/smoke.spec.ts > the sidebar alerts an available update and stays quiet otherwise": {
       "categories": [
         "settings"
       ]
@@ -575,6 +575,11 @@
     "tests/browser/smoke.spec.ts > desktop Sync summary keeps four cards on one row": {
       "categories": [
         "sync"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > a device opened from its group returns to that group": {
+      "categories": [
+        "devices"
       ]
     },
     "tests/browser/smoke.spec.ts > device assignment updates immediately": {

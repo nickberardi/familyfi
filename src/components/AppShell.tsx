@@ -11,6 +11,7 @@ import type { IconName } from "@/lib/icons";
 import { noMembersAttention } from "@/lib/sync-copy";
 import { appVersionLabel } from "@/lib/version";
 import { useAppData } from "./AppDataProvider";
+import { UpdateAlert, useUpdateCheck } from "./UpdateAlert";
 
 const NAV: { title: string; items: { href: string; label: string; icon: IconName }[] }[] = [
   {
@@ -154,6 +155,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { session, devices, sync, unifi, mutate, loading, error, notice, busy, dismissFeedback } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
+  const update = useUpdateCheck();
   // Closing on a route change is the drawer's own signal, same as the design's
   // `pickAndClose` on each item — but this also catches the back button, a redirect,
   // or anywhere else navigation happens outside a drawer tap. Adjusted during render
@@ -213,6 +215,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           </nav>
           <div className="ff-sidebar-end flex flex-col gap-2.5">
+            <UpdateAlert update={update} />
             <div className="rounded-[9px] border border-[var(--ff-line)] bg-[var(--ff-card)] p-2.5">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full" style={{ background: syncDot }} />
@@ -319,6 +322,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   onNavigate={() => setNavOpen(false)}
                 />
               </nav>
+              <UpdateAlert update={update} />
             </div>
           </>
         ) : null}

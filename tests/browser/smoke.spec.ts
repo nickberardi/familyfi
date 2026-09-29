@@ -64,11 +64,10 @@ test("sign-in and household pages", async ({ page }) => {
 
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(page.getByText("About")).toBeVisible();
-  await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(page.getByText("About", { exact: true })).toHaveCount(0);
 });
 
-test("settings shows available, current, and unavailable update checks", async ({ page }) => {
+test("the sidebar alerts an available update and stays quiet otherwise", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   let update: UpdateCheck = {
     status: "ok",
@@ -92,12 +91,18 @@ test("settings shows available, current, and unavailable update checks", async (
       }),
     });
   });
-  await page.goto("/settings");
-  await expect(page.getByText("Update available: v0.6.0")).toBeVisible();
-  await expect(page.getByRole("link", { name: "View release" })).toHaveAttribute(
+  await page.goto("/family");
+  const alert = page.getByRole("region", { name: "Update available" });
+  await expect(alert).toContainText("v0.6.0 is ready. You’re on v0.5.1.");
+  await expect(alert.getByRole("link", { name: "View release" })).toHaveAttribute(
     "href",
     "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
   );
+
+  // Settings no longer carries the update check; the alert is the one place it appears.
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(alert).toBeVisible();
 
   update = {
     ...update,
@@ -106,7 +111,8 @@ test("settings shows available, current, and unavailable update checks", async (
     releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v0.5.1",
   };
   await page.reload();
-  await expect(page.getByText("Up to date")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(alert).toHaveCount(0);
 
   update = {
     ...update,
@@ -117,7 +123,8 @@ test("settings shows available, current, and unavailable update checks", async (
     error: "GitHub release check failed.",
   };
   await page.reload();
-  await expect(page.getByText("Update check unavailable")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(alert).toHaveCount(0);
 });
 
 test("create person lands on a seeded detail page that can be edited", async ({ page }) => {
@@ -188,6 +195,27 @@ test("desktop Sync summary keeps four cards on one row", { tag: "@desktop" }, as
     items.map((item) => Math.round(item.getBoundingClientRect().top)),
   );
   expect(new Set(tops).size).toBe(1);
+});
+
+test("a device opened from its group returns to that group", async ({ page }) => {
+  await signIn(page);
+  const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as {
+    groups: { id: string; kind: string; name: string }[];
+  };
+  const { devices } = (await (await page.request.get("/api/v1/devices")).json()) as {
+    devices: { mac: string; groupId: string | null }[];
+  };
+  const device = devices.find((item) => groups.some((group) => group.id === item.groupId));
+  expect(device, "the mock household has an assigned device").toBeTruthy();
+  const group = groups.find((item) => item.id === device!.groupId)!;
+  const groupPath = `/${group.kind}/${group.id}`;
+
+  await page.goto(groupPath);
+  await page.locator(`a[href^="/devices/${encodeURIComponent(device!.mac)}?from="]`).click();
+  await expect(page.getByRole("link", { name: `‹ ${group.name}` })).toHaveAttribute("href", groupPath);
+
+  await page.goto(`/devices/${encodeURIComponent(device!.mac)}`);
+  await expect(page.getByRole("link", { name: "‹ All devices" })).toHaveAttribute("href", "/devices");
 });
 
 test("device assignment updates immediately", async ({ page }) => {
