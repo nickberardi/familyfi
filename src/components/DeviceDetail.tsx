@@ -37,8 +37,19 @@ function tone(presence: Device["presence"]): { ink: string; fill: string } {
   return { ink: "var(--ff-muted)", fill: "var(--ff-field)" };
 }
 
-export function DeviceDetailPage({ params }: { params: Promise<{ mac: string }> }) {
+function groupHref(group: Group) {
+  return group.kind === "family" ? `/family/${group.id}` : `/things/${group.id}`;
+}
+
+export function DeviceDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ mac: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
   const { mac } = use(params);
+  const { from } = use(searchParams);
   let requestedMac = mac;
   try {
     requestedMac = decodeURIComponent(mac);
@@ -59,12 +70,16 @@ export function DeviceDetailPage({ params }: { params: Promise<{ mac: string }> 
   const device = devices.find((item) => item.mac.toLowerCase() === requestedMac.toLowerCase());
   const group = device?.groupId ? groups.find((item) => item.id === device.groupId) : null;
   const timezone = household?.timezone ?? "UTC";
+  // A group's device list links here with `?from=<group id>` so the way back returns to that group.
+  const fromGroup = typeof from === "string" ? groups.find((item) => item.id === from) : undefined;
 
   return (
     <>
       <PageHeader title="Devices" sub="Assignment persists while a device is offline." />
       <div className="mx-auto flex max-w-[920px] flex-col gap-4 p-4 md:p-6">
-        <Link href="/devices" className="self-start text-[14px] text-[var(--ff-accent)]">‹ All devices</Link>
+        <Link href={fromGroup ? groupHref(fromGroup) : "/devices"} className="self-start text-[14px] text-[var(--ff-accent)]">
+          ‹ {fromGroup ? fromGroup.name : "All devices"}
+        </Link>
         {!device ? (
           <div className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px] text-[14px]">
             {loading ? "Loading device…" : error ? "Device details are unavailable right now." : "Device not found."}
@@ -93,7 +108,6 @@ function DeviceDetails({
   const presence = effectivePresence(device, now);
   const colors = tone(presence);
   const name = device.hostname ?? "Unnamed device";
-  const groupHref = group ? (group.kind === "family" ? `/family/${group.id}` : `/things/${group.id}`) : null;
   const network = networks.find((item) => item.id === device.networkId)?.name
     ?? networkLabel(device, networks);
   const connection = connectionLabel(device.connectionType);
@@ -127,7 +141,7 @@ function DeviceDetails({
       </section>
       <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
         <DetailSection title="Device">
-          <DetailRow label="Group">{groupHref ? <Link href={groupHref} className="text-[var(--ff-accent)]">{group?.name}</Link> : "Unassigned"}</DetailRow>
+          <DetailRow label="Group">{group ? <Link href={groupHref(group)} className="text-[var(--ff-accent)]">{group.name}</Link> : "Unassigned"}</DetailRow>
           <DetailRow label="Name">{name}</DetailRow>
           <DetailRow label="Device type">{deviceKindLabel(device.hostname)}</DetailRow>
           <DetailRow label="Manufacturer">{device.manufacturer ?? "Unknown"}</DetailRow>
