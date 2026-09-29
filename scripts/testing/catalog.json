@@ -314,6 +314,11 @@
         "sync"
       ]
     },
+    "tests/unit/release-notes.test.ts": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/unit/update-check.test.ts": {
       "categories": [
         "settings"
