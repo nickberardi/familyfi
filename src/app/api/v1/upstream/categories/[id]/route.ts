@@ -32,7 +32,7 @@ export async function GET(request: Request, ctx: Ctx) {
 
 const PatchBody = z.object({
   label: z.string().min(1).max(60).optional(),
-  monogram: z.string().min(1).max(3).optional(),
+  monogram: z.string().min(1).max(4).optional(),
   enabled: z.boolean().optional(),
   /**
    * The whole *active* list, replaced wholesale — the same shape as a rule's

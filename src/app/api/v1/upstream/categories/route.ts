@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
 const CreateBody = z.object({
   label: z.string().min(1).max(60),
-  monogram: z.string().min(1).max(3).optional(),
+  monogram: z.string().min(1).max(4).optional(),
   domains: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
 });

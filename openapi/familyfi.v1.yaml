@@ -2889,7 +2889,7 @@ components:
         id: { type: string }
         slug: { type: string }
         label: { type: string }
-        monogram: { type: string, maxLength: 3 }
+        monogram: { type: string, maxLength: 4 }
         source: { type: string, enum: [seed, user] }
         enabled:
           type: boolean
@@ -2912,7 +2912,7 @@ components:
       required: [label]
       properties:
         label: { type: string, minLength: 1, maxLength: 60 }
-        monogram: { type: string, minLength: 1, maxLength: 3 }
+        monogram: { type: string, minLength: 1, maxLength: 4 }
         domains:
           type: array
           items: { type: string }
@@ -2922,7 +2922,7 @@ components:
       additionalProperties: false
       properties:
         label: { type: string, minLength: 1, maxLength: 60 }
-        monogram: { type: string, minLength: 1, maxLength: 3 }
+        monogram: { type: string, minLength: 1, maxLength: 4 }
         enabled: { type: boolean }
         domains:
           type: array

@@ -93,6 +93,23 @@ describe("upstream categories API", () => {
     expect(video.domains.every((domain) => domain.source === "seed")).toBe(true);
   });
 
+  it("accepts a monogram of up to four characters and refuses five", async () => {
+    const auth = await signedIn();
+    const create = (monogram: string) =>
+      createCategory(
+        request("/api/v1/upstream/categories", {
+          method: "POST",
+          auth,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ label: `Mono ${monogram}`, monogram }),
+        }),
+      );
+    const four = await create("abcd");
+    expect(four.status).toBe(201);
+    expect(((await four.json()) as { category: PublicCategory }).category.monogram).toBe("ABCD");
+    expect((await create("abcde")).status).toBe(400);
+  });
+
   it("creates a custom category, deriving the slug and monogram", async () => {
     const auth = await signedIn();
     const response = await createCategory(

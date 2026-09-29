@@ -93,13 +93,13 @@ export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; on
               />
             </Field>
           ) : (
-            <Field label="Monogram — up to 3 characters, e.g. TV, PC">
+            <Field label="Monogram — up to 4 characters, e.g. TV, PC">
               <TextField
                 label="Monogram"
                 value={monogram}
                 onChange={(value) => setMonogram(value.toUpperCase())}
                 placeholder={trimmed.slice(0, 2).toUpperCase() || "e.g. TV"}
-                maxLength={3}
+                maxLength={4}
                 onSubmit={create}
               />
             </Field>
