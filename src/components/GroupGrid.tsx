@@ -7,6 +7,7 @@ import { useAppData } from "./AppDataProvider";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
 import { GroupCard } from "./GroupCard";
 import { PageHeader } from "./PageHeader";
+import { NewGroupSheet } from "./NewGroupSheet";
 import { PauseSheet } from "./PauseSheet";
 
 type DpiItem = { id: number; name: string };
@@ -41,6 +42,7 @@ export function useFilterCatalog() {
 export function GroupGrid({ kind }: { kind: "family" | "things" }) {
   const { groups, rules, household, reload } = useAppData();
   const [sheet, setSheet] = useState<{ group: Group; mode: "pause" | "extend" } | null>(null);
+  const [adding, setAdding] = useState(false);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
   const rows = groups.filter((group) => group.kind === kind);
   const timezone = household?.timezone ?? "America/New_York";
@@ -64,8 +66,8 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
       <PageHeader
         title={title}
         sub={sub}
-        actionHref={kind === "family" ? "/family/new" : "/things/new"}
         actionLabel="Add"
+        onAction={() => setAdding(true)}
       />
       <div className="grid grid-cols-1 items-start gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">
         {rows.length === 0 ? (
@@ -89,6 +91,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
           ))
         )}
       </div>
+      {adding ? <NewGroupSheet kind={kind} onClose={() => setAdding(false)} /> : null}
       {sheet ? (
         <PauseSheet
           group={sheet.group}

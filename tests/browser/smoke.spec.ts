@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { UpdateCheck } from "@/lib/types";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
@@ -120,20 +120,32 @@ test("settings shows available, current, and unavailable update checks", async (
   await expect(page.getByText("Update check unavailable")).toBeVisible();
 });
 
-test("create person lands on a seeded detail page that can be edited", async ({ page }) => {
+/** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
+async function addGroup(page: Page, kind: "family" | "things", fill: (dialog: Locator) => Promise<void>, name: string) {
+  await page.goto(`/${kind}`);
+  await expect(page.getByText("Loading household…")).toHaveCount(0);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: kind === "family" ? "New family member" : "New group" });
+  await expect(dialog).toBeVisible();
+  await fill(dialog);
+  const created = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/groups") && response.request().method() === "POST",
+  );
+  await dialog.getByRole("button", { name: kind === "family" ? "Add person" : "Create group" }).click();
+  const response = await created;
+  expect(response.ok()).toBeTruthy();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`/${kind}$`));
+  await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
+  return ((await response.json()) as { group: { id: string } }).group.id;
+}
+
+test("add person opens a sheet over Family, and the new person can be edited", async ({ page }) => {
   await signIn(page);
 
   const name = `QA ${test.info().project.name} ${Date.now()}`;
-  await page.goto("/family/new");
-  await expect(page.getByRole("heading", { name: "Add person" })).toBeVisible();
-  await expect(page.getByText("Loading household…")).toHaveCount(0);
-  await page.getByLabel("Name").fill(name);
-  const created = page.waitForResponse(
-    (response) => response.url().includes("/api/v1/groups") && response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "Create" }).click();
-  expect((await created).ok()).toBeTruthy();
-  await expect(page).toHaveURL(/\/family\/(?!new$)[^/]+$/);
+  const id = await addGroup(page, "family", (dialog) => dialog.getByLabel("Name").fill(name), name);
+  await page.goto(`/family/${id}`);
   await expect(page.getByText("Group not found.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   // A new person has no internet rule, and the page says so rather than implying one.
@@ -167,21 +179,22 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
   await expect(page.getByText("Group not found.")).toBeVisible();
 });
 
-test("create things group lands on a seeded detail page that can be edited", async ({ page }) => {
+test("add things group opens a sheet over Things, and the new group can be edited", async ({ page }) => {
   await signIn(page);
 
   const name = `Things ${test.info().project.name} ${Date.now()}`;
-  await page.goto("/things/new");
-  await expect(page.getByRole("heading", { name: "Add Things group" })).toBeVisible();
-  await expect(page.getByText("Loading household…")).toHaveCount(0);
-  await page.getByLabel("Name").fill(name);
-  await page.getByLabel("Monogram").fill("QA");
-  const created = page.waitForResponse(
-    (response) => response.url().includes("/api/v1/groups") && response.request().method() === "POST",
+  const id = await addGroup(
+    page,
+    "things",
+    async (dialog) => {
+      await dialog.getByLabel("Name").fill(name);
+      await dialog.getByLabel("Monogram").fill("qa");
+      await expect(dialog.getByLabel("Monogram")).toHaveValue("QA");
+    },
+    name,
   );
-  await page.getByRole("button", { name: "Create" }).click();
-  expect((await created).ok()).toBeTruthy();
-  await expect(page).toHaveURL(/\/things\/(?!new$)[^/]+$/);
+  await page.goto(`/things/${id}`);
+  await expect(page.getByText("Loading household…")).toHaveCount(0);
   await expect(page.getByText("Group not found.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 

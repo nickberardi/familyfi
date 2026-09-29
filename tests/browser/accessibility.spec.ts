@@ -14,9 +14,11 @@ async function signIn(page: Page) {
   expect(login.ok()).toBe(true);
 }
 
-async function expectAccessible(page: Page, route: string) {
-  await page.goto(route);
-  await page.waitForLoadState("networkidle");
+async function expectAccessible(page: Page, route: string, { navigate = true } = {}) {
+  if (navigate) {
+    await page.goto(route);
+    await page.waitForLoadState("networkidle");
+  }
   // Swagger UI on /reference is third-party markup; FamilyFi's own chrome around it is still checked.
   const result = await new AxeBuilder({ page }).withTags(WCAG).exclude(".swagger-ui").analyze();
   const problems: string[] = [];
@@ -37,12 +39,23 @@ test.describe("accessibility", () => {
     await expectAccessible(page, "/login");
   });
 
-  for (const route of ["/family", "/family/new", "/things", "/things/new", "/devices", "/rules", "/rules/new", "/categories", "/pair", "/sync", "/settings", "/reference"]) {
+  for (const route of ["/family", "/things", "/devices", "/rules", "/rules/new", "/categories", "/pair", "/sync", "/settings", "/reference"]) {
     test(route, async ({ page }) => {
       await signIn(page);
       await expectAccessible(page, route);
     });
   }
+
+  test("add sheets", async ({ page }) => {
+    await signIn(page);
+    for (const [route, title] of [["/family", "New family member"], ["/things", "New group"]] as const) {
+      await page.goto(route);
+      await page.waitForLoadState("networkidle");
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      await expect(page.getByRole("dialog", { name: title })).toBeVisible();
+      await expectAccessible(page, `${route} add sheet`, { navigate: false });
+    }
+  });
 
   test("detail pages", async ({ page }) => {
     await signIn(page);

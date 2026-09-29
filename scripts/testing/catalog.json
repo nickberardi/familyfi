@@ -571,12 +571,12 @@
         "settings"
       ]
     },
-    "tests/browser/smoke.spec.ts > create person lands on a seeded detail page that can be edited": {
+    "tests/browser/smoke.spec.ts > add person opens a sheet over Family, and the new person can be edited": {
       "categories": [
         "groups"
       ]
     },
-    "tests/browser/smoke.spec.ts > create things group lands on a seeded detail page that can be edited": {
+    "tests/browser/smoke.spec.ts > add things group opens a sheet over Things, and the new group can be edited": {
       "categories": [
         "groups"
       ]
