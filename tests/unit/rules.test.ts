@@ -18,6 +18,7 @@ function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">):
     networkIds: [],
     domains: [],
     enabled: true,
+    pause: { active: false, until: null, by: null },
     mode: "always",
     windows: [],
     useGeneratedName: false,

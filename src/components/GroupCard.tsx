@@ -63,7 +63,7 @@ export function GroupCard({
   const things = group.kind === "things";
   const monogram = (group.monogram ?? group.name.slice(0, 2)).slice(0, 4);
   const now = new Date();
-  const windows = internetWindowsForGroup(rules, group.id);
+  const windows = internetWindowsForGroup(rules, group.id, now);
   const state = cardStateLabel(group, windows, timezone, now);
   const stateColor = accessColor(group.access);
   const note = cardNoteLine(group, windows);
@@ -293,7 +293,7 @@ function CategoryZone({
   }
   const now = new Date();
   const weekday = localWeekday(now, timezone);
-  const internet = internetWindowsForGroup(rules, group.id);
+  const internet = internetWindowsForGroup(rules, group.id, now);
   const faded = internetDayBands({ suspension: { active: false, until: null }, allowance: { active: false, until: null } }, internet, now, timezone);
   const bands: TimelineBand[] = [
     ...faded.map((band) => ({ ...band, kind: "faded" as const })),

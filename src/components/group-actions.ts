@@ -1,5 +1,4 @@
 import { api } from "@/lib/api";
-import { canPauseGroup } from "@/lib/display";
 import type { Group } from "@/lib/types";
 import type { CardAction } from "./GroupCard";
 import type { useAppData } from "./AppDataProvider";
@@ -27,8 +26,6 @@ export function groupActionSpecs(group: Group, surface: "phone" | "web"): GroupA
     label: group.kind === "family" && group.familyRole === "adult" ? "View devices" : "Detail",
     href,
   };
-
-  if (!canPauseGroup(group)) return surface === "phone" ? [] : [detail];
 
   if (group.suspension.active) {
     return [{ label: "Resume internet", strong: true, run: "resume" }, { label: "More time", run: "extend" }, rules];

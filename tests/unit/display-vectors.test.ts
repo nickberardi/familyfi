@@ -13,7 +13,9 @@ import { describe, expect, it } from "vitest";
 import * as groupActionsModule from "@/components/group-actions";
 import * as display from "@/lib/display";
 import * as pauseSheet from "@/lib/pause-sheet";
+import * as ruleActions from "@/lib/rule-actions";
 import * as ruleWindows from "@/lib/rule-windows";
+import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 type Vector = { fn: string; name: string; input: Record<string, unknown>; expected: unknown };
@@ -43,7 +45,6 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
   windowTimes: (i) => display.windowTimes(i.start, i.end),
   cardNoteLine: (i) => display.cardNoteLine(i.group, i.windows),
   cardStateLabel: (i) => display.cardStateLabel(i.group, i.windows, i.timeZone, at(i.now)),
-  canPauseGroup: (i) => display.canPauseGroup(i.group),
   bedtimeEndDays: (i) => display.bedtimeEndDays(i.days, i.start, i.end),
   nextClockOnDays: (i) => iso(display.nextClockOnDays(i.timeZone, i.days, i.hhmm, at(i.now))),
   relativeDayLabel: (i) => display.relativeDayLabel(at(i.instant), i.timeZone, at(i.now)),
@@ -51,6 +52,11 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
   pauseSheetTitle: (i) => pauseSheet.pauseSheetTitle(i.group, i.mode),
   pauseSheetBody: (i) => pauseSheet.pauseSheetBody(i.group, i.mode, i.deviceNames),
   pauseSheetOptions: (i) => pauseSheet.pauseSheetOptions(i.group, i.windows, i.mode, i.timeZone, at(i.now)),
+  rulePauseSheetTitle: (i) => pauseSheet.rulePauseSheetTitle(i.rule, i.mode),
+  rulePauseSheetBody: (i) => pauseSheet.rulePauseSheetBody(i.rule, i.mode),
+  rulePauseSheetOptions: (i) => pauseSheet.rulePauseSheetOptions(i.rule, i.windows, i.mode, i.timeZone, at(i.now)),
+  ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),
+  ruleStateLine: (i) => ruleActions.ruleStateLine(i.rule, i.timeZone, at(i.now)),
   windowTitle: (i) => ruleWindows.windowTitle(i.window),
   isWindowActive: (i) => ruleWindows.isWindowActive(i.window, at(i.now), i.timeZone),
   windowEndsAt: (i) => iso(ruleWindows.windowEndsAt(i.window, at(i.now), i.timeZone)),
@@ -71,7 +77,7 @@ const EXCLUDED: Record<string, string> = {
   groupActions: "binds React callbacks",
 };
 
-const MODULES = { display, groupActions: groupActionsModule, pauseSheet, ruleWindows };
+const MODULES = { display, groupActions: groupActionsModule, pauseSheet, ruleActions, ruleWindows };
 
 describe("display vectors", () => {
   it("is version 1 with unique names per function", () => {

@@ -25,6 +25,8 @@ export type PlanRule = {
   targetIds: number[];
   domains: string[];
   enabled: boolean;
+  /** A pause is active: the rule's policies stay, disabled, until it ends. */
+  paused: boolean;
   mode: RuleMode;
   windows: PlanRuleWindow[];
 };
@@ -79,7 +81,8 @@ export function plannedRuleKey(ruleId: string, windowKey: string, zoneId: string
  * in each source zone its devices or networks are in. A rule covering several groups
  * puts all their devices in the same policy. A group with an allowance is left out of
  * its internet rules; when that leaves no one, the policy stays with its devices but
- * disabled, so ending the allowance does not create it again.
+ * disabled, so ending the allowance does not create it again. A paused rule keeps every
+ * policy the same way, disabled.
  */
 export function planRulePolicies(input: {
   destinationZoneId: string;
@@ -167,7 +170,7 @@ export function planRulePolicies(input: {
           macAddresses: isNetwork ? [] : found.live.length ? found.live : found.macs,
           networkIds: isNetwork ? [...found.networkIds].sort() : [],
           sourceType: isNetwork ? "NETWORK" : "MAC_ADDRESS",
-          enabled: rule.enabled && (isNetwork || found.live.length > 0),
+          enabled: rule.enabled && !rule.paused && (isNetwork || found.live.length > 0),
           schedule: window.schedule,
           name: names[index]!,
         });

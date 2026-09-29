@@ -1447,238 +1447,6 @@
       "expected": "No internet · Bedtime until 6:45 AM"
     },
     {
-      "fn": "canPauseGroup",
-      "name": "child with a bedtime",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        }
-      },
-      "expected": true
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "adult",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "adult",
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        }
-      },
-      "expected": false
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "no internet rule, child",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": []
-        }
-      },
-      "expected": true
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "no usable window",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": []
-        }
-      },
-      "expected": true
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "no internet rule without a schedule",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": []
-        }
-      },
-      "expected": true
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "things with a schedule",
-      "input": {
-        "group": {
-          "id": "t1",
-          "kind": "things",
-          "name": "Living room",
-          "monogram": null,
-          "familyRole": null,
-          "deviceCount": 2,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        }
-      },
-      "expected": true
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "things with no internet rule",
-      "input": {
-        "group": {
-          "id": "t1",
-          "kind": "things",
-          "name": "Living room",
-          "monogram": null,
-          "familyRole": null,
-          "deviceCount": 2,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": []
-        }
-      },
-      "expected": true
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "adult role on a things group does not count",
-      "input": {
-        "group": {
-          "id": "t1",
-          "kind": "things",
-          "name": "Living room",
-          "monogram": null,
-          "familyRole": "adult",
-          "deviceCount": 2,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        }
-      },
-      "expected": true
-    },
-    {
       "fn": "bedtimeEndDays",
       "name": "overnight ends the next morning",
       "input": {
@@ -2356,6 +2124,15 @@
       },
       "expected": [
         {
+          "label": "Pause all internet",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        },
+        {
           "label": "View devices",
           "href": "/family/g1"
         }
@@ -2726,7 +2503,17 @@
         },
         "surface": "phone"
       },
-      "expected": []
+      "expected": [
+        {
+          "label": "Pause all internet",
+          "strong": true,
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        }
+      ]
     },
     {
       "fn": "pauseSheetTitle",
@@ -3942,34 +3729,6 @@
         ]
       },
       "expected": "4 devices · internet off always"
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "no internet rule",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [],
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
-      },
-      "expected": true
     },
     {
       "fn": "groupActionSpecs",
@@ -5695,6 +5454,1161 @@
         "timeZone": "Pacific/Kiritimati"
       },
       "expected": 2
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "always-on rule can be allowed or paused",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Allow now",
+          "strong": true,
+          "run": "allow"
+        },
+        {
+          "label": "Pause rule",
+          "run": "pause"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "scheduled rule outside its window",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "scheduled",
+          "windows": [
+            {
+              "id": "w1",
+              "name": "Bedtime",
+              "days": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "start": "21:00",
+              "end": "07:00"
+            }
+          ],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Pause rule",
+          "run": "pause"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "scheduled rule inside its window can be allowed",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "scheduled",
+          "windows": [
+            {
+              "id": "w1",
+              "name": "Bedtime",
+              "days": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "start": "21:00",
+              "end": "07:00"
+            }
+          ],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T02:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Allow now",
+          "strong": true,
+          "run": "allow"
+        },
+        {
+          "label": "Pause rule",
+          "run": "pause"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "paused with an end time",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T17:00:00Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Resume rule",
+          "strong": true,
+          "run": "resume"
+        },
+        {
+          "label": "More time",
+          "run": "extend"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "paused until resumed",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Resume rule",
+          "strong": true,
+          "run": "resume"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "an expired pause is not paused",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T15:00:00Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Allow now",
+          "strong": true,
+          "run": "allow"
+        },
+        {
+          "label": "Pause rule",
+          "run": "pause"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "a rule that is off has no actions",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": false,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": []
+    },
+    {
+      "fn": "ruleStateLine",
+      "name": "not paused",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "ruleStateLine",
+      "name": "paused with an end time by Nick",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T17:30:00Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": "Paused until 1:30 PM by Nick"
+    },
+    {
+      "fn": "ruleStateLine",
+      "name": "paused until resumed",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": "Paused until resumed by Nick"
+    },
+    {
+      "fn": "ruleStateLine",
+      "name": "paused with no recorded actor",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T17:30:00Z",
+            "by": null
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": "Paused until 1:30 PM"
+    },
+    {
+      "fn": "ruleStateLine",
+      "name": "pause already ended",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T15:00:00Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "rulePauseSheetTitle",
+      "name": "pause",
+      "input": {
+        "rule": {
+          "name": "TV Video"
+        },
+        "mode": "pause"
+      },
+      "expected": "Pause TV Video?"
+    },
+    {
+      "fn": "rulePauseSheetTitle",
+      "name": "extend",
+      "input": {
+        "rule": {
+          "name": "TV Video"
+        },
+        "mode": "extend"
+      },
+      "expected": "Keep TV Video paused longer?"
+    },
+    {
+      "fn": "rulePauseSheetBody",
+      "name": "pause, two groups",
+      "input": {
+        "rule": {
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ]
+        },
+        "mode": "pause"
+      },
+      "expected": "The rule stops blocking for all 2 groups it covers. Other rules, and any pause on a group, stay as they are."
+    },
+    {
+      "fn": "rulePauseSheetBody",
+      "name": "pause, one group",
+      "input": {
+        "rule": {
+          "scope": "group",
+          "groupIds": [
+            "g1"
+          ]
+        },
+        "mode": "pause"
+      },
+      "expected": "The rule stops blocking for the group it covers. Other rules, and any pause on a group, stay as they are."
+    },
+    {
+      "fn": "rulePauseSheetBody",
+      "name": "pause, a network rule",
+      "input": {
+        "rule": {
+          "scope": "network",
+          "groupIds": []
+        },
+        "mode": "pause"
+      },
+      "expected": "The rule stops blocking for everything on its networks. Other rules, and any pause on a group, stay as they are."
+    },
+    {
+      "fn": "rulePauseSheetBody",
+      "name": "extend",
+      "input": {
+        "rule": {
+          "scope": "group",
+          "groupIds": [
+            "g1"
+          ]
+        },
+        "mode": "extend"
+      },
+      "expected": "The rule stays lifted for longer. Resume brings it back sooner."
+    },
+    {
+      "fn": "rulePauseSheetOptions",
+      "name": "always-on rule has no window option",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "TV Video"
+          }
+        ],
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "rulePauseSheetOptions",
+      "name": "outside its window",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "scheduled",
+          "windows": [
+            {
+              "id": "w1",
+              "name": "Bedtime",
+              "days": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "start": "21:00",
+              "end": "07:00"
+            }
+          ],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "windows": [
+          {
+            "id": "w1",
+            "name": "Bedtime",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:00",
+            "end": "07:00",
+            "ruleName": "TV Video"
+          }
+        ],
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "rulePauseSheetOptions",
+      "name": "inside its window, until it ends",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "scheduled",
+          "windows": [
+            {
+              "id": "w1",
+              "name": "Bedtime",
+              "days": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "start": "21:00",
+              "end": "07:00"
+            }
+          ],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "windows": [
+          {
+            "id": "w1",
+            "name": "Bedtime",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:00",
+            "end": "07:00",
+            "ruleName": "TV Video"
+          }
+        ],
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T02:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 10:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 11:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until Bedtime ends",
+          "note": "blocks again at 7:00 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T11:00:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "rulePauseSheetOptions",
+      "name": "the latest of overlapping windows",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "mode": "scheduled",
+          "windows": [
+            {
+              "id": "w1",
+              "name": "Bedtime",
+              "days": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "start": "21:00",
+              "end": "07:00"
+            },
+            {
+              "id": "w2",
+              "name": "Quiet",
+              "days": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "start": "22:00",
+              "end": "08:00"
+            }
+          ],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "windows": [
+          {
+            "id": "w1",
+            "name": "Bedtime",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:00",
+            "end": "07:00",
+            "ruleName": "TV Video"
+          },
+          {
+            "id": "w2",
+            "name": "Quiet",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "22:00",
+            "end": "08:00",
+            "ruleName": "TV Video"
+          }
+        ],
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T02:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 10:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 11:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until Quiet ends",
+          "note": "blocks again at 8:00 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T12:00:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "rulePauseSheetOptions",
+      "name": "extend a timed pause",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T17:00:00Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "TV Video"
+          }
+        ],
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 12:30 PM",
+          "request": {
+            "kind": "extend",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 1:00 PM",
+          "request": {
+            "kind": "extend",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "rulePauseSheetOptions",
+      "name": "extend an open-ended pause re-pauses",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "TV Video"
+          }
+        ],
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
     }
   ]
 }

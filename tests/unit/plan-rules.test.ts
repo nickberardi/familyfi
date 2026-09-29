@@ -28,6 +28,7 @@ const rule = (patch: Partial<PlanRule>): PlanRule => ({
   targetIds: [4],
   domains: [],
   enabled: true,
+  paused: false,
   mode: RuleMode.always,
   windows: [],
   ...patch,
@@ -55,6 +56,18 @@ const tvDowntime = rule({
 });
 
 describe("planRulePolicies", () => {
+  it("keeps a paused rule's policies and MACs, disabled", () => {
+    const { policies } = plan([{ ...tvDowntime, paused: true }]);
+    expect(policies).toHaveLength(2);
+    expect(policies.every((policy) => !policy.enabled && policy.macAddresses.join() === "02:00:00:00:00:01")).toBe(true);
+    expect(plan([tvDowntime]).policies.every((policy) => policy.enabled)).toBe(true);
+  });
+
+  it("disables a paused rule even when its group is also allowed", () => {
+    const { policies } = plan([{ ...tvDowntime, paused: true }], [group("g1", { allowed: true })]);
+    expect(policies.every((policy) => !policy.enabled)).toBe(true);
+  });
+
   it("plans one policy per window, named after the rule and window", () => {
     const { policies } = plan([tvDowntime]);
     expect(policies.map((policy) => [policy.key, policy.name, policy.schedule?.timeFilter])).toEqual([

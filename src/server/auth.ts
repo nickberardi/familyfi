@@ -179,24 +179,21 @@ export async function createSession(input: {
   return { raw, expiresAt, csrf: randomToken(24) };
 }
 
-export function watchGroupControlAllowed(
-  session: { device?: { client: PairedDeviceClient } | null },
-  group: { kind: string; familyRole: string | null },
-): boolean {
-  return session.device?.client !== PairedDeviceClient.watch || !(group.kind === "family" && group.familyRole === "adult");
-}
-
-/** Watch credentials can only read state and control eligible groups. */
+/** Watch credentials can only read state and pause, resume, extend or allow groups and rules. */
 function watchRouteAllowed(request: Request): boolean {
   const path = new URL(request.url).pathname;
   if (request.method === "GET") {
     return path === "/api/v1/auth/session"
       || path === "/api/v1/connection"
       || path === "/api/v1/groups"
+      || path === "/api/v1/rules"
       || /^\/api\/v1\/changes\/[^/]+$/.test(path);
   }
   if (request.method === "DELETE" && /^\/api\/v1\/connection\/devices\/[^/]+$/.test(path)) return true;
-  return request.method === "POST" && /^\/api\/v1\/groups\/[^/]+\/(pause|resume|extend)$/.test(path);
+  if (request.method === "DELETE") return /^\/api\/v1\/groups\/[^/]+\/allow$/.test(path);
+  return request.method === "POST"
+    && (/^\/api\/v1\/groups\/[^/]+\/(pause|resume|extend|allow)$/.test(path)
+      || /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|on|off)$/.test(path));
 }
 
 export async function readSessionFromRequest(request: Request) {

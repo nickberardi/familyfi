@@ -66,7 +66,12 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST/DELETE | `/api/v1/groups/{id}/allow` | An allowance lifts the group's internet-rule windows until `until` (default: when the active windows end, or until cancelled when an always-on internet rule is active; 409 when none is active). DELETE ends it. Category, app and website rules keep applying |
 | GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list |
 | GET/PATCH/DELETE | `/api/v1/rules/{id}` | PATCH changes anything but `kind` and `scope`; `windows` replaces the list, and a window sent with its `id` keeps its UniFi policy. DELETE removes the rule's recorded policies |
-| POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled |
+| POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled. Ends any pause on it |
+| POST | `/api/v1/rules/{id}/on` | Turns a rule on |
+| POST | `/api/v1/rules/{id}/pause` | Lifts the rule for every group it covers until `until` (empty body or `null` = until resumed) by disabling its policies. Records who paused it. 400 for an `until` in the past; 409 `rule_off` when the rule is off |
+| POST | `/api/v1/rules/{id}/resume` | Ends a pause or allowance |
+| POST | `/api/v1/rules/{id}/extend` | Adds `minutes` to a timed pause. 409 `not_paused`, `indefinite` or `rule_off` |
+| POST | `/api/v1/rules/{id}/allow` | Same state as a pause. Default `until` is when the windows active now end (until resumed for an always-on rule); 409 `not_in_window` when none is active, `rule_off` when the rule is off. Resume ends it; there is no `DELETE` |
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |
@@ -145,8 +150,9 @@ one of its bearer sessions and requires a new pairing.
 The iPhone may automatically enroll its reachable Watch without another administrator pairing.
 The Watch receives its own device credential and bearer token, appears as a separate device in
 System → Pair Device, and can be revoked there independently. Its sessions may only read session,
-connection, group, and change state or pause, resume, and extend groups. The three group controls
-reject adult Family groups for Watch sessions. Signing out or revoking the phone does
+connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
+resume, extend, allow, turn on and turn off any rule; role never limits a control. They cannot
+create, edit or delete rules. Signing out or revoking the phone does
 not revoke the Watch. Its bearer expires after 30 days; automatic renewal is a separate change.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.16.0
+  version: 0.17.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -1058,12 +1058,224 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}/pause:
+    post:
+      operationId: pauseRule
+      tags: [Rules]
+      summary: Pause a rule (lift it for a while)
+      description: |
+        Lifts the rule for every group it covers, from now until `until` or until resumed;
+        omit `until` for an indefinite pause. The rule's policies stay on the gateway,
+        disabled, so resuming only turns them back on. Records who paused it and replaces an
+        earlier pause or allowance. A rule that is off answers 409 `rule_off`; an `until` in
+        the past answers 400. A group's own pause is separate and unchanged.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}/resume:
+    post:
+      operationId: resumeRule
+      tags: [Rules]
+      summary: Resume a rule after a pause or allowance
+      description: |
+        Ends the pause or allowance: the rule blocks again. Always succeeds.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}/extend:
+    post:
+      operationId: extendRulePause
+      tags: [Rules]
+      summary: Extend a timed rule pause
+      description: |
+        Adds `minutes` to a timed pause. 409 `not_paused` when the rule is not paused,
+        `indefinite` when the pause has no end, `rule_off` when the rule is off.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}/allow:
+    post:
+      operationId: allowRule
+      tags: [Rules]
+      summary: Allow a rule while its window is blocking
+      description: |
+        Lifts the rule until `until`, the same state as a pause. Omit `until` to allow until the
+        windows active now end, or until resumed for an always-on rule (409 `not_in_window` when
+        none is active); `null` allows until resumed. 409 `rule_off` when the rule is off.
+        Resume ends it: rules have no `DELETE /allow`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/rules/{id}/on:
+    post:
+      operationId: turnOnRule
+      tags: [Rules]
+      summary: Turn on a rule
+      description: |
+        Sets desired enabled true, the counterpart to `/off`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rule, change]
+                properties:
+                  rule: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/rules/{id}/off:
     post:
       operationId: turnOffRule
       tags: [Rules]
       summary: Turn off a rule
-      description: Sets desired enabled false; the rule's policies stay on the gateway, disabled. A group's pause is unchanged.
+      description: Sets desired enabled false; the rule's policies stay on the gateway, disabled, and any pause on the rule ends. A group's pause is unchanged.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -2552,7 +2764,7 @@ components:
     Rule:
       type: object
       additionalProperties: false
-      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, mode, windows, useGeneratedName, policyNames]
+      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, pause, mode, windows, useGeneratedName, policyNames]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 60 }
@@ -2580,6 +2792,7 @@ components:
           maxItems: 100
           description: Website domains for domain rules; empty otherwise
         enabled: { type: boolean }
+        pause: { $ref: "#/components/schemas/RulePause" }
         mode:
           type: string
           enum: [always, scheduled]
@@ -2678,6 +2891,17 @@ components:
       properties:
         accountId: { type: [string, "null"] }
         name: { type: string }
+    RulePause:
+      type: object
+      additionalProperties: false
+      required: [active, until, by]
+      description: |
+        A pause or allowance lifts the rule for every group it covers until `until`, or until
+        resumed when null. Never set through create or update.
+      properties:
+        active: { type: boolean }
+        until: { type: [string, "null"], format: date-time }
+        by: { $ref: "#/components/schemas/Actor" }
     Suspension:
       type: object
       additionalProperties: false

@@ -81,7 +81,7 @@ interpret that retained snapshot as a fresh gateway observation.
 ### Pause from intent to feedback
 
 1. The browser selects an action through [group-actions.ts](../src/components/group-actions.ts) and submits it using [api.ts](../src/lib/api.ts), including the cookie session's CSRF header.
-2. The [pause route](../src/app/api/v1/groups/[id]/pause/route.ts) checks authentication, request shape, group existence and Watch eligibility, then saves the suspension in PostgreSQL.
+2. The [pause route](../src/app/api/v1/groups/[id]/pause/route.ts) checks authentication, request shape, group existence, then saves the suspension in PostgreSQL.
 3. [enqueueChange](../src/server/changes.ts) increments the household revision, creates a pending `ChangeResult` with actor attribution and requests reconciliation. The route returns the updated group and change reference. The group write and enqueue are separate operations; do not assume the entire path is one database transaction.
 4. The browser applies the returned state through [household-state.ts](../src/lib/household-state.ts) and shows saved feedback. [mutate-gate.ts](../src/lib/mutate-gate.ts) prevents a superseded mutation response from replacing a newer one.
 5. Reconciliation takes its database lock, reads current desired state and writes only owned UniFi policies. A pause creates the group's unscheduled block policy; resume deletes it. The run records outcomes and settles eligible changes.

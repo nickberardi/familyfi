@@ -1,6 +1,7 @@
 /** Client-safe rule helpers + curated slots (mirrors server curated-categories). */
 
 import { windowDayBands, type InternetWindow } from "./rule-windows";
+import type { Actor } from "./types";
 
 export type RuleKind = "internet" | "category" | "app" | "domain";
 
@@ -16,6 +17,8 @@ export type Rule = {
   targetIds: number[];
   domains: string[];
   enabled: boolean;
+  /** A pause lifts the rule for every group it covers until `until`, or until resumed. */
+  pause: { active: boolean; until: string | null; by: Actor };
   mode: "always" | "scheduled";
   windows: (RuleWindow & { id: string })[];
   useGeneratedName: boolean;
@@ -135,16 +138,24 @@ export function internetRulePresets(group: { kind: "family" | "things"; familyRo
   return [];
 }
 
+/** Whether the rule's pause is lifting it at `now`. */
+export function rulePaused(rule: Pick<Rule, "pause">, now: Date): boolean {
+  return rule.pause.active && (rule.pause.until === null || now.getTime() < new Date(rule.pause.until).getTime());
+}
+
 /**
- * The windows of the group's enabled internet rules, with the rule each came from. An
+ * The windows of the group's enabled, unpaused internet rules, with the rule each came from. An
  * always-on rule is one window with no end.
  */
-export function internetWindowsForGroup(rules: Rule[], groupId: string): InternetWindow[] {
+export function internetWindowsForGroup(rules: Rule[], groupId: string, now: Date): InternetWindow[] {
   return internetRulesForGroup(rules, groupId)
-    .filter((rule) => rule.enabled)
-    .flatMap((rule) =>
-      rule.mode === "always" ? [alwaysWindow(rule.name)] : rule.windows.map((window) => ({ ...window, ruleName: rule.name })),
-    );
+    .filter((rule) => rule.enabled && !rulePaused(rule, now))
+    .flatMap(ruleInternetWindows);
+}
+
+/** One rule's windows, each with the rule it came from. An always-on rule is one window with no end. */
+export function ruleInternetWindows(rule: Pick<Rule, "name" | "mode" | "windows">): InternetWindow[] {
+  return rule.mode === "always" ? [alwaysWindow(rule.name)] : rule.windows.map((window) => ({ ...window, ruleName: rule.name }));
 }
 
 /** An always-on internet rule as a window: all day, every day, never ending. */

@@ -3,7 +3,6 @@ import {
   bedtimeEndDays,
   cardNoteLine,
   cardStateLabel,
-  canPauseGroup,
   daysLabel,
   deviceKindLabel,
   deviceIcon,
@@ -62,14 +61,6 @@ describe("schedule copy", () => {
     const grounded = { name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "00:00", always: true, ruleName: "Grounded" };
     expect(cardStateLabel(group(), [grounded], TZ, monday7pm)).toBe("No internet · Grounded · always");
     expect(cardNoteLine(group(), [grounded])).toBe("4 devices · internet off always");
-  });
-});
-
-describe("pause eligibility", () => {
-  it("hides Pause for adults, and offers it without any rule", () => {
-    expect(canPauseGroup(group({ familyRole: "adult" }))).toBe(false);
-    expect(canPauseGroup(group({ internetRuleIds: [] }))).toBe(true);
-    expect(canPauseGroup(group({ kind: "things", familyRole: null, internetRuleIds: [] }))).toBe(true);
   });
 });
 

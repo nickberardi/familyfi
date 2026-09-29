@@ -1,12 +1,14 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { daysLabel, windowTimes } from "@/lib/display";
-import { CURATED_CATEGORY_SLOTS, ruleBlocksLabel, windowSegments, type Rule, type RuleWindow } from "@/lib/rules";
+import { ruleActionSpecs, ruleStateLine } from "@/lib/rule-actions";
+import { CURATED_CATEGORY_SLOTS, rulePaused, ruleBlocksLabel, windowSegments, type Rule, type RuleWindow } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { useFilterCatalog } from "@/components/GroupGrid";
+import { RulePauseSheet } from "@/components/PauseSheet";
 import { PageHeader } from "@/components/PageHeader";
 import { CategoryGlyph } from "@/components/ui/CategoryGlyph";
 import { Icon } from "@/components/ui/Icon";
@@ -21,7 +23,10 @@ const one = (value: string | string[] | undefined) => (Array.isArray(value) ? va
  */
 export function RulesList({ searchParams }: { searchParams: Promise<{ group?: string | string[] }> }) {
   const scope = one(use(searchParams).group) ?? null;
-  const { rules, groups, unifi, mutate } = useAppData();
+  const { rules, groups, unifi, household, mutate } = useAppData();
+  const [sheet, setSheet] = useState<{ rule: Rule; mode: "pause" | "extend" } | null>(null);
+  const timezone = household?.timezone ?? "America/New_York";
+  const now = new Date();
   const { catalogNames } = useFilterCatalog();
   const scoped = scope ? groups.find((group) => group.id === scope) : undefined;
   const list = scoped ? rules.filter((rule) => rule.groupIds.includes(scoped.id)) : rules;
@@ -38,6 +43,11 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
       undefined,
       { notice: `${rule.name} turned ${rule.enabled ? "off" : "on"}. FamilyFi writes it to the gateway next.` },
     );
+
+  const run = (rule: Rule, action: "pause" | "resume" | "extend" | "allow") => {
+    if (action === "pause" || action === "extend") return setSheet({ rule, mode: action });
+    void mutate(() => api(`/api/v1/rules/${rule.id}/${action}`, { method: "POST", body: action === "allow" ? "{}" : undefined }));
+  };
 
   return (
     <>
@@ -82,7 +92,7 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
             <article
               key={rule.id}
               className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]"
-              style={{ opacity: rule.enabled ? 1 : 0.7 }}
+              style={{ opacity: rule.enabled && !rulePaused(rule, now) ? 1 : 0.7 }}
             >
               <div className="flex items-start gap-3 p-4 pb-3">
                 <RuleMark rule={rule} />
@@ -119,9 +129,12 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
                   </dd>
                 </dl>
               </Link>
+              <RuleActions rule={rule} timezone={timezone} now={now} run={run} />
             </article>
           ))}
         </div>
+
+        {sheet ? <RulePauseSheet rule={sheet.rule} mode={sheet.mode} timezone={timezone} onClose={() => setSheet(null)} /> : null}
 
         {!scoped && unruled.length ? (
           <p className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px] text-[14px]">
@@ -138,6 +151,42 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
         </p>
       </div>
     </>
+  );
+}
+
+/** A paused rule says so and who paused it; the actions follow. Nothing shows while it is off. */
+function RuleActions({
+  rule,
+  timezone,
+  now,
+  run,
+}: {
+  rule: Rule;
+  timezone: string;
+  now: Date;
+  run: (rule: Rule, action: "pause" | "resume" | "extend" | "allow") => void;
+}) {
+  const state = ruleStateLine(rule, timezone, now);
+  const actions = ruleActionSpecs(rule, timezone, now);
+  if (!state && actions.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-[var(--ff-line)] px-4 py-3">
+      {state ? <span className="mr-auto text-[14px] text-[var(--ff-ink-2)]">{state}</span> : <span className="mr-auto" />}
+      {actions.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          onClick={() => run(rule, action.run)}
+          className={
+            action.strong
+              ? "rounded-lg bg-[var(--ff-accent)] px-3 py-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
+              : "rounded-lg border border-[var(--ff-hairline-card)] px-3 py-1.5 text-[14px] font-semibold"
+          }
+        >
+          {action.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
