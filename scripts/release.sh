@@ -4,9 +4,12 @@
 #   scripts/release.sh --tag v0.12.1               # checks and tests, build, push, publish
 #   scripts/release.sh --tag v0.12.1 --skip-ci
 #   scripts/release.sh --tag v0.12.1 --no-push     # build both architectures, publish nothing
+#   scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag checked out at HEAD
 #
 # Options:
 #   --tag vX.Y.Z    the release to publish; must start with v, and must not exist on GitHub yet
+#   --force         allow a tag that already exists, if it is HEAD: rebuild and push its images,
+#                   overwriting them on GHCR, and create the GitHub Release only if it is missing
 #   --skip-ci       don't run the checks and tests (ci.yml's verify job, and container.yml) first
 #   --no-push       build only: no GHCR login, no push, no GitHub Release
 #   --allow-dirty   allow uncommitted changes in the working tree (the build uses them)
@@ -27,13 +30,14 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-tag="" run_ci=1 push=1 allow_dirty=0
+tag="" run_ci=1 push=1 allow_dirty=0 force=0
 while (($#)); do
   case "$1" in
     --tag) tag="${2:-}"; shift 2 ;;
     --skip-ci) run_ci=0; shift ;;
     --no-push) push=0; shift ;;
     --allow-dirty) allow_dirty=1; shift ;;
+    --force) force=1; shift ;;
     -h|--help) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0"; exit 0 ;;
     *) echo "unknown argument $1" >&2; exit 2 ;;
   esac
@@ -57,7 +61,13 @@ git merge-base --is-ancestor HEAD origin/main || die "HEAD is not on origin/main
 if ((!allow_dirty)) && [[ -n "$(git status --porcelain)" ]]; then
   die "working tree is dirty (commit, stash, or pass --allow-dirty)"
 fi
-[[ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]] || die "$tag already exists on GitHub"
+# A lightweight tag lists its commit; an annotated one also lists the commit it peels to, last.
+remote_commit=$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | tail -n 1 | cut -f 1)
+if [[ -n "$remote_commit" ]]; then
+  ((force)) || die "$tag already exists on GitHub (pass --force to rebuild it)"
+  [[ "$remote_commit" == "$(git rev-parse HEAD)" ]] ||
+    die "$tag on GitHub is $remote_commit, not HEAD (git switch --detach $tag)"
+fi
 if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
   [[ "$(git rev-parse "$tag^{commit}")" == "$(git rev-parse HEAD)" ]] || die "local tag $tag is not HEAD"
 fi
@@ -135,6 +145,10 @@ if ((!push)); then
 fi
 
 # The GitHub Release step. Creating it creates the tag at HEAD.
+if ((force)) && gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+  echo "published $image:$version; GitHub Release $tag already exists and is unchanged"
+  exit 0
+fi
 echo "==> GitHub Release $tag"
 # Below 1.0 every release is a pre-release (docs/operations.md, Releases), as is a tag with a `-`.
 flags=()

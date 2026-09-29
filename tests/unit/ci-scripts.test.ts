@@ -76,6 +76,11 @@ describe("scripts/release.sh", () => {
     expect(runScript("scripts/release.sh", "--no-such-option").status).toBe(2);
     expect(runScript("scripts/release.sh").status).toBe(2);
   });
+
+  it("accepts --force", () => {
+    const result = runScript("scripts/release.sh", "--force");
+    expect(result.stderr).toContain("--tag is required");
+  });
 });
 
 describe("scripts/ paths", () => {

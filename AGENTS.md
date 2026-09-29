@@ -98,7 +98,7 @@ Each invariant names the tests that enforce it; `tests/unit/invariants.test.ts` 
 - Never delete another task's worktree, shared cache, Docker volume, simulator or model data. Remove a task-created worktree only when inactive and its status confirms no work will be lost; use the environment's managed-worktree tool when applicable, otherwise `git worktree remove`. Leave the current checkout in place.
 - Never run `scripts/ci/runner-cleanup.sh` on a development machine; it removes shared Docker and cache data.
 - Live UniFi writes, publishing and deployment require the user's request. A test or release checklist is not authorization to change a household gateway or publish a release.
-- Do not bypass checks with `--no-verify`, `--skip-ci`, `--allow-dirty`, `--breaking-api` or `BREAKING_API_APPROVED` unless the operator explicitly authorized that exception. Report any exception and its missing evidence.
+- Do not bypass checks with `--no-verify`, `--skip-ci`, `--allow-dirty`, `--force`, `--breaking-api` or `BREAKING_API_APPROVED` unless the operator explicitly authorized that exception. Report any exception and its missing evidence.
 
 ## Pull requests
 
