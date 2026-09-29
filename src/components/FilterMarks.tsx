@@ -3,10 +3,10 @@
 /**
  * Category and app filter marks on a comfortable card.
  *
- * Card System: every comfortable card can carry two more rows below the band —
- * a fixed category catalog and open-ended app rules. Each mark is its own
- * policy with its own popover; the card-level Pause/Schedule pair stays with
- * Internet alone.
+ * Card System: every comfortable card can carry two more rows below its internet
+ * zone — a fixed category catalog and open-ended app rules. Each mark is its own
+ * rule with its own popover; Pause, Resume and Allow stay with all internet alone,
+ * in the zone above, so a category control never reads as a device-wide one.
  *
  * A mark shows whichever thing is actually blocking the category. A FamilyFi rule
  * blocking right now wins and renders in red, the same red as the sheet's Turn off;
@@ -22,8 +22,12 @@ import {
   categoryRuleForSlot,
   glyphForAppName,
   parentFacingRuleLabel,
+  type CuratedCategorySlot,
   type Rule,
 } from "@/lib/rules";
+import type { IconName } from "@/lib/icons";
+import { upstreamCategoryIcon } from "@/lib/upstream-domains";
+import { Icon } from "@/components/ui/Icon";
 import {
   appMarkState,
   categoryMarkLabel,
@@ -41,7 +45,7 @@ import { FilterSheet, type FilterSheetState } from "@/components/filters/FilterS
 import { AddAppSheet } from "@/components/filters/AddAppSheet";
 import type { Group } from "@/lib/types";
 
-function SectionLabel({ children }: { children: ReactNode }) {
+export function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <div className="text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ color: "var(--ff-ink-2)" }}>
       {children}
@@ -50,7 +54,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 /** A 34px mark with its label and state word beneath, per the Card System. */
-function MarkButton({
+export function MarkButton({
   label,
   state,
   onClick,
@@ -91,6 +95,81 @@ function MarkButton({
   );
 }
 
+/**
+ * A household category as a group sees it: its rule, its resolver's verdict and its
+ * mark state. `slot` is the UniFi DPI category FamilyFi can block it with; a category
+ * without one (AI, Dating, one the household made) can only be reported, or blocked
+ * by its websites.
+ */
+export type CategorySlotState = {
+  key: string;
+  label: string;
+  slot: CuratedCategorySlot | undefined;
+  /** The seeded category's glyph, when it has no DPI slot to draw. */
+  icon: IconName | undefined;
+  monogram: string;
+  /** The domains the resolver checks for it, for a Websites rule. */
+  domains: string[];
+  rule: Rule | undefined;
+  check: ReturnType<typeof effectiveCheck>;
+  blocking: boolean;
+  state: CategoryMarkState;
+};
+
+/** Every household category: the ones UniFi can block first, then the rest as listed. */
+export function categorySlotStates(
+  group: Group,
+  rules: Rule[],
+  upstreamCategories: UpstreamCategoryRow[],
+  timezone: string,
+): CategorySlotState[] {
+  const seededSlot = (row: UpstreamCategoryRow) =>
+    row.source === "seed" ? CURATED_CATEGORY_SLOTS.find((slot) => slot.slot === row.slug) : undefined;
+  const mapped = CURATED_CATEGORY_SLOTS.map((slot) => {
+    const upstream = upstreamCategoryForSlot(upstreamCategories, slot.slot);
+    return { slot, upstream: upstream && seededSlot(upstream) ? upstream : undefined };
+  });
+  const others = upstreamCategories.filter((row) => !seededSlot(row)).map((row) => ({ slot: undefined, upstream: row }));
+  return [...mapped, ...others].map(({ slot, upstream }) => {
+    const rule = slot ? categoryRuleForSlot(rules, group.id, slot.categoryId) : undefined;
+    // A rule blocking *right now* wins; otherwise this group's resolver decides.
+    const check = upstream ? effectiveCheck(upstream.checks, group) : null;
+    const blocking = ruleActivelyBlocking(rule, timezone);
+    return {
+      key: slot?.slot ?? upstream!.slug,
+      label: slot?.label ?? upstream!.label,
+      slot,
+      icon: upstream ? upstreamCategoryIcon(upstream.slug, upstream.source) : undefined,
+      monogram: upstream?.monogram ?? slot!.label.slice(0, 3).toUpperCase(),
+      domains: upstream ? upstream.domains.filter((domain) => !domain.removed).map((domain) => domain.domain) : [],
+      rule,
+      check,
+      blocking,
+      state: categoryMarkState(blocking, check),
+    };
+  });
+}
+
+/** The sheet a category's mark opens. */
+export function categorySheet(item: CategorySlotState): FilterSheetState {
+  return {
+    kind: "category",
+    name: item.label,
+    categoryId: item.slot ? item.slot.categoryId : null,
+    domains: item.domains,
+    rule: item.rule,
+    upstream: item.check,
+    activelyBlocking: item.blocking,
+  };
+}
+
+/** A category's glyph: its DPI slot's mark, its seeded icon, or its monogram. */
+export function CategoryMarkGlyph({ item, size }: { item: CategorySlotState; size: number }) {
+  if (item.slot) return <CategoryGlyph slot={item.slot.slot} size={size} />;
+  if (item.icon) return <Icon name={item.icon} size={size} />;
+  return <span className="text-[9px] font-bold">{item.monogram}</span>;
+}
+
 export function GroupFilterMarks({
   group,
   rules,
@@ -117,8 +196,6 @@ export function GroupFilterMarks({
   const [sheet, setSheet] = useState<FilterSheetState | null>(null);
   const [addApp, setAddApp] = useState(false);
 
-  if (group.protected) return null;
-
   const apps = appRulesForGroup(rules, group.id);
   /** Without app rules and without the + tile the section is a heading over nothing. */
   const showApps = apps.length > 0 || Boolean(showAppAdd);
@@ -131,36 +208,13 @@ export function GroupFilterMarks({
         data-testid={`filter-marks-${group.id}`}
       >
         <div className="px-[18px] pt-2">
-          <SectionLabel>Category Rules</SectionLabel>
+          <SectionLabel>Category rules</SectionLabel>
           <div className="flex flex-wrap gap-3.5 py-2">
-            {CURATED_CATEGORY_SLOTS.map((slot) => {
-              const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
-              // A rule blocking *right now* wins; otherwise this group's resolver
-              // decides. A scheduled rule outside its window is not blocking.
-              const upstream = upstreamCategoryForSlot(upstreamCategories ?? [], slot.slot);
-              const check = upstream ? effectiveCheck(upstream.checks, group) : null;
-              const blocking = ruleActivelyBlocking(rule, timezone);
-              const state = categoryMarkState(blocking, check);
-              return (
-                <MarkButton
-                  key={slot.slot}
-                  label={slot.label}
-                  state={state}
-                  onClick={() =>
-                    setSheet({
-                      kind: "category",
-                      name: slot.label,
-                      categoryId: slot.categoryId,
-                      rule,
-                      upstream: check,
-                      activelyBlocking: blocking,
-                    })
-                  }
-                >
-                  <CategoryGlyph slot={slot.slot} size={15} />
-                </MarkButton>
-              );
-            })}
+            {categorySlotStates(group, rules, upstreamCategories ?? [], timezone).map((item) => (
+              <MarkButton key={item.key} label={item.label} state={item.state} onClick={() => setSheet(categorySheet(item))}>
+                <CategoryMarkGlyph item={item} size={15} />
+              </MarkButton>
+            ))}
           </div>
         </div>
 

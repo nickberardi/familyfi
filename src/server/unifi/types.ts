@@ -1,5 +1,5 @@
 export const UNIFI_PAGE_LIMIT = 200;
-export const FAMILYFI_POLICY_PREFIX = "FamilyFi ";
+export { FAMILYFI_POLICY_PREFIX } from "@/lib/policy-names";
 export const UNIFI_API_VERSION = "10.4.57";
 
 export type UnifiPage<T> = {
@@ -106,7 +106,12 @@ export type ApplicationFilter = {
   applicationIds: number[];
 };
 
-/** Destination traffic filter — internet (zone only) or DPI APPLICATION_* shapes. */
+export type DomainFilter = {
+  type: "DOMAINS";
+  domains: string[];
+};
+
+/** Destination traffic filter — internet (zone only), DPI APPLICATION_* or DOMAIN shapes. */
 export type DestinationTrafficFilter =
   | {
       type: "APPLICATION_CATEGORY";
@@ -116,6 +121,11 @@ export type DestinationTrafficFilter =
   | {
       type: "APPLICATION";
       applicationFilter: ApplicationFilter;
+      portFilter?: unknown;
+    }
+  | {
+      type: "DOMAIN";
+      domainFilter: DomainFilter;
       portFilter?: unknown;
     }
   | {

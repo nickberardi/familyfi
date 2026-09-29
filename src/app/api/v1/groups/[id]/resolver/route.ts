@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
-import { publicGroup } from "@/server/groups";
+import { groupInclude, publicGroup } from "@/server/groups";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
@@ -65,7 +65,7 @@ export async function PUT(request: Request, ctx: Ctx) {
       if (current.dohOverrideUrl !== url) {
         await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
       }
-      return tx.group.update({ where: { id }, data: {
+      return tx.group.update({ where: { id }, include: groupInclude, data: {
         dohOverrideUrl: url,
         ...(current.dohOverrideUrl !== url ? { upstreamResolverSnapshot: Prisma.DbNull } : {}),
       } });
@@ -92,7 +92,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
     });
     const group = await withUpstreamLock(async (tx) => {
       await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
-      return tx.group.update({ where: { id }, data: { dohOverrideUrl: null, upstreamResolverSnapshot: Prisma.DbNull } });
+      return tx.group.update({ where: { id }, include: groupInclude, data: { dohOverrideUrl: null, upstreamResolverSnapshot: Prisma.DbNull } });
     });
     await refreshResolverContexts();
     return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });

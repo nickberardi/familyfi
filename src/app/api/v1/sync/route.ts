@@ -3,30 +3,25 @@ import { publicChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { deviceScope } from "@/server/devices";
 import { withSession } from "@/server/guard";
-import { coverageIssues, isWriteFailure } from "@/server/policy-coverage";
+import { isWriteFailure, storedCoverage } from "@/server/policy-coverage";
 import { networkInScope } from "@/server/unifi/scope";
 
 export async function GET(request: Request) {
   return withSession(request, async () => {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const scope = deviceScope(household);
-    const [run, appPolicies, changeRows, groups, devices] = await Promise.all([
+    const [run, appPolicies, rulePolicies, changeRows, coverage] = await Promise.all([
       prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } }),
       prisma().appPolicy.findMany(),
+      prisma().rulePolicy.findMany(),
       prisma().changeResult.findMany({ orderBy: { updatedAt: "desc" }, take: 30 }),
-      prisma().group.findMany(),
-      prisma().device.findMany(),
+      storedCoverage({ now: new Date(), deviceInScope: (networkId) => networkInScope(scope, networkId) }),
     ]);
-    const issues = coverageIssues({
-      groups,
-      devices: devices.map((device) => ({
-        ...device,
-        inScope: networkInScope(scope, device.networkId),
-      })),
-      policies: appPolicies,
-    });
+    const { issues } = coverage;
     const writeIssues = issues.filter(isWriteFailure);
-    const policyErrors = appPolicies.filter((policy) => policy.lastError).length;
+    // Every policy FamilyFi owns: pause and quarantine policies, and one per rule window.
+    const owned = [...appPolicies, ...rulePolicies];
+    const policyErrors = owned.filter((policy) => policy.lastError).length;
     const failingCount = policyErrors + writeIssues.length;
     const staleNoMembers =
       failingCount === 0 &&
@@ -44,7 +39,7 @@ export async function GET(request: Request) {
     return Response.json({
       revision: household.revision,
       connectionStatus: household.connectionStatus,
-      appPolicyCount: appPolicies.filter((policy) => policy.unifiPolicyId).length,
+      appPolicyCount: owned.filter((policy) => policy.unifiPolicyId).length,
       failingCount,
       issues,
       lastRun: run

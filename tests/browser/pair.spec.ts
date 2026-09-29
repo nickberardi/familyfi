@@ -65,6 +65,26 @@ async function publishHomeNetwork(page: Page, url: string) {
   return card;
 }
 
+test("going back to Off from an unsaved My domain choice switches the picker to Off", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  try {
+    await page.request.put("/api/v1/connection/tunnel", { headers: await csrf(page), data: { mode: "off" } });
+    await page.goto("/pair");
+    const card = page.getByTestId("remote-access");
+    const picker = card.getByRole("group", { name: "Remote access" });
+    await expect(picker.getByRole("button", { name: "Off" })).toHaveAttribute("aria-pressed", "true");
+    // My domain only opens its choices; nothing is published yet.
+    await picker.getByRole("button", { name: "My domain" }).click();
+    await expect(picker.getByRole("button", { name: "My domain" })).toHaveAttribute("aria-pressed", "true");
+    // Off is already what the server has, and the picker must still follow the click.
+    await picker.getByRole("button", { name: "Off" }).click();
+    await expect(picker.getByRole("button", { name: "Off" })).toHaveAttribute("aria-pressed", "true");
+    await expect(card.getByText("No route is published, so phones can’t reach home or pair.")).toBeVisible();
+  } finally {
+    await cleanUp(page, []);
+  }
+});
+
 test("publishes a home-network route, pairs a phone through it, and revokes it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const url = `https://pair-e2e-${Date.now()}.home`;

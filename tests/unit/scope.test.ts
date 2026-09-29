@@ -1,4 +1,4 @@
-import { AssignmentState, GroupKind, GroupMode } from "@prisma/client";
+import { AssignmentState, GroupKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { networkInScope, resolveNetworkScope } from "@/server/unifi/scope";
 import { planPolicies } from "@/server/unifi/plan";
@@ -54,7 +54,7 @@ describe("planPolicies network scope", () => {
     expect(planned.retainOwners.size).toBe(0);
   });
 
-  it("retains group policies when an assigned MAC roams off a managed VLAN", () => {
+  it("retains a paused group's policy when an assigned MAC roams off a managed VLAN", () => {
     const planned = planPolicies({
       installId: "default",
       now,
@@ -64,13 +64,7 @@ describe("planPolicies network scope", () => {
           id: "kid",
           name: "Betsy",
           kind: GroupKind.family,
-          protected: false,
-          mode: GroupMode.scheduled,
-          scheduleEnabled: true,
-          scheduleDays: [1],
-          scheduleStart: "21:00",
-          scheduleEnd: "07:00",
-          suspensionActive: false,
+          suspensionActive: true,
           suspensionUntil: null,
         },
       ],

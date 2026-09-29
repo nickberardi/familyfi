@@ -40,8 +40,8 @@ describe("dev UniFi mock household", () => {
   it("seeds groups, an adult login, and assigned devices for UI work", async () => {
     await ensureDevDummyData();
     const groups = await prisma().group.findMany({ orderBy: { name: "asc" } });
-    // One group per comfortable-card layout: protected adult, scheduled child and
-    // teen, a paused member, and things groups with and without a schedule.
+    // One group per comfortable-card layout: an adult, child and teen with
+    // internet rules, a paused member, and things groups with and without rules.
     expect(groups.map((group) => group.name)).toEqual([
       "Betsy",
       "Living Room",
@@ -53,6 +53,17 @@ describe("dev UniFi mock household", () => {
     const paused = groups.find((group) => group.name === "Robin");
     expect(paused?.suspensionActive).toBe(true);
     expect(groups.find((group) => group.name === "Smart Home")?.monogram).toBe("IOT");
+    const rules = await prisma().rule.findMany({ include: { groups: true, windows: true }, orderBy: { name: "asc" } });
+    const byName = new Map(groups.map((group) => [group.id, group.name]));
+    expect(rules.map((rule) => [rule.name, rule.kind, rule.groups.map((link) => byName.get(link.groupId)).sort(), rule.windows.length])).toEqual([
+      ["Bedtime", "internet", ["Betsy"], 1],
+      ["Homework", "internet", ["Betsy"], 1],
+      ["Late gaming", "category", ["Sam"], 1],
+      ["No TikTok", "domain", ["Robin", "Sam"], 0],
+      ["School nights", "internet", ["Robin", "Sam"], 1],
+      ["TV downtime", "internet", ["Living Room"], 2],
+      ["TV video evenings", "category", ["Living Room"], 2],
+    ]);
     const pat = await prisma().account.findUnique({ where: { username: DEV_SEED_ADULT_USERNAME } });
     expect(pat?.isAdmin).toBe(true);
     expect(await runReconcileOnce()).toBe(true);
@@ -63,6 +74,7 @@ describe("dev UniFi mock household", () => {
     expect(devices.filter((row) => row.assignment === AssignmentState.assigned)).toHaveLength(4);
     await ensureDevDummyData();
     expect(await prisma().group.count()).toBe(6);
+    expect(await prisma().rule.count()).toBe(7);
     expect(await prisma().account.count({ where: { username: DEV_SEED_ADULT_USERNAME } })).toBe(1);
   });
 });

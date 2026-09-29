@@ -62,20 +62,14 @@ export function AddAppSheet({
         api("/api/v1/rules", {
           method: "POST",
           body: JSON.stringify({
+            name: `${catalog.find((item) => item.id === selectedDpiId)?.name ?? "App"} for ${group.name}`.slice(0, 60),
             kind: "app",
             scope: "group",
-            groupId: group.id,
+            groupIds: [group.id],
             targetIds: [selectedDpiId],
             mode: enforcement,
             ...(enforcement === "scheduled"
-              ? {
-                  schedule: {
-                    enabled: true,
-                    days: [0, 1, 2, 3, 4, 5, 6],
-                    start: "21:00",
-                    end: "07:00",
-                  },
-                }
+              ? { windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }] }
               : {}),
           }),
         }),

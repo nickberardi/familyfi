@@ -18,11 +18,11 @@ async function signIn(page: Page) {
  */
 async function clearSlotRules(page: Page, groupId: string, categoryId: number) {
   const body = (await (await page.request.get("/api/v1/rules")).json()) as {
-    rules: { id: string; groupId: string | null; kind: string; targetIds: number[] }[];
+    rules: { id: string; groupIds: string[]; kind: string; targetIds: number[] }[];
   };
   const csrf = (await page.context().cookies()).find((c) => c.name === "familyfi_csrf")?.value ?? "";
   for (const rule of body.rules) {
-    if (rule.groupId === groupId && rule.kind === "category" && rule.targetIds.includes(categoryId)) {
+    if (rule.groupIds.includes(groupId) && rule.kind === "category" && rule.targetIds.includes(categoryId)) {
       await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: { "X-CSRF-Token": csrf } });
     }
   }
@@ -30,10 +30,10 @@ async function clearSlotRules(page: Page, groupId: string, categoryId: number) {
 
 async function childGroup(page: Page) {
   const body = (await (await page.request.get("/api/v1/groups")).json()) as {
-    groups: { id: string; name: string; kind: string; protected: boolean }[];
+    groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
-  const kid = body.groups.find((group) => group.kind === "family" && !group.protected);
-  expect(kid, "seed must include a non-protected family group").toBeTruthy();
+  const kid = body.groups.find((group) => group.kind === "family" && group.familyRole !== "adult");
+  expect(kid, "seed must include a child or teen").toBeTruthy();
   return kid!;
 }
 

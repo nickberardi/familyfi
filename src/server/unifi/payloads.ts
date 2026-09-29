@@ -240,3 +240,44 @@ export function dpiAppNetworkBlockPolicy(input: {
     ...(input.schedule ? { schedule: input.schedule } : {}),
   };
 }
+
+/**
+ * Website block (#94): UniFi matches the domains, and their subdomains, by watching DNS
+ * lookups, so a device using encrypted DNS can get around it. Source is either the covered
+ * devices' MACs or managed networks.
+ */
+export function domainBlockPolicy(input: {
+  name: string;
+  sourceZoneId: string;
+  destinationZoneId: string;
+  macAddresses?: string[];
+  networkIds?: string[];
+  domains: string[];
+  enabled?: boolean;
+  schedule?: UnifiFirewallSchedule;
+}): FirewallPolicyWrite {
+  const domains = [...new Set(input.domains.map((domain) => domain.trim().toLowerCase()).filter(Boolean))].sort();
+  if (domains.length === 0) throw new Error("A website policy needs at least one domain.");
+  let sourceFilter;
+  if (input.networkIds) {
+    sourceFilter = networkSourceFilter(input.networkIds);
+  } else {
+    const macAddresses = [...new Set((input.macAddresses ?? []).map(normalizeMac))].sort();
+    if (macAddresses.length === 0) throw new Error("A website policy needs at least one MAC address.");
+    sourceFilter = { type: "MAC_ADDRESS", macAddressFilter: { macAddresses } };
+  }
+  return {
+    name: input.name,
+    description: "FamilyFi managed website block.",
+    enabled: input.enabled ?? true,
+    loggingEnabled: false,
+    action: { type: INTERNET_BLOCK_ACTION },
+    ipProtocolScope: { ipVersion: "IPV4_AND_IPV6" },
+    source: { zoneId: input.sourceZoneId, trafficFilter: sourceFilter },
+    destination: {
+      zoneId: input.destinationZoneId,
+      trafficFilter: { type: "DOMAIN", domainFilter: { type: "DOMAINS", domains } },
+    },
+    ...(input.schedule ? { schedule: input.schedule } : {}),
+  };
+}

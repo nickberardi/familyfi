@@ -1,4 +1,5 @@
-import { formatClock, nextBedtimeResumeAt } from "./display";
+import { formatClock } from "./display";
+import { nextWindowStart, windowEndsAt, windowTitle, type InternetWindow } from "./rule-windows";
 import type { Group } from "./types";
 
 export type PauseSheetMode = "pause" | "extend";
@@ -16,43 +17,61 @@ export type PauseSheetOption = { label: string; note: string; request: PauseShee
 
 /*
  * The pause sheet's copy and options as plain data, so the native iOS app can port them
- * and `tests/fixtures/display-vectors.json` can pin them.
+ * and `tests/fixtures/display-vectors.json` can pin them. A pause blocks all internet on
+ * every device in the group, so the copy names that scope and the devices.
  */
 
-export function pauseSheetTitle(group: Pick<Group, "kind" | "name">, mode: PauseSheetMode): string {
-  const word = group.kind === "family" ? "bedtime" : "schedule";
-  return mode === "extend" ? `More time for ${group.name}?` : `Pause ${group.name}’s ${word}?`;
+export function pauseSheetTitle(group: Pick<Group, "name">, mode: PauseSheetMode): string {
+  return mode === "extend" ? `Keep all internet off for ${group.name} longer?` : `Pause all internet for ${group.name}?`;
 }
 
-export function pauseSheetBody(mode: PauseSheetMode): string {
-  return mode === "extend"
-    ? "Extending keeps the schedule suspended longer. Resume restores bedtime, which may still block."
-    : "Pause suspends bedtime enforcement so internet is available from FamilyFi. Resume restores the stored schedule, which may still block during bedtime.";
+/** `deviceNames` are the group's devices' known names; the first one names the devices. */
+export function pauseSheetBody(group: Pick<Group, "kind" | "deviceCount">, mode: PauseSheetMode, deviceNames: string[] = []): string {
+  if (mode === "extend") return "Every device stays offline for longer. Resume brings internet back sooner.";
+  const named = deviceNames.find((name) => name.trim())?.trim();
+  const others = group.deviceCount - 1;
+  const devices = named
+    ? others > 0
+      ? `${named} and ${others} other ${others === 1 ? "device" : "devices"} lose`
+      : `${named} loses`
+    : group.deviceCount === 1
+      ? "Its 1 device loses"
+      : group.deviceCount === 0
+        ? "Devices you assign lose"
+        : `All ${group.deviceCount} of its devices lose`;
+  const outside = group.kind === "family" ? "Cellular data is not affected." : "The local network still works.";
+  return `${devices} all internet. Category, app and website rules stay as they are. ${outside}`;
 }
 
 export function pauseSheetOptions(
-  group: Pick<Group, "schedule" | "suspension">,
+  group: Pick<Group, "suspension">,
+  windows: InternetWindow[],
   mode: PauseSheetMode,
   timezone: string,
   now: Date,
 ): PauseSheetOption[] {
-  const bedtimeAt = nextBedtimeResumeAt(group, timezone, now);
   // Extend adds to a timed pause; an open-ended one has nothing to add to, so it re-pauses.
   const extending = mode === "extend" && group.suspension.active && Boolean(group.suspension.until);
   const timed = (label: string, minutes: number): PauseSheetOption => ({
     label,
-    note: `schedule back at ${formatClock(new Date(now.getTime() + minutes * 60_000), timezone)}`,
+    note: `back at ${formatClock(new Date(now.getTime() + minutes * 60_000), timezone)}`,
     request: extending ? { kind: "extend", minutes } : { kind: "pauseFor", minutes },
   });
+  // Straight into the next internet window: offline until that window ends.
+  const next = windows
+    .map((window) => ({ window, start: nextWindowStart(window, now, timezone) }))
+    .filter((item): item is { window: InternetWindow; start: Date } => item.start !== null)
+    .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
+  const nextEnd = next ? windowEndsAt(next.window, next.start, timezone) : null;
   return [
     timed("For 30 minutes", 30),
     timed("For an hour", 60),
-    ...(bedtimeAt
+    ...(next && nextEnd
       ? [
           {
-            label: "Until bedtime ends",
-            note: `schedule back at ${formatClock(bedtimeAt, timezone)}`,
-            request: { kind: "pauseUntil", until: bedtimeAt.toISOString() } as const,
+            label: `Until ${windowTitle(next.window)} ends`,
+            note: `back at ${formatClock(nextEnd, timezone)}`,
+            request: { kind: "pauseUntil", until: nextEnd.toISOString() } as const,
           },
         ]
       : []),

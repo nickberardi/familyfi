@@ -8,9 +8,9 @@ import { withUpstreamLock } from "./transaction";
  * A household-local wall-clock schedule, not an interval from the last boot — the
  * earlier version read `dohProbeIntervalMinutes` once at start and re-armed a
  * `setInterval` of that length, so "daily" drifted with every restart and the setting
- * had no way to reach the UI anyway. This mirrors `scheduleStart`/`scheduleDays` on
- * `Group`, and reuses `nextClockOnDays` (`src/lib/display.ts`), the same DST-correct
- * function behind bedtime's `nextBedtimeResumeAt`, rather than writing new time math.
+ * had no way to reach the UI anyway. It is shaped like a rule window's start and days,
+ * and reuses `nextClockOnDays` (`src/lib/display.ts`), the same DST-correct function
+ * behind a rule window's next start, rather than writing new time math.
  */
 export const DEFAULT_PROBE_TIME = "00:00";
 export const DEFAULT_PROBE_DAYS = [0];

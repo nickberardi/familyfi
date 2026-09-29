@@ -24,7 +24,7 @@
       "input": {
         "access": "paused"
       },
-      "expected": "Paused"
+      "expected": "Paused · all internet off"
     },
     {
       "fn": "accessColor",
@@ -36,19 +36,19 @@
     },
     {
       "fn": "accessLabel",
-      "name": "always_on",
+      "name": "allowed",
       "input": {
-        "access": "always_on"
+        "access": "allowed"
       },
-      "expected": "Always On · Internet blocked"
+      "expected": "Online · allowed during a schedule"
     },
     {
       "fn": "accessColor",
-      "name": "always_on",
+      "name": "allowed",
       "input": {
-        "access": "always_on"
+        "access": "allowed"
       },
-      "expected": "var(--ff-danger)"
+      "expected": "var(--ff-on)"
     },
     {
       "fn": "accessLabel",
@@ -56,7 +56,7 @@
       "input": {
         "access": "blocked"
       },
-      "expected": "Internet blocked (bedtime)"
+      "expected": "No internet · scheduled"
     },
     {
       "fn": "accessColor",
@@ -64,23 +64,7 @@
       "input": {
         "access": "blocked"
       },
-      "expected": "var(--ff-danger)"
-    },
-    {
-      "fn": "accessLabel",
-      "name": "protected",
-      "input": {
-        "access": "protected"
-      },
-      "expected": "Protected — FamilyFi does not block"
-    },
-    {
-      "fn": "accessColor",
-      "name": "protected",
-      "input": {
-        "access": "protected"
-      },
-      "expected": "var(--ff-muted)"
+      "expected": "var(--ff-accent)"
     },
     {
       "fn": "accessLabel",
@@ -161,97 +145,6 @@
         "value": "bedtime"
       },
       "expected": null
-    },
-    {
-      "fn": "scheduleBands",
-      "name": "daytime window",
-      "input": {
-        "start": "09:00",
-        "end": "17:00"
-      },
-      "expected": [
-        {
-          "left": "37.500%",
-          "width": "33.333%"
-        }
-      ]
-    },
-    {
-      "fn": "scheduleBands",
-      "name": "overnight window splits at midnight",
-      "input": {
-        "start": "21:30",
-        "end": "06:45"
-      },
-      "expected": [
-        {
-          "left": "89.583%",
-          "width": "10.417%"
-        },
-        {
-          "left": "0%",
-          "width": "28.125%"
-        }
-      ]
-    },
-    {
-      "fn": "scheduleBands",
-      "name": "start equals end covers the day",
-      "input": {
-        "start": "08:00",
-        "end": "08:00"
-      },
-      "expected": [
-        {
-          "left": "0%",
-          "width": "100%"
-        }
-      ]
-    },
-    {
-      "fn": "scheduleBands",
-      "name": "ends at midnight",
-      "input": {
-        "start": "22:00",
-        "end": "00:00"
-      },
-      "expected": [
-        {
-          "left": "91.667%",
-          "width": "8.333%"
-        },
-        {
-          "left": "0%",
-          "width": "0.000%"
-        }
-      ]
-    },
-    {
-      "fn": "scheduleBands",
-      "name": "missing start",
-      "input": {
-        "start": null,
-        "end": "06:45"
-      },
-      "expected": []
-    },
-    {
-      "fn": "scheduleBands",
-      "name": "missing end",
-      "input": {
-        "start": "21:30",
-        "end": null
-      },
-      "expected": []
-    },
-    {
-      "fn": "scheduleBands",
-      "name": "malformed",
-      "input": {
-        "start": "9pm",
-        "end": "06:45"
-      },
-      "expected": []
     },
     {
       "fn": "localNowPercent",
@@ -827,270 +720,6 @@
       "expected": "8:30 PM"
     },
     {
-      "fn": "dayCaption",
-      "name": "every night",
-      "input": {
-        "days": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6
-        ]
-      },
-      "expected": "every night"
-    },
-    {
-      "fn": "dayCaption",
-      "name": "school nights",
-      "input": {
-        "days": [
-          1,
-          2,
-          3,
-          4,
-          5
-        ]
-      },
-      "expected": "school nights"
-    },
-    {
-      "fn": "dayCaption",
-      "name": "school nights out of order with repeats",
-      "input": {
-        "days": [
-          5,
-          3,
-          1,
-          2,
-          4,
-          4
-        ]
-      },
-      "expected": "school nights"
-    },
-    {
-      "fn": "dayCaption",
-      "name": "weekends",
-      "input": {
-        "days": [
-          6,
-          0
-        ]
-      },
-      "expected": "weekends"
-    },
-    {
-      "fn": "dayCaption",
-      "name": "other days in week order",
-      "input": {
-        "days": [
-          5,
-          1,
-          3
-        ]
-      },
-      "expected": "Mon, Wed, Fri"
-    },
-    {
-      "fn": "dayCaption",
-      "name": "one day",
-      "input": {
-        "days": [
-          3
-        ]
-      },
-      "expected": "Wed"
-    },
-    {
-      "fn": "dayCaption",
-      "name": "none",
-      "input": {
-        "days": []
-      },
-      "expected": ""
-    },
-    {
-      "fn": "dayCaption",
-      "name": "out-of-range day is dropped",
-      "input": {
-        "days": [
-          1,
-          9
-        ]
-      },
-      "expected": "Mon"
-    },
-    {
-      "fn": "scheduleCaption",
-      "name": "school-night bedtime",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
-      },
-      "expected": "off 9:30 PM–6:45 AM, school nights"
-    },
-    {
-      "fn": "scheduleCaption",
-      "name": "every night things schedule",
-      "input": {
-        "group": {
-          "id": "t1",
-          "kind": "things",
-          "name": "Living room",
-          "monogram": null,
-          "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              0,
-              1,
-              2,
-              3,
-              4,
-              5,
-              6
-            ],
-            "start": "22:00",
-            "end": "07:00"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
-      },
-      "expected": "off 10 PM–7 AM, every night"
-    },
-    {
-      "fn": "scheduleCaption",
-      "name": "Always On",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "always",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "always_on"
-        }
-      },
-      "expected": "Always On"
-    },
-    {
-      "fn": "scheduleCaption",
-      "name": "schedule disabled",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
-      },
-      "expected": "no schedule"
-    },
-    {
-      "fn": "scheduleCaption",
-      "name": "no times",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1
-            ],
-            "start": null,
-            "end": null
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
-      },
-      "expected": "no schedule"
-    },
-    {
       "fn": "cardNoteLine",
       "name": "school-night bedtime",
       "input": {
@@ -1100,11 +729,26 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1113,17 +757,12 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
-      "expected": "4 devices · off 9:30 PM–6:45 AM, school nights"
+      "expected": "4 devices · 1 internet window"
     },
     {
       "fn": "cardNoteLine",
@@ -1135,11 +774,26 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               0,
               1,
@@ -1150,21 +804,16 @@
               6
             ],
             "start": "22:00",
-            "end": "07:00"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
+            "end": "07:00",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
-      "expected": "2 devices · off 10 PM–7 AM, every night"
+      "expected": "2 devices · 1 internet window"
     },
     {
       "fn": "cardNoteLine",
-      "name": "Always On",
+      "name": "was Always On",
       "input": {
         "group": {
           "id": "g1",
@@ -1172,28 +821,28 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "always",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "always_on"
-        }
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
+        },
+        "windows": []
       },
-      "expected": "4 devices · Always On"
+      "expected": "4 devices · no internet rule"
     },
     {
       "fn": "cardNoteLine",
-      "name": "schedule disabled",
+      "name": "no internet rule",
       "input": {
         "group": {
           "id": "g1",
@@ -1201,34 +850,28 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
-        }
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
+        },
+        "windows": []
       },
-      "expected": "4 devices · no schedule"
+      "expected": "4 devices · no internet rule"
     },
     {
       "fn": "cardNoteLine",
-      "name": "no times",
+      "name": "no windows",
       "input": {
         "group": {
           "id": "g1",
@@ -1236,26 +879,24 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1
-            ],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
-        }
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
+        },
+        "windows": []
       },
-      "expected": "4 devices · no schedule"
+      "expected": "4 devices · no internet rule"
     },
     {
       "fn": "cardNoteLine",
@@ -1267,11 +908,26 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 1,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1280,21 +936,16 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
-      "expected": "1 device · off 9:30 PM–6:45 AM, school nights"
+      "expected": "1 device · 1 internet window"
     },
     {
       "fn": "cardNoteLine",
-      "name": "no devices with a bedtime",
+      "name": "no devices with an internet rule",
       "input": {
         "group": {
           "id": "g1",
@@ -1302,11 +953,26 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 0,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1315,21 +981,16 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        }
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
-      "expected": "No devices · bedtime cannot apply on UniFi until you assign one"
+      "expected": "No devices · rules cannot apply on UniFi until you assign one"
     },
     {
       "fn": "cardNoteLine",
-      "name": "no devices in Always On",
+      "name": "no devices and no internet rule, paused never",
       "input": {
         "group": {
           "id": "g1",
@@ -1337,28 +998,28 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "always",
           "deviceCount": 0,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "always_on"
-        }
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
+        },
+        "windows": []
       },
-      "expected": "No devices · Always On cannot apply on UniFi until you assign one"
+      "expected": "0 devices · no internet rule"
     },
     {
       "fn": "cardNoteLine",
-      "name": "no devices and no schedule",
+      "name": "no devices and no rules",
       "input": {
         "group": {
           "id": "g1",
@@ -1366,24 +1027,24 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 0,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
-        }
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
+        },
+        "windows": []
       },
-      "expected": "0 devices · no schedule"
+      "expected": "0 devices · no internet rule"
     },
     {
       "fn": "cardStateLabel",
@@ -1395,11 +1056,27 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1408,22 +1085,17 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "America/New_York"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "now": "2026-09-14T19:00:00-04:00"
       },
-      "expected": "Internet available"
+      "expected": "Online · Bedtime at 9:30 PM"
     },
     {
       "fn": "cardStateLabel",
-      "name": "bedtime blocking",
+      "name": "in an internet window",
       "input": {
         "group": {
           "id": "g1",
@@ -1431,11 +1103,27 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1444,22 +1132,17 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "blocked"
-        },
-        "timeZone": "America/New_York"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "now": "2026-09-14T22:00:00-04:00"
       },
-      "expected": "Bedtime active · Internet blocked"
+      "expected": "No internet · Bedtime until 6:45 AM"
     },
     {
       "fn": "cardStateLabel",
-      "name": "Always On blocking",
+      "name": "no internet rule",
       "input": {
         "group": {
           "id": "g1",
@@ -1467,25 +1150,26 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "always",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "always_on"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         },
-        "timeZone": "America/New_York"
+        "timeZone": "America/New_York",
+        "windows": [],
+        "now": "2026-09-14T19:00:00-04:00"
       },
-      "expected": "Always On · Internet blocked"
+      "expected": "Online · no internet rule"
     },
     {
       "fn": "cardStateLabel",
@@ -1497,11 +1181,30 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": true,
+            "until": "2026-09-14T20:00:00-04:00",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "dohOverrideUrl": null,
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1510,18 +1213,13 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": true,
-            "until": "2026-09-14T20:00:00-04:00"
-          },
-          "dohOverrideUrl": null,
-          "access": "paused"
-        },
-        "timeZone": "America/New_York"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "now": "2026-09-14T19:00:00-04:00"
       },
-      "expected": "Paused until 8:00 PM"
+      "expected": "All internet paused until 8:00 PM by Nick"
     },
     {
       "fn": "cardStateLabel",
@@ -1533,11 +1231,30 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": true,
+            "until": "2026-09-15T00:00:00Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "dohOverrideUrl": null,
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "Pacific/Kiritimati",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1546,18 +1263,13 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": true,
-            "until": "2026-09-15T00:00:00Z"
-          },
-          "dohOverrideUrl": null,
-          "access": "paused"
-        },
-        "timeZone": "Pacific/Kiritimati"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "now": "2026-09-14T19:00:00-04:00"
       },
-      "expected": "Paused until 2:00 PM"
+      "expected": "All internet paused until 2:00 PM by Nick"
     },
     {
       "fn": "cardStateLabel",
@@ -1569,107 +1281,49 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": true,
-            "until": null
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
           },
           "dohOverrideUrl": null,
-          "access": "paused"
-        },
-        "timeZone": "America/New_York"
-      },
-      "expected": "Paused until you resume"
-    },
-    {
-      "fn": "cardStateLabel",
-      "name": "protected wins over paused",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": true,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "paused"
-        },
-        "timeZone": "America/New_York"
-      },
-      "expected": "Always On — never paused"
-    },
-    {
-      "fn": "cardStateLabel",
-      "name": "protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
+          "access": "paused",
+          "allowance": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
-          "dohOverrideUrl": null,
-          "access": "protected"
+          "internetRuleIds": [
+            "r1"
+          ]
         },
-        "timeZone": "America/New_York"
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "Bedtime",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "now": "2026-09-14T19:00:00-04:00"
       },
-      "expected": "Always On — never paused"
+      "expected": "All internet paused until resumed by Nick"
     },
     {
       "fn": "cardStateLabel",
-      "name": "adult has no controls even when blocked",
+      "name": "adult under an internet rule",
       "input": {
         "group": {
           "id": "g1",
@@ -1677,11 +1331,27 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1690,16 +1360,42 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "now": "2026-09-14T22:00:00-04:00"
+      },
+      "expected": "No internet · Bedtime until 6:45 AM"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "adult with no internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "adult",
+          "deviceCount": 4,
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "blocked"
+          "access": "blocked",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         },
-        "timeZone": "America/New_York"
+        "timeZone": "America/New_York",
+        "windows": [],
+        "now": "2026-09-14T22:00:00-04:00"
       },
       "expected": "No controls applied"
     },
@@ -1713,11 +1409,27 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "blocked",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -1726,18 +1438,13 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "blocked"
-        },
-        "timeZone": "America/New_York"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "now": "2026-09-14T22:00:00-04:00"
       },
-      "expected": "Bedtime active · Internet blocked"
+      "expected": "No internet · Bedtime until 6:45 AM"
     },
     {
       "fn": "canPauseGroup",
@@ -1749,27 +1456,22 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         }
       },
       "expected": true
@@ -1784,34 +1486,29 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         }
       },
       "expected": false
     },
     {
       "fn": "canPauseGroup",
-      "name": "protected",
+      "name": "no internet rule, child",
       "input": {
         "group": {
           "id": "g1",
@@ -1819,34 +1516,27 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": true,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         }
       },
-      "expected": false
+      "expected": true
     },
     {
       "fn": "canPauseGroup",
-      "name": "no schedule",
+      "name": "no usable window",
       "input": {
         "group": {
           "id": "g1",
@@ -1854,28 +1544,27 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         }
       },
-      "expected": false
+      "expected": true
     },
     {
       "fn": "canPauseGroup",
-      "name": "enabled without an end",
+      "name": "no internet rule without a schedule",
       "input": {
         "group": {
           "id": "g1",
@@ -1883,52 +1572,20 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1
-            ],
-            "start": "21:30",
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
-        }
-      },
-      "expected": false
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "Always On without a schedule",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "always",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
-          "suspension": {
+          "access": "available",
+          "allowance": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
-          "dohOverrideUrl": null,
-          "access": "always_on"
+          "internetRuleIds": []
         }
       },
       "expected": true
@@ -1943,34 +1600,29 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         }
       },
       "expected": true
     },
     {
       "fn": "canPauseGroup",
-      "name": "things without a schedule",
+      "name": "things with no internet rule",
       "input": {
         "group": {
           "id": "t1",
@@ -1978,24 +1630,23 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         }
       },
-      "expected": false
+      "expected": true
     },
     {
       "fn": "canPauseGroup",
@@ -2007,27 +1658,22 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         }
       },
       "expected": true
@@ -2254,253 +1900,6 @@
       "expected": null
     },
     {
-      "fn": "nextBedtimeResumeAt",
-      "name": "Monday evening resumes Tuesday morning",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
-      },
-      "expected": "2026-09-15T10:45:00.000Z"
-    },
-    {
-      "fn": "nextBedtimeResumeAt",
-      "name": "Friday night resumes Saturday morning",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "America/New_York",
-        "now": "2026-09-19T02:00:00Z"
-      },
-      "expected": "2026-09-19T10:45:00.000Z"
-    },
-    {
-      "fn": "nextBedtimeResumeAt",
-      "name": "Saturday afternoon waits for Tuesday",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "America/New_York",
-        "now": "2026-09-19T18:00:00Z"
-      },
-      "expected": "2026-09-22T10:45:00.000Z"
-    },
-    {
-      "fn": "nextBedtimeResumeAt",
-      "name": "daytime window resumes the same day",
-      "input": {
-        "group": {
-          "id": "t1",
-          "kind": "things",
-          "name": "Living room",
-          "monogram": null,
-          "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "09:00",
-            "end": "15:00"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T14:00:00Z"
-      },
-      "expected": "2026-09-14T19:00:00.000Z"
-    },
-    {
-      "fn": "nextBedtimeResumeAt",
-      "name": "UTC+14",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "Pacific/Kiritimati",
-        "now": "2026-09-14T12:00:00Z"
-      },
-      "expected": "2026-09-14T16:45:00.000Z"
-    },
-    {
-      "fn": "nextBedtimeResumeAt",
-      "name": "no schedule",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
-      },
-      "expected": null
-    },
-    {
-      "fn": "nextBedtimeResumeAt",
-      "name": "no days",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
-      },
-      "expected": null
-    },
-    {
       "fn": "relativeDayLabel",
       "name": "same local day",
       "input": {
@@ -2580,39 +1979,34 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "web"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         },
         {
           "label": "Detail",
@@ -2630,43 +2024,41 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": true,
-            "until": "2026-09-14T20:00:00.000Z"
+            "until": "2026-09-14T20:00:00.000Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
           },
           "dohOverrideUrl": null,
-          "access": "paused"
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "web"
       },
       "expected": [
         {
-          "label": "Resume",
+          "label": "Resume internet",
           "strong": true,
           "run": "resume"
         },
         {
-          "label": "Extend",
+          "label": "More time",
           "run": "extend"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         }
       ]
     },
@@ -2680,49 +2072,47 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": true,
-            "until": null
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
           },
           "dohOverrideUrl": null,
-          "access": "paused"
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "web"
       },
       "expected": [
         {
-          "label": "Resume",
+          "label": "Resume internet",
           "strong": true,
           "run": "resume"
         },
         {
-          "label": "Extend",
+          "label": "More time",
           "run": "extend"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         }
       ]
     },
     {
       "fn": "groupActionSpecs",
-      "name": "web: bedtime blocking",
+      "name": "web: in an internet window",
       "input": {
         "group": {
           "id": "g1",
@@ -2730,39 +2120,73 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "blocked"
+          "access": "blocked",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "web"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Allow internet now",
+          "strong": true,
+          "run": "allow"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: was Always On",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         },
         {
           "label": "Detail",
@@ -2772,7 +2196,7 @@
     },
     {
       "fn": "groupActionSpecs",
-      "name": "web: Always On",
+      "name": "web: child with no internet rule",
       "input": {
         "group": {
           "id": "g1",
@@ -2780,73 +2204,32 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "always",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "always_on"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         },
         "surface": "web"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
-        },
-        {
-          "label": "Detail",
-          "href": "/family/g1"
-        }
-      ]
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "web: no schedule",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "surface": "web"
-      },
-      "expected": [
-        {
-          "label": "Rules",
-          "href": "/rules#group-g1",
-          "strong": true
+          "href": "/rules?group=g1"
         },
         {
           "label": "Detail",
@@ -2864,39 +2247,34 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "web"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-t1"
+          "href": "/rules?group=t1"
         },
         {
           "label": "Detail",
@@ -2906,7 +2284,7 @@
     },
     {
       "fn": "groupActionSpecs",
-      "name": "web: things without a schedule",
+      "name": "web: things with no internet rule",
       "input": {
         "group": {
           "id": "t1",
@@ -2914,29 +2292,32 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         },
         "surface": "web"
       },
       "expected": [
         {
+          "label": "Pause all internet",
+          "strong": true,
+          "run": "pause"
+        },
+        {
           "label": "Rules",
-          "href": "/rules#group-t1",
-          "strong": true
+          "href": "/rules?group=t1"
         },
         {
           "label": "Detail",
@@ -2954,115 +2335,28 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "web"
       },
       "expected": [
         {
           "label": "View devices",
-          "href": "/family/g1"
-        }
-      ]
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "web: protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "protected"
-        },
-        "surface": "web"
-      },
-      "expected": [
-        {
-          "label": "Detail",
-          "href": "/family/g1"
-        }
-      ]
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "web: protected while paused",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": true,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "paused"
-        },
-        "surface": "web"
-      },
-      "expected": [
-        {
-          "label": "Detail",
           "href": "/family/g1"
         }
       ]
@@ -3077,39 +2371,34 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "phone"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         }
       ]
     },
@@ -3123,43 +2412,41 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": true,
-            "until": "2026-09-14T20:00:00.000Z"
+            "until": "2026-09-14T20:00:00.000Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
           },
           "dohOverrideUrl": null,
-          "access": "paused"
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "phone"
       },
       "expected": [
         {
-          "label": "Resume",
+          "label": "Resume internet",
           "strong": true,
           "run": "resume"
         },
         {
-          "label": "Extend",
+          "label": "More time",
           "run": "extend"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         }
       ]
     },
@@ -3173,49 +2460,47 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": true,
-            "until": null
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
           },
           "dohOverrideUrl": null,
-          "access": "paused"
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "phone"
       },
       "expected": [
         {
-          "label": "Resume",
+          "label": "Resume internet",
           "strong": true,
           "run": "resume"
         },
         {
-          "label": "Extend",
+          "label": "More time",
           "run": "extend"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         }
       ]
     },
     {
       "fn": "groupActionSpecs",
-      "name": "phone: bedtime blocking",
+      "name": "phone: in an internet window",
       "input": {
         "group": {
           "id": "g1",
@@ -3223,45 +2508,79 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "blocked"
+          "access": "blocked",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "phone"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Allow internet now",
+          "strong": true,
+          "run": "allow"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: was Always On",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
+          "href": "/rules?group=g1"
         }
       ]
     },
     {
       "fn": "groupActionSpecs",
-      "name": "phone: Always On",
+      "name": "phone: child with no internet rule",
       "input": {
         "group": {
           "id": "g1",
@@ -3269,69 +2588,32 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "always",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "always_on"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         },
         "surface": "phone"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-g1"
-        }
-      ]
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "phone: no schedule",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "surface": "phone"
-      },
-      "expected": [
-        {
-          "label": "Rules",
-          "href": "/rules#group-g1",
-          "strong": true
+          "href": "/rules?group=g1"
         }
       ]
     },
@@ -3345,45 +2627,40 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "phone"
       },
       "expected": [
         {
-          "label": "Pause",
+          "label": "Pause all internet",
           "strong": true,
           "run": "pause"
         },
         {
           "label": "Rules",
-          "href": "/rules#group-t1"
+          "href": "/rules?group=t1"
         }
       ]
     },
     {
       "fn": "groupActionSpecs",
-      "name": "phone: things without a schedule",
+      "name": "phone: things with no internet rule",
       "input": {
         "group": {
           "id": "t1",
@@ -3391,29 +2668,32 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         },
         "surface": "phone"
       },
       "expected": [
         {
+          "label": "Pause all internet",
+          "strong": true,
+          "run": "pause"
+        },
+        {
           "label": "Rules",
-          "href": "/rules#group-t1",
-          "strong": true
+          "href": "/rules?group=t1"
         }
       ]
     },
@@ -3427,99 +2707,22 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "surface": "phone"
-      },
-      "expected": []
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "phone: protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
+          "access": "available",
+          "allowance": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
-          "dohOverrideUrl": null,
-          "access": "protected"
-        },
-        "surface": "phone"
-      },
-      "expected": []
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "phone: protected while paused",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "mode": "scheduled",
-          "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": true,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "paused"
+          "internetRuleIds": [
+            "r1"
+          ]
         },
         "surface": "phone"
       },
@@ -3535,7 +2738,7 @@
         },
         "mode": "pause"
       },
-      "expected": "Pause Betsy’s bedtime?"
+      "expected": "Pause all internet for Betsy?"
     },
     {
       "fn": "pauseSheetTitle",
@@ -3547,15 +2750,19 @@
         },
         "mode": "pause"
       },
-      "expected": "Pause Living room’s schedule?"
+      "expected": "Pause all internet for Living room?"
     },
     {
       "fn": "pauseSheetBody",
       "name": "pause",
       "input": {
-        "mode": "pause"
+        "mode": "pause",
+        "group": {
+          "kind": "family",
+          "deviceCount": 4
+        }
       },
-      "expected": "Pause suspends bedtime enforcement so internet is available from FamilyFi. Resume restores the stored schedule, which may still block during bedtime."
+      "expected": "All 4 of its devices lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
     },
     {
       "fn": "pauseSheetTitle",
@@ -3567,7 +2774,7 @@
         },
         "mode": "extend"
       },
-      "expected": "More time for Betsy?"
+      "expected": "Keep all internet off for Betsy longer?"
     },
     {
       "fn": "pauseSheetTitle",
@@ -3579,15 +2786,19 @@
         },
         "mode": "extend"
       },
-      "expected": "More time for Living room?"
+      "expected": "Keep all internet off for Living room longer?"
     },
     {
       "fn": "pauseSheetBody",
       "name": "extend",
       "input": {
-        "mode": "extend"
+        "mode": "extend",
+        "group": {
+          "kind": "family",
+          "deviceCount": 4
+        }
       },
-      "expected": "Extending keeps the schedule suspended longer. Resume restores bedtime, which may still block."
+      "expected": "Every device stays offline for longer. Resume brings internet back sooner."
     },
     {
       "fn": "pauseSheetOptions",
@@ -3599,11 +2810,29 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -3612,23 +2841,15 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "mode": "pause",
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 7:30 PM",
+          "note": "back at 7:30 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 30
@@ -3636,15 +2857,15 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 8:00 PM",
+          "note": "back at 8:00 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 60
           }
         },
         {
-          "label": "Until bedtime ends",
-          "note": "schedule back at 6:45 AM",
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
           "request": {
             "kind": "pauseUntil",
             "until": "2026-09-15T10:45:00.000Z"
@@ -3670,11 +2891,29 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 2,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -3683,23 +2922,15 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "mode": "pause",
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 7:30 PM",
+          "note": "back at 7:30 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 30
@@ -3707,15 +2938,15 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 8:00 PM",
+          "note": "back at 8:00 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 60
           }
         },
         {
-          "label": "Until bedtime ends",
-          "note": "schedule back at 6:45 AM",
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
           "request": {
             "kind": "pauseUntil",
             "until": "2026-09-15T10:45:00.000Z"
@@ -3741,11 +2972,29 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "mode": "pause",
+        "timeZone": "Pacific/Kiritimati",
+        "now": "2026-09-14T08:00:00Z",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -3754,23 +3003,15 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "mode": "pause",
-        "timeZone": "Pacific/Kiritimati",
-        "now": "2026-09-14T08:00:00Z"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 10:30 PM",
+          "note": "back at 10:30 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 30
@@ -3778,18 +3019,18 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 11:00 PM",
+          "note": "back at 11:00 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 60
           }
         },
         {
-          "label": "Until bedtime ends",
-          "note": "schedule back at 6:45 AM",
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
           "request": {
             "kind": "pauseUntil",
-            "until": "2026-09-14T16:45:00.000Z"
+            "until": "2026-09-15T16:45:00.000Z"
           }
         },
         {
@@ -3812,11 +3053,29 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T03:45:00Z",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -3825,23 +3084,15 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "mode": "pause",
-        "timeZone": "America/New_York",
-        "now": "2026-09-15T03:45:00Z"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 12:15 AM",
+          "note": "back at 12:15 AM",
           "request": {
             "kind": "pauseFor",
             "minutes": 30
@@ -3849,18 +3100,18 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 12:45 AM",
+          "note": "back at 12:45 AM",
           "request": {
             "kind": "pauseFor",
             "minutes": 60
           }
         },
         {
-          "label": "Until bedtime ends",
-          "note": "schedule back at 6:45 AM",
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
           "request": {
             "kind": "pauseUntil",
-            "until": "2026-09-15T10:45:00.000Z"
+            "until": "2026-09-16T10:45:00.000Z"
           }
         },
         {
@@ -3875,7 +3126,7 @@
     },
     {
       "fn": "pauseSheetOptions",
-      "name": "Always On has no bedtime option",
+      "name": "no internet rule has no window option",
       "input": {
         "group": {
           "id": "g1",
@@ -3883,30 +3134,30 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "always",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": false,
-            "days": [],
-            "start": null,
-            "end": null
-          },
           "suspension": {
             "active": false,
-            "until": null
+            "until": null,
+            "by": null
           },
           "dohOverrideUrl": null,
-          "access": "always_on"
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": []
         },
         "mode": "pause",
         "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
+        "now": "2026-09-14T23:00:00Z",
+        "windows": []
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 7:30 PM",
+          "note": "back at 7:30 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 30
@@ -3914,7 +3165,7 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 8:00 PM",
+          "note": "back at 8:00 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 60
@@ -3940,11 +3191,32 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": true,
+            "until": "2026-09-15T00:00:00.000Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "dohOverrideUrl": null,
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -3953,23 +3225,15 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": true,
-            "until": "2026-09-15T00:00:00.000Z"
-          },
-          "dohOverrideUrl": null,
-          "access": "paused"
-        },
-        "mode": "extend",
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 7:30 PM",
+          "note": "back at 7:30 PM",
           "request": {
             "kind": "extend",
             "minutes": 30
@@ -3977,15 +3241,15 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 8:00 PM",
+          "note": "back at 8:00 PM",
           "request": {
             "kind": "extend",
             "minutes": 60
           }
         },
         {
-          "label": "Until bedtime ends",
-          "note": "schedule back at 6:45 AM",
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
           "request": {
             "kind": "pauseUntil",
             "until": "2026-09-15T10:45:00.000Z"
@@ -4011,11 +3275,32 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "dohOverrideUrl": null,
+          "access": "paused",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -4024,23 +3309,15 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": true,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "paused"
-        },
-        "mode": "extend",
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 7:30 PM",
+          "note": "back at 7:30 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 30
@@ -4048,15 +3325,15 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 8:00 PM",
+          "note": "back at 8:00 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 60
           }
         },
         {
-          "label": "Until bedtime ends",
-          "note": "schedule back at 6:45 AM",
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
           "request": {
             "kind": "pauseUntil",
             "until": "2026-09-15T10:45:00.000Z"
@@ -4082,11 +3359,29 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
-          "mode": "scheduled",
           "deviceCount": 4,
-          "schedule": {
-            "enabled": true,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T23:00:00Z",
+        "windows": [
+          {
+            "name": "Bedtime",
             "days": [
               1,
               2,
@@ -4095,23 +3390,15 @@
               5
             ],
             "start": "21:30",
-            "end": "06:45"
-          },
-          "suspension": {
-            "active": false,
-            "until": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "mode": "extend",
-        "timeZone": "America/New_York",
-        "now": "2026-09-14T23:00:00Z"
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
       },
       "expected": [
         {
           "label": "For 30 minutes",
-          "note": "schedule back at 7:30 PM",
+          "note": "back at 7:30 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 30
@@ -4119,15 +3406,15 @@
         },
         {
           "label": "For an hour",
-          "note": "schedule back at 8:00 PM",
+          "note": "back at 8:00 PM",
           "request": {
             "kind": "pauseFor",
             "minutes": 60
           }
         },
         {
-          "label": "Until bedtime ends",
-          "note": "schedule back at 6:45 AM",
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
           "request": {
             "kind": "pauseUntil",
             "until": "2026-09-15T10:45:00.000Z"
@@ -4142,6 +3429,2272 @@
           }
         }
       ]
+    },
+    {
+      "fn": "daysLabel",
+      "name": "every day",
+      "input": {
+        "days": [
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          0
+        ]
+      },
+      "expected": "Every day"
+    },
+    {
+      "fn": "daysLabel",
+      "name": "weekdays",
+      "input": {
+        "days": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "expected": "Mon–Fri"
+    },
+    {
+      "fn": "daysLabel",
+      "name": "school nights",
+      "input": {
+        "days": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "expected": "Sun–Thu"
+    },
+    {
+      "fn": "daysLabel",
+      "name": "weekends",
+      "input": {
+        "days": [
+          0,
+          6
+        ]
+      },
+      "expected": "Weekends"
+    },
+    {
+      "fn": "daysLabel",
+      "name": "a few days",
+      "input": {
+        "days": [
+          3,
+          1
+        ]
+      },
+      "expected": "Mon, Wed"
+    },
+    {
+      "fn": "windowTimes",
+      "name": "across midnight",
+      "input": {
+        "start": "21:30",
+        "end": "06:45"
+      },
+      "expected": "9:30 PM–6:45 AM"
+    },
+    {
+      "fn": "windowTimes",
+      "name": "on the hour",
+      "input": {
+        "start": "15:00",
+        "end": "18:00"
+      },
+      "expected": "3 PM–6 PM"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "allowed during a window",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": "2026-09-14T18:00:00-04:00",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "allowed"
+        },
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T16:00:00-04:00"
+      },
+      "expected": "Online · allowed until 6:00 PM by Nick"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "allowed until cancelled",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "allowed"
+        },
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T16:00:00-04:00"
+      },
+      "expected": "Online · allowed until you resume the schedule"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "next window named",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T12:00:00-04:00"
+      },
+      "expected": "Online · Homework at 3:00 PM"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "last night's bedtime still blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T05:00:00-04:00"
+      },
+      "expected": "No internet · Bedtime until 6:45 AM"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "things group with no internet rule",
+      "input": {
+        "group": {
+          "id": "t1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": null,
+          "familyRole": null,
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [],
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T12:00:00-04:00"
+      },
+      "expected": "Online · no internet rule"
+    },
+    {
+      "fn": "cardStateLabel",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ],
+        "now": "2026-09-14T19:00:00-04:00"
+      },
+      "expected": "No internet · Grounded · always"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "two internet windows",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ]
+      },
+      "expected": "4 devices · 2 internet windows"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "paused with no devices",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 0,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": []
+      },
+      "expected": "No devices · rules cannot apply on UniFi until you assign one"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ]
+      },
+      "expected": "4 devices · internet off always"
+    },
+    {
+      "fn": "canPauseGroup",
+      "name": "no internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "dohOverrideUrl": null,
+          "access": "available"
+        }
+      },
+      "expected": true
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: in an internet window allows",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Allow internet now",
+          "strong": true,
+          "run": "allow"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "web: allowed resumes the schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "allowed"
+        },
+        "surface": "web"
+      },
+      "expected": [
+        {
+          "label": "Resume schedule",
+          "strong": true,
+          "run": "disallow"
+        },
+        {
+          "label": "Pause all internet",
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: in an internet window allows",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "blocked"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Allow internet now",
+          "strong": true,
+          "run": "allow"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        }
+      ]
+    },
+    {
+      "fn": "groupActionSpecs",
+      "name": "phone: allowed resumes the schedule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "allowed"
+        },
+        "surface": "phone"
+      },
+      "expected": [
+        {
+          "label": "Resume schedule",
+          "strong": true,
+          "run": "disallow"
+        },
+        {
+          "label": "Pause all internet",
+          "run": "pause"
+        },
+        {
+          "label": "Rules",
+          "href": "/rules?group=g1"
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause one device",
+      "input": {
+        "group": {
+          "kind": "family",
+          "deviceCount": 1
+        },
+        "mode": "pause"
+      },
+      "expected": "Its 1 device loses all internet. Category, app and website rules stay as they are. Cellular data is not affected."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause a things group",
+      "input": {
+        "group": {
+          "kind": "things",
+          "deviceCount": 7
+        },
+        "mode": "pause"
+      },
+      "expected": "All 7 of its devices lose all internet. Category, app and website rules stay as they are. The local network still works."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause with no devices",
+      "input": {
+        "group": {
+          "kind": "family",
+          "deviceCount": 0
+        },
+        "mode": "pause"
+      },
+      "expected": "Devices you assign lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause names the first device",
+      "input": {
+        "group": {
+          "kind": "family",
+          "deviceCount": 2
+        },
+        "mode": "pause",
+        "deviceNames": [
+          "Cassie's iPhone",
+          "Cassie's iPad"
+        ]
+      },
+      "expected": "Cassie's iPhone and 1 other device lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause names its only device",
+      "input": {
+        "group": {
+          "kind": "things",
+          "deviceCount": 1
+        },
+        "mode": "pause",
+        "deviceNames": [
+          "Living room TV"
+        ]
+      },
+      "expected": "Living room TV loses all internet. Category, app and website rules stay as they are. The local network still works."
+    },
+    {
+      "fn": "pauseSheetBody",
+      "name": "pause skips unnamed devices",
+      "input": {
+        "group": {
+          "kind": "family",
+          "deviceCount": 3
+        },
+        "mode": "pause",
+        "deviceNames": [
+          "",
+          "Kids iPad"
+        ]
+      },
+      "expected": "Kids iPad and 2 other devices lose all internet. Category, app and website rules stay as they are. Cellular data is not affected."
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "until the next window ends, across midnight",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ],
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T19:00:00-04:00"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "back at 7:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "back at 8:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until Bedtime ends",
+          "note": "back at 6:45 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-15T10:45:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "pauseSheetOptions",
+      "name": "the earliest of several windows",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-14T12:00:00-04:00"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "back at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "back at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until Homework ends",
+          "note": "back at 6:00 PM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-14T22:00:00.000Z"
+          }
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "windowTitle",
+      "name": "window name",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        }
+      },
+      "expected": "Homework"
+    },
+    {
+      "fn": "windowTitle",
+      "name": "falls back to the rule",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        }
+      },
+      "expected": "Bedtime"
+    },
+    {
+      "fn": "isWindowActive",
+      "name": "inside, same day",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        },
+        "now": "2026-09-14T16:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": true
+    },
+    {
+      "fn": "isWindowActive",
+      "name": "outside its days",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        },
+        "now": "2026-09-13T16:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": false
+    },
+    {
+      "fn": "isWindowActive",
+      "name": "morning after a Friday-only bedtime",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            5
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-09-19T05:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": true
+    },
+    {
+      "fn": "isWindowActive",
+      "name": "morning after, not a start day",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            5
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-09-20T05:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": false
+    },
+    {
+      "fn": "isWindowActive",
+      "name": "start equals end never blocks",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "start": "21:30",
+          "end": "21:30",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-09-14T22:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": false
+    },
+    {
+      "fn": "windowEndsAt",
+      "name": "tonight's bedtime ends tomorrow",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-09-14T23:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": "2026-09-15T10:45:00.000Z"
+    },
+    {
+      "fn": "windowEndsAt",
+      "name": "last night's bedtime ends this morning",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-09-15T02:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": "2026-09-15T10:45:00.000Z"
+    },
+    {
+      "fn": "windowEndsAt",
+      "name": "not active",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        },
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": null
+    },
+    {
+      "fn": "windowEndsAt",
+      "name": "in UTC+14",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-09-14T10:00:00Z",
+        "timeZone": "Pacific/Kiritimati"
+      },
+      "expected": "2026-09-14T16:45:00.000Z"
+    },
+    {
+      "fn": "nextWindowStart",
+      "name": "later today",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        },
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": "2026-09-14T19:00:00.000Z"
+    },
+    {
+      "fn": "nextWindowStart",
+      "name": "over the weekend",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        },
+        "now": "2026-09-19T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": "2026-09-21T19:00:00.000Z"
+    },
+    {
+      "fn": "windowDayBands",
+      "name": "last night's tail and tonight",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        },
+        "weekday": 1
+      },
+      "expected": [
+        {
+          "from": 0,
+          "to": 405,
+          "carried": true
+        },
+        {
+          "from": 1290,
+          "to": 1440,
+          "carried": false
+        }
+      ]
+    },
+    {
+      "fn": "windowDayBands",
+      "name": "same-day window",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        },
+        "weekday": 1
+      },
+      "expected": [
+        {
+          "from": 900,
+          "to": 1080,
+          "carried": false
+        }
+      ]
+    },
+    {
+      "fn": "windowDayBands",
+      "name": "tail only the day after its last start",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            5
+          ],
+          "start": "21:30",
+          "end": "06:45",
+          "ruleName": "Bedtime"
+        },
+        "weekday": 6
+      },
+      "expected": [
+        {
+          "from": 0,
+          "to": 405,
+          "carried": true
+        }
+      ]
+    },
+    {
+      "fn": "windowDayBands",
+      "name": "nothing on another day",
+      "input": {
+        "window": {
+          "name": "Homework",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "15:00",
+          "end": "18:00",
+          "ruleName": "School days"
+        },
+        "weekday": 0
+      },
+      "expected": []
+    },
+    {
+      "fn": "windowOverlaps",
+      "name": "same evening",
+      "input": {
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          },
+          {
+            "name": "Chores",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "17:00",
+            "end": "19:00",
+            "ruleName": "School days"
+          },
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          }
+        ]
+      },
+      "expected": [
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "fn": "windowOverlaps",
+      "name": "across midnight into the next day",
+      "input": {
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              1
+            ],
+            "start": "05:00",
+            "end": "08:00",
+            "ruleName": "School days"
+          }
+        ]
+      },
+      "expected": [
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "fn": "windowOverlaps",
+      "name": "across the end of the week",
+      "input": {
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              0
+            ],
+            "start": "05:00",
+            "end": "07:00",
+            "ruleName": "School days"
+          }
+        ]
+      },
+      "expected": [
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "fn": "windowOverlaps",
+      "name": "different days",
+      "input": {
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              0,
+              6
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "fn": "internetState",
+      "name": "no internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "no_rule"
+      }
+    },
+    {
+      "fn": "internetState",
+      "name": "online with the next window",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "online",
+        "next": {
+          "window": "Homework",
+          "at": "2026-09-14T19:00:00.000Z"
+        }
+      }
+    },
+    {
+      "fn": "internetState",
+      "name": "blocked until the later of two windows",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          },
+          {
+            "name": "Chores",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "17:00",
+            "end": "19:00",
+            "ruleName": "School days"
+          }
+        ],
+        "now": "2026-09-14T17:30:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "blocked",
+        "window": "Chores",
+        "until": "2026-09-14T23:00:00.000Z"
+      }
+    },
+    {
+      "fn": "internetState",
+      "name": "a pause wins over an allowance",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "allowance": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "now": "2026-09-14T16:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "paused",
+        "until": null,
+        "by": {
+          "accountId": "a1",
+          "name": "Nick"
+        }
+      }
+    },
+    {
+      "fn": "internetState",
+      "name": "allowed during a window",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": "2026-09-14T18:00:00-04:00",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "now": "2026-09-14T16:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "allowed",
+        "window": "Homework",
+        "until": "2026-09-14T18:00:00-04:00",
+        "by": {
+          "accountId": "a1",
+          "name": "Nick"
+        }
+      }
+    },
+    {
+      "fn": "internetState",
+      "name": "an expired allowance blocks again",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": "2026-09-14T17:00:00-04:00",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "now": "2026-09-14T17:30:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "blocked",
+        "window": "Homework",
+        "until": "2026-09-14T22:00:00.000Z"
+      }
+    },
+    {
+      "fn": "internetState",
+      "name": "an expired pause is over",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": true,
+            "until": "2026-09-14T11:00:00-04:00",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "no_rule"
+      }
+    },
+    {
+      "fn": "internetState",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "blocked",
+        "window": "Grounded",
+        "until": null
+      }
+    },
+    {
+      "fn": "internetDayBands",
+      "name": "every window with its source",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "Bedtime"
+          },
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": [
+        {
+          "kind": "window",
+          "from": 0,
+          "to": 405,
+          "carried": true,
+          "label": "Bedtime",
+          "source": "Bedtime rule"
+        },
+        {
+          "kind": "window",
+          "from": 1290,
+          "to": 1440,
+          "carried": false,
+          "label": "Bedtime",
+          "source": "Bedtime rule"
+        },
+        {
+          "kind": "window",
+          "from": 900,
+          "to": 1080,
+          "carried": false,
+          "label": "Homework",
+          "source": "School days rule · Homework"
+        }
+      ]
+    },
+    {
+      "fn": "internetDayBands",
+      "name": "a timed pause from now",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": true,
+            "until": "2026-09-14T20:10:00-04:00",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [],
+        "now": "2026-09-14T19:40:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": [
+        {
+          "kind": "pause",
+          "from": 1180,
+          "to": 1210,
+          "label": "Paused",
+          "source": "Paused by Nick until 8:10 PM",
+          "carried": false
+        }
+      ]
+    },
+    {
+      "fn": "internetDayBands",
+      "name": "a pause into tomorrow runs to midnight",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": true,
+            "until": "2026-09-15T07:00:00-04:00",
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [],
+        "now": "2026-09-14T19:40:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": [
+        {
+          "kind": "pause",
+          "from": 1180,
+          "to": 1440,
+          "label": "Paused",
+          "source": "Paused by someone until 7:00 AM",
+          "carried": false
+        }
+      ]
+    },
+    {
+      "fn": "internetDayBands",
+      "name": "an allowance over its window",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": "2026-09-14T18:00:00-04:00",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "Homework",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "15:00",
+            "end": "18:00",
+            "ruleName": "School days"
+          }
+        ],
+        "now": "2026-09-14T16:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": [
+        {
+          "kind": "window",
+          "from": 900,
+          "to": 1080,
+          "carried": false,
+          "label": "Homework",
+          "source": "School days rule · Homework"
+        },
+        {
+          "kind": "allowance",
+          "from": 960,
+          "to": 1080,
+          "label": "Allowed",
+          "source": "Allowed by Nick until 6:00 PM",
+          "carried": false
+        }
+      ]
+    },
+    {
+      "fn": "internetDayBands",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": [
+        {
+          "kind": "window",
+          "from": 0,
+          "to": 1440,
+          "carried": false,
+          "label": "Grounded",
+          "source": "Grounded rule"
+        }
+      ]
+    },
+    {
+      "fn": "localWeekday",
+      "name": "Monday evening in New York",
+      "input": {
+        "now": "2026-09-15T01:00:00Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": 1
+    },
+    {
+      "fn": "localWeekday",
+      "name": "already Tuesday in UTC+14",
+      "input": {
+        "now": "2026-09-14T12:00:00Z",
+        "timeZone": "Pacific/Kiritimati"
+      },
+      "expected": 2
     }
   ]
 }

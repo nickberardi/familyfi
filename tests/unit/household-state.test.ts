@@ -15,11 +15,10 @@ function group(overrides: Partial<Group> = {}): Group {
     name: "Betsy",
     monogram: null,
     familyRole: "child",
-    protected: false,
-    mode: "scheduled",
     deviceCount: 1,
-    schedule: { enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" },
-    suspension: { active: false, until: null },
+    suspension: { active: false, until: null, by: null },
+    allowance: { active: false, until: null, by: null },
+    internetRuleIds: [],
     dohOverrideUrl: null,
     access: "available",
     ...overrides,
@@ -59,11 +58,11 @@ describe("applyMutationResult", () => {
   it("replaces an edited group in place", () => {
     const next = applyMutationResult(
       { groups: [group()], devices: [] },
-      { group: group({ name: "Elizabeth", protected: true, access: "protected" }) },
+      { group: group({ name: "Elizabeth", access: "paused" }) },
     );
     expect(next.groups).toHaveLength(1);
     expect(next.groups[0]?.name).toBe("Elizabeth");
-    expect(next.groups[0]?.protected).toBe(true);
+    expect(next.groups[0]?.access).toBe("paused");
   });
 
   it("quarantines members when a group is deleted", () => {

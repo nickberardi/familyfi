@@ -30,6 +30,13 @@ export type IconName =
   // Actions
   | "copy"
   | "arrow-square-out"
+  | "plus"
+  | "caret-up"
+  | "caret-down"
+  // Rule kinds
+  | "globe-simple"
+  | "app-window"
+  | "link-simple"
   // Device types
   | "device-tablet"
   | "laptop"

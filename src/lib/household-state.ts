@@ -1,3 +1,4 @@
+import type { Rule } from "@/lib/rules";
 import type { Account, Device, Group, UnifiSettings } from "@/lib/types";
 
 export type HouseholdLists = {
@@ -20,7 +21,9 @@ export type MutationPayload = {
   household?: HouseholdPublic;
   account?: Account;
   unifi?: UnifiSettings;
+  rule?: Rule;
   removedGroupId?: string;
+  removedRuleId?: string;
 };
 
 export function upsertGroup(groups: Group[], group: Group): Group[] {

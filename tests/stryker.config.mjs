@@ -14,7 +14,7 @@ const config = {
     "src/server/reconciliation.ts",
     "src/server/quarantine.ts",
     "src/server/unifi/plan.ts",
-    "src/server/unifi/plan-dpi.ts",
+    "src/server/unifi/plan-rules.ts",
     "src/server/unifi/policy-ownership.ts",
     "src/lib/schedule.ts",
   ],

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { UpdateCheck } from "@/lib/types";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
@@ -134,22 +134,40 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   await expect(alert).toHaveCount(0);
 });
 
-test("create person lands on a seeded detail page that can be edited", async ({ page }) => {
+/** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
+async function addGroup(page: Page, kind: "family" | "things", fill: (dialog: Locator) => Promise<void>, name: string) {
+  await page.goto(`/${kind}`);
+  await expect(page.getByText("Loading household…")).toHaveCount(0);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: kind === "family" ? "New family member" : "New group" });
+  await expect(dialog).toBeVisible();
+  await fill(dialog);
+  const created = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/groups") && response.request().method() === "POST",
+  );
+  await dialog.getByRole("button", { name: kind === "family" ? "Add person" : "Create group" }).click();
+  const response = await created;
+  expect(response.ok()).toBeTruthy();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`/${kind}$`));
+  await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
+  return ((await response.json()) as { group: { id: string } }).group.id;
+}
+
+test("add person opens a sheet over Family, and the new person can be edited", async ({ page }) => {
   await signIn(page);
 
   const name = `QA ${test.info().project.name} ${Date.now()}`;
-  await page.goto("/family/new");
-  await expect(page.getByRole("heading", { name: "Add person" })).toBeVisible();
-  await expect(page.getByText("Loading household…")).toHaveCount(0);
-  await page.getByLabel("Name").fill(name);
-  const created = page.waitForResponse(
-    (response) => response.url().includes("/api/v1/groups") && response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "Create" }).click();
-  expect((await created).ok()).toBeTruthy();
-  await expect(page).toHaveURL(/\/family\/(?!new$)[^/]+$/);
+  const id = await addGroup(page, "family", (dialog) => dialog.getByLabel("Name").fill(name), name);
+  await page.goto(`/family/${id}`);
   await expect(page.getByText("Group not found.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  // A new person has no internet rule, and the page says so rather than implying one.
+  await expect(page.getByRole("heading", { name: "All internet · no rule" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+  // A child is offered one-tap schedules.
+  await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Homework 3–6 PM" })).toBeVisible();
 
   const renamed = `${name} Jr`;
   await page.getByLabel("Name").fill(renamed);
@@ -160,30 +178,37 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
   expect((await editHeading.boundingBox())?.y).toBe(yBefore);
 
-  await page.getByLabel(/Protected/).check();
+  // Groups can no longer be protected from FamilyFi.
+  await expect(page.getByLabel(/Protected/)).toHaveCount(0);
+
+  // An adult starts from a custom schedule only, and is not paused from here.
+  await page.getByLabel("Role").selectOption("adult");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("Protected groups do not use Pause or bedtime.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Custom schedule" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Pause all internet" })).toHaveCount(0);
 
   await page.goto("/family/does-not-exist");
   await expect(page.getByText("Loading household…")).toHaveCount(0);
   await expect(page.getByText("Group not found.")).toBeVisible();
 });
 
-test("create things group lands on a seeded detail page that can be edited", async ({ page }) => {
+test("add things group opens a sheet over Things, and the new group can be edited", async ({ page }) => {
   await signIn(page);
 
   const name = `Things ${test.info().project.name} ${Date.now()}`;
-  await page.goto("/things/new");
-  await expect(page.getByRole("heading", { name: "Add Things group" })).toBeVisible();
-  await expect(page.getByText("Loading household…")).toHaveCount(0);
-  await page.getByLabel("Name").fill(name);
-  await page.getByLabel("Monogram").fill("QA");
-  const created = page.waitForResponse(
-    (response) => response.url().includes("/api/v1/groups") && response.request().method() === "POST",
+  const id = await addGroup(
+    page,
+    "things",
+    async (dialog) => {
+      await dialog.getByLabel("Name").fill(name);
+      await dialog.getByLabel("Monogram").fill("qa");
+      await expect(dialog.getByLabel("Monogram")).toHaveValue("QA");
+    },
+    name,
   );
-  await page.getByRole("button", { name: "Create" }).click();
-  expect((await created).ok()).toBeTruthy();
-  await expect(page).toHaveURL(/\/things\/(?!new$)[^/]+$/);
+  await page.goto(`/things/${id}`);
+  await expect(page.getByText("Loading household…")).toHaveCount(0);
   await expect(page.getByText("Group not found.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 
@@ -272,102 +297,217 @@ test("device identity opens readable connection details", async ({ page }) => {
   }
 });
 
-test("Rules shell: protected absent and Always|Scheduled persist", async ({ page }) => {
+test("Rules: a two-window internet rule across midnight, named in UniFi, on the card", async ({ page }) => {
   await signIn(page);
 
   const groupsRes = await page.request.get("/api/v1/groups");
   expect(groupsRes.ok()).toBeTruthy();
   const body = (await groupsRes.json()) as {
-    groups: {
-      id: string;
-      name: string;
-      kind: string;
-      protected: boolean;
-      familyRole: string | null;
-    }[];
+    groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
-
-  const protectedGroup = body.groups.find((group) => group.protected);
-  expect(protectedGroup, "UNIFI_MOCK seed must include a protected group").toBeTruthy();
-
-  // Prefer distinct seeded kids per project to reduce desktop/phone schedule races.
+  const adult = body.groups.find((group) => group.familyRole === "adult");
+  expect(adult, "UNIFI_MOCK seed must include an adult with no rules").toBeTruthy();
+  // Distinct seeded kids per project, so desktop and phone never edit the same group.
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
-  const child =
-    body.groups.find((group) => !group.protected && group.kind === "family" && group.name === preferredName) ??
-    body.groups.find(
-      (group) =>
-        !group.protected && group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"),
-    );
-  expect(child, "UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
+  const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
+  expect(child, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+  const ruleName = `QA lights out ${test.info().project.name} ${Date.now() % 100000}`;
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
-  await expect(page.locator(`#group-${protectedGroup!.id}`)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Schedules" })).toHaveCount(0);
+  // Seeded household rules, with the kind stated in words.
+  await expect(page.getByText("All internet · every device").first()).toBeVisible();
+  // A group with no rules is not something to filter by; it is named as unfiltered.
+  await expect(page.getByRole("navigation", { name: "Show rules for" }).getByRole("link", { name: adult!.name })).toHaveCount(0);
+  await expect(page.getByText(new RegExp(`No rules: .*${adult!.name}`))).toBeVisible();
 
-  if (test.info().project.name !== "phone") {
-    await expect(page.getByRole("link", { name: "Schedules" })).toHaveCount(0);
+  await page.goto(`/rules/new?group=${child!.id}`);
+  await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
+  // All internet can be always on for chosen groups, but never for a whole network.
+  await expect(page.getByRole("group", { name: "When" }).getByRole("button", { name: "Always" })).toBeEnabled();
+  await expect(page.getByText(/All internet can’t be blocked for a whole network/)).toBeVisible();
+  const scope = page.getByRole("group", { name: "Applies to" });
+  if (await scope.count()) await expect(scope.getByRole("button", { name: "Whole networks" })).toBeDisabled();
+  await page.getByLabel("Rule name").fill(ruleName);
+  await page.getByLabel("Window 1 name").fill("Bed");
+  await page.getByRole("button", { name: "+ Add window" }).click();
+  await page.getByLabel("Window 2 name").fill("Study");
+  // Two windows: each policy is named after the rule, then its window.
+  await expect(page.getByText("Names in UniFi · one policy per window")).toBeVisible();
+  await expect(page.getByText(`${ruleName} – Bed`)).toHaveCount(2);
+  await expect(page.getByText(`${ruleName} – Study`)).toHaveCount(2);
+  // The first window already crosses midnight (9 PM–7 AM); the second overlaps nothing.
+  await expect(page.getByText(/overlap\./)).toHaveCount(0);
+
+  const created = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().endsWith("/api/v1/rules"),
+  );
+  await page.getByRole("button", { name: "Create rule" }).last().click();
+  const createdRes = await created;
+  expect(createdRes.ok()).toBeTruthy();
+  const { rule } = (await createdRes.json()) as { rule: { id: string; policyNames: string[]; windows: { start: string; end: string }[] } };
+  expect(rule.policyNames).toEqual([`FamilyFi ${ruleName} – Bed`, `FamilyFi ${ruleName} – Study`]);
+  expect(rule.windows.map((window) => [window.start, window.end])).toEqual([
+    ["21:00", "07:00"],
+    ["15:00", "18:00"],
+  ]);
+
+  try {
+    // Scoped to the child, the new rule is listed with both windows.
+    await expect(page).toHaveURL(new RegExp(`/rules\\?group=${child!.id}`));
+    await expect(page.getByRole("heading", { name: ruleName })).toBeVisible();
+
+    // The card's internet zone shows both windows on today's bar, by name.
+    await page.goto("/family");
+    const card = page.locator("article").filter({ has: page.getByText(child!.name, { exact: true }) }).first();
+    // Cards start closed: the header opens the zones.
+    const bar = card.getByRole("group", { name: `${child!.name}’s internet today` });
+    await expect(bar).toHaveCount(0);
+    await card.locator("button[aria-expanded=false]").first().click();
+    await expect(bar.getByRole("button", { name: /^Bed, / }).first()).toBeVisible();
+    await bar.getByRole("button", { name: /^Study, / }).click();
+    await expect(card.getByText(`${ruleName} rule · Study`)).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+  }
+});
+
+test("Pause all internet names its scope and can be undone", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const groupsRes = await page.request.get("/api/v1/groups");
+  const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string; deviceCount: number }[] };
+  // The Living Room TV group, so the family cards other tests use are left alone.
+  const tv = body.groups.find((group) => group.name === "Living Room");
+  expect(tv, "UNIFI_MOCK seed must include the Living Room things group").toBeTruthy();
+
+  // A no-internet window offers "Allow internet now" instead of a pause, so turn the
+  // seeded TV rule off while this runs: the test must not depend on the time of day.
+  const rulesRes = await page.request.get("/api/v1/rules");
+  const { rules } = (await rulesRes.json()) as { rules: { id: string; kind: string; enabled: boolean; groupIds: string[] }[] };
+  const internetRules = rules.filter((rule) => rule.kind === "internet" && rule.enabled && rule.groupIds.includes(tv!.id));
+  const setEnabled = async (enabled: boolean) => {
+    for (const rule of internetRules) {
+      const response = await page.request.patch(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page), data: { enabled } });
+      expect(response.ok()).toBeTruthy();
+    }
+  };
+  await setEnabled(false);
+  try {
+    await page.goto(`/things/${tv!.id}`);
+    const zone = page.getByRole("heading", { name: /^All internet · / });
+    await expect(zone).toBeVisible();
+    await page.getByRole("button", { name: "Pause all internet" }).click();
+    const sheet = page.getByRole("dialog", { name: `Pause all internet for ${tv!.name}?` });
+    await expect(sheet).toBeVisible();
+    // The confirmation names a device and says the other rules keep applying.
+    const devicesRes = await page.request.get("/api/v1/devices");
+    const { devices } = (await devicesRes.json()) as { devices: { groupId: string | null; hostname: string | null }[] };
+    const named = devices.find((device) => device.groupId === tv!.id && device.hostname?.trim());
+    expect(named, "UNIFI_MOCK seed must name a Living Room device").toBeTruthy();
+    await expect(sheet.getByText(named!.hostname!.trim(), { exact: false })).toBeVisible();
+    await expect(sheet.getByText(/Category, app and website rules stay as they are/)).toBeVisible();
+    const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/pause`));
+    await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
+    expect((await paused).ok()).toBeTruthy();
+    await expect(page.getByRole("heading", { name: "All internet · off" })).toBeVisible();
+    await expect(page.getByText(/All internet paused until/).first()).toBeVisible();
+
+    const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/resume`));
+    await page.locator('[aria-live="polite"]').getByRole("button", { name: "Undo" }).click();
+    expect((await resumed).ok()).toBeTruthy();
+    await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+  } finally {
+    // Leave the group as the seed had it, even when a step above failed.
+    await page.request.post(`/api/v1/groups/${tv!.id}/resume`, { headers: await csrfHeaders(page) });
+    await setEnabled(true);
+  }
+});
+
+test("Websites rule blocks named domains, with the encrypted DNS caveat", async ({ page }) => {
+  await signIn(page);
+  const groupsRes = await page.request.get("/api/v1/groups");
+  const body = (await groupsRes.json()) as { groups: { id: string; name: string }[] };
+  const child = body.groups.find((group) => group.name === (test.info().project.name === "phone" ? "Sam" : "Betsy"));
+  const ruleName = `QA sites ${test.info().project.name} ${Date.now() % 100000}`;
+
+  await page.goto(`/rules/new?group=${child!.id}`);
+  await page.getByRole("button", { name: "Websites" }).click();
+  await expect(page.getByText(/a device using encrypted DNS can get around this/)).toBeVisible();
+  await page.getByRole("button", { name: "Always", exact: true }).click();
+  await page.getByLabel("Rule name").fill(ruleName);
+  await page.getByLabel("Add a website").fill("https://www.Example.com/watch");
+  await page.getByLabel("Add a website").press("Enter");
+  await expect(page.getByRole("button", { name: "Remove www.example.com" })).toBeVisible();
+  const created = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().endsWith("/api/v1/rules"),
+  );
+  await page.getByRole("button", { name: "Create rule" }).last().click();
+  const res = await created;
+  expect(res.ok()).toBeTruthy();
+  const { rule } = (await res.json()) as { rule: { id: string; domains: string[]; mode: string } };
+  expect([rule.domains, rule.mode]).toEqual([["www.example.com"], "always"]);
+  await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+});
+
+test("cards show every household category; one UniFi cannot block offers a Websites rule", async ({ page }) => {
+  await signIn(page);
+  const body = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
+  const kid = body.groups.find((group) => group.kind === "family" && group.name === (test.info().project.name === "phone" ? "Sam" : "Betsy"));
+  expect(kid, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+
+  await page.goto("/family");
+  const marks = page.getByTestId(`filter-marks-${kid!.id}`);
+  const card = page.locator("article").filter({ has: marks });
+  // Not just the five UniFi categories: AI, Dating, Gambling and Adult are there too.
+  await marks.getByRole("button", { name: /^Show all \d+ categories$/ }).click();
+  for (const name of ["AI", "Dating", "Gambling", "Adult", "Video"]) {
+    await expect(marks.getByRole("button", { name: new RegExp(`^${name} `) })).toBeVisible();
   }
 
-  const row = page.locator(`#group-${child!.id}`);
-  await expect(row).toBeVisible();
-  await expect(row.getByText("Internet").filter({ visible: true })).toBeVisible();
-  // Internet parent is undeletable; nested Category/App rows may expose Delete.
-  await expect(row.getByRole("button", { name: /^Delete Internet/i })).toHaveCount(0);
+  await marks.getByRole("button", { name: /^AI / }).click();
+  await card.getByRole("button", { name: "Add rule" }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByText(/UniFi has no AI category/)).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Create policy" })).toHaveCount(0);
+  await sheet.getByRole("link", { name: "Block its websites" }).click();
+  await expect(page).toHaveURL(/\/rules\/new\?kind=domain/);
+  // A named draft titles the page with its name.
+  await expect(page.getByRole("heading", { name: `AI for ${kid!.name}`, level: 1 })).toBeVisible();
+  await expect(page.getByLabel("Rule name")).toHaveValue(`AI for ${kid!.name}`);
+  await expect(page.getByRole("button", { name: "Remove openai.com" })).toBeVisible();
 
-  const modeOf = (scope: ReturnType<Page["locator"]>) =>
-    scope.getByRole("group", { name: "Internet rule mode" }).filter({ visible: true });
-
-  async function clickMode(enabled: boolean) {
-    const mode = modeOf(page.locator(`#group-${child!.id}`));
-    const label = enabled ? "Scheduled" : "Always";
-    const put = page.waitForResponse(
-      (response) =>
-        response.request().method() === "PUT" &&
-        response.url().includes(`/api/v1/groups/${child!.id}/schedule`),
-    );
-    await mode.getByRole("button", { name: label }).click();
-    const res = await put;
+  // Categories and apps are picked like websites: nothing is listed until you search the
+  // gateway's catalog, and a rule can block several at once.
+  for (const { kind, noun, first, second, ids } of [
+    { kind: "category", noun: "categories", first: ["media", /Video/], second: ["alpha", "Fixture Category Alpha"], ids: [4, 9001] },
+    { kind: "app", noun: "apps", first: ["one", "Fixture App One"], second: ["suite", "Fixture Productivity Suite"], ids: [] as number[] },
+  ] as const) {
+    await page.goto(`/rules/new?kind=${kind}&group=${kid!.id}`);
+    const matches = page.getByRole("group", { name: `Matching ${noun}` });
+    await expect(matches).toHaveCount(0);
+    const search = page.getByLabel(`Search ${noun}`);
+    for (const [text, name] of [first, second] as const) {
+      const searched = page.waitForResponse((response) => response.url().includes(`filter=${text}`));
+      await search.fill(text);
+      await searched;
+      await matches.getByRole("button", { name }).click();
+      await expect(search).toHaveValue("");
+    }
+    await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(2);
+    await page.getByLabel("Rule name").fill(`QA ${noun} ${test.info().project.name} ${Date.now() % 100000}`);
+    const created = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/api/v1/rules"));
+    await page.getByRole("button", { name: "Create rule" }).last().click();
+    const res = await created;
     expect(res.ok()).toBeTruthy();
-    expect((res.request().postDataJSON() as { enabled: boolean }).enabled).toBe(enabled);
+    const { rule } = (await res.json()) as { rule: { id: string; targetIds: number[] } };
+    try {
+      expect(rule.targetIds).toHaveLength(2);
+      if (ids.length) expect(rule.targetIds).toEqual(ids);
+    } finally {
+      await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+    }
   }
-
-  async function expectMode(enabled: boolean) {
-    const mode = modeOf(page.locator(`#group-${child!.id}`));
-    await expect(mode.getByRole("button", { name: "Always" })).toHaveAttribute(
-      "aria-pressed",
-      enabled ? "false" : "true",
-    );
-    await expect(mode.getByRole("button", { name: "Scheduled" })).toHaveAttribute(
-      "aria-pressed",
-      enabled ? "true" : "false",
-    );
-  }
-
-  // Seed starts scheduled; if a prior run left Always, nudge to Scheduled first so Always PUT fires.
-  const initialScheduled =
-    (await modeOf(row).getByRole("button", { name: "Scheduled" }).getAttribute("aria-pressed")) === "true";
-  if (!initialScheduled) {
-    await clickMode(true);
-    await page.goto("/rules");
-  }
-
-  await clickMode(false);
-  await page.goto("/rules");
-  await expectMode(false);
-
-  await clickMode(true);
-  await page.goto("/rules");
-  await expectMode(true);
-
-  // Phase 3: Network chips from Settings managed networks (manage-all in UNIFI_MOCK seed).
-  await page.getByRole("button", { name: "Add" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
-  const networkTab = dialog.getByRole("button", { name: "Network", exact: true });
-  await expect(networkTab).toBeEnabled();
-  await networkTab.click();
-  await expect(dialog.getByRole("group", { name: "Managed networks" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
 });
 
 test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without a resolver", async ({ page }) => {
@@ -376,36 +516,35 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const groupsRes = await page.request.get("/api/v1/groups");
   expect(groupsRes.ok()).toBeTruthy();
   const body = (await groupsRes.json()) as {
-    groups: { id: string; name: string; kind: string; protected: boolean; familyRole: string | null }[];
+    groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
   // Prefer distinct seeded kids per project to reduce desktop/phone races (same as Rules shell).
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
   const child =
-    body.groups.find((group) => !group.protected && group.kind === "family" && group.name === preferredName) ??
-    body.groups.find(
-      (group) =>
-        !group.protected && group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"),
-    );
-  expect(child, "UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
-  const protectedGroup = body.groups.find((group) => group.protected);
-  expect(protectedGroup).toBeTruthy();
+    body.groups.find((group) => group.kind === "family" && group.name === preferredName) ??
+    body.groups.find((group) => group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"));
+  expect(child, "UNIFI_MOCK seed must include a family child").toBeTruthy();
+  const adult = body.groups.find((group) => group.familyRole === "adult");
+  expect(adult).toBeTruthy();
 
   await page.goto("/family");
   await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
   const marks = page.getByTestId(`filter-marks-${child!.id}`);
   await expect(marks).toBeVisible();
 
-  // Ensure Video starts Off (turn off if a prior run left it On).
-  if (await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).count()) {
-    await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
-    const turnOffSheet = page.getByRole("dialog");
-    await expect(turnOffSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
-    const offRes = page.waitForResponse(
-      (response) => response.request().method() === "POST" && /\/api\/v1\/rules\/[^/]+\/off/.test(response.url()),
-    );
-    await turnOffSheet.getByRole("button", { name: "Turn off" }).click();
-    expect((await offRes).ok()).toBeTruthy();
+  // Ensure Video starts Off (turn off a rule a prior run left on).
+  const rulesRes = await page.request.get("/api/v1/rules");
+  expect(rulesRes.ok()).toBeTruthy();
+  const { rules } = (await rulesRes.json()) as {
+    rules: { id: string; kind: string; enabled: boolean; groupIds: string[]; targetIds: number[] }[];
+  };
+  for (const rule of rules) {
+    if (rule.kind === "category" && rule.enabled && rule.groupIds.includes(child!.id) && rule.targetIds.includes(4)) {
+      const off = await page.request.post(`/api/v1/rules/${rule.id}/off`, { headers: await csrfHeaders(page) });
+      expect(off.ok()).toBeTruthy();
+    }
   }
+  await page.reload();
   // Video is left unmeasured by the mock seed, so with no rule it must read "not
   // blocked" — a mark with no verdict must never imply one. Social and Gaming carry
   // seeded verdicts and are asserted in upstream-marks.spec.
@@ -413,12 +552,16 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await expect(page.getByText(/Porn/i)).toHaveCount(0);
   // No App + on list cards
   await expect(marks.getByRole("button", { name: "Add app filter" })).toHaveCount(0);
-  // Protected: no marks
-  await expect(page.getByTestId(`filter-marks-${protectedGroup!.id}`)).toHaveCount(0);
+  // No group is exempt: an adult's card shows its marks too.
+  await expect(page.getByTestId(`filter-marks-${adult!.id}`)).toBeVisible();
 
-  // Off → Create policy. With nothing measured the sheet must not claim anything
-  // about DNS either way.
+  // A mark opens the card on that category. With no rule and nothing measured, the
+  // zone and the sheet must not claim anything about DNS either way.
+  const card = page.locator("article").filter({ has: marks });
   await marks.getByRole("button", { name: /Video not blocked/i }).click();
+  await expect(card.locator("button[aria-expanded=true]")).toBeVisible();
+  await expect(card.getByText("· no rule · not checked")).toBeVisible();
+  await card.getByRole("button", { name: "Add rule" }).click();
   const offSheet = page.getByRole("dialog");
   await expect(offSheet.getByRole("heading", { name: /Nothing's blocking Video yet/i })).toBeVisible();
   await expect(offSheet.getByText(/DNS/i)).toHaveCount(0);
@@ -434,10 +577,14 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await offSheet.getByRole("button", { name: "Create policy" }).click();
   expect((await create).ok()).toBeTruthy();
 
-  await expect(marks.getByRole("button", { name: /Video blocked by FamilyFi/i })).toBeVisible();
+  // The focused zone now shows the rule, with a way to edit it.
+  await expect(card.getByRole("heading", { name: "Video · blocked" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "Edit rule" })).toBeVisible();
 
-  // On → Turn off
-  await marks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
+  // On the group's page, the mark opens the sheet: On → Turn off
+  await page.goto(`/family/${child!.id}`);
+  const detailMarks = page.getByTestId(`filter-marks-${child!.id}`);
+  await detailMarks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
   const onSheet = page.getByRole("dialog");
   await expect(onSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
   await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeVisible();
@@ -446,33 +593,23 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   );
   await onSheet.getByRole("button", { name: "Turn off" }).click();
   expect((await off).ok()).toBeTruthy();
-  await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
+  await expect(detailMarks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
 
   // GroupDetail: App + present
-  await page.goto(`/family/${child!.id}`);
   await expect(page.getByRole("button", { name: "Add app filter" })).toBeVisible();
   // No Category +
   await expect(page.getByRole("button", { name: "Add category filter" })).toHaveCount(0);
 
-  // Soft polish on Rules
-  await page.goto("/rules");
-  await expect(page.getByText(/Always keeps the block on until you turn it off/i)).toBeVisible();
-  await expect(page.getByText(/permanent block/i)).toHaveCount(0);
-  await page.getByRole("button", { name: "Add" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New rule" })).toBeVisible();
-  // Soft polish: Network empty helper must be visible when Network tab is disabled.
-  // With UNIFI_MOCK manage-all, Network is enabled — assert curated chips hide raw ids.
-  const curated = dialog.getByRole("group", { name: "Curated category slots" });
+  // The rule editor names categories, never raw DPI ids.
+  // Searching by the familiar name finds it, though the gateway calls it "Media streaming".
+  await page.goto("/rules/new?kind=category");
+  await page.getByLabel("Search categories").fill("video");
+  const curated = page.getByRole("group", { name: "Matching categories" });
   await expect(curated.getByRole("button", { name: /Video/i })).toBeVisible();
   await expect(curated.getByText(/\(\s*4\s*\)/)).toHaveCount(0);
-  await expect(curated.getByText(/\(\s*24\s*\)/)).toHaveCount(0);
-  await expect(curated.getByText(/\(\s*8\s*\)/)).toHaveCount(0);
-  await expect(page.getByText(/Checking/i)).toHaveCount(0);
-  await expect(page.getByText(/Already blocked \(DNS\)/i)).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByText(/permanent block/i)).toHaveCount(0);
 
-  // Soft polish: Network empty helper when Network tab disabled (desktop only — avoids settings races).
+  // Network scope needs managed networks (desktop only — avoids settings races).
   if (test.info().project.name === "desktop") {
     const unifiGet = await page.request.get("/api/v1/settings/unifi");
     expect(unifiGet.ok()).toBeTruthy();
@@ -486,12 +623,9 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
         data: { manageAllNetworks: false, managedNetworkIds: [] },
       });
       expect(put.ok()).toBeTruthy();
-      await page.goto("/rules");
-      await page.getByRole("button", { name: "Add" }).click();
-      const emptyDialog = page.getByRole("dialog");
-      await expect(emptyDialog.getByRole("button", { name: "Network", exact: true })).toBeDisabled();
-      await expect(emptyDialog.getByTestId("network-scope-empty-helper")).toBeVisible();
-      await emptyDialog.getByRole("button", { name: "Cancel" }).click();
+      // With no managed networks, a rule can only cover people and things.
+      await page.goto("/rules/new?kind=category");
+      await expect(page.getByRole("button", { name: "Whole networks" })).toHaveCount(0);
     } finally {
       await page.request.put("/api/v1/settings/unifi", {
         headers: await csrfHeaders(page),

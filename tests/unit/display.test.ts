@@ -4,15 +4,18 @@ import {
   cardNoteLine,
   cardStateLabel,
   canPauseGroup,
-  dayCaption,
+  daysLabel,
   deviceKindLabel,
   deviceIcon,
   formatHhmm,
-  nextBedtimeResumeAt,
   nextClockOnDays,
-  scheduleCaption,
+  windowTimes,
 } from "@/lib/display";
+import type { InternetWindow } from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
+
+const TZ = "America/New_York";
+const bedtime: InternetWindow = { name: "Bedtime", days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45", ruleName: "Bedtime" };
 
 function group(overrides: Partial<Group> = {}): Group {
   return {
@@ -21,11 +24,10 @@ function group(overrides: Partial<Group> = {}): Group {
     name: "Betsy",
     monogram: null,
     familyRole: "child",
-    protected: false,
-    mode: "scheduled",
     deviceCount: 4,
-    schedule: { enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" },
-    suspension: { active: false, until: null },
+    suspension: { active: false, until: null, by: null },
+    allowance: { active: false, until: null, by: null },
+    internetRuleIds: ["r1"],
     dohOverrideUrl: null,
     access: "available",
     ...overrides,
@@ -33,53 +35,51 @@ function group(overrides: Partial<Group> = {}): Group {
 }
 
 describe("schedule copy", () => {
-  it("formats school-night bedtime on the note line", () => {
+  it("formats windows and their days", () => {
     expect(formatHhmm("21:30")).toBe("9:30 PM");
-    expect(dayCaption([1, 2, 3, 4, 5])).toBe("school nights");
-    expect(scheduleCaption(group())).toBe("off 9:30 PM–6:45 AM, school nights");
-    expect(cardNoteLine(group())).toBe("4 devices · off 9:30 PM–6:45 AM, school nights");
-    expect(cardNoteLine(group({ deviceCount: 0 }))).toBe(
-      "No devices · bedtime cannot apply on UniFi until you assign one",
-    );
+    expect(windowTimes("21:30", "06:45")).toBe("9:30 PM–6:45 AM");
+    expect(daysLabel([5, 4, 3, 2, 1])).toBe("Mon–Fri");
+    expect(daysLabel([0, 1, 2, 3, 4, 5, 6])).toBe("Every day");
+    expect(daysLabel([0, 3])).toBe("Sun, Wed");
   });
 
-  it("puts pause expiry in the state phrase", () => {
-    expect(
-      cardStateLabel(
-        group({
-          dohOverrideUrl: null,
-          access: "paused",
-          suspension: { active: true, until: "2026-09-14T20:00:00-04:00" },
-        }),
-        "America/New_York",
-      ),
-    ).toBe("Paused until 8:00 PM");
+  it("counts internet windows on the note line, or says there is no internet rule", () => {
+    expect(cardNoteLine(group(), [bedtime])).toBe("4 devices · 1 internet window");
+    expect(cardNoteLine(group({ internetRuleIds: [] }), [])).toBe("4 devices · no internet rule");
+    expect(cardNoteLine(group({ deviceCount: 0 }), [bedtime])).toBe("No devices · rules cannot apply on UniFi until you assign one");
+  });
+
+  it("names the scope, the source and who in the state phrase", () => {
+    const monday7pm = new Date("2026-09-14T19:00:00-04:00");
+    const paused = group({ access: "paused", suspension: { active: true, until: "2026-09-14T20:00:00-04:00", by: { accountId: "a", name: "Nick" } } });
+    expect(cardStateLabel(paused, [bedtime], TZ, monday7pm)).toBe("All internet paused until 8:00 PM by Nick");
+    expect(cardStateLabel(group(), [bedtime], TZ, monday7pm)).toBe("Online · Bedtime at 9:30 PM");
+    expect(cardStateLabel(group(), [bedtime], TZ, new Date("2026-09-14T22:00:00-04:00"))).toBe("No internet · Bedtime until 6:45 AM");
+    const allowed = group({ allowance: { active: true, until: "2026-09-15T06:45:00-04:00", by: { accountId: "a", name: "Nick" } } });
+    expect(cardStateLabel(allowed, [bedtime], TZ, new Date("2026-09-14T22:00:00-04:00"))).toBe("Online · allowed until 6:45 AM by Nick");
+    expect(cardStateLabel(group({ internetRuleIds: [] }), [], TZ, monday7pm)).toBe("Online · no internet rule");
+    // An always-on internet rule has no end to name.
+    const grounded = { name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "00:00", always: true, ruleName: "Grounded" };
+    expect(cardStateLabel(group(), [grounded], TZ, monday7pm)).toBe("No internet · Grounded · always");
+    expect(cardNoteLine(group(), [grounded])).toBe("4 devices · internet off always");
   });
 });
 
 describe("pause eligibility", () => {
-  it("hides Pause for adults, protected groups, and groups with no schedule", () => {
+  it("hides Pause for adults, and offers it without any rule", () => {
     expect(canPauseGroup(group({ familyRole: "adult" }))).toBe(false);
-    expect(canPauseGroup(group({ protected: true }))).toBe(false);
-    expect(canPauseGroup(group({ schedule: { enabled: false, days: [], start: null, end: null } }))).toBe(false);
-    expect(canPauseGroup(group())).toBe(true);
+    expect(canPauseGroup(group({ internetRuleIds: [] }))).toBe(true);
+    expect(canPauseGroup(group({ kind: "things", familyRole: null, internetRuleIds: [] }))).toBe(true);
   });
 });
 
-describe("until bedtime", () => {
+describe("window ends", () => {
   it("maps overnight windows to the morning the off period ends", () => {
     expect([...bedtimeEndDays([1, 2, 3, 4, 5], "21:30", "06:45")].sort((a, b) => a - b)).toEqual([2, 3, 4, 5, 6]);
   });
 
-  it("returns the next 6:45 AM after Monday evening", () => {
-    const now = new Date("2026-09-14T19:00:00-04:00");
-    const resume = nextBedtimeResumeAt(group(), "America/New_York", now);
-    expect(resume).not.toBeNull();
-    expect(resume?.toISOString()).toBe(new Date("2026-09-15T06:45:00-04:00").toISOString());
-  });
-
   it("finds the next clock time on selected days", () => {
-    const hit = nextClockOnDays("America/New_York", [1], "21:30", new Date("2026-09-14T12:00:00-04:00"));
+    const hit = nextClockOnDays(TZ, [1], "21:30", new Date("2026-09-14T12:00:00-04:00"));
     expect(hit?.toISOString()).toBe(new Date("2026-09-14T21:30:00-04:00").toISOString());
   });
 });
@@ -117,30 +117,5 @@ describe("device marks", () => {
     expect(deviceKindLabel("Unknown")).toBe("Device");
     expect(deviceIcon("Unknown")).toBe("question");
     expect(deviceIcon(null)).toBe("question");
-  });
-});
-
-describe("always mode", () => {
-  it("labels Always On when access is always_on", () => {
-    expect(cardStateLabel(group({ mode: "always", schedule: { enabled: false, days: [], start: null, end: null }, access: "always_on" }), "America/New_York")).toBe(
-      "Always On · Internet blocked",
-    );
-  });
-
-  it("allows Pause without a bedtime schedule in Always mode", () => {
-    expect(
-      canPauseGroup(
-        group({
-          mode: "always",
-          schedule: { enabled: false, days: [], start: null, end: null },
-          dohOverrideUrl: null,
-          access: "always_on",
-        }),
-      ),
-    ).toBe(true);
-  });
-
-  it("captions Always On", () => {
-    expect(scheduleCaption(group({ mode: "always", schedule: { enabled: false, days: [], start: null, end: null } }))).toBe("Always On");
   });
 });

@@ -14,9 +14,11 @@ async function signIn(page: Page) {
   expect(login.ok()).toBe(true);
 }
 
-async function expectAccessible(page: Page, route: string) {
-  await page.goto(route);
-  await page.waitForLoadState("networkidle");
+async function expectAccessible(page: Page, route: string, { navigate = true } = {}) {
+  if (navigate) {
+    await page.goto(route);
+    await page.waitForLoadState("networkidle");
+  }
   // Swagger UI on /reference is third-party markup; FamilyFi's own chrome around it is still checked.
   const result = await new AxeBuilder({ page }).withTags(WCAG).exclude(".swagger-ui").analyze();
   const problems: string[] = [];
@@ -37,12 +39,23 @@ test.describe("accessibility", () => {
     await expectAccessible(page, "/login");
   });
 
-  for (const route of ["/family", "/family/new", "/things", "/things/new", "/devices", "/rules", "/categories", "/pair", "/sync", "/settings", "/reference"]) {
+  for (const route of ["/family", "/things", "/devices", "/rules", "/rules/new", "/categories", "/pair", "/sync", "/settings", "/reference"]) {
     test(route, async ({ page }) => {
       await signIn(page);
       await expectAccessible(page, route);
     });
   }
+
+  test("add sheets", async ({ page }) => {
+    await signIn(page);
+    for (const [route, title] of [["/family", "New family member"], ["/things", "New group"]] as const) {
+      await page.goto(route);
+      await page.waitForLoadState("networkidle");
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      await expect(page.getByRole("dialog", { name: title })).toBeVisible();
+      await expectAccessible(page, `${route} add sheet`, { navigate: false });
+    }
+  });
 
   test("detail pages", async ({ page }) => {
     await signIn(page);
@@ -54,6 +67,10 @@ test.describe("accessibility", () => {
     await expectAccessible(page, `/family/${family!.id}`);
     await expectAccessible(page, `/things/${things!.id}`);
     await expectAccessible(page, `/categories/${categories[0].id}`);
+    const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as { rules: { id: string; windows: unknown[] }[] };
+    const scheduled = rules.find((rule) => rule.windows.length > 1);
+    expect(scheduled, "the mock household has a rule with two windows").toBeTruthy();
+    await expectAccessible(page, `/rules/${scheduled!.id}`);
     const { devices } = (await (await page.request.get("/api/v1/devices")).json()) as { devices: { mac: string }[] };
     expect(devices[0], "the mock household has a device").toBeTruthy();
     await expectAccessible(page, `/devices/${encodeURIComponent(devices[0]!.mac)}`);

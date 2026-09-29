@@ -15,7 +15,7 @@ This repository owns two distinct shared artifacts:
 | [OpenAPI specification](../openapi/familyfi.v1.yaml) | HTTP paths, request/response shapes, statuses and authentication contract | API checks and schema-validated integration responses; [authorization matrix](../tests/integration/authorization-matrix.test.ts) for caller permissions |
 | [Display vectors](../tests/fixtures/display-vectors.json) | Examples of shared labels, available actions and time-dependent display behaviour | [Vector tests](../tests/unit/display-vectors.test.ts); format and update rules in [testing](testing.md#display-vectors) |
 
-Schema compatibility does not prove behavioural compatibility. Pause/Resume meaning, protection,
+Schema compatibility does not prove behavioural compatibility. Pause/Resume meaning, allowances,
 household timezone, per-action outcomes and unknown DNS verdicts must remain consistent across
 clients. The fixtures cover the functions named by their test harness; they are not evidence of
 complete UI parity, all API semantics or live gateway enforcement.
@@ -60,10 +60,13 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |
-| PUT | `/api/v1/groups/{id}/schedule` | Recurring bedtime stored on UniFi `schedule` |
-| POST | `/api/v1/groups/{id}/pause` | Empty body = indefinite; `{ "until" }` = timed. Sets UniFi `enabled: false` |
-| POST | `/api/v1/groups/{id}/resume` | Clears suspension (`enabled: true`; schedule may still block) |
+| POST | `/api/v1/groups/{id}/pause` | Blocks all internet for the group now. Empty body = until resumed; `{ "until" }` = timed. Records who paused and ends any allowance |
+| POST | `/api/v1/groups/{id}/resume` | Ends the pause; the group's internet rules still apply |
 | POST | `/api/v1/groups/{id}/extend` | Adds minutes to a timed pause |
+| POST/DELETE | `/api/v1/groups/{id}/allow` | An allowance lifts the group's internet-rule windows until `until` (default: when the active windows end, or until cancelled when an always-on internet rule is active; 409 when none is active). DELETE ends it. Category, app and website rules keep applying |
+| GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list |
+| GET/PATCH/DELETE | `/api/v1/rules/{id}` | PATCH changes anything but `kind` and `scope`; `windows` replaces the list, and a window sent with its `id` keeps its UniFi policy. DELETE removes the rule's recorded policies |
+| POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled |
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |
@@ -143,7 +146,7 @@ The iPhone may automatically enroll its reachable Watch without another administ
 The Watch receives its own device credential and bearer token, appears as a separate device in
 System → Pair Device, and can be revoked there independently. Its sessions may only read session,
 connection, group, and change state or pause, resume, and extend groups. The three group controls
-reject protected and adult Family groups for Watch sessions. Signing out or revoking the phone does
+reject adult Family groups for Watch sessions. Signing out or revoking the phone does
 not revoke the Watch. Its bearer expires after 30 days; automatic renewal is a separate change.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may

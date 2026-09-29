@@ -78,13 +78,13 @@ export function NewCategorySheet({
               onSubmit={create}
             />
           </Field>
-          <Field label="Monogram">
+          <Field label="Monogram — up to 4 characters, e.g. GA, HW">
             <TextField
-              label="Category monogram"
+              label="Monogram"
               value={monogram}
-              onChange={setMonogram}
+              onChange={(value) => setMonogram(value.toUpperCase())}
               placeholder={trimmed ? suggestedMonogramFor(trimmed) : "e.g. GA"}
-              maxLength={3}
+              maxLength={4}
               onSubmit={create}
             />
           </Field>

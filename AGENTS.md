@@ -21,7 +21,7 @@ Shared instructions for Codex, Claude Code and contributors. `CLAUDE.md` imports
 ### Product context
 
 FamilyFi lets a household manage internet access for people and groups of things through its
-UniFi gateway. Adults use schedules, temporary pauses, device assignment and app/category rules;
+UniFi gateway. Adults use rules (all internet, categories, apps or websites, always or in named windows), pauses, allowances and device assignment;
 administrators also configure the gateway, accounts and companion connections. DNS category
 reports describe filtering observed through a resolver; they do not enforce it.
 
@@ -32,6 +32,8 @@ choices; do not maintain a copy of its implementation status here. Clients share
 semantics and the API, while each platform owns its presentation.
 
 A **Group** holds network controls for a person (`family`) or collection of equipment (`things`).
+A **Rule** blocks all internet, a category, apps or websites for one or more groups, always or in
+named **windows**; each window is one UniFi policy. An internet rule is optional.
 An **Account** is a login and may be linked to a group; a family member card does not imply a login.
 A **Device** is a discovered network client; a **PairedDevice** is a phone or Watch authorized to
 call the API. A **ChangeResult** tracks an enforcement request; a **SyncRun** tracks a reconciliation
@@ -82,8 +84,7 @@ Each invariant names the tests that enforce it; `tests/unit/invariants.test.ts` 
 - Every `/api/v1` route and method declares who may call it — anonymous, a member, an administrator, the recovery account, or a caller over the tunnel without a paired phone — in the authorization matrix. A route the matrix does not name fails the suite, and so does a guard that widens or narrows access without the table changing with it. *Tests:* `tests/integration/authorization-matrix.test.ts`.
 - Do not create UniFi Object Manager groups. Operators paste an Integration API key in Settings; FamilyFi encrypts it with `FAMILYFI_ENCRYPTION_KEY`. *Tests:* `tests/unit/unifi-client-surface.test.ts`, `tests/integration/unifi-key-storage.test.ts`, `tests/unit/crypto.test.ts`.
 - `UNIFI_MOCK=1` is local-only dummy UniFi plus a seeded household for UI work. Never treat it as enforcement. It is ignored when `NODE_ENV=production`. *Tests:* `tests/unit/unifi-mock.test.ts`.
-- Pause suspends schedule enforcement (`enabled: false` on app-owned policies, schedule preserved). Resume is `enabled: true`; bedtime may still block. Recurring bedtime is the UniFi policy `schedule`, not clock-driven enable/disable at window edges. *Tests:* `tests/integration/reconcile-properties.test.ts`, `tests/unit/schedule.test.ts`.
-- Protection is per group. Do not expose controls that bypass protection. *Tests:* `tests/integration/reconcile.test.ts`, `tests/integration/reconcile-properties.test.ts`.
+- Pause blocks all internet for a group now, through an app-owned unscheduled block policy that exists only while paused. An allowance lifts a group's internet-rule windows until a time by leaving its devices out of those policies; category, app and website rules still apply. Recurring windows are UniFi policy `schedule`s, one policy per window, never clock-driven enable/disable at window edges. *Tests:* `tests/integration/reconcile-properties.test.ts`, `tests/unit/plan-rules.test.ts`, `tests/unit/rule-windows.test.ts`, `tests/integration/rules-api.test.ts`.
 - Unassigned devices are **quarantined** in the API and tests; the Devices UI may say **Unassigned**. Discovery and quarantine only include clients on managed VLANs. *Tests:* `tests/integration/reconcile.test.ts`, `tests/integration/reconcile-properties.test.ts`, `tests/integration/quarantine-observe.test.ts`.
 - Remote access tunnels point only at the phone-only gateway (`src/server/tunnel/phone-gateway.ts`), never at the web app. The gateway passes `/api/v1/*` only, strips cookies, and stamps `x-familyfi-via: tunnel`; over a tunnel, sign-in requires a paired phone checked before the password. `cloudflared` is pinned and hash-checked in the image, never downloaded at runtime. *Tests:* `tests/unit/phone-gateway.test.ts`, `tests/integration/remote-access.test.ts`, `tests/integration/connection-api.test.ts`, `tests/integration/authorization-matrix.test.ts`.
 - A Cloudflare Access service token is handed only to phones: in the pairing code, the claim's signed manifest, and the signed manifest of a paired device's session. It is stored encrypted, and never appears in `/connection/identity`, the endpoints list, a browser session's `GET /connection`, or logs; the phone gateway strips the `CF-Access-Client-*` headers before the app sees them. Only an `own` route with `transport: cloudflare` may carry one, and `ConnectionTransport` never gains a value for it: phones decode `transport` as a closed enum. *Tests:* `tests/integration/edge-auth.test.ts`, `tests/unit/phone-gateway.test.ts`.

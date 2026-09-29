@@ -2,12 +2,12 @@ import { AssignmentState } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { coverageIssues, isWriteFailure } from "@/server/policy-coverage";
 
-const betsy = { id: "betsy", name: "Betsy", protected: false, scheduleEnabled: true };
-const abby = { id: "abby", name: "Abby", protected: false, scheduleEnabled: true };
-const nick = { id: "nick", name: "Nick", protected: true, scheduleEnabled: false };
+const betsy = { id: "betsy", name: "Betsy", enforced: true };
+const abby = { id: "abby", name: "Abby", enforced: true };
+const nick = { id: "nick", name: "Nick", enforced: false };
 
 describe("policy coverage", () => {
-  it("flags a scheduled group with no assigned devices and no UniFi policy", () => {
+  it("flags a group with rules but no assigned devices and no UniFi policy", () => {
     const issues = coverageIssues({
       groups: [betsy, nick],
       devices: [],
@@ -18,7 +18,7 @@ describe("policy coverage", () => {
         groupId: "betsy",
         groupName: "Betsy",
         kind: "no_members",
-        message: "Betsy has a bedtime but no assigned devices, so a UniFi policy cannot be created.",
+        message: "Betsy has no assigned devices, so its UniFi policies cannot be created.",
       },
     ]);
     expect(issues.every((issue) => !isWriteFailure(issue))).toBe(true);
@@ -37,11 +37,20 @@ describe("policy coverage", () => {
     expect(isWriteFailure(issues[0]!)).toBe(true);
   });
 
-  it("does not flag protected groups or groups that already have a live policy", () => {
+  it("does not flag groups with nothing enforced or with a live policy", () => {
     const issues = coverageIssues({
       groups: [nick, abby],
       devices: [{ groupId: "abby", assignment: AssignmentState.assigned, zoneId: "z1", inScope: true }],
-      policies: [{ groupId: "abby", unifiPolicyId: "pol-1", lastError: null }],
+      policies: [{ groupIds: ["betsy", "abby"], unifiPolicyId: "pol-1", lastError: null }],
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it("does not flag a group nothing is enforced on", () => {
+    const issues = coverageIssues({
+      groups: [{ ...abby, enforced: false }],
+      devices: [{ groupId: "abby", assignment: AssignmentState.assigned, zoneId: "z1", inScope: true }],
+      policies: [],
     });
     expect(issues).toEqual([]);
   });

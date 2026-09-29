@@ -38,10 +38,10 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 
 | Layer | Convention | Example |
 | --- | --- | --- |
-| React components | `PascalCase.tsx`, one component per concept | `RuleRow.tsx`, `GroupCard.tsx` |
-| Logic modules (`lib/`, `server/`) | `kebab-case.ts` | `rule-rows.ts`, `unifi-settings.ts` |
+| React components | `PascalCase.tsx`, one component per concept | `RuleEditor.tsx`, `GroupCard.tsx` |
+| Logic modules (`lib/`, `server/`) | `kebab-case.ts` | `rule-writes.ts`, `unifi-settings.ts` |
 | Directories | lowercase, no separators | `components/ui`, `server/unifi` |
-| Functions, variables, props | `camelCase` | `buildRuleRows`, `parentFacingRuleLabel` |
+| Functions, variables, props | `camelCase` | `ruleWritePlan`, `parentFacingRuleLabel` |
 | Module constants | `SCREAMING_SNAKE` | `SESSION_TTL_MS`, `CURATED_CATEGORY_SLOTS` |
 | Prisma models / tables | `PascalCase`, singular | `Rule`, `RulePolicy`, `SyncRun` |
 | Columns and JSON fields | `camelCase` | `suspensionActive`, `targetIds` |
@@ -73,8 +73,7 @@ needed for future work belongs here when implemented, not only in a canvas or se
 | Rule and resolver verdicts | [rules.ts](../src/lib/rules.ts), [upstream.ts](../src/lib/upstream.ts) and [architecture](architecture.md#upstream-dns-categories) |
 | Native typography, navigation and adaptive layout | [Native design guide](https://github.com/nickberardi/familyfi-ios/blob/main/docs/design-system.md); read its current sources for platform details |
 
-Shared meaning must survive platform adaptation: Pause suspends enforcement, protection cannot be
-bypassed, time follows the household timezone, and unknown observations remain unknown. Native
+Shared meaning must survive platform adaptation: Pause blocks all internet for a group and names that scope, an internet rule is optional, time follows the household timezone, and unknown observations remain unknown. Native
 controls, fonts and navigation can differ; web CSS dimensions are not a native layout specification.
 Record deliberate web choices here and native choices there, with links rather than mirrored claims.
 

@@ -48,14 +48,18 @@ const SIZES: Record<LogoSize, { shield: number; word: number; tag: number; gap: 
  * wordmark and tagline beside it are marked decorative rather than read out twice.
  */
 export function Shield({ size = 28 }: { size?: number }) {
+  const width = Math.round(size * SHIELD_RATIO);
   return (
     <Image
       src={shieldFamily}
       alt="FamilyFi"
       height={size}
-      width={Math.round(size * SHIELD_RATIO)}
+      width={width}
       priority
       className="block flex-none"
+      // Both sizes in CSS too: the base styles give every img `height: auto`, and a
+      // CSS size on one axis only makes Next.js warn about the aspect ratio.
+      style={{ width, height: size }}
     />
   );
 }
@@ -91,6 +95,8 @@ export function Wordmark({ size = 21, onDeep = false }: { size?: number; onDeep?
             height={Math.round(size * 0.503)}
             width={Math.round(size * 0.411)}
             style={{
+              width: Math.round(size * 0.411),
+              height: Math.round(size * 0.503),
               position: "absolute",
               left: "50%",
               bottom: 0.425 * size,

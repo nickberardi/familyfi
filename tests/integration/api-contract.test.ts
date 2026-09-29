@@ -5,7 +5,7 @@ import YAML from "yaml";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getGroups, POST as createGroup } from "@/app/api/v1/groups/route";
 import { DELETE as deleteGroup } from "@/app/api/v1/groups/[id]/route";
-import { PUT as putSchedule } from "@/app/api/v1/groups/[id]/schedule/route";
+import { POST as createRule } from "@/app/api/v1/rules/route";
 import { POST as pause } from "@/app/api/v1/groups/[id]/pause/route";
 import { POST as resume } from "@/app/api/v1/groups/[id]/resume/route";
 import { POST as extend } from "@/app/api/v1/groups/[id]/extend/route";
@@ -20,7 +20,7 @@ import { GET as getUnifi } from "@/app/api/v1/settings/unifi/route";
 import { prisma } from "@/server/db";
 import { AssignmentState } from "@prisma/client";
 import { authFromLogin, request } from "../helpers/http";
-import { INTERNAL_NETWORK, INTERNAL_ZONE, resetDatabase, seedDevice } from "../helpers/db";
+import { createFamilyGroup, INTERNAL_NETWORK, INTERNAL_ZONE, resetDatabase, seedDevice } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
@@ -136,16 +136,21 @@ describe("v1 API contracts", () => {
     const listed = await getGroups(request("/api/v1/groups", { auth }));
     expect(listed.status).toBe(200);
 
-    const scheduled = await putSchedule(
-      request(`/api/v1/groups/${groupBody.group.id}/schedule`, {
-        method: "PUT",
+    const scheduled = await createRule(
+      request("/api/v1/rules", {
+        method: "POST",
         auth,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" }),
+        body: JSON.stringify({
+          name: "Bedtime",
+          kind: "internet",
+          groupIds: [groupBody.group.id],
+          mode: "scheduled",
+          windows: [{ days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" }],
+        }),
       }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
     );
-    expect(scheduled.status).toBe(200);
+    expect(scheduled.status).toBe(201);
 
     const paused = await pause(
       request(`/api/v1/groups/${groupBody.group.id}/pause`, {
@@ -234,20 +239,38 @@ describe("v1 API contracts", () => {
     expect(device.groupId).toBeNull();
   });
 
-  it("pauses and resumes an Always group without schedule", async () => {
+  it("counts rule policies with app-owned policies on the sync page, and their errors as failing", async () => {
+    const auth = await signedIn();
+    const group = await createFamilyGroup("Sync");
+    const rule = await prisma().rule.findFirstOrThrow({ where: { groups: { some: { groupId: group.id } } }, include: { windows: true } });
+    const owned = { connectionIdentity: "console", siteId: "site", zoneId: INTERNAL_ZONE, desiredFingerprint: "fp", desiredRevision: 1 };
+    await prisma().appPolicy.create({ data: { ...owned, unifiPolicyId: "pol-quarantine", ownerScope: "quarantine", ipVersion: "dual" } });
+    await prisma().rulePolicy.create({
+      data: { ...owned, ruleId: rule.id, windowKey: rule.windows[0]!.id, unifiPolicyId: "pol-bedtime", lastError: "UniFi PUT failed: 400" },
+    });
+
+    const sync = await getSync(request("/api/v1/sync", { auth }));
+    expect(sync.status).toBe(200);
+    const body = (await sync.json()) as { appPolicyCount: number; failingCount: number };
+    expect(body.appPolicyCount).toBe(2);
+    expect(body.failingCount).toBe(1);
+  });
+
+  it("starts a group with no internet rule, and pauses and resumes all its internet", async () => {
     const auth = await signedIn();
     const created = await createGroup(
       request("/api/v1/groups", {
         method: "POST",
         auth,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "family", name: "Always Kid", familyRole: "child" }),
+        body: JSON.stringify({ kind: "family", name: "New Kid", familyRole: "child" }),
       }),
     );
     expect(created.status).toBe(201);
-    const groupBody = (await created.json()) as { group: { id: string; mode: string; access: string } };
-    expect(groupBody.group.mode).toBe("always");
-    expect(groupBody.group.access).toBe("always_on");
+    type Body = { group: { id: string; access: string; internetRuleIds: string[]; suspension: { active: boolean; by: { name: string } | null } } };
+    const groupBody = (await created.json()) as Body;
+    expect(groupBody.group.internetRuleIds).toEqual([]);
+    expect(groupBody.group.access).toBe("available");
 
     const paused = await pause(
       request(`/api/v1/groups/${groupBody.group.id}/pause`, {
@@ -259,82 +282,17 @@ describe("v1 API contracts", () => {
       { params: Promise.resolve({ id: groupBody.group.id }) },
     );
     expect(paused.status).toBe(200);
-    const pausedBody = (await paused.json()) as { group: { access: string; mode: string } };
+    const pausedBody = (await paused.json()) as Body;
     expect(pausedBody.group.access).toBe("paused");
-    expect(pausedBody.group.mode).toBe("always");
+    expect(pausedBody.group.suspension.by?.name).toEqual(expect.any(String));
 
     const resumed = await resume(
       request(`/api/v1/groups/${groupBody.group.id}/resume`, { method: "POST", auth }),
       { params: Promise.resolve({ id: groupBody.group.id }) },
     );
     expect(resumed.status).toBe(200);
-    const resumedBody = (await resumed.json()) as {
-      group: { access: string; mode: string; schedule: { enabled: boolean }; suspension: { active: boolean } };
-    };
-    expect(resumedBody.group.mode).toBe("always");
-    expect(resumedBody.group.access).toBe("always_on");
-    expect(resumedBody.group.schedule.enabled).toBe(false);
-    expect(resumedBody.group.suspension.active).toBe(false);
-  });
-
-  it("schedule PUT flips mode between always and scheduled", async () => {
-    const auth = await signedIn();
-    const created = await createGroup(
-      request("/api/v1/groups", {
-        method: "POST",
-        auth,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "family", name: "Mode Flip", familyRole: "child" }),
-      }),
-    );
-    const groupBody = (await created.json()) as { group: { id: string; mode: string } };
-    expect(groupBody.group.mode).toBe("always");
-
-    const scheduled = await putSchedule(
-      request(`/api/v1/groups/${groupBody.group.id}/schedule`, {
-        method: "PUT",
-        auth,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled: true, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" }),
-      }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
-    );
-    expect(scheduled.status).toBe(200);
-    const scheduledBody = (await scheduled.json()) as { group: { mode: string; schedule: { enabled: boolean } } };
-    expect(scheduledBody.group.mode).toBe("scheduled");
-    expect(scheduledBody.group.schedule.enabled).toBe(true);
-
-    const always = await putSchedule(
-      request(`/api/v1/groups/${groupBody.group.id}/schedule`, {
-        method: "PUT",
-        auth,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled: false, days: [1, 2, 3, 4, 5], start: "21:30", end: "06:45" }),
-      }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
-    );
-    expect(always.status).toBe(200);
-    const alwaysBody = (await always.json()) as { group: { mode: string; schedule: { enabled: boolean }; access: string } };
-    expect(alwaysBody.group.mode).toBe("always");
-    expect(alwaysBody.group.schedule.enabled).toBe(false);
-    expect(alwaysBody.group.access).toBe("always_on");
-  });
-
-  it("rejects pause on a protected group", async () => {
-    const auth = await signedIn();
-    const created = await createGroup(
-      request("/api/v1/groups", {
-        method: "POST",
-        auth,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "family", name: "Nick", familyRole: "adult", protected: true }),
-      }),
-    );
-    const group = (await created.json()) as { group: { id: string } };
-    const paused = await pause(
-      request(`/api/v1/groups/${group.group.id}/pause`, { method: "POST", auth, body: "{}" }),
-      { params: Promise.resolve({ id: group.group.id }) },
-    );
-    expect(paused.status).toBe(409);
+    const resumedBody = (await resumed.json()) as Body;
+    expect(resumedBody.group.access).toBe("available");
+    expect(resumedBody.group.suspension).toEqual({ active: false, until: null, by: null });
   });
 });

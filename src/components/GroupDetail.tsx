@@ -1,18 +1,17 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { Rule } from "@/lib/rules";
+import { internetWindowsForGroup } from "@/lib/rules";
 import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
 import { GroupFilterMarks } from "@/components/FilterMarks";
 import { PauseSheet } from "@/components/PauseSheet";
-import { ScheduleBar } from "@/components/GroupCard";
+import { useFilterCatalog } from "@/components/GroupGrid";
+import { InternetZone } from "@/components/InternetZone";
 import { GroupResolverCard } from "@/components/upstream/GroupResolverCard";
-import type { UpstreamCategoryRow } from "@/lib/upstream";
-import { groupActions } from "@/components/group-actions";
 import type { Group } from "@/lib/types";
 
 const FIELD = "rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]";
@@ -23,13 +22,11 @@ function GroupEditForm({ group }: { group: Group }) {
   const [name, setName] = useState(group.name);
   const [familyRole, setFamilyRole] = useState<"child" | "teen" | "adult">(group.familyRole ?? "child");
   const [monogram, setMonogram] = useState(group.monogram ?? "");
-  const [prot, setProt] = useState(group.protected);
 
   const trimmed = name.trim();
   const nextMonogram = monogram.trim() || null;
   const dirty =
     trimmed !== group.name ||
-    prot !== group.protected ||
     (group.kind === "family" ? familyRole !== group.familyRole : nextMonogram !== group.monogram);
 
   async function onSave() {
@@ -39,8 +36,8 @@ function GroupEditForm({ group }: { group: Group }) {
         method: "PUT",
         body: JSON.stringify(
           group.kind === "family"
-            ? { name: trimmed, familyRole, protected: prot }
-            : { name: trimmed, monogram: nextMonogram, protected: prot },
+            ? { name: trimmed, familyRole }
+            : { name: trimmed, monogram: nextMonogram },
         ),
       }),
     );
@@ -89,10 +86,6 @@ function GroupEditForm({ group }: { group: Group }) {
             <input maxLength={4} className={FIELD} value={monogram} onChange={(e) => setMonogram(e.target.value)} />
           </label>
         )}
-        <label className="flex items-center gap-2 text-[14px]">
-          <input type="checkbox" checked={prot} onChange={(e) => setProt(e.target.checked)} />
-          Protected — FamilyFi will not block this group
-        </label>
         <button
           type="submit"
           disabled={busy || !dirty || !trimmed}
@@ -107,13 +100,11 @@ function GroupEditForm({ group }: { group: Group }) {
 
 export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
   const router = useRouter();
-  const { groups, devices, household, mutate, reload, loading } = useAppData();
+  const { groups, devices, rules, household, mutate, reload, loading } = useAppData();
   const [groupResolver, setGroupResolver] = useState<{ source: "doh" | "dhcp" | "unknown"; networks: { id: string; name: string; servers: string[]; reason: string | null }[]; reason: string | null } | null>(null);
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [catalogNames, setCatalogNames] = useState<Map<string, string>>(new Map());
-  const [upstreamCategories, setUpstreamCategories] = useState<UpstreamCategoryRow[]>([]);
+  const { catalogNames, upstreamCategories } = useFilterCatalog();
 
   // The effective source may be this group's DoH override or its devices' networks.
   useEffect(() => {
@@ -125,175 +116,108 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
     return () => window.clearTimeout(start);
   }, [id]);
 
-  const loadRules = useCallback(async () => {
-    try {
-      const [{ rules: next }, cats, apps, upstream] = await Promise.all([
-        api<{ rules: Rule[] }>("/api/v1/rules"),
-        api<{ categories: { id: number; name: string }[] }>("/api/v1/dpi/categories").catch(() => ({
-          categories: [] as { id: number; name: string }[],
-        })),
-        api<{ applications: { id: number; name: string }[] }>("/api/v1/dpi/applications").catch(() => ({
-          applications: [] as { id: number; name: string }[],
-        })),
-        // A mark falls back to this when no FamilyFi rule is blocking.
-        api<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({
-          categories: [] as UpstreamCategoryRow[],
-        })),
-      ]);
-      setRules(next);
-      setUpstreamCategories(upstream.categories);
-      const map = new Map<string, string>();
-      for (const item of cats.categories) map.set(`category:${item.id}`, item.name);
-      for (const item of apps.applications) map.set(`app:${item.id}`, item.name);
-      setCatalogNames(map);
-    } catch {
-      setRules([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      void loadRules();
-    }, 0);
-    return () => window.clearTimeout(handle);
-  }, [loadRules]);
-
   if (!group) {
     if (loading) return null;
     return <p className="p-6 text-[14px] text-[var(--ff-muted)]">Group not found.</p>;
   }
   const members = devices.filter((device) => device.groupId === id);
   const timezone = household?.timezone ?? "America/New_York";
-  const enabled = group.schedule.enabled && group.schedule.start && group.schedule.end;
-  const actions = groupActions(
-    group,
-    "web",
-    () => setSheet("pause"),
-    () => setSheet("extend"),
-    mutate,
-  );
+  const windows = internetWindowsForGroup(rules, group.id);
 
   return (
-    <div className="flex flex-col gap-5 p-4 md:p-6">
+    <div className="flex flex-col gap-4 p-4 md:p-6">
       <header>
-        <Link href={kind === "family" ? "/family" : "/things"} className="text-[14px] font-semibold text-[var(--ff-accent)]">
-          Back
+        <Link href={kind === "family" ? "/family" : "/things"} className="w-fit text-[14px] font-semibold text-[var(--ff-accent)]">
+          ← Back to {kind === "family" ? "Family" : "Things"}
         </Link>
         <h1 className="mt-2 text-[21px] font-bold tracking-tight">{group.name}</h1>
-        <p className="mt-1 text-[14px]" style={{ color: accessColor(group.access) }}>
-          {cardStateLabel(group, timezone)}
-        </p>
       </header>
-      <GroupEditForm key={group.id} group={group} />
-      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-        <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Current state</h2>
-        <div className="p-[18px]">
-          <p className="text-[14px] text-[var(--ff-muted)]">{cardNoteLine(group)}</p>
-          <div className="mt-3">
-            <ScheduleBar
-              start={enabled ? group.schedule.start : null}
-              end={enabled ? group.schedule.end : null}
-              timezone={timezone}
-            />
-          </div>
-          {group.protected ? (
-            <p className="mt-3 text-[14px] text-[var(--ff-muted)]">Protected groups do not use Pause or bedtime.</p>
-          ) : (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {actions.map((action) => {
-                const className = action.strong
-                  ? "rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
-                  : "rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]";
-                if (action.href && action.label !== "Detail" && action.label !== "View devices") {
-                  return (
-                    <Link key={action.label} href={action.href} className={className}>
-                      {action.label === "Rules" ? "Rules" : action.label}
-                    </Link>
-                  );
-                }
-                if (action.onClick) {
-                  return (
-                    <button key={action.label} type="button" className={className} onClick={action.onClick}>
-                      {action.label === "Pause"
-                        ? group.mode === "always"
-                          ? "Pause"
-                          : "Pause schedule"
-                        : action.label === "Resume"
-                          ? group.mode === "always"
-                            ? "Resume"
-                            : "Resume schedule"
-                          : action.label}
-                    </button>
-                  );
-                }
-                return null;
-              })}
-            </div>
-          )}
-        </div>
-        {!group.protected ? (
-          <GroupFilterMarks
-            group={group}
-            rules={rules}
-            catalogNames={catalogNames}
-            upstreamCategories={upstreamCategories}
-            timezone={household?.timezone ?? "UTC"}
-            showAppAdd
-            onRulesChanged={() => void loadRules()}
+      <div className="grid grid-cols-1 items-start gap-[18px] md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))]">
+        <div className="flex min-w-0 flex-col gap-[18px]">
+          <GroupEditForm key={group.id} group={group} />
+          <GroupResolverCard
+            groupId={group.id}
+            groupName={group.name}
+            dohOverrideUrl={group.dohOverrideUrl ?? null}
+            resolver={groupResolver}
+            onChanged={() => {
+              void reload();
+              void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
+                .then((res) => setGroupResolver(res.resolver))
+                .catch(() => setGroupResolver(null));
+            }}
           />
-        ) : null}
-      </section>
-      <GroupResolverCard
-        groupId={group.id}
-        groupName={group.name}
-        dohOverrideUrl={group.dohOverrideUrl ?? null}
-        resolver={groupResolver}
-        onChanged={() => {
-          void reload();
-          void loadRules();
-          void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
-            .then((res) => setGroupResolver(res.resolver))
-            .catch(() => setGroupResolver(null));
-        }}
-      />
-      <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-        <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
-        {members.length === 0 ? (
-          <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
-            No devices assigned.
-            {group.mode === "always" || group.schedule.enabled ? (
-              <>
-                {" "}
-                {group.mode === "always" ? "Always On" : "Bedtime"} cannot apply on UniFi until you{" "}
-                <Link href={`/devices?assign=${id}`} className="font-semibold text-[var(--ff-accent)]">
-                  assign a device
-                </Link>
-                .
-              </>
-            ) : null}
-          </p>
-        ) : (
-          members.map((device) => (
-            <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
-              <Link href={`/devices/${encodeURIComponent(device.mac)}?from=${encodeURIComponent(id)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{device.hostname ?? "Unnamed device"}</Link>
-              <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+            <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
+            {members.length === 0 ? (
+              <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
+                No devices assigned.
+                {group.internetRuleIds.length || group.suspension.active ? (
+                  <>
+                    {" "}
+                    Its rules cannot apply on UniFi until you{" "}
+                    <Link href={`/devices?assign=${id}`} className="font-semibold text-[var(--ff-accent)]">
+                      assign a device
+                    </Link>
+                    .
+                  </>
+                ) : null}
+              </p>
+            ) : (
+              members.map((device) => (
+                <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
+                  <Link href={`/devices/${encodeURIComponent(device.mac)}?from=${encodeURIComponent(id)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{device.hostname ?? "Unnamed device"}</Link>
+                  <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
+                </div>
+              ))
+            )}
+          </section>
+          <button
+            type="button"
+            className="self-start text-[14px] font-semibold text-[var(--ff-danger)]"
+            onClick={() =>
+              void mutate(async () => {
+                const result = await api<{ change: { changeId: string } }>(`/api/v1/groups/${id}`, { method: "DELETE" });
+                router.replace(kind === "family" ? "/family" : "/things");
+                return { ...result, removedGroupId: id };
+              })
+            }
+          >
+            Delete group (devices become quarantined)
+          </button>
+        </div>
+        <div className="flex min-w-0 flex-col gap-[18px]">
+          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+            <div className="px-[18px] pt-4 pb-3">
+              <h2 className="flex items-center gap-1.5 text-[14px] font-normal" style={{ color: accessColor(group.access) }}>
+                <span className="h-[7px] w-[7px] rounded-full" style={{ background: accessColor(group.access) }} />
+                {cardStateLabel(group, windows, timezone, new Date())}
+              </h2>
+              <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
             </div>
-          ))
-        )}
-      </section>
-      <button
-        type="button"
-        className="self-start text-[14px] font-semibold text-[var(--ff-danger)]"
-        onClick={() =>
-          void mutate(async () => {
-            const result = await api<{ change: { changeId: string } }>(`/api/v1/groups/${id}`, { method: "DELETE" });
-            router.replace(kind === "family" ? "/family" : "/things");
-            return { ...result, removedGroupId: id };
-          })
-        }
-      >
-        Delete group (devices become quarantined)
-      </button>
+            <div className="px-3 pb-3">
+              <InternetZone
+                group={group}
+                windows={windows}
+                timezone={timezone}
+                surface="web"
+                onPause={() => setSheet("pause")}
+                onExtend={() => setSheet("extend")}
+                editHref={`/rules?group=${group.id}`}
+              />
+            </div>
+            <GroupFilterMarks
+              group={group}
+              rules={rules}
+              catalogNames={catalogNames}
+              upstreamCategories={upstreamCategories}
+              timezone={timezone}
+              showAppAdd
+              onRulesChanged={() => void reload()}
+            />
+          </section>
+        </div>
+      </div>
       {sheet ? <PauseSheet group={group} mode={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
     </div>
   );

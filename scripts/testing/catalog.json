@@ -117,12 +117,6 @@
         "display"
       ]
     },
-    "tests/unit/group-mode.test.ts": {
-      "categories": [
-        "groups",
-        "schedules"
-      ]
-    },
     "tests/unit/household-state.test.ts": {
       "categories": [
         "groups",
@@ -203,7 +197,7 @@
         "trust"
       ]
     },
-    "tests/unit/plan-dpi.test.ts": {
+    "tests/unit/plan-rules.test.ts": {
       "categories": [
         "rules",
         "sync"
@@ -240,15 +234,22 @@
         "repository"
       ]
     },
-    "tests/unit/rule-rows.test.ts": {
+    "tests/unit/rules.test.ts": {
       "categories": [
+        "rules"
+      ]
+    },
+    "tests/unit/rule-windows.test.ts": {
+      "categories": [
+        "schedules",
         "rules",
         "display"
       ]
     },
-    "tests/unit/rules.test.ts": {
+    "tests/unit/rule-writes.test.ts": {
       "categories": [
-        "rules"
+        "rules",
+        "display"
       ]
     },
     "tests/unit/schedule.test.ts": {
@@ -393,12 +394,6 @@
         "pairing"
       ]
     },
-    "tests/integration/d11-mode.test.ts": {
-      "categories": [
-        "groups",
-        "database"
-      ]
-    },
     "tests/integration/dev-mock.test.ts": {
       "categories": [
         "unifi"
@@ -414,6 +409,13 @@
         "rules"
       ]
     },
+    "tests/integration/rules-api.test.ts": {
+      "categories": [
+        "rules",
+        "schedules",
+        "groups"
+      ]
+    },
     "tests/integration/edge-auth.test.ts": {
       "categories": [
         "trust"
@@ -421,6 +423,13 @@
     },
     "tests/integration/group-detail-api.test.ts": {
       "categories": [
+        "groups"
+      ]
+    },
+    "tests/integration/household-rules-migration.test.ts": {
+      "categories": [
+        "database",
+        "rules",
         "groups"
       ]
     },
@@ -567,12 +576,12 @@
         "settings"
       ]
     },
-    "tests/browser/smoke.spec.ts > create person lands on a seeded detail page that can be edited": {
+    "tests/browser/smoke.spec.ts > add person opens a sheet over Family, and the new person can be edited": {
       "categories": [
         "groups"
       ]
     },
-    "tests/browser/smoke.spec.ts > create things group lands on a seeded detail page that can be edited": {
+    "tests/browser/smoke.spec.ts > add things group opens a sheet over Things, and the new group can be edited": {
       "categories": [
         "groups"
       ]
@@ -597,7 +606,19 @@
         "devices"
       ]
     },
-    "tests/browser/smoke.spec.ts > Rules shell: protected absent and Always|Scheduled persist": {
+    "tests/browser/smoke.spec.ts > Rules: a two-window internet rule across midnight, named in UniFi, on the card": {
+      "categories": [
+        "rules",
+        "schedules"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > Pause all internet names its scope and can be undone": {
+      "categories": [
+        "groups",
+        "schedules"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > Websites rule blocks named domains, with the encrypted DNS caveat": {
       "categories": [
         "rules"
       ]
@@ -606,6 +627,13 @@
       "categories": [
         "categories",
         "groups"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > cards show every household category; one UniFi cannot block offers a Websites rule": {
+      "categories": [
+        "categories",
+        "groups",
+        "rules"
       ]
     }
   }

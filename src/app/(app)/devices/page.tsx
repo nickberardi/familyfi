@@ -79,7 +79,7 @@ function DevicesBody() {
           <section className="rounded-[12px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] px-[18px] py-3">
             <div className="text-[14px] font-semibold text-[var(--ff-paused)]">{assignGroup.name} needs devices</div>
             <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
-              {assignGroup.name} has a bedtime but no assigned devices, so a UniFi policy cannot be created. Assign an
+              {assignGroup.name} has no assigned devices, so its UniFi policies cannot be created. Assign an
               unassigned device below.
             </p>
           </section>

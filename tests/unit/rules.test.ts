@@ -5,18 +5,23 @@ import {
   categoryRuleForSlot,
   glyphForAppName,
   parentFacingRuleLabel,
+  internetRulesForGroup,
+  normalizeDomain,
   type Rule,
 } from "@/lib/rules";
 
 function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">): Rule {
   return {
+    name: "Rule",
     scope: "group",
-    groupId: "g1",
+    groupIds: ["g1"],
     networkIds: [],
+    domains: [],
     enabled: true,
     mode: "always",
-    schedule: { enabled: false, days: [], start: null, end: null },
-    internet: false,
+    windows: [],
+    useGeneratedName: false,
+    policyNames: [],
     ...partial,
   };
 }
@@ -48,11 +53,14 @@ describe("rules helpers", () => {
       rule({ id: "c-off", kind: "category", targetIds: [4], enabled: false }),
       rule({ id: "c", kind: "category", targetIds: [4], enabled: true }),
       rule({ id: "a", kind: "app", targetIds: [100], enabled: false }),
-      rule({ id: "other", kind: "category", groupId: "g2", targetIds: [24] }),
+      rule({ id: "other", kind: "category", groupIds: ["g2"], targetIds: [24] }),
+      rule({ id: "shared", kind: "internet", groupIds: ["g2", "g1"], targetIds: [], mode: "scheduled" }),
     ];
     expect(categoryRuleForSlot(rules, "g1", 4)?.id).toBe("c");
     expect(categoryRuleForSlot(rules, "g1", 24)).toBeUndefined();
     expect(appRulesForGroup(rules, "g1").map((r) => r.id)).toEqual(["a"]);
+    expect(internetRulesForGroup(rules, "g1").map((r) => r.id)).toEqual(["shared"]);
+    expect(internetRulesForGroup(rules, "g3")).toEqual([]);
   });
 
   it("parent-facing labels never fall back to raw DPI ids", () => {
@@ -61,5 +69,15 @@ describe("rules helpers", () => {
     expect(parentFacingRuleLabel(rule({ id: "2", kind: "app", targetIds: [99] }), catalog)).toBe("TikTok");
     expect(parentFacingRuleLabel(rule({ id: "3", kind: "app", targetIds: [12345] }), catalog)).toBe("App");
     expect(glyphForAppName("TikTok")).toBe("TI");
+  });
+
+  it("normalizes a pasted website to the domain the gateway blocks", () => {
+    expect(normalizeDomain("https://www.TikTok.com/foryou?x=1")).toBe("www.tiktok.com");
+    expect(normalizeDomain("tiktok.com.")).toBe("tiktok.com");
+    expect(normalizeDomain("*.tiktokcdn.com")).toBe("tiktokcdn.com");
+    expect(normalizeDomain("example.com:8443/path")).toBe("example.com");
+    expect(normalizeDomain("localhost")).toBeNull();
+    expect(normalizeDomain("not a domain.com")).toBeNull();
+    expect(normalizeDomain("192.0.2.1")).toBeNull();
   });
 });

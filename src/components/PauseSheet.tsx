@@ -1,7 +1,9 @@
 "use client";
 
 import { api } from "@/lib/api";
+import { formatClock } from "@/lib/display";
 import { pauseSheetBody, pauseSheetOptions, pauseSheetTitle, type PauseSheetRequest } from "@/lib/pause-sheet";
+import { internetWindowsForGroup } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 
@@ -20,8 +22,9 @@ export function PauseSheet({
   timezone: string;
   onClose: () => void;
 }) {
-  const { mutate } = useAppData();
-  const options = pauseSheetOptions(group, mode, timezone, new Date());
+  const { mutate, rules, devices } = useAppData();
+  const deviceNames = devices.filter((device) => device.groupId === group.id).map((device) => device.hostname ?? "");
+  const options = pauseSheetOptions(group, internetWindowsForGroup(rules, group.id), mode, timezone, new Date());
 
   async function run(request: PauseSheetRequest) {
     if (request.kind === "extend") {
@@ -34,25 +37,35 @@ export function PauseSheet({
       return;
     }
     const until = request.kind === "pauseFor" ? untilFromMinutes(request.minutes).toISOString() : request.until;
-    await mutate(() =>
-      api(`/api/v1/groups/${group.id}/pause`, {
-        method: "POST",
-        body: JSON.stringify(until === null ? {} : { until }),
-      }),
+    // Name the scope and who it hits, and offer the way back.
+    await mutate(
+      () =>
+        api(`/api/v1/groups/${group.id}/pause`, {
+          method: "POST",
+          body: JSON.stringify(until === null ? {} : { until }),
+        }),
+      undefined,
+      {
+        notice: `All internet paused for ${group.name} ${until ? `until ${formatClock(new Date(until), timezone)}` : "until you resume"}.`,
+        action: { label: "Undo", run: () => api(`/api/v1/groups/${group.id}/resume`, { method: "POST" }) },
+      },
     );
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ff-scrim)] p-6" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pause-sheet-title"
         className="w-full max-w-[400px] overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="p-[18px]">
-          <div className="text-[17px] font-bold tracking-tight">
+          <h2 id="pause-sheet-title" className="text-[17px] font-bold tracking-tight">
             {pauseSheetTitle(group, mode)}
-          </div>
-          <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{pauseSheetBody(mode)}</p>
+          </h2>
+          <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{pauseSheetBody(group, mode, deviceNames)}</p>
         </div>
         {options.map((option) => (
           <button

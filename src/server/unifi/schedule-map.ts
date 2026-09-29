@@ -1,4 +1,4 @@
-import { assertSchedule, isSuspended, type Schedule, type Suspension } from "@/lib/schedule";
+import { assertSchedule, type Schedule } from "@/lib/schedule";
 import type { UnifiFirewallSchedule, UnifiWeekday } from "./types";
 
 const UNIFI_DAYS: UnifiWeekday[] = [
@@ -11,7 +11,7 @@ const UNIFI_DAYS: UnifiWeekday[] = [
   "SATURDAY",
 ];
 
-/** Recurring bedtime for UniFi. `undefined` means always-on (quarantine) or no schedule. */
+/** A rule window as a UniFi policy schedule. `undefined` means no schedule: the policy always applies. */
 export function toUnifiSchedule(schedule: Schedule): UnifiFirewallSchedule | undefined {
   if (!schedule.enabled) return undefined;
   assertSchedule(schedule);
@@ -25,16 +25,4 @@ export function toUnifiSchedule(schedule: Schedule): UnifiFirewallSchedule | und
     repeatOnDays: uniqueDays.map((day) => UNIFI_DAYS[day]!),
     timeFilter,
   };
-}
-
-export function unifiPolicyEnabled(input: {
-  ownerScope: "group" | "quarantine";
-  protected: boolean;
-  suspension: Suspension;
-  now: Date;
-  quarantineEnforced?: boolean;
-}): boolean {
-  if (input.ownerScope === "quarantine") return input.quarantineEnforced !== false;
-  if (input.protected) return false;
-  return !isSuspended(input.suspension, input.now);
 }

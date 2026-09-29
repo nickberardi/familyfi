@@ -112,6 +112,8 @@ export function RemoteAccessCard({
     try {
       const result = await api<{ tunnel: RemoteAccess }>("/api/v1/connection/tunnel", { method: "PUT", body: JSON.stringify(body) });
       onTunnel(result.tunnel);
+      // Follow the server's answer even when it didn't change, e.g. Off after an unsaved "My domain".
+      setSeen(null);
       setEditing(false);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not change remote access.");
