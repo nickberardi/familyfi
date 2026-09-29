@@ -22,13 +22,11 @@ function GroupEditForm({ group }: { group: Group }) {
   const [name, setName] = useState(group.name);
   const [familyRole, setFamilyRole] = useState<"child" | "teen" | "adult">(group.familyRole ?? "child");
   const [monogram, setMonogram] = useState(group.monogram ?? "");
-  const [prot, setProt] = useState(group.protected);
 
   const trimmed = name.trim();
   const nextMonogram = monogram.trim() || null;
   const dirty =
     trimmed !== group.name ||
-    prot !== group.protected ||
     (group.kind === "family" ? familyRole !== group.familyRole : nextMonogram !== group.monogram);
 
   async function onSave() {
@@ -38,8 +36,8 @@ function GroupEditForm({ group }: { group: Group }) {
         method: "PUT",
         body: JSON.stringify(
           group.kind === "family"
-            ? { name: trimmed, familyRole, protected: prot }
-            : { name: trimmed, monogram: nextMonogram, protected: prot },
+            ? { name: trimmed, familyRole }
+            : { name: trimmed, monogram: nextMonogram },
         ),
       }),
     );
@@ -88,10 +86,6 @@ function GroupEditForm({ group }: { group: Group }) {
             <input maxLength={4} className={FIELD} value={monogram} onChange={(e) => setMonogram(e.target.value)} />
           </label>
         )}
-        <label className="flex items-center gap-2 text-[14px]">
-          <input type="checkbox" checked={prot} onChange={(e) => setProt(e.target.checked)} />
-          Protected — FamilyFi will not block this group
-        </label>
         <button
           type="submit"
           disabled={busy || !dirty || !trimmed}
@@ -212,19 +206,15 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
                 editHref={`/rules?group=${group.id}`}
               />
             </div>
-            {!group.protected ? (
-              <>
-                <GroupFilterMarks
-                  group={group}
-                  rules={rules}
-                  catalogNames={catalogNames}
-                  upstreamCategories={upstreamCategories}
-                  timezone={timezone}
-                  showAppAdd
-                  onRulesChanged={() => void reload()}
-                />
-              </>
-            ) : null}
+            <GroupFilterMarks
+              group={group}
+              rules={rules}
+              catalogNames={catalogNames}
+              upstreamCategories={upstreamCategories}
+              timezone={timezone}
+              showAppAdd
+              onRulesChanged={() => void reload()}
+            />
           </section>
         </div>
       </div>

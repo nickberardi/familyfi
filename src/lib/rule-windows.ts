@@ -18,13 +18,11 @@ export type InternetWindow = RuleWindowSpec & { ruleName: string };
 export type Actor = { accountId: string | null; name: string } | null;
 
 export type InternetGroup = {
-  protected: boolean;
   suspension: { active: boolean; until: string | null; by?: Actor };
   allowance: { active: boolean; until: string | null; by?: Actor };
 };
 
 export type InternetState =
-  | { state: "protected" }
   | { state: "paused"; until: string | null; by: Actor }
   | { state: "blocked"; window: string; until: string | null }
   | { state: "allowed"; window: string | null; until: string | null; by: Actor }
@@ -125,7 +123,6 @@ function weekSpans(window: RuleWindowSpec): [number, number][] {
  * limits the group. Category, app and website rules are separate and never change this.
  */
 export function internetState(group: InternetGroup, windows: InternetWindow[], now: Date, timeZone: string): InternetState {
-  if (group.protected) return { state: "protected" };
   if (isActiveUntil(group.suspension, now)) {
     return { state: "paused", until: group.suspension.until, by: group.suspension.by ?? null };
   }
@@ -156,7 +153,6 @@ export function internetState(group: InternetGroup, windows: InternetWindow[], n
  * to its end drawn over the windows it lifts.
  */
 export function internetDayBands(group: InternetGroup, windows: InternetWindow[], now: Date, timeZone: string): DayBand[] {
-  if (group.protected) return [];
   const weekday = localWeekday(now, timeZone);
   const minutes = localMinutes(now, timeZone);
   const bands: DayBand[] = windows.flatMap((window) =>

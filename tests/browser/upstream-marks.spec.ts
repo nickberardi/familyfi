@@ -30,10 +30,10 @@ async function clearSlotRules(page: Page, groupId: string, categoryId: number) {
 
 async function childGroup(page: Page) {
   const body = (await (await page.request.get("/api/v1/groups")).json()) as {
-    groups: { id: string; name: string; kind: string; protected: boolean }[];
+    groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
-  const kid = body.groups.find((group) => group.kind === "family" && !group.protected);
-  expect(kid, "seed must include a non-protected family group").toBeTruthy();
+  const kid = body.groups.find((group) => group.kind === "family" && group.familyRole !== "adult");
+  expect(kid, "seed must include a child or teen").toBeTruthy();
   return kid!;
 }
 

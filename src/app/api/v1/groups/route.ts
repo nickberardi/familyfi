@@ -11,7 +11,6 @@ const Create = z.object({
   name: z.string().min(1),
   monogram: z.string().max(4).optional(),
   familyRole: z.enum(["child", "teen", "adult"]).optional(),
-  protected: z.boolean().optional(),
 });
 
 export async function GET(request: Request) {
@@ -38,7 +37,6 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         monogram: parsed.data.monogram,
         familyRole: parsed.data.familyRole as FamilyRole | undefined,
-        protected: parsed.data.protected ?? false,
       },
       include: groupInclude,
     });

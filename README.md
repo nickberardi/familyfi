@@ -16,7 +16,7 @@ The responsive web app / PWA and the companion [iOS project](https://github.com/
 
 ### Family and Things
 
-Put devices into groups that match the house. **Family** groups are people (child, teen, or adult). **Things** are TVs, computers, smart-home kits — anything that is not a person. Every assigned device belongs to exactly one group. Protection is per group: a protected group is exempt from FamilyFi blocking (your UniFi rules still apply).
+Put devices into groups that match the house. **Family** groups are people (child, teen, or adult). **Things** are TVs, computers, smart-home kits — anything that is not a person. Every assigned device belongs to exactly one group.
 
 ### Rules and schedules
 

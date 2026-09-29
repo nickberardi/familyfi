@@ -15,7 +15,7 @@ This repository owns two distinct shared artifacts:
 | [OpenAPI specification](../openapi/familyfi.v1.yaml) | HTTP paths, request/response shapes, statuses and authentication contract | API checks and schema-validated integration responses; [authorization matrix](../tests/integration/authorization-matrix.test.ts) for caller permissions |
 | [Display vectors](../tests/fixtures/display-vectors.json) | Examples of shared labels, available actions and time-dependent display behaviour | [Vector tests](../tests/unit/display-vectors.test.ts); format and update rules in [testing](testing.md#display-vectors) |
 
-Schema compatibility does not prove behavioural compatibility. Pause/Resume meaning, protection,
+Schema compatibility does not prove behavioural compatibility. Pause/Resume meaning, allowances,
 household timezone, per-action outcomes and unknown DNS verdicts must remain consistent across
 clients. The fixtures cover the functions named by their test harness; they are not evidence of
 complete UI parity, all API semantics or live gateway enforcement.
@@ -146,7 +146,7 @@ The iPhone may automatically enroll its reachable Watch without another administ
 The Watch receives its own device credential and bearer token, appears as a separate device in
 System → Pair Device, and can be revoked there independently. Its sessions may only read session,
 connection, group, and change state or pause, resume, and extend groups. The three group controls
-reject protected and adult Family groups for Watch sessions. Signing out or revoking the phone does
+reject adult Family groups for Watch sessions. Signing out or revoking the phone does
 not revoke the Watch. Its bearer expires after 30 days; automatic renewal is a separate change.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may

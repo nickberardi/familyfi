@@ -40,7 +40,7 @@ describe("dev UniFi mock household", () => {
   it("seeds groups, an adult login, and assigned devices for UI work", async () => {
     await ensureDevDummyData();
     const groups = await prisma().group.findMany({ orderBy: { name: "asc" } });
-    // One group per comfortable-card layout: protected adult, child and teen with
+    // One group per comfortable-card layout: an adult, child and teen with
     // internet rules, a paused member, and things groups with and without rules.
     expect(groups.map((group) => group.name)).toEqual([
       "Betsy",

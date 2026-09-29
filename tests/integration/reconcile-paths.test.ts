@@ -348,7 +348,7 @@ describe("reconciler paths", () => {
       expect(policyMacs(client.state.policies.find((item) => item.id === recreated.unifiPolicyId) ?? {})).toContain(MAC);
     });
 
-    it("drops a rule policy that never reached the gateway once its group is protected", async () => {
+    it("drops a rule policy that never reached the gateway once its group leaves the rule", async () => {
       const client = fixtureUnifiClient();
       const { group } = await groupWithPolicy(client);
       const rule = await prisma().rule.create({
@@ -360,7 +360,7 @@ describe("reconciler paths", () => {
       expect(failed.unifiPolicyId).toBeNull();
 
       client.createError = undefined;
-      await prisma().group.update({ where: { id: group.id }, data: { protected: true } });
+      await prisma().ruleGroup.deleteMany({ where: { ruleId: rule.id, groupId: group.id } });
       await runReconcileOnce();
 
       expect(await prisma().rulePolicy.findUnique({ where: { id: failed.id } })).toBeNull();
@@ -371,7 +371,7 @@ describe("reconciler paths", () => {
       const client = fixtureUnifiClient();
       const { group, rulePolicy } = await groupWithRule(client);
 
-      await prisma().group.update({ where: { id: group.id }, data: { protected: true } });
+      await prisma().ruleGroup.deleteMany({ where: { groupId: group.id } });
       const refusal = refuseDelete(client, rulePolicy.unifiPolicyId);
       await runReconcileOnce();
 

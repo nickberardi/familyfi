@@ -212,7 +212,6 @@ describe("planPolicies", () => {
     id: "kid",
     name: "Betsy",
     kind: GroupKind.family,
-    protected: false,
     suspensionActive: false,
     suspensionUntil: null as Date | null,
   };
@@ -254,7 +253,7 @@ describe("planPolicies", () => {
     expect(policies[0]?.enabled).toBe(false);
   });
 
-  it("plans a group's policy only while it is paused: an unscheduled block, never a protected group", () => {
+  it("plans a group's policy only while it is paused: an unscheduled block", () => {
     const devices = [
       { mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "kid", zoneId: "z1" },
       { mac: "aa:aa:aa:aa:aa:99", assignment: AssignmentState.assigned, groupId: "adult", zoneId: "z1" },
@@ -262,15 +261,15 @@ describe("planPolicies", () => {
     const plan = (groups: (typeof child)[], at = now) =>
       planPolicies({ installId: "default", now: at, destinationZoneId, zoneNames: { z1: "Internal" }, groups, devices }).policies;
 
-    expect(plan([child, { ...paused, id: "adult", protected: true }])).toEqual([]);
+    expect(plan([child, { ...child, id: "adult" }])).toEqual([]);
 
-    const [policy, ...rest] = plan([paused, { ...paused, id: "adult", protected: true }]);
+    const [policy, ...rest] = plan([paused, { ...child, id: "adult" }]);
     expect(rest).toEqual([]);
     expect(policy).toMatchObject({ ownerScope: "group", groupId: "kid", enabled: true, name: "FamilyFi Betsy's Internet Pause" });
     expect(policy).not.toHaveProperty("schedule");
 
     const timed = { ...paused, suspensionUntil: new Date("2026-09-14T18:00:00Z") };
-    const adult = { ...child, id: "adult", protected: true };
+    const adult = { ...child, id: "adult" };
     expect(plan([timed, adult])).toHaveLength(1);
     expect(plan([timed, adult], new Date("2026-09-14T18:00:00Z"))).toEqual([]);
   });
@@ -298,17 +297,5 @@ describe("planPolicies", () => {
     });
     expect(unresolvedOnly.policies).toHaveLength(0);
     expect(unresolvedOnly.retainOwners.has("group:kid")).toBe(true);
-  });
-
-  it("does not retain block policies for protected groups even if a MAC is unresolved", () => {
-    const planned = planPolicies({
-      installId: "default",
-      now,
-      destinationZoneId,
-      groups: [{ ...paused, id: "adult", protected: true }],
-      devices: [{ mac: "aa:aa:aa:aa:aa:01", assignment: AssignmentState.assigned, groupId: "adult", zoneId: null }],
-    });
-    expect(planned.policies).toHaveLength(0);
-    expect(planned.retainOwners.size).toBe(0);
   });
 });

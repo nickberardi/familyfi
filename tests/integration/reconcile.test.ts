@@ -284,7 +284,7 @@ describe("reconciliation against mocked UniFi", () => {
     expect(run?.status).toBe("applied");
   });
 
-  it("skips protected groups and quarantines devices when the group is deleted", async () => {
+  it("writes nothing for a group with no rules, and quarantines devices when the group is deleted", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
     const adult = await prisma().group.create({
@@ -292,7 +292,6 @@ describe("reconciliation against mocked UniFi", () => {
         kind: GroupKind.family,
         name: "Nick",
         familyRole: FamilyRole.adult,
-        protected: true,
       },
     });
     await seedDevice({ mac: "02:00:00:00:00:01", groupId: adult.id });

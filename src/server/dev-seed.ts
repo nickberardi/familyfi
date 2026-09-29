@@ -52,7 +52,7 @@ async function ensureDummyHouseholdMembers() {
   if (existing > 0) return;
 
   const adult = await prisma().group.create({
-    data: { kind: GroupKind.family, name: "Pat", familyRole: FamilyRole.adult, protected: true },
+    data: { kind: GroupKind.family, name: "Pat", familyRole: FamilyRole.adult },
   });
   const child = await prisma().group.create({
     data: { kind: GroupKind.family, name: "Betsy", familyRole: FamilyRole.child },

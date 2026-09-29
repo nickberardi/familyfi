@@ -42,12 +42,6 @@ export function InternetZone({
   const at = (iso: string | null) => (iso ? formatClock(new Date(iso), timezone) : null);
   const by = (actor: { name: string } | null) => (actor ? ` by ${actor.name}` : "");
 
-  if (state.state === "protected") {
-    return (
-      <Zone tone="neutral" title="All internet · never limited" sub={`Protected — FamilyFi never blocks ${group.name}.`} />
-    );
-  }
-
   const actions = groupActions(group, surface, onPause, onExtend, mutate).filter((action) => action.onClick);
   const bands: TimelineBand[] = internetDayBands(group, windows, now, timezone);
   const timeline = (
@@ -109,7 +103,7 @@ function Zone({
   actions = [],
   children,
 }: {
-  tone: "on" | "off" | "paused" | "neutral";
+  tone: "on" | "off" | "paused";
   title: string;
   sub: string;
   actions?: Action[];

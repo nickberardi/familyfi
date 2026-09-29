@@ -142,8 +142,6 @@ export function GroupFilterMarks({
   const [sheet, setSheet] = useState<FilterSheetState | null>(null);
   const [addApp, setAddApp] = useState(false);
 
-  if (group.protected) return null;
-
   const apps = appRulesForGroup(rules, group.id);
   /** Without app rules and without the + tile the section is a heading over nothing. */
   const showApps = apps.length > 0 || Boolean(showAppAdd);

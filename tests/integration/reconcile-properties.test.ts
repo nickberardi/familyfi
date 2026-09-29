@@ -31,7 +31,6 @@ const PLACES = {
 type Place = keyof typeof PLACES | "absent";
 
 type GroupSpec = {
-  protected: boolean;
   paused: boolean;
   allowed: boolean;
 };
@@ -60,7 +59,6 @@ type World = {
 
 type Step =
   | { kind: "assign"; mac: number; group: number | null }
-  | { kind: "protect"; group: number; value: boolean }
   | { kind: "pause"; group: number }
   | { kind: "resume"; group: number }
   | { kind: "allow"; group: number }
@@ -85,7 +83,7 @@ const world: fc.Arbitrary<World> = fc.record({
   managed: fc.subarray([INTERNAL_NETWORK, IOT_NETWORK]),
   quarantineEnforced: fc.boolean(),
   groups: fc.array(
-    fc.record({ protected: fc.boolean(), paused: fc.boolean(), allowed: fc.boolean() }),
+    fc.record({ paused: fc.boolean(), allowed: fc.boolean() }),
     { minLength: GROUP_COUNT, maxLength: GROUP_COUNT },
   ),
   rules: fc.array(
@@ -114,7 +112,6 @@ const world: fc.Arbitrary<World> = fc.record({
 
 const step: fc.Arbitrary<Step> = fc.oneof(
   fc.record({ kind: fc.constant("assign" as const), mac: macIndex, group: fc.option(groupIndex, { nil: null }) }),
-  fc.record({ kind: fc.constant("protect" as const), group: groupIndex, value: fc.boolean() }),
   fc.record({ kind: fc.constant("pause" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("resume" as const), group: groupIndex }),
   fc.record({ kind: fc.constant("allow" as const), group: groupIndex }),
@@ -161,7 +158,6 @@ async function build(spec: World): Promise<{ client: Client; groupIds: string[];
         kind: GroupKind.family,
         familyRole: FamilyRole.child,
         name: `Group ${n}`,
-        protected: group.protected,
         suspensionActive: group.paused,
         suspensionUntil: group.paused ? PAUSED_UNTIL() : null,
         allowActive: group.allowed,
@@ -205,9 +201,6 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
       });
       return;
     }
-    case "protect":
-      await db.group.updateMany({ where: { id: groupId! }, data: { protected: change.value } });
-      return;
     case "pause":
       await db.group.updateMany({ where: { id: groupId! }, data: { suspensionActive: true, suspensionUntil: PAUSED_UNTIL() } });
       return;
@@ -314,10 +307,6 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
     const group = device.assignment === AssignmentState.assigned && device.groupId ? groupById.get(device.groupId) : undefined;
     const holding = ours.filter(({ policy }) => policyMacs(policy).includes(device.mac));
     const holdingRules = ourRules.filter(({ policy }) => policyMacs(policy).includes(device.mac));
-    if (group?.protected) {
-      expect([...holding, ...holdingRules].map(({ policy }) => policy.name), `${device.mac} in protected ${group.name}`).toEqual([]);
-      continue;
-    }
     if (!group) {
       // Quarantine: its zone's quarantine policy, and no rule.
       expect(holding.map(({ row }) => [row.ownerScope, row.zoneId]), `${device.mac} quarantine`).toEqual([["quarantine", device.zoneId]]);
@@ -408,9 +397,9 @@ describe("reconciliation properties", () => {
                 managed: [IOT_NETWORK],
                 quarantineEnforced: false,
                 groups: [
-                  { protected: false, paused: false, allowed: false },
-                  { protected: false, paused: false, allowed: false },
-                  { protected: false, paused: false, allowed: false },
+                  { paused: false, allowed: false },
+                  { paused: false, allowed: false },
+                  { paused: false, allowed: false },
                 ],
                 rules: [{ kind: "internet", groups: [2], always: false, windows: [{ name: "", days: [6], start: "21:00", end: "06:45" }], enabled: false }],
                 places: ["internal", "iot", "internal", "internal", "internal"],

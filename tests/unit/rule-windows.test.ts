@@ -21,7 +21,6 @@ const bedtime: InternetWindow = { name: "", days: EVERY_DAY, start: "22:00", end
 const homework: InternetWindow = { name: "Homework", days: WEEKDAYS, start: "15:00", end: "18:00", ruleName: "School days" };
 
 const group = (patch: Partial<InternetGroup> = {}): InternetGroup => ({
-  protected: false,
   suspension: { active: false, until: null, by: null },
   allowance: { active: false, until: null, by: null },
   ...patch,
@@ -110,7 +109,6 @@ describe("internetState", () => {
     });
     // Once the allowance has run out the window blocks again.
     expect(internetState(allowed, [homework], at("2026-09-28T18:00:00"), TZ).state).toBe("online");
-    expect(internetState(group({ protected: true }), [homework], at("2026-09-28T16:00:00"), TZ)).toEqual({ state: "protected" });
   });
 });
 
@@ -138,9 +136,5 @@ describe("internetDayBands", () => {
     const allowed = group({ allowance: { active: true, until: at("2026-09-28T18:00:00").toISOString(), by: { accountId: "a1", name: "Nick" } } });
     const bands = internetDayBands(allowed, [homework], at("2026-09-28T16:00:00"), TZ);
     expect(bands.at(-1)).toEqual({ kind: "allowance", from: 960, to: 1080, label: "Allowed", source: "Allowed by Nick until 6:00 PM", carried: false });
-  });
-
-  it("draws nothing for a protected group", () => {
-    expect(internetDayBands(group({ protected: true }), [bedtime], at("2026-09-28T12:00:00"), TZ)).toEqual([]);
   });
 });

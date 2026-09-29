@@ -12,7 +12,6 @@ const Update = z.object({
   name: z.string().min(1).optional(),
   monogram: z.string().max(4).nullable().optional(),
   familyRole: z.enum(["child", "teen", "adult"]).nullable().optional(),
-  protected: z.boolean().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -46,7 +45,6 @@ export async function PUT(request: Request, ctx: Ctx) {
         name: parsed.data.name,
         monogram: parsed.data.monogram === undefined ? undefined : parsed.data.monogram,
         familyRole: parsed.data.familyRole === undefined ? undefined : (parsed.data.familyRole as FamilyRole | null),
-        protected: parsed.data.protected,
       },
       include: groupInclude,
     });

@@ -73,8 +73,7 @@ needed for future work belongs here when implemented, not only in a canvas or se
 | Rule and resolver verdicts | [rules.ts](../src/lib/rules.ts), [upstream.ts](../src/lib/upstream.ts) and [architecture](architecture.md#upstream-dns-categories) |
 | Native typography, navigation and adaptive layout | [Native design guide](https://github.com/nickberardi/familyfi-ios/blob/main/docs/design-system.md); read its current sources for platform details |
 
-Shared meaning must survive platform adaptation: Pause blocks all internet for a group and names that scope, an internet rule is optional, protection cannot be
-bypassed, time follows the household timezone, and unknown observations remain unknown. Native
+Shared meaning must survive platform adaptation: Pause blocks all internet for a group and names that scope, an internet rule is optional, time follows the household timezone, and unknown observations remain unknown. Native
 controls, fonts and navigation can differ; web CSS dimensions are not a native layout specification.
 Record deliberate web choices here and native choices there, with links rather than mirrored claims.
 

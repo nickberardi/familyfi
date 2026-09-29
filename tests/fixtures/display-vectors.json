@@ -68,22 +68,6 @@
     },
     {
       "fn": "accessLabel",
-      "name": "protected",
-      "input": {
-        "access": "protected"
-      },
-      "expected": "Protected — FamilyFi does not block"
-    },
-    {
-      "fn": "accessColor",
-      "name": "protected",
-      "input": {
-        "access": "protected"
-      },
-      "expected": "var(--ff-muted)"
-    },
-    {
-      "fn": "accessLabel",
       "name": "unrecognized",
       "input": {
         "access": "unrecognized"
@@ -745,7 +729,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -791,7 +774,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -839,7 +821,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -869,7 +850,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -899,7 +879,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -929,7 +908,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 1,
           "suspension": {
             "active": false,
@@ -975,7 +953,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 0,
           "suspension": {
             "active": false,
@@ -1021,7 +998,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 0,
           "suspension": {
             "active": false,
@@ -1051,7 +1027,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 0,
           "suspension": {
             "active": false,
@@ -1081,7 +1056,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1129,7 +1103,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1177,7 +1150,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1209,7 +1181,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -1260,7 +1231,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -1311,7 +1281,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -1354,105 +1323,6 @@
     },
     {
       "fn": "cardStateLabel",
-      "name": "protected wins over paused",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": true,
-            "until": null,
-            "by": {
-              "accountId": "a1",
-              "name": "Nick"
-            }
-          },
-          "dohOverrideUrl": null,
-          "access": "paused",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        },
-        "timeZone": "America/New_York",
-        "windows": [
-          {
-            "name": "Bedtime",
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45",
-            "ruleName": "Bedtime"
-          }
-        ],
-        "now": "2026-09-14T19:00:00-04:00"
-      },
-      "expected": "Always On — never paused"
-    },
-    {
-      "fn": "cardStateLabel",
-      "name": "protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "protected",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        },
-        "timeZone": "America/New_York",
-        "windows": [
-          {
-            "name": "Bedtime",
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "21:30",
-            "end": "06:45",
-            "ruleName": "Bedtime"
-          }
-        ],
-        "now": "2026-09-14T19:00:00-04:00"
-      },
-      "expected": "Always On — never paused"
-    },
-    {
-      "fn": "cardStateLabel",
       "name": "adult under an internet rule",
       "input": {
         "group": {
@@ -1461,7 +1331,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1509,7 +1378,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1541,7 +1409,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -1589,7 +1456,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1620,38 +1486,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        }
-      },
-      "expected": false
-    },
-    {
-      "fn": "canPauseGroup",
-      "name": "protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1682,7 +1516,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1711,7 +1544,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1740,7 +1572,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -1769,7 +1600,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -1800,7 +1630,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -1829,7 +1658,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -2151,7 +1979,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2197,7 +2024,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -2246,7 +2072,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -2295,7 +2120,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2337,7 +2161,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2381,7 +2204,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2425,7 +2247,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -2471,7 +2292,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -2515,7 +2335,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2544,83 +2363,6 @@
     },
     {
       "fn": "groupActionSpecs",
-      "name": "web: protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "protected",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        },
-        "surface": "web"
-      },
-      "expected": [
-        {
-          "label": "Detail",
-          "href": "/family/g1"
-        }
-      ]
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "web: protected while paused",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": true,
-            "until": null,
-            "by": {
-              "accountId": "a1",
-              "name": "Nick"
-            }
-          },
-          "dohOverrideUrl": null,
-          "access": "paused",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        },
-        "surface": "web"
-      },
-      "expected": [
-        {
-          "label": "Detail",
-          "href": "/family/g1"
-        }
-      ]
-    },
-    {
-      "fn": "groupActionSpecs",
       "name": "phone: child with a bedtime",
       "input": {
         "group": {
@@ -2629,7 +2371,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2671,7 +2412,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -2720,7 +2460,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -2769,7 +2508,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2811,7 +2549,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2851,7 +2588,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2891,7 +2627,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -2933,7 +2668,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -2973,7 +2707,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "adult",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -2982,73 +2715,6 @@
           },
           "dohOverrideUrl": null,
           "access": "available",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        },
-        "surface": "phone"
-      },
-      "expected": []
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "phone: protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "dohOverrideUrl": null,
-          "access": "protected",
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ]
-        },
-        "surface": "phone"
-      },
-      "expected": []
-    },
-    {
-      "fn": "groupActionSpecs",
-      "name": "phone: protected while paused",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": true,
-            "until": null,
-            "by": {
-              "accountId": "a1",
-              "name": "Nick"
-            }
-          },
-          "dohOverrideUrl": null,
-          "access": "paused",
           "allowance": {
             "active": false,
             "until": null,
@@ -3144,7 +2810,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -3226,7 +2891,6 @@
           "name": "Living room",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 2,
           "suspension": {
             "active": false,
@@ -3308,7 +2972,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -3390,7 +3053,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -3472,7 +3134,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -3530,7 +3191,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -3615,7 +3275,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -3700,7 +3359,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -3866,7 +3524,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -3917,7 +3574,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -3965,7 +3621,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4028,7 +3683,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4078,7 +3732,6 @@
           "name": "TV",
           "monogram": null,
           "familyRole": null,
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4110,7 +3763,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4171,7 +3823,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 0,
           "suspension": {
             "active": true,
@@ -4204,7 +3855,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4233,7 +3883,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4275,7 +3924,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4324,7 +3972,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4366,7 +4013,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4498,7 +4144,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -4582,7 +4227,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5219,7 +4863,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5253,7 +4896,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5322,7 +4964,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5387,7 +5028,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -5448,7 +5088,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5507,7 +5146,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5562,7 +5200,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -5592,59 +5229,6 @@
       }
     },
     {
-      "fn": "internetState",
-      "name": "protected",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": true,
-            "until": null,
-            "by": {
-              "accountId": "a1",
-              "name": "Nick"
-            }
-          },
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ],
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "windows": [
-          {
-            "name": "Homework",
-            "days": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "start": "15:00",
-            "end": "18:00",
-            "ruleName": "School days"
-          }
-        ],
-        "now": "2026-09-14T16:00:00-04:00",
-        "timeZone": "America/New_York"
-      },
-      "expected": {
-        "state": "protected"
-      }
-    },
-    {
       "fn": "internetDayBands",
       "name": "every window with its source",
       "input": {
@@ -5654,7 +5238,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5742,7 +5325,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -5788,7 +5370,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": true,
@@ -5831,7 +5412,6 @@
           "name": "Betsy",
           "monogram": null,
           "familyRole": "child",
-          "protected": false,
           "deviceCount": 4,
           "suspension": {
             "active": false,
@@ -5888,56 +5468,6 @@
           "carried": false
         }
       ]
-    },
-    {
-      "fn": "internetDayBands",
-      "name": "protected draws nothing",
-      "input": {
-        "group": {
-          "id": "g1",
-          "kind": "family",
-          "name": "Betsy",
-          "monogram": null,
-          "familyRole": "child",
-          "protected": true,
-          "deviceCount": 4,
-          "suspension": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "allowance": {
-            "active": false,
-            "until": null,
-            "by": null
-          },
-          "internetRuleIds": [
-            "r1"
-          ],
-          "dohOverrideUrl": null,
-          "access": "available"
-        },
-        "windows": [
-          {
-            "name": "",
-            "days": [
-              0,
-              1,
-              2,
-              3,
-              4,
-              5,
-              6
-            ],
-            "start": "21:30",
-            "end": "06:45",
-            "ruleName": "Bedtime"
-          }
-        ],
-        "now": "2026-09-14T12:00:00-04:00",
-        "timeZone": "America/New_York"
-      },
-      "expected": []
     },
     {
       "fn": "localWeekday",

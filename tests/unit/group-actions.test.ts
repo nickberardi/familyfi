@@ -9,7 +9,6 @@ function group(overrides: Partial<Group> = {}): Group {
     name: "Betsy",
     monogram: null,
     familyRole: "child",
-    protected: false,
     deviceCount: 4,
     suspension: { active: false, until: null, by: null },
     allowance: { active: false, until: null, by: null },

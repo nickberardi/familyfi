@@ -64,7 +64,6 @@ describe("planPolicies network scope", () => {
           id: "kid",
           name: "Betsy",
           kind: GroupKind.family,
-          protected: false,
           suspensionActive: true,
           suspensionUntil: null,
         },

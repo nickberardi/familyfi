@@ -14,14 +14,12 @@ export function accessLabel(access: string): string {
   if (access === "paused") return "Paused · all internet off";
   if (access === "blocked") return "No internet · scheduled";
   if (access === "allowed") return "Online · allowed during a schedule";
-  if (access === "protected") return "Protected — FamilyFi does not block";
   return "Internet available";
 }
 
 export function accessColor(access: string): string {
   if (access === "paused") return "var(--ff-paused)";
   if (access === "blocked") return "var(--ff-accent)";
-  if (access === "protected") return "var(--ff-muted)";
   return "var(--ff-on)";
 }
 
@@ -158,7 +156,6 @@ export function cardNoteLine(group: Group, windows: InternetWindow[]): string {
     return "No devices · rules cannot apply on UniFi until you assign one";
   }
   const devices = `${group.deviceCount} ${group.deviceCount === 1 ? "device" : "devices"}`;
-  if (group.protected) return devices;
   if (windows.length === 0) return `${devices} · no internet rule`;
   return `${devices} · ${windows.length} internet ${windows.length === 1 ? "window" : "windows"}`;
 }
@@ -168,7 +165,6 @@ export function cardNoteLine(group: Group, windows: InternetWindow[]): string {
  * (and who paused), the window blocking it, an allowance, or the next window.
  */
 export function cardStateLabel(group: Group, windows: InternetWindow[], timezone: string, now: Date): string {
-  if (group.protected) return "Always On — never paused";
   const state = internetState(group, windows, now, timezone);
   const by = (actor: { name: string } | null) => (actor ? ` by ${actor.name}` : "");
   const until = (at: string | null, open: string) => (at ? `until ${formatClock(new Date(at), timezone)}` : open);
@@ -190,7 +186,6 @@ export function cardStateLabel(group: Group, windows: InternetWindow[], timezone
 }
 
 export function canPauseGroup(group: Group): boolean {
-  if (group.protected) return false;
   return !(group.kind === "family" && group.familyRole === "adult");
 }
 

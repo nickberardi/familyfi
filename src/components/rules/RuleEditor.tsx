@@ -479,12 +479,9 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
                   <Chip
                     key={group.id}
                     on={on}
-                    // A protected group can't be added, but one already on the rule can come off.
-                    disabled={group.protected && !on}
                     onClick={() => set({ groupIds: on ? draft.groupIds.filter((id) => id !== group.id) : [...draft.groupIds, group.id] })}
                   >
                     {group.name}
-                    {group.protected ? " · protected" : ""}
                   </Chip>
                 );
               })}

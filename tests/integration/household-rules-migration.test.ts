@@ -1,8 +1,9 @@
 /**
  * The upgrade to household rules keeps every household enforced as it was: a bedtime
  * becomes an internet rule that keeps its UniFi policy, a group that was always blocked
- * becomes paused, and a paused bedtime becomes an allowance. Runs the real migration SQL
- * on legacy rows in a scratch schema of the test database.
+ * becomes paused, and a paused bedtime becomes an allowance. A protected group becomes an
+ * ordinary group with no rules, as it was never blocked. Runs the real migration SQL on
+ * legacy rows in a scratch schema of the test database.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -45,13 +46,15 @@ beforeAll(async () => {
       ('video', 'category', 'group', 'bedtime', '{}', '{4}', true, 'scheduled', true, '{0,1,2,3,4,5,6}', '19:00', '21:00', now()),
       ('apps', 'app', 'network', NULL, '{net}', '{10001}', true, 'always', false, '{}', NULL, NULL, now()),
       ('broken', 'category', 'group', 'bedtime', '{}', '{8}', true, 'scheduled', true, '{1}', NULL, NULL, now()),
-      ('no-days', 'category', 'group', 'bedtime', '{}', '{11}', true, 'scheduled', true, '{}', '19:00', '21:00', now());
+      ('no-days', 'category', 'group', 'bedtime', '{}', '{11}', true, 'scheduled', true, '{}', '19:00', '21:00', now()),
+      ('pat-video', 'category', 'group', 'protected', '{}', '{4}', true, 'always', false, '{}', NULL, NULL, now());
     INSERT INTO "RulePolicy" ("id", "ruleId", "connectionIdentity", "siteId", "unifiPolicyId", "zoneId", "desiredFingerprint", "desiredRevision", "updatedAt") VALUES
       ('rp-video', 'video', 'console', 'site', 'pol-video', 'zone', 'fp', 3, now());
   `);
 
   await client.query(sql(FIRST));
   await client.query(sql("20260928120100_household_rules"));
+  await client.query(sql("20260929120000_remove_group_protection"));
 });
 
 afterAll(async () => {
@@ -133,5 +136,15 @@ describe("household rules migration", () => {
     const [policy] = await rows<{ windowKey: string; windowId: string }>(`
       SELECT p."windowKey", w."id" AS "windowId" FROM "RulePolicy" p JOIN "RuleWindow" w ON w."ruleId" = p."ruleId" WHERE p."id" = 'rp-video'`);
     expect(policy?.windowKey).toBe(policy?.windowId);
+  });
+
+  it("turns a protected group into an ordinary one with no rules, as it was never blocked", async () => {
+    const columns = await rows<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = '${SCHEMA}' AND table_name = 'Group'`,
+    );
+    expect(columns.map((column) => column.column_name)).not.toContain("protected");
+    const byId = Object.fromEntries((await rules()).map((rule) => [rule.id, rule]));
+    // The rule stays, but no longer covers the group it never applied to.
+    expect([byId["pat-video"]?.name, byId["pat-video"]?.groups]).toEqual(["Video for Pat", null]);
   });
 });

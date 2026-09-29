@@ -10,10 +10,9 @@ const device = (mac: string, groupId: string, zoneId = "zone-1") => ({
   inScope: true,
 });
 
-const group = (id: string, patch: Partial<{ protected: boolean; allowed: boolean }> = {}) => ({
+const group = (id: string, patch: Partial<{ allowed: boolean }> = {}) => ({
   id,
   kind: GroupKind.family,
-  protected: false,
   allowed: false,
   ...patch,
 });
@@ -72,10 +71,10 @@ describe("planRulePolicies", () => {
     expect(policies.map((policy) => [policy.windowKey, policy.name, policy.schedule])).toEqual([["always", "FamilyFi No social", undefined]]);
   });
 
-  it("puts every covered group's devices in the same policy, per zone, and skips protected groups", () => {
+  it("puts every covered group's devices in the same policy, per zone", () => {
     const { policies } = plan(
-      [rule({ groupIds: ["g1", "g2", "g3"] })],
-      [group("g1"), group("g2"), group("g3", { protected: true })],
+      [rule({ groupIds: ["g1", "g2"] })],
+      [group("g1"), group("g2"), group("g3")],
       [
         device("02:00:00:00:00:01", "g1"),
         device("02:00:00:00:00:02", "g2"),

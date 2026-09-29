@@ -139,6 +139,9 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
   // A new person has no internet rule, and the page says so rather than implying one.
   await expect(page.getByRole("heading", { name: "All internet · no rule" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+  // A child is offered one-tap schedules.
+  await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Homework 3–6 PM" })).toBeVisible();
 
   const renamed = `${name} Jr`;
   await page.getByLabel("Name").fill(renamed);
@@ -149,9 +152,14 @@ test("create person lands on a seeded detail page that can be edited", async ({ 
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
   expect((await editHeading.boundingBox())?.y).toBe(yBefore);
 
-  await page.getByLabel(/Protected/).check();
+  // Groups can no longer be protected from FamilyFi.
+  await expect(page.getByLabel(/Protected/)).toHaveCount(0);
+
+  // An adult starts from a custom schedule only, and is not paused from here.
+  await page.getByLabel("Role").selectOption("adult");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText(/Protected — FamilyFi never blocks/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Custom schedule" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Pause all internet" })).toHaveCount(0);
 
   await page.goto("/family/does-not-exist");
@@ -247,13 +255,13 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   const groupsRes = await page.request.get("/api/v1/groups");
   expect(groupsRes.ok()).toBeTruthy();
   const body = (await groupsRes.json()) as {
-    groups: { id: string; name: string; kind: string; protected: boolean; familyRole: string | null }[];
+    groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
-  const protectedGroup = body.groups.find((group) => group.protected);
-  expect(protectedGroup, "UNIFI_MOCK seed must include a protected group").toBeTruthy();
+  const adult = body.groups.find((group) => group.familyRole === "adult");
+  expect(adult, "UNIFI_MOCK seed must include an adult with no rules").toBeTruthy();
   // Distinct seeded kids per project, so desktop and phone never edit the same group.
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
-  const child = body.groups.find((group) => !group.protected && group.kind === "family" && group.name === preferredName);
+  const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
   expect(child, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
   const ruleName = `QA lights out ${test.info().project.name} ${Date.now() % 100000}`;
 
@@ -262,8 +270,9 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   await expect(page.getByRole("link", { name: "Schedules" })).toHaveCount(0);
   // Seeded household rules, with the kind stated in words.
   await expect(page.getByText("All internet · every device").first()).toBeVisible();
-  // The protected adult never appears as something to filter by.
-  await expect(page.getByRole("navigation", { name: "Show rules for" }).getByRole("link", { name: protectedGroup!.name })).toHaveCount(0);
+  // A group with no rules is not something to filter by; it is named as unfiltered.
+  await expect(page.getByRole("navigation", { name: "Show rules for" }).getByRole("link", { name: adult!.name })).toHaveCount(0);
+  await expect(page.getByText(new RegExp(`No rules: .*${adult!.name}`))).toBeVisible();
 
   await page.goto(`/rules/new?group=${child!.id}`);
   await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
@@ -394,19 +403,16 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const groupsRes = await page.request.get("/api/v1/groups");
   expect(groupsRes.ok()).toBeTruthy();
   const body = (await groupsRes.json()) as {
-    groups: { id: string; name: string; kind: string; protected: boolean; familyRole: string | null }[];
+    groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
   // Prefer distinct seeded kids per project to reduce desktop/phone races (same as Rules shell).
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
   const child =
-    body.groups.find((group) => !group.protected && group.kind === "family" && group.name === preferredName) ??
-    body.groups.find(
-      (group) =>
-        !group.protected && group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"),
-    );
-  expect(child, "UNIFI_MOCK seed must include a non-protected family child").toBeTruthy();
-  const protectedGroup = body.groups.find((group) => group.protected);
-  expect(protectedGroup).toBeTruthy();
+    body.groups.find((group) => group.kind === "family" && group.name === preferredName) ??
+    body.groups.find((group) => group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"));
+  expect(child, "UNIFI_MOCK seed must include a family child").toBeTruthy();
+  const adult = body.groups.find((group) => group.familyRole === "adult");
+  expect(adult).toBeTruthy();
 
   await page.goto("/family");
   await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
@@ -433,8 +439,8 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await expect(page.getByText(/Porn/i)).toHaveCount(0);
   // No App + on list cards
   await expect(marks.getByRole("button", { name: "Add app filter" })).toHaveCount(0);
-  // Protected: no marks
-  await expect(page.getByTestId(`filter-marks-${protectedGroup!.id}`)).toHaveCount(0);
+  // No group is exempt: an adult's card shows its marks too.
+  await expect(page.getByTestId(`filter-marks-${adult!.id}`)).toBeVisible();
 
   // A mark opens the card on that category. With no rule and nothing measured, the
   // zone and the sheet must not claim anything about DNS either way.

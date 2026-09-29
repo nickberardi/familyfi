@@ -57,7 +57,6 @@ export async function PATCH(request: Request, ctx: Ctx) {
         },
         // Unchanged networks were valid when saved; only a new list is checked against the site.
         patch.networkIds ? householdNetworkScope : async () => ({ scope: { manageAllNetworks: true, managedNetworkIds: [] } }),
-        current.groupIds,
       );
       const rule = await saveRule(input, id);
       const change = await enqueueChange("rule");

@@ -61,7 +61,7 @@ describe("Phase 2 DPI rules", () => {
     ).toBe(401);
   });
 
-  it("lists mock DPI catalog and rejects protected group rule create", async () => {
+  it("lists mock DPI catalog and creates a category rule for an adult", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
     const auth = await signedIn();
@@ -90,23 +90,23 @@ describe("Phase 2 DPI rules", () => {
     const appBody = (await apps.json()) as { applications: { id: number; name: string }[] };
     expect(appBody.applications.every((a) => a.name.includes("Fixture") || a.id > 0)).toBe(true);
 
-    const protectedGroup = await prisma().group.create({
+    // No group is exempt from rules: an adult can have one too.
+    const adult = await prisma().group.create({
       data: {
         kind: GroupKind.family,
         name: "Adult",
         familyRole: FamilyRole.adult,
-        protected: true,
       },
     });
-    const denied = await createRule(
+    const created = await createRule(
       request("/api/v1/rules", {
         method: "POST",
         auth,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Video", kind: "category", groupIds: [protectedGroup.id], targetIds: [4], mode: "always" }),
+        body: JSON.stringify({ name: "Video", kind: "category", groupIds: [adult.id], targetIds: [4], mode: "always" }),
       }),
     );
-    expect(denied.status).toBe(409);
+    expect(created.status).toBe(201);
   });
 
   it("reconcile CUD asserts APPLICATION_CATEGORY body; off sets enabled:false; delete leaves internet untouched", async () => {

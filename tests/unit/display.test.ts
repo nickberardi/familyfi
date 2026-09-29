@@ -24,7 +24,6 @@ function group(overrides: Partial<Group> = {}): Group {
     name: "Betsy",
     monogram: null,
     familyRole: "child",
-    protected: false,
     deviceCount: 4,
     suspension: { active: false, until: null, by: null },
     allowance: { active: false, until: null, by: null },
@@ -59,14 +58,12 @@ describe("schedule copy", () => {
     const allowed = group({ allowance: { active: true, until: "2026-09-15T06:45:00-04:00", by: { accountId: "a", name: "Nick" } } });
     expect(cardStateLabel(allowed, [bedtime], TZ, new Date("2026-09-14T22:00:00-04:00"))).toBe("Online · allowed until 6:45 AM by Nick");
     expect(cardStateLabel(group({ internetRuleIds: [] }), [], TZ, monday7pm)).toBe("Online · no internet rule");
-    expect(cardStateLabel(group({ protected: true }), [bedtime], TZ, monday7pm)).toBe("Always On — never paused");
   });
 });
 
 describe("pause eligibility", () => {
-  it("hides Pause for adults and protected groups, and offers it without any rule", () => {
+  it("hides Pause for adults, and offers it without any rule", () => {
     expect(canPauseGroup(group({ familyRole: "adult" }))).toBe(false);
-    expect(canPauseGroup(group({ protected: true }))).toBe(false);
     expect(canPauseGroup(group({ internetRuleIds: [] }))).toBe(true);
     expect(canPauseGroup(group({ kind: "things", familyRole: null, internetRuleIds: [] }))).toBe(true);
   });

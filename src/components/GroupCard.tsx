@@ -68,7 +68,6 @@ export function GroupCard({
   const state = cardStateLabel(group, windows, timezone, now);
   const stateColor = accessColor(group.access);
   const note = cardNoteLine(group, windows);
-  const locked = group.protected;
 
   // FamilyFi's own rules first, then the resolver's verdicts.
   const slots = categorySlotStates(group, rules, upstreamCategories, timezone);
@@ -119,25 +118,19 @@ export function GroupCard({
 
   return (
     <article className="overflow-hidden rounded-[12px] bg-[var(--ff-card)] md:border md:border-[var(--ff-hairline-card)]">
-      {locked ? (
-        <Link href={href} className="flex items-start gap-3 px-[18px] pt-4 pb-3 text-[var(--ff-ink)]">
-          {header}
-        </Link>
-      ) : (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
-          className="flex w-full items-start gap-3 px-[18px] pt-4 pb-3 text-left"
-        >
-          {header}
-          <span className="mt-0.5 flex-none text-[var(--ff-ink-3)]" aria-hidden>
-            <Icon name={open ? "caret-up" : "caret-down"} size={16} />
-          </span>
-        </button>
-      )}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-start gap-3 px-[18px] pt-4 pb-3 text-left"
+      >
+        {header}
+        <span className="mt-0.5 flex-none text-[var(--ff-ink-3)]" aria-hidden>
+          <Icon name={open ? "caret-up" : "caret-down"} size={16} />
+        </span>
+      </button>
 
-      {open && !locked ? (
+      {open ? (
         <div className="flex flex-col gap-2.5 px-3 pb-3">
           <InternetZone
             group={group}
@@ -160,75 +153,69 @@ export function GroupCard({
         </div>
       ) : null}
 
-      {locked ? null : (
-        <div data-testid={`filter-marks-${group.id}`}>
-          {open ? (
-            <div className="px-[18px] pt-1 text-[11px] font-semibold tracking-[0.05em] text-[var(--ff-ink-2)] uppercase">
-              Other categories
-            </div>
-          ) : null}
-          <div className="flex flex-wrap items-start gap-3 px-[18px] pt-1 pb-3.5">
-            {open ? null : (
-              <>
-                <InternetMark group={group} windows={windows} timezone={timezone} onOpen={() => openOn()} />
-                <span aria-hidden className="mt-0.5 mb-3.5 w-px self-stretch bg-[var(--ff-hairline-strong)]" />
-              </>
-            )}
-            {shown.map((item) => (
-              <span key={item.slot.slot} className="relative">
-                <MarkButton label={item.slot.label} state={item.state} onClick={() => openOn(item.slot.slot)}>
-                  <CategoryGlyph slot={item.slot.slot} size={15} />
-                </MarkButton>
-              </span>
-            ))}
-            {pool.length > cap ? (
-              <button
-                type="button"
-                onClick={() => setMore(!more)}
-                aria-label={more ? "Show fewer categories" : `Show all ${ordered.length} categories`}
-                className="flex w-[52px] flex-col items-center gap-1"
-              >
-                <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-dashed border-[var(--ff-control-line)] text-[10px] font-bold text-[var(--ff-accent)]">
-                  {more ? "–" : `+${pool.length - cap}`}
-                </span>
-                <span className="text-[10px] text-[var(--ff-accent)]">{more ? "Fewer" : "More"}</span>
-                <span className="text-[9px]">{" "}</span>
-              </button>
-            ) : null}
+      <div data-testid={`filter-marks-${group.id}`}>
+        {open ? (
+          <div className="px-[18px] pt-1 text-[11px] font-semibold tracking-[0.05em] text-[var(--ff-ink-2)] uppercase">
+            Other categories
           </div>
-          {open && apps.length ? (
-            <div className="border-t border-[var(--ff-hairline)] px-[18px] pt-2 pb-3.5">
-              <SectionLabel>App rules</SectionLabel>
-              <div className="flex flex-wrap gap-3 pt-2">
-                {apps.map((rule) => {
-                  const name = parentFacingRuleLabel(rule, catalogNames);
-                  return (
-                    <MarkButton
-                      key={rule.id}
-                      label={name}
-                      state={appMarkState(ruleActivelyBlocking(rule, timezone))}
-                      onClick={() => setSheet({ kind: "app", name, rule })}
-                    >
-                      <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>
-                    </MarkButton>
-                  );
-                })}
-              </div>
-            </div>
+        ) : null}
+        <div className="flex flex-wrap items-start gap-3 px-[18px] pt-1 pb-3.5">
+          {open ? null : (
+            <>
+              <InternetMark group={group} windows={windows} timezone={timezone} onOpen={() => openOn()} />
+              <span aria-hidden className="mt-0.5 mb-3.5 w-px self-stretch bg-[var(--ff-hairline-strong)]" />
+            </>
+          )}
+          {shown.map((item) => (
+            <span key={item.slot.slot} className="relative">
+              <MarkButton label={item.slot.label} state={item.state} onClick={() => openOn(item.slot.slot)}>
+                <CategoryGlyph slot={item.slot.slot} size={15} />
+              </MarkButton>
+            </span>
+          ))}
+          {pool.length > cap ? (
+            <button
+              type="button"
+              onClick={() => setMore(!more)}
+              aria-label={more ? "Show fewer categories" : `Show all ${ordered.length} categories`}
+              className="flex w-[52px] flex-col items-center gap-1"
+            >
+              <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-dashed border-[var(--ff-control-line)] text-[10px] font-bold text-[var(--ff-accent)]">
+                {more ? "–" : `+${pool.length - cap}`}
+              </span>
+              <span className="text-[10px] text-[var(--ff-accent)]">{more ? "Fewer" : "More"}</span>
+              <span className="text-[9px]">{" "}</span>
+            </button>
           ) : null}
         </div>
-      )}
+        {open && apps.length ? (
+          <div className="border-t border-[var(--ff-hairline)] px-[18px] pt-2 pb-3.5">
+            <SectionLabel>App rules</SectionLabel>
+            <div className="flex flex-wrap gap-3 pt-2">
+              {apps.map((rule) => {
+                const name = parentFacingRuleLabel(rule, catalogNames);
+                return (
+                  <MarkButton
+                    key={rule.id}
+                    label={name}
+                    state={appMarkState(ruleActivelyBlocking(rule, timezone))}
+                    onClick={() => setSheet({ kind: "app", name, rule })}
+                  >
+                    <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>
+                  </MarkButton>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
-      {open || locked ? (
+      {open ? (
         <ActionRow
-          actions={
-            locked
-              ? [{ label: "Detail", href }]
-              : [
-                  { label: "Rules", href: `/rules?group=${group.id}` },
-                  { label: "Details", href },
-                ]
-          }
+          actions={[
+            { label: "Rules", href: `/rules?group=${group.id}` },
+            { label: "Details", href },
+          ]}
         />
       ) : null}
 
@@ -316,7 +303,7 @@ function CategoryZone({
   const now = new Date();
   const weekday = localWeekday(now, timezone);
   const internet = internetWindowsForGroup(rules, group.id);
-  const faded = internetDayBands({ protected: false, suspension: { active: false, until: null }, allowance: { active: false, until: null } }, internet, now, timezone);
+  const faded = internetDayBands({ suspension: { active: false, until: null }, allowance: { active: false, until: null } }, internet, now, timezone);
   const bands: TimelineBand[] = [
     ...faded.map((band) => ({ ...band, kind: "faded" as const })),
     ...ruleDayBands(rule, weekday).map((band) => ({

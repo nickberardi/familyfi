@@ -47,7 +47,7 @@ foreign key.
 | Concept | Owns or relates to |
 | --- | --- |
 | `Household` | Gateway configuration, managed network scope, timezone, desired revision, resolver defaults and connection identity |
-| `Group` → `Device` | Family/Things controls: pause, allowance and protection; each discovered network device has an optional group. Unassigned devices are quarantined. |
+| `Group` → `Device` | Family/Things controls: pause and allowance; each discovered network device has an optional group. Unassigned devices are quarantined. |
 | `Account` → `Session` | Login identity and permissions. An account can link to a family group; group membership and authentication are separate concepts. |
 | `PairedDevice` → `Session` | Companion enrollment and device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
 | `ConnectionEndpoint`, `Pairing`, `DeviceEdgeToken` | Routes, one-time enrollment and delivery records for encrypted edge credentials; see [connection guidance](api.md#companion-connection-and-https) |
@@ -81,7 +81,7 @@ interpret that retained snapshot as a fresh gateway observation.
 ### Pause from intent to feedback
 
 1. The browser selects an action through [group-actions.ts](../src/components/group-actions.ts) and submits it using [api.ts](../src/lib/api.ts), including the cookie session's CSRF header.
-2. The [pause route](../src/app/api/v1/groups/[id]/pause/route.ts) checks authentication, request shape, group existence, Watch eligibility and protection, then saves the suspension in PostgreSQL.
+2. The [pause route](../src/app/api/v1/groups/[id]/pause/route.ts) checks authentication, request shape, group existence and Watch eligibility, then saves the suspension in PostgreSQL.
 3. [enqueueChange](../src/server/changes.ts) increments the household revision, creates a pending `ChangeResult` with actor attribution and requests reconciliation. The route returns the updated group and change reference. The group write and enqueue are separate operations; do not assume the entire path is one database transaction.
 4. The browser applies the returned state through [household-state.ts](../src/lib/household-state.ts) and shows saved feedback. [mutate-gate.ts](../src/lib/mutate-gate.ts) prevents a superseded mutation response from replacing a newer one.
 5. Reconciliation takes its database lock, reads current desired state and writes only owned UniFi policies. A pause creates the group's unscheduled block policy; resume deletes it. The run records outcomes and settles eligible changes.
@@ -125,7 +125,7 @@ then read its callers and focused tests. Native feature details belong in its ow
 
 | Web area | Responsibility | Implementation and test starting points |
 | --- | --- | --- |
-| Family and Things | Group cards/details, membership, protection, the internet zone (pause, allowance, today's timeline) and category marks | [GroupGrid](../src/components/GroupGrid.tsx), [InternetZone](../src/components/InternetZone.tsx), [group routes](../src/app/api/v1/groups), [group API tests](../tests/integration/group-detail-api.test.ts), [display vectors](../tests/unit/display-vectors.test.ts) |
+| Family and Things | Group cards/details, membership, the internet zone (pause, allowance, today's timeline) and category marks | [GroupGrid](../src/components/GroupGrid.tsx), [InternetZone](../src/components/InternetZone.tsx), [group routes](../src/app/api/v1/groups), [group API tests](../tests/integration/group-detail-api.test.ts), [display vectors](../tests/unit/display-vectors.test.ts) |
 | Devices / Unassigned | Discovery, assignment, quarantine and last observed connection details within managed networks | [devices](../src/server/devices.ts), [reconciliation](../src/server/reconciliation.ts), [quarantine tests](../tests/integration/quarantine-observe.test.ts) |
 | Rules and group filter sheets | Household rules (internet, category, app, website), their windows, groups and UniFi policy names | [rules](../src/server/rules.ts), [rule planner](../src/server/unifi/plan-rules.ts), [rule editor](../src/components/rules/RuleEditor.tsx), [rules API tests](../tests/integration/rules-api.test.ts), [DPI tests](../tests/integration/dpi-rules.test.ts) |
 | Categories | Domain lists, resolver configuration and DNS observations | [probe](../src/server/upstream/probe.ts), [category API tests](../tests/integration/upstream-categories-api.test.ts), [browser tests](../tests/browser/categories.spec.ts) |
@@ -141,8 +141,7 @@ A group's internet is shaped by three things, in this order ([internetState](../
 ```text
 paused  = suspension.active && (suspension.until is null || now < suspension.until)
 allowed = allowance.active && (allowance.until is null || now < allowance.until)
-blocked = !group.protected
-          && (paused || (!allowed && any internet-rule window is active))
+blocked = paused || (!allowed && any internet-rule window is active)
 ```
 
 - **Pause** blocks all internet for every device in the group now, until a time or until resumed. It is a FamilyFi-owned unscheduled BLOCK policy for the group that exists only while the pause lasts; resume (or expiry) deletes it. It records who paused.
@@ -150,7 +149,7 @@ blocked = !group.protected
 - **An allowance** lifts the group's internet-rule windows until a time (by default when the windows active now end): its devices leave those rules' policies. A policy left with nobody keeps its devices and is disabled, so ending the allowance does not create it again. A pause replaces an allowance.
 - **Category, app and website rules** are separate policies, and neither a pause nor an allowance changes them. While an internet window is active they are covered anyway.
 
-Quarantined devices (null `groupId`) are desired-blocked independently of rules. Timed pause and allowance expiry are the only clock-driven writes; membership, quarantine and protection still go through reconciliation.
+Quarantined devices (null `groupId`) are desired-blocked independently of rules. Timed pause and allowance expiry are the only clock-driven writes; membership and quarantine still go through reconciliation.
 
 Discovery and quarantine only include clients whose UniFi **network (VLAN)** is in the household allowlist (`manageAllNetworks` or `managedNetworkIds`). New devices on other VLANs are not ingested and are not added to quarantine policies. Assigned devices that roam off a managed network are left out of FamilyFi policies until they return. UniFi still applies a MAC policy to every VLAN that shares that **firewall zone**; pick networks whose zones match what you want to enforce.
 

@@ -328,7 +328,6 @@ async function tick(owner: string): Promise<boolean> {
       groups: groups.map((group) => ({
         id: group.id,
         kind: group.kind,
-        protected: group.protected,
         allowed: group.allowActive && (group.allowUntil === null || now < group.allowUntil),
       })),
       devices: devices.map((device) => ({

@@ -31,7 +31,6 @@ export async function POST(request: Request, ctx: Ctx) {
     const existing = await prisma().group.findUnique({ where: { id }, include: groupInclude });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
     if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
-    if (existing.protected) return jsonError(409, "protected", "Protected groups have no internet rules.");
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const now = new Date();
     const ends = internetWindows(existing)

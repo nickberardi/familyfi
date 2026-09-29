@@ -295,22 +295,4 @@ describe("v1 API contracts", () => {
     expect(resumedBody.group.access).toBe("available");
     expect(resumedBody.group.suspension).toEqual({ active: false, until: null, by: null });
   });
-
-  it("rejects pause on a protected group", async () => {
-    const auth = await signedIn();
-    const created = await createGroup(
-      request("/api/v1/groups", {
-        method: "POST",
-        auth,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "family", name: "Nick", familyRole: "adult", protected: true }),
-      }),
-    );
-    const group = (await created.json()) as { group: { id: string } };
-    const paused = await pause(
-      request(`/api/v1/groups/${group.group.id}/pause`, { method: "POST", auth, body: "{}" }),
-      { params: Promise.resolve({ id: group.group.id }) },
-    );
-    expect(paused.status).toBe(409);
-  });
 });

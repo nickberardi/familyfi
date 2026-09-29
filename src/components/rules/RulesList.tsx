@@ -27,7 +27,7 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
   const list = scoped ? rules.filter((rule) => rule.groupIds.includes(scoped.id)) : rules;
   const covered = new Set(rules.flatMap((rule) => rule.groupIds));
   const chips = groups.filter((group) => covered.has(group.id));
-  const unruled = groups.filter((group) => !group.protected && !covered.has(group.id)).map((group) => group.name);
+  const unruled = groups.filter((group) => !covered.has(group.id)).map((group) => group.name);
   const nameOf = (id: string) => groups.find((group) => group.id === id)?.name ?? "Deleted group";
   const networkOf = (id: string) => unifi?.networks.find((network) => network.id === id)?.name ?? "Network";
   const newHref = scoped ? `/rules/new?group=${scoped.id}` : "/rules/new";

@@ -646,8 +646,7 @@ paths:
         Blocks all internet for every device in the group now, until `until` or until
         resumed; omit `until` for an indefinite pause. FamilyFi writes an unscheduled
         block policy that exists only while the group is paused. Records who paused and
-        ends any allowance. Category, app and website rules are unchanged. Protected
-        groups return 409.
+        ends any allowance. Category, app and website rules are unchanged.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/GroupId" }
@@ -680,8 +679,6 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-        "409":
           $ref: "#/components/responses/Error"
   /api/v1/groups/{id}/resume:
     post:
@@ -926,8 +923,7 @@ paths:
       description: |
         A rule blocks all internet, DPI categories, apps or websites for one or more
         groups (or managed networks), always or in named recurring windows. Each window
-        is its own UniFi policy. Protected groups are rejected. Category and app rules
-        store UniFi DPI integer ids.
+        is its own UniFi policy. Category and app rules store UniFi DPI integer ids.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -2698,14 +2694,13 @@ components:
     Group:
       type: object
       additionalProperties: false
-      required: [id, kind, name, protected, deviceCount, suspension, allowance, internetRuleIds, access, dohOverrideUrl]
+      required: [id, kind, name, deviceCount, suspension, allowance, internetRuleIds, access, dohOverrideUrl]
       properties:
         id: { type: string }
         kind: { type: string, enum: [family, things] }
         name: { type: string }
         monogram: { type: [string, "null"] }
         familyRole: { type: [string, "null"], enum: [child, teen, adult, null] }
-        protected: { type: boolean }
         deviceCount: { type: integer, minimum: 0 }
         suspension: { $ref: "#/components/schemas/Suspension" }
         allowance: { $ref: "#/components/schemas/Allowance" }
@@ -2715,7 +2710,7 @@ components:
           description: The group's internet rules. Empty means nothing limits its internet.
         access:
           type: string
-          enum: [available, blocked, paused, allowed, protected]
+          enum: [available, blocked, paused, allowed]
           description: |
             paused = a pause blocks all internet; blocked = an internet rule's window is
             active; allowed = an allowance is in effect, lifting any internet window until
@@ -2734,7 +2729,6 @@ components:
         name: { type: string }
         monogram: { type: string, maxLength: 4 }
         familyRole: { type: string, enum: [child, teen, adult] }
-        protected: { type: boolean }
     GroupUpdate:
       type: object
       additionalProperties: false
@@ -2742,7 +2736,6 @@ components:
         name: { type: string }
         monogram: { type: [string, "null"] }
         familyRole: { type: [string, "null"], enum: [child, teen, adult, null] }
-        protected: { type: boolean }
     Device:
       type: object
       additionalProperties: false

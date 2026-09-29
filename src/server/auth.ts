@@ -181,9 +181,9 @@ export async function createSession(input: {
 
 export function watchGroupControlAllowed(
   session: { device?: { client: PairedDeviceClient } | null },
-  group: { protected: boolean; kind: string; familyRole: string | null },
+  group: { kind: string; familyRole: string | null },
 ): boolean {
-  return session.device?.client !== PairedDeviceClient.watch || (!group.protected && !(group.kind === "family" && group.familyRole === "adult"));
+  return session.device?.client !== PairedDeviceClient.watch || !(group.kind === "family" && group.familyRole === "adult");
 }
 
 /** Watch credentials can only read state and control eligible groups. */

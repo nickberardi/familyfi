@@ -15,7 +15,6 @@ function group(overrides: Partial<Group> = {}): Group {
     name: "Betsy",
     monogram: null,
     familyRole: "child",
-    protected: false,
     deviceCount: 1,
     suspension: { active: false, until: null, by: null },
     allowance: { active: false, until: null, by: null },
@@ -59,11 +58,11 @@ describe("applyMutationResult", () => {
   it("replaces an edited group in place", () => {
     const next = applyMutationResult(
       { groups: [group()], devices: [] },
-      { group: group({ name: "Elizabeth", protected: true, access: "protected" }) },
+      { group: group({ name: "Elizabeth", access: "paused" }) },
     );
     expect(next.groups).toHaveLength(1);
     expect(next.groups[0]?.name).toBe("Elizabeth");
-    expect(next.groups[0]?.protected).toBe(true);
+    expect(next.groups[0]?.access).toBe("paused");
   });
 
   it("quarantines members when a group is deleted", () => {

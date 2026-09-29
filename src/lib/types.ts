@@ -1,4 +1,4 @@
-export type GroupAccess = "available" | "blocked" | "paused" | "allowed" | "protected";
+export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
 /** Who paused a group or allowed it online, as they were named then. */
 export type Actor = { accountId: string | null; name: string } | null;
@@ -9,7 +9,6 @@ export type Group = {
   name: string;
   monogram: string | null;
   familyRole: "child" | "teen" | "adult" | null;
-  protected: boolean;
   deviceCount: number;
   /** A pause blocks all internet until `until`, or until resumed. */
   suspension: { active: boolean; until: string | null; by: Actor };

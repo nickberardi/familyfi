@@ -32,7 +32,6 @@ export type PlanRule = {
 export type PlanRuleGroup = {
   id: string;
   kind: GroupKind;
-  protected: boolean;
   /** An allowance is active: the group's devices leave its internet rules' policies. */
   allowed: boolean;
 };
@@ -130,7 +129,7 @@ export function planRulePolicies(input: {
         found.networkNames.push(network.name);
       }
     } else {
-      const covered = new Set(rule.groupIds.filter((id) => groups.has(id) && !groups.get(id)!.protected));
+      const covered = new Set(rule.groupIds.filter((id) => groups.has(id)));
       const devices = input.devices.filter(
         (device) => device.groupId && covered.has(device.groupId) && device.assignment === AssignmentState.assigned && device.mac,
       );

@@ -15,7 +15,7 @@ export function isWriteFailure(issue: CoverageIssue): boolean {
 
 export function coverageIssues(input: {
   /** `enforced`: the group is paused or covered by an enabled rule, so UniFi needs a policy for it. */
-  groups: Array<{ id: string; name: string; protected: boolean; enforced: boolean }>;
+  groups: Array<{ id: string; name: string; enforced: boolean }>;
   devices: Array<{
     groupId: string | null;
     assignment: AssignmentState | string;
@@ -27,7 +27,7 @@ export function coverageIssues(input: {
 }): CoverageIssue[] {
   const issues: CoverageIssue[] = [];
   for (const group of input.groups) {
-    if (group.protected || !group.enforced) continue;
+    if (!group.enforced) continue;
     const live = input.policies.some(
       (policy) => policy.groupIds.includes(group.id) && policy.unifiPolicyId && !policy.lastError,
     );

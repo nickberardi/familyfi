@@ -1,7 +1,7 @@
 import { FamilyRole, GroupKind, Prisma } from "@prisma/client";
 import { internetState, type InternetWindow } from "@/lib/rule-windows";
 
-export type GroupAccess = "available" | "blocked" | "paused" | "allowed" | "protected";
+export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
 /** Everything `publicGroup` reads. */
 export const groupInclude = {
@@ -46,7 +46,6 @@ export function groupAccess(group: GroupWithRules, now: Date, timezone: string):
 
 function internetGroup(group: GroupWithRules) {
   return {
-    protected: group.protected,
     suspension: {
       active: group.suspensionActive,
       until: group.suspensionUntil?.toISOString() ?? null,
@@ -68,7 +67,6 @@ export function publicGroup(group: GroupWithRules, timezone: string, now = new D
     name: group.name,
     monogram: group.monogram,
     familyRole: group.familyRole as FamilyRole | null,
-    protected: group.protected,
     /**
      * Null means this group reads the household resolver. A card needs it to resolve
      * its own upstream verdict rather than showing the household's.

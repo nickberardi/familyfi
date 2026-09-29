@@ -17,7 +17,6 @@ export type PlanGroup = {
   id: string;
   name: string;
   kind: GroupKind;
-  protected: boolean;
   suspensionActive: boolean;
   suspensionUntil: Date | null;
 };
@@ -55,7 +54,7 @@ export function planPolicies(input: {
       const group = groups.get(device.groupId!);
       if (!group) owner = "quarantine";
       // A group's own policy is its pause: it exists only while the group is paused.
-      else if (group.protected || !paused(group, input.now)) continue;
+      else if (!paused(group, input.now)) continue;
     }
     if (device.inScope === false) {
       if (owner.startsWith("group:")) retainOwners.add(owner);
@@ -89,7 +88,7 @@ export function planPolicies(input: {
     }
     const groupId = bucket.owner.slice("group:".length);
     const group = groups.get(groupId);
-    if (!group || group.protected) continue;
+    if (!group) continue;
     policies.push({
       key: bucket.owner + "|" + bucket.zoneId,
       ownerScope: "group",

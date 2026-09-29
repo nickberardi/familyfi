@@ -12,7 +12,6 @@ export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
   const [name, setName] = useState("");
   const [familyRole, setFamilyRole] = useState<"child" | "teen" | "adult">("child");
   const [monogram, setMonogram] = useState("");
-  const [prot, setProt] = useState(false);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -24,7 +23,6 @@ export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
           name,
           familyRole: kind === "family" ? familyRole : undefined,
           monogram: monogram || undefined,
-          protected: prot,
         }),
       }),
     );
@@ -54,10 +52,6 @@ export function NewGroupForm({ kind }: { kind: "family" | "things" }) {
           <input maxLength={4} className="rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]" value={monogram} onChange={(e) => setMonogram(e.target.value)} />
         </label>
       )}
-      <label className="flex items-center gap-2 text-[14px]">
-        <input type="checkbox" checked={prot} onChange={(e) => setProt(e.target.checked)} />
-        Protected — FamilyFi will not block this group
-      </label>
       <button type="submit" disabled={busy} className="rounded-[9px] bg-[var(--ff-accent)] py-3 text-[16px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50">
         Create
       </button>

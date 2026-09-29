@@ -2,9 +2,9 @@ import { AssignmentState } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { coverageIssues, isWriteFailure } from "@/server/policy-coverage";
 
-const betsy = { id: "betsy", name: "Betsy", protected: false, enforced: true };
-const abby = { id: "abby", name: "Abby", protected: false, enforced: true };
-const nick = { id: "nick", name: "Nick", protected: true, enforced: false };
+const betsy = { id: "betsy", name: "Betsy", enforced: true };
+const abby = { id: "abby", name: "Abby", enforced: true };
+const nick = { id: "nick", name: "Nick", enforced: false };
 
 describe("policy coverage", () => {
   it("flags a group with rules but no assigned devices and no UniFi policy", () => {
@@ -37,7 +37,7 @@ describe("policy coverage", () => {
     expect(isWriteFailure(issues[0]!)).toBe(true);
   });
 
-  it("does not flag protected groups or groups that already have a live policy", () => {
+  it("does not flag groups with nothing enforced or with a live policy", () => {
     const issues = coverageIssues({
       groups: [nick, abby],
       devices: [{ groupId: "abby", assignment: AssignmentState.assigned, zoneId: "z1", inScope: true }],

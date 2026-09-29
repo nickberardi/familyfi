@@ -213,7 +213,6 @@ model Group {
   name             String
   monogram         String?
   familyRole       FamilyRole?
-  protected        Boolean         @default(false)
   /// A pause blocks all internet for the group now, until `suspensionUntil` or until resumed.
   suspensionActive Boolean         @default(false)
   suspensionUntil  DateTime?

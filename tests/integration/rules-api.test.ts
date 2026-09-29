@@ -255,43 +255,15 @@ describe("household rules", () => {
     expect(policy?.schedule).toBeFalsy();
   });
 
-  it("keeps a shared rule editable after one of its groups is protected", async () => {
-    const auth = await signedIn();
-    const emma = await child();
-    const parent = await prisma().group.create({ data: { kind: GroupKind.family, name: "Pat", familyRole: FamilyRole.adult } });
-    const created = await postRule(auth, {
-      name: "School nights",
-      kind: "internet",
-      groupIds: [emma.id, parent.id],
-      mode: "scheduled",
-      windows: [{ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" }],
-    });
-    expect(created.status).toBe(201);
-    const { rule } = (await created.json()) as { rule: PublicRule };
-    await prisma().group.update({ where: { id: parent.id }, data: { protected: true } });
-
-    // Renaming or turning off the rule doesn't add the protected group, so it is allowed.
-    expect((await patch(auth, rule.id, { name: "Lights out" })).status).toBe(200);
-    expect((await patch(auth, rule.id, { enabled: false })).status).toBe(200);
-    // The protected group can be taken off the rule…
-    const removed = await patch(auth, rule.id, { groupIds: [emma.id] });
-    expect(removed.status).toBe(200);
-    expect(((await removed.json()) as { rule: PublicRule }).rule.groupIds).toEqual([emma.id]);
-    // …but not added back.
-    expect((await patch(auth, rule.id, { groupIds: [emma.id, parent.id] })).status).toBe(409);
-  });
-
   it("rejects rules that are not complete", async () => {
     const auth = await signedIn();
     const emma = await child();
-    const protectedGroup = await prisma().group.create({ data: { kind: GroupKind.family, name: "Pat", familyRole: FamilyRole.adult, protected: true } });
     const window = { days: EVERY_DAY, start: "21:00", end: "07:00" };
     const cases: [object, number, string][] = [
       [{ name: "All day", kind: "internet", groupIds: [emma.id], mode: "always" }, 400, "invalid_schedule"],
       [{ name: "No windows", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows: [] }, 400, "invalid_schedule"],
       [{ name: " ", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows: [window] }, 400, "invalid_name"],
       [{ name: "Nobody", kind: "internet", groupIds: [], mode: "scheduled", windows: [window] }, 400, "invalid_groups"],
-      [{ name: "Adults", kind: "internet", groupIds: [protectedGroup.id], mode: "scheduled", windows: [window] }, 409, "protected"],
       [{ name: "Same time", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows: [{ ...window, end: "21:00" }] }, 400, "invalid_schedule"],
       [{ name: "Video", kind: "category", groupIds: [emma.id], mode: "always" }, 400, "invalid_targets"],
       [{ name: "Networks", kind: "internet", scope: "network", networkIds: ["x"], mode: "scheduled", windows: [window] }, 400, "invalid_scope"],

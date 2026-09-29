@@ -137,13 +137,13 @@ describe("independent Watch device", () => {
     expect((await authenticatePairedDevice(watch.deviceId, watch.deviceCredential))?.id).toBe(watch.deviceId);
   });
 
-  it("allows three controls for a child group but refuses adult and protected groups", async () => {
+  it("allows three controls for child and things groups but refuses adult groups", async () => {
     const phone = await pairedPhone();
     const watch = await enrolledWatch(phone.auth);
     const auth = bearer(watch.token);
     const child = await prisma().group.create({ data: { kind: GroupKind.family, name: "Child", familyRole: FamilyRole.child } });
     const adult = await prisma().group.create({ data: { kind: GroupKind.family, name: "Adult", familyRole: FamilyRole.adult } });
-    const protectedGroup = await prisma().group.create({ data: { kind: GroupKind.things, name: "Protected", protected: true } });
+    const things = await prisma().group.create({ data: { kind: GroupKind.things, name: "Living Room" } });
     const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const path = (id: string, action: string) => `/api/v1/groups/${id}/${action}`;
     const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
@@ -159,6 +159,8 @@ describe("independent Watch device", () => {
     expect((await extend(request(path(adult.id, "extend"), {
       method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes: 30 }),
     }), ctx(adult.id))).status).toBe(403);
-    expect((await resume(request(path(protectedGroup.id, "resume"), { method: "POST", auth }), ctx(protectedGroup.id))).status).toBe(403);
+    expect((await pause(request(path(things.id, "pause"), {
+      method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ until }),
+    }), ctx(things.id))).status).toBe(200);
   });
 });

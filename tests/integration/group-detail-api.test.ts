@@ -52,16 +52,18 @@ describe("GET and PUT /api/v1/groups/{id}", () => {
     expect((await getGroup(request("/api/v1/groups/missing", { auth }), ctx("missing"))).status).toBe(404);
   });
 
-  it("renames and protects a group, and queues the change for reconciliation", async () => {
+  it("renames a group, and queues the change for reconciliation", async () => {
     const group = await createFamilyGroup("Betsy");
+    // An older client may still send `protected`; groups are no longer protected, so it is ignored.
     const response = await put(auth, group.id, { name: "Elizabeth", monogram: "EL", familyRole: "teen", protected: true });
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { group: { name: string; protected: boolean }; change: { changeId: string; revision: number } };
-    expect(body.group).toMatchObject({ name: "Elizabeth", protected: true });
+    const body = (await response.json()) as { group: Record<string, unknown>; change: { changeId: string; revision: number } };
+    expect(body.group).toMatchObject({ name: "Elizabeth" });
+    expect(body.group).not.toHaveProperty("protected");
     expect(body.change.changeId).toBeTruthy();
 
     const stored = await prisma().group.findUniqueOrThrow({ where: { id: group.id } });
-    expect(stored).toMatchObject({ name: "Elizabeth", monogram: "EL", familyRole: "teen", protected: true });
+    expect(stored).toMatchObject({ name: "Elizabeth", monogram: "EL", familyRole: "teen" });
     expect(await prisma().changeResult.findUnique({ where: { id: body.change.changeId } })).toMatchObject({ scope: "group", status: "pending" });
   });
 
@@ -71,7 +73,7 @@ describe("GET and PUT /api/v1/groups/{id}", () => {
     const response = await put(auth, group.id, { monogram: null });
     expect(response.status).toBe(200);
     const stored = await prisma().group.findUniqueOrThrow({ where: { id: group.id } });
-    expect(stored).toMatchObject({ name: "Betsy", monogram: null, protected: false, familyRole: "child" });
+    expect(stored).toMatchObject({ name: "Betsy", monogram: null, familyRole: "child" });
   });
 
   it("refuses an invalid update, an unknown group, and a write without CSRF", async () => {
