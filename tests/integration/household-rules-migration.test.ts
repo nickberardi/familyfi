@@ -37,7 +37,8 @@ beforeAll(async () => {
       ('always-paused-ended', 'things', 'Tablet', false, 'always', false, '{}', NULL, NULL, true, '2020-01-01T00:00:00.000Z', now()),
       ('half-scheduled', 'family', 'Ava', false, 'scheduled', true, '{1}', NULL, NULL, false, NULL, now()),
       ('no-days', 'family', 'Lee', false, 'scheduled', true, '{}', '21:00', '07:00', false, NULL, now()),
-      ('protected', 'family', 'Pat', true, 'always', false, '{}', NULL, NULL, false, NULL, now());
+      ('protected', 'family', 'Pat', true, 'always', false, '{}', NULL, NULL, false, NULL, now()),
+      ('protected-paused', 'things', 'Server', true, 'always', false, '{}', NULL, NULL, true, NULL, now());
     INSERT INTO "AppPolicy" ("id", "connectionIdentity", "siteId", "unifiPolicyId", "ownerScope", "groupId", "zoneId", "ipVersion", "desiredFingerprint", "desiredRevision", "updatedAt") VALUES
       ('ap-bedtime', 'console', 'site', 'pol-bedtime', 'group', 'bedtime', 'zone', 'dual', 'fp', 3, now()),
       ('ap-always', 'console', 'site', 'pol-always', 'group', 'always', 'zone', 'dual', 'fp', 3, now()),
@@ -118,6 +119,8 @@ describe("household rules migration", () => {
       // One with times but no days has no window to keep, so it stays blocked like always.
       "no-days": [true, null, false, null],
       protected: [false, null, false, null],
+      // Paused before it was protected: the pause never applied, and must not start blocking now.
+      "protected-paused": [false, null, false, null],
     });
   });
 

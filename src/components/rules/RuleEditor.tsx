@@ -644,7 +644,6 @@ function Writes({ writes }: { writes: RuleWrite[] }) {
   );
 }
 
-/** Search the gateway's app catalog and pick apps; each pick is a DPI id. */
 /**
  * One UniFi DPI category: the familiar five first, with their glyphs, then every other
  * category the gateway reports, by its own name.
@@ -696,6 +695,7 @@ function CategoryPicker({ targetIds, onChange }: { targetIds: number[]; onChange
   );
 }
 
+/** Search the gateway's app catalog and pick apps; each pick is a DPI id. */
 function AppPicker({ targetIds, onChange }: { targetIds: number[]; onChange: (ids: number[]) => void }) {
   const [filter, setFilter] = useState("");
   const [catalog, setCatalog] = useState<{ id: number; name: string }[]>([]);

@@ -707,12 +707,12 @@ function isNotFound(error: unknown): boolean {
   return error instanceof UnifiHttpError && error.status === 404;
 }
 
-/** Deletes a policy FamilyFi owns. One already gone from the gateway counts as deleted. */
 /** A record whose policy is no longer on the gateway: there is nothing left to keep. */
 function goneFromGateway(unifiPolicyId: string | null, onGateway: Set<string>): boolean {
   return Boolean(unifiPolicyId) && !onGateway.has(unifiPolicyId!);
 }
 
+/** Deletes a policy FamilyFi owns. One already gone from the gateway counts as deleted. */
 async function deleteFromGateway(client: UnifiClient, siteId: string, policyId: string, onGateway: Set<string>) {
   if (onGateway.has(policyId)) {
     try {

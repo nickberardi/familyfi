@@ -718,7 +718,8 @@ paths:
       description: |
         An allowance lifts the group's internet-rule windows until `until`: its devices
         leave those rules' UniFi policies. Omit `until` to allow until the windows active
-        now end (409 `not_in_window` when none is active); `null` allows until cancelled.
+        now end, or until cancelled (`until` null) when one is an always-on rule, which
+        never ends (409 `not_in_window` when none is active); `null` allows until cancelled.
         Category, app and website rules keep applying. Ends any pause and records who
         allowed it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]

@@ -63,7 +63,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/groups/{id}/pause` | Blocks all internet for the group now. Empty body = until resumed; `{ "until" }` = timed. Records who paused and ends any allowance |
 | POST | `/api/v1/groups/{id}/resume` | Ends the pause; the group's internet rules still apply |
 | POST | `/api/v1/groups/{id}/extend` | Adds minutes to a timed pause |
-| POST/DELETE | `/api/v1/groups/{id}/allow` | An allowance lifts the group's internet-rule windows until `until` (default: when the active windows end; 409 when none is active). DELETE ends it. Category, app and website rules keep applying |
+| POST/DELETE | `/api/v1/groups/{id}/allow` | An allowance lifts the group's internet-rule windows until `until` (default: when the active windows end, or until cancelled when an always-on internet rule is active; 409 when none is active). DELETE ends it. Category, app and website rules keep applying |
 | GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list |
 | GET/PATCH/DELETE | `/api/v1/rules/{id}` | PATCH changes anything but `kind` and `scope`; `windows` replaces the list, and a window sent with its `id` keeps its UniFi policy. DELETE removes the rule's recorded policies |
 | POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled |

@@ -162,8 +162,13 @@ export function FilterSheet({
       : upstreamPartial
         ? `${group.name}'s DNS resolver blocks ${upstream!.blockedCount} of ${upstream!.totalCount} ${state.name} domains we test.${measured} A FamilyFi policy would cover the rest.`
         : "Create a FamilyFi policy? Schedulable afterward, same as Internet.";
+  const domainCount = state.kind === "category" ? state.domains.length : 0;
   const websitesNote = websitesOnly
-    ? `UniFi has no ${state.name} category, so FamilyFi can't block it as one. A Websites rule can block the ${state.kind === "category" ? state.domains.length : 0} websites this category checks.`
+    ? `UniFi has no ${state.name} category, so FamilyFi can't block it as one. ${
+        domainCount
+          ? `A Websites rule can block the ${domainCount} ${domainCount === 1 ? "website" : "websites"} this category checks.`
+          : "Add its websites on the Categories page, or block them with a Websites rule."
+      }`
     : "";
 
   return (
