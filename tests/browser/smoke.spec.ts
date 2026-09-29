@@ -440,19 +440,19 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
     expect(named, "UNIFI_MOCK seed must name a Living Room device").toBeTruthy();
     await expect(sheet.getByText(named!.hostname!.trim(), { exact: false })).toBeVisible();
     await expect(sheet.getByText(/Category, app and website rules stay as they are/)).toBeVisible();
-    const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/pause`));
+    const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/pause`));
     await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
     expect((await paused).ok()).toBeTruthy();
     await expect(page.getByRole("heading", { name: "All internet · off" })).toBeVisible();
     await expect(page.getByText(/All internet paused until/).first()).toBeVisible();
 
-    const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/resume`));
+    const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/resume`));
     await page.locator('[aria-live="polite"]').getByRole("button", { name: "Undo" }).click();
     expect((await resumed).ok()).toBeTruthy();
     await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
   } finally {
     // Leave the group as the seed had it, even when a step above failed.
-    await page.request.post(`/api/v1/groups/${tv!.id}/resume`, { headers: await csrfHeaders(page) });
+    await page.request.post(`/api/v1/groups/${tv!.id}/rules/internet/resume`, { headers: await csrfHeaders(page) });
     await setEnabled(true);
   }
 });

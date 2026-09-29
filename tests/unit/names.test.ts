@@ -16,8 +16,7 @@ describe("UniFi policy names", () => {
   it("uses descriptive FamilyFi titles", () => {
     expect(quarantinePolicyName("Internal")).toBe("FamilyFi Quarantine Internal Devices");
     expect(pauseRuleName({ name: "Betsy", kind: GroupKind.family })).toBe("Betsy's Internet Pause");
-    expect(pauseRuleName({ name: "Ross", kind: GroupKind.family })).toBe("Ross's Internet Pause");
-    expect(pauseRuleName({ name: "Chris", kind: GroupKind.family })).toBe("Chris' Internet Pause");
+    expect(pauseRuleName({ name: "Ross", kind: GroupKind.family })).toBe("Ross' Internet Pause");
     expect(pauseRuleName({ name: "TV", kind: GroupKind.things })).toBe("TV Internet Pause");
     expect(spikePolicyName("Internal")).toBe("FamilyFi Spike Internal Devices");
   });

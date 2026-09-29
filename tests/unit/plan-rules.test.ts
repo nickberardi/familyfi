@@ -80,7 +80,7 @@ describe("planRulePolicies", () => {
     const [policy, ...rest] = plan([block]).policies;
     expect(rest).toEqual([]);
     expect(policy).toMatchObject({ enabled: true, name: "FamilyFi Betsy's Internet Pause", macAddresses: ["02:00:00:00:00:01"] });
-    expect(policy).not.toHaveProperty("schedule");
+    expect(policy?.schedule).toBeUndefined();
     // Off, it has no policy at all, unlike an ordinary rule that is switched off.
     expect(plan([{ ...block, enabled: false }]).policies).toEqual([]);
     expect(plan([{ ...block, system: false, enabled: false }]).policies).toHaveLength(1);

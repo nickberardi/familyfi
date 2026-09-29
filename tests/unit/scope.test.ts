@@ -1,4 +1,4 @@
-import { AssignmentState, GroupKind } from "@prisma/client";
+import { AssignmentState } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { networkInScope, resolveNetworkScope } from "@/server/unifi/scope";
 import { planPolicies } from "@/server/unifi/plan";

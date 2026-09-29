@@ -13,7 +13,7 @@ import { toUnifiSchedule } from "@/server/unifi/schedule-map";
 import { sanitizeUnifiText } from "@/server/unifi/sanitize";
 import { applyInternetBlocks, discoverInventory, setPoliciesEnabled, deletePolicies } from "@/server/unifi/spike";
 import { planPolicies } from "@/server/unifi/plan";
-import { AssignmentState, GroupKind } from "@prisma/client";
+import { AssignmentState } from "@prisma/client";
 import { UNIFI_PAGE_LIMIT } from "@/server/unifi/types";
 import type { ClientOverview, FirewallPolicy, FirewallZone, NetworkDetails, UnifiPage } from "@/server/unifi/types";
 

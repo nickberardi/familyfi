@@ -47,7 +47,7 @@ foreign key.
 | Concept | Owns or relates to |
 | --- | --- |
 | `Household` | Gateway configuration, managed network scope, timezone, desired revision, resolver defaults and connection identity |
-| `Group` → `Device` | Family/Things controls: pause and allowance; each discovered network device has an optional group. Unassigned devices are quarantined. |
+| `Group` → `Device` | Family/Things controls: pause and allowance, as the verbs on the built-in `internet` rule; each discovered network device has an optional group. Unassigned devices are quarantined. |
 | `Account` → `Session` | Login identity and permissions. An account can link to a family group; group membership and authentication are separate concepts. |
 | `PairedDevice` → `Session` | Companion enrollment and device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
 | `ConnectionEndpoint`, `Pairing`, `DeviceEdgeToken` | Routes, one-time enrollment and delivery records for encrypted edge credentials; see [connection guidance](api.md#companion-connection-and-https) |
@@ -81,10 +81,10 @@ interpret that retained snapshot as a fresh gateway observation.
 ### Pause from intent to feedback
 
 1. The browser selects an action through [group-actions.ts](../src/components/group-actions.ts) and submits it using [api.ts](../src/lib/api.ts), including the cookie session's CSRF header.
-2. The [pause route](../src/app/api/v1/groups/[id]/pause/route.ts) checks authentication, request shape, group existence, then saves the suspension in PostgreSQL.
+2. The [pause route](../src/app/api/v1/groups/[id]/rules/[ruleId]/pause/route.ts), called with the reserved rule id `internet`, checks authentication, request shape and group existence, then [runGroupInternet](../src/server/group-internet.ts) enables the group's built-in block rule in PostgreSQL.
 3. [enqueueChange](../src/server/changes.ts) increments the household revision, creates a pending `ChangeResult` with actor attribution and requests reconciliation. The route returns the updated group and change reference. The group write and enqueue are separate operations; do not assume the entire path is one database transaction.
 4. The browser applies the returned state through [household-state.ts](../src/lib/household-state.ts) and shows saved feedback. [mutate-gate.ts](../src/lib/mutate-gate.ts) prevents a superseded mutation response from replacing a newer one.
-5. Reconciliation takes its database lock, reads current desired state and writes only owned UniFi policies. A pause creates the group's unscheduled block policy; resume deletes it. The run records outcomes and settles eligible changes.
+5. Reconciliation takes its database lock, reads current desired state and writes only owned UniFi policies. A pause enables the group's built-in rule, whose one unscheduled block policy is planned like any rule's; resume switches the rule off and its policy is deleted. The run records outcomes and settles eligible changes.
 6. The browser polls this change's ID and reports applied, partial, failed or still pending, then refreshes. A polling failure leaves the saved state in place and reports a follow-up problem. A later global sync success is not proof that this particular request succeeded.
 
 Evidence: [reconciliation tests](../tests/integration/reconcile.test.ts),
@@ -144,9 +144,9 @@ allowed = allowance.active && (allowance.until is null || now < allowance.until)
 blocked = paused || (!allowed && any internet-rule window is active)
 ```
 
-- **Pause** blocks all internet for every device in the group now, until a time or until resumed. It is a FamilyFi-owned unscheduled BLOCK policy for the group that exists only while the pause lasts; resume (or expiry) deletes it. It records who paused.
+- **Pause** (`POST /groups/{id}/rules/internet/pause`) blocks all internet for every device in the group now, until a time or until resumed. `internet` is the group's built-in rule, "this group has internet": pausing it enables a hidden always-on internet rule (`Rule.systemGroupId`) whose one unscheduled BLOCK policy exists only while it is enabled; resume (or expiry) switches it off and the policy is deleted. It records who paused. The group's `suspension`, `allowance` and `access` are derived from these rules.
 - **Internet rules** are optional, and apply to chosen people and things, never a whole network. Each window of an enabled internet rule is its own UniFi policy carrying that window's recurring `schedule`; UniFi starts and ends it, never a clock-driven `enabled` write. An always-on internet rule is one unscheduled policy that keeps the group offline until it is changed or an allowance lifts it. A group with no internet rule is not limited, and says so.
-- **An allowance** lifts the group's internet-rule windows until a time (by default when the windows active now end): its devices leave those rules' policies. A policy left with nobody keeps its devices and is disabled, so ending the allowance does not create it again. A pause replaces an allowance.
+- **An allowance** (`allow` on `internet`) is an allowance lift on each of the group's internet rules until a time (by default when each rule's active windows end): its devices leave those rules' policies. A policy left with nobody keeps its devices and is disabled, so ending the allowance does not create it again. A pause replaces an allowance.
 - **A rule pause or allowance** lifts one rule, for every group it covers or for one group alone, until a time. For every group the rule's policies are disabled and keep their devices; for one group that group's devices leave the rule's policies (a policy left with nobody stays disabled with its devices). Pause, resume and extend act on a pause; allow and disallow on an allowance, at either scope.
 - **Category, app and website rules** are separate policies, and neither a pause nor an allowance changes them. While an internet window is active they are covered anyway.
 

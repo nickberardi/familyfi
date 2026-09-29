@@ -426,6 +426,13 @@
         "groups"
       ]
     },
+    "tests/integration/group-internet-rule-migration.test.ts": {
+      "categories": [
+        "database",
+        "rules",
+        "groups"
+      ]
+    },
     "tests/integration/household-rules-migration.test.ts": {
       "categories": [
         "database",

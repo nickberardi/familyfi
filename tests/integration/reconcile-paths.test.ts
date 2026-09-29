@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AssignmentState, ChangeStatus, FamilyRole, GroupKind, RuleKind, RuleScope } from "@prisma/client";
+import { AssignmentState, ChangeStatus, FamilyRole, GroupKind, RuleKind, RuleMode, RuleScope } from "@prisma/client";
 import { prisma } from "@/server/db";
 import {
   requestReconcile,
@@ -48,16 +48,29 @@ async function lastRun() {
   return prisma().syncRun.findFirstOrThrow({ orderBy: { startedAt: "desc" } });
 }
 
-/** A connected household whose first device belongs to a paused group, with its live pause policy. */
+/** A group's own pause: its hidden always-on block rule, enabled. */
+async function pauseGroup(groupId: string) {
+  return prisma().rule.create({
+    data: {
+      name: "Betsy's Internet Pause",
+      kind: RuleKind.internet,
+      mode: RuleMode.always,
+      systemGroupId: groupId,
+      groups: { create: [{ groupId }] },
+    },
+  });
+}
+
+/** A connected household whose first device belongs to a paused group, with its live pause policy: the group's built-in rule. */
 async function groupWithPolicy(client: MockUnifiClient) {
   setReconcileClientForTests(client);
   await runReconcileOnce();
   const group = await createFamilyGroup();
-  await prisma().group.update({ where: { id: group.id }, data: { suspensionActive: true } });
+  const block = await pauseGroup(group.id);
   await prisma().device.update({ where: { mac: MAC }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
   await runReconcileOnce();
-  const policy = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
-  return { group, policy };
+  const policy = await prisma().rulePolicy.findFirstOrThrow({ where: { ruleId: block.id } });
+  return { group, block, policy };
 }
 
 /** As `groupWithPolicy`, plus an app-category rule on the group and its live UniFi policy. */
@@ -147,16 +160,16 @@ describe("reconciler paths", () => {
   describe("pause policies", () => {
     it("records a refused update on the policy, reports a partial run, and retries it next pass", async () => {
       const client = fixtureUnifiClient();
-      const { group, policy } = await groupWithPolicy(client);
+      const { block, policy } = await groupWithPolicy(client);
       const onGateway = () => client.state.policies.find((item) => item.id === policy.unifiPolicyId);
       expect(onGateway()?.name).toBe("FamilyFi Betsy's Internet Pause");
 
-      await prisma().group.update({ where: { id: group.id }, data: { name: "Betsy B" } });
+      await prisma().rule.update({ where: { id: block.id }, data: { name: "Betsy B's Internet Pause" } });
       vi.spyOn(client, "updatePolicy").mockRejectedValueOnce(gatewayError(500, "PUT"));
       await runReconcileOnce();
 
       expect((await lastRun()).status).toBe(ChangeStatus.partial);
-      const failed = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      const failed = await prisma().rulePolicy.findUniqueOrThrow({ where: { id: policy.id } });
       expect(failed.lastError).toMatch(/500/);
       expect(failed.unifiPolicyId).toBe(policy.unifiPolicyId);
       expect(onGateway()?.name).toBe("FamilyFi Betsy's Internet Pause");
@@ -164,7 +177,7 @@ describe("reconciler paths", () => {
       // Same desired state as the failed pass: the recorded error alone makes it write again.
       await runReconcileOnce();
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
-      const retried = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      const retried = await prisma().rulePolicy.findUniqueOrThrow({ where: { id: policy.id } });
       expect(retried.lastError).toBeNull();
       expect(retried.unifiPolicyId).toBe(policy.unifiPolicyId);
       expect(onGateway()?.name).toBe("FamilyFi Betsy B's Internet Pause");
@@ -172,14 +185,14 @@ describe("reconciler paths", () => {
 
     it("creates the policy again when it disappears between the listing and the update", async () => {
       const client = fixtureUnifiClient();
-      const { group, policy } = await groupWithPolicy(client);
+      const { block, policy } = await groupWithPolicy(client);
 
-      await prisma().group.update({ where: { id: group.id }, data: { name: "Betsy B" } });
+      await prisma().rule.update({ where: { id: block.id }, data: { name: "Betsy B's Internet Pause" } });
       vi.spyOn(client, "getPolicy").mockRejectedValueOnce(gatewayError(404, "GET"));
       await runReconcileOnce();
 
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
-      const replaced = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      const replaced = await prisma().rulePolicy.findUniqueOrThrow({ where: { id: policy.id } });
       expect(replaced.unifiPolicyId).not.toBe(policy.unifiPolicyId);
       const created = client.state.policies.find((item) => item.id === replaced.unifiPolicyId);
       expect(policyMacs(created ?? {})).toContain(MAC);
@@ -192,14 +205,15 @@ describe("reconciler paths", () => {
       await runReconcileOnce();
       // Paused, with no rules: the pause policy is the only one it needs.
       const group = await prisma().group.create({
-        data: { kind: GroupKind.family, name: "Betsy", familyRole: FamilyRole.child, suspensionActive: true },
+        data: { kind: GroupKind.family, name: "Betsy", familyRole: FamilyRole.child },
       });
+      const block = await pauseGroup(group.id);
       await prisma().device.update({ where: { mac: MAC }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
       client.createError = (body) => (body.name.includes("Betsy") ? gatewayError(500, "POST") : undefined);
       await runReconcileOnce();
 
       expect((await lastRun()).status).toBe(ChangeStatus.partial);
-      const failed = await prisma().appPolicy.findFirstOrThrow({ where: { groupId: group.id } });
+      const failed = await prisma().rulePolicy.findFirstOrThrow({ where: { ruleId: block.id } });
       expect(failed.unifiPolicyId).toBeNull();
       expect(failed.lastError).toMatch(/500/);
 
@@ -207,43 +221,41 @@ describe("reconciler paths", () => {
       await prisma().device.update({ where: { mac: MAC }, data: { groupId: null, assignment: AssignmentState.quarantined } });
       await runReconcileOnce();
 
-      expect(await prisma().appPolicy.findUnique({ where: { id: failed.id } })).toBeNull();
+      expect(await prisma().rulePolicy.findUnique({ where: { id: failed.id } })).toBeNull();
       expect(client.calls.some((call) => call.method === "DELETE")).toBe(false);
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
     });
 
     it("keeps the record and reports a partial run when the gateway refuses a delete", async () => {
       const client = fixtureUnifiClient();
-      const { group, policy } = await groupWithPolicy(client);
+      const { block, policy } = await groupWithPolicy(client);
 
-      await prisma().device.update({ where: { mac: MAC }, data: { groupId: null, assignment: AssignmentState.quarantined } });
-      await prisma().group.update({ where: { id: group.id }, data: { suspensionActive: false } });
+      await prisma().rule.update({ where: { id: block.id }, data: { enabled: false } });
       const refusal = refuseDelete(client, policy.unifiPolicyId);
       await runReconcileOnce();
 
       expect((await lastRun()).status).toBe(ChangeStatus.partial);
-      const kept = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      const kept = await prisma().rulePolicy.findUniqueOrThrow({ where: { id: policy.id } });
       expect(kept.lastError).toMatch(/500/);
       expect(client.state.policies.some((item) => item.id === policy.unifiPolicyId)).toBe(true);
 
       refusal.mockRestore();
       await runReconcileOnce();
-      expect(await prisma().appPolicy.findUnique({ where: { id: policy.id } })).toBeNull();
+      expect(await prisma().rulePolicy.findUnique({ where: { id: policy.id } })).toBeNull();
       expect(client.state.policies.some((item) => item.id === policy.unifiPolicyId)).toBe(false);
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
     });
 
     it("counts a policy the gateway answers 404 for on delete as already deleted", async () => {
       const client = fixtureUnifiClient();
-      const { group, policy } = await groupWithPolicy(client);
+      const { block, policy } = await groupWithPolicy(client);
 
       // Listed at the start of the pass, then removed on the console before the delete.
-      await prisma().device.update({ where: { mac: MAC }, data: { groupId: null, assignment: AssignmentState.quarantined } });
-      await prisma().group.update({ where: { id: group.id }, data: { suspensionActive: false } });
+      await prisma().rule.update({ where: { id: block.id }, data: { enabled: false } });
       vi.spyOn(client, "deletePolicy").mockRejectedValueOnce(gatewayError(404, "DELETE"));
       await runReconcileOnce();
 
-      expect(await prisma().appPolicy.findUnique({ where: { id: policy.id } })).toBeNull();
+      expect(await prisma().rulePolicy.findUnique({ where: { id: policy.id } })).toBeNull();
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
     });
 
@@ -254,7 +266,7 @@ describe("reconciler paths", () => {
       await configureConnectedHousehold({ manageAllNetworks: false, managedNetworkIds: [IOT_NETWORK] });
       await runReconcileOnce();
 
-      expect(await prisma().appPolicy.findUnique({ where: { id: policy.id } })).not.toBeNull();
+      expect(await prisma().rulePolicy.findUnique({ where: { id: policy.id } })).not.toBeNull();
       expect(client.state.policies.some((item) => item.id === policy.unifiPolicyId)).toBe(true);
       expect(client.calls.some((call) => call.method === "DELETE" && call.path.endsWith(policy.unifiPolicyId!))).toBe(false);
     });
@@ -433,7 +445,7 @@ describe("reconciler paths", () => {
     it("keeps the creation record and reports a partial run when the gateway refuses the delete", async () => {
       const client = fixtureUnifiClient();
       const { group, policy } = await groupWithPolicy(client);
-      await prisma().appPolicy.delete({ where: { id: policy.id } });
+      await prisma().rulePolicy.delete({ where: { id: policy.id } });
       await prisma().device.update({ where: { mac: MAC }, data: { groupId: null, assignment: AssignmentState.quarantined } });
       await prisma().group.delete({ where: { id: group.id } });
 
