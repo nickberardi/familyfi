@@ -26,10 +26,6 @@ function ownerOf(device: Device, groups: Group[]) {
   return groups.find((group) => group.id === device.groupId) ?? null;
 }
 
-function ownerHref(group: Group) {
-  return group.kind === "family" ? `/family/${group.id}` : `/things/${group.id}`;
-}
-
 export default function DevicesPage() {
   return (
     <Suspense fallback={<p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">Loading devices…</p>}>
@@ -168,15 +164,12 @@ function DevicesBody() {
             <div>
               <div className="ff-device-grid grid items-center gap-3.5 bg-[var(--ff-field-soft)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)]">
                 <div>Device</div>
-                <div className="hidden md:block">Belongs to</div>
                 <div className="hidden xl:block">Address</div>
                 <div className="hidden lg:block">Hardware</div>
-                <div>Assign</div>
+                <div>Belongs to</div>
                 <div aria-hidden="true" />
               </div>
               {rows.map((device) => {
-                const owner = ownerOf(device, groups);
-                const unassignedRow = device.assignment === "quarantined";
                 const name = device.hostname ?? "Unnamed device";
                 return (
                   <div
@@ -187,12 +180,6 @@ function DevicesBody() {
                       <DeviceMark hostname={device.hostname} />
                       <DeviceIdentity device={device} networks={networks} name={name} timezone={household?.timezone ?? "UTC"} now={now} />
                     </Link>
-                    <div
-                      className="hidden min-w-0 truncate text-[14px] md:block"
-                      style={{ color: unassignedRow ? "var(--ff-danger)" : "var(--ff-ink)" }}
-                    >
-                      {owner ? <Link href={ownerHref(owner)}>{owner.name}</Link> : "Unassigned"}
-                    </div>
                     <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] xl:block">
                       {device.ip ?? "—"}
                     </div>
