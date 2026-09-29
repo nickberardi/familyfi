@@ -27,7 +27,10 @@ export type FilterSheetState =
   | {
       kind: "category";
       name: string;
-      categoryId: number;
+      /** The UniFi DPI category, or null when UniFi has none for it (AI, Dating, …). */
+      categoryId: number | null;
+      /** The domains its checks use; a Websites rule can block these instead. */
+      domains: string[];
       rule: Rule | undefined;
       /** Already resolved for this card's group; null when nothing has been measured. */
       upstream: UpstreamCheckRow | null;
@@ -97,7 +100,7 @@ export function FilterSheet({
         "Could not turn on.",
       );
     }
-    if (state.kind === "category" && !state.rule) {
+    if (state.kind === "category" && !state.rule && state.categoryId !== null) {
       return run(
         () =>
           api("/api/v1/rules", {
@@ -136,6 +139,14 @@ export function FilterSheet({
         ? `Partially blocked (DNS)`
         : `Nothing's blocking ${state.name} yet`;
 
+  /** UniFi has no category for it, so FamilyFi can only block its websites. */
+  const websitesOnly = state.kind === "category" && state.categoryId === null && !state.rule;
+  const websitesHref =
+    state.kind === "category"
+      ? `/rules/new?kind=domain&group=${group.id}&name=${encodeURIComponent(`${state.name} for ${group.name}`.slice(0, 60))}${
+          state.domains.length ? `&domains=${encodeURIComponent(state.domains.join(","))}` : ""
+        }`
+      : "";
   const shared = (state.rule?.groupIds.length ?? 0) > 1;
   const windows = state.rule?.mode === "scheduled" ? state.rule.windows : [];
   const body = on
@@ -151,6 +162,9 @@ export function FilterSheet({
       : upstreamPartial
         ? `${group.name}'s DNS resolver blocks ${upstream!.blockedCount} of ${upstream!.totalCount} ${state.name} domains we test.${measured} A FamilyFi policy would cover the rest.`
         : "Create a FamilyFi policy? Schedulable afterward, same as Internet.";
+  const websitesNote = websitesOnly
+    ? `UniFi has no ${state.name} category, so FamilyFi can't block it as one. A Websites rule can block the ${state.kind === "category" ? state.domains.length : 0} websites this category checks.`
+    : "";
 
   return (
     <div
@@ -171,7 +185,7 @@ export function FilterSheet({
             {heading}
           </h2>
           <p className="text-[13px] leading-snug" style={{ color: "var(--ff-ink-3)" }}>
-            {body}
+            {websitesOnly ? websitesNote : body}
           </p>
           {windows.length ? (
             <ul className="text-[13px] leading-snug" style={{ color: "var(--ff-ink-2)" }}>
@@ -189,30 +203,42 @@ export function FilterSheet({
               {error}
             </p>
           ) : null}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void (on ? turnOff() : createOrEnable())}
-            className="mt-1 rounded-[9px] py-2.5 text-center text-[14px] font-semibold disabled:opacity-50"
-            style={
-              on
-                ? { background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }
-                : { background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }
-            }
-          >
-            {on ? "Turn off" : "Create policy"}
-          </button>
-          <Link
-            href={
-              state.rule
-                ? `/rules/${state.rule.id}`
-                : `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`
-            }
-            className="text-center text-[14px] font-semibold"
-            style={{ color: "var(--ff-accent)" }}
-          >
-            {state.rule ? "Edit rule and schedule" : "Schedule it instead"}
-          </Link>
+          {websitesOnly ? (
+            <Link
+              href={websitesHref}
+              className="mt-1 rounded-[9px] py-2.5 text-center text-[14px] font-semibold"
+              style={{ background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }}
+            >
+              Block its websites
+            </Link>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void (on ? turnOff() : createOrEnable())}
+                className="mt-1 rounded-[9px] py-2.5 text-center text-[14px] font-semibold disabled:opacity-50"
+                style={
+                  on
+                    ? { background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }
+                    : { background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }
+                }
+              >
+                {on ? "Turn off" : "Create policy"}
+              </button>
+              <Link
+                href={
+                  state.rule
+                    ? `/rules/${state.rule.id}`
+                    : `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`
+                }
+                className="text-center text-[14px] font-semibold"
+                style={{ color: "var(--ff-accent)" }}
+              >
+                {state.rule ? "Edit rule and schedule" : "Schedule it instead"}
+              </Link>
+            </>
+          )}
         </div>
         <button
           type="button"

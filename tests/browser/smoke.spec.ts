@@ -397,6 +397,39 @@ test("Websites rule blocks named domains, with the encrypted DNS caveat", async 
   await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
 });
 
+test("cards show every household category; one UniFi cannot block offers a Websites rule", async ({ page }) => {
+  await signIn(page);
+  const body = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
+  const kid = body.groups.find((group) => group.kind === "family" && group.name === (test.info().project.name === "phone" ? "Sam" : "Betsy"));
+  expect(kid, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+
+  await page.goto("/family");
+  const marks = page.getByTestId(`filter-marks-${kid!.id}`);
+  const card = page.locator("article").filter({ has: marks });
+  // Not just the five UniFi categories: AI, Dating, Gambling and Adult are there too.
+  await marks.getByRole("button", { name: /^Show all \d+ categories$/ }).click();
+  for (const name of ["AI", "Dating", "Gambling", "Adult", "Video"]) {
+    await expect(marks.getByRole("button", { name: new RegExp(`^${name} `) })).toBeVisible();
+  }
+
+  await marks.getByRole("button", { name: /^AI / }).click();
+  await card.getByRole("button", { name: "Add rule" }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByText(/UniFi has no AI category/)).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Create policy" })).toHaveCount(0);
+  await sheet.getByRole("link", { name: "Block its websites" }).click();
+  await expect(page).toHaveURL(/\/rules\/new\?kind=domain/);
+  // A named draft titles the page with its name.
+  await expect(page.getByRole("heading", { name: `AI for ${kid!.name}`, level: 1 })).toBeVisible();
+  await expect(page.getByLabel("Rule name")).toHaveValue(`AI for ${kid!.name}`);
+  await expect(page.getByRole("button", { name: "Remove openai.com" })).toBeVisible();
+
+  // The editor offers every category the gateway reports, not only the familiar five.
+  await page.goto("/rules/new?kind=category");
+  const more = page.getByRole("group", { name: "More UniFi categories" });
+  await expect(more.getByRole("button", { name: "Fixture Category Alpha" })).toBeVisible();
+});
+
 test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without a resolver", async ({ page }) => {
   await signIn(page);
 

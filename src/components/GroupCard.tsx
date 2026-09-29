@@ -7,10 +7,9 @@ import { internetDayBands, internetState, localWeekday } from "@/lib/rule-window
 import { appRulesForGroup, glyphForAppName, internetWindowsForGroup, parentFacingRuleLabel, ruleDayBands, type Rule } from "@/lib/rules";
 import { appMarkState, categoryMarkStyle, ruleActivelyBlocking, type UpstreamCategoryRow } from "@/lib/upstream";
 import type { Group } from "@/lib/types";
-import { CategoryGlyph } from "./ui/CategoryGlyph";
 import { Icon } from "./ui/Icon";
 import { DayTimeline, type TimelineBand } from "./DayTimeline";
-import { categorySlotStates, MarkButton, SectionLabel, type CategorySlotState } from "./FilterMarks";
+import { categorySheet, categorySlotStates, CategoryMarkGlyph, MarkButton, SectionLabel, type CategorySlotState } from "./FilterMarks";
 import { FilterSheet, type FilterSheetState } from "./filters/FilterSheet";
 import { InternetZone } from "./InternetZone";
 
@@ -72,7 +71,7 @@ export function GroupCard({
   // FamilyFi's own rules first, then the resolver's verdicts.
   const slots = categorySlotStates(group, rules, upstreamCategories, timezone);
   const ordered = [...slots.filter((item) => item.rule?.enabled), ...slots.filter((item) => !item.rule?.enabled)];
-  const focused = ordered.find((item) => item.slot.slot === focus) ?? ordered[0];
+  const focused = ordered.find((item) => item.key === focus) ?? ordered[0];
   const pool = open ? ordered.filter((item) => item !== focused) : ordered;
   const cap = open ? OPEN_MARKS : CLOSED_MARKS;
   const shown = more ? pool : pool.slice(0, cap);
@@ -82,14 +81,6 @@ export function GroupCard({
     if (slot) setFocus(slot);
     setOpen(true);
   };
-  const sheetFor = (item: CategorySlotState): FilterSheetState => ({
-    kind: "category",
-    name: item.slot.label,
-    categoryId: item.slot.categoryId,
-    rule: item.rule,
-    upstream: item.check,
-    activelyBlocking: item.blocking,
-  });
 
   const header = (
     <>
@@ -147,7 +138,7 @@ export function GroupCard({
               item={focused}
               rules={rules}
               timezone={timezone}
-              onOpenSheet={() => setSheet(sheetFor(focused))}
+              onOpenSheet={() => setSheet(categorySheet(focused))}
             />
           ) : null}
         </div>
@@ -167,9 +158,9 @@ export function GroupCard({
             </>
           )}
           {shown.map((item) => (
-            <span key={item.slot.slot} className="relative">
-              <MarkButton label={item.slot.label} state={item.state} onClick={() => openOn(item.slot.slot)}>
-                <CategoryGlyph slot={item.slot.slot} size={15} />
+            <span key={item.key} className="relative">
+              <MarkButton label={item.label} state={item.state} onClick={() => openOn(item.key)}>
+                <CategoryMarkGlyph item={item} size={15} />
               </MarkButton>
             </span>
           ))}
@@ -287,10 +278,10 @@ function CategoryZone({
     return (
       <div className="flex items-center gap-2.5 rounded-[10px] bg-[var(--ff-field-soft)] px-3 py-2.5">
         <span aria-hidden className="flex h-7 w-7 flex-none items-center justify-center rounded-full" style={{ background: style.fill, color: style.ink }}>
-          <CategoryGlyph slot={item.slot.slot} size={14} />
+          <CategoryMarkGlyph item={item} size={14} />
         </span>
         <span className="min-w-0 flex-1 text-[14px]">
-          <span className="font-semibold">{item.slot.label}</span>
+          <span className="font-semibold">{item.label}</span>
           <span className="text-[var(--ff-ink-2)]"> · no rule · {words[item.state]}</span>
         </span>
         <button type="button" onClick={onOpenSheet} className="flex flex-none items-center gap-1 text-[14px] font-semibold text-[var(--ff-accent)]">
@@ -310,7 +301,7 @@ function CategoryZone({
       kind: "category" as const,
       from: band.from,
       to: band.to,
-      label: `${item.slot.label} blocked`,
+      label: `${item.label} blocked`,
       source: `${rule.name} rule${band.window.name.trim() && rule.mode === "scheduled" ? ` · ${band.window.name.trim()}` : ""}`,
     })),
   ];
@@ -327,11 +318,11 @@ function CategoryZone({
               : { background: "var(--ff-verdict-rule-fill)", color: "var(--ff-verdict-rule-ink)" }
           }
         >
-          <CategoryGlyph slot={item.slot.slot} size={14} />
+          <CategoryMarkGlyph item={item} size={14} />
         </span>
         <div className="min-w-[140px] flex-1">
           <h3 className="m-0 text-[14px] font-semibold">
-            {item.slot.label} · {item.blocking ? "blocked" : "allowed now"}
+            {item.label} · {item.blocking ? "blocked" : "allowed now"}
           </h3>
           <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-ink-2)]">{when} Everything else stays on.</p>
         </div>
@@ -342,8 +333,8 @@ function CategoryZone({
           Edit rule
         </Link>
       </div>
-      <DayTimeline bands={bands} timezone={timezone} label={`${group.name}’s ${item.slot.label} today`} />
-      {internet.length ? <p className="text-[14px] text-[var(--ff-ink-2)]">No-internet time also covers {item.slot.label}.</p> : null}
+      <DayTimeline bands={bands} timezone={timezone} label={`${group.name}’s ${item.label} today`} />
+      {internet.length ? <p className="text-[14px] text-[var(--ff-ink-2)]">No-internet time also covers {item.label}.</p> : null}
     </div>
   );
 }

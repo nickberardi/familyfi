@@ -618,6 +618,13 @@
         "categories",
         "groups"
       ]
+    },
+    "tests/browser/smoke.spec.ts > cards show every household category; one UniFi cannot block offers a Websites rule": {
+      "categories": [
+        "categories",
+        "groups",
+        "rules"
+      ]
     }
   }
 }

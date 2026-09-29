@@ -25,7 +25,15 @@ import { Segmented } from "@/components/ui/Segmented";
 import { RuleBar } from "./RulesList";
 
 type Params = Promise<{ id: string }>;
-type Search = Promise<{ group?: string | string[]; kind?: string | string[]; target?: string | string[] }>;
+type Search = Promise<{
+  group?: string | string[];
+  kind?: string | string[];
+  target?: string | string[];
+  /** A starting name, e.g. "AI for Sam" from a category's sheet. */
+  name?: string | string[];
+  /** Comma-separated websites for a Websites rule, e.g. a category's domains. */
+  domains?: string | string[];
+}>;
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
@@ -66,16 +74,22 @@ function fromRule(rule: Rule): Draft {
   };
 }
 
-function blankDraft(kind: RuleKind, groupId: string | undefined, target: number | undefined): Draft {
+function blankDraft(
+  kind: RuleKind,
+  groupId: string | undefined,
+  target: number | undefined,
+  prefill: { name?: string; domains?: string } = {},
+): Draft {
   const scheduled = kind === "internet";
+  const domains = kind === "domain" && prefill.domains ? prefill.domains.split(",").map(normalizeDomain).filter((item): item is string => Boolean(item)) : [];
   return {
     id: "",
-    name: "",
+    name: (prefill.name ?? "").slice(0, MAX_RULE_NAME),
     useGeneratedName: false,
     kind,
     scope: "group",
     targetIds: kind === "category" ? [target ?? CURATED_CATEGORY_SLOTS[0]!.categoryId] : [],
-    domains: [],
+    domains: [...new Set(domains)],
     groupIds: groupId ? [groupId] : [],
     networkIds: [],
     enabled: true,
@@ -107,7 +121,11 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
     <RuleEditor
       key={rule?.id ?? "new"}
       saved={rule ?? null}
-      initial={rule ? fromRule(rule) : blankDraft(kind, one(search.group), Number.isFinite(target) ? target : undefined)}
+      initial={
+        rule
+          ? fromRule(rule)
+          : blankDraft(kind, one(search.group), Number.isFinite(target) ? target : undefined, { name: one(search.name), domains: one(search.domains) })
+      }
       returnGroup={one(search.group) ?? null}
     />
   );
@@ -310,21 +328,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
             }
           />
           {saved ? <p className="text-[14px] text-[var(--ff-ink-2)]">A saved rule keeps what it blocks. Make a new rule to block something else.</p> : null}
-          {draft.kind === "category" ? (
-            <ChipGroup label="Category">
-              {CURATED_CATEGORY_SLOTS.map((slot) => (
-                <Chip
-                  key={slot.slot}
-                  on={draft.targetIds.includes(slot.categoryId)}
-                  tone="rule"
-                  onClick={() => set({ targetIds: [slot.categoryId] })}
-                >
-                  <CategoryGlyph slot={slot.slot} size={13} />
-                  {slot.label}
-                </Chip>
-              ))}
-            </ChipGroup>
-          ) : null}
+          {draft.kind === "category" ? <CategoryPicker targetIds={draft.targetIds} onChange={(targetIds) => set({ targetIds })} /> : null}
           {draft.kind === "app" ? <AppPicker targetIds={draft.targetIds} onChange={(targetIds) => set({ targetIds })} /> : null}
           {draft.kind === "domain" ? (
             <div className="flex flex-col gap-2">
@@ -634,6 +638,57 @@ function Writes({ writes }: { writes: RuleWrite[] }) {
 }
 
 /** Search the gateway's app catalog and pick apps; each pick is a DPI id. */
+/**
+ * One UniFi DPI category: the familiar five first, with their glyphs, then every other
+ * category the gateway reports, by its own name.
+ */
+function CategoryPicker({ targetIds, onChange }: { targetIds: number[]; onChange: (ids: number[]) => void }) {
+  const [catalog, setCatalog] = useState<{ id: number; name: string }[]>([]);
+  const [filter, setFilter] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    void api<{ categories: { id: number; name: string }[] }>("/api/v1/dpi/categories")
+      .then((res) => {
+        if (!cancelled) setCatalog(res.categories);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const curatedIds = new Set(CURATED_CATEGORY_SLOTS.map((slot) => slot.categoryId));
+  const needle = filter.trim().toLowerCase();
+  const others = catalog
+    .filter((item) => !curatedIds.has(item.id) && (!needle || item.name.toLowerCase().includes(needle)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <div className="flex flex-col gap-2">
+      <ChipGroup label="Category">
+        {CURATED_CATEGORY_SLOTS.map((slot) => (
+          <Chip key={slot.slot} on={targetIds.includes(slot.categoryId)} tone="rule" onClick={() => onChange([slot.categoryId])}>
+            <CategoryGlyph slot={slot.slot} size={13} />
+            {slot.label}
+          </Chip>
+        ))}
+      </ChipGroup>
+      {catalog.length ? (
+        <>
+          <TextField label="Search UniFi categories" value={filter} onChange={setFilter} placeholder="Search the gateway’s categories" />
+          <ChipGroup label="More UniFi categories">
+            {others.map((item) => (
+              <Chip key={item.id} on={targetIds.includes(item.id)} tone="rule" onClick={() => onChange([item.id])}>
+                {item.name}
+              </Chip>
+            ))}
+          </ChipGroup>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function AppPicker({ targetIds, onChange }: { targetIds: number[]; onChange: (ids: number[]) => void }) {
   const [filter, setFilter] = useState("");
   const [catalog, setCatalog] = useState<{ id: number; name: string }[]>([]);

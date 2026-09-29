@@ -22,8 +22,12 @@ import {
   categoryRuleForSlot,
   glyphForAppName,
   parentFacingRuleLabel,
+  type CuratedCategorySlot,
   type Rule,
 } from "@/lib/rules";
+import type { IconName } from "@/lib/icons";
+import { upstreamCategoryIcon } from "@/lib/upstream-domains";
+import { Icon } from "@/components/ui/Icon";
 import {
   appMarkState,
   categoryMarkLabel,
@@ -91,29 +95,79 @@ export function MarkButton({
   );
 }
 
-/** A curated category slot as a group sees it: its rule, its resolver's verdict and its mark state. */
+/**
+ * A household category as a group sees it: its rule, its resolver's verdict and its
+ * mark state. `slot` is the UniFi DPI category FamilyFi can block it with; a category
+ * without one (AI, Dating, one the household made) can only be reported, or blocked
+ * by its websites.
+ */
 export type CategorySlotState = {
-  slot: (typeof CURATED_CATEGORY_SLOTS)[number];
+  key: string;
+  label: string;
+  slot: CuratedCategorySlot | undefined;
+  /** The seeded category's glyph, when it has no DPI slot to draw. */
+  icon: IconName | undefined;
+  monogram: string;
+  /** The domains the resolver checks for it, for a Websites rule. */
+  domains: string[];
   rule: Rule | undefined;
   check: ReturnType<typeof effectiveCheck>;
   blocking: boolean;
   state: CategoryMarkState;
 };
 
+/** Every household category: the ones UniFi can block first, then the rest as listed. */
 export function categorySlotStates(
   group: Group,
   rules: Rule[],
   upstreamCategories: UpstreamCategoryRow[],
   timezone: string,
 ): CategorySlotState[] {
-  return CURATED_CATEGORY_SLOTS.map((slot) => {
-    const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
-    // A rule blocking *right now* wins; otherwise this group's resolver decides.
+  const seededSlot = (row: UpstreamCategoryRow) =>
+    row.source === "seed" ? CURATED_CATEGORY_SLOTS.find((slot) => slot.slot === row.slug) : undefined;
+  const mapped = CURATED_CATEGORY_SLOTS.map((slot) => {
     const upstream = upstreamCategoryForSlot(upstreamCategories, slot.slot);
+    return { slot, upstream: upstream && seededSlot(upstream) ? upstream : undefined };
+  });
+  const others = upstreamCategories.filter((row) => !seededSlot(row)).map((row) => ({ slot: undefined, upstream: row }));
+  return [...mapped, ...others].map(({ slot, upstream }) => {
+    const rule = slot ? categoryRuleForSlot(rules, group.id, slot.categoryId) : undefined;
+    // A rule blocking *right now* wins; otherwise this group's resolver decides.
     const check = upstream ? effectiveCheck(upstream.checks, group) : null;
     const blocking = ruleActivelyBlocking(rule, timezone);
-    return { slot, rule, check, blocking, state: categoryMarkState(blocking, check) };
+    return {
+      key: slot?.slot ?? upstream!.slug,
+      label: slot?.label ?? upstream!.label,
+      slot,
+      icon: upstream ? upstreamCategoryIcon(upstream.slug, upstream.source) : undefined,
+      monogram: upstream?.monogram ?? slot!.label.slice(0, 3).toUpperCase(),
+      domains: upstream ? upstream.domains.filter((domain) => !domain.removed).map((domain) => domain.domain) : [],
+      rule,
+      check,
+      blocking,
+      state: categoryMarkState(blocking, check),
+    };
   });
+}
+
+/** The sheet a category's mark opens. */
+export function categorySheet(item: CategorySlotState): FilterSheetState {
+  return {
+    kind: "category",
+    name: item.label,
+    categoryId: item.slot ? item.slot.categoryId : null,
+    domains: item.domains,
+    rule: item.rule,
+    upstream: item.check,
+    activelyBlocking: item.blocking,
+  };
+}
+
+/** A category's glyph: its DPI slot's mark, its seeded icon, or its monogram. */
+export function CategoryMarkGlyph({ item, size }: { item: CategorySlotState; size: number }) {
+  if (item.slot) return <CategoryGlyph slot={item.slot.slot} size={size} />;
+  if (item.icon) return <Icon name={item.icon} size={size} />;
+  return <span className="text-[9px] font-bold">{item.monogram}</span>;
 }
 
 export function GroupFilterMarks({
@@ -156,34 +210,11 @@ export function GroupFilterMarks({
         <div className="px-[18px] pt-2">
           <SectionLabel>Category rules</SectionLabel>
           <div className="flex flex-wrap gap-3.5 py-2">
-            {CURATED_CATEGORY_SLOTS.map((slot) => {
-              const rule = categoryRuleForSlot(rules, group.id, slot.categoryId);
-              // A rule blocking *right now* wins; otherwise this group's resolver
-              // decides. A scheduled rule outside its window is not blocking.
-              const upstream = upstreamCategoryForSlot(upstreamCategories ?? [], slot.slot);
-              const check = upstream ? effectiveCheck(upstream.checks, group) : null;
-              const blocking = ruleActivelyBlocking(rule, timezone);
-              const state = categoryMarkState(blocking, check);
-              return (
-                <MarkButton
-                  key={slot.slot}
-                  label={slot.label}
-                  state={state}
-                  onClick={() =>
-                    setSheet({
-                      kind: "category",
-                      name: slot.label,
-                      categoryId: slot.categoryId,
-                      rule,
-                      upstream: check,
-                      activelyBlocking: blocking,
-                    })
-                  }
-                >
-                  <CategoryGlyph slot={slot.slot} size={15} />
-                </MarkButton>
-              );
-            })}
+            {categorySlotStates(group, rules, upstreamCategories ?? [], timezone).map((item) => (
+              <MarkButton key={item.key} label={item.label} state={item.state} onClick={() => setSheet(categorySheet(item))}>
+                <CategoryMarkGlyph item={item} size={15} />
+              </MarkButton>
+            ))}
           </div>
         </div>
 
