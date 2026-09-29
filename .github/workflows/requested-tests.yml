@@ -39,7 +39,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install chromium --with-deps
+      - run: pnpm exec playwright install chromium
       - name: Run requested selection
         env:
           SELECTORS: ${{ inputs.selectors }}
