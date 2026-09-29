@@ -175,7 +175,7 @@ Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does
 scripts/release.sh --tag vX.Y.Z  # replace with the matching package/spec version
 ```
 
-It logs in to GHCR with `GHCR_TOKEN` (from the environment or a gitignored `.release.env`), or with `gh auth token` once `gh auth refresh -s write:packages` has granted that scope. Creating the Release creates the tag, which starts `release.yml`; its `on-main` job finds the version's images already on GHCR and skips the rest. Options and details are in [`scripts/README.md`](../scripts/README.md#releasesh).
+It logs in to GHCR with `GHCR_TOKEN` (from the environment or a gitignored `.release.env`), or with `gh auth token` once `gh auth refresh -s write:packages` has granted that scope. Creating the Release creates the tag, which starts `release.yml`; its `on-main` job finds the version's images already on GHCR and skips the rest. To rebuild and push the images of a release that already exists, check out its tag and add `--force`. Options and details are in [`scripts/README.md`](../scripts/README.md#releasesh).
 
 ### Update availability
 

@@ -171,10 +171,10 @@ scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag
 
 | Option | What it does |
 | --- | --- |
-| `--tag vX.Y.Z` | the release to publish; must start with `v` and must not exist on GitHub yet |
+| `--tag vX.Y.Z` | the release to publish; must start with `v` and must not exist on GitHub yet, unless `--force` |
 | `--skip-ci` | don't run the checks and tests first |
 | `--no-push` | build only: no GHCR login, no push, no GitHub Release |
-| `--force` | allow a tag that already exists on GitHub or locally, if it is `HEAD`: rebuild and push its images, overwriting them on GHCR, and create the GitHub Release only if it is missing |
+| `--force` | allow a tag that already exists on GitHub or locally, if it is `HEAD`: rebuild and push its images, overwriting them on GHCR, and create the GitHub Release only if it is missing. `X.Y` and `latest` move only when the tag is the newest release without a `-` |
 | `--allow-dirty` | allow uncommitted changes in the working tree; the build uses them |
 | `-h`, `--help` | print usage |
 

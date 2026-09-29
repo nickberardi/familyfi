@@ -8,8 +8,10 @@
 #
 # Options:
 #   --tag vX.Y.Z    the release to publish; must start with v, and must not exist on GitHub yet
+#                   unless --force
 #   --force         allow a tag that already exists, if it is HEAD: rebuild and push its images,
-#                   overwriting them on GHCR, and create the GitHub Release only if it is missing
+#                   overwriting them on GHCR, and create the GitHub Release only if it is missing;
+#                   :X.Y and :latest move only if it is the newest release without a `-`
 #   --skip-ci       don't run the checks and tests (ci.yml's verify job, and container.yml) first
 #   --no-push       build only: no GHCR login, no push, no GitHub Release
 #   --allow-dirty   allow uncommitted changes in the working tree (the build uses them)
@@ -67,6 +69,8 @@ if [[ -n "$remote_commit" ]]; then
   ((force)) || die "$tag already exists on GitHub (pass --force to rebuild it)"
   [[ "$remote_commit" == "$(git rev-parse HEAD)" ]] ||
     die "$tag on GitHub is $remote_commit, not HEAD (git switch --detach $tag)"
+  newest=$(git ls-remote --tags --refs --sort=-v:refname origin 'v*' | sed 's#.*refs/tags/##' |
+    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
 fi
 if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
   [[ "$(git rev-parse "$tag^{commit}")" == "$(git rev-parse HEAD)" ]] || die "local tag $tag is not HEAD"
@@ -126,7 +130,10 @@ fi
 
 # The ghcr and manifest jobs, as one multi-platform build.
 tags=(--tag "$image:$version")
-if [[ -z "$prerelease" ]]; then
+if [[ -n "$remote_commit" && "$tag" != "${newest:-}" ]]; then
+  # Rebuilding an older release must not move households on :latest back to it.
+  echo "==> $tag is not the newest release ($newest); :$major.$minor and :latest are left as they are"
+elif [[ -z "$prerelease" ]]; then
   tags+=(--tag "$image:$major.$minor" --tag "$image:latest")
 fi
 if ((push)); then output=(--push); else output=(--output type=cacheonly); fi
