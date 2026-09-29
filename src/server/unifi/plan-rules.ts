@@ -180,8 +180,7 @@ export function planRulePolicies(input: {
 
 function ruleWindows(rule: PlanRule): { id: string; name: string; schedule?: UnifiFirewallSchedule }[] {
   if (rule.mode === "always") {
-    // A rule that blocks all internet all day is a pause, not a rule.
-    if (rule.kind === "internet") return [];
+    // One unscheduled policy; for an internet rule, an allowance still takes a group out.
     return [{ id: ALWAYS_WINDOW, name: "" }];
   }
   return [...rule.windows]

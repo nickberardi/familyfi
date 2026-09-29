@@ -108,7 +108,6 @@ export function glyphForAppName(name: string): string {
   return (cleaned.slice(0, 2) || "AP").toUpperCase();
 }
 
-/** The windows of the group's enabled internet rules, with the rule each came from. */
 export type InternetRulePreset = { name: string; days: number[]; start: string; end: string; label: string };
 
 /**
@@ -127,10 +126,21 @@ export function internetRulePresets(group: { kind: "family" | "things"; familyRo
   return [];
 }
 
+/**
+ * The windows of the group's enabled internet rules, with the rule each came from. An
+ * always-on rule is one window with no end.
+ */
 export function internetWindowsForGroup(rules: Rule[], groupId: string): InternetWindow[] {
   return internetRulesForGroup(rules, groupId)
-    .filter((rule) => rule.enabled && rule.mode === "scheduled")
-    .flatMap((rule) => rule.windows.map((window) => ({ ...window, ruleName: rule.name })));
+    .filter((rule) => rule.enabled)
+    .flatMap((rule) =>
+      rule.mode === "always" ? [alwaysWindow(rule.name)] : rule.windows.map((window) => ({ ...window, ruleName: rule.name })),
+    );
+}
+
+/** An always-on internet rule as a window: all day, every day, never ending. */
+export function alwaysWindow(ruleName: string): InternetWindow {
+  return { name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "00:00", always: true, ruleName };
 }
 
 /** The group's category, app and website rules: each blocks only its own traffic. */

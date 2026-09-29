@@ -2578,7 +2578,7 @@ components:
         mode:
           type: string
           enum: [always, scheduled]
-          description: always = one policy with no schedule (never for internet rules); scheduled = one policy per window
+          description: always = one policy with no schedule; scheduled = one policy per window. An internet rule is always group-scoped, never a whole network.
         windows:
           type: array
           items: { $ref: "#/components/schemas/RuleWindow" }

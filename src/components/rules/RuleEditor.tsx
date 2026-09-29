@@ -358,25 +358,23 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
         </Section>
 
         <Section title="When" note="Each window is its own UniFi policy with one schedule. Windows can cross midnight.">
-          {draft.kind !== "internet" ? (
-            <Segmented
-              name="When"
-              value={draft.mode}
-              segments={[
-                { value: "always", label: "Always" },
-                { value: "scheduled", label: "Scheduled" },
-              ]}
-              onChange={(mode) =>
-                set({
-                  mode,
-                  windows:
-                    mode === "scheduled" && liveWindows.length === 0
-                      ? [...draft.windows, keyed({ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" })]
-                      : draft.windows,
-                })
-              }
-            />
-          ) : null}
+          <Segmented
+            name="When"
+            value={draft.mode}
+            segments={[
+              { value: "always", label: "Always" },
+              { value: "scheduled", label: "Scheduled" },
+            ]}
+            onChange={(mode) =>
+              set({
+                mode,
+                windows:
+                  mode === "scheduled" && liveWindows.length === 0
+                    ? [...draft.windows, keyed({ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" })]
+                    : draft.windows,
+              })
+            }
+          />
           {!scheduled ? (
             <p className="text-[14px] text-[var(--ff-ink-2)]">Blocked all day, every day. One UniFi policy.</p>
           ) : (
@@ -464,16 +462,25 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
         </Section>
 
         <Section title="Applies to" note="People and things. One rule can cover several.">
-          {draft.kind !== "internet" && managedNetworks.length ? (
+          {managedNetworks.length ? (
             <Segmented
               name="Applies to"
               value={draft.scope}
               segments={[
                 { value: "group", label: "People and things", disabled: Boolean(saved) && draft.scope !== "group" },
-                { value: "network", label: "Whole networks", disabled: Boolean(saved) && draft.scope !== "network" },
+                {
+                  value: "network",
+                  label: "Whole networks",
+                  disabled: draft.kind === "internet" || (Boolean(saved) && draft.scope !== "network"),
+                },
               ]}
               onChange={(scope) => set({ scope })}
             />
+          ) : null}
+          {draft.kind === "internet" ? (
+            <p className="text-[14px] text-[var(--ff-ink-2)]">
+              All internet can&rsquo;t be blocked for a whole network, which would take every device offline. Choose the people and things it applies to.
+            </p>
           ) : null}
           {draft.scope === "group" ? (
             <ChipGroup label="Groups">

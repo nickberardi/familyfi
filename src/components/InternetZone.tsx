@@ -75,7 +75,7 @@ export function InternetZone({
     state.state === "paused"
       ? `Paused${state.until ? ` until ${at(state.until)}` : " until you resume"}${by(state.by)}, on ${devices}.`
       : state.state === "blocked"
-        ? `${state.window} until ${at(state.until)}, on ${devices}.`
+        ? `${state.window}${state.until ? ` until ${at(state.until)}` : ", always"}, on ${devices}.`
         : state.state === "allowed"
           ? `${state.window ?? "The schedule"} lifted${state.until ? ` until ${at(state.until)}` : ""}${by(state.by)}, on ${devices}.`
           : state.next

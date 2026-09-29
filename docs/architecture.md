@@ -145,7 +145,7 @@ blocked = paused || (!allowed && any internet-rule window is active)
 ```
 
 - **Pause** blocks all internet for every device in the group now, until a time or until resumed. It is a FamilyFi-owned unscheduled BLOCK policy for the group that exists only while the pause lasts; resume (or expiry) deletes it. It records who paused.
-- **Internet rules** are optional. Each window of an enabled internet rule is its own UniFi policy carrying that window's recurring `schedule`; UniFi starts and ends it, never a clock-driven `enabled` write. A group with no internet rule is not limited, and says so.
+- **Internet rules** are optional, and apply to chosen people and things, never a whole network. Each window of an enabled internet rule is its own UniFi policy carrying that window's recurring `schedule`; UniFi starts and ends it, never a clock-driven `enabled` write. An always-on internet rule is one unscheduled policy that keeps the group offline until it is changed or an allowance lifts it. A group with no internet rule is not limited, and says so.
 - **An allowance** lifts the group's internet-rule windows until a time (by default when the windows active now end): its devices leave those rules' policies. A policy left with nobody keeps its devices and is disabled, so ending the allowance does not create it again. A pause replaces an allowance.
 - **Category, app and website rules** are separate policies, and neither a pause nor an allowance changes them. While an internet window is active they are covered anyway.
 

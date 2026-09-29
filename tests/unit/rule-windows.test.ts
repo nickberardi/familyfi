@@ -112,6 +112,26 @@ describe("internetState", () => {
   });
 });
 
+describe("an always-on internet rule", () => {
+  const grounded: InternetWindow = { name: "", days: EVERY_DAY, start: "00:00", end: "00:00", always: true, ruleName: "Grounded" };
+
+  it("blocks with no end, outlasting a window that ends, until an allowance lifts it", () => {
+    const noon = at("2026-09-28T16:00:00");
+    expect(internetState(group(), [homework, grounded], noon, TZ)).toEqual({ state: "blocked", window: "Grounded", until: null });
+    const allowed = group({ allowance: { active: true, until: null, by: null } });
+    expect(internetState(allowed, [grounded], noon, TZ)).toMatchObject({ state: "allowed", window: "Grounded", until: null });
+  });
+
+  it("fills the whole day on the timeline, and has no start or end to offer", () => {
+    expect(internetDayBands(group(), [grounded], at("2026-09-28T12:00:00"), TZ)).toEqual([
+      { kind: "window", from: 0, to: 1440, label: "Grounded", source: "Grounded rule", carried: false },
+    ]);
+    expect(windowEndsAt(grounded, at("2026-09-28T12:00:00"), TZ)).toBeNull();
+    expect(nextWindowStart(grounded, at("2026-09-28T12:00:00"), TZ)).toBeNull();
+    expect(isWindowActive(grounded, at("2026-09-28T03:00:00"), TZ)).toBe(true);
+  });
+});
+
 describe("internetDayBands", () => {
   it("shows every window with its source, including last night's bedtime", () => {
     const bands = internetDayBands(group(), [bedtime, homework], at("2026-09-28T12:00:00"), TZ);

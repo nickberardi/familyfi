@@ -3754,6 +3754,56 @@
       "expected": "Online · no internet rule"
     },
     {
+      "fn": "cardStateLabel",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "timeZone": "America/New_York",
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ],
+        "now": "2026-09-14T19:00:00-04:00"
+      },
+      "expected": "No internet · Grounded · always"
+    },
+    {
       "fn": "cardNoteLine",
       "name": "two internet windows",
       "input": {
@@ -3844,6 +3894,54 @@
         "windows": []
       },
       "expected": "No devices · rules cannot apply on UniFi until you assign one"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ]
+      },
+      "expected": "4 devices · internet off always"
     },
     {
       "fn": "canPauseGroup",
@@ -5229,6 +5327,58 @@
       }
     },
     {
+      "fn": "internetState",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "state": "blocked",
+        "window": "Grounded",
+        "until": null
+      }
+    },
+    {
       "fn": "internetDayBands",
       "name": "every window with its source",
       "input": {
@@ -5466,6 +5616,65 @@
           "label": "Allowed",
           "source": "Allowed by Nick until 6:00 PM",
           "carried": false
+        }
+      ]
+    },
+    {
+      "fn": "internetDayBands",
+      "name": "always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 4,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ],
+          "dohOverrideUrl": null,
+          "access": "available"
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "Grounded"
+          }
+        ],
+        "now": "2026-09-14T12:00:00-04:00",
+        "timeZone": "America/New_York"
+      },
+      "expected": [
+        {
+          "kind": "window",
+          "from": 0,
+          "to": 1440,
+          "carried": false,
+          "label": "Grounded",
+          "source": "Grounded rule"
         }
       ]
     },

@@ -10,7 +10,8 @@ import { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays } from ".
  * `days` are the days a window starts on, 0 = Sunday.
  */
 
-export type RuleWindowSpec = { name: string; days: number[]; start: string; end: string };
+/** `always`: an internet rule with no windows, blocking all day, every day, with no end. */
+export type RuleWindowSpec = { name: string; days: number[]; start: string; end: string; always?: boolean };
 
 /** A window of one of the group's internet rules, with the rule it came from. */
 export type InternetWindow = RuleWindowSpec & { ruleName: string };
@@ -51,6 +52,7 @@ export function windowTitle(window: InternetWindow): string {
 
 /** True while `now` falls inside one occurrence of the window. */
 export function isWindowActive(window: RuleWindowSpec, now: Date, timeZone: string): boolean {
+  if (window.always) return true;
   const start = minutesFromHhmm(window.start);
   const end = minutesFromHhmm(window.end);
   if (start === null || end === null || start === end) return false;
@@ -61,14 +63,15 @@ export function isWindowActive(window: RuleWindowSpec, now: Date, timeZone: stri
   return window.days.includes((weekday + 6) % 7) && minutes < end;
 }
 
-/** When the occurrence active at `now` ends, or null when the window is not active. */
+/** When the occurrence active at `now` ends, or null when the window is not active or never ends. */
 export function windowEndsAt(window: RuleWindowSpec, now: Date, timeZone: string): Date | null {
-  if (!isWindowActive(window, now, timeZone)) return null;
+  if (window.always || !isWindowActive(window, now, timeZone)) return null;
   return nextClockOnDays(timeZone, bedtimeEndDays(window.days, window.start, window.end), window.end, now);
 }
 
 /** The next time the window starts after `now`. */
 export function nextWindowStart(window: RuleWindowSpec, now: Date, timeZone: string): Date | null {
+  if (window.always) return null;
   return nextClockOnDays(timeZone, window.days, window.start, now);
 }
 
@@ -77,6 +80,7 @@ export function nextWindowStart(window: RuleWindowSpec, now: Date, timeZone: str
  * of one that started the evening before.
  */
 export function windowDayBands(window: RuleWindowSpec, weekday: number): { from: number; to: number; carried: boolean }[] {
+  if (window.always) return [{ from: 0, to: DAY, carried: false }];
   const start = minutesFromHhmm(window.start);
   const end = minutesFromHhmm(window.end);
   if (start === null || end === null || start === end) return [];
@@ -103,6 +107,7 @@ export function windowOverlaps(windows: RuleWindowSpec[]): [number, number][] {
 
 /** A window's occurrences in minutes of the week from Sunday midnight, wrapped at week end. */
 function weekSpans(window: RuleWindowSpec): [number, number][] {
+  if (window.always) return [[0, 7 * DAY]];
   const start = minutesFromHhmm(window.start);
   const end = minutesFromHhmm(window.end);
   if (start === null || end === null || start === end) return [];
@@ -126,10 +131,12 @@ export function internetState(group: InternetGroup, windows: InternetWindow[], n
   if (isActiveUntil(group.suspension, now)) {
     return { state: "paused", until: group.suspension.until, by: group.suspension.by ?? null };
   }
+  // The window active longest comes first; one that never ends outlasts them all.
+  const lasts = (end: Date | null) => end?.getTime() ?? Number.MAX_SAFE_INTEGER;
   const active = windows
+    .filter((window) => isWindowActive(window, now, timeZone))
     .map((window) => ({ window, end: windowEndsAt(window, now, timeZone) }))
-    .filter((item): item is { window: InternetWindow; end: Date } => item.end !== null)
-    .sort((a, b) => b.end.getTime() - a.end.getTime());
+    .sort((a, b) => lasts(b.end) - lasts(a.end));
   if (isActiveUntil(group.allowance, now)) {
     return {
       state: "allowed",
@@ -138,7 +145,7 @@ export function internetState(group: InternetGroup, windows: InternetWindow[], n
       by: group.allowance.by ?? null,
     };
   }
-  if (active[0]) return { state: "blocked", window: windowTitle(active[0].window), until: active[0].end.toISOString() };
+  if (active[0]) return { state: "blocked", window: windowTitle(active[0].window), until: active[0].end?.toISOString() ?? null };
   if (windows.length === 0) return { state: "no_rule" };
   const next = windows
     .map((window) => ({ window, at: nextWindowStart(window, now, timeZone) }))

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { watchGroupControlAllowed } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
 import { groupInclude, internetWindows, publicGroup, sessionActor } from "@/server/groups";
-import { windowEndsAt } from "@/lib/rule-windows";
+import { isWindowActive, windowEndsAt } from "@/lib/rule-windows";
 import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -33,14 +33,14 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!watchGroupControlAllowed(session, existing)) return jsonError(403, "watch_group_forbidden", "The Watch cannot control this group.");
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const now = new Date();
-    const ends = internetWindows(existing)
-      .map((window) => windowEndsAt(window, now, household.timezone))
-      .filter((end): end is Date => end !== null)
-      .sort((a, b) => b.getTime() - a.getTime());
-    if (parsed.data.until === undefined && ends.length === 0) {
+    const active = internetWindows(existing).filter((window) => isWindowActive(window, now, household.timezone));
+    if (parsed.data.until === undefined && active.length === 0) {
       return jsonError(409, "not_in_window", "No internet rule is blocking this group now.");
     }
-    const until = parsed.data.until === undefined ? ends[0]! : parsed.data.until === null ? null : new Date(parsed.data.until);
+    // By default until the active windows end; an always-on rule never does, so until resumed.
+    const ends = active.map((window) => windowEndsAt(window, now, household.timezone));
+    const defaultUntil = ends.some((end) => end === null) ? null : ends.reduce<Date | null>((latest, end) => (!latest || end!.getTime() > latest.getTime() ? end : latest), null);
+    const until = parsed.data.until === undefined ? defaultUntil : parsed.data.until === null ? null : new Date(parsed.data.until);
     if (until && until.getTime() <= now.getTime()) return jsonError(400, "invalid_request", "until must be in the future.");
     const group = await prisma().group.update({
       where: { id },

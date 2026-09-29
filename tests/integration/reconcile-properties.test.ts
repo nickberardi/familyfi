@@ -167,8 +167,8 @@ async function build(spec: World): Promise<{ client: Client; groupIds: string[];
     groupIds.push(row.id);
   }
   for (const [n, rule] of spec.rules.entries()) {
-    // An internet rule always has windows: all-day blocking is a pause.
-    const always = rule.kind === "category" && rule.always;
+    // Either kind may be always on: one unscheduled policy instead of one per window.
+    const always = rule.always;
     await prisma().rule.create({
       data: {
         name: `Rule ${n}`,

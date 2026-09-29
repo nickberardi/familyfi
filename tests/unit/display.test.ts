@@ -58,6 +58,10 @@ describe("schedule copy", () => {
     const allowed = group({ allowance: { active: true, until: "2026-09-15T06:45:00-04:00", by: { accountId: "a", name: "Nick" } } });
     expect(cardStateLabel(allowed, [bedtime], TZ, new Date("2026-09-14T22:00:00-04:00"))).toBe("Online · allowed until 6:45 AM by Nick");
     expect(cardStateLabel(group({ internetRuleIds: [] }), [], TZ, monday7pm)).toBe("Online · no internet rule");
+    // An always-on internet rule has no end to name.
+    const grounded = { name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "00:00", always: true, ruleName: "Grounded" };
+    expect(cardStateLabel(group(), [grounded], TZ, monday7pm)).toBe("No internet · Grounded · always");
+    expect(cardNoteLine(group(), [grounded])).toBe("4 devices · internet off always");
   });
 });
 

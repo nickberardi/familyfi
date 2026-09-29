@@ -1,5 +1,6 @@
-import { FamilyRole, GroupKind, Prisma } from "@prisma/client";
+import { FamilyRole, GroupKind, Prisma, RuleMode } from "@prisma/client";
 import { internetState, type InternetWindow } from "@/lib/rule-windows";
+import { alwaysWindow } from "@/lib/rules";
 
 export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
@@ -14,11 +15,13 @@ export type GroupWithRules = Prisma.GroupGetPayload<{ include: typeof groupInclu
 /** The windows of the group's enabled internet rules, in rule then window order. */
 export function internetWindows(group: Pick<GroupWithRules, "rules">): InternetWindow[] {
   return internetRules(group)
-    .filter((rule) => rule.enabled && rule.mode === "scheduled")
+    .filter((rule) => rule.enabled)
     .flatMap((rule) =>
-      [...rule.windows]
-        .sort((a, b) => a.position - b.position)
-        .map((window) => ({ name: window.name, days: window.days, start: window.start, end: window.end, ruleName: rule.name })),
+      rule.mode === RuleMode.always
+        ? [alwaysWindow(rule.name)]
+        : [...rule.windows]
+            .sort((a, b) => a.position - b.position)
+            .map((window) => ({ name: window.name, days: window.days, start: window.start, end: window.end, ruleName: rule.name })),
     );
 }
 

@@ -121,13 +121,10 @@ export async function validateRule(
     domains = normalizeDomains(input.domains);
   }
 
-  if (input.kind === RuleKind.internet) {
-    if (input.scope !== RuleScope.group) {
-      throw new RuleInputError(400, "invalid_scope", "An internet rule applies to people and things, not networks.");
-    }
-    if (input.mode !== RuleMode.scheduled) {
-      throw new RuleInputError(400, "invalid_schedule", "An internet rule needs at least one window. To block all internet now, pause the group.");
-    }
+  // All internet can be blocked for chosen people and things, always or on a schedule,
+  // but never for a whole network: that would take every device offline.
+  if (input.kind === RuleKind.internet && input.scope !== RuleScope.group) {
+    throw new RuleInputError(400, "invalid_scope", "All internet can't be blocked for a whole network. Choose the people and things it applies to.");
   }
 
   const windows = input.mode === RuleMode.scheduled ? input.windows.map(normalizeWindow) : [];

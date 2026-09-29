@@ -157,6 +157,7 @@ export function cardNoteLine(group: Group, windows: InternetWindow[]): string {
   }
   const devices = `${group.deviceCount} ${group.deviceCount === 1 ? "device" : "devices"}`;
   if (windows.length === 0) return `${devices} · no internet rule`;
+  if (windows.some((window) => window.always)) return `${devices} · internet off always`;
   return `${devices} · ${windows.length} internet ${windows.length === 1 ? "window" : "windows"}`;
 }
 
@@ -172,7 +173,7 @@ export function cardStateLabel(group: Group, windows: InternetWindow[], timezone
     case "paused":
       return `All internet paused ${until(state.until, "until resumed")}${by(state.by)}`;
     case "blocked":
-      return `No internet · ${state.window} ${until(state.until, "")}`.trimEnd();
+      return `No internet · ${state.window} ${until(state.until, "· always")}`;
     case "allowed":
       return `Online · allowed ${until(state.until, "until you resume the schedule")}${by(state.by)}`;
     case "online":

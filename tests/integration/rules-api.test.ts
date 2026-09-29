@@ -260,7 +260,6 @@ describe("household rules", () => {
     const emma = await child();
     const window = { days: EVERY_DAY, start: "21:00", end: "07:00" };
     const cases: [object, number, string][] = [
-      [{ name: "All day", kind: "internet", groupIds: [emma.id], mode: "always" }, 400, "invalid_schedule"],
       [{ name: "No windows", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows: [] }, 400, "invalid_schedule"],
       [{ name: " ", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows: [window] }, 400, "invalid_name"],
       [{ name: "Nobody", kind: "internet", groupIds: [], mode: "scheduled", windows: [window] }, 400, "invalid_groups"],
@@ -332,6 +331,38 @@ describe("household rules", () => {
     await runReconcileOnce();
     expect(client.state.policies.find((policy) => policy.id === homework!.id)?.enabled).toBe(true);
     expect((await readGroup(auth, emma.id)).access).toBe("blocked");
+  });
+
+  it("blocks all internet always for chosen groups, never a whole network, and an allowance lifts it until resumed", async () => {
+    const auth = await signedIn();
+    const emma = await child();
+    // All internet for a whole network would take every device offline.
+    const network = await postRule(auth, { name: "Everyone", kind: "internet", scope: "network", networkIds: ["x"], mode: "always" });
+    expect([network.status, ((await network.json()) as { error: { code: string } }).error.code]).toEqual([400, "invalid_scope"]);
+
+    const created = await postRule(auth, { name: "Grounded", kind: "internet", groupIds: [emma.id], mode: "always" });
+    expect(created.status).toBe(201);
+    expect(((await created.json()) as { rule: PublicRule }).rule.policyNames).toEqual(["FamilyFi Grounded"]);
+    await runReconcileOnce();
+    const [policy] = policiesNamed(client, "FamilyFi Grounded");
+    expect(policy?.enabled).toBe(true);
+    expect(policy?.schedule).toBeFalsy();
+    expect(policyMacs(policy!)).toEqual([MAC]);
+    const blocked = await readGroup(auth, emma.id);
+    expect(blocked.access).toBe("blocked");
+    expect(blocked.internetRuleIds).toHaveLength(1);
+
+    // The rule never ends, so by default the allowance lasts until someone resumes the schedule.
+    const allowed = await groupAction(allow, auth, emma.id);
+    expect(allowed.status).toBe(200);
+    const group = ((await allowed.json()) as { group: PublicGroup }).group;
+    expect([group.access, group.allowance.active, group.allowance.until]).toEqual(["allowed", true, null]);
+    await runReconcileOnce();
+    expect(client.state.policies.find((item) => item.id === policy!.id)?.enabled).toBe(false);
+
+    await groupAction(disallow, auth, emma.id, "DELETE");
+    await runReconcileOnce();
+    expect(client.state.policies.find((item) => item.id === policy!.id)?.enabled).toBe(true);
   });
 
   it("lets a pause replace an allowance", async () => {

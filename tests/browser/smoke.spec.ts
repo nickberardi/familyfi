@@ -276,6 +276,11 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
 
   await page.goto(`/rules/new?group=${child!.id}`);
   await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
+  // All internet can be always on for chosen groups, but never for a whole network.
+  await expect(page.getByRole("group", { name: "When" }).getByRole("button", { name: "Always" })).toBeEnabled();
+  await expect(page.getByText(/All internet can’t be blocked for a whole network/)).toBeVisible();
+  const scope = page.getByRole("group", { name: "Applies to" });
+  if (await scope.count()) await expect(scope.getByRole("button", { name: "Whole networks" })).toBeDisabled();
   await page.getByLabel("Rule name").fill(ruleName);
   await page.getByLabel("Window 1 name").fill("Bed");
   await page.getByRole("button", { name: "+ Add window" }).click();

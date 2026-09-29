@@ -110,10 +110,14 @@ describe("planRulePolicies", () => {
     ]);
   });
 
-  it("never plans an internet rule without windows or on networks", () => {
-    const always = { ...tvDowntime, mode: RuleMode.always };
-    const network = { ...tvDowntime, id: "net", scope: RuleScope.network, networkIds: ["net-a"] };
-    expect(plan([always, network]).policies).toEqual([]);
+  it("plans an always-on internet rule as one unscheduled policy an allowance lifts, and never one on networks", () => {
+    const always = { ...tvDowntime, mode: RuleMode.always, windows: [] };
+    expect(plan([always]).policies.map((policy) => [policy.windowKey, policy.name, policy.schedule, policy.enabled])).toEqual([
+      ["always", "FamilyFi TV downtime", undefined, true],
+    ]);
+    expect(plan([always], [group("g1", { allowed: true })]).policies.map((policy) => policy.enabled)).toEqual([false]);
+    const network = { ...always, id: "net", scope: RuleScope.network, networkIds: ["net-a"] };
+    expect(plan([network]).policies).toEqual([]);
   });
 
   it("disables every policy of a rule turned off", () => {
