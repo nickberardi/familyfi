@@ -24,7 +24,7 @@ export {
   isOwnedPolicyName,
   INTERNET_BLOCK_ACTION,
 } from "./payloads";
-export { quarantinePolicyName, pausePolicyName, rulePolicyNames } from "./names";
+export { quarantinePolicyName, pauseRuleName, rulePolicyNames } from "./names";
 export { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./plan-rules";
 export { CURATED_MAP_STATUS, CURATED_CATEGORY_CANDIDATES, curatedCategoryIds } from "./curated-categories";
 export { relativeOrderPreserved, orderedPolicyIds } from "./ordering";

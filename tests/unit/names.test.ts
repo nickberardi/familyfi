@@ -1,6 +1,6 @@
 import { GroupKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { pausePolicyName, quarantinePolicyName, spikePolicyName } from "@/server/unifi/names";
+import { pauseRuleName, quarantinePolicyName, spikePolicyName } from "@/server/unifi/names";
 import { MAX_POLICY_NAME, rulePolicyNames } from "@/lib/policy-names";
 
 const rule = (patch: Partial<Parameters<typeof rulePolicyNames>[0]> = {}) => ({
@@ -15,15 +15,10 @@ const rule = (patch: Partial<Parameters<typeof rulePolicyNames>[0]> = {}) => ({
 describe("UniFi policy names", () => {
   it("uses descriptive FamilyFi titles", () => {
     expect(quarantinePolicyName("Internal")).toBe("FamilyFi Quarantine Internal Devices");
-    expect(pausePolicyName({ name: "Betsy", kind: GroupKind.family, zoneName: "Internal" })).toBe(
-      "FamilyFi Betsy's Internet Pause",
-    );
-    expect(pausePolicyName({ name: "Betsy", kind: GroupKind.family, zoneName: "IoT" })).toBe(
-      "FamilyFi Betsy's Internet Pause (IoT)",
-    );
-    expect(pausePolicyName({ name: "TV", kind: GroupKind.things, zoneName: "Internal" })).toBe(
-      "FamilyFi TV Internet Pause",
-    );
+    expect(pauseRuleName({ name: "Betsy", kind: GroupKind.family })).toBe("Betsy's Internet Pause");
+    expect(pauseRuleName({ name: "Ross", kind: GroupKind.family })).toBe("Ross's Internet Pause");
+    expect(pauseRuleName({ name: "Chris", kind: GroupKind.family })).toBe("Chris' Internet Pause");
+    expect(pauseRuleName({ name: "TV", kind: GroupKind.things })).toBe("TV Internet Pause");
     expect(spikePolicyName("Internal")).toBe("FamilyFi Spike Internal Devices");
   });
 });

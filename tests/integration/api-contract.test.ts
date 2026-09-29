@@ -6,9 +6,9 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getGroups, POST as createGroup } from "@/app/api/v1/groups/route";
 import { DELETE as deleteGroup } from "@/app/api/v1/groups/[id]/route";
 import { POST as createRule } from "@/app/api/v1/rules/route";
-import { POST as pause } from "@/app/api/v1/groups/[id]/pause/route";
-import { POST as resume } from "@/app/api/v1/groups/[id]/resume/route";
-import { POST as extend } from "@/app/api/v1/groups/[id]/extend/route";
+import { POST as pause } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
+import { POST as resume } from "@/app/api/v1/groups/[id]/rules/[ruleId]/resume/route";
+import { POST as extend } from "@/app/api/v1/groups/[id]/rules/[ruleId]/extend/route";
 import { GET as getDevices } from "@/app/api/v1/devices/route";
 import { PUT as assignDevice } from "@/app/api/v1/devices/[mac]/assignment/route";
 import { GET as getDevice, DELETE as deleteDevice } from "@/app/api/v1/devices/[mac]/route";
@@ -153,30 +153,30 @@ describe("v1 API contracts", () => {
     expect(scheduled.status).toBe(201);
 
     const paused = await pause(
-      request(`/api/v1/groups/${groupBody.group.id}/pause`, {
+      request(`/api/v1/groups/${groupBody.group.id}/rules/internet/pause`, {
         method: "POST",
         auth,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ until: new Date(Date.now() + 3_600_000).toISOString() }),
       }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
+      { params: Promise.resolve({ id: groupBody.group.id, ruleId: "internet" }) },
     );
     expect(paused.status).toBe(200);
 
     const extended = await extend(
-      request(`/api/v1/groups/${groupBody.group.id}/extend`, {
+      request(`/api/v1/groups/${groupBody.group.id}/rules/internet/extend`, {
         method: "POST",
         auth,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ minutes: 15 }),
       }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
+      { params: Promise.resolve({ id: groupBody.group.id, ruleId: "internet" }) },
     );
     expect(extended.status).toBe(200);
 
     const resumed = await resume(
-      request(`/api/v1/groups/${groupBody.group.id}/resume`, { method: "POST", auth }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
+      request(`/api/v1/groups/${groupBody.group.id}/rules/internet/resume`, { method: "POST", auth }),
+      { params: Promise.resolve({ id: groupBody.group.id, ruleId: "internet" }) },
     );
     expect(resumed.status).toBe(200);
 
@@ -273,13 +273,13 @@ describe("v1 API contracts", () => {
     expect(groupBody.group.access).toBe("available");
 
     const paused = await pause(
-      request(`/api/v1/groups/${groupBody.group.id}/pause`, {
+      request(`/api/v1/groups/${groupBody.group.id}/rules/internet/pause`, {
         method: "POST",
         auth,
         headers: { "content-type": "application/json" },
         body: "{}",
       }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
+      { params: Promise.resolve({ id: groupBody.group.id, ruleId: "internet" }) },
     );
     expect(paused.status).toBe(200);
     const pausedBody = (await paused.json()) as Body;
@@ -287,8 +287,8 @@ describe("v1 API contracts", () => {
     expect(pausedBody.group.suspension.by?.name).toEqual(expect.any(String));
 
     const resumed = await resume(
-      request(`/api/v1/groups/${groupBody.group.id}/resume`, { method: "POST", auth }),
-      { params: Promise.resolve({ id: groupBody.group.id }) },
+      request(`/api/v1/groups/${groupBody.group.id}/rules/internet/resume`, { method: "POST", auth }),
+      { params: Promise.resolve({ id: groupBody.group.id, ruleId: "internet" }) },
     );
     expect(resumed.status).toBe(200);
     const resumedBody = (await resumed.json()) as Body;

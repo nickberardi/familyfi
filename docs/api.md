@@ -60,10 +60,6 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |
-| POST | `/api/v1/groups/{id}/pause` | Blocks all internet for the group now. Empty body = until resumed; `{ "until" }` = timed. Records who paused and ends any allowance |
-| POST | `/api/v1/groups/{id}/resume` | Ends the pause; the group's internet rules still apply |
-| POST | `/api/v1/groups/{id}/extend` | Adds minutes to a timed pause |
-| POST/DELETE | `/api/v1/groups/{id}/allow` | An allowance lifts the group's internet-rule windows until `until` (default: when the active windows end, or until cancelled when an always-on internet rule is active; 409 when none is active). DELETE ends it. Category, app and website rules keep applying |
 | GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list |
 | GET/PATCH/DELETE | `/api/v1/rules/{id}` | PATCH changes anything but `kind` and `scope`; `windows` replaces the list, and a window sent with its `id` keeps its UniFi policy. DELETE removes the rule's recorded policies |
 | POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled. Ends any pause on it |
@@ -73,7 +69,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/rules/{id}/extend` | Adds `minutes` to a timed pause. 409 `not_paused` (an allowance is not extended), `indefinite` or `rule_off` |
 | POST | `/api/v1/rules/{id}/allow` | Overrides the rule, like a pause but recorded as an allowance. Default `until` is when the windows active now end (until disallowed for an always-on rule); 409 `not_in_window` when none is active, `rule_off` when the rule is off |
 | POST | `/api/v1/rules/{id}/disallow` | Ends an allowance; a pause is ended by `resume` |
-| POST | `/api/v1/groups/{id}/rules/{ruleId}/(pause\|resume\|extend\|allow\|disallow)` | The same five verbs for one group alone: its devices leave the rule's policies (a policy left with no one stays disabled with its devices). Same requests, states and errors as the rule-wide routes; 404 when the group does not have the rule. Rules list the active ones as `groupPauses` |
+| POST | `/api/v1/groups/{id}/rules/{ruleId}/(pause\|resume\|extend\|allow\|disallow)` | The same five verbs for one group alone: its devices leave the rule's policies (a policy left with no one stays disabled with its devices). Same requests, states and errors as the rule-wide routes; 404 when the group does not have the rule. Rules list the active ones as `groupPauses`. `ruleId` may be the reserved `internet`, a group's built-in rule "this group has internet", and the verbs mean the same to it: `pause` suspends it (blocks all internet now; a hidden always-on block rule is enabled until `until` or until resumed, and its policy exists only meanwhile), `resume` ends that, `extend` adds time to it, `allow` overrides the group's internet rules until `until` (default: each rule's active windows end; 409 `not_in_window` when none is blocking), `disallow` ends that. Pause and allow replace each other. The response is `{ group, change }`. `Group.suspension`, `allowance` and `access` are read from these rules |
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |

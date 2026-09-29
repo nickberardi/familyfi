@@ -3,6 +3,7 @@ import { hashPassword } from "./auth";
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
 import { recoveryPassword, unifiMockEnabled } from "./env";
+import { pauseRuleName } from "./unifi/names";
 import { refreshResolverContexts } from "./upstream/discovery";
 import {
   DEV_MOCK_API_KEY,
@@ -66,9 +67,18 @@ async function ensureDummyHouseholdMembers() {
       kind: GroupKind.family,
       name: "Robin",
       familyRole: FamilyRole.teen,
-      suspensionActive: true,
-      suspensionUntil: new Date(Date.now() + 2 * 60 * 60 * 1000),
-      suspendedByName: "Pat",
+    },
+  });
+  // Her pause is the built-in rule a group's own pause uses.
+  await prisma().rule.create({
+    data: {
+      name: pauseRuleName({ name: "Robin", kind: GroupKind.family }),
+      kind: RuleKind.internet,
+      mode: RuleMode.always,
+      systemGroupId: paused.id,
+      expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      blockedByName: "Pat",
+      groups: { create: { groupId: paused.id } },
     },
   });
   // A things group carries the 44px monogram tile a person's card goes without.

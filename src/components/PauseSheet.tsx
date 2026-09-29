@@ -15,6 +15,7 @@ import {
 import { internetWindowsForGroup, ruleInternetWindows, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
+import { internetRulePath } from "./group-actions";
 
 function untilFromMinutes(minutes: number) {
   return new Date(Date.now() + minutes * 60_000);
@@ -38,7 +39,7 @@ export function PauseSheet({
   async function run(request: PauseSheetRequest) {
     if (request.kind === "extend") {
       await mutate(() =>
-        api(`/api/v1/groups/${group.id}/extend`, {
+        api(`${internetRulePath(group)}/extend`, {
           method: "POST",
           body: JSON.stringify({ minutes: request.minutes }),
         }),
@@ -49,14 +50,14 @@ export function PauseSheet({
     // Name the scope and who it hits, and offer the way back.
     await mutate(
       () =>
-        api(`/api/v1/groups/${group.id}/pause`, {
+        api(`${internetRulePath(group)}/pause`, {
           method: "POST",
           body: JSON.stringify(until === null ? {} : { until }),
         }),
       undefined,
       {
         notice: `All internet paused for ${group.name} ${until ? `until ${formatClock(new Date(until), timezone)}` : "until you resume"}.`,
-        action: { label: "Undo", run: () => api(`/api/v1/groups/${group.id}/resume`, { method: "POST" }) },
+        action: { label: "Undo", run: () => api(`${internetRulePath(group)}/resume`, { method: "POST" }) },
       },
     );
   }

@@ -41,6 +41,11 @@ export function groupActionSpecs(group: Group, surface: "phone" | "web"): GroupA
   return surface === "phone" ? [pause, rules] : [pause, rules, detail];
 }
 
+/** A group's built-in rule, "this group has internet": pausing it blocks all internet. */
+export function internetRulePath(group: Pick<Group, "id">): string {
+  return `/api/v1/groups/${group.id}/rules/internet`;
+}
+
 export function groupActions(
   group: Group,
   surface: "phone" | "web",
@@ -50,10 +55,10 @@ export function groupActions(
 ): CardAction[] {
   const handlers = {
     pause: () => openPause(group),
-    resume: () => void mutate(() => api(`/api/v1/groups/${group.id}/resume`, { method: "POST" })),
+    resume: () => void mutate(() => api(`${internetRulePath(group)}/resume`, { method: "POST" })),
     extend: () => openExtend(group),
-    allow: () => void mutate(() => api(`/api/v1/groups/${group.id}/allow`, { method: "POST", body: "{}" })),
-    disallow: () => void mutate(() => api(`/api/v1/groups/${group.id}/allow`, { method: "DELETE" })),
+    allow: () => void mutate(() => api(`${internetRulePath(group)}/allow`, { method: "POST", body: "{}" })),
+    disallow: () => void mutate(() => api(`${internetRulePath(group)}/disallow`, { method: "POST" })),
   };
   return groupActionSpecs(group, surface).map(({ run, ...action }) =>
     run ? { ...action, onClick: handlers[run] } : action,

@@ -19,7 +19,7 @@ export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {
     const { id } = await ctx.params;
     const rule = await prisma().rule.findUnique({ where: { id }, include: ruleInclude });
-    if (!rule) return jsonError(404, "not_found", "Rule not found.");
+    if (!rule || rule.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     return Response.json({ rule: publicRule(rule) });
   });
 }
@@ -37,7 +37,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const parsed = RuleUpdateBody.safeParse(body.value);
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid rule update.");
     const existing = await prisma().rule.findUnique({ where: { id }, include: ruleInclude });
-    if (!existing) return jsonError(404, "not_found", "Rule not found.");
+    if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     const current = publicRule(existing);
     const patch = parsed.data;
     try {
@@ -75,7 +75,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
       where: { id },
       include: { policies: true },
     });
-    if (!existing) return jsonError(404, "not_found", "Rule not found.");
+    if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     // Delete recorded UniFi policies only (D3). Never touch a group's pause AppPolicy rows.
     const household = await prisma().household.findUnique({ where: { id: "default" } });
     if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {

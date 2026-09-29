@@ -13,7 +13,7 @@ export type LiftAction = "pause" | "resume" | "extend" | "allow" | "disallow";
 const UntilBody = z.object({ until: z.string().datetime().nullable().optional() });
 const ExtendBody = z.object({ minutes: z.number().int().positive() });
 
-const CLEARED = { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null };
+export const CLEARED = { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null };
 
 /**
  * One rule's pause or allowance, for everyone the rule covers (`groupId` absent) or for one
@@ -27,27 +27,12 @@ export async function runLift(
   action: LiftAction,
   target: { ruleId: string; groupId?: string },
 ): Promise<Response> {
-  let body: unknown = {};
-  if (action === "extend") {
-    const read = await readJson(request);
-    if (!read.ok) return read.response;
-    const parsed = ExtendBody.safeParse(read.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "minutes must be a positive integer.");
-    body = parsed.data;
-  } else if (action === "pause" || action === "allow") {
-    let value: unknown = {};
-    try {
-      value = await request.json();
-    } catch {
-      value = {};
-    }
-    const parsed = UntilBody.safeParse(value);
-    if (!parsed.success) return jsonError(400, "invalid_request", `Invalid ${action} request.`);
-    body = parsed.data;
-  }
+  const read = await readLiftBody(request, action);
+  if (!read.ok) return read.response;
+  const body = read.body;
 
   const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: ruleInclude });
-  if (!rule) return jsonError(404, "not_found", "Rule not found.");
+  if (!rule || rule.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
   const link = target.groupId ? rule.groups.find((item) => item.groupId === target.groupId) : undefined;
   if (target.groupId && !link) return jsonError(404, "not_found", "That group does not have this rule.");
   const state = link ?? rule;
@@ -97,4 +82,30 @@ export async function runLift(
 
 async function household() {
   return prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+}
+
+/** The request body a verb takes: `minutes` for extend, an optional `until` for pause and allow. */
+export async function readLiftBody(
+  request: Request,
+  action: LiftAction,
+): Promise<{ ok: true; body: unknown } | { ok: false; response: Response }> {
+  if (action === "extend") {
+    const read = await readJson(request);
+    if (!read.ok) return read;
+    const parsed = ExtendBody.safeParse(read.value);
+    if (!parsed.success) return { ok: false, response: jsonError(400, "invalid_request", "minutes must be a positive integer.") };
+    return { ok: true, body: parsed.data };
+  }
+  if (action === "pause" || action === "allow") {
+    let value: unknown = {};
+    try {
+      value = await request.json();
+    } catch {
+      value = {};
+    }
+    const parsed = UntilBody.safeParse(value);
+    if (!parsed.success) return { ok: false, response: jsonError(400, "invalid_request", `Invalid ${action} request.`) };
+    return { ok: true, body: parsed.data };
+  }
+  return { ok: true, body: {} };
 }

@@ -179,7 +179,7 @@ export async function createSession(input: {
   return { raw, expiresAt, csrf: randomToken(24) };
 }
 
-/** Watch credentials can only read state and pause, resume, extend, allow or disallow groups and rules. */
+/** Watch credentials can only read state and pause, resume, extend, allow or disallow rules, including a group's own `internet` rule. */
 function watchRouteAllowed(request: Request): boolean {
   const path = new URL(request.url).pathname;
   if (request.method === "GET") {
@@ -190,10 +190,8 @@ function watchRouteAllowed(request: Request): boolean {
       || /^\/api\/v1\/changes\/[^/]+$/.test(path);
   }
   if (request.method === "DELETE" && /^\/api\/v1\/connection\/devices\/[^/]+$/.test(path)) return true;
-  if (request.method === "DELETE") return /^\/api\/v1\/groups\/[^/]+\/allow$/.test(path);
   return request.method === "POST"
-    && (/^\/api\/v1\/groups\/[^/]+\/(pause|resume|extend|allow)$/.test(path)
-      || /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/.test(path)
+    && (/^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/.test(path)
       || /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/.test(path));
 }
 

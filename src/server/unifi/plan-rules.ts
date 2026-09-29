@@ -27,6 +27,8 @@ export type PlanRule = {
   enabled: boolean;
   /** A pause is active: the rule's policies stay, disabled, until it ends. */
   paused: boolean;
+  /** A group's built-in pause rule: it has policies only while it is enabled. */
+  system: boolean;
   /** Groups the rule is lifted for alone: their devices leave its policies. */
   liftedGroupIds: string[];
   mode: RuleMode;
@@ -36,8 +38,6 @@ export type PlanRule = {
 export type PlanRuleGroup = {
   id: string;
   kind: GroupKind;
-  /** An allowance is active: the group's devices leave its internet rules' policies. */
-  allowed: boolean;
 };
 
 export type PlanRuleDevice = {
@@ -81,10 +81,9 @@ export function plannedRuleKey(ruleId: string, windowKey: string, zoneId: string
 /**
  * Desired UniFi policies for every rule: one per window (or one for an always-on rule)
  * in each source zone its devices or networks are in. A rule covering several groups
- * puts all their devices in the same policy. A group with an allowance is left out of
- * its internet rules; when that leaves no one, the policy stays with its devices but
- * disabled, so ending the allowance does not create it again. The same holds for a group
- * the rule is lifted for alone, on any rule kind. A paused rule keeps every
+ * puts all their devices in the same policy. A group the rule is lifted for alone is
+ * left out of it; when that leaves no one, the policy stays with its devices but
+ * disabled, so ending the lift does not create it again. A paused rule keeps every
  * policy the same way, disabled.
  */
 export function planRulePolicies(input: {
@@ -105,6 +104,7 @@ export function planRulePolicies(input: {
   const zoneName = (zoneId: string) => input.zoneNames?.[zoneId] ?? zoneId;
 
   for (const rule of input.rules) {
+    if (rule.system && !rule.enabled) continue;
     const windows = ruleWindows(rule);
     if (windows.length === 0) continue;
     const buckets = new Map<string, { macs: string[]; live: string[]; networkIds: string[]; networkNames: string[] }>();
@@ -147,9 +147,7 @@ export function planRulePolicies(input: {
         }
         const found = bucket(device.zoneId);
         found.macs.push(device.mac);
-        const lifted =
-          (rule.kind === "internet" && groups.get(device.groupId!)!.allowed) || rule.liftedGroupIds.includes(device.groupId!);
-        if (!lifted) found.live.push(device.mac);
+        if (!rule.liftedGroupIds.includes(device.groupId!)) found.live.push(device.mac);
       }
     }
 

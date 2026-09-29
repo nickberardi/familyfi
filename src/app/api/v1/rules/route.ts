@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const groupId = url.searchParams.get("groupId") ?? undefined;
     const rules = await prisma().rule.findMany({
-      where: groupId ? { scope: RuleScope.group, groups: { some: { groupId } } } : undefined,
+      where: { systemGroupId: null, ...(groupId ? { scope: RuleScope.group, groups: { some: { groupId } } } : {}) },
       include: ruleInclude,
       orderBy: [{ scope: "asc" }, { createdAt: "asc" }],
     });

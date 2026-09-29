@@ -9,17 +9,16 @@ import { GET as currentSession } from "@/app/api/v1/auth/session/route";
 import { POST as logout } from "@/app/api/v1/auth/logout/route";
 import { GET as listGroups } from "@/app/api/v1/groups/route";
 import { GET as household } from "@/app/api/v1/settings/household/route";
-import { POST as pause } from "@/app/api/v1/groups/[id]/pause/route";
-import { POST as resume } from "@/app/api/v1/groups/[id]/resume/route";
-import { POST as extend } from "@/app/api/v1/groups/[id]/extend/route";
-import { DELETE as disallow, POST as allow } from "@/app/api/v1/groups/[id]/allow/route";
 import { GET as listRules, POST as createRule } from "@/app/api/v1/rules/route";
 import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
 import { POST as allowRule } from "@/app/api/v1/rules/[id]/allow/route";
 import { POST as disallowRule } from "@/app/api/v1/rules/[id]/disallow/route";
 import { POST as extendRule } from "@/app/api/v1/rules/[id]/extend/route";
 import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
+import { POST as resumeGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/resume/route";
+import { POST as extendGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/extend/route";
 import { POST as allowGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/allow/route";
+import { POST as disallowGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/disallow/route";
 import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
 import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
@@ -159,14 +158,17 @@ describe("independent Watch device", () => {
     ];
     const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const json = { "content-type": "application/json" };
-    const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+    // A group's own pause and allowance are the verbs on its built-in `internet` rule.
+    const ctx = (id: string) => ({ params: Promise.resolve({ id, ruleId: "internet" }) });
     for (const group of groups) {
-      const path = (action: string) => `/api/v1/groups/${group.id}/${action}`;
-      expect((await pause(request(path("pause"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), ctx(group.id))).status).toBe(200);
-      expect((await extend(request(path("extend"), { method: "POST", auth, headers: json, body: JSON.stringify({ minutes: 30 }) }), ctx(group.id))).status).toBe(200);
-      expect((await resume(request(path("resume"), { method: "POST", auth }), ctx(group.id))).status).toBe(200);
-      expect((await allow(request(path("allow"), { method: "POST", auth, headers: json, body: JSON.stringify({ until }) }), ctx(group.id))).status).toBe(200);
-      expect((await disallow(request(path("allow"), { method: "DELETE", auth }), ctx(group.id))).status).toBe(200);
+      const path = (action: string) => `/api/v1/groups/${group.id}/rules/internet/${action}`;
+      const send = (handler: typeof pauseGroupRule, action: string, body?: object) =>
+        handler(request(path(action), { method: "POST", auth, headers: json, body: body ? JSON.stringify(body) : undefined }), ctx(group.id));
+      expect((await send(pauseGroupRule, "pause", { until })).status).toBe(200);
+      expect((await send(extendGroupRule, "extend", { minutes: 30 })).status).toBe(200);
+      expect((await send(resumeGroupRule, "resume")).status).toBe(200);
+      expect((await send(allowGroupRule, "allow", { until })).status).toBe(200);
+      expect((await send(disallowGroupRule, "disallow")).status).toBe(200);
     }
   });
 
