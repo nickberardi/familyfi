@@ -181,12 +181,13 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   // Groups can no longer be protected from FamilyFi.
   await expect(page.getByLabel(/Protected/)).toHaveCount(0);
 
-  // An adult starts from a custom schedule only, and is not paused from here.
+  // An adult starts from a custom schedule only.
   await page.getByLabel("Role").selectOption("adult");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("link", { name: "Custom schedule" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Pause all internet" })).toHaveCount(0);
+  // Role never limits a control: an adult can be paused too. Only the suggested schedules differ.
+  await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
 
   await page.goto("/family/does-not-exist");
   await expect(page.getByText("Loading household…")).toHaveCount(0);
