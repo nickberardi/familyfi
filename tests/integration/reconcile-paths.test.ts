@@ -272,6 +272,126 @@ describe("reconciler paths", () => {
     });
   });
 
+  describe("quarantine policies", () => {
+    /** A discovered household: every unassigned device sits behind a quarantine policy. */
+    async function quarantined(client: MockUnifiClient) {
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+      const policy = await prisma().appPolicy.findFirstOrThrow({ where: { ownerScope: "quarantine" }, orderBy: { id: "asc" } });
+      return { policy, onGateway: () => client.state.policies.find((item) => item.id === policy.unifiPolicyId) };
+    }
+
+    it("records a refused update on the policy, reports a partial run, and retries it next pass", async () => {
+      const client = fixtureUnifiClient();
+      const { policy, onGateway } = await quarantined(client);
+      expect(onGateway()?.enabled).toBe(true);
+
+      await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: false } });
+      vi.spyOn(client, "updatePolicy").mockRejectedValueOnce(gatewayError(500, "PUT"));
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).toBe(ChangeStatus.partial);
+      const failed = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      expect(failed.lastError).toMatch(/500/);
+      expect(onGateway()?.enabled).toBe(true);
+
+      await runReconcileOnce();
+      expect((await lastRun()).status).toBe(ChangeStatus.applied);
+      const retried = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      expect(retried.lastError).toBeNull();
+      expect(onGateway()?.enabled).toBe(false);
+    });
+
+    it("creates the policy again when it disappears between the listing and the update", async () => {
+      const client = fixtureUnifiClient();
+      const { policy } = await quarantined(client);
+
+      await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: false } });
+      vi.spyOn(client, "getPolicy").mockRejectedValueOnce(gatewayError(404, "GET"));
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).toBe(ChangeStatus.applied);
+      const replaced = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      expect(replaced.unifiPolicyId).not.toBe(policy.unifiPolicyId);
+      expect(client.state.policies.find((item) => item.id === replaced.unifiPolicyId)?.enabled).toBe(false);
+    });
+
+    it("records a failed create, then creates the policy on the next pass", async () => {
+      const client = fixtureUnifiClient();
+      client.createError = gatewayError(500, "POST");
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).toBe(ChangeStatus.partial);
+      const failed = await prisma().appPolicy.findFirstOrThrow({ where: { ownerScope: "quarantine" } });
+      expect(failed.unifiPolicyId).toBeNull();
+      expect(failed.lastError).toMatch(/500/);
+
+      client.createError = undefined;
+      await runReconcileOnce();
+      expect((await lastRun()).status).toBe(ChangeStatus.applied);
+      const created = await prisma().appPolicy.findUniqueOrThrow({ where: { id: failed.id } });
+      expect(client.state.policies.some((item) => item.id === created.unifiPolicyId)).toBe(true);
+    });
+
+    it("drops a record whose create failed once no device needs quarantining", async () => {
+      const client = fixtureUnifiClient();
+      client.createError = gatewayError(500, "POST");
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+      const failed = await prisma().appPolicy.findFirstOrThrow({ where: { ownerScope: "quarantine" } });
+      expect(failed.unifiPolicyId).toBeNull();
+
+      client.createError = undefined;
+      const group = await createFamilyGroup();
+      await prisma().device.updateMany({ data: { groupId: group.id, assignment: AssignmentState.assigned } });
+      await runReconcileOnce();
+
+      expect(await prisma().appPolicy.count({ where: { ownerScope: "quarantine" } })).toBe(0);
+      expect(client.calls.some((call) => call.method === "DELETE")).toBe(false);
+    });
+
+    it("keeps the record and reports a partial run when the gateway refuses a delete, and removes it next pass", async () => {
+      const client = fixtureUnifiClient();
+      const { policy } = await quarantined(client);
+      const group = await createFamilyGroup();
+      await prisma().device.updateMany({ data: { groupId: group.id, assignment: AssignmentState.assigned } });
+
+      const refusal = refuseDelete(client, policy.unifiPolicyId);
+      await runReconcileOnce();
+      expect((await lastRun()).status).toBe(ChangeStatus.partial);
+      const kept = await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } });
+      expect(kept.lastError).toMatch(/500/);
+      expect(client.state.policies.some((item) => item.id === policy.unifiPolicyId)).toBe(true);
+
+      refusal.mockRestore();
+      await runReconcileOnce();
+      expect(await prisma().appPolicy.findUnique({ where: { id: policy.id } })).toBeNull();
+      expect(client.state.policies.some((item) => item.id === policy.unifiPolicyId)).toBe(false);
+    });
+
+    it("counts a policy the gateway answers 404 for on delete as already deleted", async () => {
+      const client = fixtureUnifiClient();
+      const { policy } = await quarantined(client);
+      const group = await createFamilyGroup();
+      await prisma().device.updateMany({ data: { groupId: group.id, assignment: AssignmentState.assigned } });
+
+      vi.spyOn(client, "deletePolicy").mockRejectedValueOnce(gatewayError(404, "DELETE"));
+      await runReconcileOnce();
+
+      expect(await prisma().appPolicy.findUnique({ where: { id: policy.id } })).toBeNull();
+      expect((await lastRun()).status).toBe(ChangeStatus.applied);
+    });
+
+    it("keeps a quarantine policy while its devices have no zone", async () => {
+      const client = fixtureUnifiClient();
+      const { policy } = await quarantined(client);
+      await prisma().device.updateMany({ where: { zoneId: policy.zoneId }, data: { zoneId: null } });
+      await runReconcileOnce();
+      expect(await prisma().appPolicy.findUnique({ where: { id: policy.id } })).not.toBeNull();
+    });
+  });
+
   describe("app and category rule policies", () => {
     it("writes nothing for a rule whose policy is unchanged and still on the gateway", async () => {
       const client = fixtureUnifiClient();
