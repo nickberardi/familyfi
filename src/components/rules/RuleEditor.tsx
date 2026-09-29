@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState, type ReactNode } from "react";
+import { use, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -8,6 +8,7 @@ import { FAMILYFI_POLICY_PREFIX, MAX_POLICY_NAME, rulePolicyNames } from "@/lib/
 import { overlapNotices, ruleWritePlan, type RuleDraft, type RuleWrite } from "@/lib/rule-writes";
 import {
   CURATED_CATEGORY_SLOTS,
+  catalogLabel,
   MAX_RULE_NAME,
   MAX_RULE_WINDOWS,
   MAX_WINDOW_NAME,
@@ -88,7 +89,7 @@ function blankDraft(
     useGeneratedName: false,
     kind,
     scope: "group",
-    targetIds: kind === "category" ? [target ?? CURATED_CATEGORY_SLOTS[0]!.categoryId] : [],
+    targetIds: kind === "category" && target !== undefined ? [target] : [],
     domains: [...new Set(domains)],
     groupIds: groupId ? [groupId] : [],
     networkIds: [],
@@ -164,7 +165,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
     if (draft.scope === "network" && draft.networkIds.length === 0) return "Pick at least one network.";
     if (draft.kind === "domain" && draft.domains.length === 0) return "Add at least one website.";
     if ((draft.kind === "app" || draft.kind === "category") && draft.targetIds.length === 0) {
-      return draft.kind === "app" ? "Pick at least one app." : "Pick a category.";
+      return draft.kind === "app" ? "Pick at least one app." : "Pick at least one category.";
     }
     if (scheduled && liveWindows.length === 0) return "Add at least one window.";
     if (scheduled && liveWindows.some((window) => window.days.length === 0)) return "Each window needs at least one day.";
@@ -319,7 +320,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
                 kind,
                 scope: kind === "internet" ? "group" : draft.scope,
                 mode: kind === "internet" ? "scheduled" : draft.mode,
-                targetIds: kind === "category" ? [CURATED_CATEGORY_SLOTS[0]!.categoryId] : [],
+                targetIds: [],
                 windows:
                   kind === "internet" && draft.windows.every((window) => window.removed)
                     ? [...draft.windows, keyed({ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" })]
@@ -328,8 +329,9 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
             }
           />
           {saved ? <p className="text-[14px] text-[var(--ff-ink-2)]">A saved rule keeps what it blocks. Make a new rule to block something else.</p> : null}
-          {draft.kind === "category" ? <CategoryPicker targetIds={draft.targetIds} onChange={(targetIds) => set({ targetIds })} /> : null}
-          {draft.kind === "app" ? <AppPicker targetIds={draft.targetIds} onChange={(targetIds) => set({ targetIds })} /> : null}
+          {draft.kind === "category" || draft.kind === "app" ? (
+            <CatalogPicker key={draft.kind} kind={draft.kind} targetIds={draft.targetIds} onChange={(targetIds) => set({ targetIds })} />
+          ) : null}
           {draft.kind === "domain" ? (
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-1.5 rounded-[9px] border border-[var(--ff-input-line)] bg-[var(--ff-card)] p-2">
@@ -644,95 +646,127 @@ function Writes({ writes }: { writes: RuleWrite[] }) {
   );
 }
 
+type CatalogItem = { id: number; name: string };
+
+/** Where each kind of rule finds what it can block: the gateway's own DPI catalogs. */
+const CATALOGS = {
+  category: { path: "/api/v1/dpi/categories", key: "categories", noun: "category", nouns: "categories" },
+  app: { path: "/api/v1/dpi/applications", key: "applications", noun: "app", nouns: "apps" },
+} as const;
+
 /**
- * One UniFi DPI category: the familiar five first, with their glyphs, then every other
- * category the gateway reports, by its own name.
+ * The categories or apps a rule blocks, picked the way websites are: the box holds only
+ * what is picked, and a search asks the gateway's catalog (`?filter=`) for matches to add.
+ * Nothing is listed by hand, so whatever the gateway supports can be found.
  */
-function CategoryPicker({ targetIds, onChange }: { targetIds: number[]; onChange: (ids: number[]) => void }) {
-  const [catalog, setCatalog] = useState<{ id: number; name: string }[]>([]);
-  const [filter, setFilter] = useState("");
+function CatalogPicker({ kind, targetIds, onChange }: { kind: "category" | "app"; targetIds: number[]; onChange: (ids: number[]) => void }) {
+  const source = CATALOGS[kind];
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ query: string; items: CatalogItem[] }>({ query: "", items: [] });
+  const [names, setNames] = useState<Map<number, string>>(new Map());
+  const [error, setError] = useState("");
+  const remember = (items: CatalogItem[]) => setNames((current) => new Map([...current, ...items.map((item) => [item.id, item.name] as const)]));
+  const fetchCatalog = (filter: string) =>
+    api<Record<string, CatalogItem[]>>(`${source.path}${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`).then((res) => res[source.key] ?? []);
+
+  // A saved rule's picks need their names once.
+  const [initial] = useState(targetIds);
   useEffect(() => {
+    if (initial.length === 0) return;
     let cancelled = false;
-    void api<{ categories: { id: number; name: string }[] }>("/api/v1/dpi/categories")
-      .then((res) => {
-        if (!cancelled) setCatalog(res.categories);
+    void fetchCatalog("")
+      .then((items) => {
+        if (!cancelled) remember(items);
       })
-      .catch(() => {
-        if (!cancelled) setCatalog([]);
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, []);
-  const curatedIds = new Set(CURATED_CATEGORY_SLOTS.map((slot) => slot.categoryId));
-  const needle = filter.trim().toLowerCase();
-  const others = catalog
-    .filter((item) => !curatedIds.has(item.id) && (!needle || item.name.toLowerCase().includes(needle)))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return (
-    <div className="flex flex-col gap-2">
-      <ChipGroup label="Category">
-        {CURATED_CATEGORY_SLOTS.map((slot) => (
-          <Chip key={slot.slot} on={targetIds.includes(slot.categoryId)} tone="rule" onClick={() => onChange([slot.categoryId])}>
-            <CategoryGlyph slot={slot.slot} size={13} />
-            {slot.label}
-          </Chip>
-        ))}
-      </ChipGroup>
-      {catalog.length ? (
-        <>
-          <TextField label="Search UniFi categories" value={filter} onChange={setFilter} placeholder="Search the gateway’s categories" />
-          <ChipGroup label="More UniFi categories">
-            {others.map((item) => (
-              <Chip key={item.id} on={targetIds.includes(item.id)} tone="rule" onClick={() => onChange([item.id])}>
-                {item.name}
-              </Chip>
-            ))}
-          </ChipGroup>
-        </>
-      ) : null}
-    </div>
-  );
-}
+    // Only the rule as it was opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
 
-/** Search the gateway's app catalog and pick apps; each pick is a DPI id. */
-function AppPicker({ targetIds, onChange }: { targetIds: number[]; onChange: (ids: number[]) => void }) {
-  const [filter, setFilter] = useState("");
-  const [catalog, setCatalog] = useState<{ id: number; name: string }[]>([]);
-  const [known, setKnown] = useState<Map<number, string>>(new Map());
+  // Search as you type, and drop answers to a query that has since changed.
   useEffect(() => {
+    const filter = query.trim();
+    if (!filter) return;
+    let cancelled = false;
     const handle = window.setTimeout(() => {
-      void api<{ applications: { id: number; name: string }[] }>(
-        `/api/v1/dpi/applications${filter.trim() ? `?filter=${encodeURIComponent(filter.trim())}` : ""}`,
-      )
-        .then((res) => {
-          setCatalog(res.applications.slice(0, 30));
-          setKnown((current) => new Map([...current, ...res.applications.map((item) => [item.id, item.name] as const)]));
+      void fetchCatalog(filter)
+        .then((items) => {
+          if (cancelled) return;
+          remember(items);
+          setResults({ query: filter, items: items.slice(0, 30) });
+          setError("");
         })
-        .catch(() => setCatalog([]));
+        .catch(() => {
+          if (!cancelled) setError(`Couldn’t search the gateway’s ${source.nouns}.`);
+        });
     }, 250);
-    return () => window.clearTimeout(handle);
-  }, [filter]);
-  const picked = useMemo(() => targetIds.map((id) => ({ id, name: known.get(id) ?? `App ${id}` })), [targetIds, known]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const filter = query.trim();
+  // The gateway knows "Video" as "Media streaming", so a familiar name matches too.
+  const familiar =
+    kind === "category" && filter
+      ? CURATED_CATEGORY_SLOTS.filter((item) => item.label.toLowerCase().includes(filter.toLowerCase())).map((item) => ({ id: item.categoryId, name: item.catalogName }))
+      : [];
+  const found = filter && results.query === filter ? results.items : [];
+  const matches = [...familiar, ...found.filter((item) => !familiar.some((known) => known.id === item.id))].filter((item) => !targetIds.includes(item.id));
+  const label = (id: number) => catalogLabel(kind, id, names);
+  const slot = (id: number) => (kind === "category" ? CURATED_CATEGORY_SLOTS.find((item) => item.categoryId === id) : undefined);
+  const add = (id: number) => {
+    onChange([...targetIds, id]);
+    setQuery("");
+  };
   return (
     <div className="flex flex-col gap-2">
-      <ChipGroup label="Chosen apps">
-        {picked.map((app) => (
-          <Chip key={app.id} on tone="rule" onClick={() => onChange(targetIds.filter((id) => id !== app.id))}>
-            {app.name}
-          </Chip>
-        ))}
-      </ChipGroup>
-      <TextField label="Search apps" value={filter} onChange={setFilter} placeholder="Search the gateway’s app catalog" />
-      <ChipGroup label="Apps">
-        {catalog
-          .filter((app) => !targetIds.includes(app.id))
-          .map((app) => (
-            <Chip key={app.id} on={false} onClick={() => onChange([...targetIds, app.id])}>
-              {app.name}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-[9px] border border-[var(--ff-input-line)] bg-[var(--ff-card)] p-2">
+        {targetIds.map((id) => {
+          const known = slot(id);
+          return (
+            <span key={id} className="inline-flex items-center gap-1.5 rounded-[6px] bg-[var(--ff-field)] px-2 py-1 text-[14px]">
+              {known ? <CategoryGlyph slot={known.slot} size={12} /> : null}
+              {label(id)}
+              <button type="button" aria-label={`Remove ${label(id)}`} className="text-[var(--ff-danger)]" onClick={() => onChange(targetIds.filter((item) => item !== id))}>
+                ×
+              </button>
+            </span>
+          );
+        })}
+        <div className="min-w-[180px] flex-1">
+          <TextField
+            label={`Search ${source.nouns}`}
+            value={query}
+            onChange={setQuery}
+            onSubmit={() => {
+              if (matches[0]) add(matches[0].id);
+            }}
+            placeholder={`Search the gateway’s ${source.nouns}`}
+          />
+        </div>
+      </div>
+      {matches.length ? (
+        <ChipGroup label={`Matching ${source.nouns}`}>
+          {matches.map((item) => (
+            <Chip key={item.id} on={false} tone="rule" onClick={() => add(item.id)}>
+              {slot(item.id) ? <CategoryGlyph slot={slot(item.id)!.slot} size={13} /> : null}
+              {label(item.id)}
             </Chip>
           ))}
-      </ChipGroup>
+        </ChipGroup>
+      ) : filter && results.query === filter && !error && !familiar.length ? (
+        <p className="text-[14px] text-[var(--ff-ink-2)]">No {source.nouns} match “{filter}”.</p>
+      ) : null}
+      {error ? <p className="text-[14px] text-[var(--ff-danger)]">{error}</p> : null}
+      <p className="text-[14px] leading-5 text-[var(--ff-ink-2)]">
+        Search what the gateway can detect, and pick as many {source.nouns} as the rule should block.
+      </p>
     </div>
   );
 }

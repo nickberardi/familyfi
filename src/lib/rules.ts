@@ -63,6 +63,15 @@ export const CURATED_CATEGORY_SLOTS: readonly CuratedCategorySlot[] = [
   { slot: "messaging", label: "Messaging", categoryId: 0, catalogName: "Instant messengers" },
 ] as const;
 
+/**
+ * What a picked category or app is called in the rule editor: a category FamilyFi knows
+ * by its familiar name ("Video"), otherwise the gateway catalog's name, otherwise its id.
+ */
+export function catalogLabel(kind: "category" | "app", id: number, names: ReadonlyMap<number, string>): string {
+  const slot = kind === "category" ? CURATED_CATEGORY_SLOTS.find((item) => item.categoryId === id) : undefined;
+  return slot?.label ?? names.get(id) ?? `${kind === "category" ? "Category" : "App"} ${id}`;
+}
+
 export function groupScopedRules(rules: Rule[], groupId: string): Rule[] {
   return rules.filter((rule) => rule.scope === "group" && rule.groupIds.includes(groupId));
 }

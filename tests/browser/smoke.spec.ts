@@ -429,10 +429,37 @@ test("cards show every household category; one UniFi cannot block offers a Websi
   await expect(page.getByLabel("Rule name")).toHaveValue(`AI for ${kid!.name}`);
   await expect(page.getByRole("button", { name: "Remove openai.com" })).toBeVisible();
 
-  // The editor offers every category the gateway reports, not only the familiar five.
-  await page.goto("/rules/new?kind=category");
-  const more = page.getByRole("group", { name: "More UniFi categories" });
-  await expect(more.getByRole("button", { name: "Fixture Category Alpha" })).toBeVisible();
+  // Categories and apps are picked like websites: nothing is listed until you search the
+  // gateway's catalog, and a rule can block several at once.
+  for (const { kind, noun, first, second, ids } of [
+    { kind: "category", noun: "categories", first: ["media", /Video/], second: ["alpha", "Fixture Category Alpha"], ids: [4, 9001] },
+    { kind: "app", noun: "apps", first: ["one", "Fixture App One"], second: ["suite", "Fixture Productivity Suite"], ids: [] as number[] },
+  ] as const) {
+    await page.goto(`/rules/new?kind=${kind}&group=${kid!.id}`);
+    const matches = page.getByRole("group", { name: `Matching ${noun}` });
+    await expect(matches).toHaveCount(0);
+    const search = page.getByLabel(`Search ${noun}`);
+    for (const [text, name] of [first, second] as const) {
+      const searched = page.waitForResponse((response) => response.url().includes(`filter=${text}`));
+      await search.fill(text);
+      await searched;
+      await matches.getByRole("button", { name }).click();
+      await expect(search).toHaveValue("");
+    }
+    await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(2);
+    await page.getByLabel("Rule name").fill(`QA ${noun} ${test.info().project.name} ${Date.now() % 100000}`);
+    const created = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/api/v1/rules"));
+    await page.getByRole("button", { name: "Create rule" }).last().click();
+    const res = await created;
+    expect(res.ok()).toBeTruthy();
+    const { rule } = (await res.json()) as { rule: { id: string; targetIds: number[] } };
+    try {
+      expect(rule.targetIds).toHaveLength(2);
+      if (ids.length) expect(rule.targetIds).toEqual(ids);
+    } finally {
+      await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+    }
+  }
 });
 
 test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without a resolver", async ({ page }) => {
@@ -526,8 +553,10 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await expect(page.getByRole("button", { name: "Add category filter" })).toHaveCount(0);
 
   // The rule editor names categories, never raw DPI ids.
+  // Searching by the familiar name finds it, though the gateway calls it "Media streaming".
   await page.goto("/rules/new?kind=category");
-  const curated = page.getByRole("group", { name: "Category" });
+  await page.getByLabel("Search categories").fill("video");
+  const curated = page.getByRole("group", { name: "Matching categories" });
   await expect(curated.getByRole("button", { name: /Video/i })).toBeVisible();
   await expect(curated.getByText(/\(\s*4\s*\)/)).toHaveCount(0);
   await expect(page.getByText(/permanent block/i)).toHaveCount(0);

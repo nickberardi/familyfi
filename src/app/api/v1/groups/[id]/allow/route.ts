@@ -14,8 +14,9 @@ const Body = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
- * Lets a group back online during its internet rules' windows, until `until`, by default
- * when the windows active now end. Category, app and website rules keep applying.
+ * Lets a group back online during its internet rules' windows, until `until`: by default
+ * when the windows active now end, or until cancelled when one is an always-on rule.
+ * Category, app and website rules keep applying.
  */
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async (session) => {

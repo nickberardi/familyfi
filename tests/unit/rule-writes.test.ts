@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { overlapNotices, ruleWritePlan, type RuleDraft } from "@/lib/rule-writes";
-import { internetRulePresets, internetWindowsForGroup, ruleBlocksLabel, ruleDayBands, windowSegments, type Rule } from "@/lib/rules";
+import { catalogLabel, internetRulePresets, internetWindowsForGroup, ruleBlocksLabel, ruleDayBands, windowSegments, type Rule } from "@/lib/rules";
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 
@@ -104,6 +104,18 @@ describe("client rule helpers", () => {
   it("collects enabled internet windows for a group, with their rule", () => {
     const rules = [rule({ name: "Bedtime" }), rule({ name: "Off", enabled: false }), rule({ name: "Other", groupIds: ["g2"] }), rule({ name: "Video", kind: "category" })];
     expect(internetWindowsForGroup(rules, "g1")).toEqual([{ id: "w", name: "", days: EVERY_DAY, start: "22:00", end: "06:00", ruleName: "Bedtime" }]);
+  });
+
+  it("names a picked category or app from what FamilyFi knows, then the catalog, then its id", () => {
+    const names = new Map([
+      [4, "Media streaming"],
+      [9001, "Fixture Category Alpha"],
+    ]);
+    expect(catalogLabel("category", 4, names)).toBe("Video");
+    expect(catalogLabel("category", 9001, names)).toBe("Fixture Category Alpha");
+    expect(catalogLabel("category", 77, names)).toBe("Category 77");
+    expect(catalogLabel("app", 9001, names)).toBe("Fixture Category Alpha");
+    expect(catalogLabel("app", 12, new Map())).toBe("App 12");
   });
 
   it("offers one-tap internet rules to children and teens only", () => {
