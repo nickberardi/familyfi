@@ -3081,7 +3081,7 @@ components:
       type: object
       additionalProperties: false
       required: [active, until, by]
-      description: Read-only, derived from the group's internet rules. An allowance lifts every enabled internet rule of the group until `until`, or until disallowed when null.
+      description: Read-only, derived from the group's internet rules. An allowance is an allowance lift on any enabled internet rule of the group while no other internet rule is blocking it, until the earliest end, or until disallowed when null.
       properties:
         active: { type: boolean }
         until: { type: [string, "null"], format: date-time }

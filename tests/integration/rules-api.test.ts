@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AssignmentState, FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as getGroup } from "@/app/api/v1/groups/[id]/route";
+import { DELETE as deleteGroup, GET as getGroup } from "@/app/api/v1/groups/[id]/route";
 import { GET as listRules, POST as createRule } from "@/app/api/v1/rules/route";
 import { POST as allowRule } from "@/app/api/v1/rules/[id]/allow/route";
 import { POST as disallowRule } from "@/app/api/v1/rules/[id]/disallow/route";
@@ -787,6 +787,31 @@ describe("household rules", () => {
       await groupAction(pause, auth, emma.id);
       await groupAction(disallow, auth, emma.id);
       expect((await readGroup(auth, emma.id)).access).toBe("paused");
+    });
+
+    it("leaves no block policy on the gateway once a paused group is deleted", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      await groupAction(pause, auth, emma.id);
+      await runReconcileOnce();
+      expect(policiesNamed(client, "FamilyFi Emma's Internet Pause")).toHaveLength(1);
+
+      const deleted = await deleteGroup(request(`/api/v1/groups/${emma.id}`, { method: "DELETE", auth }), { params: Promise.resolve({ id: emma.id }) });
+      expect(deleted.status).toBe(200);
+      // The route deletes through the household's own client; the next pass clears anything the fixture gateway kept.
+      await runReconcileOnce();
+      expect(policiesNamed(client, "FamilyFi Emma's Internet Pause")).toEqual([]);
+      expect(await prisma().rule.count({ where: { systemGroupId: { not: null } } })).toBe(0);
+    });
+
+    it("gives an allowance a new time when allowed again", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      await postRule(auth, { name: "Grounded", kind: "internet", groupIds: [emma.id], mode: "always" });
+      await groupAction(allow, auth, emma.id, JSON.stringify({ until: inMinutes(30).toISOString() }));
+      const later = inMinutes(90);
+      const again = ((await (await groupAction(allow, auth, emma.id, JSON.stringify({ until: later.toISOString() }))).json()) as { group: PublicGroup }).group;
+      expect(again.allowance.until).toBe(later.toISOString());
     });
   });
 });

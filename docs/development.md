@@ -44,7 +44,7 @@ CSS custom properties are the one place an abbreviation is right: `:root` is a g
 | Functions, variables, props | `camelCase` | `ruleWritePlan`, `parentFacingRuleLabel` |
 | Module constants | `SCREAMING_SNAKE` | `SESSION_TTL_MS`, `CURATED_CATEGORY_SLOTS` |
 | Prisma models / tables | `PascalCase`, singular | `Rule`, `RulePolicy`, `SyncRun` |
-| Columns and JSON fields | `camelCase` | `suspensionActive`, `targetIds` |
+| Columns and JSON fields | `camelCase` | `pauseActive`, `targetIds` |
 | Prisma enum values | `lowercase` | `family`, `scheduled`, `quarantined` |
 | API paths | lowercase, plural, `{id}` | `/api/v1/groups/{id}/rules/{ruleId}/pause` |
 | Our env vars | `FAMILYFI_` + purpose | `FAMILYFI_ENCRYPTION_KEY` |
