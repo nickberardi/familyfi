@@ -3,6 +3,7 @@ import {
   assertSchedule,
   extendSuspensionUntil,
   inRecurringWindow,
+  isSuspended,
 } from "@/lib/schedule";
 
 const zone = "America/New_York";
@@ -123,6 +124,20 @@ describe("schedule windows across time zones", () => {
 
 describe("pause", () => {
   const now = at("2026-09-14T22:10:00-04:00");
+
+  it("is paused while active and before its end, or with no end", () => {
+    expect(isSuspended({ active: false, until: null }, now)).toBe(false);
+    expect(isSuspended({ active: true, until: null }, now)).toBe(true);
+    expect(isSuspended({ active: true, until: at("2026-09-14T23:00:00-04:00") }, now)).toBe(true);
+    // A pause that has run out no longer counts, even before reconciliation clears it.
+    expect(isSuspended({ active: true, until: at("2026-09-14T22:00:00-04:00") }, now)).toBe(false);
+  });
+
+  it("extends a pause with no end, or one already over, from now", () => {
+    const hour = 60 * 60 * 1000;
+    expect(extendSuspensionUntil(null, now, hour).toISOString()).toBe("2026-09-15T03:10:00.000Z");
+    expect(extendSuspensionUntil(at("2026-09-14T21:00:00-04:00"), now, hour).toISOString()).toBe("2026-09-15T03:10:00.000Z");
+  });
 
   it("extends from the later of now and the existing expiry", () => {
     const existing = at("2026-09-14T23:00:00-04:00");

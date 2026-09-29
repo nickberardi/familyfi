@@ -299,7 +299,8 @@ async function tick(owner: string): Promise<boolean> {
       const key = plannedKey(row.ownerScope, row.groupId, row.zoneId);
       if (desiredKeys.has(key)) continue;
       const owner = row.ownerScope === PolicyOwnerScope.quarantine ? "quarantine" : `group:${row.groupId}`;
-      if (retainOwners.has(owner)) continue;
+      // Kept while its devices are out of view, unless the console already removed it.
+      if (retainOwners.has(owner) && !goneFromGateway(row.unifiPolicyId, onGateway)) continue;
       if (!row.unifiPolicyId) {
         await prisma().appPolicy.delete({ where: { id: row.id } });
         continue;
@@ -381,7 +382,7 @@ async function tick(owner: string): Promise<boolean> {
     for (const row of rulePolicies) {
       const key = plannedRuleKey(row.ruleId, row.windowKey, row.zoneId);
       if (desiredRuleKeys.has(key)) continue;
-      if (retainRuleIds.has(row.ruleId)) continue;
+      if (retainRuleIds.has(row.ruleId) && !goneFromGateway(row.unifiPolicyId, onGateway)) continue;
       if (!row.unifiPolicyId) {
         await prisma().rulePolicy.delete({ where: { id: row.id } });
         continue;
@@ -708,6 +709,11 @@ function isNotFound(error: unknown): boolean {
 }
 
 /** Deletes a policy FamilyFi owns. One already gone from the gateway counts as deleted. */
+/** A record whose policy is no longer on the gateway: there is nothing left to keep. */
+function goneFromGateway(unifiPolicyId: string | null, onGateway: Set<string>): boolean {
+  return Boolean(unifiPolicyId) && !onGateway.has(unifiPolicyId!);
+}
+
 async function deleteFromGateway(client: UnifiClient, siteId: string, policyId: string, onGateway: Set<string>) {
   if (onGateway.has(policyId)) {
     try {

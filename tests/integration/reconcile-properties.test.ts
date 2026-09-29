@@ -397,7 +397,33 @@ describe("reconciliation properties", () => {
             setReconcileClientForTests(undefined);
           }
         }),
-        { numRuns: 40 },
+        {
+          numRuns: 40,
+          examples: [
+            // A disabled rule's policy is kept while its only device is off the managed
+            // networks; the console then deletes it. The record must not outlive it.
+            [
+              {
+                manageAll: false,
+                managed: [IOT_NETWORK],
+                quarantineEnforced: false,
+                groups: [
+                  { protected: false, paused: false, allowed: false },
+                  { protected: false, paused: false, allowed: false },
+                  { protected: false, paused: false, allowed: false },
+                ],
+                rules: [{ kind: "internet", groups: [2], always: false, windows: [{ name: "", days: [6], start: "21:00", end: "06:45" }], enabled: false }],
+                places: ["internal", "iot", "internal", "internal", "internal"],
+                assignments: [null, 2, null, null, null],
+                lookalikes: [],
+              },
+              [
+                { kind: "move", mac: 1, place: "internal" },
+                { kind: "consoleDelete", pick: 0 },
+              ],
+            ],
+          ],
+        },
       );
     },
     180_000,
