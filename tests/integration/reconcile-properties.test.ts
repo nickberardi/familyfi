@@ -152,7 +152,8 @@ async function setBlock(groupId: string, on: boolean) {
   const existing = await db.rule.findUnique({ where: { systemGroupId: groupId } });
   if (existing) {
     await db.rule.update({ where: { id: existing.id }, data });
-  } else if (on) {
+  } else if (on && (await db.group.findUnique({ where: { id: groupId } }))) {
+    // A group a step already deleted has nothing to pause.
     await db.rule.create({
       data: { ...data, name: `Pause ${groupId}`, kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: groupId, groups: { create: { groupId } } },
     });
@@ -411,7 +412,15 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
   for (const { row, policy } of ourRules) {
     const rule = rules.find((item) => item.id === row.ruleId);
     if (!rule) continue;
-    if (!rule.enabled || rulePaused(rule)) expect(policy.enabled, `${policy.name} off or paused`).toBe(false);
+    // A policy kept while every device it covers is out of view is left as it was.
+    const inView = devices.some(
+      (device) =>
+        device.assignment === AssignmentState.assigned &&
+        rule.groups.some((link) => link.groupId === device.groupId) &&
+        inScope(device.networkId) &&
+        device.zoneId,
+    );
+    if (inView && (!rule.enabled || rulePaused(rule))) expect(policy.enabled, `${policy.name} off or paused`).toBe(false);
     expect(policy.name.startsWith(`FamilyFi ${rule.name}`), policy.name).toBe(true);
     const window = rule.windows.find((item) => item.id === row.windowKey);
     const schedule = window ? toUnifiSchedule({ enabled: true, days: window.days, start: window.start, end: window.end }) : undefined;
