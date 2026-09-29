@@ -155,7 +155,7 @@ scripts/test.py run scripts/tests/
 
 ## `release.sh`
 
-Publishing requires the operator's request. `--skip-ci` and `--allow-dirty` are explicit operator exceptions, never normal agent workflow. A script accepting an option does not authorize using it.
+Publishing requires the operator's request. `--skip-ci`, `--allow-dirty` and `--force` are explicit operator exceptions, never normal agent workflow. A script accepting an option does not authorize using it.
 
 Does what `.github/workflows/release.yml` does, from this machine: checks that `HEAD` is on
 `origin/main`, runs the checks and tests of `ci.yml`'s verify job and of `container.yml` through
@@ -166,6 +166,7 @@ Release creates the tag on GitHub at `HEAD`.
 ```sh
 scripts/release.sh --tag v0.12.1               # checks and tests, build, push, publish
 scripts/release.sh --tag v0.12.1 --no-push     # build both architectures, publish nothing
+scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag checked out at HEAD
 ```
 
 | Option | What it does |
@@ -173,6 +174,7 @@ scripts/release.sh --tag v0.12.1 --no-push     # build both architectures, publi
 | `--tag vX.Y.Z` | the release to publish; must start with `v` and must not exist on GitHub yet |
 | `--skip-ci` | don't run the checks and tests first |
 | `--no-push` | build only: no GHCR login, no push, no GitHub Release |
+| `--force` | allow a tag that already exists on GitHub or locally, if it is `HEAD`: rebuild and push its images, overwriting them on GHCR, and create the GitHub Release only if it is missing |
 | `--allow-dirty` | allow uncommitted changes in the working tree; the build uses them |
 | `-h`, `--help` | print usage |
 
