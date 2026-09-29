@@ -27,6 +27,8 @@ export type PlanRule = {
   enabled: boolean;
   /** A pause is active: the rule's policies stay, disabled, until it ends. */
   paused: boolean;
+  /** Groups the rule is lifted for alone: their devices leave its policies. */
+  liftedGroupIds: string[];
   mode: RuleMode;
   windows: PlanRuleWindow[];
 };
@@ -81,7 +83,8 @@ export function plannedRuleKey(ruleId: string, windowKey: string, zoneId: string
  * in each source zone its devices or networks are in. A rule covering several groups
  * puts all their devices in the same policy. A group with an allowance is left out of
  * its internet rules; when that leaves no one, the policy stays with its devices but
- * disabled, so ending the allowance does not create it again. A paused rule keeps every
+ * disabled, so ending the allowance does not create it again. The same holds for a group
+ * the rule is lifted for alone, on any rule kind. A paused rule keeps every
  * policy the same way, disabled.
  */
 export function planRulePolicies(input: {
@@ -144,7 +147,8 @@ export function planRulePolicies(input: {
         }
         const found = bucket(device.zoneId);
         found.macs.push(device.mac);
-        const lifted = rule.kind === "internet" && groups.get(device.groupId!)!.allowed;
+        const lifted =
+          (rule.kind === "internet" && groups.get(device.groupId!)!.allowed) || rule.liftedGroupIds.includes(device.groupId!);
         if (!lifted) found.live.push(device.mac);
       }
     }

@@ -386,6 +386,12 @@ enum RuleMode {
   scheduled
 }
 
+/// How a rule came to be lifted: a pause suspends it, an allowance overrides it.
+enum RuleLiftKind {
+  pause
+  allow
+}
+
 enum RuleScope {
   group
   network
@@ -404,9 +410,10 @@ model Rule {
   domains          String[]     @default([])
   enabled          Boolean      @default(true)
   mode             RuleMode     @default(always)
-  /// A pause lifts the rule for every group it covers until `pauseUntil`, or until resumed.
+  /// A pause or allowance lifts the rule for every group it covers until `pauseUntil`, or until ended.
   pauseActive      Boolean      @default(false)
   pauseUntil       DateTime?
+  pauseKind        RuleLiftKind @default(pause)
   /// Who paused it, as they were named then.
   pausedByAccountId String?
   pausedByName     String?
@@ -424,6 +431,12 @@ model RuleGroup {
   rule    Rule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   groupId String
   group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// The same lift for this group alone: its devices leave the rule's policies until `pauseUntil`.
+  pauseActive       Boolean      @default(false)
+  pauseUntil        DateTime?
+  pauseKind         RuleLiftKind @default(pause)
+  pausedByAccountId String?
+  pausedByName      String?
 
   @@id([ruleId, groupId])
   @@index([groupId])

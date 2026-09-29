@@ -94,7 +94,8 @@ describe("client rule helpers", () => {
     targetIds: [],
     domains: [],
     enabled: true,
-    pause: { active: false, until: null, by: null },
+    pause: { active: false, until: null, kind: "pause", by: null },
+    groupPauses: [],
     mode: "scheduled",
     windows: [{ id: "w", name: "", days: EVERY_DAY, start: "22:00", end: "06:00" }],
     useGeneratedName: false,
@@ -109,10 +110,22 @@ describe("client rule helpers", () => {
 
   it("leaves a paused rule's windows out until the pause ends", () => {
     const now = new Date("2026-09-14T12:00:00Z");
-    const paused = (until: string | null) => rule({ name: "Bedtime", pause: { active: true, until, by: null } });
+    const paused = (until: string | null) => rule({ name: "Bedtime", pause: { active: true, until, kind: "pause", by: null } });
     expect(internetWindowsForGroup([paused("2026-09-14T13:00:00Z")], "g1", now)).toEqual([]);
     expect(internetWindowsForGroup([paused(null)], "g1", now)).toEqual([]);
     expect(internetWindowsForGroup([paused("2026-09-14T11:00:00Z")], "g1", now)).toHaveLength(1);
+  });
+
+  it("leaves a rule out for the one group it is lifted for", () => {
+    const now = new Date("2026-09-14T12:00:00Z");
+    const lifted = rule({
+      name: "Bedtime",
+      groupIds: ["g1", "g2"],
+      groupPauses: [{ groupId: "g1", pause: { active: true, until: "2026-09-14T13:00:00Z", kind: "allow", by: null } }],
+    });
+    expect(internetWindowsForGroup([lifted], "g1", now)).toEqual([]);
+    expect(internetWindowsForGroup([lifted], "g2", now)).toHaveLength(1);
+    expect(internetWindowsForGroup([lifted], "g1", new Date("2026-09-14T14:00:00Z"))).toHaveLength(1);
   });
 
   it("names a picked category or app from what FamilyFi knows, then the catalog, then its id", () => {

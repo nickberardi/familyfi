@@ -57,6 +57,7 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
   rulePauseSheetOptions: (i) => pauseSheet.rulePauseSheetOptions(i.rule, i.windows, i.mode, i.timeZone, at(i.now)),
   ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),
   ruleStateLine: (i) => ruleActions.ruleStateLine(i.rule, i.timeZone, at(i.now)),
+  ruleGroupStateLines: (i) => ruleActions.ruleGroupStateLines(i.rule, i.groupNames, i.timeZone, at(i.now)),
   windowTitle: (i) => ruleWindows.windowTitle(i.window),
   isWindowActive: (i) => ruleWindows.isWindowActive(i.window, at(i.now), i.timeZone),
   windowEndsAt: (i) => iso(ruleWindows.windowEndsAt(i.window, at(i.now), i.timeZone)),

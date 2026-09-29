@@ -68,10 +68,12 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/PATCH/DELETE | `/api/v1/rules/{id}` | PATCH changes anything but `kind` and `scope`; `windows` replaces the list, and a window sent with its `id` keeps its UniFi policy. DELETE removes the rule's recorded policies |
 | POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled. Ends any pause on it |
 | POST | `/api/v1/rules/{id}/on` | Turns a rule on |
-| POST | `/api/v1/rules/{id}/pause` | Lifts the rule for every group it covers until `until` (empty body or `null` = until resumed) by disabling its policies. Records who paused it. 400 for an `until` in the past; 409 `rule_off` when the rule is off |
-| POST | `/api/v1/rules/{id}/resume` | Ends a pause or allowance |
-| POST | `/api/v1/rules/{id}/extend` | Adds `minutes` to a timed pause. 409 `not_paused`, `indefinite` or `rule_off` |
-| POST | `/api/v1/rules/{id}/allow` | Same state as a pause. Default `until` is when the windows active now end (until resumed for an always-on rule); 409 `not_in_window` when none is active, `rule_off` when the rule is off. Resume ends it; there is no `DELETE` |
+| POST | `/api/v1/rules/{id}/pause` | Suspends the rule for every group it covers until `until` (empty body or `null` = until resumed) by disabling its policies. Records who paused it and replaces an earlier pause or allowance. 400 for an `until` in the past; 409 `rule_off` when the rule is off |
+| POST | `/api/v1/rules/{id}/resume` | Ends a pause. An allowance is ended by `disallow`; ending the other kind changes nothing and still returns 200 |
+| POST | `/api/v1/rules/{id}/extend` | Adds `minutes` to a timed pause. 409 `not_paused` (an allowance is not extended), `indefinite` or `rule_off` |
+| POST | `/api/v1/rules/{id}/allow` | Overrides the rule, like a pause but recorded as an allowance. Default `until` is when the windows active now end (until disallowed for an always-on rule); 409 `not_in_window` when none is active, `rule_off` when the rule is off |
+| POST | `/api/v1/rules/{id}/disallow` | Ends an allowance; a pause is ended by `resume` |
+| POST | `/api/v1/groups/{id}/rules/{ruleId}/(pause\|resume\|extend\|allow\|disallow)` | The same five verbs for one group alone: its devices leave the rule's policies (a policy left with no one stays disabled with its devices). Same requests, states and errors as the rule-wide routes; 404 when the group does not have the rule. Rules list the active ones as `groupPauses` |
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |
@@ -151,7 +153,7 @@ The iPhone may automatically enroll its reachable Watch without another administ
 The Watch receives its own device credential and bearer token, appears as a separate device in
 System → Pair Device, and can be revoked there independently. Its sessions may only read session,
 connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
-resume, extend, allow, turn on and turn off any rule; role never limits a control. They cannot
+resume, extend, allow, disallow, turn on and turn off any rule, or lift one for a single group; role never limits a control. They cannot
 create, edit or delete rules. Signing out or revoking the phone does
 not revoke the Watch. Its bearer expires after 30 days; automatic renewal is a separate change.
 

@@ -29,6 +29,7 @@ const rule = (patch: Partial<PlanRule>): PlanRule => ({
   domains: [],
   enabled: true,
   paused: false,
+  liftedGroupIds: [],
   mode: RuleMode.always,
   windows: [],
   ...patch,
@@ -61,6 +62,21 @@ describe("planRulePolicies", () => {
     expect(policies).toHaveLength(2);
     expect(policies.every((policy) => !policy.enabled && policy.macAddresses.join() === "02:00:00:00:00:01")).toBe(true);
     expect(plan([tvDowntime]).policies.every((policy) => policy.enabled)).toBe(true);
+  });
+
+  it("takes a lifted group's devices out of a rule for that group alone, on any kind", () => {
+    const video = rule({ id: "video", groupIds: ["g1", "g2"], liftedGroupIds: ["g1"] });
+    const { policies } = plan(
+      [video],
+      [group("g1"), group("g2")],
+      [device("02:00:00:00:00:01", "g1"), device("02:00:00:00:00:02", "g2")],
+    );
+    expect(policies.map((policy) => [policy.enabled, policy.macAddresses])).toEqual([[true, ["02:00:00:00:00:02"]]]);
+  });
+
+  it("keeps a policy disabled with its devices when every group in it is lifted", () => {
+    const { policies } = plan([rule({ liftedGroupIds: ["g1"] })]);
+    expect(policies.map((policy) => [policy.enabled, policy.macAddresses])).toEqual([[false, ["02:00:00:00:00:01"]]]);
   });
 
   it("disables a paused rule even when its group is also allowed", () => {

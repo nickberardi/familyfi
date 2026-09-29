@@ -5,6 +5,9 @@ import type { Actor } from "./types";
 
 export type RuleKind = "internet" | "category" | "app" | "domain";
 
+/** A pause suspends a rule; an allowance overrides it. Either lifts it until `until`, or until ended when null. */
+export type RulePause = { active: boolean; until: string | null; kind: "pause" | "allow"; by: Actor };
+
 export type RuleWindow = { id?: string; name: string; days: number[]; start: string; end: string };
 
 export type Rule = {
@@ -17,8 +20,10 @@ export type Rule = {
   targetIds: number[];
   domains: string[];
   enabled: boolean;
-  /** A pause lifts the rule for every group it covers until `until`, or until resumed. */
-  pause: { active: boolean; until: string | null; by: Actor };
+  /** A pause or allowance lifts the rule for every group it covers until `until`, or until ended. */
+  pause: RulePause;
+  /** The same lift for one group alone; only the active ones. */
+  groupPauses: { groupId: string; pause: RulePause }[];
   mode: "always" | "scheduled";
   windows: (RuleWindow & { id: string })[];
   useGeneratedName: boolean;
@@ -138,9 +143,18 @@ export function internetRulePresets(group: { kind: "family" | "things"; familyRo
   return [];
 }
 
-/** Whether the rule's pause is lifting it at `now`. */
+function lifting(pause: Pick<RulePause, "active" | "until">, now: Date): boolean {
+  return pause.active && (pause.until === null || now.getTime() < new Date(pause.until).getTime());
+}
+
+/** Whether the rule's pause or allowance is lifting it for every group at `now`. */
 export function rulePaused(rule: Pick<Rule, "pause">, now: Date): boolean {
-  return rule.pause.active && (rule.pause.until === null || now.getTime() < new Date(rule.pause.until).getTime());
+  return lifting(rule.pause, now);
+}
+
+/** Whether the rule is lifted for this group alone at `now`. */
+export function ruleLiftedForGroup(rule: Pick<Rule, "groupPauses">, groupId: string, now: Date): boolean {
+  return rule.groupPauses.some((item) => item.groupId === groupId && lifting(item.pause, now));
 }
 
 /**
@@ -149,7 +163,7 @@ export function rulePaused(rule: Pick<Rule, "pause">, now: Date): boolean {
  */
 export function internetWindowsForGroup(rules: Rule[], groupId: string, now: Date): InternetWindow[] {
   return internetRulesForGroup(rules, groupId)
-    .filter((rule) => rule.enabled && !rulePaused(rule, now))
+    .filter((rule) => rule.enabled && !rulePaused(rule, now) && !ruleLiftedForGroup(rule, groupId, now))
     .flatMap(ruleInternetWindows);
 }
 

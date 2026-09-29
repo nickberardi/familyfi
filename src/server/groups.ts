@@ -13,18 +13,29 @@ export const groupInclude = {
 
 export type GroupWithRules = Prisma.GroupGetPayload<{ include: typeof groupInclude }>;
 
-/** The windows of the group's enabled, unpaused internet rules, in rule then window order. */
+/**
+ * The windows of the group's enabled internet rules, in rule then window order, leaving out
+ * a rule that is paused or allowed, for everyone or for this group alone.
+ */
 export function internetWindows(group: Pick<GroupWithRules, "rules">, now: Date): InternetWindow[] {
-  return internetRules(group)
-    .filter((rule) => rule.enabled && !isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now))
-    .flatMap(ruleInternetWindows);
+  return internetLinks(group)
+    .filter(({ rule, link }) => rule.enabled && !lifted(rule, now) && !lifted(link, now))
+    .flatMap(({ rule }) => ruleInternetWindows(rule));
+}
+
+function lifted(state: { pauseActive: boolean; pauseUntil: Date | null }, now: Date) {
+  return isSuspended({ active: state.pauseActive, until: state.pauseUntil }, now);
+}
+
+function internetLinks(group: Pick<GroupWithRules, "rules">) {
+  return group.rules
+    .map((link) => ({ rule: link.rule, link }))
+    .filter(({ rule }) => rule.kind === "internet")
+    .sort((a, b) => a.rule.createdAt.getTime() - b.rule.createdAt.getTime());
 }
 
 function internetRules(group: Pick<GroupWithRules, "rules">) {
-  return group.rules
-    .map((link) => link.rule)
-    .filter((rule) => rule.kind === "internet")
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  return internetLinks(group).map(({ rule }) => rule);
 }
 
 function actor(accountId: string | null, name: string | null) {

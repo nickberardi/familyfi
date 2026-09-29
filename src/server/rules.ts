@@ -1,4 +1,4 @@
-import { Prisma, RuleKind, RuleMode, RuleScope } from "@prisma/client";
+import { Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { z } from "zod";
 import { rulePolicyNames } from "@/lib/policy-names";
 import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain } from "@/lib/rules";
@@ -16,6 +16,23 @@ export type RuleWithWindows = Prisma.RuleGetPayload<{ include: typeof ruleInclud
 
 export type PublicRule = ReturnType<typeof publicRule>;
 
+type LiftColumns = {
+  pauseActive: boolean;
+  pauseUntil: Date | null;
+  pauseKind: RuleLiftKind;
+  pausedByAccountId: string | null;
+  pausedByName: string | null;
+};
+
+function publicPause(state: LiftColumns) {
+  return {
+    active: state.pauseActive,
+    until: state.pauseUntil?.toISOString() ?? null,
+    kind: state.pauseKind,
+    by: state.pausedByName ? { accountId: state.pausedByAccountId, name: state.pausedByName } : null,
+  };
+}
+
 export function publicRule(rule: RuleWithWindows) {
   const windows = [...rule.windows].sort((a, b) => a.position - b.position);
   return {
@@ -28,11 +45,11 @@ export function publicRule(rule: RuleWithWindows) {
     targetIds: [...rule.targetIds],
     domains: [...rule.domains],
     enabled: rule.enabled,
-    pause: {
-      active: rule.pauseActive,
-      until: rule.pauseUntil?.toISOString() ?? null,
-      by: rule.pausedByName ? { accountId: rule.pausedByAccountId, name: rule.pausedByName } : null,
-    },
+    pause: publicPause(rule),
+    groupPauses: rule.groups
+      .filter((link) => link.pauseActive)
+      .map((link) => ({ groupId: link.groupId, pause: publicPause(link) }))
+      .sort((a, b) => a.groupId.localeCompare(b.groupId)),
     mode: rule.mode,
     windows: windows.map((window) => ({
       id: window.id,
@@ -266,7 +283,7 @@ export async function saveRule(input: RuleInput, existingId?: string): Promise<R
       enabled: input.enabled,
       mode: input.mode,
       // Off and paused never overlap: turning a rule off ends its pause.
-      ...(input.enabled ? {} : { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null }),
+      ...(input.enabled ? {} : { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null }),
     };
     const rule = existingId
       ? await tx.rule.update({ where: { id: existingId }, data })
