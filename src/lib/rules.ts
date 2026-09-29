@@ -152,11 +152,6 @@ export function alwaysWindow(ruleName: string): InternetWindow {
   return { name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "00:00", always: true, ruleName };
 }
 
-/** The group's category, app and website rules: each blocks only its own traffic. */
-export function filterRulesForGroup(rules: Rule[], groupId: string): Rule[] {
-  return groupScopedRules(rules, groupId).filter((rule) => rule.kind !== "internet");
-}
-
 /** What a rule blocks, in the words its card uses. */
 export function ruleBlocksLabel(rule: Pick<Rule, "kind" | "targetIds" | "domains">, catalogNames: Map<string, string>): string {
   if (rule.kind === "internet") return "All internet · every device";

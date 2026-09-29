@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { inRecurringWindow } from "@/lib/schedule";
+import { isWindowActive } from "@/lib/rule-windows";
 import type { UnifiClient } from "@/server/unifi/client";
 import { createFixtureUnifiClient, DEV_MOCK_ADMIN_POLICY_ID, DEV_MOCK_ROGUE_POLICY_ID } from "@/server/unifi/dev-mock";
 import type { MockUnifiClient } from "@/server/unifi/mock";
@@ -232,7 +232,7 @@ describe("spike verify: bedtime windows", () => {
       const now = new Date(Date.UTC(2026, 8, 24, Math.floor(minute / 60), minute % 60));
       const { inside, outside } = midnightWindows(minute);
       const holds = (window: { start: string; end: string }) =>
-        inRecurringWindow(now, { enabled: true, days: [0, 1, 2, 3, 4, 5, 6], ...window }, "UTC");
+        isWindowActive({ name: "", days: [0, 1, 2, 3, 4, 5, 6], ...window }, now, "UTC");
       expect(inside.start > inside.end, `${minute}: inside crosses midnight`).toBe(true);
       expect(holds(inside), `${minute}: inside holds now`).toBe(true);
       const nearMidnight = minute < 21 || minute > 24 * 60 - 21;
