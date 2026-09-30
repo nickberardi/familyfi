@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
-import type { Group } from "@/lib/types";
+import { FAMILY_ROLES, MONOGRAM_MAX, monogramPlaceholder, newGroupCopy, normalizeMonogram, type FamilyRole } from "@/lib/group-form";
+import { createGroup } from "@/lib/group-writes";
 import { useAppData } from "@/components/AppDataProvider";
 import { Field, TextField } from "@/components/ui/Controls";
 import { Segmented } from "@/components/ui/Segmented";
-
-type Role = "child" | "teen" | "adult";
 
 /**
  * Adds a family member or a Things group over the page it was opened from, like adding a
@@ -15,9 +13,9 @@ type Role = "child" | "teen" | "adult";
  * it asks for; the new card appears in place.
  */
 export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; onClose: () => void }) {
-  const { mutate } = useAppData();
+  const { store } = useAppData();
   const [name, setName] = useState("");
-  const [familyRole, setFamilyRole] = useState<Role>("child");
+  const [familyRole, setFamilyRole] = useState<FamilyRole>("child");
   const [monogram, setMonogram] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -25,29 +23,17 @@ export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; on
   const trimmed = name.trim();
   const canCreate = !busy && trimmed.length > 0;
   const family = kind === "family";
+  const copy = newGroupCopy(kind);
 
   async function create() {
     if (!canCreate) return;
     setBusy(true);
     setError("");
-    const result = await mutate(
-      () =>
-        api<{ group: Group; change: { changeId: string } }>("/api/v1/groups", {
-          method: "POST",
-          body: JSON.stringify({
-            kind,
-            name: trimmed,
-            familyRole: family ? familyRole : undefined,
-            monogram: !family && monogram.trim() ? monogram.trim() : undefined,
-          }),
-        }),
-      undefined,
-      { notice: `${trimmed} added. Assign devices on the Devices page.` },
-    );
+    const result = await createGroup(store.mutate, { kind, name, familyRole, monogram });
     setBusy(false);
     // A failure is reported by `mutate`; the sheet stays open so nothing typed is lost.
     if (result?.group) onClose();
-    else setError(`Could not add ${family ? "the person" : "the group"}.`);
+    else setError(copy.failed);
   }
 
   return (
@@ -66,17 +52,15 @@ export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; on
       >
         <header className="px-5 pb-1 pt-[18px]">
           <h2 id="new-group-title" className="m-0 text-[17px] font-bold tracking-tight">
-            {family ? "New family member" : "New group"}
+            {copy.title}
           </h2>
           <p className="mt-1 text-[13px] leading-snug" style={{ color: "var(--ff-ink-3)" }}>
-            {family
-              ? "A person in the household. Assign their devices afterward."
-              : "A Things group is any set of devices that isn't a person. Assign devices to it afterward."}
+            {copy.body}
           </p>
         </header>
         <div className="flex flex-col gap-3.5 px-5 py-4">
           <Field label="Name">
-            <TextField label="Name" value={name} onChange={setName} placeholder={family ? "e.g. Sam" : "e.g. Consoles"} onSubmit={create} />
+            <TextField label="Name" value={name} onChange={setName} placeholder={copy.namePlaceholder} onSubmit={create} />
           </Field>
           {family ? (
             <Field label="Role">
@@ -85,21 +69,17 @@ export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; on
                 grow
                 value={familyRole}
                 onChange={setFamilyRole}
-                segments={[
-                  { value: "child", label: "Child" },
-                  { value: "teen", label: "Teen" },
-                  { value: "adult", label: "Adult" },
-                ]}
+                segments={[...FAMILY_ROLES]}
               />
             </Field>
           ) : (
-            <Field label="Monogram — up to 4 characters, e.g. TV, PC">
+            <Field label={copy.monogramLabel}>
               <TextField
                 label="Monogram"
                 value={monogram}
-                onChange={(value) => setMonogram(value.toUpperCase())}
-                placeholder={trimmed.slice(0, 2).toUpperCase() || "e.g. TV"}
-                maxLength={4}
+                onChange={(value) => setMonogram(normalizeMonogram(value))}
+                placeholder={monogramPlaceholder(trimmed)}
+                maxLength={MONOGRAM_MAX}
                 onSubmit={create}
               />
             </Field>
@@ -112,7 +92,7 @@ export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; on
         </div>
         <div className="flex" style={{ borderTop: "1px solid var(--ff-hairline-card)" }}>
           <button type="button" onClick={onClose} className="flex-1 px-5 py-[13px] text-[14px]" style={{ color: "var(--ff-ink-3)" }}>
-            Cancel
+            {copy.cancel}
           </button>
           <button
             type="button"
@@ -124,7 +104,7 @@ export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; on
               color: canCreate ? "var(--ff-accent)" : "var(--ff-locked)",
             }}
           >
-            {family ? "Add person" : "Create group"}
+            {copy.create}
           </button>
         </div>
       </div>

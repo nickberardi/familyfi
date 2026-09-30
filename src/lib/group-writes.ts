@@ -1,9 +1,11 @@
 import { formatClock } from "./display";
+import { groupAddedNotice, groupEditBody, newGroupBody, type GroupEditDraft, type NewGroupDraft } from "./group-form";
 import { internetRulePath } from "./group-actions";
 import type { HouseholdStore } from "./household-store";
 import type { PauseSheetRequest } from "./pause-sheet";
 import type { Rule } from "./rules";
-import type { Group } from "./types";
+import { assignDeviceLocally } from "./household-state";
+import type { Device, Group } from "./types";
 
 /**
  * The internet writes every client sends from a card or a pause sheet, with their notices. A
@@ -54,4 +56,44 @@ export function applyRulePause(mutate: Mutate, rule: Pick<Rule, "id" | "name">, 
 export function runGroupAction(mutate: Mutate, group: Group, run: "resume" | "allow" | "disallow") {
   const path = internetRulePath(group);
   return mutate((send) => send(`${path}/${run}`, { method: "POST", body: run === "allow" ? {} : undefined }), { groupId: group.id });
+}
+
+/**
+ * Adding, editing and deleting a group, and assigning a device to one. Each resolves to the
+ * store's payload, or undefined when there was nothing to send or the write failed (the store
+ * reports a failure).
+ */
+export function createGroup(mutate: Mutate, draft: NewGroupDraft) {
+  const body = newGroupBody(draft);
+  if (!body) return Promise.resolve(undefined);
+  return mutate((send) => send<{ group: Group; change: { changeId: string } }>("/api/v1/groups", { method: "POST", body }), {
+    feedback: { notice: groupAddedNotice(body.name) },
+  });
+}
+
+export function updateGroup(mutate: Mutate, group: Group, draft: GroupEditDraft) {
+  const body = groupEditBody(group, draft);
+  if (!body) return Promise.resolve(undefined);
+  return mutate((send) => send<{ group: Group; change: { changeId: string } }>(`/api/v1/groups/${group.id}`, { method: "PUT", body }), {
+    groupId: group.id,
+  });
+}
+
+/** Deletes a group; its devices become quarantined (Unassigned). */
+export function deleteGroup(mutate: Mutate, group: Pick<Group, "id">) {
+  return mutate(async (send) => {
+    const result = await send<{ change: { changeId: string } }>(`/api/v1/groups/${group.id}`, { method: "DELETE" });
+    return { ...result, removedGroupId: group.id };
+  });
+}
+
+export function assignDevicePath(mac: string): string {
+  return `/api/v1/devices/${encodeURIComponent(mac)}/assignment`;
+}
+
+/** Puts a device in a group, or leaves it Unassigned (`null`); the card updates at once. */
+export function assignDevice(mutate: Mutate, device: Pick<Device, "mac">, groupId: string | null) {
+  return mutate((send) => send<{ device: Device; change: { changeId: string } }>(assignDevicePath(device.mac), { method: "PUT", body: { groupId } }), {
+    optimistic: (state) => assignDeviceLocally(state, device.mac, groupId),
+  });
 }

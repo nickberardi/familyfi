@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, TransportError, type ApiRequest } from "@/lib/api-client";
-import { applyGroupPause, applyRulePause, runGroupAction } from "@/lib/group-writes";
+import { applyGroupPause, applyRulePause, assignDevice, createGroup, deleteGroup, runGroupAction, updateGroup } from "@/lib/group-writes";
 import { createHouseholdStore, NOTICE_MS, NOTICE_WITH_ACTION_MS, type OfflineGuard } from "@/lib/household-store";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -162,6 +162,35 @@ describe("household store", () => {
       ["resume", undefined],
       ["allow", {}],
       ["disallow", undefined],
+    ]);
+  });
+
+  it("adds, edits and deletes a group, and assigns a device, with the requests the API expects", async () => {
+    const child = childGroup();
+    const added = childGroup({ id: "group-new", name: "Consoles", kind: "things", familyRole: null, monogram: "CO" });
+    const { store, server } = setup({
+      ...reads(() => child),
+      "POST /api/v1/groups": () => ({ json: { group: added, change: { changeId: "c1" } } }),
+      "PUT /api/v1/groups/group-child": () => ({ json: { group: { ...child, name: "Sam" }, change: { changeId: "c2" } } }),
+      "PUT /api/v1/devices/aa%3Abb/assignment": () => ({ json: { device: { mac: "aa:bb", groupId: "group-child" }, change: { changeId: "c3" } } }),
+      "DELETE /api/v1/groups/group-child": () => ({ json: { change: { changeId: "c4" } } }),
+    });
+    await store.reload();
+    await createGroup(store.mutate, { kind: "things", name: " Consoles ", familyRole: "child", monogram: "CO" });
+    expect(store.getState().notice).toBe("Consoles added. Assign devices on the Devices page.");
+    expect(store.getState().groups.map((group) => group.id)).toContain("group-new");
+    // Nothing to send is not sent: an unchanged edit and an empty name.
+    await expect(updateGroup(store.mutate, child, { name: child.name, familyRole: "child", monogram: "" })).resolves.toBeUndefined();
+    await expect(createGroup(store.mutate, { kind: "family", name: "  ", familyRole: "child", monogram: "" })).resolves.toBeUndefined();
+    await updateGroup(store.mutate, child, { name: "Sam", familyRole: "teen", monogram: "" });
+    await assignDevice(store.mutate, { mac: "aa:bb" }, "group-child");
+    await deleteGroup(store.mutate, child);
+    expect(store.getState().groups.map((group) => group.id)).not.toContain("group-child");
+    expect(server.calls.filter((call) => call.method !== "GET").map((call) => [call.method, call.path, call.body])).toEqual([
+      ["POST", "/api/v1/groups", { kind: "things", name: "Consoles", familyRole: undefined, monogram: "CO" }],
+      ["PUT", "/api/v1/groups/group-child", { name: "Sam", familyRole: "teen" }],
+      ["PUT", "/api/v1/devices/aa%3Abb/assignment", { groupId: "group-child" }],
+      ["DELETE", "/api/v1/groups/group-child", undefined],
     ]);
   });
 
