@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PendingEnrollment } from "@/lib/companion-pairing";
-import { connectionHousehold, pendingHouseholdNote, pendingHouseholdRows } from "@/lib/companion-setup";
+import { connectionHousehold, pendingHouseholdNote, pendingHouseholdSections, trustExplanation } from "@/lib/companion-setup";
 import { shortPin } from "@/lib/connection-routes";
 import type { ConnectionRoute } from "@/lib/types";
 
@@ -30,20 +30,34 @@ const pending = (endpoint: ConnectionRoute): PendingEnrollment => ({
 });
 
 describe("confirming a household", () => {
-  it("shows the address, route, pin and signing key of a pinned home-network route", () => {
-    expect(pendingHouseholdRows(pending(route))).toEqual([
-      { label: "Address", value: "https://familyfi.home" },
-      { label: "Route", value: "Home network" },
-      { label: "Certificate pin", value: shortPin(PIN) },
-      { label: "Signing key", value: shortPin(FINGERPRINT) },
+  it("groups what the code said (the key kept secret) and what a pinned household proved", () => {
+    expect(pendingHouseholdSections(pending(route))).toEqual([
+      {
+        title: "Found in pairing code",
+        rows: [
+          { label: "Server address", value: "https://familyfi.home", mono: true },
+          { label: "One-time pairing key", value: "cm1.token", mono: true, secret: true },
+        ],
+      },
+      {
+        title: "Verified household",
+        rows: [
+          { label: "Household", value: "A household", mono: false },
+          { label: "Instance", value: "ff_home", mono: true },
+          { label: "Key fingerprint", value: FINGERPRINT, mono: true },
+          { label: "Certificate", value: PIN, mono: true },
+        ],
+      },
     ]);
     expect(pendingHouseholdNote(pending(route))).toBe("The server identity and certificate matched the pairing code.");
+    expect(trustExplanation(pending(route))).toMatch(/^FamilyFi issues its own certificate\. Trusting it pins this fingerprint/);
   });
 
-  it("shows no pin for a system-trusted route, and says HTTPS validation passed", () => {
+  it("shows no certificate for a system-trusted route, and says ordinary HTTPS validation applies", () => {
     const system = { ...route, transport: "cloudflare" as const, trustMode: "system" as const, spkiSha256: null };
-    expect(pendingHouseholdRows(pending(system)).map((row) => row.label)).toEqual(["Address", "Route", "Signing key"]);
+    expect(pendingHouseholdSections(pending(system))[1]!.rows.map((row) => row.label)).toEqual(["Household", "Instance", "Key fingerprint"]);
     expect(pendingHouseholdNote(pending(system))).toMatch(/passed HTTPS validation/);
+    expect(trustExplanation(pending(system))).toMatch(/^This route uses ordinary HTTPS validation\./);
   });
 });
 
