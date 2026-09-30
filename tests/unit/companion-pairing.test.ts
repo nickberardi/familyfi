@@ -319,6 +319,29 @@ describe("a companion session", () => {
     expect(relaunch.getState().status).toBe("unpaired");
   });
 
+  it("keeps a refreshed route list, and neither saves nor announces an unchanged one", async () => {
+    const home = household();
+    const storage = memory();
+    let writes = 0;
+    const counted: SecureStorage = { ...storage, set: async (key, value) => void (writes++, await storage.set(key, value)) };
+    const session = createCompanionSession({ transport: home.transport, storage: counted, deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+    let announced = 0;
+    session.subscribe(() => announced++);
+
+    writes = 0;
+    await session.refresh();
+    expect(session.getState().profile?.endpoints.find((route) => route.id === EDGE.id)?.edgeTokenVersion).toBe(2);
+    expect(writes).toBeGreaterThan(0);
+
+    writes = 0;
+    announced = 0;
+    await session.refresh();
+    expect([writes, announced]).toEqual([0, 0]);
+  });
+
   it("drops a household the person rejects without spending its code", async () => {
     const home = household();
     const session = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
