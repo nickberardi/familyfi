@@ -21,8 +21,11 @@ concurrency:
   cancel-in-progress: true
     
 jobs:
-  # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
-  verify:
+  # Lint, types, unit tests (display vectors, import allowlist, schema, hygiene, invariants,
+  # reviewer parity), the schema staleness check and expo-doctor. The same as .githooks/pre-push.
+  # Self-hosted runners, as familyfi and familyfi-ios use; GitHub-hosted runners are not enabled
+  # for this private repository.
+  checks:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
