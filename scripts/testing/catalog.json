@@ -701,6 +701,11 @@
         "sessions"
       ]
     },
+    "tests/unit/companion-setup.test.ts": {
+      "categories": [
+        "pairing"
+      ]
+    },
     "tests/unit/companion-pairing.test.ts": {
       "categories": [
         "pairing",

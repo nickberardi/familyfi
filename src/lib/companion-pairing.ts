@@ -10,6 +10,7 @@
  * 4. Sign in with the device credential.
  */
 import { ApiError, TransportError, type ApiRequest } from "./api-client";
+import { COMPANION_OFFLINE_GUARD } from "./household-store";
 import {
   mergeEdgeCredentials,
   requireEndpoint,
@@ -45,6 +46,38 @@ export function pairingErrorMessage(error: unknown): string {
   if (error instanceof PairingCodeError || error instanceof TrustError || error instanceof ApiError) return error.message;
   if (error instanceof TransportError) return PAIRING_UNREACHABLE;
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Android 17 puts connections to the local network behind a runtime permission (Nearby devices).
+ * A household reached only over the internet works without it; one with a home-network route may not.
+ */
+export const LOCAL_NETWORK_DENIED =
+  "FamilyFi couldn't reach your household. To reach it on your home network, allow Nearby devices for FamilyFi in Settings, then try again.";
+export const LOCAL_NETWORK_OFF =
+  "Can't reach FamilyFi — Nearby devices is off for FamilyFi, and it needs that on your home network. Allow it in Settings.";
+export const ROUTES_UNREACHABLE = "Couldn't reach FamilyFi on any route. These are the routes it last signed.";
+
+/** Whether reaching this household may need local network access: it has an enabled home-network route. */
+export function needsLocalNetwork(routes: readonly Pick<ConnectionRoute, "enabled" | "transport">[]): boolean {
+  return routes.some((route) => route.enabled && route.transport === "lan");
+}
+
+/** What a failed pairing step says, and whether Settings can fix it (local network access was refused). */
+export function pairingFailure(error: unknown, localNetwork: boolean): { message: string; settings: boolean } {
+  if (!localNetwork && error instanceof TransportError) return { message: LOCAL_NETWORK_DENIED, settings: true };
+  return { message: pairingErrorMessage(error), settings: false };
+}
+
+/** A failed check of the signed routes (the phone's Connection screen). */
+export function routeCheckError(error: unknown): string {
+  if (error instanceof TransportError) return ROUTES_UNREACHABLE;
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The stale message to show: the permission's, while it is off and may be why the household is unreachable. */
+export function companionStaleMessage(message: string, localNetwork: boolean): string {
+  return message === COMPANION_OFFLINE_GUARD.stale && !localNetwork ? LOCAL_NETWORK_OFF : message;
 }
 
 /** A household that verified but is not yet trusted: it holds the unspent code, so it lives only in memory. */

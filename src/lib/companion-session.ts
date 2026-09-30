@@ -167,8 +167,11 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     },
     /** Re-reads the routes, keeping them only from a manifest the trusted key signed. */
     async refresh() {
-      if (!state.profile) return;
-      const next = await refreshRoutes(request, state.profile, credentials);
+      const asked = state.profile;
+      if (!asked) return;
+      const next = await refreshRoutes(request, asked, credentials);
+      // Signed out of, forgotten or re-paired while it was asked: the answer is for a household the phone no longer holds.
+      if (state.profile !== asked) return;
       // Run on every household refresh: unchanged routes are neither saved again nor announced.
       const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
       if (same(next.profile, state.profile) && same(next.edgeCredentials, credentials)) return;

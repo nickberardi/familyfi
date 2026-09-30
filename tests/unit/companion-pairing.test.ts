@@ -5,7 +5,21 @@
  */
 import { generateKeyPairSync, sign } from "node:crypto";
 import { TransportError } from "@/lib/api-client";
-import { claimHousehold, refreshRoutes, signInPaired, verifyHousehold } from "@/lib/companion-pairing";
+import {
+  LOCAL_NETWORK_DENIED,
+  LOCAL_NETWORK_OFF,
+  PAIRING_UNREACHABLE,
+  ROUTES_UNREACHABLE,
+  claimHousehold,
+  companionStaleMessage,
+  needsLocalNetwork,
+  pairingFailure,
+  refreshRoutes,
+  routeCheckError,
+  signInPaired,
+  verifyHousehold,
+} from "@/lib/companion-pairing";
+import { COMPANION_OFFLINE_GUARD } from "@/lib/household-store";
 import { createCompanionRequest, type Transport, type TransportRequest, type TransportResponse } from "@/lib/companion-request";
 import { createCompanionSession, type SecureStorage } from "@/lib/companion-session";
 import { IDENTITY_MISMATCH, MANIFEST_MISSING_ENDPOINT, MANIFEST_SIGNATURE_INVALID, type EndpointCredential } from "@/lib/companion-trust";
@@ -342,6 +356,28 @@ describe("a companion session", () => {
     expect([writes, announced]).toEqual([0, 0]);
   });
 
+  it("never brings back a household forgotten while its routes were being refreshed", async () => {
+    const home = household();
+    const storage = memory();
+    let answer: (() => void) | null = null;
+    const slow: Transport = async (request) => {
+      if (new URL(request.url).pathname === "/api/v1/connection") await new Promise<void>((resolve) => (answer = resolve));
+      return home.transport(request);
+    };
+    const session = createCompanionSession({ transport: slow, storage, deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+
+    const refreshing = session.refresh();
+    await Promise.resolve();
+    await session.forget();
+    answer!();
+    await refreshing;
+    expect(storage.keys()).toEqual([]);
+    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null });
+  });
+
   it("drops a household the person rejects without spending its code", async () => {
     const home = household();
     const session = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
@@ -361,5 +397,34 @@ describe("a companion session", () => {
     const session = createCompanionSession({ transport: household().transport, storage, deviceName: () => "A phone" });
     await session.load();
     expect(session.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
+  });
+});
+
+describe("a companion's wording", () => {
+  const unreachable = new TransportError(new Error("refused"));
+
+  it("points to Settings only when an unreachable household may be refused local network access", () => {
+    expect(pairingFailure(unreachable, false)).toEqual({ message: LOCAL_NETWORK_DENIED, settings: true });
+    expect(pairingFailure(unreachable, true)).toEqual({ message: PAIRING_UNREACHABLE, settings: false });
+    expect(pairingFailure(new Error("This isn't a FamilyFi pairing code."), false)).toEqual({
+      message: "This isn't a FamilyFi pairing code.",
+      settings: false,
+    });
+  });
+
+  it("names the permission in the stale message only while it is off", () => {
+    expect(companionStaleMessage(COMPANION_OFFLINE_GUARD.stale, false)).toBe(LOCAL_NETWORK_OFF);
+    expect(companionStaleMessage(COMPANION_OFFLINE_GUARD.stale, true)).toBe(COMPANION_OFFLINE_GUARD.stale);
+    expect(companionStaleMessage("Saved.", false)).toBe("Saved.");
+  });
+
+  it("needs local network access only for an enabled home-network route", () => {
+    expect(needsLocalNetwork([LAN, EDGE])).toBe(true);
+    expect(needsLocalNetwork([{ ...LAN, enabled: false }, EDGE])).toBe(false);
+  });
+
+  it("words a failed route check without pairing copy", () => {
+    expect(routeCheckError(unreachable)).toBe(ROUTES_UNREACHABLE);
+    expect(routeCheckError(new Error(MANIFEST_SIGNATURE_INVALID))).toBe(MANIFEST_SIGNATURE_INVALID);
   });
 });
