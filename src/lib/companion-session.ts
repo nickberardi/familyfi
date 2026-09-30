@@ -10,7 +10,7 @@ import {
   type StoredSession,
 } from "./companion-pairing";
 import { createCompanionRequest, type Transport } from "./companion-request";
-import { SIGN_IN_UNREACHABLE, signInError } from "./sign-in";
+import { ACCESS_REVOKED, SIGN_IN_UNREACHABLE, signInError } from "./sign-in";
 
 /**
  * A paired phone's session: what it keeps between launches, and the steps that change it. Plain
@@ -78,6 +78,8 @@ export type CompanionSessionState = {
   pending: PendingEnrollment | null;
   /** The route that last answered. */
   activeRouteId: string | null;
+  /** Why the phone is back at setup, when the household ended its pairing: shown on Welcome until the next pairing. */
+  notice: string | null;
 };
 
 export type CompanionSession = ReturnType<typeof createCompanionSession>;
@@ -85,7 +87,7 @@ export type CompanionSession = ReturnType<typeof createCompanionSession>;
 export function createCompanionSession(deps: { transport: Transport; storage: SecureStorage; deviceName: () => string }) {
   const { transport, deviceName } = deps;
   const vault = createSessionVault(deps.storage);
-  let state: CompanionSessionState = { status: "loading", profile: null, session: null, pending: null, activeRouteId: null };
+  let state: CompanionSessionState = { status: "loading", profile: null, session: null, pending: null, activeRouteId: null, notice: null };
   let credentials: EndpointCredential[] = [];
   const listeners = new Set<() => void>();
   const set = (patch: Partial<CompanionSessionState>) => {
@@ -139,7 +141,7 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     },
     /** Reads a pairing code and verifies the household it names. Throws; `pairingErrorMessage` words it. */
     async verify(code: string) {
-      set({ pending: await verifyHousehold(transport, code) });
+      set({ pending: await verifyHousehold(transport, code), notice: null });
     },
     /** The explicit trust action: spends the code, and keeps the household only if its manifest verifies. */
     async trust() {
@@ -172,6 +174,14 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
         set({ session, status: "signedIn" });
         return null;
       } catch (error) {
+        // The household no longer knows this phone (an administrator revoked it): a password cannot help, so
+        // forget the pairing and start setup again, as familyfi-ios does.
+        if (error instanceof ApiError && error.code === "device_not_paired" && holds(asked)) {
+          await vault.forget();
+          credentials = [];
+          set({ profile: null, session: null, pending: null, activeRouteId: null, status: "unpaired", notice: ACCESS_REVOKED });
+          return null;
+        }
         return error instanceof ApiError ? signInError({ ok: false, body: { error: { message: error.message } } }) : SIGN_IN_UNREACHABLE;
       }
     },
