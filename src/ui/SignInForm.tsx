@@ -85,6 +85,8 @@ export function SignInForm({
           autoComplete="current-password"
           textContentType="password"
           enterKeyHint="go"
+          // Return keeps the field focused, so a wrong password can be retyped straight away.
+          submitBehavior="submit"
           onSubmitEditing={() => void submit()}
         />
       </View>

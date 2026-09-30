@@ -37,7 +37,8 @@ test("sign-in and household pages", async ({ page }) => {
   const usernameBox = page.getByLabel("Username");
   await expect(usernameBox).toHaveCSS("font-size", "16px");
 
-  // Through the form, as a person signs in: a wrong password is reported, and Return submits.
+  // Through the form, as a person signs in: a wrong password is reported, and Return submits. The
+  // failure counts toward the sign-in throttle (5 per username or address in 15 minutes).
   await usernameBox.fill("admin");
   await page.getByLabel("Password").fill("not-the-password");
   await page.getByLabel("Password").press("Enter");

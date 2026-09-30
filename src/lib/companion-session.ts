@@ -113,8 +113,7 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
       };
     },
     request,
-    /** Reads what the phone kept, and lands the launch. */
-    /** Launch state from secure storage. Storage that cannot be read (a lost key) lands on setup, where pairing again replaces it. */
+    /** Reads what the phone kept, and lands the launch. Storage that cannot be read (a lost key) lands on setup, where pairing again replaces it. */
     async load() {
       let stored;
       try {
@@ -170,6 +169,9 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     async refresh() {
       if (!state.profile) return;
       const next = await refreshRoutes(request, state.profile, credentials);
+      // Run on every household refresh: unchanged routes are neither saved again nor announced.
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      if (same(next.profile, state.profile) && same(next.edgeCredentials, credentials)) return;
       await vault.saveRoutes(next.profile, next.edgeCredentials);
       credentials = next.edgeCredentials;
       set({ profile: next.profile });
