@@ -2,8 +2,9 @@
  * The FamilyFi lockup for the native app, from the web's geometry (`@/lib/logo`); the web's own
  * `Logo.web.tsx` draws it through `next/image`. The shield and the check shield are the supplied
  * artwork, placed; only the wordmark is live text. The shield carries the product's name, so the
- * wordmark and tagline beside it are hidden from screen readers. Pick `onDeep` by the ground it
- * sits on, not by a theme.
+ * wordmark and tagline beside it are hidden from screen readers. The lockup is artwork, drawn at
+ * its sizes whatever the system text size, as familyfi-ios draws it. Pick `onDeep` by the ground
+ * it sits on, not by a theme.
  */
 import { Image, StyleSheet, Text, View, type ImageSourcePropType } from "react-native";
 
@@ -41,11 +42,11 @@ export function Wordmark({ size = 21, onDeep = false }: { size?: number; onDeep?
   const cyan = ui.color("brand-cyan");
   return (
     <View aria-hidden style={styles.row}>
-      <Text style={[text, { color: ui.color(onDeep ? "brand-on-deep" : "ink") }]}>Family</Text>
-      <Text style={[text, { color: cyan }]}>F</Text>
+      <Text allowFontScaling={false} style={[text, { color: ui.color(onDeep ? "brand-on-deep" : "ink") }]}>Family</Text>
+      <Text allowFontScaling={false} style={[text, { color: cyan }]}>F</Text>
       {/* Android clips a view's children unless told otherwise; the check shield stands above the "ı". */}
       <View style={styles.dot}>
-        <Text style={[text, { color: cyan }]}>{"ı"}</Text>
+        <Text allowFontScaling={false} style={[text, { color: cyan }]}>{"ı"}</Text>
         <Image
           source={onDeep ? CHECK_DEEP : CHECK_LIGHT}
           alt=""
@@ -72,6 +73,7 @@ export function Tagline({ size = 10, onDeep = false }: { size?: number; onDeep?:
     <View aria-hidden style={[styles.row, { alignItems: "center", gap: 0.82 * size }]}>
       {rule}
       <Text
+        allowFontScaling={false}
         style={{
           fontFamily: ui.font,
           fontSize: size,
