@@ -104,3 +104,8 @@ export function applyMutationResult(state: HouseholdLists, result: MutationPaylo
   if (result.group) next = { ...next, groups: upsertGroup(next.groups, result.group) };
   return next;
 }
+
+/** The household's time zone, or New York's before the household has loaded. */
+export function householdTimezone(household: Pick<HouseholdPublic, "timezone"> | null): string {
+  return household?.timezone ?? "America/New_York";
+}

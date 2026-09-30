@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { groupPageSummary, groupPageTitle } from "@/lib/group-page";
+import { householdTimezone } from "@/lib/household-state";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
@@ -47,7 +48,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
   const [adding, setAdding] = useState(false);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
   const rows = groups.filter((group) => group.kind === kind);
-  const timezone = household?.timezone ?? "America/New_York";
+  const timezone = householdTimezone(household);
   const title = groupPageTitle(kind);
   const sub = groupPageSummary(kind, groups);
 

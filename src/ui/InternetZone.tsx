@@ -78,6 +78,8 @@ export function InternetZone({
                 key={action.label}
                 role="button"
                 aria-disabled={action.disabled}
+                // 44 pt to touch on a phone; react-native-web ignores it, so the web is unchanged.
+                hitSlop={{ top: 6, bottom: 6 }}
                 disabled={action.disabled}
                 onPress={action.onPress}
                 testID={action.testID}

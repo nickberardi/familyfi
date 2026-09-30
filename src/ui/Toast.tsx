@@ -37,11 +37,11 @@ export function Toast({
         {message}
       </Text>
       {!error && actionLabel && onAction ? (
-        <Pressable role="button" testID="toast-action" hitSlop={8} onPress={onAction} style={styles.button}>
+        <Pressable role="button" testID="toast-action" hitSlop={TOUCH} onPress={onAction} style={styles.button}>
           <Text style={[text, { fontWeight: "600", color: ui.color("accent") }]}>{actionLabel}</Text>
         </Pressable>
       ) : null}
-      <Pressable role="button" aria-label="Dismiss" testID="toast-dismiss" hitSlop={8} onPress={onDismiss} style={styles.button}>
+      <Pressable role="button" aria-label="Dismiss" testID="toast-dismiss" hitSlop={TOUCH} onPress={onDismiss} style={styles.button}>
         {({ hovered }: { pressed: boolean; hovered?: boolean }) => (
           <Text style={[text, { fontWeight: "600", color: ui.color(hovered ? "ink" : "muted") }]}>Dismiss</Text>
         )}
@@ -49,6 +49,9 @@ export function Toast({
     </View>
   );
 }
+
+/** Reaches 44 pt to touch on a phone; react-native-web ignores it, so the web is unchanged. */
+const TOUCH = { top: 12, bottom: 12, left: 8, right: 8 };
 
 const styles = StyleSheet.create({
   toast: {

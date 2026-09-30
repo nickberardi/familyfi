@@ -63,6 +63,8 @@ export function DayTimeline({
             // React Native has no aria-pressed; this carries the same state to VoiceOver and TalkBack.
             accessibilityState={{ selected: chosen === index }}
             onPress={() => setChosen(chosen === index ? null : index)}
+            // The bar is 22 pt: 44 to touch on a phone. react-native-web ignores it.
+            hitSlop={{ top: 11, bottom: 11 }}
             onFocus={(event) => setRing(focusVisible(event) ? index : null)}
             onBlur={() => setRing(null)}
             // No press dimming: a band keeps its own opacity (a faded window is 0.22), as on the web.

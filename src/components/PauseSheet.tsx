@@ -1,17 +1,15 @@
 "use client";
 
+import { groupPauseSheet } from "@/lib/group-pause-sheet";
 import { applyGroupPause, applyRulePause } from "@/lib/group-writes";
 import {
-  pauseSheetBody,
-  pauseSheetOptions,
-  pauseSheetTitle,
   rulePauseSheetBody,
   rulePauseSheetOptions,
   rulePauseSheetTitle,
   type PauseSheetOption,
   type PauseSheetRequest,
 } from "@/lib/pause-sheet";
-import { internetWindowsForGroup, ruleInternetWindows, type Rule } from "@/lib/rules";
+import { ruleInternetWindows, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 
@@ -27,8 +25,7 @@ export function PauseSheet({
   onClose: () => void;
 }) {
   const { store, rules, devices } = useAppData();
-  const deviceNames = devices.filter((device) => device.groupId === group.id).map((device) => device.hostname ?? "");
-  const options = pauseSheetOptions(group, internetWindowsForGroup(rules, group.id, new Date()), mode, timezone, new Date());
+  const sheet = groupPauseSheet(group, rules, devices, mode, timezone, new Date());
 
   async function run(request: PauseSheetRequest) {
     await applyGroupPause(store.mutate, group, request, timezone);
@@ -36,9 +33,9 @@ export function PauseSheet({
 
   return (
     <PauseSheetView
-      title={pauseSheetTitle(group, mode)}
-      body={pauseSheetBody(group, mode, deviceNames)}
-      options={options}
+      title={sheet.title}
+      body={sheet.body}
+      options={sheet.options}
       onPick={(request) => run(request)}
       onClose={onClose}
     />

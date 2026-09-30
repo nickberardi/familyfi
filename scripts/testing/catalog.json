@@ -683,6 +683,12 @@
         "display",
         "accessibility"
       ]
+    },
+    "tests/unit/group-pause-sheet.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
     }
   }
 }
