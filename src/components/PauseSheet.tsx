@@ -15,7 +15,7 @@ import {
 import { internetWindowsForGroup, ruleInternetWindows, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
-import { internetRulePath } from "./group-actions";
+import { internetRulePath } from "@/lib/group-actions";
 
 function untilFromMinutes(minutes: number) {
   return new Date(Date.now() + minutes * 60_000);

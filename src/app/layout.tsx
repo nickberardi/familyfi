@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ReactNativeWebStyles } from "@/components/ReactNativeWebStyles";
 /*
  * Phosphor Regular, the product's one icon set, imported from the package rather
  * than the CDN the design sketched it against: a household gateway should not make
@@ -44,7 +45,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${jetBrainsMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <ReactNativeWebStyles>{children}</ReactNativeWebStyles>
+      </body>
     </html>
   );
 }

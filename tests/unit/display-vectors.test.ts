@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import * as groupActionsModule from "@/components/group-actions";
+import * as groupActionsModule from "@/lib/group-actions";
 import * as display from "@/lib/display";
 import * as pauseSheet from "@/lib/pause-sheet";
 import * as ruleActions from "@/lib/rule-actions";
@@ -74,9 +74,7 @@ const RUNNERS: Record<string, (input: Input) => unknown> = {
  * have at least one, so a new display function cannot ship without telling iOS.
  */
 const EXCLUDED: Record<string, string> = {
-  // Wires `groupActionSpecs` to callbacks and the API client; the vectors pin the specs.
-  groupActions: "binds React callbacks",
-  internetRulePath: "builds an API path; each client owns its own URLs",
+  internetRulePath: "an API path, not display text",
 };
 
 const MODULES = { display, groupActions: groupActionsModule, pauseSheet, ruleActions, ruleWindows };

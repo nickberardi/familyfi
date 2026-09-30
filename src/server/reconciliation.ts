@@ -18,6 +18,7 @@ import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicyWrite } from "./unifi/types";
+import { unrefTimer } from "./unref-timer";
 
 const INTERVAL_MS = 30_000;
 const LOCK_MS = 25_000;
@@ -712,7 +713,7 @@ export function startReconciliation() {
   env();
   requestReconcile();
   const timer = setInterval(() => requestReconcile(), INTERVAL_MS);
-  timer.unref?.();
+  unrefTimer(timer);
 }
 
 function isNotFound(error: unknown): boolean {

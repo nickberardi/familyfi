@@ -1,5 +1,6 @@
 import { APP_VERSION } from "@/lib/version";
 import type { UpdateCheck } from "@/lib/types";
+import { unrefTimer } from "./unref-timer";
 
 const GITHUB_RELEASES_URL = "https://api.github.com/repos/nickberardi/familyfi/releases";
 const GITHUB_RELEASE_PAGE_URL = "https://github.com/nickberardi/familyfi/releases/tag";
@@ -241,7 +242,7 @@ export function createUpdateChecker(): UpdateChecker {
     const run = () => {
       void refresh().finally(() => {
         timer = setTimeout(run, UPDATE_CHECK_INTERVAL_MS);
-        timer.unref?.();
+        unrefTimer(timer);
       });
     };
     run();

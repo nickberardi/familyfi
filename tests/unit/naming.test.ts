@@ -29,7 +29,9 @@ const rel = (file: string) => path.relative(repoRoot, file);
  * The browser resolves <meta name="theme-color"> before CSS variables exist, so
  * that one value cannot be a token. Nothing else may opt out.
  */
-const COLOR_LITERAL_EXEMPT = new Set(["src/app/layout.tsx"]);
+// The shared palette spells each token's value for native clients, which have no stylesheet;
+// tests/unit/ui-palette.test.ts keeps its light values equal to globals.css.
+const COLOR_LITERAL_EXEMPT = new Set(["src/app/layout.tsx", "src/ui/palette.ts"]);
 
 describe("naming conventions (AGENTS.md)", () => {
   /**
@@ -118,7 +120,8 @@ describe("naming conventions (AGENTS.md)", () => {
   it("names every component file PascalCase and every module kebab-case", () => {
     const bad: string[] = [];
     for (const file of walk(srcRoot, (f) => f.endsWith(".ts") || f.endsWith(".tsx"))) {
-      const base = path.basename(file).replace(/\.tsx?$/, "");
+      // A platform suffix (`DefaultUI.web.tsx`) picks the file per platform; the name is before it.
+      const base = path.basename(file).replace(/\.tsx?$/, "").replace(/\.(web|ios|android|native)$/, "");
       // App Router reserves these, and [id]/[mac] are route params.
       if (/^(page|layout|route|error|loading|not-found|instrumentation|middleware)$/.test(base)) continue;
       if (file.includes(`${path.sep}app${path.sep}`) && /^\[.+\]$/.test(base)) continue;

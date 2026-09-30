@@ -1,21 +1,20 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { formatClock } from "@/lib/display";
-import { internetDayBands, internetState, type InternetWindow } from "@/lib/rule-windows";
+import { internetZoneText } from "@/lib/internet-zone";
 import { internetRulePresets, type InternetRulePreset } from "@/lib/rules";
+import type { InternetWindow } from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
+import { InternetZone as SharedInternetZone } from "@/ui/InternetZone";
 import { useAppData } from "./AppDataProvider";
-import { DayTimeline, type TimelineBand } from "./DayTimeline";
 import { groupActions } from "./group-actions";
 
 /**
- * The group's device-wide controls, kept apart from its category marks: whether all of
- * its internet is on, the day's no-internet time, and Pause / Resume / Allow, each named
- * for its scope. A group with no internet rule says so, rather than implying one exists.
+ * The group's device-wide controls: the shared component (`src/ui/InternetZone.tsx`, rendered
+ * here through react-native-web and natively in the app), wired to this app's actions, presets
+ * and rule links.
  */
 export function InternetZone({
   group,
@@ -36,136 +35,20 @@ export function InternetZone({
   editHref?: string;
 }) {
   const { mutate } = useAppData();
+  const actions = groupActions(group, surface, onPause, onExtend, mutate).flatMap((action) =>
+    action.onClick ? [{ label: action.label, onPress: action.onClick, strong: action.strong }] : [],
+  );
   const now = new Date();
-  const state = internetState(group, windows, now, timezone);
-  const devices = group.deviceCount === 1 ? "its 1 device" : `all ${group.deviceCount} of its devices`;
-  const at = (iso: string | null) => (iso ? formatClock(new Date(iso), timezone) : null);
-  const by = (actor: { name: string } | null) => (actor ? ` by ${actor.name}` : "");
-
-  const actions = groupActions(group, surface, onPause, onExtend, mutate).filter((action) => action.onClick);
-  const bands: TimelineBand[] = internetDayBands(group, windows, now, timezone);
-  const timeline = (
-    <>
-      <DayTimeline bands={bands} timezone={timezone} label={`${group.name}’s internet today`} />
-      {editHref ? (
-        <Link href={editHref} className="self-end text-[14px] font-semibold text-[var(--ff-accent)]">
-          Edit internet rule
-        </Link>
-      ) : null}
-    </>
-  );
-
-  if (state.state === "no_rule") {
-    return (
-      <div className="flex flex-col gap-2.5 rounded-[10px] border-[1.5px] border-dashed border-[var(--ff-control-line)] p-3">
-        <ZoneHeading
-          icon={<Icon name="globe-simple" size={16} />}
-          iconStyle={{ border: "1.5px dashed var(--ff-control-line)", color: "var(--ff-ink-3)" }}
-          title="All internet · no rule"
-          sub={`Nothing limits ${group.name}’s internet. Category rules still apply on their own.`}
-          actions={actions}
-        />
-        <Presets group={group} />
-      </div>
-    );
-  }
-
-  const off = state.state === "paused" || state.state === "blocked";
-  const sub =
-    state.state === "paused"
-      ? `Paused${state.until ? ` until ${at(state.until)}` : " until you resume"}${by(state.by)}, on ${devices}.`
-      : state.state === "blocked"
-        ? `${state.window}${state.until ? ` until ${at(state.until)}` : ", always"}, on ${devices}.`
-        : state.state === "allowed"
-          ? `${state.window ?? "The schedule"} lifted${state.until ? ` until ${at(state.until)}` : ""}${by(state.by)}, on ${devices}.`
-          : state.next
-            ? `${state.next.window} starts at ${at(state.next.at)}, on ${devices}.`
-            : `Online on ${devices}.`;
-
+  const noRule = internetZoneText(group, windows, timezone, now).tone === "no_rule";
+  const footer = noRule ? (
+    <Presets group={group} />
+  ) : editHref ? (
+    <Link href={editHref} className="self-end text-[14px] font-semibold text-[var(--ff-accent)]">
+      Edit internet rule
+    </Link>
+  ) : null;
   return (
-    <Zone
-      tone={state.state === "paused" ? "paused" : off ? "off" : "on"}
-      title={off ? "All internet · off" : "All internet · on"}
-      sub={sub}
-      actions={actions}
-    >
-      {timeline}
-    </Zone>
-  );
-}
-
-type Action = { label: string; onClick?: () => void; strong?: boolean };
-
-function Zone({
-  tone,
-  title,
-  sub,
-  actions = [],
-  children,
-}: {
-  tone: "on" | "off" | "paused";
-  title: string;
-  sub: string;
-  actions?: Action[];
-  children?: ReactNode;
-}) {
-  const background = tone === "paused" ? "var(--ff-paused-fill)" : tone === "off" ? "var(--ff-accent-wash)" : "var(--ff-field-soft)";
-  const iconStyle =
-    tone === "paused"
-      ? { background: "var(--ff-paused)", color: "var(--ff-ink-on-fill)" }
-      : tone === "off"
-        ? { background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }
-        : { background: "var(--ff-field)", color: "var(--ff-ink-2)" };
-  return (
-    <div className="flex flex-col gap-2.5 rounded-[10px] p-3" style={{ background }}>
-      <ZoneHeading icon={<Icon name="globe-simple" size={16} />} iconStyle={iconStyle} title={title} sub={sub} actions={actions} />
-      {children}
-    </div>
-  );
-}
-
-function ZoneHeading({
-  icon,
-  iconStyle,
-  title,
-  sub,
-  actions,
-}: {
-  icon: ReactNode;
-  iconStyle: CSSProperties;
-  title: string;
-  sub: string;
-  actions: Action[];
-}) {
-  return (
-    <div className="flex flex-wrap items-start gap-2.5">
-      <span aria-hidden className="flex h-7 w-7 flex-none items-center justify-center rounded-[8px]" style={iconStyle}>
-        {icon}
-      </span>
-      <div className="min-w-[140px] flex-1">
-        <h3 className="m-0 text-[14px] font-semibold">{title}</h3>
-        <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-ink-2)]">{sub}</p>
-      </div>
-      {actions.length ? (
-        <div className="flex flex-wrap gap-1.5">
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              onClick={action.onClick}
-              className="rounded-[8px] px-2.5 py-1.5 text-[14px] font-semibold"
-              style={
-                action.strong
-                  ? { background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }
-                  : { background: "var(--ff-card)", color: "var(--ff-accent)", boxShadow: "inset 0 0 0 1px var(--ff-control-line)" }
-              }
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <SharedInternetZone group={group} windows={windows} timezone={timezone} now={now} actions={actions} footer={footer} />
   );
 }
 
