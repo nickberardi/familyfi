@@ -1,6 +1,6 @@
 "use client";
 
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { accessColor, cardNoteLine, cardStateLabel, roleTag } from "@/lib/display";
 import { groupMonogram } from "@/lib/internet-zone";
@@ -8,6 +8,7 @@ import type { InternetWindow } from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
 
 import { tokenOf, useUI } from "./UIContext";
+import { useWide } from "./use-wide";
 
 /**
  * A group card's identity, shared by every client: a things group's monogram tile, the name and
@@ -26,11 +27,10 @@ export function GroupCardHeader({
   now: Date;
 }) {
   const ui = useUI();
-  const { width } = useWindowDimensions();
   const monogram = groupMonogram(group);
   const stateColor = ui.color(tokenOf(accessColor(group.access)));
   const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
-  const wide = width >= 768;
+  const wide = useWide();
 
   return (
     <View style={styles.row}>

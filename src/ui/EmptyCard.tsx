@@ -1,13 +1,14 @@
 "use client";
 
-import { StyleSheet, Text, useWindowDimensions } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
 import { useUI } from "./UIContext";
+import { useWide } from "./use-wide";
 
 /** A page with nothing on it yet, in the card's place: "Nothing here yet." */
 export function EmptyCard({ text = "Nothing here yet." }: { text?: string }) {
   const ui = useUI();
-  const wide = useWindowDimensions().width >= 768;
+  const wide = useWide();
   return (
     <Text
       style={[

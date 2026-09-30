@@ -1,13 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
 
 import { GroupCardHeader } from "./GroupCardHeader";
 import { useUI } from "./UIContext";
+import { useWide } from "./use-wide";
 
 /**
  * A group card's frame, shared by every client: the card, and its header as the button that opens
@@ -33,7 +34,7 @@ export function GroupCardFrame({
   children?: ReactNode;
 }) {
   const ui = useUI();
-  const wide = useWindowDimensions().width >= 768;
+  const wide = useWide();
   return (
     <View
       role="article"

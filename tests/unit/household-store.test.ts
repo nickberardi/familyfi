@@ -192,6 +192,23 @@ describe("household store", () => {
     expect(store.getState().unifi).toEqual({ configured: false });
   });
 
+  it("ignores a second write for a group while its first is in flight, and sends nothing", async () => {
+    let release: () => void = () => {};
+    const { store, server } = setup({
+      ...reads(() => childGroup()),
+      "POST /api/v1/groups/group-child/rules/internet/resume": () =>
+        new Promise((resolve) => {
+          release = () => resolve({ json: {} });
+        }),
+    });
+    await store.reload();
+    const first = runGroupAction(store.mutate, childGroup(), "resume");
+    await expect(runGroupAction(store.mutate, childGroup(), "allow")).resolves.toBeUndefined();
+    release();
+    await first;
+    expect(server.calls.filter((call) => call.method === "POST").map((call) => call.path.split("/").pop())).toEqual(["resume"]);
+  });
+
   it("rolls the optimistic change back and shows the server's error", async () => {
     const { store } = setup({
       ...reads(() => childGroup()),
