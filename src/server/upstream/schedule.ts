@@ -3,6 +3,7 @@ import { nextClockOnDays } from "@/lib/display";
 import { probeEnabledCategories } from "./probe";
 import { ResolverConfigError } from "./resolver-settings";
 import { withUpstreamLock } from "./transaction";
+import { unrefTimer } from "../unref-timer";
 
 /**
  * A household-local wall-clock schedule, not an interval from the last boot — the
@@ -127,7 +128,7 @@ async function arm(): Promise<void> {
   timer = setTimeout(() => {
     void claimAndSweepIfDue().finally(() => void arm());
   }, delay);
-  timer.unref?.();
+  unrefTimer(timer);
 }
 
 /** Claims a missed run if one is due, then arms the timer for the next occurrence. */

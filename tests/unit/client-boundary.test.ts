@@ -3,7 +3,8 @@
  * (AGENTS.md). Nothing stopped a Client Component, or a `src/lib` module a Client
  * Component uses, from importing `src/server` — directly or through a chain of other
  * modules — and shipping it to the browser. This walks the import graph from every
- * `"use client"` file and every `src/lib` module (documented as client-safe) and fails
+ * `"use client"` file, every `src/lib` module (documented as client-safe) and every shared
+ * `src/ui` component, and fails
  * with the full chain when it reaches server code or a Node-only package.
  *
  * Next's `server-only` marker would do this at build time, but it throws in Vitest and
@@ -49,7 +50,8 @@ function resolveLocal(fromFile: string, specifier: string): string | null {
   const base = specifier.startsWith("@/")
     ? path.join(srcRoot, specifier.slice(2))
     : path.resolve(path.dirname(fromFile), specifier);
-  const candidates = [base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts"), path.join(base, "index.tsx")];
+  // The web bundle resolves a `.web` file first (next.config.ts), so that is the file it ships.
+  const candidates = [`${base}.web.tsx`, `${base}.web.ts`, base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts"), path.join(base, "index.tsx")];
   return candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? null;
 }
 
@@ -102,14 +104,17 @@ function boundaryViolations(roots: string[]): string[] {
 const sourceFiles = walk(srcRoot).filter(isCode);
 const clientFiles = sourceFiles.filter((file) => /^\s*["']use client["']/.test(readFileSync(file, "utf8")));
 const libFiles = sourceFiles.filter((file) => file.startsWith(path.join(srcRoot, "lib") + path.sep));
+// Shared components run in the browser and in the native app, which imports them directly.
+const uiFiles = sourceFiles.filter((file) => file.startsWith(path.join(srcRoot, "ui") + path.sep));
 
 describe("client boundary", () => {
   it("finds the files it guards", () => {
     expect(clientFiles.length).toBeGreaterThan(0);
     expect(libFiles.length).toBeGreaterThan(0);
+    expect(uiFiles.length).toBeGreaterThan(0);
   });
 
-  it("never lets a Client Component or src/lib reach server code, even through other modules", () => {
-    expect(boundaryViolations([...clientFiles, ...libFiles])).toEqual([]);
+  it("never lets a Client Component, src/lib or src/ui reach server code, even through other modules", () => {
+    expect(boundaryViolations([...clientFiles, ...libFiles, ...uiFiles])).toEqual([]);
   });
 });

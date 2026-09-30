@@ -1,5 +1,6 @@
 "use client";
 
+import { Toast } from "@/ui/Toast";
 import { createContext, useContext, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -275,36 +276,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4 md:left-[232px] md:top-4"
             aria-live="polite"
           >
-            {error || notice ? (
-              <div
-                role={error ? "alert" : "status"}
-                className="pointer-events-auto flex max-w-lg items-start gap-3 rounded-[9px] border border-[var(--ff-line)] bg-[var(--ff-card)] px-3.5 py-2.5 text-[14px] shadow-[var(--ff-shadow-toast)]"
-                style={{ color: error ? "var(--ff-danger)" : "var(--ff-on)" }}
-              >
-                <span className="min-w-0 flex-1">{error || notice}</span>
-                {!error && noticeAction ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const action = noticeAction;
-                      dismissFeedback();
-                      void mutate(action.run);
-                    }}
-                    className="flex-none rounded px-1.5 text-[14px] font-semibold text-[var(--ff-accent)]"
-                  >
-                    {noticeAction.label}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={dismissFeedback}
-                  className="flex-none rounded px-1.5 text-[14px] font-semibold text-[var(--ff-muted)] hover:text-[var(--ff-ink)]"
-                  aria-label="Dismiss"
-                >
-                  Dismiss
-                </button>
-              </div>
-            ) : null}
+            <div className="pointer-events-auto">
+              <Toast
+                error={error}
+                notice={notice}
+                actionLabel={noticeAction?.label}
+                onAction={() => {
+                  if (!noticeAction) return;
+                  const action = noticeAction;
+                  dismissFeedback();
+                  void mutate(action.run);
+                }}
+                onDismiss={dismissFeedback}
+              />
+            </div>
           </div>
           {loading ? <p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">Loading household…</p> : null}
           {children}

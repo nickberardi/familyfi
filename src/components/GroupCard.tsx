@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { accessColor, cardNoteLine, cardStateLabel, roleTag, windowTimes } from "@/lib/display";
-import { internetDayBands, internetState, localWeekday } from "@/lib/rule-windows";
+import { windowTimes } from "@/lib/display";
+import { internetDayBands, localWeekday } from "@/lib/rule-windows";
 import { appRulesForGroup, glyphForAppName, internetWindowsForGroup, parentFacingRuleLabel, ruleDayBands, type Rule } from "@/lib/rules";
 import { appMarkState, categoryMarkStyle, ruleActivelyBlocking, type UpstreamCategoryRow } from "@/lib/upstream";
 import type { Group } from "@/lib/types";
@@ -12,6 +12,8 @@ import { DayTimeline, type TimelineBand } from "./DayTimeline";
 import { categorySheet, categorySlotStates, CategoryMarkGlyph, MarkButton, SectionLabel, type CategorySlotState } from "./FilterMarks";
 import { FilterSheet, type FilterSheetState } from "./filters/FilterSheet";
 import { InternetZone } from "./InternetZone";
+import { GroupCardFrame } from "@/ui/GroupCardFrame";
+import { InternetMark } from "@/ui/InternetMark";
 
 export type CardAction = {
   label: string;
@@ -60,13 +62,8 @@ export function GroupCard({
   const [more, setMore] = useState(false);
   const [sheet, setSheet] = useState<FilterSheetState | null>(null);
 
-  const things = group.kind === "things";
-  const monogram = (group.monogram ?? group.name.slice(0, 2)).slice(0, 4);
   const now = new Date();
   const windows = internetWindowsForGroup(rules, group.id, now);
-  const state = cardStateLabel(group, windows, timezone, now);
-  const stateColor = accessColor(group.access);
-  const note = cardNoteLine(group, windows);
 
   // FamilyFi's own rules first, then the resolver's verdicts.
   const slots = categorySlotStates(group, rules, upstreamCategories, timezone);
@@ -82,44 +79,8 @@ export function GroupCard({
     setOpen(true);
   };
 
-  const header = (
-    <>
-      {things ? (
-        <span
-          className="flex h-11 w-11 flex-none items-center justify-center rounded-[11px] bg-[var(--ff-mark)] font-bold tracking-wide text-[var(--ff-ink-on-fill)]"
-          style={{ fontSize: monogram.length > 2 ? 12 : 14 }}
-          aria-hidden
-        >
-          {monogram}
-        </span>
-      ) : null}
-      <span className="min-w-0 flex-1">
-        <span className="flex items-baseline gap-2">
-          <span className="text-[19px] font-semibold tracking-tight md:text-[17px]">{group.name}</span>
-          <span className="text-[14px] text-[var(--ff-ink-2)]">{roleTag(group)}</span>
-        </span>
-        <span className="mt-0.5 flex items-center gap-1.5 text-[14px]" style={{ color: stateColor }}>
-          <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: stateColor }} />
-          {state}
-        </span>
-        <span className="mt-0.5 block text-[14px] text-[var(--ff-ink-3)]">{note}</span>
-      </span>
-    </>
-  );
-
   return (
-    <article className="overflow-hidden rounded-[12px] bg-[var(--ff-card)] md:border md:border-[var(--ff-hairline-card)]">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-start gap-3 px-[18px] pt-4 pb-3 text-left"
-      >
-        {header}
-        <span className="mt-0.5 flex-none text-[var(--ff-ink-3)]" aria-hidden>
-          <Icon name={open ? "caret-up" : "caret-down"} size={16} />
-        </span>
-      </button>
+    <GroupCardFrame group={group} windows={windows} timezone={timezone} now={now} open={open} onToggle={() => setOpen(!open)}>
 
       {open ? (
         <div className="flex flex-col gap-2.5 px-3 pb-3">
@@ -153,7 +114,7 @@ export function GroupCard({
         <div className="flex flex-wrap items-start gap-3 px-[18px] pt-1 pb-3.5">
           {open ? null : (
             <>
-              <InternetMark group={group} windows={windows} timezone={timezone} onOpen={() => openOn()} />
+              <InternetMark group={group} windows={windows} timezone={timezone} now={now} onPress={() => openOn()} />
               <span aria-hidden className="mt-0.5 mb-3.5 w-px self-stretch bg-[var(--ff-hairline-strong)]" />
             </>
           )}
@@ -213,44 +174,7 @@ export function GroupCard({
       {sheet ? (
         <FilterSheet group={group} state={sheet} onClose={() => setSheet(null)} onChanged={onRulesChanged} />
       ) : null}
-    </article>
-  );
-}
-
-/** All internet, as one mark in the row: Off, Paused, On, or No rule when nothing limits it. */
-function InternetMark({
-  group,
-  windows,
-  timezone,
-  onOpen,
-}: {
-  group: Group;
-  windows: ReturnType<typeof internetWindowsForGroup>;
-  timezone: string;
-  onOpen: () => void;
-}) {
-  const state = internetState(group, windows, new Date(), timezone).state;
-  const look =
-    state === "paused"
-      ? { word: "Paused", fill: "var(--ff-paused)", ink: "var(--ff-ink-on-fill)", wordInk: "var(--ff-paused)", border: "none" }
-      : state === "blocked"
-        ? { word: "Off", fill: "var(--ff-accent)", ink: "var(--ff-ink-on-fill)", wordInk: "var(--ff-accent)", border: "none" }
-        : state === "no_rule"
-          ? { word: "No rule", fill: "transparent", ink: "var(--ff-ink-3)", wordInk: "var(--ff-ink-2)", border: "1.5px dashed var(--ff-control-line)" }
-          : { word: "On", fill: "var(--ff-field)", ink: "var(--ff-ink-2)", wordInk: "var(--ff-ink-2)", border: "none" };
-  return (
-    <button type="button" onClick={onOpen} aria-label={`All internet — ${look.word.toLowerCase()}`} className="flex w-[52px] flex-col items-center gap-1">
-      <span
-        className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]"
-        style={{ background: look.fill, color: look.ink, border: look.border }}
-      >
-        <Icon name="globe-simple" size={18} />
-      </span>
-      <span className="text-[10px] text-[var(--ff-ink-2)]">Internet</span>
-      <span className="text-[9px] font-semibold" style={{ color: look.wordInk }}>
-        {look.word}
-      </span>
-    </button>
+    </GroupCardFrame>
   );
 }
 

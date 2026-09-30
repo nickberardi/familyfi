@@ -246,6 +246,12 @@ button:not(:disabled):active {
   opacity: var(--ff-press-opacity);
 }
 
+/* react-native-web's reset (for the shared src/ui components) hides the search field's clear
+   button; the web keeps the browser's. */
+input[type="search"]::-webkit-search-cancel-button {
+  display: revert;
+}
+
 @media (prefers-reduced-motion: reduce) {
   a,
   button {

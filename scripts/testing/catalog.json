@@ -648,6 +648,47 @@
         "groups",
         "rules"
       ]
+    },
+    "tests/unit/api-client.test.ts": {
+      "categories": [
+        "sync"
+      ]
+    },
+    "tests/unit/day-timeline.test.ts": {
+      "categories": [
+        "display",
+        "schedules"
+      ]
+    },
+    "tests/unit/group-page.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
+    },
+    "tests/unit/household-store.test.ts": {
+      "categories": [
+        "groups",
+        "sync"
+      ]
+    },
+    "tests/unit/internet-zone.test.ts": {
+      "categories": [
+        "display",
+        "groups"
+      ]
+    },
+    "tests/unit/ui-palette.test.ts": {
+      "categories": [
+        "display",
+        "accessibility"
+      ]
+    },
+    "tests/unit/group-pause-sheet.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
     }
   }
 }

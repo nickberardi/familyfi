@@ -11,8 +11,11 @@ admin_password="ci-recovery-password"
 session_secret="ci-only-session-secret-32chars!!"
 encryption_key="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 host_port="${SMOKE_PORT:-7011}"
+# The self-hosted runners share /tmp under different users, so a fixed path can belong to another.
+login_body="$(mktemp "${TMPDIR:-/tmp}/familyfi-smoke-login.XXXXXX")"
 
 cleanup() {
+  rm -f "$login_body"
   docker rm -f "$app" "$db" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
 }
@@ -66,12 +69,12 @@ if [ "$ok" -ne 1 ]; then
   exit 1
 fi
 
-login="$(curl -sf -D - -o /tmp/familyfi-smoke-login.json -X POST "http://127.0.0.1:${host_port}/api/v1/auth/login" \
+login="$(curl -sf -D - -o "$login_body" -X POST "http://127.0.0.1:${host_port}/api/v1/auth/login" \
   -H 'content-type: application/json' \
   -d "{\"username\":\"admin\",\"password\":\"${admin_password}\",\"client\":\"browser\"}")"
 echo "$login" | grep -qi 'familyfi_session' || {
   echo "login did not set a session cookie" >&2
-  cat /tmp/familyfi-smoke-login.json >&2 || true
+  cat "$login_body" >&2 || true
   exit 1
 }
 

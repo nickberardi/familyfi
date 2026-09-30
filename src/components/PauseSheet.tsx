@@ -1,25 +1,17 @@
 "use client";
 
-import { api } from "@/lib/api";
-import { formatClock } from "@/lib/display";
+import { groupPauseSheet } from "@/lib/group-pause-sheet";
+import { applyGroupPause, applyRulePause } from "@/lib/group-writes";
 import {
-  pauseSheetBody,
-  pauseSheetOptions,
-  pauseSheetTitle,
   rulePauseSheetBody,
   rulePauseSheetOptions,
   rulePauseSheetTitle,
   type PauseSheetOption,
   type PauseSheetRequest,
 } from "@/lib/pause-sheet";
-import { internetWindowsForGroup, ruleInternetWindows, type Rule } from "@/lib/rules";
+import { ruleInternetWindows, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
-import { internetRulePath } from "./group-actions";
-
-function untilFromMinutes(minutes: number) {
-  return new Date(Date.now() + minutes * 60_000);
-}
 
 export function PauseSheet({
   group,
@@ -32,41 +24,18 @@ export function PauseSheet({
   timezone: string;
   onClose: () => void;
 }) {
-  const { mutate, rules, devices } = useAppData();
-  const deviceNames = devices.filter((device) => device.groupId === group.id).map((device) => device.hostname ?? "");
-  const options = pauseSheetOptions(group, internetWindowsForGroup(rules, group.id, new Date()), mode, timezone, new Date());
+  const { store, rules, devices } = useAppData();
+  const sheet = groupPauseSheet(group, rules, devices, mode, timezone, new Date());
 
   async function run(request: PauseSheetRequest) {
-    if (request.kind === "extend") {
-      await mutate(() =>
-        api(`${internetRulePath(group)}/extend`, {
-          method: "POST",
-          body: JSON.stringify({ minutes: request.minutes }),
-        }),
-      );
-      return;
-    }
-    const until = request.kind === "pauseFor" ? untilFromMinutes(request.minutes).toISOString() : request.until;
-    // Name the scope and who it hits, and offer the way back.
-    await mutate(
-      () =>
-        api(`${internetRulePath(group)}/pause`, {
-          method: "POST",
-          body: JSON.stringify(until === null ? {} : { until }),
-        }),
-      undefined,
-      {
-        notice: `All internet paused for ${group.name} ${until ? `until ${formatClock(new Date(until), timezone)}` : "until you resume"}.`,
-        action: { label: "Undo", run: () => api(`${internetRulePath(group)}/resume`, { method: "POST" }) },
-      },
-    );
+    await applyGroupPause(store.mutate, group, request, timezone);
   }
 
   return (
     <PauseSheetView
-      title={pauseSheetTitle(group, mode)}
-      body={pauseSheetBody(group, mode, deviceNames)}
-      options={options}
+      title={sheet.title}
+      body={sheet.body}
+      options={sheet.options}
       onPick={(request) => run(request)}
       onClose={onClose}
     />
@@ -85,29 +54,11 @@ export function RulePauseSheet({
   timezone: string;
   onClose: () => void;
 }) {
-  const { mutate } = useAppData();
+  const { store } = useAppData();
   const options = rulePauseSheetOptions(rule, ruleInternetWindows(rule), mode, timezone, new Date());
 
   async function run(request: PauseSheetRequest) {
-    if (request.kind === "extend") {
-      await mutate(() =>
-        api(`/api/v1/rules/${rule.id}/extend`, { method: "POST", body: JSON.stringify({ minutes: request.minutes }) }),
-      );
-      return;
-    }
-    const until = request.kind === "pauseFor" ? untilFromMinutes(request.minutes).toISOString() : request.until;
-    await mutate(
-      () =>
-        api(`/api/v1/rules/${rule.id}/pause`, {
-          method: "POST",
-          body: JSON.stringify(until === null ? {} : { until }),
-        }),
-      undefined,
-      {
-        notice: `${rule.name} paused ${until ? `until ${formatClock(new Date(until), timezone)}` : "until you resume"}.`,
-        action: { label: "Undo", run: () => api(`/api/v1/rules/${rule.id}/resume`, { method: "POST" }) },
-      },
-    );
+    await applyRulePause(store.mutate, rule, request, timezone);
   }
 
   return (

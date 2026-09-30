@@ -69,13 +69,22 @@ needed for future work belongs here when implemented, not only in a canvas or se
 | Web colour, typography and spacing tokens | [globals.css](../src/app/globals.css); font loading in [layout.tsx](../src/app/layout.tsx) |
 | Reusable controls and marks | [src/components/ui](../src/components/ui); compose these before introducing a new primitive |
 | Brand artwork and its composition | [public/brand](../public/brand) and [Logo.tsx](../src/components/ui/Logo.tsx) |
-| Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/components/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts), [rule-actions.ts](../src/lib/rule-actions.ts) and [shared vectors](testing.md#display-vectors) |
+| Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/lib/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts), [rule-actions.ts](../src/lib/rule-actions.ts), [day-timeline.ts](../src/lib/day-timeline.ts), [internet-zone.ts](../src/lib/internet-zone.ts) and [shared vectors](testing.md#display-vectors) |
+| Components shared with the native app | [src/ui](../src/ui): React Native components the web renders through react-native-web; see [shared components](#shared-components) |
 | Rule and resolver verdicts | [rules.ts](../src/lib/rules.ts), [upstream.ts](../src/lib/upstream.ts) and [architecture](architecture.md#upstream-dns-categories) |
 | Native typography, navigation and adaptive layout | [Native design guide](https://github.com/nickberardi/familyfi-ios/blob/main/docs/design-system.md); read its current sources for platform details |
 
 Shared meaning must survive platform adaptation: Pause blocks all internet for a group and names that scope, an internet rule is optional, time follows the household timezone, and unknown observations remain unknown. Native
 controls, fonts and navigation can differ; web CSS dimensions are not a native layout specification.
 Record deliberate web choices here and native choices there, with links rather than mirrored claims.
+
+### Shared components
+
+`src/ui` holds the components the web and the native app ([familyfi-mobile](https://github.com/nickberardi/familyfi-mobile), which vendors this repository) draw from one source: the group card's header, Internet mark, internet zone and day timeline. They use React Native primitives (`View`, `Text`, `Pressable`) and `aria-*`/`role` props, which react-native-web renders as DOM (`next.config.ts` aliases `react-native` to it and resolves `.web.tsx` first; `ReactNativeWebStyles` puts its stylesheet in the server-rendered HTML). Their logic lives in `src/lib`.
+
+- Colours come from `useUI().color("<token>")`, never a literal: the web's `DefaultUI.web.tsx` returns `var(--ff-<token>)`, and native clients supply the palette for their appearance through `UIProvider`. Glyphs come from `useUI().Icon` (Phosphor's `Icon` on the web).
+- react-native-web resets `line-height`, so every shared `Text` sets its own (1.5× its size, the web's default). Pressed controls use `PRESS_OPACITY`, the web's `--ff-press-opacity`.
+- A web-only concern (a Next `Link`, a DOM sheet) stays in the `src/components` wrapper around the shared component and reaches it through a prop or slot, such as the internet zone's `footer`.
 
 ### Interaction rules
 
@@ -90,7 +99,7 @@ The Devices list leads with the observed connection status and links each identi
 ### Styling
 
 - Accessibility: contrast at least 4.5:1; no text under 14px rendered below 0.7 alpha. `tests/unit/mark-contrast.test.ts` checks colour tokens and `tests/browser/accessibility.spec.ts` runs axe (WCAG 2.1 A and AA) on every page in both viewports, with no exceptions.
-- **Never write a raw colour literal.** Every colour is a `--ff-*` token in `src/app/globals.css`; add a token rather than inlining `rgba(...)` or a hex. The only exception is `themeColor` in `src/app/layout.tsx`, which the browser reads before CSS exists.
+- **Never write a raw colour literal.** Every colour is a `--ff-*` token in `src/app/globals.css`; add a token rather than inlining `rgba(...)` or a hex. The exceptions are `themeColor` in `src/app/layout.tsx`, which the browser reads before CSS exists, and the shared palette `src/ui/palette.ts`, which spells each token for native clients that have no stylesheet (`tests/unit/ui-palette.test.ts` keeps its light values equal to `globals.css`).
 - Prefer a shared primitive in `src/components/ui` over a fourth copy of the same control. If you are writing a segmented control, a mark, a day picker or a pill, one already exists.
 - The Card System's density ladder is 44 / 32 / 24 px marks — comfortable, compact, dense. Never a fourth size.
 - **The verdict palette is one system.** Five states — `rule`, `blocked`, `partial`, `open`, `unknown` — each with an ink, a fill and a line under `--ff-verdict-*`. The colour answers *who* is blocking, which is why none of them borrows the accent. Never restyle a verdict locally and never reuse those colours for something that is not a verdict. `unknown` means we could not look; it must never read as `open`.
