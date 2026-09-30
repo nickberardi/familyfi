@@ -172,6 +172,16 @@ describe("endpoint manifest", () => {
     expect(check({ endpoints: [route()], edgeCredentials: [{ ...credential, endpointId: "r-lan" }] })).toThrow(EDGE_CREDENTIAL_INVALID);
     expect(check({ endpoints: [route()], edgeCredentials: [credential] })).toThrow(EDGE_CREDENTIAL_INVALID); // credential for no route
   });
+
+  it("refuses a pinned route without a well-formed pin, an unknown trust mode, and a route with no enabled flag", () => {
+    const home = household();
+    const check = (endpoint: unknown) => () => verifyManifest(home.manifest({ instanceId: "ff_home", endpoints: [endpoint] }), home.x, "ff_home");
+    expect(check(route({ spkiSha256: null }))).toThrow(EDGE_CREDENTIAL_INVALID);
+    expect(check(route({ spkiSha256: "short" }))).toThrow(EDGE_CREDENTIAL_INVALID);
+    expect(check({ ...route(), trustMode: "none" })).toThrow(EDGE_CREDENTIAL_INVALID);
+    expect(check({ ...route(), enabled: undefined })).toThrow(EDGE_CREDENTIAL_INVALID);
+    expect(check(route())).not.toThrow();
+  });
 });
 
 describe("routes and Access credentials", () => {

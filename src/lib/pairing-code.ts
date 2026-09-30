@@ -77,7 +77,7 @@ export function isServerOrigin(value: string): boolean {
   );
 }
 
-const PIN = /^[A-Za-z0-9_-]{43}$/;
+export const SPKI_PIN = /^[A-Za-z0-9_-]{43}$/;
 const HEADER_VALUE = /^[\x21-\x7e]{1,512}$/;
 
 /** Whether an Access credential may be sent as the CF-Access headers of a route: printable ASCII, at most 512 bytes. */
@@ -115,7 +115,7 @@ export function parsePairingCode(value: string): PairingCode {
     !isServerOrigin(payload.url.trim()) ||
     !payload.fingerprint ||
     (pin !== undefined && access !== undefined) ||
-    (pin !== undefined && (typeof pin !== "string" || !PIN.test(pin))) ||
+    (pin !== undefined && (typeof pin !== "string" || !SPKI_PIN.test(pin))) ||
     (access !== undefined &&
       (typeof access !== "object" ||
         access === null ||

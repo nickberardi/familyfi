@@ -80,7 +80,7 @@ Record deliberate web choices here and native choices there, with links rather t
 
 ### Shared components
 
-`src/ui` holds the components the web and the native app ([familyfi-mobile](https://github.com/nickberardi/familyfi-mobile), which vendors this repository) draw from one source: the group card's header, Internet mark, internet zone and day timeline. They use React Native primitives (`View`, `Text`, `Pressable`) and `aria-*`/`role` props, which react-native-web renders as DOM (`next.config.ts` aliases `react-native` to it and resolves `.web.tsx` first; `ReactNativeWebStyles` puts its stylesheet in the server-rendered HTML). Their logic lives in `src/lib`.
+`src/ui` holds the components the web and the native app ([familyfi-mobile](https://github.com/nickberardi/familyfi-mobile), which vendors this repository) draw from one source: the group card's header, Internet mark, internet zone and day timeline, and the sign-in form. They use React Native primitives (`View`, `Text`, `Pressable`) and `aria-*`/`role` props, which react-native-web renders as DOM (`next.config.ts` aliases `react-native` to it and resolves `.web.tsx` first; `ReactNativeWebStyles` puts its stylesheet in the server-rendered HTML). Their logic lives in `src/lib`.
 
 - Colours come from `useUI().color("<token>")`, never a literal: the web's `DefaultUI.web.tsx` returns `var(--ff-<token>)`, and native clients supply the palette for their appearance through `UIProvider`. Glyphs come from `useUI().Icon` (Phosphor's `Icon` on the web).
 - react-native-web resets `line-height`, so every shared `Text` sets its own (1.5× its size, the web's default). Pressed controls use `PRESS_OPACITY`, the web's `--ff-press-opacity`.

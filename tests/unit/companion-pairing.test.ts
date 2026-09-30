@@ -233,6 +233,36 @@ describe("companion requests", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("sends a write to the route that last answered, after a read has failed over", async () => {
+    const calls: TransportRequest[] = [];
+    let active: string | null = null;
+    const transport: Transport = async (request) => {
+      calls.push(request);
+      return request.url.startsWith(LAN.url) ? unreachable() : json(200, { ok: true });
+    };
+    const request = createCompanionRequest(transport, {
+      routes: () => routes,
+      edgeCredentials: () => [CREDENTIAL],
+      activeRouteId: () => active,
+      onRoute: (route) => void (active = route.id),
+    });
+    await request("/api/v1/groups");
+    calls.length = 0;
+    await expect(request("/api/v1/groups/g/rules/internet/pause", { method: "POST", body: {} })).resolves.toEqual({ ok: true });
+    expect(calls.map((call) => new URL(call.url).origin)).toEqual([EDGE.url]);
+  });
+
+  it("moves a sign-in to the next route when one is unreachable", async () => {
+    const calls: TransportRequest[] = [];
+    const transport: Transport = async (request) => {
+      calls.push(request);
+      return request.url.startsWith(LAN.url) ? unreachable() : json(200, { ok: true });
+    };
+    const request = createCompanionRequest(transport, { routes: () => routes, edgeCredentials: () => [CREDENTIAL] });
+    await expect(request("/api/v1/auth/login", { method: "POST", body: {} })).resolves.toEqual({ ok: true });
+    expect(calls.map((call) => new URL(call.url).origin)).toEqual([LAN.url, EDGE.url]);
+  });
+
   it("treats a Cloudflare Access wall as the route being unavailable, not as signed out", async () => {
     const transport: Transport = async (request) =>
       request.url.startsWith(LAN.url)
