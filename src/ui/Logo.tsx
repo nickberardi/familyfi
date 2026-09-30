@@ -43,7 +43,8 @@ export function Wordmark({ size = 21, onDeep = false }: { size?: number; onDeep?
     <View aria-hidden style={styles.row}>
       <Text style={[text, { color: ui.color(onDeep ? "brand-on-deep" : "ink") }]}>Family</Text>
       <Text style={[text, { color: cyan }]}>F</Text>
-      <View>
+      {/* Android clips a view's children unless told otherwise; the check shield stands above the "ı". */}
+      <View style={styles.dot}>
         <Text style={[text, { color: cyan }]}>{"ı"}</Text>
         <Image
           source={onDeep ? CHECK_DEEP : CHECK_LIGHT}
@@ -114,5 +115,6 @@ export function Logo({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "baseline" },
+  row: { flexDirection: "row", alignItems: "baseline", overflow: "visible" },
+  dot: { overflow: "visible" },
 });
