@@ -6,6 +6,8 @@ on:
   pull_request:
     branches:
       - main
+      # familyfi-mobile-migration: see ci.yml.
+      - familyfi-mobile-migration
     paths:
       - openapi/**
     types: [opened, synchronize, reopened, labeled, unlabeled]
