@@ -86,8 +86,8 @@ export function DayTimeline({
           </Text>
         ))}
       </View>
-      {/* Always present, so a screen reader announces each choice as it fills. */}
-      <Text aria-live="polite" style={text}>
+      {/* Always present, so a screen reader announces each choice as it fills; no height while empty. */}
+      <Text aria-live="polite" style={[text, !picked && styles.empty]}>
         {picked ? (
           <>
             <Text style={{ fontWeight: "600", color: ui.color("ink") }}>{picked.label}</Text> · {bandTimes(picked)} · {picked.source}
@@ -125,4 +125,5 @@ const styles = StyleSheet.create({
   // react-native-web keeps a View at full width (flexShrink 0); a long window name wraps instead.
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },
   swatch: { width: 8, height: 8, borderRadius: 2 },
+  empty: { height: 0, overflow: "hidden" },
 });
