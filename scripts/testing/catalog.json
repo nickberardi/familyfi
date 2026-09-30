@@ -689,6 +689,12 @@
         "groups",
         "display"
       ]
+    },
+    "tests/unit/companion-trust.test.ts": {
+      "categories": [
+        "pairing",
+        "trust"
+      ]
     }
   }
 }

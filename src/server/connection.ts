@@ -1,4 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { isServerOrigin } from "@/lib/pairing-code";
 import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
 import { SESSION_TTL_MS } from "@/lib/constants";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
@@ -95,7 +96,7 @@ export function httpsOrigin(value: string): URL {
   } catch {
     throw new Error("Endpoint must be an absolute HTTPS origin.");
   }
-  if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("Endpoint must be an absolute HTTPS origin.");
+  if (!isServerOrigin(value)) throw new Error("Endpoint must be an absolute HTTPS origin.");
   return url;
 }
 
