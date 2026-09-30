@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PendingEnrollment } from "@/lib/companion-pairing";
-import { pendingHouseholdNote, pendingHouseholdRows } from "@/lib/companion-setup";
+import { connectionHousehold, pendingHouseholdNote, pendingHouseholdRows } from "@/lib/companion-setup";
 import { shortPin } from "@/lib/connection-routes";
 import type { ConnectionRoute } from "@/lib/types";
 
@@ -44,5 +44,12 @@ describe("confirming a household", () => {
     const system = { ...route, transport: "cloudflare" as const, trustMode: "system" as const, spkiSha256: null };
     expect(pendingHouseholdRows(pending(system)).map((row) => row.label)).toEqual(["Address", "Route", "Signing key"]);
     expect(pendingHouseholdNote(pending(system))).toMatch(/passed HTTPS validation/);
+  });
+});
+
+describe("the Connection screen", () => {
+  it("names the signing key, and who is signed in", () => {
+    expect(connectionHousehold(FINGERPRINT, "Admin")).toBe(`Signing key ${shortPin(FINGERPRINT)} · signed in as Admin`);
+    expect(connectionHousehold(FINGERPRINT, null)).toBe(`Signing key ${shortPin(FINGERPRINT)}`);
   });
 });

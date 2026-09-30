@@ -29,6 +29,23 @@ export const SETUP_STEPS = {
   },
 } as const;
 
+/** The setup steps' actions. */
+export const SETUP_ACTIONS = {
+  scan: "Scan pairing code",
+  paste: "Paste pairing code",
+  pasteInstead: "Paste the code instead",
+  continue: "Continue",
+  scanAgain: "Scan again",
+  allowCamera: "Allow camera",
+  openSettings: "Open Settings",
+  trust: "Trust this instance",
+  reject: "Not my household — start over",
+  pairAnother: "Pair with a different household",
+} as const;
+
+export const SCAN_NOTE =
+  "The code carries a short-lived pairing key and the server identity. It never carries a UniFi API key or an administrator password.";
+export const VERIFIED_HOUSEHOLD = "Verified household";
 export const SCAN_VERIFYING = "Code found — verifying the instance…";
 export const CAMERA_OFF = "Camera access is off for FamilyFi. Allow it in Settings, or paste the code instead.";
 export const CAMERA_NEEDED = "FamilyFi needs the camera to read the pairing code.";
@@ -49,4 +66,24 @@ export function pendingHouseholdNote({ code }: PendingEnrollment): string {
   return code.endpoint.trustMode === "pinned"
     ? "The server identity and certificate matched the pairing code."
     : "The server identity matched the pairing code, and its certificate passed HTTPS validation.";
+}
+
+/** A paired phone's Connection screen: the household it trusts, its routes, and leaving it. */
+export const CONNECTION_COPY = {
+  routes: "Routes",
+  inUse: "In use",
+  off: "Off",
+  check: "Check routes again",
+  checking: "Checking routes…",
+  signOut: "Sign out",
+  forget: "Forget this household",
+  forgetTitle: "Forget this household?",
+  forgetBody: "This phone stops trusting it. To use FamilyFi again, pair with a new code.",
+  forgetConfirm: "Forget",
+  cancel: "Cancel",
+} as const;
+
+/** The trusted household's line: its signing key, and who is signed in. */
+export function connectionHousehold(keyFingerprint: string, signedInAs: string | null): string {
+  return `Signing key ${shortPin(keyFingerprint)}${signedInAs ? ` · signed in as ${signedInAs}` : ""}`;
 }

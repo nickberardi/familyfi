@@ -37,12 +37,20 @@ test("sign-in and household pages", async ({ page }) => {
   const usernameBox = page.getByLabel("Username");
   await expect(usernameBox).toHaveCSS("font-size", "16px");
 
-  // Through the form, as a person signs in: a wrong password is reported, and Return submits. The
-  // failure counts toward the sign-in throttle (5 per username or address in 15 minutes).
+  // Through the form, as a person signs in: a refused sign-in is reported, and Return submits. The
+  // refusal is answered here, so no failure counts toward the sign-in throttle.
+  await page.route("**/api/v1/auth/login", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "invalid_credentials", message: "Invalid username or password." } }),
+    }),
+  );
   await usernameBox.fill("admin");
   await page.getByLabel("Password").fill("not-the-password");
   await page.getByLabel("Password").press("Enter");
   await expect(page.getByTestId("sign-in-error")).toHaveText("Invalid username or password.");
+  await page.unroute("**/api/v1/auth/login");
   await page.getByLabel("Password").fill(password!);
   await page.getByLabel("Password").press("Enter");
   await expect(page).toHaveURL(/\/family/);

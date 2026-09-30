@@ -378,6 +378,66 @@ describe("a companion session", () => {
     expect(session.getState()).toMatchObject({ status: "unpaired", profile: null });
   });
 
+  it("never brings back a household forgotten while refreshed routes were being saved", async () => {
+    const home = household();
+    const storage = memory();
+    let saving: (() => void) | null = null;
+    let paired = false;
+    const slow: SecureStorage = {
+      ...storage,
+      set: async (key, value) => {
+        if (paired && key === "connectionProfile") await new Promise<void>((resolve) => (saving = resolve));
+        await storage.set(key, value);
+      },
+    };
+    const session = createCompanionSession({ transport: home.transport, storage: slow, deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+    paired = true;
+
+    const refreshing = session.refresh();
+    for (let i = 0; i < 20 && !saving; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    await session.forget();
+    saving!();
+    await refreshing;
+    expect(storage.keys()).toEqual([]);
+    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null });
+  });
+
+  it("never signs in to a household forgotten while signing in", async () => {
+    const home = household();
+    const storage = memory();
+    let answer: (() => void) | null = null;
+    const slow: Transport = async (request) => {
+      if (new URL(request.url).pathname === "/api/v1/auth/login") await new Promise<void>((resolve) => (answer = resolve));
+      return home.transport(request);
+    };
+    const session = createCompanionSession({ transport: slow, storage, deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+
+    const signingIn = session.signIn("admin", "right");
+    for (let i = 0; i < 20 && !answer; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    await session.forget();
+    answer!();
+    await expect(signingIn).resolves.toBeNull();
+    expect(storage.keys()).toEqual([]);
+    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
+  });
+
+  it("ends the server session when it forgets a signed-in household", async () => {
+    const home = household();
+    const session = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+    await session.signIn("admin", "right");
+    await session.forget();
+    expect(home.calls.at(-1)).toMatchObject({ method: "POST", url: expect.stringMatching(/\/api\/v1\/auth\/logout$/) });
+  });
+
   it("drops a household the person rejects without spending its code", async () => {
     const home = household();
     const session = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
