@@ -67,6 +67,7 @@ export function SignInForm({
           enterKeyHint="next"
           // Return submits once a password is filled in (as the web's form always did), else moves to it.
           onSubmitEditing={() => (password ? void submit() : passwordField.current?.focus())}
+          blurOnSubmit={false}
         />
       </View>
       <View style={styles.field}>
