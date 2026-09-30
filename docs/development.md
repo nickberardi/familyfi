@@ -86,7 +86,6 @@ Record deliberate web choices here and native choices there, with links rather t
 - react-native-web resets `line-height`, so every shared `Text` sets its own (1.5× its size, the web's default). Pressed controls use `PRESS_OPACITY`, the web's `--ff-press-opacity`.
 - A web-only concern (a Next `Link`, a DOM sheet) stays in the `src/components` wrapper around the shared component and reaches it through a prop or slot, such as the internet zone's `footer`.
 
-
 ### Interaction rules
 
 - Present the household task and its result in plain language. Keep gateway implementation details in diagnostic views where they help an operator act.

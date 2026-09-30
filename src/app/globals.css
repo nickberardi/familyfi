@@ -252,13 +252,6 @@ input[type="search"]::-webkit-search-cancel-button {
   display: revert;
 }
 
-/* Nor does it take the browser's tap highlight or iOS text sizing (:root outranks its html rule). */
-:root {
-  -webkit-tap-highlight-color: revert;
-  -webkit-text-size-adjust: revert;
-  text-size-adjust: revert;
-}
-
 @media (prefers-reduced-motion: reduce) {
   a,
   button {

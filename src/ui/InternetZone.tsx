@@ -77,7 +77,6 @@ export function InternetZone({
               <Pressable
                 key={action.label}
                 role="button"
-                aria-label={`${action.label}, ${group.name}`}
                 aria-disabled={action.disabled}
                 disabled={action.disabled}
                 onPress={action.onPress}

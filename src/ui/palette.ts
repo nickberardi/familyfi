@@ -89,7 +89,6 @@ export const LIGHT = {
 /** A colour token name: `--ff-<name>` in `globals.css`. */
 export type ColorToken = keyof typeof LIGHT;
 
-
 export const DARK: Partial<Record<ColorToken, string>> = {
   "accent": "rgb(112, 181, 255)",
   "accent-fill": "rgba(112, 181, 255, 0.1)",

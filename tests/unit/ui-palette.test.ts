@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { DARK, LIGHT } from "@/ui/palette";
+import { PRESS_OPACITY } from "@/ui/UIContext";
 
 const css = readFileSync(path.resolve(__dirname, "../../src/app/globals.css"), "utf8");
 const root = css.slice(css.indexOf(":root"), css.indexOf("\n}", css.indexOf(":root")));
@@ -23,6 +24,10 @@ const colours = Object.fromEntries(
 describe("shared UI palette", () => {
   it("matches globals.css for every colour token", () => {
     expect(LIGHT).toEqual(colours);
+  });
+
+  it("presses shared controls to the web's --ff-press-opacity", () => {
+    expect(String(PRESS_OPACITY)).toBe(declared["press-opacity"]);
   });
 
   it("has a dark value only for tokens the web declares", () => {
