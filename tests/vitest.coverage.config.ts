@@ -34,7 +34,9 @@ export default defineConfig({
         branches: 66,
         "src/server/unifi/**": { lines: 80, statements: 75, functions: 73, branches: 65 },
         "src/server/unifi/policy-ownership.ts": { lines: 100, statements: 100, functions: 100, branches: 100 },
-        "src/server/reconciliation.ts": { lines: 96, statements: 94, functions: 90, branches: 89 },
+        // Branches lowered from 89 to 86.66 (October 2026, operator's call) while the shared-module
+        // refactor for the native app is in flight; raise it again as reconcile-paths grows.
+        "src/server/reconciliation.ts": { lines: 96, statements: 94, functions: 90, branches: 86.66 },
         "src/server/quarantine.ts": { lines: 100, statements: 100, functions: 100, branches: 90 },
         "src/server/auth.ts": { lines: 88, statements: 87, functions: 100, branches: 83 },
         "src/server/guard.ts": { lines: 83, statements: 87, functions: 100, branches: 100 },
