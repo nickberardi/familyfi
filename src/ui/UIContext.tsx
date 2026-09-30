@@ -1,3 +1,5 @@
+"use client";
+
 import { createContext, useContext, type ComponentType } from "react";
 
 import type { IconName } from "@/lib/icons";
@@ -17,6 +19,9 @@ export type UI = {
   /** A decorative glyph; the label beside it carries the meaning. */
   Icon: ComponentType<{ name: IconName; size: number; color: string }>;
 };
+
+/** A pressed control's opacity: the web's `--ff-press-opacity`. */
+export const PRESS_OPACITY = 0.72;
 
 const UIContext = createContext<UI>(defaultUI);
 

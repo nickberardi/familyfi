@@ -1,5 +1,7 @@
+"use client";
+
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View, type DimensionValue } from "react-native";
+import { Pressable, StyleSheet, Text, View, type DimensionValue, type NativeSyntheticEvent } from "react-native";
 
 import { localNowPercent } from "@/lib/display";
 import {
@@ -12,7 +14,7 @@ import {
   type TimelineBand,
 } from "@/lib/day-timeline";
 
-import { useUI } from "./UIContext";
+import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /**
  * Today on a 24-hour bar, shared by every client: the time a group has no internet, and why.
@@ -35,10 +37,11 @@ export function DayTimeline({
 }) {
   const ui = useUI();
   const [chosen, setChosen] = useState<number | null>(null);
+  const [ring, setRing] = useState<number | null>(null);
   const picked = chosen !== null ? bands[chosen] : undefined;
   const order = bands.map((band, index) => ({ band, index })).sort((a, b) => timelineRank(a.band) - timelineRank(b.band));
   const items = legend ? timelineLegend(bands) : [];
-  const text = { fontFamily: ui.font, fontSize: 14, color: ui.color("ink-2") };
+  const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 21, color: ui.color("ink-2") };
   const fill = (kind: TimelineBand["kind"]) => {
     const look = TIMELINE_BAND_LOOK[kind];
     return {
@@ -59,19 +62,23 @@ export function DayTimeline({
             aria-pressed={chosen === index}
             accessibilityState={{ selected: chosen === index }}
             onPress={() => setChosen(chosen === index ? null : index)}
-            style={[
+            onFocus={(event) => setRing(focusVisible(event) ? index : null)}
+            onBlur={() => setRing(null)}
+            style={({ pressed }) => [
               styles.band,
               { left: timelinePercent(band.from), width: timelinePercent(Math.max(band.to - band.from, 4)) },
               fill(band.kind),
+              pressed && { opacity: PRESS_OPACITY },
+              // The bar clips anything outside a band, so its focus ring is drawn inside.
+              ring === index && { outlineWidth: 2, outlineStyle: "solid", outlineOffset: -2, outlineColor: ui.color("ink") },
             ]}
           />
         ))}
         <View
-          pointerEvents="none"
-          style={[styles.now, { left: localNowPercent(timezone, now ?? new Date()) as DimensionValue, backgroundColor: ui.color("now") }]}
+          style={[styles.now, { pointerEvents: "none" }, { left: localNowPercent(timezone, now ?? new Date()) as DimensionValue, backgroundColor: ui.color("now") }]}
         />
       </View>
-      <View style={styles.hours} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={styles.hours} aria-hidden>
         {TIMELINE_HOURS.map((hour, index) => (
           <Text key={index} style={[text, { color: ui.color("muted") }]}>
             {hour}
@@ -87,10 +94,10 @@ export function DayTimeline({
         ) : null}
       </Text>
       {items.length ? (
-        <View style={styles.legend}>
+        <View role="list" style={styles.legend}>
           {items.map((item) => (
-            <View key={`${item.kind}:${item.label}:${item.source}`} style={styles.legendItem}>
-              <View style={[styles.swatch, fill(item.kind)]} />
+            <View role="listitem" key={`${item.kind}:${item.label}:${item.source}`} style={styles.legendItem}>
+              <View aria-hidden style={[styles.swatch, fill(item.kind)]} />
               <Text style={text}>
                 {item.label} {item.times}
               </Text>
@@ -100,6 +107,12 @@ export function DayTimeline({
       ) : null}
     </View>
   );
+}
+
+/** Whether focus should show a ring: on the web only for keyboard focus (`:focus-visible`), as a button's. */
+function focusVisible(event: NativeSyntheticEvent<unknown>): boolean {
+  const { target } = (event.nativeEvent ?? {}) as { target?: { matches?: (selector: string) => boolean } };
+  return target?.matches ? target.matches(":focus-visible") : true;
 }
 
 const styles = StyleSheet.create({

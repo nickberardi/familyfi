@@ -28,7 +28,8 @@ the gateway's management API.
 
 ```text
 src/app          pages, layouts, api/v1 route handlers
-src/components   shared UI
+src/components   web UI
+src/ui           components shared with the native app (React Native, rendered on the web by react-native-web)
 src/server       env, database, auth, schedule, UniFi, reconciliation
 src/lib          client-safe constants, types, and pure logic (schedule windows)
 prisma           PostgreSQL schema and migrations

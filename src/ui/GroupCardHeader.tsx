@@ -1,3 +1,5 @@
+"use client";
+
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { accessColor, cardNoteLine, cardStateLabel, roleTag } from "@/lib/display";
@@ -27,12 +29,13 @@ export function GroupCardHeader({
   const { width } = useWindowDimensions();
   const monogram = groupMonogram(group);
   const stateColor = ui.color(tokenOf(accessColor(group.access)));
-  const body = { fontFamily: ui.font, fontSize: 14 };
+  const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
+  const wide = width >= 768;
 
   return (
     <View style={styles.row}>
       {group.kind === "things" ? (
-        <View style={[styles.tile, { backgroundColor: ui.color("mark") }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <View style={[styles.tile, { backgroundColor: ui.color("mark") }]} aria-hidden>
           <Text
             maxFontSizeMultiplier={1.2}
             style={{ fontFamily: ui.font, fontWeight: "700", letterSpacing: 0.35, color: ui.color("ink-on-fill"), fontSize: monogram.length > 2 ? 12 : 14 }}
@@ -44,7 +47,17 @@ export function GroupCardHeader({
       <View style={styles.words}>
         <View style={styles.title}>
           {/* The web's md breakpoint: 17 pt names on wide screens, 19 pt on phones. */}
-          <Text style={{ fontFamily: ui.font, fontSize: width >= 768 ? 17 : 19, fontWeight: "600", letterSpacing: -0.3, color: ui.color("ink") }}>
+          <Text
+            style={{
+              fontFamily: ui.font,
+              fontSize: wide ? 17 : 19,
+              lineHeight: wide ? 25.5 : 28.5,
+              fontWeight: "600",
+              // The web's tracking-tight, -0.025em.
+              letterSpacing: wide ? -0.425 : -0.475,
+              color: ui.color("ink"),
+            }}
+          >
             {group.name}
           </Text>
           <Text style={[body, { color: ui.color("ink-2") }]}>{roleTag(group)}</Text>

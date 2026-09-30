@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -5,7 +7,7 @@ import { internetDayBands, type InternetWindow } from "@/lib/rule-windows";
 import { internetZoneText } from "@/lib/internet-zone";
 import type { Group } from "@/lib/types";
 
-import { useUI } from "./UIContext";
+import { PRESS_OPACITY, useUI } from "./UIContext";
 import { DayTimeline } from "./DayTimeline";
 
 export type ZoneAction = {
@@ -60,11 +62,11 @@ export function InternetZone({
       ]}
     >
       <View style={styles.heading}>
-        <View style={[styles.icon, icon.box]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <View style={[styles.icon, icon.box]} aria-hidden>
           <ui.Icon name="globe-simple" size={16} color={icon.ink} />
         </View>
         <View style={styles.words}>
-          <Text accessibilityRole="header" style={{ fontFamily: ui.font, fontSize: 14, fontWeight: "600", color: ui.color("ink") }}>
+          <Text role="heading" aria-level={3} style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, fontWeight: "600", color: ui.color("ink") }}>
             {zone.title}
           </Text>
           <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, marginTop: 2, color: ui.color("ink-2") }}>{zone.sub}</Text>
@@ -85,13 +87,14 @@ export function InternetZone({
                   action.strong
                     ? { backgroundColor: ui.color(action.disabled ? "disabled" : "accent") }
                     : { backgroundColor: ui.color("card"), borderWidth: 1, borderColor: ui.color("control-line"), paddingHorizontal: 9, paddingVertical: 5 },
-                  pressed && { opacity: 0.7 },
+                  pressed && { opacity: PRESS_OPACITY },
                 ]}
               >
                 <Text
                   style={{
                     fontFamily: ui.font,
                     fontSize: 14,
+                    lineHeight: 21,
                     fontWeight: "600",
                     color: action.strong ? ui.color("ink-on-fill") : ui.color(action.disabled ? "disabled" : "accent"),
                   }}

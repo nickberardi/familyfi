@@ -1,10 +1,12 @@
+"use client";
+
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { internetMarkLook } from "@/lib/internet-zone";
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
 
-import { useUI } from "./UIContext";
+import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /** All internet as one mark in a closed card's row, shared by every client: Off, Paused, On or No rule. */
 export function InternetMark({
@@ -23,7 +25,7 @@ export function InternetMark({
   const ui = useUI();
   const look = internetMarkLook(group, windows, timezone, now);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`All internet — ${look.word.toLowerCase()}`} onPress={onPress} style={styles.mark}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`All internet — ${look.word.toLowerCase()}`} onPress={onPress} style={({ pressed }) => [styles.mark, pressed && { opacity: PRESS_OPACITY }]}>
       <View
         style={[
           styles.tile,
@@ -31,10 +33,12 @@ export function InternetMark({
           look.border === "dashed" ? { borderWidth: 1.5, borderStyle: "dashed", borderColor: ui.color("control-line") } : null,
         ]}
       >
-        <ui.Icon name="globe-simple" size={18} color={ui.color(look.ink)} />
+        <View aria-hidden>
+          <ui.Icon name="globe-simple" size={18} color={ui.color(look.ink)} />
+        </View>
       </View>
-      <Text style={{ fontFamily: ui.font, fontSize: 10, color: ui.color("ink-2") }}>Internet</Text>
-      <Text style={{ fontFamily: ui.font, fontSize: 9, fontWeight: "600", color: ui.color(look.wordInk) }}>{look.word}</Text>
+      <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, color: ui.color("ink-2") }}>Internet</Text>
+      <Text style={{ fontFamily: ui.font, fontSize: 9, lineHeight: 13.5, fontWeight: "600", color: ui.color(look.wordInk) }}>{look.word}</Text>
     </Pressable>
   );
 }
