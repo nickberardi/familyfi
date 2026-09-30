@@ -6,12 +6,18 @@ on:
   pull_request:
     branches:
       - main
+      # familyfi-mobile-migration: see ci.yml.
+      - familyfi-mobile-migration
     paths:
       - openapi/**
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # info.version must rise with every change, so the iOS client can tell its vendored copy is stale.

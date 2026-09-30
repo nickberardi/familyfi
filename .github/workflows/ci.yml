@@ -4,10 +4,21 @@ on:
 #  push:
 #    branches:
 #    - main
+  # familyfi-mobile-migration collects the native app's shared-code PRs until the migration merges
+  # to main; its PRs and merges get the same checks. Remove it from here, container.yml and
+  # openapi.yml when it merges.
+  push:
+    branches:
+    - familyfi-mobile-migration
   pull_request:
     branches:
     - main
+    - familyfi-mobile-migration
   workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
     
 jobs:
   # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.

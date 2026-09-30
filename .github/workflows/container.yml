@@ -3,11 +3,20 @@ name: Container
 # Pull requests, not pushes to main: the image build is slow, and a merged PR
 # already passed it. It also gates every release (see release.yml).
 on:
+  # familyfi-mobile-migration: see ci.yml.
+  push:
+    branches:
+      - familyfi-mobile-migration
   pull_request:
     branches:
       - main
+      - familyfi-mobile-migration
   workflow_dispatch:
   workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   container:
