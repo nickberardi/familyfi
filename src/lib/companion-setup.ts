@@ -36,7 +36,6 @@ export const SETUP_ACTIONS = {
   pasteInstead: "Paste the code instead",
   continue: "Continue",
   scanAgain: "Scan again",
-  allowCamera: "Allow camera",
   openSettings: "Open Settings",
   trust: "Trust this instance",
   reject: "Not my household — start over",
@@ -48,7 +47,7 @@ export const SCAN_NOTE =
 export const VERIFIED_HOUSEHOLD = "Verified household";
 export const SCAN_VERIFYING = "Code found — verifying the instance…";
 export const CAMERA_OFF = "Camera access is off for FamilyFi. Allow it in Settings, or paste the code instead.";
-export const CAMERA_NEEDED = "FamilyFi needs the camera to read the pairing code.";
+export const SCAN_UNAVAILABLE = "Camera scanning isn't available on this device.";
 
 /** The details of a verified household, to check before trusting it. */
 export function pendingHouseholdRows({ code, identity }: PendingEnrollment): { label: string; value: string }[] {

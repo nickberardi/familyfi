@@ -20,6 +20,7 @@ import {
   verifyHousehold,
 } from "@/lib/companion-pairing";
 import { COMPANION_OFFLINE_GUARD } from "@/lib/household-store";
+import { ACCESS_REVOKED } from "@/lib/sign-in";
 import { createCompanionRequest, type Transport, type TransportRequest, type TransportResponse } from "@/lib/companion-request";
 import { createCompanionSession, type SecureStorage } from "@/lib/companion-session";
 import { IDENTITY_MISMATCH, MANIFEST_MISSING_ENDPOINT, MANIFEST_SIGNATURE_INVALID, type EndpointCredential } from "@/lib/companion-trust";
@@ -93,6 +94,8 @@ function household({ manifestEndpoints = [LAN, EDGE], otherSigner = false } = {}
       }),
     "POST /api/v1/auth/login": (request) => {
       const body = JSON.parse(request.body ?? "{}");
+      if (body.password === "revoked")
+        return json(403, { error: { code: "device_not_paired", message: "Pair this phone with a household administrator before signing in." } });
       return body.client === "native" && body.deviceCredential === "device-secret" && body.password === "right"
         ? json(200, {
             session: {
@@ -499,6 +502,17 @@ describe("a companion session", () => {
     answer!();
     await expect(signingIn).resolves.toBeNull();
     expect(session.getState().status).toBe("signedIn");
+  });
+
+  it("forgets a revoked phone at sign-in and says why on Welcome, until the next pairing", async () => {
+    const home = household();
+    const storage = memory();
+    const session = await paired(home, home.transport, storage);
+    await expect(session.signIn("admin", "revoked")).resolves.toBeNull();
+    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null, notice: ACCESS_REVOKED });
+    expect(storage.keys()).toEqual([]);
+    await session.verify(home.code);
+    expect(session.getState().notice).toBeNull();
   });
 
   it("drops a household the person rejects without spending its code", async () => {
