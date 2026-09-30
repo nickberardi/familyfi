@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ComponentProps } from "react";
 import { StyleSheet, Text, TextInput, View, type TextInputInstance } from "react-native";
 
 import { SIGN_IN_NOTE } from "@/lib/sign-in";
@@ -17,11 +17,16 @@ export function SignInForm({
   onSubmit,
   initialUsername = "",
   surface = "card",
+  buttonStyle,
+  buttonLabelStyle,
 }: {
   onSubmit: (username: string, password: string) => Promise<string | null>;
   initialUsername?: string;
   /** `card` on a page (the web); `plain` sits the fields straight on a ground, filled with `field` (a phone's setup). */
   surface?: "card" | "plain";
+  /** The submit button's platform shape and type, on top of the web's (`Button`'s `style` and `labelStyle`). */
+  buttonStyle?: ComponentProps<typeof Button>["style"];
+  buttonLabelStyle?: ComponentProps<typeof Button>["labelStyle"];
 }) {
   const ui = useUI();
   const [username, setUsername] = useState(initialUsername);
@@ -103,7 +108,7 @@ export function SignInForm({
           {error}
         </Text>
       ) : null}
-      <Button label={pending ? "Signing in…" : "Sign in"} disabled={pending} onPress={() => void submit()} testID="sign-in-submit" />
+      <Button label={pending ? "Signing in…" : "Sign in"} disabled={pending} onPress={() => void submit()} testID="sign-in-submit" style={buttonStyle} labelStyle={buttonLabelStyle} />
       <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, color: ui.color("muted") }}>{SIGN_IN_NOTE}</Text>
     </View>
   );
