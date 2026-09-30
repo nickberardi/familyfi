@@ -89,7 +89,6 @@ The workflows that run tests call `scripts/test.py`, so a local run is the CI ru
 | `container.yml` | Pull requests | Image build, image hygiene, container smoke; the same helpers as `check container`, with the build action's layer cache |
 | `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`, with the helpers `check api-version` and `check api-breaking` call. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | `check mutation`. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
-| `requested-tests.yml` | By hand | Any selection `run` accepts: test identities, categories, layers and platforms. Uploads the run's results |
 
 ### Running CI's jobs locally
 
