@@ -438,6 +438,69 @@ describe("a companion session", () => {
     expect(home.calls.at(-1)).toMatchObject({ method: "POST", url: expect.stringMatching(/\/api\/v1\/auth\/logout$/) });
   });
 
+  const paired = async (home: ReturnType<typeof household>, transport: Transport, storage: SecureStorage = memory()) => {
+    const session = createCompanionSession({ transport, storage, deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+    return session;
+  };
+  const settle = async (until: () => boolean) => {
+    for (let i = 0; i < 20 && !until(); i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+
+  it("signs out and forgets at once, without waiting for an unreachable server", async () => {
+    const home = household();
+    const hanging: Transport = (request) =>
+      new URL(request.url).pathname === "/api/v1/auth/logout" ? new Promise(() => undefined) : home.transport(request);
+    const session = await paired(home, hanging);
+    await session.signIn("admin", "right");
+    await session.signOut();
+    expect(session.getState().status).toBe("signedOut");
+    await session.signIn("admin", "right");
+    await session.forget();
+    expect(session.getState().status).toBe("unpaired");
+  });
+
+  it("drops a sign-in when forget lands while its session is saved, and ends that session on the server", async () => {
+    const home = household();
+    const storage = memory();
+    let saving: (() => void) | null = null;
+    const slow: SecureStorage = {
+      ...storage,
+      set: async (key, value) => {
+        if (key === "bearerSession") await new Promise<void>((resolve) => (saving = resolve));
+        await storage.set(key, value);
+      },
+    };
+    const session = await paired(home, home.transport, slow);
+    const signingIn = session.signIn("admin", "right");
+    await settle(() => !!saving);
+    await session.forget();
+    saving!();
+    await expect(signingIn).resolves.toBeNull();
+    await settle(() => home.calls.some((call) => call.url.endsWith("/api/v1/auth/logout")));
+    expect(storage.keys()).toEqual([]);
+    expect(session.getState()).toMatchObject({ status: "unpaired", session: null });
+    expect(home.calls.at(-1)).toMatchObject({ method: "POST", headers: { Authorization: "Bearer bearer-1" } });
+  });
+
+  it("keeps a sign-in when the routes change while it is in flight", async () => {
+    const home = household();
+    let answer: (() => void) | null = null;
+    const slow: Transport = async (request) => {
+      if (new URL(request.url).pathname === "/api/v1/auth/login") await new Promise<void>((resolve) => (answer = resolve));
+      return home.transport(request);
+    };
+    const session = await paired(home, slow);
+    const signingIn = session.signIn("admin", "right");
+    await settle(() => !!answer);
+    await session.refresh(); // the manifest moves an Access token up, replacing the profile
+    answer!();
+    await expect(signingIn).resolves.toBeNull();
+    expect(session.getState().status).toBe("signedIn");
+  });
+
   it("drops a household the person rejects without spending its code", async () => {
     const home = household();
     const session = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
