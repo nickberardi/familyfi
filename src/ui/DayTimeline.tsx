@@ -14,7 +14,7 @@ import {
   type TimelineBand,
 } from "@/lib/day-timeline";
 
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { useUI } from "./UIContext";
 
 /**
  * Today on a 24-hour bar, shared by every client: the time a group has no internet, and why.
@@ -65,11 +65,11 @@ export function DayTimeline({
             onPress={() => setChosen(chosen === index ? null : index)}
             onFocus={(event) => setRing(focusVisible(event) ? index : null)}
             onBlur={() => setRing(null)}
-            style={({ pressed }) => [
+            // No press dimming: a band keeps its own opacity (a faded window is 0.22), as on the web.
+            style={[
               styles.band,
               { left: timelinePercent(band.from), width: timelinePercent(Math.max(band.to - band.from, 4)) },
               fill(band.kind),
-              pressed && { opacity: PRESS_OPACITY },
               // The bar clips anything outside a band, so its focus ring is drawn inside.
               ring === index && { outlineWidth: 2, outlineStyle: "solid", outlineOffset: -2, outlineColor: ui.color("ink") },
             ]}

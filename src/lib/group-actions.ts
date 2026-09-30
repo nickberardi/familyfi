@@ -2,8 +2,8 @@ import type { Group } from "./types";
 
 /**
  * A card action as plain data: what `groupActions` shows, with `run` naming what a tap
- * does instead of carrying the callback. Every client shows these (the native app imports
- * this module), and `tests/fixtures/display-vectors.json` pins them.
+ * does instead of carrying the callback. Every client shows these: the Expo app imports this
+ * module, the native iOS app ports it, and `tests/fixtures/display-vectors.json` pins them.
  */
 export type GroupActionSpec = {
   label: string;
