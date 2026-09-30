@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { groupPageSummary, groupPageTitle } from "@/lib/group-page";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
+import { EmptyCard } from "@/ui/EmptyCard";
 import { GroupCard } from "./GroupCard";
 import { PageHeader } from "./PageHeader";
 import { NewGroupSheet } from "./NewGroupSheet";
@@ -46,20 +48,8 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
   const { catalogNames, upstreamCategories } = useFilterCatalog();
   const rows = groups.filter((group) => group.kind === kind);
   const timezone = household?.timezone ?? "America/New_York";
-  const title = kind === "family" ? "Family" : "Things";
-  const paused = rows.filter((group) => group.access === "paused").map((group) => group.name);
-  const offline = rows.filter((group) => group.access === "blocked").map((group) => group.name);
-  const sub =
-    kind === "family"
-      ? paused.length || offline.length
-        ? [
-            paused.length ? `${paused.join(" and ")} paused` : "",
-            offline.length ? `${offline.join(" and ")} in a no-internet window` : "",
-          ]
-            .filter(Boolean)
-            .join(" · ")
-        : "Everyone online right now"
-      : "Device groups that are not a person. House destinations are Things groups.";
+  const title = groupPageTitle(kind);
+  const sub = groupPageSummary(kind, groups);
 
   return (
     <>
@@ -71,9 +61,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
       />
       <div className="grid grid-cols-1 items-start gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">
         {rows.length === 0 ? (
-          <p className="rounded-[12px] bg-[var(--ff-card)] p-[18px] text-[14px] text-[var(--ff-muted)] md:border md:border-[var(--ff-hairline-card)]">
-            Nothing here yet.
-          </p>
+          <EmptyCard />
         ) : (
           rows.map((group) => (
             <GroupCard

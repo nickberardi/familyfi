@@ -147,3 +147,12 @@ export function paletteColor(scheme: "light" | "dark", token: string): string {
   const name = token in LIGHT ? (token as ColorToken) : "ink";
   return (scheme === "dark" ? DARK[name] : undefined) ?? LIGHT[name];
 }
+
+/** The `--ff-shadow-*` values in `globals.css`, for native clients (CSS box-shadow syntax). */
+export const SHADOWS = {
+  sheet: "0 24px 60px rgba(0, 0, 0, 0.28)",
+  toast: "0 8px 24px rgba(0, 0, 0, 0.12)",
+  knob: "0 1px 2px rgba(0, 0, 0, 0.12)",
+} as const;
+
+export type ShadowName = keyof typeof SHADOWS;

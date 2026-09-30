@@ -4,6 +4,8 @@ import { createContext, useContext, type ComponentType } from "react";
 
 import type { IconName } from "@/lib/icons";
 
+import type { ShadowName } from "./palette";
+
 import { defaultUI } from "./DefaultUI";
 
 /**
@@ -14,6 +16,8 @@ import { defaultUI } from "./DefaultUI";
 export type UI = {
   /** A colour by its `--ff-*` token name, without the prefix: `color("accent")`. */
   color: (token: string) => string;
+  /** A shadow by its `--ff-shadow-*` name, without the prefix: `shadow("toast")`, as a CSS box-shadow. */
+  shadow: (name: ShadowName) => string;
   /** The text font, or undefined for the platform's system font. */
   font?: string;
   /** A decorative glyph; the label beside it carries the meaning. */

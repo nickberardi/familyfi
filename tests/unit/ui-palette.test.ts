@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { DARK, LIGHT } from "@/ui/palette";
+import { DARK, LIGHT, SHADOWS } from "@/ui/palette";
 import { PRESS_OPACITY } from "@/ui/UIContext";
 
 const css = readFileSync(path.resolve(__dirname, "../../src/app/globals.css"), "utf8");
@@ -24,6 +24,11 @@ const colours = Object.fromEntries(
 describe("shared UI palette", () => {
   it("matches globals.css for every colour token", () => {
     expect(LIGHT).toEqual(colours);
+  });
+
+  it("matches globals.css for every shadow", () => {
+    const shadows = Object.fromEntries(Object.entries(declared).filter(([name]) => name.startsWith("shadow-")).map(([name, value]) => [name.slice("shadow-".length), value]));
+    expect(SHADOWS).toEqual(shadows);
   });
 
   it("presses shared controls to the web's --ff-press-opacity", () => {

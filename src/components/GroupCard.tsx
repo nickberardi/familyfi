@@ -12,7 +12,7 @@ import { DayTimeline, type TimelineBand } from "./DayTimeline";
 import { categorySheet, categorySlotStates, CategoryMarkGlyph, MarkButton, SectionLabel, type CategorySlotState } from "./FilterMarks";
 import { FilterSheet, type FilterSheetState } from "./filters/FilterSheet";
 import { InternetZone } from "./InternetZone";
-import { GroupCardHeader } from "@/ui/GroupCardHeader";
+import { GroupCardFrame } from "@/ui/GroupCardFrame";
 import { InternetMark } from "@/ui/InternetMark";
 
 export type CardAction = {
@@ -79,21 +79,8 @@ export function GroupCard({
     setOpen(true);
   };
 
-  const header = <GroupCardHeader group={group} windows={windows} timezone={timezone} now={now} />;
-
   return (
-    <article className="overflow-hidden rounded-[12px] bg-[var(--ff-card)] md:border md:border-[var(--ff-hairline-card)]">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-start gap-3 px-[18px] pt-4 pb-3 text-left"
-      >
-        {header}
-        <span className="mt-0.5 flex-none text-[var(--ff-ink-3)]" aria-hidden>
-          <Icon name={open ? "caret-up" : "caret-down"} size={16} />
-        </span>
-      </button>
+    <GroupCardFrame group={group} windows={windows} timezone={timezone} now={now} open={open} onToggle={() => setOpen(!open)}>
 
       {open ? (
         <div className="flex flex-col gap-2.5 px-3 pb-3">
@@ -187,7 +174,7 @@ export function GroupCard({
       {sheet ? (
         <FilterSheet group={group} state={sheet} onClose={() => setSheet(null)} onChanged={onRulesChanged} />
       ) : null}
-    </article>
+    </GroupCardFrame>
   );
 }
 
