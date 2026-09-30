@@ -60,6 +60,7 @@ export function DayTimeline({
             role="button"
             aria-label={`${band.label}, ${bandTimes(band)}. ${band.source}`}
             aria-pressed={chosen === index}
+            // React Native has no aria-pressed; this carries the same state to VoiceOver and TalkBack.
             accessibilityState={{ selected: chosen === index }}
             onPress={() => setChosen(chosen === index ? null : index)}
             onFocus={(event) => setRing(focusVisible(event) ? index : null)}
@@ -98,7 +99,7 @@ export function DayTimeline({
           {items.map((item) => (
             <View role="listitem" key={`${item.kind}:${item.label}:${item.source}`} style={styles.legendItem}>
               <View aria-hidden style={[styles.swatch, fill(item.kind)]} />
-              <Text style={text}>
+              <Text style={[text, { flexShrink: 1 }]}>
                 {item.label} {item.times}
               </Text>
             </View>
@@ -121,6 +122,7 @@ const styles = StyleSheet.create({
   now: { position: "absolute", top: 0, bottom: 0, width: 2 },
   hours: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
   legend: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 12, rowGap: 6, marginTop: 4 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // react-native-web keeps a View at full width (flexShrink 0); a long window name wraps instead.
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },
   swatch: { width: 8, height: 8, borderRadius: 2 },
 });

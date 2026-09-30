@@ -76,9 +76,9 @@ export function InternetZone({
             {actions.map((action) => (
               <Pressable
                 key={action.label}
-                accessibilityRole="button"
-                accessibilityLabel={`${action.label}, ${group.name}`}
-                accessibilityState={{ disabled: action.disabled }}
+                role="button"
+                aria-label={`${action.label}, ${group.name}`}
+                aria-disabled={action.disabled}
                 disabled={action.disabled}
                 onPress={action.onPress}
                 testID={action.testID}
@@ -124,6 +124,7 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: 10 },
   icon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   words: { minWidth: 140, flex: 1 },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  // flexShrink lets the row narrow to the line so its buttons wrap (react-native-web defaults to 0).
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 6, flexShrink: 1 },
   action: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minHeight: 32, justifyContent: "center" },
 });

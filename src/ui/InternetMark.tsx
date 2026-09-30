@@ -25,7 +25,7 @@ export function InternetMark({
   const ui = useUI();
   const look = internetMarkLook(group, windows, timezone, now);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`All internet — ${look.word.toLowerCase()}`} onPress={onPress} style={({ pressed }) => [styles.mark, pressed && { opacity: PRESS_OPACITY }]}>
+    <Pressable role="button" aria-label={`All internet — ${look.word.toLowerCase()}`} onPress={onPress} style={({ pressed }) => [styles.mark, pressed && { opacity: PRESS_OPACITY }]}>
       <View
         style={[
           styles.tile,
