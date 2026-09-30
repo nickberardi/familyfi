@@ -98,6 +98,7 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     routes: () => state.profile?.endpoints ?? [],
     edgeCredentials: () => credentials,
     token: () => state.session?.token ?? null,
+    activeRouteId: () => state.activeRouteId,
     onRoute: (route) => {
       if (state.activeRouteId !== route.id) set({ activeRouteId: route.id });
     },

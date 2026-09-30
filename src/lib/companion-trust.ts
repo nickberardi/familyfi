@@ -2,7 +2,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 
 import { base64UrlDecode, base64UrlEncode, utf8Decode } from "./base64url";
-import { isEdgeHeaderValue, isServerOrigin, type EdgeCredential } from "./pairing-code";
+import { isEdgeHeaderValue, isServerOrigin, SPKI_PIN, type EdgeCredential } from "./pairing-code";
 import type { ConnectionRoute } from "./types";
 
 /**
@@ -91,13 +91,20 @@ export function verifyManifest(manifest: EndpointManifest, publicKeyX: string, i
   return verified;
 }
 
-/** Every route an HTTPS origin, ids unique, and each route's Access credential matching its binding. */
+/**
+ * Every route an HTTPS origin with a known trust mode, a pinned route with a well-formed pin, ids
+ * unique, and each route's Access credential matching its binding.
+ */
 export function validateManifest({ endpoints, edgeCredentials }: VerifiedManifest): void {
   const ids = new Set(endpoints.map((endpoint) => endpoint.id));
   const bound = new Set(edgeCredentials.map((credential) => credential.endpointId));
   if (ids.size !== endpoints.length || bound.size !== edgeCredentials.length) throw new TrustError(EDGE_CREDENTIAL_INVALID);
   for (const endpoint of endpoints) {
     if (typeof endpoint.url !== "string" || !isServerOrigin(endpoint.url)) throw new TrustError(EDGE_CREDENTIAL_INVALID);
+    if (typeof endpoint.enabled !== "boolean") throw new TrustError(EDGE_CREDENTIAL_INVALID);
+    if (endpoint.trustMode === "pinned" ? typeof endpoint.spkiSha256 !== "string" || !SPKI_PIN.test(endpoint.spkiSha256) : endpoint.trustMode !== "system") {
+      throw new TrustError(EDGE_CREDENTIAL_INVALID);
+    }
     validateEdgeCredential(edgeCredentials.find((credential) => credential.endpointId === endpoint.id) ?? null, endpoint);
   }
   if (!edgeCredentials.every((credential) => ids.has(credential.endpointId))) throw new TrustError(EDGE_CREDENTIAL_INVALID);

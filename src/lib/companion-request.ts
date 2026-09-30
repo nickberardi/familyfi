@@ -39,13 +39,15 @@ export function asTransport(send: (request: TransportRequest) => Promise<Transpo
 
 /**
  * A companion's `/api/v1` requests over its trusted routes: the route order and Access rules of
- * `companion-trust.ts` over the phone's transport. A read that finds a route unreachable,
- * or behind a Cloudflare Access wall, moves to the next route; a household write never does, since
- * it may have landed.
+ * `companion-trust.ts` over the phone's transport. Each request starts at the route that last
+ * answered, as familyfi-ios's client does, then the rest in manifest order. A read (or a sign-in,
+ * which changes nothing in the household) that finds a route unreachable, or behind a Cloudflare
+ * Access wall, moves to the next route; a household write never does, since it may have landed.
  */
 
 const TIMEOUT_MS = 15_000;
 const SAFE_METHODS = new Set(["GET", "HEAD"]);
+const FAILOVER_WRITES = new Set(["/api/v1/auth/login"]);
 
 export type CompanionConnection = {
   /** The trusted routes, from the last verified manifest (or a pairing code's stand-in). */
@@ -53,7 +55,9 @@ export type CompanionConnection = {
   edgeCredentials: () => EndpointCredential[];
   /** The bearer token, once signed in. */
   token?: () => string | null;
-  /** Told which route answered, so the Connection screen can show it. */
+  /** The route that last answered, where each request starts. */
+  activeRouteId?: () => string | null;
+  /** Told which route answered, so the Connection screen can show it and the next request starts there. */
   onRoute?: (route: ConnectionRoute) => void;
 };
 
@@ -62,11 +66,17 @@ export function createCompanionRequest(transport: Transport, connection: Compani
     // Only the household API: never another host, never another path.
     if (!path.startsWith("/api/v1/")) throw new Error(`Not an /api/v1 path: ${path}`);
     const method = (init.method ?? "GET").toUpperCase();
-    const retryable = SAFE_METHODS.has(method);
+    const retryable = SAFE_METHODS.has(method) || FAILOVER_WRITES.has(path);
     const token = connection.token?.() ?? null;
     let lastFailure: unknown = new Error("FamilyFi has no route to try.");
 
-    for (const route of candidateRoutes(connection.routes())) {
+    const candidates = candidateRoutes(connection.routes());
+    const active = connection.activeRouteId?.() ?? null;
+    const ordered = [
+      ...candidates.filter((route) => route.id === active),
+      ...candidates.filter((route) => route.id !== active),
+    ];
+    for (const route of ordered) {
       const headers: Record<string, string> = {
         Accept: "application/json",
         ...edgeHeaders(route, connection.edgeCredentials()),

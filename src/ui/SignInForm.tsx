@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from "react-native";
 
 import { SIGN_IN_NOTE } from "@/lib/sign-in";
 
@@ -25,6 +25,7 @@ export function SignInForm({
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [focused, setFocused] = useState<"username" | "password" | null>(null);
+  const passwordField = useRef<TextInputInstance>(null);
 
   async function submit() {
     if (pending) return;
@@ -63,11 +64,14 @@ export function SignInForm({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="next"
+          // Return submits once a password is filled in (as the web's form always did), else moves to it.
+          onSubmitEditing={() => (password ? void submit() : passwordField.current?.focus())}
         />
       </View>
       <View style={styles.field}>
         <Text style={label}>Password</Text>
         <TextInput
+          ref={passwordField}
           aria-label="Password"
           testID="sign-in-password"
           style={input("password")}
