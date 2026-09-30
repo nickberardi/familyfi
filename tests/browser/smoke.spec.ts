@@ -37,8 +37,13 @@ test("sign-in and household pages", async ({ page }) => {
   const usernameBox = page.getByLabel("Username");
   await expect(usernameBox).toHaveCSS("font-size", "16px");
 
-  await signIn(page);
-  await page.goto("/family");
+  // Through the form, as a person signs in: a wrong password is reported, and Return submits.
+  await usernameBox.fill("admin");
+  await page.getByLabel("Password").fill("not-the-password");
+  await page.getByLabel("Password").press("Enter");
+  await expect(page.getByTestId("sign-in-error")).toHaveText("Invalid username or password.");
+  await page.getByLabel("Password").fill(password!);
+  await page.getByLabel("Password").press("Enter");
   await expect(page).toHaveURL(/\/family/);
   await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
 

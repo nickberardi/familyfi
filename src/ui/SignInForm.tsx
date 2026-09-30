@@ -63,7 +63,7 @@ export function SignInForm({
           textContentType="username"
           autoCapitalize="none"
           autoCorrect={false}
-          returnKeyType="next"
+          enterKeyHint="next"
           // Return submits once a password is filled in (as the web's form always did), else moves to it.
           onSubmitEditing={() => (password ? void submit() : passwordField.current?.focus())}
         />
@@ -84,7 +84,7 @@ export function SignInForm({
           secureTextEntry
           autoComplete="current-password"
           textContentType="password"
-          returnKeyType="go"
+          enterKeyHint="go"
           onSubmitEditing={() => void submit()}
         />
       </View>

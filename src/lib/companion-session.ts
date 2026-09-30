@@ -114,8 +114,17 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     },
     request,
     /** Reads what the phone kept, and lands the launch. */
+    /** Launch state from secure storage. Storage that cannot be read (a lost key) lands on setup, where pairing again replaces it. */
     async load() {
-      const [profile, session, edge] = await Promise.all([vault.profile(), vault.session(), vault.edgeCredentials()]);
+      let stored;
+      try {
+        stored = await Promise.all([vault.profile(), vault.session(), vault.edgeCredentials()]);
+      } catch {
+        credentials = [];
+        set({ profile: null, session: null, status: "unpaired" });
+        return;
+      }
+      const [profile, session, edge] = stored;
       credentials = edge;
       set({ profile, session: profile ? session : null, status: !profile ? "unpaired" : session ? "signedIn" : "signedOut" });
     },
