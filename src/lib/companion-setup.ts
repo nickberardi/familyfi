@@ -1,10 +1,14 @@
 /**
- * What a phone's setup says, step by step (familyfi-ios's setup views), in the web's own names for
- * where a code comes from (Pair Device → Pair a phone), and the household details a person checks
- * before trusting it. Each client lays the steps out natively.
+ * What a phone's setup says, step by step, as familyfi-ios's setup views say it (`App/Features/Setup`),
+ * in the web's own names for where a code comes from (Pair Device → Pair a phone), and the
+ * household details a person checks before trusting it. Each client lays the steps out natively.
  */
 import type { PendingEnrollment } from "./companion-pairing";
-import { shortPin, transportLabel } from "./connection-routes";
+import { shortPin } from "./connection-routes";
+
+/** The four steps the setup header's progress shows, in order. */
+export const SETUP_PROGRESS = ["welcome", "code", "confirm", "signIn"] as const;
+export type SetupProgressStep = (typeof SETUP_PROGRESS)[number];
 
 export const SETUP_STEPS = {
   welcome: {
@@ -34,30 +38,61 @@ export const SETUP_ACTIONS = {
   scan: "Scan pairing code",
   paste: "Paste pairing code",
   pasteInstead: "Paste the code instead",
-  continue: "Continue",
+  pair: "Pair this phone",
+  pasteFromClipboard: "Paste",
+  back: "Back",
   scanAgain: "Scan again",
   openSettings: "Open Settings",
   trust: "Trust this instance",
   reject: "Not my household — start over",
-  pairAnother: "Pair with a different household",
+  pairAnother: "Pair a different phone",
+  reveal: "Reveal",
+  hide: "Hide",
 } as const;
 
 export const SCAN_NOTE =
   "The code carries a short-lived pairing key and the server identity. It never carries a UniFi API key or an administrator password.";
-export const VERIFIED_HOUSEHOLD = "Verified household";
+export const PAIRING_CODE_LABEL = "Pairing code";
 export const SCAN_VERIFYING = "Code found — verifying the instance…";
 export const CAMERA_OFF = "Camera access is off for FamilyFi. Allow it in Settings, or paste the code instead.";
-export const SCAN_UNAVAILABLE = "Camera scanning isn't available on this device.";
+export const SCAN_UNAVAILABLE = "Camera scanning isn't available on this device";
 
-/** The details of a verified household, to check before trusting it. */
-export function pendingHouseholdRows({ code, identity }: PendingEnrollment): { label: string; value: string }[] {
+export type PendingRow = { label: string; value: string; mono: boolean; secret?: boolean };
+
+/**
+ * The details of a verified household, to check before trusting it, in familyfi-ios's two groups:
+ * what the pairing code said (the one-time key hidden until revealed) and what the household proved.
+ */
+export function pendingHouseholdSections({ code, identity }: PendingEnrollment): { title: string; rows: PendingRow[] }[] {
   const { endpoint } = code;
   return [
-    { label: "Address", value: endpoint.url },
-    { label: "Route", value: transportLabel(endpoint.transport) },
-    ...(endpoint.trustMode === "pinned" && endpoint.spkiSha256 ? [{ label: "Certificate pin", value: shortPin(endpoint.spkiSha256) }] : []),
-    { label: "Signing key", value: shortPin(identity.keyFingerprint) },
+    {
+      title: "Found in pairing code",
+      rows: [
+        { label: "Server address", value: endpoint.url, mono: true },
+        { label: "One-time pairing key", value: `${code.pairingId}.${code.token}`, mono: true, secret: true },
+      ],
+    },
+    {
+      title: "Verified household",
+      rows: [
+        { label: "Household", value: identity.householdName, mono: false },
+        { label: "Instance", value: identity.instanceId, mono: true },
+        { label: "Key fingerprint", value: identity.keyFingerprint, mono: true },
+        ...(endpoint.trustMode === "pinned" && endpoint.spkiSha256 ? [{ label: "Certificate", value: endpoint.spkiSha256, mono: true }] : []),
+      ],
+    },
   ];
+}
+
+/** A hidden one-time key, until the person reveals it. */
+export const HIDDEN_KEY = "••••••••••••";
+
+/** What trusting the household means: pinning its own certificate, or ordinary HTTPS. */
+export function trustExplanation({ code }: PendingEnrollment): string {
+  return code.endpoint.trustMode === "pinned"
+    ? "FamilyFi issues its own certificate. Trusting it pins this fingerprint — if it changes later, the app stops and asks you, rather than trusting anything that answers the address."
+    : "This route uses ordinary HTTPS validation. The fingerprint above identifies the household itself, not the certificate.";
 }
 
 /** What matched: the identity and the pinned certificate, or the identity and the system's HTTPS check. */

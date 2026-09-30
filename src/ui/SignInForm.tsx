@@ -16,9 +16,12 @@ import { useUI } from "./UIContext";
 export function SignInForm({
   onSubmit,
   initialUsername = "",
+  surface = "card",
 }: {
   onSubmit: (username: string, password: string) => Promise<string | null>;
   initialUsername?: string;
+  /** `card` on a page (the web); `plain` sits the fields straight on a ground, filled with `field` (a phone's setup). */
+  surface?: "card" | "plain";
 }) {
   const ui = useUI();
   const [username, setUsername] = useState(initialUsername);
@@ -43,11 +46,12 @@ export function SignInForm({
   const input = (field: "username" | "password") => [
     styles.input,
     { fontFamily: ui.font, color: ui.color("ink"), borderColor: ui.color(focused === field ? "accent" : "line") },
+    surface === "plain" && { backgroundColor: ui.color("field") },
     focused === field && { boxShadow: `0 0 0 3px ${ui.color("focus-ring")}` },
   ];
 
   return (
-    <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("line") }]}>
+    <View style={surface === "card" ? [styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("line") }] : styles.plain}>
       <View style={styles.field}>
         <Text style={label}>Username</Text>
         <TextInput
@@ -107,6 +111,7 @@ export function SignInForm({
 
 const styles = StyleSheet.create({
   card: { gap: 14, borderWidth: 1, borderRadius: 14, padding: 20 },
+  plain: { gap: 14 },
   field: { gap: 6 },
   input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, lineHeight: 24, outlineWidth: 0 },
   error: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, lineHeight: 20, overflow: "hidden" },
