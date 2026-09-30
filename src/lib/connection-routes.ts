@@ -101,3 +101,10 @@ export function countdown(msRemaining: number): string {
 export function shortPin(pin: string): string {
   return pin.length > 12 ? `${pin.slice(0, 6)}…${pin.slice(-6)}` : pin;
 }
+
+/** How a paired phone trusts a route: its pinned certificate or the system's check, and Access in front. */
+export function routeTrust(route: Pick<ConnectionRoute, "trustMode" | "spkiSha256" | "edgeAuth">): string {
+  const trust =
+    route.trustMode === "pinned" && route.spkiSha256 ? `Pinned certificate ${shortPin(route.spkiSha256)}` : "Certificate checked by the system";
+  return route.edgeAuth === "serviceToken" ? `${trust} · behind Cloudflare Access` : trust;
+}

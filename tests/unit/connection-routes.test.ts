@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessRollout, canPin, countdown, remoteChoice, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
+import { accessRollout, canPin, countdown, remoteChoice, routeTrust, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
 function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
@@ -14,6 +14,14 @@ describe("connection routes", () => {
     expect(canPin("lan")).toBe(true);
     expect(canPin("tailscale")).toBe(false);
     expect(canPin("cloudflare")).toBe(false);
+  });
+
+  it("says how a phone trusts a route: its pin or the system, and Access in front", () => {
+    const pin = "a".repeat(43);
+    expect(routeTrust({ trustMode: "pinned", spkiSha256: pin, edgeAuth: "none" })).toBe(`Pinned certificate ${shortPin(pin)}`);
+    expect(routeTrust({ trustMode: "system", spkiSha256: null, edgeAuth: "serviceToken" })).toBe(
+      "Certificate checked by the system · behind Cloudflare Access",
+    );
   });
 
   it("keeps insertion order for tied priorities", () => {

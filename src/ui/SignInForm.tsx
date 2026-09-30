@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from "react-native";
+import { StyleSheet, Text, TextInput, View, type TextInputInstance } from "react-native";
 
 import { SIGN_IN_NOTE } from "@/lib/sign-in";
 
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { Button } from "./Button";
+import { useUI } from "./UIContext";
 
 /**
  * The sign-in form every client shows: username, password, the outcome, and the note on resets.
@@ -95,16 +96,7 @@ export function SignInForm({
           {error}
         </Text>
       ) : null}
-      <Pressable
-        role="button"
-        testID="sign-in-submit"
-        aria-disabled={pending}
-        disabled={pending}
-        onPress={() => void submit()}
-        style={({ pressed }) => [styles.button, { backgroundColor: ui.color("accent") }, pending && { opacity: 0.6 }, pressed && !pending && { opacity: PRESS_OPACITY }]}
-      >
-        <Text style={{ fontFamily: ui.font, fontSize: 16, lineHeight: 24, fontWeight: "600", color: ui.color("ink-on-fill") }}>{pending ? "Signing in…" : "Sign in"}</Text>
-      </Pressable>
+      <Button label={pending ? "Signing in…" : "Sign in"} disabled={pending} onPress={() => void submit()} testID="sign-in-submit" />
       <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, color: ui.color("muted") }}>{SIGN_IN_NOTE}</Text>
     </View>
   );
@@ -115,5 +107,4 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, lineHeight: 24, outlineWidth: 0 },
   error: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, lineHeight: 20, overflow: "hidden" },
-  button: { alignItems: "center", borderRadius: 9, paddingVertical: 12, minHeight: 44 },
 });

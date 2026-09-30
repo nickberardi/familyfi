@@ -58,6 +58,13 @@ export type OfflineGuard = {
   maybeNotSent: string;
 };
 
+/** A paired phone's wording: it can lose its connection, and never queues a change for later. */
+export const COMPANION_OFFLINE_GUARD: OfflineGuard = {
+  stale: "Can't reach FamilyFi — showing the last update. Controls are off until it's back.",
+  notSent: "Can't reach FamilyFi — this change wasn't sent.",
+  maybeNotSent: "Can't reach FamilyFi — this change may not have been sent.",
+};
+
 export type MutateOptions = {
   optimistic?: (state: HouseholdLists) => HouseholdLists;
   feedback?: { notice: string; action?: NoticeAction };
