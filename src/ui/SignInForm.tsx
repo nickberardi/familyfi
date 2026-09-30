@@ -67,6 +67,7 @@ export function SignInForm({
           enterKeyHint="next"
           // Return submits once a password is filled in (as the web's form always did), else moves to it.
           onSubmitEditing={() => (password ? void submit() : passwordField.current?.focus())}
+          // Keeps focus in the field when Return submits (react-native-web reads only blurOnSubmit).
           blurOnSubmit={false}
         />
       </View>
