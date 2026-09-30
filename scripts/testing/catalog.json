@@ -695,6 +695,11 @@
         "pairing",
         "trust"
       ]
+    },
+    "tests/unit/sign-in.test.ts": {
+      "categories": [
+        "sessions"
+      ]
     }
   }
 }
