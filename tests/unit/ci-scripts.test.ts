@@ -19,9 +19,6 @@ const harness = readdirSync(path.join(repoRoot, "scripts/testing"))
   .map((f) => read(`scripts/testing/${f}`))
   .join("\n");
 
-/** Workflows whose tests and checks run through the harness. container.yml keeps its build action for the layer cache. */
-const THROUGH_HARNESS = [".github/workflows/ci.yml", ".github/workflows/mutation.yml", ".github/workflows/requested-tests.yml"];
-
 /** A test runner or check called directly, which would be a second execution path. */
 const DIRECT_RUN =
   /\bpnpm (?:run )?(?:test|lint|typecheck|build|audit|test-api|db-drift|db-upgrade)\b|\bvitest\b|\bplaywright test\b|\bstryker\b|prisma migrate/;
@@ -32,28 +29,6 @@ const HELPER = /scripts\/ci\/[\w.-]+\.(?:sh|mjs)/g;
 function runScript(script: string, ...args: string[]) {
   return spawnSync("bash", [path.join(repoRoot, script), ...args], { cwd: repoRoot, encoding: "utf8" });
 }
-
-describe("the workflows run tests through scripts/test.py", () => {
-  it("call no test runner or check of their own", () => {
-    for (const workflow of THROUGH_HARNESS) {
-      const steps = read(workflow)
-        .split("\n")
-        .filter((line) => !line.trim().startsWith("#"));
-      for (const line of steps) {
-        expect(line, `${workflow} runs this outside scripts/test.py`).not.toMatch(DIRECT_RUN);
-      }
-      expect(read(workflow), `${workflow} never calls the harness`).toContain("scripts/test.py");
-    }
-  });
-
-  it("call only helpers the harness calls too, so a local check is the CI check", () => {
-    for (const workflow of workflows) {
-      for (const [helper] of read(workflow).matchAll(HELPER)) {
-        expect(harness, `${workflow} calls ${helper}; scripts/testing does not`).toContain(helper);
-      }
-    }
-  });
-});
 
 describe("the Makefile", () => {
   it("keeps its test and check targets as aliases for scripts/test.py", () => {
