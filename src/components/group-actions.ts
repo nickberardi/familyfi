@@ -1,22 +1,23 @@
-import { api } from "@/lib/api";
-import { groupActionSpecs, internetRulePath } from "@/lib/group-actions";
+import { groupActionSpecs } from "@/lib/group-actions";
+import { runGroupAction } from "@/lib/group-writes";
+import type { HouseholdStore } from "@/lib/household-store";
 import type { Group } from "@/lib/types";
 import type { CardAction } from "./GroupCard";
-import type { useAppData } from "./AppDataProvider";
 
+/** The card's actions for the web: pause and extend open their sheets; the rest write through the shared store. */
 export function groupActions(
   group: Group,
   surface: "phone" | "web",
   openPause: (group: Group) => void,
   openExtend: (group: Group) => void,
-  mutate: ReturnType<typeof useAppData>["mutate"],
+  mutate: HouseholdStore["mutate"],
 ): CardAction[] {
   const handlers = {
     pause: () => openPause(group),
-    resume: () => void mutate(() => api(`${internetRulePath(group)}/resume`, { method: "POST" })),
+    resume: () => void runGroupAction(mutate, group, "resume"),
     extend: () => openExtend(group),
-    allow: () => void mutate(() => api(`${internetRulePath(group)}/allow`, { method: "POST", body: "{}" })),
-    disallow: () => void mutate(() => api(`${internetRulePath(group)}/disallow`, { method: "POST" })),
+    allow: () => void runGroupAction(mutate, group, "allow"),
+    disallow: () => void runGroupAction(mutate, group, "disallow"),
   };
   return groupActionSpecs(group, surface).map(({ run, ...action }) =>
     run ? { ...action, onClick: handlers[run] } : action,

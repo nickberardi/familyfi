@@ -1,14 +1,7 @@
+import { ApiError, waitForChange as pollChange, type ApiRequest } from "./api-client";
 import { CSRF_COOKIE, CSRF_HEADER } from "./constants";
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code?: string,
-  ) {
-    super(message);
-  }
-}
+export { ApiError };
 
 function csrfToken(): string {
   if (typeof document === "undefined") return "";
@@ -34,11 +27,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return json as T;
 }
 
-export async function waitForChange(changeId: string, attempts = 40) {
-  for (let i = 0; i < attempts; i++) {
-    const { change } = await api<{ change: { status: string; error: string | null } }>(`/api/v1/changes/${changeId}`);
-    if (change.status !== "pending") return change;
-    await new Promise((resolve) => setTimeout(resolve, 750));
-  }
-  return { status: "pending", error: "Still applying. Check Sync for the latest result." };
+/** `api` as the shared store and writes call it: a JSON body, serialized here. */
+export const request: ApiRequest = (path, init = {}) =>
+  api(path, { method: init.method, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
+
+export function waitForChange(changeId: string, attempts = 40) {
+  return pollChange(request, changeId, { attempts });
 }

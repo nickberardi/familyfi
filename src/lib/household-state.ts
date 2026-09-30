@@ -7,6 +7,7 @@ export type HouseholdLists = {
 };
 
 export type HouseholdPublic = {
+  displayName?: string;
   timezone: string;
   revision: number;
   quarantineEnforced: boolean;

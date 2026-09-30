@@ -34,8 +34,8 @@ export function InternetZone({
   /** Where "Edit internet rule" goes; omitted where the page already links to rules. */
   editHref?: string;
 }) {
-  const { mutate } = useAppData();
-  const actions = groupActions(group, surface, onPause, onExtend, mutate).flatMap((action) =>
+  const { store } = useAppData();
+  const actions = groupActions(group, surface, onPause, onExtend, store.mutate).flatMap((action) =>
     action.onClick ? [{ label: action.label, onPress: action.onClick, strong: action.strong }] : [],
   );
   const now = new Date();

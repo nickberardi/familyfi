@@ -60,7 +60,7 @@ foreign key.
 
 - [Route handlers](../src/app/api/v1) validate requests and apply [authentication guards](../src/server/guard.ts). Authorization is specified per method in the [authorization matrix](../tests/integration/authorization-matrix.test.ts).
 - [src/server](../src/server) owns database access, secrets and external effects. [src/lib](../src/lib) holds client-safe types and logic; the [boundary test](../tests/unit/client-boundary.test.ts) checks transitive imports.
-- [AppDataProvider](../src/components/AppDataProvider.tsx) owns shared browser household state and mutation feedback. Pages compose it with domain components; feature-specific data may have a page-owned lifecycle.
+- The [household store](../src/lib/household-store.ts) owns shared household state and mutation feedback for every client; [AppDataProvider](../src/components/AppDataProvider.tsx) wraps it for the browser, and the native app wraps it in its own provider. Pages compose it with domain components; feature-specific data may have a page-owned lifecycle.
 - [Reconciliation](../src/server/reconciliation.ts) coordinates enforcement. [Policy ownership](../src/server/unifi/policy-ownership.ts) guards all updates and deletes; planners and the UniFi client live under [src/server/unifi](../src/server/unifi).
 - The [native repository](https://github.com/nickberardi/familyfi-ios) owns its implementation and platform guidance. This repository owns the [HTTP and shared behaviour contract](api.md#shared-behaviour-and-consumer-adoption), not a copy of native screen status.
 
@@ -73,15 +73,18 @@ builds: it loads configuration, ensures recovery/household/seed data, starts rec
 scheduling, starts update checking, and resumes configured remote access. These are server process
 responsibilities; visiting a page is not what starts enforcement.
 
-The browser's [AppDataProvider](../src/components/AppDataProvider.tsx) reads the session first, then
-groups, devices, sync, gateway settings, household settings and accounts. It refreshes periodically;
-generation checks discard superseded reads. An unauthorized session redirects to login. Initial
-read errors are shown; periodic refresh failures currently retain the previous data silently. Do not
-interpret that retained snapshot as a fresh gateway observation.
+The [household store](../src/lib/household-store.ts), through the browser's
+[AppDataProvider](../src/components/AppDataProvider.tsx), reads the session first, then groups,
+devices, rules, sync, gateway settings, household settings and accounts. It refreshes every 15
+seconds; generation checks discard superseded reads. An unauthorized session redirects to login.
+Initial read errors are shown; periodic refresh failures retain the previous data and mark it
+`stale`, which the browser does not show. Do not interpret that retained snapshot as a fresh gateway
+observation. A native client passes an offline guard instead: a stale view says so, and its
+controls send nothing until a refresh succeeds.
 
 ### Pause from intent to feedback
 
-1. The browser selects an action through [group-actions.ts](../src/components/group-actions.ts) and submits it using [api.ts](../src/lib/api.ts), including the cookie session's CSRF header.
+1. The browser selects an action through [group-actions.ts](../src/components/group-actions.ts), and the shared [group-writes.ts](../src/lib/group-writes.ts) sends it through the store using [api.ts](../src/lib/api.ts), including the cookie session's CSRF header.
 2. The [pause route](../src/app/api/v1/groups/[id]/rules/[ruleId]/pause/route.ts), called with the reserved rule id `internet`, checks authentication, request shape and group existence, then [runGroupInternet](../src/server/group-internet.ts) enables the group's built-in block rule in PostgreSQL.
 3. [enqueueChange](../src/server/changes.ts) increments the household revision, creates a pending `ChangeResult` with actor attribution and requests reconciliation. The route returns the updated group and change reference. The group write and enqueue are separate operations; do not assume the entire path is one database transaction.
 4. The browser applies the returned state through [household-state.ts](../src/lib/household-state.ts) and shows saved feedback. [mutate-gate.ts](../src/lib/mutate-gate.ts) prevents a superseded mutation response from replacing a newer one.
@@ -90,7 +93,8 @@ interpret that retained snapshot as a fresh gateway observation.
 
 Evidence: [reconciliation tests](../tests/integration/reconcile.test.ts),
 [reconciliation properties](../tests/integration/reconcile-properties.test.ts),
-[household state tests](../tests/unit/household-state.test.ts) and
+[household state tests](../tests/unit/household-state.test.ts),
+[household store tests](../tests/unit/household-store.test.ts) and
 [mutation ordering tests](../tests/unit/mutate-gate.test.ts).
 
 ### Pairing, sign-in and remote access
