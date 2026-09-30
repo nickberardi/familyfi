@@ -111,6 +111,11 @@
         "runtime"
       ]
     },
+    "tests/unit/group-form.test.ts": {
+      "categories": [
+        "groups"
+      ]
+    },
     "tests/unit/group-actions.test.ts": {
       "categories": [
         "groups",

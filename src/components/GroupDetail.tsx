@@ -4,6 +4,8 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, type FamilyRole } from "@/lib/group-form";
+import { deleteGroup, updateGroup } from "@/lib/group-writes";
 import { internetWindowsForGroup } from "@/lib/rules";
 import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
@@ -17,35 +19,24 @@ import type { Group } from "@/lib/types";
 const FIELD = "rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]";
 
 function GroupEditForm({ group }: { group: Group }) {
-  const { mutate, busy, accounts } = useAppData();
-  const lockedRole = Boolean(accounts.find((account) => !account.recovery && account.groupId === group.id));
-  const [name, setName] = useState(group.name);
-  const [familyRole, setFamilyRole] = useState<"child" | "teen" | "adult">(group.familyRole ?? "child");
-  const [monogram, setMonogram] = useState(group.monogram ?? "");
+  const { store, busy, accounts } = useAppData();
+  const lockedRole = roleLocked(group, accounts);
+  const initial = groupEditDraft(group);
+  const [name, setName] = useState(initial.name);
+  const [familyRole, setFamilyRole] = useState<FamilyRole>(initial.familyRole);
+  const [monogram, setMonogram] = useState(initial.monogram);
 
-  const trimmed = name.trim();
-  const nextMonogram = monogram.trim() || null;
-  const dirty =
-    trimmed !== group.name ||
-    (group.kind === "family" ? familyRole !== group.familyRole : nextMonogram !== group.monogram);
+  const draft = { name, familyRole, monogram };
+  const canSave = groupEditBody(group, draft) !== null;
 
   async function onSave() {
-    if (!trimmed || !dirty) return;
-    await mutate(() =>
-      api<{ group: Group; change: { changeId: string } }>(`/api/v1/groups/${group.id}`, {
-        method: "PUT",
-        body: JSON.stringify(
-          group.kind === "family"
-            ? { name: trimmed, familyRole }
-            : { name: trimmed, monogram: nextMonogram },
-        ),
-      }),
-    );
+    if (!canSave) return;
+    await updateGroup(store.mutate, group, draft);
   }
 
   return (
     <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-      <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Edit</h2>
+      <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">{GROUP_DETAIL_COPY.edit}</h2>
       <form
         className="flex flex-col gap-3 p-[18px]"
         method="post"
@@ -66,29 +57,27 @@ function GroupEditForm({ group }: { group: Group }) {
               value={familyRole}
               disabled={lockedRole && familyRole === "adult"}
               onChange={(e) => {
-                const role = e.target.value as "child" | "teen" | "adult";
+                const role = e.target.value as FamilyRole;
                 if (lockedRole && role !== "adult") return;
                 setFamilyRole(role);
               }}
             >
-              <option value="child" disabled={lockedRole}>
-                Child
-              </option>
-              <option value="teen" disabled={lockedRole}>
-                Teen
-              </option>
-              <option value="adult">Adult</option>
+              {FAMILY_ROLES.map((role) => (
+                <option key={role.value} value={role.value} disabled={lockedRole && role.value !== "adult"}>
+                  {role.label}
+                </option>
+              ))}
             </select>
           </label>
         ) : (
           <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
             Monogram
-            <input maxLength={4} className={FIELD} value={monogram} onChange={(e) => setMonogram(e.target.value)} />
+            <input maxLength={MONOGRAM_MAX} className={FIELD} value={monogram} onChange={(e) => setMonogram(e.target.value)} />
           </label>
         )}
         <button
           type="submit"
-          disabled={busy || !dirty || !trimmed}
+          disabled={busy || !canSave}
           className="self-start rounded-[9px] bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
         >
           Save
@@ -100,7 +89,7 @@ function GroupEditForm({ group }: { group: Group }) {
 
 export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
   const router = useRouter();
-  const { groups, devices, rules, household, mutate, reload, loading } = useAppData();
+  const { groups, devices, rules, household, store, reload, loading } = useAppData();
   const [groupResolver, setGroupResolver] = useState<{ source: "doh" | "dhcp" | "unknown"; networks: { id: string; name: string; servers: string[]; reason: string | null }[]; reason: string | null } | null>(null);
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
@@ -176,10 +165,8 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             type="button"
             className="self-start text-[14px] font-semibold text-[var(--ff-danger)]"
             onClick={() =>
-              void mutate(async () => {
-                const result = await api<{ change: { changeId: string } }>(`/api/v1/groups/${id}`, { method: "DELETE" });
-                router.replace(kind === "family" ? "/family" : "/things");
-                return { ...result, removedGroupId: id };
+              void deleteGroup(store.mutate, group).then((result) => {
+                if (result) router.replace(kind === "family" ? "/family" : "/things");
               })
             }
           >

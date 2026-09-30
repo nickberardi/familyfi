@@ -1,13 +1,8 @@
 "use client";
 
-import { api } from "@/lib/api";
-import { assignDeviceLocally } from "@/lib/household-state";
+import { assignDevice } from "@/lib/group-writes";
 import type { Device, Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
-
-export function assignPath(mac: string) {
-  return `/api/v1/devices/${encodeURIComponent(mac)}/assignment`;
-}
 
 export function networkLabel(device: Device, networks: { id: string; name: string; vlanId: number }[]) {
   const match = networks.find((network) => network.id === device.networkId);
@@ -23,7 +18,7 @@ export function DeviceAssignSelect({
   device: Device;
   groups: Group[];
 }) {
-  const { mutate, busy } = useAppData();
+  const { store, busy } = useAppData();
   return (
     <select
       className="w-full max-w-full rounded-[7px] border border-[var(--ff-input-line)] bg-[var(--ff-card)] px-2 py-1.5 text-[14px] disabled:opacity-50"
@@ -32,15 +27,7 @@ export function DeviceAssignSelect({
       disabled={busy}
       aria-busy={busy || undefined}
       onChange={(event) => {
-        const groupId = event.target.value || null;
-        void mutate(
-          () =>
-            api<{ device: Device; change: { changeId: string } }>(assignPath(device.mac), {
-              method: "PUT",
-              body: JSON.stringify({ groupId }),
-            }),
-          (state) => assignDeviceLocally(state, device.mac, groupId),
-        );
+        void assignDevice(store.mutate, device, event.target.value || null);
       }}
     >
       <option value="">Unassigned</option>
