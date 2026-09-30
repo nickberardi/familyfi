@@ -328,5 +328,15 @@ describe("a companion session", () => {
     expect(session.getState().pending).toBeNull();
     expect(home.calls.map((call) => call.method)).toEqual(["GET"]);
   });
-});
 
+  it("lands on setup when secure storage cannot be read", async () => {
+    const storage: SecureStorage = {
+      get: async () => Promise.reject(new Error("could not decrypt")),
+      set: async () => undefined,
+      delete: async () => undefined,
+    };
+    const session = createCompanionSession({ transport: household().transport, storage, deviceName: () => "A phone" });
+    await session.load();
+    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
+  });
+});
