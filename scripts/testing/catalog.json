@@ -700,6 +700,13 @@
       "categories": [
         "sessions"
       ]
+    },
+    "tests/unit/companion-pairing.test.ts": {
+      "categories": [
+        "pairing",
+        "trust",
+        "sessions"
+      ]
     }
   }
 }
