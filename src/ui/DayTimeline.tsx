@@ -50,12 +50,13 @@ export function DayTimeline({
 
   return (
     <View>
-      <View accessibilityRole="none" accessibilityLabel={label} style={[styles.bar, { backgroundColor: ui.color("well") }]}>
+      <View role="group" aria-label={label} style={[styles.bar, { backgroundColor: ui.color("well") }]}>
         {order.map(({ band, index }) => (
           <Pressable
             key={index}
-            accessibilityRole="button"
-            accessibilityLabel={`${band.label}, ${bandTimes(band)}. ${band.source}`}
+            role="button"
+            aria-label={`${band.label}, ${bandTimes(band)}. ${band.source}`}
+            aria-pressed={chosen === index}
             accessibilityState={{ selected: chosen === index }}
             onPress={() => setChosen(chosen === index ? null : index)}
             style={[
@@ -77,11 +78,14 @@ export function DayTimeline({
           </Text>
         ))}
       </View>
-      {picked ? (
-        <Text accessibilityLiveRegion="polite" style={text}>
-          <Text style={{ fontWeight: "600", color: ui.color("ink") }}>{picked.label}</Text> · {bandTimes(picked)} · {picked.source}
-        </Text>
-      ) : null}
+      {/* Always present, so a screen reader announces each choice as it fills. */}
+      <Text aria-live="polite" style={text}>
+        {picked ? (
+          <>
+            <Text style={{ fontWeight: "600", color: ui.color("ink") }}>{picked.label}</Text> · {bandTimes(picked)} · {picked.source}
+          </>
+        ) : null}
+      </Text>
       {items.length ? (
         <View style={styles.legend}>
           {items.map((item) => (
