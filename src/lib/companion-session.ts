@@ -104,6 +104,16 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     },
   });
 
+  /** Still paired with the household `asked` was for: not forgotten, nor replaced by another pairing. */
+  const holds = (asked: ConnectionProfile) =>
+    state.profile?.instanceId === asked.instanceId && state.profile.deviceId === asked.deviceId;
+  /** Ends a session on the server in the background, with the routes and credentials it was made over. */
+  const endOnServer = (profile: ConnectionProfile, edge: EndpointCredential[], token: string) =>
+    void createCompanionRequest(transport, { routes: () => profile.endpoints, edgeCredentials: () => edge, token: () => token })(
+      "/api/v1/auth/logout",
+      { method: "POST" },
+    ).catch(() => undefined);
+
   return {
     getState: () => state,
     subscribe(listener: () => void) {
@@ -146,12 +156,17 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
       const asked = state.profile;
       if (!asked) return SIGN_IN_UNREACHABLE;
       try {
+        const edge = credentials;
         const session = await signInPaired(request, asked, username, password);
         // Forgotten or re-paired while signing in: the session is for a household the phone no longer holds.
-        if (state.profile !== asked) return null;
+        if (!holds(asked)) {
+          endOnServer(asked, edge, session.token);
+          return null;
+        }
         await vault.saveSession(session);
-        if (state.profile !== asked) {
+        if (!holds(asked)) {
           await vault.signOut();
+          endOnServer(asked, edge, session.token);
           return null;
         }
         set({ session, status: "signedIn" });
@@ -160,18 +175,21 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
         return error instanceof ApiError ? signInError({ ok: false, body: { error: { message: error.message } } }) : SIGN_IN_UNREACHABLE;
       }
     },
-    /** Ends the session on the server when it can be reached; on the phone it ends regardless. */
+    /** Signs out on the phone at once, and ends the session on the server in the background when it can be reached. */
     async signOut() {
-      if (state.session) await request("/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+      const { profile, session } = state;
       await vault.signOut();
-      set({ session: null, status: state.profile ? "signedOut" : "unpaired" });
+      set({ session: null, status: profile ? "signedOut" : "unpaired" });
+      if (profile && session) endOnServer(profile, credentials, session.token);
     },
-    /** Forgets the household, so the phone must pair again; ends the session on the server first, when it can. */
+    /** Forgets the household at once, so the phone must pair again; its session ends on the server in the background. */
     async forget() {
-      if (state.session) await request("/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+      const { profile, session } = state;
+      const edge = credentials;
       await vault.forget();
       credentials = [];
       set({ profile: null, session: null, pending: null, activeRouteId: null, status: "unpaired" });
+      if (profile && session) endOnServer(profile, edge, session.token);
     },
     /** Re-reads the routes, keeping them only from a manifest the trusted key signed. */
     async refresh() {
@@ -179,12 +197,12 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
       if (!asked) return;
       const next = await refreshRoutes(request, asked, credentials);
       // Forgotten or re-paired while it was asked: the answer is for a household the phone no longer holds.
-      if (state.profile !== asked) return;
+      if (!holds(asked)) return;
       // Run on every household refresh: unchanged routes are neither saved again nor announced.
       const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
       if (same(next.profile, state.profile) && same(next.edgeCredentials, credentials)) return;
       await vault.saveRoutes(next.profile, next.edgeCredentials);
-      if (state.profile !== asked) {
+      if (!holds(asked)) {
         // Forgotten or re-paired while it was saved: put back what the phone holds now.
         await (state.profile ? vault.saveRoutes(state.profile, credentials) : vault.forget());
         return;

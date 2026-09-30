@@ -86,8 +86,9 @@ export function SignInForm({
           autoComplete="current-password"
           textContentType="password"
           enterKeyHint="go"
-          // Return keeps the field focused, so a wrong password can be retyped straight away.
-          submitBehavior="submit"
+          // Return keeps the field focused, so a wrong password can be retyped straight away. (react-native-web
+          // reads only blurOnSubmit; React Native reads it as submitBehavior "submit".)
+          blurOnSubmit={false}
           onSubmitEditing={() => void submit()}
         />
       </View>
