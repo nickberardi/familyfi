@@ -5,10 +5,9 @@ import Link from "next/link";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/ui/Icon";
-import { networkLabel } from "@/components/DeviceAssign";
-import { deviceIcon, deviceKindLabel } from "@/lib/display";
-import { connectionLabel, effectivePresence, presenceLabel } from "@/lib/device-presence";
-import { formatLogWhen } from "@/lib/sync-copy";
+import { deviceDetail, groupHref, presenceTone } from "@/lib/device-detail";
+import { DEVICES_COPY } from "@/lib/device-list";
+import { deviceIcon } from "@/lib/display";
 import type { Device, Group } from "@/lib/types";
 
 function DetailRow({ label, children, mono = false }: { label: string; children: ReactNode; mono?: boolean }) {
@@ -27,18 +26,6 @@ function DetailSection({ title, children }: { title: string; children: ReactNode
       <dl>{children}</dl>
     </section>
   );
-}
-
-function tone(presence: Device["presence"]): { ink: string; fill: string } {
-  if (presence === "online") return { ink: "var(--ff-on-ink)", fill: "var(--ff-on-tint)" };
-  if (presence === "stale_online" || presence === "stale_offline") {
-    return { ink: "var(--ff-paused)", fill: "var(--ff-paused-fill)" };
-  }
-  return { ink: "var(--ff-muted)", fill: "var(--ff-field)" };
-}
-
-function groupHref(group: Group) {
-  return group.kind === "family" ? `/family/${group.id}` : `/things/${group.id}`;
 }
 
 export function DeviceDetailPage({
@@ -75,7 +62,7 @@ export function DeviceDetailPage({
 
   return (
     <>
-      <PageHeader title="Devices" sub="Assignment persists while a device is offline." />
+      <PageHeader title={DEVICES_COPY.title} sub={DEVICES_COPY.detailSubtitle} />
       <div className="mx-auto flex max-w-[920px] flex-col gap-4 p-4 md:p-6">
         <Link href={fromGroup ? groupHref(fromGroup) : "/devices"} className="self-start text-[14px] text-[var(--ff-accent)]">
           ‹ {fromGroup ? fromGroup.name : "All devices"}
@@ -105,22 +92,9 @@ function DeviceDetails({
   timezone: string;
   now: Date;
 }) {
-  const presence = effectivePresence(device, now);
-  const colors = tone(presence);
-  const name = device.hostname ?? "Unnamed device";
-  const network = networks.find((item) => item.id === device.networkId)?.name
-    ?? networkLabel(device, networks);
-  const connection = connectionLabel(device.connectionType);
-  const checked = device.presenceCheckedAt ? formatLogWhen(device.presenceCheckedAt, timezone) : "Never checked";
-  const lastSeen = device.lastSeenAt ? formatLogWhen(device.lastSeenAt, timezone) : "Unknown";
-  const summary = presence === "online"
-    ? [connection, device.accessPointName, device.connectedAt ? `connected since ${formatLogWhen(device.connectedAt, timezone)}` : null]
-        .filter(Boolean).join(" · ") || "Connected now"
-    : presence === "offline"
-      ? `Last seen ${lastSeen}`
-      : presence === "unknown"
-        ? "No successful presence check yet"
-        : `Presence checked ${checked}`;
+  const detail = deviceDetail(device, group, networks, timezone, now);
+  const tone = presenceTone(detail.presence);
+  const colors = { ink: `var(--ff-${tone.ink})`, fill: `var(--ff-${tone.fill})` };
 
   return (
     <>
@@ -130,34 +104,25 @@ function DeviceDetails({
         </span>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[21px] font-semibold tracking-tight">{name}</h2>
+            <h2 className="text-[21px] font-semibold tracking-tight">{detail.name}</h2>
             <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[14px] font-semibold" style={{ color: colors.ink, background: colors.fill }}>
               <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-              {presenceLabel(presence)}
+              {detail.status}
             </span>
           </div>
-          <p className="mt-1 text-[14px] text-[var(--ff-muted)]">{summary}</p>
+          <p className="mt-1 text-[14px] text-[var(--ff-muted)]">{detail.summary}</p>
         </div>
       </section>
       <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-        <DetailSection title="Device">
-          <DetailRow label="Group">{group ? <Link href={groupHref(group)} className="text-[var(--ff-accent)]">{group.name}</Link> : "Unassigned"}</DetailRow>
-          <DetailRow label="Name">{name}</DetailRow>
-          <DetailRow label="Device type">{deviceKindLabel(device.hostname)}</DetailRow>
-          <DetailRow label="Manufacturer">{device.manufacturer ?? "Unknown"}</DetailRow>
-          <DetailRow label="MAC address" mono>{device.mac.toUpperCase()}</DetailRow>
-        </DetailSection>
-        <DetailSection title="Connection">
-          <DetailRow label="Status">{presenceLabel(presence)}</DetailRow>
-          <DetailRow label="Checked">{checked}</DetailRow>
-          {device.connectedAt && (presence === "online" || presence === "stale_online") ? (
-            <DetailRow label="Connected since">{formatLogWhen(device.connectedAt, timezone)}</DetailRow>
-          ) : <DetailRow label="Last seen">{lastSeen}</DetailRow>}
-          <DetailRow label="Connection type">{connection ?? "Unknown"}</DetailRow>
-          {device.connectionType === "wireless" ? <DetailRow label="Access point">{device.accessPointName ?? "Unknown access point"}</DetailRow> : null}
-          <DetailRow label="Network">{network}</DetailRow>
-          <DetailRow label="IP address" mono>{device.ip ?? "Unknown"}</DetailRow>
-        </DetailSection>
+        {detail.sections.map((section) => (
+          <DetailSection key={section.title} title={section.title}>
+            {section.rows.map((row) => (
+              <DetailRow key={row.label} label={row.label} mono={row.mono}>
+                {row.group ? <Link href={groupHref(row.group)} className="text-[var(--ff-accent)]">{row.value}</Link> : row.value}
+              </DetailRow>
+            ))}
+          </DetailSection>
+        ))}
       </div>
     </>
   );

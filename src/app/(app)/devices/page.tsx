@@ -3,44 +3,40 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
 import { DeviceAssignSelect, networkLabel } from "@/components/DeviceAssign";
-import { assignDevicesCopy, byDeviceName, deviceName } from "@/lib/device-assign";
+import { assignDevicesCopy, deviceName } from "@/lib/device-assign";
+import {
+  DEVICE_FILTERS,
+  DEVICES_COPY as COPY,
+  deviceFilterLabel,
+  deviceRemoveCopy,
+  filterDevices,
+  quarantineTitle,
+  type DeviceFilterId,
+} from "@/lib/device-list";
+import { deleteDevice, setQuarantineEnforced } from "@/lib/device-writes";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { TogglePill } from "@/components/ui/Controls";
 import { Icon } from "@/components/ui/Icon";
 import { deviceIcon, deviceKindLabel } from "@/lib/display";
 import { presenceSummary } from "@/lib/device-presence";
-import { removeDeviceLocally } from "@/lib/household-state";
-import type { Device, Group } from "@/lib/types";
-
-const FILTERS = [
-  { id: "all", label: "Everything" },
-  { id: "assigned", label: "Assigned" },
-  { id: "loose", label: "Unassigned" },
-] as const;
-
-type FilterId = (typeof FILTERS)[number]["id"];
-
-function ownerOf(device: Device, groups: Group[]) {
-  return groups.find((group) => group.id === device.groupId) ?? null;
-}
+import type { Device } from "@/lib/types";
 
 export default function DevicesPage() {
   return (
-    <Suspense fallback={<p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">Loading devices…</p>}>
+    <Suspense fallback={<p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">{COPY.loading}</p>}>
       <DevicesBody />
     </Suspense>
   );
 }
 
 function DevicesBody() {
-  const { devices, groups, unifi, household, mutate, busy } = useAppData();
+  const { devices, groups, unifi, household, store, busy } = useAppData();
   const searchParams = useSearchParams();
   const assignGroupId = searchParams.get("assign");
   const assignGroup = groups.find((group) => group.id === assignGroupId) ?? null;
-  const [filter, setFilter] = useState<FilterId>(assignGroup ? "loose" : "all");
+  const [filter, setFilter] = useState<DeviceFilterId>(assignGroup ? "loose" : "all");
   const [query, setQuery] = useState("");
   const [now, setNow] = useState(() => new Date(0));
   useEffect(() => {
@@ -52,29 +48,13 @@ function DevicesBody() {
     };
   }, []);
   const networks = unifi?.networks ?? [];
-  const unassigned = devices.filter((device) => device.assignment === "quarantined");
   const enforced = household?.quarantineEnforced === true;
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return devices
-      .filter((device) => {
-        if (filter === "assigned") return device.assignment === "assigned";
-        if (filter === "loose") return device.assignment === "quarantined";
-        return true;
-      })
-      .filter((device) => {
-        if (!q) return true;
-        const owner = ownerOf(device, groups);
-        const hay = [device.hostname ?? "", device.mac, device.ip ?? "", owner?.name ?? "unassigned"].join(" ").toLowerCase();
-        return hay.includes(q);
-      })
-      .sort(byDeviceName);
-  }, [devices, filter, groups, query]);
+  const rows = useMemo(() => filterDevices(devices, groups, filter, query), [devices, filter, groups, query]);
 
   return (
     <>
-      <PageHeader title="Devices" sub="Assignment is by MAC address and persists while a device is offline." />
+      <PageHeader title={COPY.title} sub={COPY.subtitle} />
       <div className="flex flex-col gap-4 p-4 md:p-6">
         {assignGroup ? (
           <section className="rounded-[12px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] px-[18px] py-3">
@@ -89,12 +69,10 @@ function DevicesBody() {
               className="text-[14px] font-semibold"
               style={{ color: enforced ? undefined : "var(--ff-paused)" }}
             >
-              {enforced
-                ? "Quarantine unassigned devices"
-                : "Quarantine is off — unassigned devices may have internet"}
+              {quarantineTitle(enforced)}
             </div>
             <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
-              New arrivals stay off the internet until assigned. Off is an emergency override on FamilyFi policies only.
+              {COPY.quarantineBody}
             </p>
           </div>
           {/*
@@ -104,24 +82,17 @@ function DevicesBody() {
           */}
           <TogglePill
             on={enforced}
-            onToggle={() =>
-              void mutate(() =>
-                api("/api/v1/settings/household", {
-                  method: "PUT",
-                  body: JSON.stringify({ quarantineEnforced: !enforced }),
-                }),
-              )
-            }
-            label="Quarantine unassigned devices"
-            onLabel="Enforced"
-            offLabel="Off"
+            onToggle={() => void setQuarantineEnforced(store.mutate, !enforced)}
+            label={COPY.quarantineLabel}
+            onLabel={COPY.quarantineOn}
+            offLabel={COPY.quarantineOff}
           />
         </section>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
-            {FILTERS.map((item) => {
+            {DEVICE_FILTERS.map((item) => {
               const on = filter === item.id;
               return (
                 <button
@@ -136,8 +107,7 @@ function DevicesBody() {
                     boxShadow: on ? "var(--ff-shadow-knob)" : "none",
                   }}
                 >
-                  {item.label}
-                  {item.id === "loose" && unassigned.length ? ` · ${unassigned.length}` : ""}
+                  {deviceFilterLabel(item, devices)}
                 </button>
               );
             })}
@@ -145,7 +115,7 @@ function DevicesBody() {
           <div className="flex-1" />
           <input
             className="w-full max-w-[260px] rounded-[7px] border border-[var(--ff-input-line)] px-2.5 py-2 text-[16px] md:text-[14px]"
-            placeholder="Search name, IP or MAC"
+            placeholder={COPY.search}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -153,9 +123,7 @@ function DevicesBody() {
 
         {rows.length === 0 ? (
           <p className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px] text-[14px] text-[var(--ff-muted)]">
-            {devices.length === 0
-              ? "No devices yet. New in-scope MACs appear as unassigned."
-              : "Nothing matches this filter."}
+            {devices.length === 0 ? COPY.noDevices : COPY.noMatch}
           </p>
         ) : (
           <div className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
@@ -190,13 +158,8 @@ function DevicesBody() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() =>
-                        void mutate(
-                          () => api(`/api/v1/devices/${encodeURIComponent(device.mac)}`, { method: "DELETE" }),
-                          (state) => removeDeviceLocally(state, device.mac),
-                        )
-                      }
-                      aria-label={`Delete ${name} (${device.mac.toUpperCase()})`}
+                      onClick={() => void deleteDevice(store.mutate, device)}
+                      aria-label={deviceRemoveCopy(device).label}
                       className="flex h-5 w-5 items-center justify-center rounded-md text-[14px] leading-none disabled:opacity-40"
                       style={{ color: "var(--ff-danger)" }}
                     >
