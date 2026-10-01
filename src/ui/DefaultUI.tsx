@@ -8,4 +8,10 @@ export const defaultUI: UI = {
   Icon: () => null,
   TextField: () => null,
   Segmented: () => null,
+  Toggle: () => null,
+  TimeField: () => null,
+  DayPicker: () => null,
+  Select: () => null,
+  Link: ({ children }) => children,
+  confirm: () => Promise.resolve(false),
 };
