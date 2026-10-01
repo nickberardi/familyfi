@@ -7,6 +7,7 @@ import { request } from "@/lib/api";
 import { loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
 import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, rulesNeedDevice, type FamilyRole } from "@/lib/group-form";
 import { deleteGroup, updateGroup } from "@/lib/group-writes";
+import { deviceName } from "@/lib/device-assign";
 import { internetWindowsForGroup } from "@/lib/rules";
 import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
@@ -47,12 +48,12 @@ function GroupEditForm({ group }: { group: Group }) {
         }}
       >
         <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
-          Name
+          {GROUP_DETAIL_COPY.name}
           <input required className={FIELD} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         {group.kind === "family" ? (
           <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
-            Role
+            {GROUP_DETAIL_COPY.role}
             <select
               className={FIELD}
               value={familyRole}
@@ -72,7 +73,7 @@ function GroupEditForm({ group }: { group: Group }) {
           </label>
         ) : (
           <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
-            Monogram
+            {GROUP_DETAIL_COPY.monogram}
             <input maxLength={MONOGRAM_MAX} className={FIELD} value={monogram} onChange={(e) => setMonogram(e.target.value)} />
           </label>
         )}
@@ -81,7 +82,7 @@ function GroupEditForm({ group }: { group: Group }) {
           disabled={busy || !canSave}
           className="self-start rounded-[9px] bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
         >
-          Save
+          {GROUP_DETAIL_COPY.save}
         </button>
       </form>
     </section>
@@ -90,7 +91,7 @@ function GroupEditForm({ group }: { group: Group }) {
 
 export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
   const router = useRouter();
-  const { groups, devices, rules, household, store, reload, loading } = useAppData();
+  const { groups, devices, rules, household, store, reload, loading, busy } = useAppData();
   const [groupResolver, setGroupResolver] = useState<GroupResolver | null>(null);
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
@@ -106,7 +107,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
 
   if (!group) {
     if (loading) return null;
-    return <p className="p-6 text-[14px] text-[var(--ff-muted)]">Group not found.</p>;
+    return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{GROUP_DETAIL_COPY.notFound}</p>;
   }
   const members = devices.filter((device) => device.groupId === id);
   const timezone = household?.timezone ?? "America/New_York";
@@ -134,7 +135,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             }}
           />
           <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-            <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
+            <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">{GROUP_DETAIL_COPY.devices}</h2>
             {members.length === 0 ? (
               <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
                 {GROUP_DETAIL_COPY.noDevices}
@@ -152,15 +153,17 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             ) : (
               members.map((device) => (
                 <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
-                  <Link href={`/devices/${encodeURIComponent(device.mac)}?from=${encodeURIComponent(id)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{device.hostname ?? "Unnamed device"}</Link>
+                  <Link href={`/devices/${encodeURIComponent(device.mac)}?from=${encodeURIComponent(id)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{deviceName(device)}</Link>
                   <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
                 </div>
               ))
             )}
           </section>
+          {/* Disabled while a write is in flight, which the store would otherwise drop without a word. */}
           <button
             type="button"
-            className="self-start text-[14px] font-semibold text-[var(--ff-danger)]"
+            disabled={busy}
+            className="self-start text-[14px] font-semibold text-[var(--ff-danger)] disabled:opacity-50"
             onClick={() =>
               void deleteGroup(store.mutate, group, () => router.replace(kind === "family" ? "/family" : "/things"))
             }
