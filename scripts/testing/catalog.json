@@ -133,6 +133,11 @@
         "groups"
       ]
     },
+    "tests/unit/device-assign.test.ts": {
+      "categories": [
+        "groups"
+      ]
+    },
     "tests/unit/group-actions.test.ts": {
       "categories": [
         "groups",
