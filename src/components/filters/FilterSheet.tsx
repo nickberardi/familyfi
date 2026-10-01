@@ -6,7 +6,6 @@
 
 import type { CategorySheetState } from "@/lib/category-marks";
 import { useState } from "react";
-import Link from "next/link";
 import { applyFilterAction, filterEditHref, filterSheetCopy, filterWebsitesHref } from "@/lib/filter-sheet";
 import { useAppData } from "@/components/AppDataProvider";
 import type { Group } from "@/lib/types";
@@ -32,7 +31,6 @@ export function FilterSheet({
   const [error, setError] = useState("");
   const copy = filterSheetCopy(group, state);
   const upstream = state.kind === "category" ? state.upstream : null;
-  const websitesHref = filterWebsitesHref(group, state);
 
   async function run() {
     if (busy || copy.action === "websites") return;
@@ -68,24 +66,8 @@ export function FilterSheet({
           busy={busy}
           error={error}
           details={<NetworkCheckDetails check={upstream} />}
-          websitesAction={
-            <Link
-              href={websitesHref}
-              className="mt-1 rounded-[9px] py-2.5 text-center text-[14px] font-semibold"
-              style={{ background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }}
-            >
-              {copy.actionLabel}
-            </Link>
-          }
-          editLink={
-            <Link
-              href={filterEditHref(group, state)}
-              className="text-center text-[14px] font-semibold"
-              style={{ color: "var(--ff-accent)" }}
-            >
-              {copy.editLabel}
-            </Link>
-          }
+          websitesHref={filterWebsitesHref(group, state)}
+          editHref={filterEditHref(group, state)}
           onAction={() => void run()}
           onCancel={onClose}
         />

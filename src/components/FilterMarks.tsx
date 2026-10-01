@@ -10,7 +10,7 @@ import { useState, type ReactNode } from "react";
 import { appRulesForGroup, glyphForAppName, parentFacingRuleLabel, type Rule } from "@/lib/rules";
 import { categorySheet, categorySlotStates } from "@/lib/category-marks";
 import { appMarkState, ruleActivelyBlocking, type UpstreamCategoryRow } from "@/lib/upstream";
-import { AppMark, CategoryMark } from "@/ui/CategoryMarks";
+import { AddAppMark, AppMark, CategoryMark } from "@/ui/CategoryMarks";
 import { FilterSheet, type FilterSheetState } from "@/components/filters/FilterSheet";
 import { AddAppSheet } from "@/components/filters/AddAppSheet";
 import type { Group } from "@/lib/types";
@@ -86,27 +86,7 @@ export function GroupFilterMarks({
                   />
                 );
               })}
-              {showAppAdd ? (
-                <button
-                  type="button"
-                  onClick={() => setAddApp(true)}
-                  className="flex w-[52px] flex-col items-center gap-1"
-                  aria-label="Add app filter"
-                >
-                  <div
-                    className="flex h-[34px] w-[34px] items-center justify-center rounded-full border-[1.5px] border-dashed text-[16px] font-light leading-none"
-                    style={{ borderColor: "var(--ff-control-line)", color: "var(--ff-accent)" }}
-                  >
-                    +
-                  </div>
-                  <div
-                    className="text-center text-[10px] font-semibold leading-tight"
-                    style={{ color: "var(--ff-accent)" }}
-                  >
-                    Add
-                  </div>
-                </button>
-              ) : null}
+              {showAppAdd ? <AddAppMark onPress={() => setAddApp(true)} /> : null}
             </div>
           </div>
         ) : null}

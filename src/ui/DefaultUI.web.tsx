@@ -14,9 +14,21 @@ export const defaultUI: UI = {
   font: "var(--ff-font)",
   Icon,
   // The web's fields keep its own font, a URL's included.
-  TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled, mono }) => (
-    <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={mono} />
-  ),
+  TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled, mono, search }) =>
+    search ? (
+      <input
+        type="search"
+        aria-label={label}
+        placeholder={placeholder}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border px-3 py-2 text-[15px]"
+        style={{ borderColor: "var(--ff-line)" }}
+      />
+    ) : (
+      <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={mono} />
+    ),
   // A disabled control disables each of its segments, as the web's segmented control draws it.
   Segmented: ({ name, value, segments, onChange, disabled, fit }) => (
     <Segmented name={name} grow={!fit} value={value} onChange={onChange} segments={disabled ? segments.map((segment) => ({ ...segment, disabled: true })) : segments} />
@@ -49,9 +61,10 @@ export const defaultUI: UI = {
     </select>
   ),
   // A plain anchor around shared content, which sets its own layout and colours.
-  Link: ({ href, children, label, current, grow }) => (
+  Link: ({ href, children, label, current, grow, onNavigate }) => (
     <NextLink
       href={href}
+      onClick={onNavigate}
       aria-label={label}
       aria-current={current ? "page" : undefined}
       style={{ display: "flex", flexDirection: "column", minWidth: 0, color: "inherit", textDecoration: "none", ...(grow ? { flex: 1 } : {}) }}
