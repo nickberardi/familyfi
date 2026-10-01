@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
-import { probeScheduleWhen, type UpstreamResolverSettings } from "@/lib/upstream";
-import { formatHhmm, relativeDayLabel } from "@/lib/display";
+import { request } from "@/lib/api";
+import { resolverScheduleLine, toggleProbeDay, type UpstreamResolverSettings } from "@/lib/upstream";
+import { CATEGORIES_COPY, canSaveResolverUrl, clearResolver, saveResolverUrl, updateResolver } from "@/lib/upstream-writes";
 import { useAppData } from "@/components/AppDataProvider";
 import { TextField, TimeField } from "@/components/ui/Controls";
 import { DayPicker } from "@/components/ui/DayPicker";
@@ -12,6 +12,8 @@ import { DayPicker } from "@/components/ui/DayPicker";
  * The household DNS-over-HTTPS endpoint, shown in full. Seeing what you configured is
  * the point: a mistyped profile id is otherwise invisible behind an unknown verdict.
  */
+const COPY = CATEGORIES_COPY.resolver;
+
 export function ResolverCard({
   resolver,
   onChanged,
@@ -37,27 +39,24 @@ export function ResolverCard({
     }
   }
 
-  const canSave = !busy && url.trim().length > 8;
+  const canSave = !busy && canSaveResolverUrl(url);
   const { household } = useAppData();
   const timezone = household?.timezone ?? "America/New_York";
 
   function toggleDay(day: number) {
     if (!resolver) return;
-    const days = resolver.probeDays.includes(day)
-      ? resolver.probeDays.filter((d) => d !== day)
-      : [...resolver.probeDays, day].sort((a, b) => a - b);
-    void run(
-      () => api("/api/v1/upstream/resolver", { method: "PUT", body: JSON.stringify({ probeDays: days }) }),
-      "Could not change the check days.",
-    );
+    void run(() => updateResolver(request, { probeDays: toggleProbeDay(resolver.probeDays, day) }), COPY.daysFailed);
   }
 
-  function scheduleLine(r: UpstreamResolverSettings): string {
-    if (!r.probeEnabled) return "Paused — last results kept";
-    if (r.probeDays.length === 0) return "No days selected — checking won't run";
-    const when = `${probeScheduleWhen(r.probeDays)} at ${formatHhmm(r.probeTime)}`;
-    if (!r.nextRunAt) return when;
-    return `${when} · next ${relativeDayLabel(new Date(r.nextRunAt), timezone, new Date())}`;
+  function save() {
+    void run(
+      () =>
+        saveResolverUrl(request, url).then(() => {
+          setPasting(false);
+          setUrl("");
+        }),
+      COPY.saveFailed,
+    );
   }
 
   return (
@@ -72,7 +71,7 @@ export function ResolverCard({
         className="px-[18px] py-[15px] text-[14px] font-semibold"
         style={{ borderBottom: "1px solid var(--ff-hairline-card)" }}
       >
-        DNS resolver
+        {COPY.title}
       </div>
       <div className="px-[18px] py-4">
         {resolver?.url && !pasting ? (
@@ -80,8 +79,7 @@ export function ResolverCard({
         ) : null}
         {!resolver?.url && !pasting ? (
           <p className="m-0 text-[12.5px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
-            {resolver?.source === "dhcp" ? "Using DNS servers assigned by UniFi DHCP."
-              : resolver?.reason ?? "Resolver information is unavailable."}
+            {resolver?.source === "dhcp" ? COPY.dhcp : resolver?.reason ?? COPY.unavailable}
           </p>
         ) : null}
         {resolver?.networks?.map((network) => (
@@ -90,29 +88,23 @@ export function ResolverCard({
           </p>
         ))}
         <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
-          Checks run from the FamilyFi host. A device on another VLAN may get a different answer.
-          Turning checking off clears earlier results. Check now stays available.
+          {COPY.note}
         </p>
 
         {resolver ? (
           <div className="mt-3.5 pt-3.5" style={{ borderTop: "1px solid var(--ff-hairline)" }}>
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] font-semibold">Check schedule</div>
+                <div className="text-[12.5px] font-semibold">{COPY.schedule}</div>
                 <div className="mt-0.5 text-[12px]" style={{ color: "var(--ff-ink-3)" }}>
-                  {scheduleLine(resolver)}
+                  {resolverScheduleLine(resolver, timezone, new Date())}
                 </div>
               </div>
               <TimeField
-                label="Check time"
+                label={COPY.time}
                 value={resolver.probeTime}
                 disabled={busy}
-                onChange={(next) =>
-                  void run(
-                    () => api("/api/v1/upstream/resolver", { method: "PUT", body: JSON.stringify({ probeTime: next }) }),
-                    "Could not change the check time.",
-                  )
-                }
+                onChange={(next) => void run(() => updateResolver(request, { probeTime: next }), COPY.timeFailed)}
               />
             </div>
             <div className="mt-2.5">
@@ -124,50 +116,26 @@ export function ResolverCard({
         {pasting ? (
           <div className="mt-3 flex flex-col gap-2">
             <TextField
-              label="DNS-over-HTTPS endpoint"
+              label={COPY.endpoint}
               value={url}
               onChange={setUrl}
-              placeholder="https://dns.example.com/dns-query/profile"
+              placeholder={COPY.placeholder}
               onSubmit={() => {
-                if (canSave) {
-                  void run(
-                    () =>
-                      api("/api/v1/upstream/resolver", {
-                        method: "PUT",
-                        body: JSON.stringify({ url: url.trim(), probeEnabled: true }),
-                      }).then(() => {
-                        setPasting(false);
-                        setUrl("");
-                      }),
-                    "Could not save the endpoint.",
-                  );
-                }
+                if (canSave) save();
               }}
             />
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 disabled={!canSave}
-                onClick={() =>
-                  void run(
-                    () =>
-                      api("/api/v1/upstream/resolver", {
-                        method: "PUT",
-                        body: JSON.stringify({ url: url.trim(), probeEnabled: true }),
-                      }).then(() => {
-                        setPasting(false);
-                        setUrl("");
-                      }),
-                    "Could not save the endpoint.",
-                  )
-                }
+                onClick={save}
                 className="rounded-lg px-3.5 py-2 text-[13px] font-semibold"
                 style={{
                   background: canSave ? "var(--ff-accent)" : "var(--ff-field-strong)",
                   color: canSave ? "var(--ff-ink-on-fill)" : "var(--ff-locked)",
                 }}
               >
-                Save
+                {COPY.save}
               </button>
               <button
                 type="button"
@@ -179,7 +147,7 @@ export function ResolverCard({
                 className="rounded-lg px-3.5 py-2 text-[13px] font-semibold"
                 style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-ink-3)" }}
               >
-                Cancel
+                {COPY.cancel}
               </button>
             </div>
           </div>
@@ -191,41 +159,27 @@ export function ResolverCard({
               className="rounded-lg px-3 py-[7px] text-[12.5px] font-semibold"
               style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-accent)" }}
             >
-              {resolver?.url ? "Replace DoH override" : "Add DoH override"}
+              {resolver?.url ? COPY.replace : COPY.add}
             </button>
             {resolver ? (
               <>
                 {resolver.url ? <button
                   type="button"
                   disabled={busy}
-                  onClick={() =>
-                    void run(
-                      () =>
-                        api("/api/v1/upstream/resolver", {
-                          method: "PUT",
-                          body: JSON.stringify({ probeEnabled: !resolver.probeEnabled }),
-                        }),
-                      "Could not change checking.",
-                    )
-                  }
+                  onClick={() => void run(() => updateResolver(request, { probeEnabled: !resolver.probeEnabled }), COPY.toggleFailed)}
                   className="rounded-lg px-3 py-[7px] text-[12.5px] font-semibold"
                   style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-ink-2)" }}
                 >
-                  {resolver.probeEnabled ? "Checking on" : "Checking off"}
+                  {resolver.probeEnabled ? COPY.checkingOn : COPY.checkingOff}
                 </button> : null}
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() =>
-                    void run(
-                      () => api("/api/v1/upstream/resolver", { method: "DELETE" }),
-                      "Could not clear the endpoint.",
-                    )
-                  }
+                  onClick={() => void run(() => clearResolver(request), COPY.clearFailed)}
                   className="rounded-lg px-3 py-[7px] text-[12.5px] font-semibold"
                   style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-danger)" }}
                 >
-                  Remove
+                  {COPY.remove}
                 </button>
               </>
             ) : null}

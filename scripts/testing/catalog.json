@@ -770,6 +770,12 @@
       "categories": [
         "rules"
       ]
+    },
+    "tests/unit/upstream-writes.test.ts": {
+      "categories": [
+        "categories",
+        "schedules"
+      ]
     }
   }
 }

@@ -3,18 +3,28 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { request } from "@/lib/api";
 import {
   activeDomainList,
-  checkedAgo,
+  categoryCheckLine,
+  domainListAfter,
   domainVerdictStyle,
   effectiveCheck,
   enabledNoteText,
   sourceNoteText,
-  verdictDetailText,
   verdictStyle,
   type UpstreamCategoryRow,
 } from "@/lib/upstream";
+import {
+  CATEGORIES_COPY,
+  checkCategory,
+  deleteCategory,
+  loadUpstreamCategory,
+  patchCategoryDomains,
+  setCategoryChecking,
+} from "@/lib/upstream-writes";
+
+const COPY = CATEGORIES_COPY.detail;
 import { MonoTile } from "@/components/ui/MonoTile";
 import { upstreamCategoryIcon } from "@/lib/upstream-domains";
 import { TextField, TogglePill } from "@/components/ui/Controls";
@@ -35,14 +45,12 @@ export default function CategoryDetailPage() {
     if (!id) return;
     const gen = ++loadGen.current;
     try {
-      const { category: next } = await api<{ category: UpstreamCategoryRow }>(
-        `/api/v1/upstream/categories/${id}`,
-      );
+      const next = await loadUpstreamCategory(request, id);
       if (gen !== loadGen.current) return;
       setCategory(next);
     } catch (err) {
       if (gen !== loadGen.current) return;
-      setError(err instanceof Error ? err.message : "Could not load the category.");
+      setError(err instanceof Error ? err.message : COPY.loadFailed);
     }
   }, [id]);
 
@@ -74,14 +82,7 @@ export default function CategoryDetailPage() {
    * (added here), so this page never has to know which case it is.
    */
   function patchDomains(domains: string[], failure: string) {
-    return run(
-      () =>
-        api(`/api/v1/upstream/categories/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ domains }),
-        }),
-      failure,
-    );
+    return run(() => patchCategoryDomains(request, { id: id! }, domains), failure);
   }
 
   if (!category) {
@@ -93,7 +94,7 @@ export default function CategoryDetailPage() {
           </p>
         ) : (
           <p className="m-0 text-[13px]" style={{ color: "var(--ff-ink-3)" }}>
-            Loading&hellip;
+            {COPY.loading}
           </p>
         )}
       </div>
@@ -111,7 +112,7 @@ export default function CategoryDetailPage() {
         className="w-fit text-[13.5px] font-semibold no-underline"
         style={{ color: "var(--ff-accent)" }}
       >
-        &larr; Back to Categories
+        {COPY.back}
       </Link>
 
       <section
@@ -141,20 +142,16 @@ export default function CategoryDetailPage() {
             type="button"
             disabled={busy}
             onClick={() =>
-              void run(
-                () => api(`/api/v1/upstream/categories/${category.id}/check`, { method: "POST" }),
-                "Could not check the category.",
-              )
+              void run(() => checkCategory(request, category), COPY.checkFailed)
             }
             className="flex-none rounded-lg px-3.5 py-[7px] text-[12.5px] font-semibold disabled:opacity-40"
             style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-ink)" }}
           >
-            Check now
+            {COPY.checkNow}
           </button>
         </div>
         <p className="mt-2 mb-0 text-[12.5px]" style={{ color: "var(--ff-ink-3)" }}>
-          {check?.source === "doh" ? "DoH override · " : check?.source === "dhcp" ? "UniFi DHCP · " : ""}{verdictDetailText(check)}
-          {check ? ` · checked ${checkedAgo(check.checkedAt)}` : ""}
+          {categoryCheckLine(check)}
         </p>
         <NetworkCheckDetails check={check} />
 
@@ -165,19 +162,12 @@ export default function CategoryDetailPage() {
           <TogglePill
             on={category.enabled}
             onToggle={() =>
-              void run(
-                () =>
-                  api(`/api/v1/upstream/categories/${category.id}`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ enabled: !category.enabled }),
-                  }),
-                "Could not change checking.",
-              )
+              void run(() => setCategoryChecking(request, category, !category.enabled), CATEGORIES_COPY.toggleFailed)
             }
             disabled={busy}
-            label={`Checking ${category.label}`}
-            onLabel="Checking on"
-            offLabel="Checking off"
+            label={CATEGORIES_COPY.checkingLabel(category.label)}
+            onLabel={COPY.checkingOn}
+            offLabel={COPY.checkingOff}
           />
           <span className="text-[12.5px]" style={{ color: "var(--ff-ink-3)" }}>
             {enabledNoteText(category.enabled)}
@@ -189,14 +179,14 @@ export default function CategoryDetailPage() {
               disabled={busy}
               onClick={() =>
                 void run(async () => {
-                  await api(`/api/v1/upstream/categories/${category.id}`, { method: "DELETE" });
+                  await deleteCategory(request, category);
                   router.push("/categories");
-                }, "Could not delete the category.")
+                }, COPY.deleteFailed)
               }
               className="text-[12.5px] font-semibold disabled:opacity-40"
               style={{ color: "var(--ff-danger)" }}
             >
-              Delete category
+              {COPY.deleteCategory}
             </button>
           ) : null}
         </div>
@@ -210,7 +200,7 @@ export default function CategoryDetailPage() {
           className="px-[18px] py-[14px] text-[14px] font-semibold"
           style={{ borderBottom: "1px solid var(--ff-hairline-card)" }}
         >
-          Domains
+          {COPY.domains}
         </div>
 
         {category.domains.map((domain) => {
@@ -244,17 +234,12 @@ export default function CategoryDetailPage() {
                 type="button"
                 disabled={busy}
                 onClick={() =>
-                  void patchDomains(
-                    domain.removed
-                      ? [...active, domain.domain]
-                      : active.filter((name) => name !== domain.domain),
-                    domain.removed ? "Could not restore the domain." : "Could not remove the domain.",
-                  )
+                  void patchDomains(domainListAfter(active, domain), domain.removed ? COPY.restoreFailed : COPY.removeFailed)
                 }
                 className="flex-none text-[12.5px] font-semibold disabled:opacity-40"
                 style={{ color: "var(--ff-accent)" }}
               >
-                {domain.removed ? "Restore" : "Remove"}
+                {domain.removed ? COPY.restore : COPY.remove}
               </button>
             </div>
           );
@@ -265,17 +250,15 @@ export default function CategoryDetailPage() {
           style={{ borderTop: "1px solid var(--ff-hairline)" }}
         >
           <TextField
-            label="Add a domain"
+            label={COPY.addLabel}
             value={newDomain}
             onChange={setNewDomain}
-            placeholder="Add a domain, e.g. example.com"
+            placeholder={COPY.addPlaceholder}
             mono
             onSubmit={() => {
               const value = newDomain.trim();
               if (!value) return;
-              void patchDomains([...active, value], "Could not add the domain.").then(() =>
-                setNewDomain(""),
-              );
+              void patchDomains([...active, value], COPY.addFailed).then(() => setNewDomain(""));
             }}
           />
           <button
@@ -284,14 +267,12 @@ export default function CategoryDetailPage() {
             onClick={() => {
               const value = newDomain.trim();
               if (!value) return;
-              void patchDomains([...active, value], "Could not add the domain.").then(() =>
-                setNewDomain(""),
-              );
+              void patchDomains([...active, value], COPY.addFailed).then(() => setNewDomain(""));
             }}
             className="flex-none rounded-lg px-3.5 py-2 text-[13px] font-semibold disabled:opacity-40"
             style={{ background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }}
           >
-            Add
+            {COPY.add}
           </button>
         </div>
 

@@ -1,5 +1,6 @@
 /** Client-safe types and presentation for upstream categories. */
 
+import { formatHhmm, relativeDayLabel } from "@/lib/display";
 import { isWindowActive, type RuleWindowSpec } from "@/lib/rule-windows";
 
 export type UpstreamVerdictValue = "blocked" | "partial" | "open" | "unknown";
@@ -215,6 +216,34 @@ export function checkedAgo(checkedAt: string, now = Date.now()): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+/** The check schedule in a line: paused, never, or when it runs and when it runs next. */
+export function resolverScheduleLine(resolver: Pick<UpstreamResolverSettings, "probeEnabled" | "probeDays" | "probeTime" | "nextRunAt">, timezone: string, now: Date): string {
+  if (!resolver.probeEnabled) return "Paused — last results kept";
+  if (resolver.probeDays.length === 0) return "No days selected — checking won't run";
+  const when = `${probeScheduleWhen(resolver.probeDays)} at ${formatHhmm(resolver.probeTime)}`;
+  if (!resolver.nextRunAt) return when;
+  return `${when} · next ${relativeDayLabel(new Date(resolver.nextRunAt), timezone, now)}`;
+}
+
+/** The check days with one turned on or off, in order. */
+export function toggleProbeDay(days: number[], day: number): number[] {
+  return days.includes(day) ? days.filter((item) => item !== day) : [...days, day].sort((a, b) => a - b);
+}
+
+/** A category's last check in a line: where it was measured, what it found, and how long ago. */
+export function categoryCheckLine(check: UpstreamCheckRow | null, now = Date.now()): string {
+  const via = check?.source === "doh" ? "DoH override · " : check?.source === "dhcp" ? "UniFi DHCP · " : "";
+  return `${via}${verdictDetailText(check)}${check ? ` · checked ${checkedAgo(check.checkedAt, now)}` : ""}`;
+}
+
+/**
+ * The list a domain's Restore or Remove sends. Every domain edit PATCHes the whole active list;
+ * the server decides whether leaving one out strikes it through (seeded) or deletes it (added).
+ */
+export function domainListAfter(active: string[], domain: Pick<UpstreamDomainRow, "domain" | "removed">): string[] {
+  return domain.removed ? [...active, domain.domain] : active.filter((name) => name !== domain.domain);
 }
 
 /** The active domain list a PATCH replaces, derived from what the UI is showing. */

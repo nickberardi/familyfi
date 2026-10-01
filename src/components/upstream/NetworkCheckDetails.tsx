@@ -1,4 +1,5 @@
 import { verdictStyle, type UpstreamCheckRow, type UpstreamVerdictValue } from "@/lib/upstream";
+import { CATEGORIES_COPY } from "@/lib/upstream-writes";
 
 function VerdictLabel({ verdict }: { verdict: UpstreamVerdictValue }) {
   const style = verdictStyle({ verdict });
@@ -11,7 +12,7 @@ export function NetworkCheckDetails({ check }: { check: UpstreamCheckRow | null 
   if (!check?.networks?.length) return null;
   return (
     <details className="mt-3 rounded-lg border border-[var(--ff-hairline-card)] px-3 py-2 text-[12.5px]">
-      <summary className="cursor-pointer font-semibold">Results by network</summary>
+      <summary className="cursor-pointer font-semibold">{CATEGORIES_COPY.detail.resultsByNetwork}</summary>
       <div className="mt-2 flex flex-col gap-2">
         {check.networks.map((network) => (
           <div key={network.id} className="border-t border-[var(--ff-hairline)] pt-2">
