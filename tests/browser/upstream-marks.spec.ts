@@ -127,7 +127,8 @@ test("a measured all-clear is not the same mark as an unmeasured category", asyn
   await expect(unknown).toBeVisible();
 
   const circleFill = (button: typeof open) =>
-    button.locator("span").first().evaluate((node) => getComputedStyle(node).backgroundColor);
+    // The mark's circle: its first element, a react-native-web View (`src/ui/CategoryMarks.tsx`).
+    button.locator("div").first().evaluate((node) => getComputedStyle(node).backgroundColor);
   expect(await circleFill(open)).not.toBe(await circleFill(unknown));
 });
 
