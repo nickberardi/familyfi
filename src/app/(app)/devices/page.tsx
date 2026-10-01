@@ -3,25 +3,25 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { DeviceAssignSelect, networkLabel } from "@/components/DeviceAssign";
-import { assignDevicesCopy, deviceName } from "@/lib/device-assign";
+import { DeviceAssignSelect } from "@/components/DeviceAssign";
+import { deviceName } from "@/lib/device-assign";
 import {
   DEVICE_FILTERS,
   DEVICES_COPY as COPY,
+  deviceAddressSuffix,
   deviceFilterLabel,
   deviceRemoveCopy,
   filterDevices,
-  quarantineTitle,
   type DeviceFilterId,
 } from "@/lib/device-list";
 import { deleteDevice, setQuarantineEnforced } from "@/lib/device-writes";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
-import { TogglePill } from "@/components/ui/Controls";
-import { Icon } from "@/components/ui/Icon";
-import { deviceIcon, deviceKindLabel } from "@/lib/display";
-import { presenceSummary } from "@/lib/device-presence";
-import type { Device } from "@/lib/types";
+import { deviceKindLabel } from "@/lib/display";
+import { AssignNeededBanner } from "@/ui/AssignNeededBanner";
+import { DeviceIdentity } from "@/ui/DeviceIdentity";
+import { DeviceMark } from "@/ui/DeviceMark";
+import { QuarantineCard } from "@/ui/QuarantineCard";
 
 export default function DevicesPage() {
   return (
@@ -56,39 +56,8 @@ function DevicesBody() {
     <>
       <PageHeader title={COPY.title} sub={COPY.subtitle} />
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        {assignGroup ? (
-          <section className="rounded-[12px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] px-[18px] py-3">
-            <div className="text-[14px] font-semibold text-[var(--ff-paused)]">{assignDevicesCopy(assignGroup).needsTitle}</div>
-            <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">{assignDevicesCopy(assignGroup).needsBody}</p>
-          </section>
-        ) : null}
-        {household ? (
-        <section className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] px-[18px] py-3">
-          <div className="min-w-0 flex-1">
-            <div
-              className="text-[14px] font-semibold"
-              style={{ color: enforced ? undefined : "var(--ff-paused)" }}
-            >
-              {quarantineTitle(enforced)}
-            </div>
-            <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
-              {COPY.quarantineBody}
-            </p>
-          </div>
-          {/*
-            The pill names the state quarantine is *in*. It used to name the action —
-            reading "Off" while quarantine was being enforced — which is the one
-            reading a household must not get wrong on this control.
-          */}
-          <TogglePill
-            on={enforced}
-            onToggle={() => void setQuarantineEnforced(store.mutate, !enforced)}
-            label={COPY.quarantineLabel}
-            onLabel={COPY.quarantineOn}
-            offLabel={COPY.quarantineOff}
-          />
-        </section>
-        ) : null}
+        {assignGroup ? <AssignNeededBanner group={assignGroup} /> : null}
+        {household ? <QuarantineCard enforced={enforced} onToggle={() => void setQuarantineEnforced(store.mutate, !enforced)} /> : null}
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
@@ -144,7 +113,15 @@ function DevicesBody() {
                   >
                     <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="flex min-w-0 items-center gap-2.5" aria-label={`View details for ${name}`}>
                       <DeviceMark hostname={device.hostname} />
-                      <DeviceIdentity device={device} networks={networks} name={name} timezone={household?.timezone ?? "UTC"} now={now} />
+                      <DeviceIdentity
+                        device={device}
+                        networks={networks}
+                        name={name}
+                        timezone={household?.timezone ?? "UTC"}
+                        now={now}
+                        inline={<span className="lg:hidden">{deviceAddressSuffix(device)}</span>}
+                        below={<div className="mt-0.5 hidden truncate text-[14px] text-[var(--ff-muted)] lg:block">{deviceKindLabel(device.hostname)}</div>}
+                      />
                     </Link>
                     <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] xl:block">
                       {device.ip ?? "—"}
@@ -173,49 +150,5 @@ function DevicesBody() {
         )}
       </div>
     </>
-  );
-}
-
-/**
- * The device's type, as a glyph on the well.
- *
- * Decorative on purpose: `DeviceIdentity` renders the same type as a word right
- * beside it, so the icon is a second reading of the row rather than its only one.
- */
-function DeviceMark({ hostname }: { hostname: string | null }) {
-  return (
-    <div className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px] bg-[var(--ff-well)] text-[var(--ff-muted)]">
-      <Icon name={deviceIcon(hostname)} size={16} />
-    </div>
-  );
-}
-
-function DeviceIdentity({
-  device,
-  networks,
-  name,
-  timezone,
-  now,
-}: {
-  device: Device;
-  networks: { id: string; name: string; vlanId: number }[];
-  name: string;
-  timezone: string;
-  now: Date;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="truncate text-[14px]">{name}</div>
-      <div className="mt-0.5 truncate text-[14px] text-[var(--ff-muted)]">
-        {presenceSummary(device, timezone, now)}
-        <span className="lg:hidden">
-          {" "}
-          · {device.mac.toUpperCase()}
-          {device.ip ? ` · ${device.ip}` : ""}
-        </span>
-        {!device.inScope ? ` · ${networkLabel(device, networks)}` : ""}
-      </div>
-      <div className="mt-0.5 hidden truncate text-[14px] text-[var(--ff-muted)] lg:block">{deviceKindLabel(device.hostname)}</div>
-    </div>
   );
 }

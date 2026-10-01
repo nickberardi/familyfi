@@ -1,32 +1,12 @@
 "use client";
 
-import { use, useEffect, useState, type ReactNode } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
-import { Icon } from "@/components/ui/Icon";
-import { deviceDetail, groupHref, presenceTone } from "@/lib/device-detail";
+import { groupHref } from "@/lib/device-detail";
 import { DEVICES_COPY } from "@/lib/device-list";
-import { deviceIcon } from "@/lib/display";
-import type { Device, Group } from "@/lib/types";
-
-function DetailRow({ label, children, mono = false }: { label: string; children: ReactNode; mono?: boolean }) {
-  return (
-    <div className="flex min-h-11 items-start justify-between gap-4 border-t border-[var(--ff-hairline)] py-3 text-[14px]">
-      <dt className="flex-none text-[var(--ff-muted)]">{label}</dt>
-      <dd className={`min-w-0 break-words text-right ${mono ? "font-mono" : ""}`}>{children}</dd>
-    </div>
-  );
-}
-
-function DetailSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] px-[18px]">
-      <h3 className="py-4 text-[14px] font-semibold">{title}</h3>
-      <dl>{children}</dl>
-    </section>
-  );
-}
+import { DeviceDetailContent } from "@/ui/DeviceDetailContent";
 
 export function DeviceDetailPage({
   params,
@@ -72,57 +52,8 @@ export function DeviceDetailPage({
             {loading ? "Loading device…" : error ? "Device details are unavailable right now." : "Device not found."}
           </div>
         ) : (
-          <DeviceDetails device={device} group={group} networks={unifi?.networks ?? []} timezone={timezone} now={now} />
+          <DeviceDetailContent device={device} group={group} networks={unifi?.networks ?? []} timezone={timezone} now={now} />
         )}
-      </div>
-    </>
-  );
-}
-
-function DeviceDetails({
-  device,
-  group,
-  networks,
-  timezone,
-  now,
-}: {
-  device: Device;
-  group: Group | null | undefined;
-  networks: { id: string; name: string; vlanId: number }[];
-  timezone: string;
-  now: Date;
-}) {
-  const detail = deviceDetail(device, group, networks, timezone, now);
-  const tone = presenceTone(detail.presence);
-  const colors = { ink: `var(--ff-${tone.ink})`, fill: `var(--ff-${tone.fill})` };
-
-  return (
-    <>
-      <section className="flex items-center gap-4 rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px]">
-        <span className="flex h-11 w-11 flex-none items-center justify-center rounded-[9px] bg-[var(--ff-well)] text-[var(--ff-muted)]">
-          <Icon name={deviceIcon(device.hostname)} size={23} />
-        </span>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[21px] font-semibold tracking-tight">{detail.name}</h2>
-            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[14px] font-semibold" style={{ color: colors.ink, background: colors.fill }}>
-              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-              {detail.status}
-            </span>
-          </div>
-          <p className="mt-1 text-[14px] text-[var(--ff-muted)]">{detail.summary}</p>
-        </div>
-      </section>
-      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-        {detail.sections.map((section) => (
-          <DetailSection key={section.title} title={section.title}>
-            {section.rows.map((row) => (
-              <DetailRow key={row.label} label={row.label} mono={row.mono}>
-                {row.group ? <Link href={groupHref(row.group)} className="text-[var(--ff-accent)]">{row.value}</Link> : row.value}
-              </DetailRow>
-            ))}
-          </DetailSection>
-        ))}
       </div>
     </>
   );
