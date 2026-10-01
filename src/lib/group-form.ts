@@ -88,6 +88,11 @@ export function groupEditBody(group: Group, draft: GroupEditDraft) {
   return { name, monogram };
 }
 
+/** Whether a group with no devices is told its rules cannot apply until it has one. */
+export function rulesNeedDevice(group: Pick<Group, "internetRuleIds" | "suspension">): boolean {
+  return group.internetRuleIds.length > 0 || group.suspension.active;
+}
+
 /** The group detail's words. */
 export const GROUP_DETAIL_COPY = {
   edit: "Edit",
@@ -101,6 +106,8 @@ export const GROUP_DETAIL_COPY = {
   currentState: "Current state",
   devices: "Devices",
   noDevices: "No devices assigned.",
+  /** After "No devices assigned." when the group has rules or a pause: the words around the link to assign one. */
+  rulesNeedDevice: { before: "Its rules cannot apply on UniFi until you", link: "assign a device", after: "." },
   manageDevices: "Manage devices",
   delete: "Delete group",
   notFound: "Group not found.",

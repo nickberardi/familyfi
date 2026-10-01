@@ -78,7 +78,8 @@ export function GroupResolverCard({
   const outline = (label: string, tone: "accent" | "danger" | "ink-3", onPress: () => void, testID?: string, size: "sm" | "md" = "sm") => (
     <Pressable
       role="button"
-      aria-disabled={off}
+      // Cancel always works, even while a save is in flight; the others wait for it.
+      aria-disabled={off && tone !== "ink-3"}
       disabled={off && tone !== "ink-3"}
       onPress={onPress}
       testID={testID}
@@ -153,7 +154,8 @@ const styles = StyleSheet.create({
   medium: { justifyContent: "center", borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   filled: { borderWidth: 0 },
   mediumLabel: { fontSize: 13, lineHeight: 19.5, fontWeight: "600" },
-  url: { fontFamily: MONO, fontSize: 13, lineHeight: 19.5 },
+  // A long endpoint breaks anywhere on the web, as it always has; natively it wraps at its slashes.
+  url: { fontFamily: MONO, fontSize: 13, lineHeight: 19.5, ...Platform.select({ web: { wordBreak: "break-all" } as object, default: {} }) },
   note: { marginTop: 4 },
   hostNote: { marginTop: 8 },
   error: { marginTop: 8, fontSize: 13, lineHeight: 19.5 },

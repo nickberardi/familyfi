@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { GROUP_CARD_COPY } from "@/lib/group-page";
 import { cardMarks, categorySheet, categorySlotStates } from "@/lib/category-marks";
 import { internetWindowsForGroup, type Rule } from "@/lib/rules";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
@@ -93,7 +94,7 @@ export function GroupCard({
                     href={`/rules/${focused.rule.id}?group=${group.id}`}
                     className="rounded-[8px] bg-[var(--ff-card)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-accent)] shadow-[inset_0_0_0_1px_var(--ff-control-line)]"
                   >
-                    Edit rule
+                    {GROUP_CARD_COPY.editRule}
                   </Link>
                 ) : null
               }
@@ -120,8 +121,8 @@ export function GroupCard({
       {open ? (
         <ActionRow
           actions={[
-            { label: "Rules", href: `/rules?group=${group.id}` },
-            { label: "Details", href },
+            { label: GROUP_CARD_COPY.rules, href: `/rules?group=${group.id}` },
+            { label: GROUP_CARD_COPY.details, href },
           ]}
         />
       ) : null}

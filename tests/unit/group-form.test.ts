@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  rulesNeedDevice,
   deleteGroupConfirm,
   groupEditBody,
   groupEditDraft,
@@ -60,5 +61,11 @@ describe("editing a group", () => {
 
   it("says what deleting does before it happens", () => {
     expect(deleteGroupConfirm(group())).toMatchObject({ title: "Delete Sam?", confirm: "Delete group", cancel: "Never mind" });
+  });
+
+  it("tells a group with rules or a pause, and no devices, that its rules cannot apply yet", () => {
+    expect(rulesNeedDevice({ internetRuleIds: [], suspension: { active: false, until: null } } as never)).toBe(false);
+    expect(rulesNeedDevice({ internetRuleIds: ["r1"], suspension: { active: false, until: null } } as never)).toBe(true);
+    expect(rulesNeedDevice({ internetRuleIds: [], suspension: { active: true, until: null } } as never)).toBe(true);
   });
 });

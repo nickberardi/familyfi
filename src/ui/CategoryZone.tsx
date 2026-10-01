@@ -37,7 +37,8 @@ export function CategoryZone({
 }) {
   const ui = useUI();
   const colors = useMarkColors(item.state);
-  const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 20 };
+  // The web's 14px text takes the page's 1.5 line height (21); only the "when" line is 20.
+  const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
   const rule = item.rule?.enabled ? item.rule : undefined;
 
   if (!rule) {
@@ -85,7 +86,7 @@ export function CategoryZone({
           <Text role="heading" aria-level={3} style={[text, { fontWeight: "600", color: ui.color("ink") }]}>
             {item.label} · {item.blocking ? "blocked" : "allowed now"}
           </Text>
-          <Text style={[text, styles.sub, { color: ui.color("ink-2") }]}>{categoryRuleWhen(rule)} Everything else stays on.</Text>
+          <Text style={[text, styles.sub, { lineHeight: 20, color: ui.color("ink-2") }]}>{categoryRuleWhen(rule)} Everything else stays on.</Text>
         </View>
         {editRule}
       </View>
