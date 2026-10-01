@@ -94,6 +94,8 @@ export type UILinkProps = {
   current?: boolean;
   /** Takes the room left in its row. */
   grow?: boolean;
+  /** Runs as the link is followed, before the new page shows: a sheet closes itself. */
+  onNavigate?: () => void;
   testID?: string;
 };
 
@@ -122,6 +124,8 @@ export type UITextFieldProps = {
   capitals?: boolean;
   /** A domain or address, set in the monospaced face with no capitals or corrections. */
   mono?: boolean;
+  /** A search box, which the platform may draw as its own search field. */
+  search?: boolean;
   autoFocus?: boolean;
   testID?: string;
 };

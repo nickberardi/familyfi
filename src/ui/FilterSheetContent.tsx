@@ -9,8 +9,8 @@ import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /**
  * What a category's or app rule's sheet says and offers (`src/lib/filter-sheet.ts`), shared by
- * every client inside its own sheet. Links to the rule editor and the measured results are each
- * client's own, so they come in as slots.
+ * every client inside its own sheet. Its links go through the platform's `Link`; the measured
+ * results come in as a slot.
  */
 export function FilterSheetContent({
   copy,
@@ -19,8 +19,8 @@ export function FilterSheetContent({
   error,
   note,
   details,
-  editLink,
-  websitesAction,
+  editHref,
+  websitesHref,
   onAction,
   onCancel,
 }: {
@@ -33,10 +33,10 @@ export function FilterSheetContent({
   note?: string;
   /** The measured results by network. */
   details?: ReactNode;
-  /** "Edit rule and schedule" or "Schedule it instead". */
-  editLink?: ReactNode;
-  /** "Block its websites", for a category UniFi cannot block. */
-  websitesAction?: ReactNode;
+  /** Where "Edit rule and schedule" or "Schedule it instead" goes (`filterEditHref`). */
+  editHref?: string;
+  /** Where "Block its websites" goes (`filterWebsitesHref`), for a category UniFi cannot block. */
+  websitesHref?: string;
   onAction: () => void;
   onCancel: () => void;
 }) {
@@ -65,7 +65,13 @@ export function FilterSheetContent({
         {note ? <Text style={[text(13, 19.5), { color: ui.color("muted") }]}>{note}</Text> : null}
         {error ? <Text style={[text(13, 19.5), { color: ui.color("danger") }]}>{error}</Text> : null}
         {copy.action === "websites" ? (
-          websitesAction
+          websitesHref ? (
+            <ui.Link href={websitesHref} onNavigate={onCancel} testID="filter-sheet-websites">
+              <View style={[styles.action, { backgroundColor: ui.color("accent") }]}>
+                <Text style={[text(14, 21), styles.strong, { color: ui.color("ink-on-fill") }]}>{copy.actionLabel}</Text>
+              </View>
+            </ui.Link>
+          ) : null
         ) : (
           <>
             <Pressable
@@ -83,7 +89,11 @@ export function FilterSheetContent({
             >
               <Text style={[text(14, 21), styles.strong, { color: ui.color(turnOff ? "danger" : "ink-on-fill") }]}>{copy.actionLabel}</Text>
             </Pressable>
-            {editLink}
+            {editHref ? (
+              <ui.Link href={editHref} onNavigate={onCancel} testID="filter-sheet-edit">
+                <Text style={[text(14, 21), styles.strong, { color: ui.color("accent") }]}>{copy.editLabel}</Text>
+              </ui.Link>
+            ) : null}
           </>
         )}
       </View>
@@ -99,8 +109,6 @@ export function FilterSheetContent({
   );
 }
 
-/** The style a client's own link under the button takes, to sit with the shared sheet. */
-export const FILTER_SHEET_LINK = { fontSize: 14, lineHeight: 21, fontWeight: "600", textAlign: "center" } as const;
 
 const styles = StyleSheet.create({
   content: { gap: 10, padding: 20 },

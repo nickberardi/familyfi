@@ -35,6 +35,16 @@ test("Categories lists the seeded set and states the reporting-only stance", asy
   await expect(page.getByText(/Using DNS servers assigned by UniFi DHCP/i)).toBeVisible();
 });
 
+/** Domain names drawn struck through, by their rendered style: the list is shared React Native, so no inline style to match. */
+function struckDomains(page: Page) {
+  return page.evaluate(
+    () =>
+      [...document.querySelectorAll('[data-testid^="category-domain-"] *')].filter((element) =>
+        getComputedStyle(element).textDecorationLine.includes("line-through"),
+      ).length,
+  );
+}
+
 test("a seeded domain strikes through on remove and comes back on restore", async ({ page }) => {
   await signIn(page);
   await page.goto("/categories");
@@ -59,11 +69,11 @@ test("a seeded domain strikes through on remove and comes back on restore", asyn
   // Kept on record and struck through, not deleted — that is what makes it restorable.
   await expect(page.getByRole("button", { name: "Restore" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Remove" })).toHaveCount(total - 1);
-  await expect(page.locator("span[style*='line-through']")).toHaveCount(1);
+  await expect.poll(() => struckDomains(page)).toBe(1);
 
   await page.getByRole("button", { name: "Restore" }).first().click();
   await expect(page.getByRole("button", { name: "Remove" })).toHaveCount(total);
-  await expect(page.locator("span[style*='line-through']")).toHaveCount(0);
+  await expect.poll(() => struckDomains(page)).toBe(0);
 });
 
 test("a custom category is created report-only and can be deleted", async ({ page }) => {
