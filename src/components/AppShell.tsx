@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api } from "@/lib/api";
+import { unassignedBadgeCount } from "@/lib/device-list";
 import { initials } from "@/lib/display";
 import type { IconName } from "@/lib/icons";
 import { noMembersAttention } from "@/lib/sync-copy";
@@ -167,7 +168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setOpenedAtPathname(pathname);
     if (navOpen) setNavOpen(false);
   }
-  const unassignedCount = devices.filter((device) => device.assignment === "quarantined" && device.inScope).length;
+  const unassignedCount = unassignedBadgeCount(devices);
   const coverageFailing = (sync?.failingCount ?? 0) > 0;
   const deviceAttention = noMembersAttention(sync?.issues ?? []);
   const familyNeedsDevices = (sync?.issues ?? []).filter((issue) => issue.kind === "no_members").length;

@@ -739,6 +739,21 @@
         "trust",
         "sessions"
       ]
+    },
+    "tests/unit/device-list.test.ts": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/unit/device-writes.test.ts": {
+      "categories": [
+        "devices"
+      ]
+    },
+    "tests/unit/device-detail.test.ts": {
+      "categories": [
+        "devices"
+      ]
     }
   }
 }

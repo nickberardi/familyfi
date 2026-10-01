@@ -8,6 +8,7 @@ import { loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
 import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, rulesNeedDevice, type FamilyRole } from "@/lib/group-form";
 import { deleteGroup, updateGroup } from "@/lib/group-writes";
 import { deviceName } from "@/lib/device-assign";
+import { deviceHref } from "@/lib/device-detail";
 import { internetWindowsForGroup } from "@/lib/rules";
 import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
@@ -153,7 +154,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             ) : (
               members.map((device) => (
                 <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
-                  <Link href={`/devices/${encodeURIComponent(device.mac)}?from=${encodeURIComponent(id)}`} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{deviceName(device)}</Link>
+                  <Link href={deviceHref(device, id)} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{deviceName(device)}</Link>
                   <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
                 </div>
               ))
