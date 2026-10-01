@@ -10,8 +10,9 @@ export const defaultUI: UI = {
   shadow: (name) => `var(--ff-${`shadow-${name}`})`,
   font: "var(--ff-font)",
   Icon,
-  TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled, url }) => (
-    <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={url} />
+  // The web's fields keep its own font, a URL's included.
+  TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled }) => (
+    <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} />
   ),
   Segmented: ({ name, value, segments, onChange }) => <Segmented name={name} grow value={value} onChange={onChange} segments={segments} />,
 };

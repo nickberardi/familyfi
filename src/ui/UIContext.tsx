@@ -38,7 +38,7 @@ export type UITextFieldProps = {
   /** Return (Enter) submits, so a form works without a submit button of its own. */
   onSubmit?: () => void;
   disabled?: boolean;
-  /** For a URL: monospaced, no capitals or corrections. */
+  /** For a URL: no capitals or corrections, and the URL keyboard where there is one. */
   url?: boolean;
   /** Capitals as typed, for a monogram. */
   capitals?: boolean;
