@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   bedtimeEndDays,
   cardNoteLine,
@@ -6,6 +6,7 @@ import {
   daysLabel,
   deviceKindLabel,
   deviceIcon,
+  formatClock,
   formatHhmm,
   nextClockOnDays,
   windowTimes,
@@ -61,6 +62,22 @@ describe("schedule copy", () => {
     const grounded = { name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "00:00", always: true, ruleName: "Grounded" };
     expect(cardStateLabel(group(), [grounded], TZ, monday7pm)).toBe("No internet · Grounded · always");
     expect(cardNoteLine(group(), [grounded])).toBe("4 devices · internet off always");
+  });
+});
+
+describe("clock times", () => {
+  // Hermes and some ICU versions put U+202F NARROW NO-BREAK SPACE before AM/PM; every client
+  // must still produce the plain space the display vectors pin.
+  it("separates the time from AM/PM with a plain space whatever the runtime's ICU returns", () => {
+    class NarrowSpaceFormat extends Intl.DateTimeFormat {
+      override format = () => "8:00\u202fPM";
+    }
+    vi.stubGlobal("Intl", Object.assign(Object.create(Intl), { DateTimeFormat: NarrowSpaceFormat }));
+    try {
+      expect(formatClock(new Date("2026-03-10T00:00:00Z"), TZ)).toBe("8:00 PM");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

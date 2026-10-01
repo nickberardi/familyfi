@@ -1,4 +1,5 @@
 import { formatClock } from "./display";
+import { extendSuspensionUntil } from "./schedule";
 import { isWindowActive, nextWindowStart, windowEndsAt, windowTitle, type InternetWindow } from "./rule-windows";
 import type { Rule } from "./rules";
 import type { Group } from "./types";
@@ -21,6 +22,11 @@ export type PauseSheetOption = { label: string; note: string; request: PauseShee
  * and `tests/fixtures/display-vectors.json` can pin them. A pause blocks all internet on
  * every device in the group, so the copy names that scope and the devices.
  */
+
+/** When a timed option ends: extend adds to the pause's current end, as the server does; otherwise to now. */
+function endAfter(until: string | null, now: Date, minutes: number): Date {
+  return extendSuspensionUntil(until ? new Date(until) : null, now, minutes * 60_000);
+}
 
 export function pauseSheetTitle(group: Pick<Group, "name">, mode: PauseSheetMode): string {
   return mode === "extend" ? `Keep all internet off for ${group.name} longer?` : `Pause all internet for ${group.name}?`;
@@ -55,7 +61,7 @@ export function pauseSheetOptions(
   const extending = mode === "extend" && group.suspension.active && Boolean(group.suspension.until);
   const timed = (label: string, minutes: number): PauseSheetOption => ({
     label,
-    note: `back at ${formatClock(new Date(now.getTime() + minutes * 60_000), timezone)}`,
+    note: `back at ${formatClock(endAfter(extending ? group.suspension.until : null, now, minutes), timezone)}`,
     request: extending ? { kind: "extend", minutes } : { kind: "pauseFor", minutes },
   });
   // Straight into the next internet window: offline until that window ends.
@@ -110,7 +116,7 @@ export function rulePauseSheetOptions(
   const extending = mode === "extend" && rule.pause.active && Boolean(rule.pause.until);
   const timed = (label: string, minutes: number): PauseSheetOption => ({
     label,
-    note: `blocks again at ${formatClock(new Date(now.getTime() + minutes * 60_000), timezone)}`,
+    note: `blocks again at ${formatClock(endAfter(extending ? rule.pause.until : null, now, minutes), timezone)}`,
     request: extending ? { kind: "extend", minutes } : { kind: "pauseFor", minutes },
   });
   // A window is blocking now: lift the rule until the last active one ends.

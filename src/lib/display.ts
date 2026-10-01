@@ -126,11 +126,14 @@ export function formatHhmm(value: string): string {
 }
 
 export function formatClock(date: Date, timezone: string): string {
+  // Some ICU versions, Hermes's among them, put U+202F before AM/PM; every client shows a plain space.
   return new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+  })
+    .format(date)
+    .replace(/[\u00a0\u202f]/g, " ");
 }
 
 /** "Every day", "Mon–Fri", "Weekends", or the days listed, for the days a window starts on. */
