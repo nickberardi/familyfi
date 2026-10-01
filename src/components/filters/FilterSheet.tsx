@@ -7,7 +7,7 @@
 import type { CategorySheetState } from "@/lib/category-marks";
 import { useState } from "react";
 import Link from "next/link";
-import { applyFilterAction, filterRuleName, filterSheetCopy } from "@/lib/filter-sheet";
+import { applyFilterAction, filterEditHref, filterSheetCopy, filterWebsitesHref } from "@/lib/filter-sheet";
 import { useAppData } from "@/components/AppDataProvider";
 import type { Group } from "@/lib/types";
 import { NetworkCheckDetails } from "@/components/upstream/NetworkCheckDetails";
@@ -32,12 +32,7 @@ export function FilterSheet({
   const [error, setError] = useState("");
   const copy = filterSheetCopy(group, state);
   const upstream = state.kind === "category" ? state.upstream : null;
-  const websitesHref =
-    state.kind === "category"
-      ? `/rules/new?kind=domain&group=${group.id}&name=${encodeURIComponent(filterRuleName(group, state))}${
-          state.domains.length ? `&domains=${encodeURIComponent(state.domains.join(","))}` : ""
-        }`
-      : "";
+  const websitesHref = filterWebsitesHref(group, state);
 
   async function run() {
     if (busy || copy.action === "websites") return;
@@ -84,11 +79,7 @@ export function FilterSheet({
           }
           editLink={
             <Link
-              href={
-                state.rule
-                  ? `/rules/${state.rule.id}`
-                  : `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`
-              }
+              href={filterEditHref(group, state)}
               className="text-center text-[14px] font-semibold"
               style={{ color: "var(--ff-accent)" }}
             >

@@ -69,3 +69,45 @@ describe("filter sheet", () => {
     await expect(applyFilterAction(mutate as never, group, category({ categoryId: null }), "create")).rejects.toThrow("Nothing to create.");
   });
 });
+
+describe("filter sheet links and the Add app filter", () => {
+  it("links to a Websites rule filled from the category, and to the rule or a new category rule", async () => {
+    const { filterEditHref, filterWebsitesHref } = await import("@/lib/filter-sheet");
+    expect(filterWebsitesHref(group, category({ domains: ["a.com", "b.com"] }))).toBe(
+      "/rules/new?kind=domain&group=g1&name=Video%20for%20A%20child&domains=a.com%2Cb.com",
+    );
+    expect(filterWebsitesHref(group, category())).toBe("/rules/new?kind=domain&group=g1&name=Video%20for%20A%20child");
+    expect(filterWebsitesHref(group, { kind: "app", name: "Chat", rule: rule() })).toBe("");
+    expect(filterEditHref(group, category({ rule: rule({ id: "r7" }) }))).toBe("/rules/r7");
+    expect(filterEditHref(group, category())).toBe("/rules/new?kind=category&target=7&group=g1");
+  });
+
+  it("creates an app rule always on, or scheduled overnight", async () => {
+    const { addAppCopy, createAppRule } = await import("@/lib/filter-sheet");
+    const bodies: unknown[] = [];
+    const mutate = (run: (request: never) => Promise<unknown>) =>
+      run(((path: string, init: { body: unknown }) => {
+        bodies.push({ path, ...init });
+        return Promise.resolve({});
+      }) as never);
+    await createAppRule(mutate, group, { id: 3, name: "Chat" }, 3, "always");
+    await createAppRule(mutate, group, undefined, 4, "scheduled");
+    expect(bodies).toEqual([
+      { path: "/api/v1/rules", method: "POST", body: { name: "Chat for A child", kind: "app", scope: "group", groupIds: ["g1"], targetIds: [3], mode: "always" } },
+      {
+        path: "/api/v1/rules",
+        method: "POST",
+        body: {
+          name: "App for A child",
+          kind: "app",
+          scope: "group",
+          groupIds: ["g1"],
+          targetIds: [4],
+          mode: "scheduled",
+          windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }],
+        },
+      },
+    ]);
+    expect(addAppCopy(group).body).toBe("Blocks an app for A child.");
+  });
+});

@@ -119,3 +119,58 @@ export async function applyFilterAction(
   }
   throw new Error("Nothing to create.");
 }
+
+/** "Block its websites": a new Websites rule for this group, named and filled from the category. */
+export function filterWebsitesHref(group: Pick<Group, "id" | "name">, state: CategorySheetState): string {
+  if (state.kind !== "category") return "";
+  const domains = state.domains.length ? `&domains=${encodeURIComponent(state.domains.join(","))}` : "";
+  return `/rules/new?kind=domain&group=${group.id}&name=${encodeURIComponent(filterRuleName(group, state))}${domains}`;
+}
+
+/** "Edit rule and schedule": the rule's own page, or a new category rule for this group. */
+export function filterEditHref(group: Pick<Group, "id">, state: CategorySheetState): string {
+  if (state.rule) return `/rules/${state.rule.id}`;
+  return `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`;
+}
+
+/** What adding an app filter to a group says. */
+export function addAppCopy(group: Pick<Group, "name">) {
+  return {
+    title: "Add app filter",
+    body: `Blocks an app for ${group.name}.`,
+    app: "App",
+    search: "Search catalog",
+    picker: "DPI application",
+    pick: "Select…",
+    enforcement: "Enforcement",
+    always: "Always",
+    scheduled: "Scheduled",
+    cancel: "Cancel",
+    create: "Create policy",
+    loadFailed: "Could not load the DPI catalog.",
+  } as const;
+}
+
+/** Block an app for a group, always or overnight every day; the store reports a failure itself. */
+export function createAppRule(
+  mutate: (run: (request: ApiRequest) => Promise<unknown>) => Promise<unknown>,
+  group: Pick<Group, "id" | "name">,
+  app: { id: number; name: string } | undefined,
+  appId: number,
+  mode: "always" | "scheduled",
+) {
+  return mutate((send) =>
+    send("/api/v1/rules", {
+      method: "POST",
+      body: {
+        name: `${app?.name ?? "App"} for ${group.name}`.slice(0, 60),
+        kind: "app",
+        scope: "group",
+        groupIds: [group.id],
+        targetIds: [appId],
+        mode,
+        ...(mode === "scheduled" ? { windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }] } : {}),
+      },
+    }),
+  );
+}

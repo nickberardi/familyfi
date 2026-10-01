@@ -3,20 +3,42 @@
 import { use, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { FAMILYFI_POLICY_PREFIX, MAX_POLICY_NAME, rulePolicyNames } from "@/lib/policy-names";
-import { overlapNotices, ruleWritePlan, type RuleDraft, type RuleWrite } from "@/lib/rule-writes";
+import { request } from "@/lib/api";
+import { FAMILYFI_POLICY_PREFIX, MAX_POLICY_NAME } from "@/lib/policy-names";
+import { CATALOG_RESULTS_SHOWN, catalogCopy, catalogFamiliar, catalogMatches, searchCatalog, type CatalogItem } from "@/lib/rule-catalog";
 import {
-  CURATED_CATEGORY_SLOTS,
-  catalogLabel,
-  MAX_RULE_NAME,
-  MAX_RULE_WINDOWS,
-  MAX_WINDOW_NAME,
-  normalizeDomain,
-  type Rule,
-  type RuleKind,
-  type RuleWindow,
-} from "@/lib/rules";
+  KIND_NOTE,
+  RULE_EDITOR_COPY as COPY,
+  RULE_KINDS as KINDS,
+  addDomain as addDomainTo,
+  addWindow,
+  blankDraft,
+  canAddWindow,
+  changeKind,
+  changeMode,
+  deleteRule,
+  deleteRuleCopy,
+  fromRule,
+  managedNetworks as managedNetworksOf,
+  removeDomain,
+  removeWindow,
+  ruleEditorBack,
+  ruleEditorParams,
+  ruleEditorState,
+  saveRule,
+  toggleRuleGroup,
+  toggleRuleNetwork,
+  toggleWindowDay,
+  undoRemoveWindow,
+  updateWindow,
+  validateRuleDraft,
+  windowTimeLabels,
+  windowTitle,
+  type EditWindow,
+  type EditorDraft as Draft,
+} from "@/lib/rule-editor";
+import type { RuleWrite } from "@/lib/rule-writes";
+import { CURATED_CATEGORY_SLOTS, catalogLabel, MAX_RULE_NAME, MAX_WINDOW_NAME, type Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { CategoryGlyph } from "@/components/ui/CategoryGlyph";
@@ -37,75 +59,6 @@ type Search = Promise<{
 }>;
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
-const KINDS: { value: RuleKind; label: string }[] = [
-  { value: "internet", label: "All internet" },
-  { value: "category", label: "Categories" },
-  { value: "app", label: "Apps" },
-  { value: "domain", label: "Websites" },
-];
-const KIND_NOTE: Record<RuleKind, string> = {
-  internet: "Every site and app on every device in the chosen groups.",
-  category: "Only this category. Everything else stays on.",
-  app: "Only these apps, matched by the gateway’s app detection. Everything else stays on.",
-  domain: "Only these websites and their subdomains. Everything else stays on.",
-};
-
-/** A window being edited: `key` tells rows apart before a new window has an id. */
-type EditWindow = RuleWindow & { key: string; removed?: boolean };
-type Draft = Omit<RuleDraft, "windows"> & { scope: "group" | "network"; networkIds: string[]; enabled: boolean; windows: EditWindow[] };
-
-let nextKey = 0;
-const keyed = (window: RuleWindow): EditWindow => ({ ...window, key: window.id ?? `new-${nextKey++}` });
-
-function fromRule(rule: Rule): Draft {
-  return {
-    id: rule.id,
-    name: rule.name,
-    useGeneratedName: rule.useGeneratedName,
-    kind: rule.kind,
-    scope: rule.scope,
-    targetIds: [...rule.targetIds],
-    domains: [...rule.domains],
-    groupIds: [...rule.groupIds],
-    networkIds: [...rule.networkIds],
-    enabled: rule.enabled,
-    mode: rule.mode,
-    windows: rule.windows.map(keyed),
-  };
-}
-
-function blankDraft(
-  kind: RuleKind,
-  groupId: string | undefined,
-  target: number | undefined,
-  prefill: { name?: string; domains?: string } = {},
-): Draft {
-  const scheduled = kind === "internet";
-  const domains = kind === "domain" && prefill.domains ? prefill.domains.split(",").map(normalizeDomain).filter((item): item is string => Boolean(item)) : [];
-  return {
-    id: "",
-    name: (prefill.name ?? "").slice(0, MAX_RULE_NAME),
-    useGeneratedName: false,
-    kind,
-    scope: "group",
-    targetIds: kind === "category" && target !== undefined ? [target] : [],
-    domains: [...new Set(domains)],
-    groupIds: groupId ? [groupId] : [],
-    networkIds: [],
-    enabled: true,
-    mode: scheduled ? "scheduled" : "always",
-    windows: scheduled ? [keyed({ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" })] : [],
-  };
-}
-
-/** The draft as it would be saved: removed windows dropped. */
-function live(draft: Draft): RuleDraft {
-  return {
-    ...draft,
-    windows: draft.mode === "scheduled" ? draft.windows.filter((window) => !window.removed).map(({ id, name, days, start, end }) => ({ id, name, days, start, end })) : [],
-  };
-}
 
 export function RuleEditorPage({ params, searchParams }: { params?: Params; searchParams: Search }) {
   const id = params ? use(params).id : null;
@@ -114,19 +67,13 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
   const rule = id ? rules.find((item) => item.id === id) : undefined;
   if (id && !rule) {
     if (loading) return null;
-    return <p className="p-6 text-[14px] text-[var(--ff-muted)]">Rule not found.</p>;
+    return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{COPY.notFound}</p>;
   }
-  const kind = KINDS.some((item) => item.value === one(search.kind)) ? (one(search.kind) as RuleKind) : "internet";
-  const target = one(search.target) ? Number(one(search.target)) : undefined;
   return (
     <RuleEditor
       key={rule?.id ?? "new"}
       saved={rule ?? null}
-      initial={
-        rule
-          ? fromRule(rule)
-          : blankDraft(kind, one(search.group), Number.isFinite(target) ? target : undefined, { name: one(search.name), domains: one(search.domains) })
-      }
+      initial={rule ? fromRule(rule) : blankDraft(ruleEditorParams(search))}
       returnGroup={one(search.group) ?? null}
     />
   );
@@ -134,102 +81,48 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
 
 function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initial: Draft; returnGroup: string | null }) {
   const router = useRouter();
-  const { groups, unifi, mutate, busy } = useAppData();
+  const { groups, unifi, store, busy } = useAppData();
   const [draft, setDraft] = useState<Draft>(initial);
   const [error, setError] = useState("");
   const [domainDraft, setDomainDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const set = (patch: Partial<Draft>) => {
+  const edit = (next: (current: Draft) => Draft) => {
     setError("");
-    setDraft((current) => ({ ...current, ...patch }));
+    setDraft(next);
   };
-  const setWindow = (key: string, patch: Partial<EditWindow>) =>
-    set({ windows: draft.windows.map((window) => (window.key === key ? { ...window, ...patch } : window)) });
+  const set = (patch: Partial<Draft>) => edit((current) => ({ ...current, ...patch }));
+  const setWindow = (key: string, patch: Partial<Pick<EditWindow, "name" | "start" | "end">>) => edit((current) => updateWindow(current, key, patch));
 
-  const back = returnGroup ? `/rules?group=${returnGroup}` : "/rules";
-  const backLabel = returnGroup ? `Rules for ${groups.find((group) => group.id === returnGroup)?.name ?? "this group"}` : "All rules";
-  const current = live(draft);
-  const liveWindows = draft.windows.filter((window) => !window.removed);
-  const scheduled = draft.mode === "scheduled";
-  const policyNames = rulePolicyNames({ ...current, id: saved?.id ?? "new0" });
-  const writes = ruleWritePlan(saved ? live(fromRule(saved)) : null, { ...current, id: saved?.id ?? "new0" });
-  const overlaps = scheduled ? overlapNotices(liveWindows) : [];
-  const dirty = !saved || JSON.stringify(current) !== JSON.stringify(live(fromRule(saved)));
-  const managedNetworks = (unifi?.networks ?? []).filter(
-    (network) => unifi?.manageAllNetworks || unifi?.managedNetworkIds.includes(network.id),
-  );
-
-  function validate(): string | null {
-    if (!draft.name.trim()) return "Give the rule a name.";
-    if (draft.scope === "group" && draft.groupIds.length === 0) return "Pick at least one person or thing it applies to.";
-    if (draft.scope === "network" && draft.networkIds.length === 0) return "Pick at least one network.";
-    if (draft.kind === "domain" && draft.domains.length === 0) return "Add at least one website.";
-    if ((draft.kind === "app" || draft.kind === "category") && draft.targetIds.length === 0) {
-      return draft.kind === "app" ? "Pick at least one app." : "Pick at least one category.";
-    }
-    if (scheduled && liveWindows.length === 0) return "Add at least one window.";
-    if (scheduled && liveWindows.some((window) => window.days.length === 0)) return "Each window needs at least one day.";
-    if (scheduled && liveWindows.some((window) => window.start === window.end)) return "A window cannot start and end at the same time.";
-    return null;
-  }
+  const { href: back, label: backLabel } = ruleEditorBack(returnGroup, groups);
+  const { title, summary, scheduled, windows: liveWindows, policyNames, writes, overlaps, dirty } = ruleEditorState(draft, saved);
+  const managedNetworks = managedNetworksOf(unifi);
 
   async function save() {
     if (busy) return;
-    const problem = validate();
+    const problem = validateRuleDraft(draft);
     if (problem) {
       setError(problem);
       return;
     }
-    const body = {
-      name: current.name.trim(),
-      useGeneratedName: current.useGeneratedName,
-      groupIds: draft.scope === "group" ? current.groupIds : undefined,
-      networkIds: draft.scope === "network" ? draft.networkIds : undefined,
-      targetIds: draft.kind === "category" || draft.kind === "app" ? current.targetIds : undefined,
-      domains: draft.kind === "domain" ? current.domains : undefined,
-      mode: current.mode,
-      windows: current.windows,
-    };
-    const result = await mutate(
-      () =>
-        saved
-          ? api<{ rule: Rule }>(`/api/v1/rules/${saved.id}`, { method: "PATCH", body: JSON.stringify(body) })
-          : api<{ rule: Rule }>("/api/v1/rules", {
-              method: "POST",
-              body: JSON.stringify({ ...body, kind: draft.kind, scope: draft.scope, enabled: true }),
-            }),
-      undefined,
-      { notice: `${body.name} ${saved ? "saved" : "created"}. FamilyFi writes it to the gateway next.` },
-    );
+    const result = await saveRule(store.mutate, draft, saved);
     if (result?.rule) router.push(back);
   }
 
   async function remove() {
     if (!saved) return;
-    const result = await mutate(
-      async () => ({ ...(await api<object>(`/api/v1/rules/${saved.id}`, { method: "DELETE" })), removedRuleId: saved.id }),
-      undefined,
-      { notice: `${saved.name} deleted. Its UniFi policies are removed on the next reconcile.` },
-    );
+    const result = await deleteRule(store.mutate, saved);
     if (result) router.push(back);
   }
 
   function addDomain() {
-    const domain = normalizeDomain(domainDraft);
-    if (!domain) {
-      setError(`“${domainDraft.trim()}” is not a website domain.`);
+    const added = addDomainTo(draft, domainDraft);
+    if (added.error) {
+      setError(added.error);
       return;
     }
-    if (!draft.domains.includes(domain)) set({ domains: [...draft.domains, domain] });
+    set({ domains: added.draft.domains });
     setDomainDraft("");
   }
-
-  const title = draft.name.trim() || saved?.name || "New rule";
-  const summary = [
-    KINDS.find((item) => item.value === draft.kind)!.label,
-    scheduled ? `${liveWindows.length} ${liveWindows.length === 1 ? "window" : "windows"}` : "always",
-    `${policyNames.length} UniFi ${policyNames.length === 1 ? "policy" : "policies"}`,
-  ].join(" · ");
 
   return (
     <>
@@ -237,7 +130,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
         title={title}
         sub={summary}
         onAction={() => void save()}
-        actionLabel={saved ? "Save" : "Create rule"}
+        actionLabel={saved ? COPY.save : COPY.create}
         secondary={
           saved ? (
             <button
@@ -246,7 +139,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
               style={{ background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }}
               onClick={() => setConfirmDelete(true)}
             >
-              Delete rule…
+              {COPY.deleteRule}
             </button>
           ) : null
         }
@@ -262,7 +155,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
           <Link href={back} className="text-[14px] font-semibold text-[var(--ff-accent)]">
             ‹ {backLabel}
           </Link>
-          {saved && dirty ? <span className="text-[14px] text-[var(--ff-paused)]">Unsaved changes</span> : null}
+          {saved && dirty ? <span className="text-[14px] text-[var(--ff-paused)]">{COPY.unsaved}</span> : null}
         </div>
         {error ? (
           <p role="alert" className="rounded-[9px] px-3 py-2 text-[14px]" style={{ background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }}>
@@ -270,22 +163,22 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
           </p>
         ) : null}
 
-        <Section title="Name" note="What your household calls it, and what UniFi’s policy table shows.">
+        <Section title={COPY.name.title} note={COPY.name.note}>
           <label className="flex flex-col gap-1.5 text-[14px] font-semibold text-[var(--ff-ink-3)]">
-            Rule name
-            <TextField label="Rule name" value={draft.name} onChange={(name) => set({ name })} placeholder="e.g. School nights" maxLength={MAX_RULE_NAME} />
+            {COPY.name.label}
+            <TextField label={COPY.name.label} value={draft.name} onChange={(name) => set({ name })} placeholder={COPY.name.placeholder} maxLength={MAX_RULE_NAME} />
           </label>
           <div className="rounded-[9px] bg-[var(--ff-field-soft)] p-3">
             <div className="flex items-baseline gap-2">
               <span className="flex-1 text-[14px] font-semibold">
-                {policyNames.length > 1 ? "Names in UniFi · one policy per window" : "Name in UniFi"}
+                {policyNames.length > 1 ? COPY.policyNames.many : COPY.policyNames.one}
               </span>
               <button
                 type="button"
                 className="text-[14px] font-semibold text-[var(--ff-accent)]"
                 onClick={() => set({ useGeneratedName: !draft.useGeneratedName })}
               >
-                {draft.useGeneratedName ? "Use rule name" : "Use generated name"}
+                {draft.useGeneratedName ? COPY.policyNames.useRuleName : COPY.policyNames.useGenerated}
               </button>
             </div>
             <ul className="mt-2 flex flex-col gap-1">
@@ -302,33 +195,20 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
               ))}
             </ul>
             <p className="mt-2 text-[14px] leading-5 text-[var(--ff-ink-2)]">
-              {policyNames.length > 1
-                ? "Rule name, then the window name. The FamilyFi prefix is fixed, so administrators can tell FamilyFi’s policies apart."
-                : "Follows the rule name. With a second window each policy gets the window’s name on the end."}
+              {policyNames.length > 1 ? COPY.policyNames.manyNote : COPY.policyNames.oneNote}
             </p>
           </div>
         </Section>
 
-        <Section title="What it blocks" note={KIND_NOTE[draft.kind]}>
+        <Section title={COPY.blocks.title} note={KIND_NOTE[draft.kind]}>
           <Segmented
-            name="What it blocks"
+            name={COPY.blocks.title}
             grow
             value={draft.kind}
             segments={KINDS.map((item) => ({ ...item, disabled: Boolean(saved) && item.value !== draft.kind }))}
-            onChange={(kind) =>
-              set({
-                kind,
-                scope: kind === "internet" ? "group" : draft.scope,
-                mode: kind === "internet" ? "scheduled" : draft.mode,
-                targetIds: [],
-                windows:
-                  kind === "internet" && draft.windows.every((window) => window.removed)
-                    ? [...draft.windows, keyed({ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" })]
-                    : draft.windows,
-              })
-            }
+            onChange={(kind) => edit((current) => changeKind(current, kind))}
           />
-          {saved ? <p className="text-[14px] text-[var(--ff-ink-2)]">A saved rule keeps what it blocks. Make a new rule to block something else.</p> : null}
+          {saved ? <p className="text-[14px] text-[var(--ff-ink-2)]">{COPY.blocks.savedKind}</p> : null}
           {draft.kind === "category" || draft.kind === "app" ? (
             <CatalogPicker key={draft.kind} kind={draft.kind} targetIds={draft.targetIds} onChange={(targetIds) => set({ targetIds })} />
           ) : null}
@@ -342,43 +222,35 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
                       type="button"
                       aria-label={`Remove ${domain}`}
                       className="text-[var(--ff-danger)]"
-                      onClick={() => set({ domains: draft.domains.filter((item) => item !== domain) })}
+                      onClick={() => edit((current) => removeDomain(current, domain))}
                     >
                       ×
                     </button>
                   </span>
                 ))}
                 <div className="min-w-[180px] flex-1">
-                  <TextField label="Add a website" value={domainDraft} onChange={setDomainDraft} onSubmit={addDomain} placeholder="Add a domain, then Enter" mono />
+                  <TextField label={COPY.domains.label} value={domainDraft} onChange={setDomainDraft} onSubmit={addDomain} placeholder={COPY.domains.placeholder} mono />
                 </div>
               </div>
               <p className="text-[14px] leading-5 text-[var(--ff-ink-2)]">
-                Subdomains are included. The gateway matches websites by their DNS lookups, so a device using encrypted DNS can get around this.
+                {COPY.domains.note}
               </p>
             </div>
           ) : null}
         </Section>
 
-        <Section title="When" note="Each window is its own UniFi policy with one schedule. Windows can cross midnight.">
+        <Section title={COPY.when.title} note={COPY.when.note}>
           <Segmented
-            name="When"
+            name={COPY.when.title}
             value={draft.mode}
             segments={[
-              { value: "always", label: "Always" },
-              { value: "scheduled", label: "Scheduled" },
+              { value: "always", label: COPY.when.always },
+              { value: "scheduled", label: COPY.when.scheduled },
             ]}
-            onChange={(mode) =>
-              set({
-                mode,
-                windows:
-                  mode === "scheduled" && liveWindows.length === 0
-                    ? [...draft.windows, keyed({ name: "", days: EVERY_DAY, start: "21:00", end: "07:00" })]
-                    : draft.windows,
-              })
-            }
+            onChange={(mode) => edit((current) => changeMode(current, mode))}
           />
           {!scheduled ? (
-            <p className="text-[14px] text-[var(--ff-ink-2)]">Blocked all day, every day. One UniFi policy.</p>
+            <p className="text-[14px] text-[var(--ff-ink-2)]">{COPY.when.alwaysNote}</p>
           ) : (
             <>
               <RuleBar rule={{ kind: draft.kind, mode: "scheduled", windows: liveWindows }} />
@@ -388,17 +260,17 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
                   return (
                     <div key={window.key} className="flex items-center gap-2 rounded-[9px] bg-[var(--ff-field-soft)] px-3 py-2 text-[14px]">
                       <span className="flex-1">
-                        <span className="line-through">{window.name || "Window"}</span> · removed on save.
+                        <span className="line-through">{window.name || "Window"}</span> · {COPY.when.removed}
                       </span>
-                      <button type="button" className="font-semibold text-[var(--ff-accent)]" onClick={() => setWindow(window.key, { removed: false })}>
-                        Undo
+                      <button type="button" className="font-semibold text-[var(--ff-accent)]" onClick={() => edit((current) => undoRemoveWindow(current, window.key))}>
+                        {COPY.when.undo}
                       </button>
                     </div>
                   );
                 }
                 return (
                   <fieldset key={window.key} className="m-0 flex flex-col gap-2.5 rounded-[9px] border border-[var(--ff-hairline-card)] p-3">
-                    <legend className="sr-only">{window.name || `Window ${index + 1}`}</legend>
+                    <legend className="sr-only">{windowTitle(window, index)}</legend>
                     <div className="flex items-center gap-2">
                       <div className="min-w-0 flex-1">
                         <TextField
@@ -409,70 +281,62 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
                           maxLength={MAX_WINDOW_NAME}
                         />
                       </div>
-                      {saved && !window.id ? <span className="flex-none text-[14px] text-[var(--ff-on)]">New · adds 1 policy</span> : null}
+                      {saved && !window.id ? <span className="flex-none text-[14px] text-[var(--ff-on)]">{COPY.when.newWindow}</span> : null}
                       {liveWindows.length > 1 ? (
                         <button
                           type="button"
                           aria-label={`Remove ${window.name || `window ${index + 1}`}`}
                           className="flex h-7 w-7 flex-none items-center justify-center rounded-[6px] text-[17px] text-[var(--ff-danger)]"
-                          onClick={() =>
-                            window.id
-                              ? setWindow(window.key, { removed: true })
-                              : set({ windows: draft.windows.filter((item) => item.key !== window.key) })
-                          }
+                          onClick={() => edit((current) => removeWindow(current, window.key))}
                         >
                           ×
                         </button>
                       ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <TimeField label={draft.kind === "internet" ? "Offline" : "Blocked"} value={window.start} onChange={(start) => setWindow(window.key, { start })} />
-                      <TimeField label={draft.kind === "internet" ? "Back on" : "Until"} value={window.end} onChange={(end) => setWindow(window.key, { end })} />
+                      <TimeField label={windowTimeLabels(draft.kind).start} value={window.start} onChange={(start) => setWindow(window.key, { start })} />
+                      <TimeField label={windowTimeLabels(draft.kind).end} value={window.end} onChange={(end) => setWindow(window.key, { end })} />
                       <DayPicker
                         days={window.days}
-                        onToggle={(day) =>
-                          setWindow(window.key, {
-                            days: window.days.includes(day) ? window.days.filter((item) => item !== day) : [...window.days, day].sort(),
-                          })
-                        }
+                        onToggle={(day) => edit((current) => toggleWindowDay(current, window.key, day))}
                       />
                     </div>
                     {liveWindows.length === 1 ? (
-                      <p className="text-[14px] text-[var(--ff-ink-2)]">A scheduled rule needs at least one window. To remove it entirely, delete the rule.</p>
+                      <p className="text-[14px] text-[var(--ff-ink-2)]">{COPY.when.lastWindow}</p>
                     ) : null}
                   </fieldset>
                 );
               })}
               {overlaps.length ? (
                 <p role="status" className="rounded-[9px] bg-[var(--ff-paused-fill)] px-3 py-2 text-[14px] leading-5">
-                  {overlaps.join(" ")} Both block while they overlap; access comes back when the later one ends.
+                  {overlaps.join(" ")} {COPY.when.overlap}
                 </p>
               ) : null}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  disabled={liveWindows.length >= MAX_RULE_WINDOWS}
+                  disabled={!canAddWindow(draft)}
                   className="text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
-                  onClick={() => set({ windows: [...draft.windows, keyed({ name: "", days: [1, 2, 3, 4, 5], start: "15:00", end: "18:00" })] })}
+                  onClick={() => edit(addWindow)}
                 >
-                  + Add window
+                  {COPY.when.add}
                 </button>
-                <span className="text-[14px] text-[var(--ff-ink-2)]">Each window adds one UniFi policy</span>
+                <span className="text-[14px] text-[var(--ff-ink-2)]">{COPY.when.addNote}</span>
               </div>
             </>
           )}
         </Section>
 
-        <Section title="Applies to" note="People and things. One rule can cover several.">
+        <Section title={COPY.appliesTo.title} note={COPY.appliesTo.note}>
           {managedNetworks.length ? (
             <Segmented
-              name="Applies to"
+              name={COPY.appliesTo.title}
               value={draft.scope}
               segments={[
-                { value: "group", label: "People and things", disabled: Boolean(saved) && draft.scope !== "group" },
+                { value: "group", label: COPY.appliesTo.groups, disabled: Boolean(saved) && draft.scope !== "group" },
                 {
                   value: "network",
-                  label: "Whole networks",
+                  label: COPY.appliesTo.networks,
                   disabled: draft.kind === "internet" || (Boolean(saved) && draft.scope !== "network"),
                 },
               ]}
@@ -480,19 +344,17 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
             />
           ) : null}
           {draft.kind === "internet" ? (
-            <p className="text-[14px] text-[var(--ff-ink-2)]">
-              All internet can&rsquo;t be blocked for a whole network, which would take every device offline. Choose the people and things it applies to.
-            </p>
+            <p className="text-[14px] text-[var(--ff-ink-2)]">{COPY.appliesTo.internetNote}</p>
           ) : null}
           {draft.scope === "group" ? (
-            <ChipGroup label="Groups">
+            <ChipGroup label={COPY.appliesTo.groupsLabel}>
               {groups.map((group) => {
                 const on = draft.groupIds.includes(group.id);
                 return (
                   <Chip
                     key={group.id}
                     on={on}
-                    onClick={() => set({ groupIds: on ? draft.groupIds.filter((id) => id !== group.id) : [...draft.groupIds, group.id] })}
+                    onClick={() => edit((current) => toggleRuleGroup(current, group.id))}
                   >
                     {group.name}
                   </Chip>
@@ -500,14 +362,14 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
               })}
             </ChipGroup>
           ) : (
-            <ChipGroup label="Networks">
+            <ChipGroup label={COPY.appliesTo.networksLabel}>
               {managedNetworks.map((network) => {
                 const on = draft.networkIds.includes(network.id);
                 return (
                   <Chip
                     key={network.id}
                     on={on}
-                    onClick={() => set({ networkIds: on ? draft.networkIds.filter((id) => id !== network.id) : [...draft.networkIds, network.id] })}
+                    onClick={() => edit((current) => toggleRuleNetwork(current, network.id))}
                   >
                     {network.name}
                   </Chip>
@@ -517,7 +379,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
           )}
         </Section>
 
-        <Section title="What FamilyFi will write" note="Applied on the next reconcile. Your own UniFi policies are never touched.">
+        <Section title={COPY.writes.title} note={COPY.writes.note}>
           <Writes writes={writes} />
         </Section>
 
@@ -535,12 +397,9 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
           >
             <div className="flex flex-col gap-2 p-5">
               <h2 id="delete-rule-title" className="text-[17px] font-bold tracking-tight">
-                Delete “{saved.name}”?
+                {deleteRuleCopy(saved).title}
               </h2>
-              <p className="text-[14px] leading-5 text-[var(--ff-ink-2)]">
-                Removes {saved.policyNames.length === 1 ? "its UniFi policy" : `all ${saved.policyNames.length} of its UniFi policies`} on the next
-                reconcile, and discards unsaved edits. Other rules are not affected. This can’t be undone.
-              </p>
+              <p className="text-[14px] leading-5 text-[var(--ff-ink-2)]">{deleteRuleCopy(saved).message}</p>
               <ul className="font-mono text-[14px] text-[var(--ff-ink-2)]">
                 {saved.policyNames.map((name) => (
                   <li key={name} className="line-through">
@@ -551,14 +410,14 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
             </div>
             <div className="flex border-t border-[var(--ff-hairline-card)]">
               <button type="button" className="flex-1 py-3 text-[14px] text-[var(--ff-ink-3)]" onClick={() => setConfirmDelete(false)}>
-                Cancel
+                {deleteRuleCopy(saved).cancel}
               </button>
               <button
                 type="button"
                 className="flex-1 border-l border-[var(--ff-hairline-card)] py-3 text-[14px] font-semibold text-[var(--ff-danger)]"
                 onClick={() => void remove()}
               >
-                Delete rule
+                {deleteRuleCopy(saved).confirm}
               </button>
             </div>
           </div>
@@ -646,28 +505,19 @@ function Writes({ writes }: { writes: RuleWrite[] }) {
   );
 }
 
-type CatalogItem = { id: number; name: string };
-
-/** Where each kind of rule finds what it can block: the gateway's own DPI catalogs. */
-const CATALOGS = {
-  category: { path: "/api/v1/dpi/categories", key: "categories", noun: "category", nouns: "categories" },
-  app: { path: "/api/v1/dpi/applications", key: "applications", noun: "app", nouns: "apps" },
-} as const;
-
 /**
  * The categories or apps a rule blocks, picked the way websites are: the box holds only
  * what is picked, and a search asks the gateway's catalog (`?filter=`) for matches to add.
  * Nothing is listed by hand, so whatever the gateway supports can be found.
  */
 function CatalogPicker({ kind, targetIds, onChange }: { kind: "category" | "app"; targetIds: number[]; onChange: (ids: number[]) => void }) {
-  const source = CATALOGS[kind];
+  const copy = catalogCopy(kind);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<{ query: string; items: CatalogItem[] }>({ query: "", items: [] });
   const [names, setNames] = useState<Map<number, string>>(new Map());
   const [error, setError] = useState("");
   const remember = (items: CatalogItem[]) => setNames((current) => new Map([...current, ...items.map((item) => [item.id, item.name] as const)]));
-  const fetchCatalog = (filter: string) =>
-    api<Record<string, CatalogItem[]>>(`${source.path}${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`).then((res) => res[source.key] ?? []);
+  const fetchCatalog = (filter: string) => searchCatalog(request, kind, filter);
 
   // A saved rule's picks need their names once.
   const [initial] = useState(targetIds);
@@ -696,11 +546,11 @@ function CatalogPicker({ kind, targetIds, onChange }: { kind: "category" | "app"
         .then((items) => {
           if (cancelled) return;
           remember(items);
-          setResults({ query: filter, items: items.slice(0, 30) });
+          setResults({ query: filter, items: items.slice(0, CATALOG_RESULTS_SHOWN) });
           setError("");
         })
         .catch(() => {
-          if (!cancelled) setError(`Couldn’t search the gateway’s ${source.nouns}.`);
+          if (!cancelled) setError(copy.failed);
         });
     }, 250);
     return () => {
@@ -711,13 +561,9 @@ function CatalogPicker({ kind, targetIds, onChange }: { kind: "category" | "app"
   }, [query]);
 
   const filter = query.trim();
-  // The gateway knows "Video" as "Media streaming", so a familiar name matches too.
-  const familiar =
-    kind === "category" && filter
-      ? CURATED_CATEGORY_SLOTS.filter((item) => item.label.toLowerCase().includes(filter.toLowerCase())).map((item) => ({ id: item.categoryId, name: item.catalogName }))
-      : [];
   const found = filter && results.query === filter ? results.items : [];
-  const matches = [...familiar, ...found.filter((item) => !familiar.some((known) => known.id === item.id))].filter((item) => !targetIds.includes(item.id));
+  // The gateway knows "Video" as "Media streaming", so a familiar name matches too.
+  const matches = catalogMatches(kind, filter, found, targetIds);
   const label = (id: number) => catalogLabel(kind, id, names);
   const slot = (id: number) => (kind === "category" ? CURATED_CATEGORY_SLOTS.find((item) => item.categoryId === id) : undefined);
   const add = (id: number) => {
@@ -741,18 +587,18 @@ function CatalogPicker({ kind, targetIds, onChange }: { kind: "category" | "app"
         })}
         <div className="min-w-[180px] flex-1">
           <TextField
-            label={`Search ${source.nouns}`}
+            label={copy.search}
             value={query}
             onChange={setQuery}
             onSubmit={() => {
               if (matches[0]) add(matches[0].id);
             }}
-            placeholder={`Search the gateway’s ${source.nouns}`}
+            placeholder={copy.placeholder}
           />
         </div>
       </div>
       {matches.length ? (
-        <ChipGroup label={`Matching ${source.nouns}`}>
+        <ChipGroup label={copy.matches}>
           {matches.map((item) => (
             <Chip key={item.id} on={false} tone="rule" onClick={() => add(item.id)}>
               {slot(item.id) ? <CategoryGlyph slot={slot(item.id)!.slot} size={13} /> : null}
@@ -760,12 +606,12 @@ function CatalogPicker({ kind, targetIds, onChange }: { kind: "category" | "app"
             </Chip>
           ))}
         </ChipGroup>
-      ) : filter && results.query === filter && !error && !familiar.length ? (
-        <p className="text-[14px] text-[var(--ff-ink-2)]">No {source.nouns} match “{filter}”.</p>
+      ) : filter && results.query === filter && !error && !catalogFamiliar(kind, filter).length ? (
+        <p className="text-[14px] text-[var(--ff-ink-2)]">{copy.none(filter)}</p>
       ) : null}
       {error ? <p className="text-[14px] text-[var(--ff-danger)]">{error}</p> : null}
       <p className="text-[14px] leading-5 text-[var(--ff-ink-2)]">
-        Search what the gateway can detect, and pick as many {source.nouns} as the rule should block.
+        {copy.note}
       </p>
     </div>
   );
