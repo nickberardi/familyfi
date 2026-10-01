@@ -79,10 +79,15 @@ export function updateGroup(mutate: Mutate, group: Group, draft: GroupEditDraft)
   });
 }
 
-/** Deletes a group; its devices become quarantined (Unassigned). */
-export function deleteGroup(mutate: Mutate, group: Pick<Group, "id">) {
+/**
+ * Deletes a group; its devices become quarantined (Unassigned). `onDeleted` runs once the server
+ * has deleted it and before it leaves the household, so a page showing the group can move away
+ * without ever drawing it as missing.
+ */
+export function deleteGroup(mutate: Mutate, group: Pick<Group, "id">, onDeleted?: () => void) {
   return mutate(async (send) => {
     const result = await send<{ change: { changeId: string } }>(`/api/v1/groups/${group.id}`, { method: "DELETE" });
+    onDeleted?.();
     return { ...result, removedGroupId: group.id };
   });
 }

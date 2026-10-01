@@ -90,8 +90,8 @@ export function GroupResolverCard({
   );
 
   return (
-    <View role="region" aria-label={COPY.title} style={[styles.card, { borderColor: ui.color("hairline-card"), backgroundColor: ui.color("card") }]} testID="group-resolver">
-      <Text role="heading" aria-level={2} style={[styles.title, { fontFamily: ui.font, color: ui.color("ink"), borderBottomColor: ui.color("hairline-card") }]}>
+    <View role="region" aria-labelledby="group-resolver-title" style={[styles.card, { borderColor: ui.color("hairline-card"), backgroundColor: ui.color("card") }]} testID="group-resolver">
+      <Text role="heading" aria-level={2} id="group-resolver-title" style={[styles.title, { fontFamily: ui.font, color: ui.color("ink"), borderBottomColor: ui.color("hairline-card") }]}>
         {COPY.title}
       </Text>
       <View style={styles.content}>

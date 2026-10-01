@@ -162,9 +162,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             type="button"
             className="self-start text-[14px] font-semibold text-[var(--ff-danger)]"
             onClick={() =>
-              void deleteGroup(store.mutate, group).then((result) => {
-                if (result) router.replace(kind === "family" ? "/family" : "/things");
-              })
+              void deleteGroup(store.mutate, group, () => router.replace(kind === "family" ? "/family" : "/things"))
             }
           >
             Delete group (devices become quarantined)

@@ -53,8 +53,9 @@ export function FilterSheetContent({
         <Text style={[text(13, 17.875), { color: ui.color("ink-3") }]}>{copy.body}</Text>
         {copy.windows.length ? (
           <View role="list">
-            {copy.windows.map((line) => (
-              <Text key={line} role="listitem" style={[text(13, 17.875), { color: ui.color("ink-2") }]}>
+            {/* A rule's windows in order; two can read the same, so the position is the key. */}
+            {copy.windows.map((line, index) => (
+              <Text key={index} role="listitem" style={[text(13, 17.875), { color: ui.color("ink-2") }]}>
                 {line}
               </Text>
             ))}

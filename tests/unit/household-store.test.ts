@@ -184,7 +184,12 @@ describe("household store", () => {
     await expect(createGroup(store.mutate, { kind: "family", name: "  ", familyRole: "child", monogram: "" })).resolves.toBeUndefined();
     await updateGroup(store.mutate, child, { name: "Sam", familyRole: "teen", monogram: "" });
     await assignDevice(store.mutate, { mac: "aa:bb" }, "group-child");
-    await deleteGroup(store.mutate, child);
+    // The page showing the group moves away while the group is still there, never drawing it as missing.
+    let presentWhenDeleted: boolean | undefined;
+    await deleteGroup(store.mutate, child, () => {
+      presentWhenDeleted = store.getState().groups.some((group) => group.id === "group-child");
+    });
+    expect(presentWhenDeleted).toBe(true);
     expect(store.getState().groups.map((group) => group.id)).not.toContain("group-child");
     expect(server.calls.filter((call) => call.method !== "GET").map((call) => [call.method, call.path, call.body])).toEqual([
       ["POST", "/api/v1/groups", { kind: "things", name: "Consoles", familyRole: undefined, monogram: "CO" }],
