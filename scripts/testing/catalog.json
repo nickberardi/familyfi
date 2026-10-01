@@ -122,6 +122,17 @@
         "display"
       ]
     },
+    "tests/unit/filter-sheet.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
+    },
+    "tests/unit/group-resolver.test.ts": {
+      "categories": [
+        "groups"
+      ]
+    },
     "tests/unit/group-actions.test.ts": {
       "categories": [
         "groups",

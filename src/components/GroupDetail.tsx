@@ -3,7 +3,8 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { request } from "@/lib/api";
+import { loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
 import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, type FamilyRole } from "@/lib/group-form";
 import { deleteGroup, updateGroup } from "@/lib/group-writes";
 import { internetWindowsForGroup } from "@/lib/rules";
@@ -90,7 +91,7 @@ function GroupEditForm({ group }: { group: Group }) {
 export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
   const router = useRouter();
   const { groups, devices, rules, household, store, reload, loading } = useAppData();
-  const [groupResolver, setGroupResolver] = useState<{ source: "doh" | "dhcp" | "unknown"; networks: { id: string; name: string; servers: string[]; reason: string | null }[]; reason: string | null } | null>(null);
+  const [groupResolver, setGroupResolver] = useState<GroupResolver | null>(null);
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
@@ -98,9 +99,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   // The effective source may be this group's DoH override or its devices' networks.
   useEffect(() => {
     const start = window.setTimeout(() => {
-      void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
-        .then((res) => setGroupResolver(res.resolver))
-        .catch(() => setGroupResolver(null));
+      void loadGroupResolver(request, id).then(setGroupResolver);
     }, 0);
     return () => window.clearTimeout(start);
   }, [id]);
@@ -131,9 +130,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             resolver={groupResolver}
             onChanged={() => {
               void reload();
-              void api<{ resolver: NonNullable<typeof groupResolver> }>(`/api/v1/groups/${id}/resolver`)
-                .then((res) => setGroupResolver(res.resolver))
-                .catch(() => setGroupResolver(null));
+              void loadGroupResolver(request, id).then(setGroupResolver);
             }}
           />
           <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
