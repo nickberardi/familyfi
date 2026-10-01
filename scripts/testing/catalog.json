@@ -116,6 +116,12 @@
         "groups"
       ]
     },
+    "tests/unit/category-marks.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
+    },
     "tests/unit/group-actions.test.ts": {
       "categories": [
         "groups",
