@@ -18,7 +18,7 @@ import { tokenOf, useUI } from "./UIContext";
 export function SectionLabel({ children }: { children: string }) {
   const ui = useUI();
   return (
-    <Text style={{ fontFamily: ui.font, fontSize: 11, lineHeight: 16, fontWeight: "600", letterSpacing: 0.55, textTransform: "uppercase", color: ui.color("ink-2") }}>
+    <Text style={{ fontFamily: ui.font, fontSize: 11, lineHeight: 16.5, fontWeight: "600", letterSpacing: 0.55, textTransform: "uppercase", color: ui.color("ink-2") }}>
       {children}
     </Text>
   );

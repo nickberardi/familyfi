@@ -130,6 +130,8 @@ export function cardMarks(slots: CategorySlotState[], { open, focus, more }: { o
   };
 }
 
+export type CardMarks = ReturnType<typeof cardMarks>;
+
 /** The "More" mark's words. */
 export function moreMarkLabels(more: boolean, total: number, hidden: number) {
   return {

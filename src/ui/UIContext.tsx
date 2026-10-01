@@ -22,6 +22,38 @@ export type UI = {
   font?: string;
   /** A decorative glyph; the label beside it carries the meaning. */
   Icon: ComponentType<{ name: IconName; size: number; color: string }>;
+  /** A single-line text field: the web's input, or the platform's own. */
+  TextField: ComponentType<UITextFieldProps>;
+  /** A choice of a few options side by side: the web's segmented control, or the platform's own. */
+  Segmented: ComponentType<UISegmentedProps<string>>;
+};
+
+export type UITextFieldProps = {
+  /** Its accessible name; a visible label sits above it, outside the field. */
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+  /** Return (Enter) submits, so a form works without a submit button of its own. */
+  onSubmit?: () => void;
+  disabled?: boolean;
+  /** For a URL: monospaced, no capitals or corrections. */
+  url?: boolean;
+  /** Capitals as typed, for a monogram. */
+  capitals?: boolean;
+  autoFocus?: boolean;
+  testID?: string;
+};
+
+export type UISegmentedProps<T extends string> = {
+  /** Its accessible name. */
+  name: string;
+  value: T;
+  segments: readonly { value: T; label: string; disabled?: boolean }[];
+  onChange: (next: T) => void;
+  disabled?: boolean;
+  testID?: string;
 };
 
 /** A pressed control's opacity: the web's `--ff-press-opacity`. */
