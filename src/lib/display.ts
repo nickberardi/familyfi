@@ -1,6 +1,10 @@
+import { WEEKDAYS, addCalendarDays, bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays, zonedParts } from "./clock";
 import type { IconName } from "./icons";
 import { internetState, type InternetWindow } from "./rule-windows";
 import type { Group } from "./types";
+
+// The clock helpers live in ./clock; every client still finds them here.
+export { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays };
 
 /*
  * Display copy and state shared by every surface. The native iOS app ports this module,
@@ -8,7 +12,6 @@ import type { Group } from "./types";
  * here reads the wall clock or the server's time zone: a function that needs the time
  * takes `now` and the household `timezone` from its caller.
  */
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export function accessLabel(access: string): string {
   if (access === "paused") return "Paused · all internet off";
@@ -21,13 +24,6 @@ export function accessColor(access: string): string {
   if (access === "paused") return "var(--ff-paused)";
   if (access === "blocked") return "var(--ff-accent)";
   return "var(--ff-on)";
-}
-
-export function minutesFromHhmm(value: string | null): number | null {
-  if (!value) return null;
-  const match = /^(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  return Number(match[1]) * 60 + Number(match[2]);
 }
 
 export function localNowPercent(timezone: string, now: Date): string {
@@ -125,14 +121,6 @@ export function formatHhmm(value: string): string {
   return minute === 0 ? `${twelve} ${period}` : `${twelve}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
-export function formatClock(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
 /** "Every day", "Mon–Fri", "Weekends", or the days listed, for the days a window starts on. */
 export function daysLabel(days: number[]): string {
   const unique = [...new Set(days)].sort((a, b) => a - b);
@@ -186,34 +174,6 @@ export function cardStateLabel(group: Group, windows: InternetWindow[], timezone
   }
 }
 
-export function bedtimeEndDays(days: number[], start: string, end: string): number[] {
-  const from = minutesFromHhmm(start);
-  const to = minutesFromHhmm(end);
-  if (from === null || to === null) return days;
-  if (from < to) return days;
-  return [...new Set(days.map((day) => (day + 1) % 7))];
-}
-
-export function nextClockOnDays(
-  timezone: string,
-  days: number[],
-  hhmm: string,
-  now: Date,
-): Date | null {
-  const minutes = minutesFromHhmm(hhmm);
-  if (minutes === null || days.length === 0) return null;
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  const start = zonedParts(now, timezone);
-  for (let offset = 0; offset < 8; offset++) {
-    const wall = addCalendarDays(start.year, start.month, start.day, offset);
-    const instant = zonedWallTimeToUtc(timezone, wall.year, wall.month, wall.day, hour, minute);
-    const seen = zonedParts(instant, timezone);
-    if (days.includes(seen.weekday) && instant.getTime() > now.getTime()) return instant;
-  }
-  return null;
-}
-
 /**
  * "today" / "tomorrow" / a weekday name, for a scheduled instant relative to `now` —
  * both compared as calendar dates in the household timezone, since a UTC-day boundary
@@ -230,52 +190,3 @@ export function relativeDayLabel(instant: Date, timezone: string, now: Date): st
   return WEEKDAYS[target.weekday] ?? "";
 }
 
-type ZonedParts = {
-  year: number;
-  month: number;
-  day: number;
-  weekday: number;
-  hour: number;
-  minute: number;
-};
-
-function zonedParts(date: Date, timeZone: string): ZonedParts {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
-  return {
-    year: Number(get("year")),
-    month: Number(get("month")),
-    day: Number(get("day")),
-    weekday: WEEKDAYS.indexOf(get("weekday") as (typeof WEEKDAYS)[number]),
-    hour: Number(get("hour")),
-    minute: Number(get("minute")),
-  };
-}
-
-function addCalendarDays(year: number, month: number, day: number, offset: number) {
-  const utc = new Date(Date.UTC(year, month - 1, day + offset));
-  return { year: utc.getUTCFullYear(), month: utc.getUTCMonth() + 1, day: utc.getUTCDate() };
-}
-
-function zonedWallTimeToUtc(
-  timeZone: string,
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-): Date {
-  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
-  const seen = zonedParts(new Date(utcGuess), timeZone);
-  const seenAsUtc = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute, 0);
-  return new Date(utcGuess - (seenAsUtc - utcGuess));
-}

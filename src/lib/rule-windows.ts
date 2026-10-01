@@ -1,4 +1,4 @@
-import { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays } from "./display";
+import { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays } from "./clock";
 
 /*
  * Recurring rule windows, and a group's internet state and day timeline built from them.
