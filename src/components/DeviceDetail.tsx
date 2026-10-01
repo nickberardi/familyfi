@@ -49,7 +49,7 @@ export function DeviceDetailPage({
         </Link>
         {!device ? (
           <div className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px] text-[14px]">
-            {loading ? "Loading device…" : error ? "Device details are unavailable right now." : "Device not found."}
+            {loading ? DEVICES_COPY.detailLoading : error ? DEVICES_COPY.detailUnavailable : DEVICES_COPY.detailNotFound}
           </div>
         ) : (
           <DeviceDetailContent device={device} group={group} networks={unifi?.networks ?? []} timezone={timezone} now={now} />
