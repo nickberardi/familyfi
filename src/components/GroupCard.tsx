@@ -3,16 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { cardMarks, categorySheet, categorySlotStates } from "@/lib/category-marks";
-import { appRulesForGroup, glyphForAppName, internetWindowsForGroup, parentFacingRuleLabel, type Rule } from "@/lib/rules";
-import { appMarkState, ruleActivelyBlocking, type UpstreamCategoryRow } from "@/lib/upstream";
+import { internetWindowsForGroup, type Rule } from "@/lib/rules";
+import type { UpstreamCategoryRow } from "@/lib/upstream";
 import type { Group } from "@/lib/types";
-import { AppMark, CategoryMark, MoreMark } from "@/ui/CategoryMarks";
 import { CategoryZone } from "@/ui/CategoryZone";
-import { SectionLabel } from "./FilterMarks";
+import { GroupCardMarks } from "@/ui/GroupCardMarks";
 import { FilterSheet, type FilterSheetState } from "./filters/FilterSheet";
 import { InternetZone } from "./InternetZone";
 import { GroupCardFrame } from "@/ui/GroupCardFrame";
-import { InternetMark } from "@/ui/InternetMark";
 
 export type CardAction = {
   label: string;
@@ -59,8 +57,8 @@ export function GroupCard({
   const now = new Date();
   const windows = internetWindowsForGroup(rules, group.id, now);
 
-  const { ordered, focused, shown, hidden } = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, focus, more });
-  const apps = appRulesForGroup(rules, group.id);
+  const marks = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, focus, more });
+  const { focused } = marks;
 
   const openOn = (slot?: string) => {
     if (slot) setFocus(slot);
@@ -104,46 +102,20 @@ export function GroupCard({
         </div>
       ) : null}
 
-      <div data-testid={`filter-marks-${group.id}`}>
-        {open ? (
-          <div className="px-[18px] pt-1 text-[11px] font-semibold tracking-[0.05em] text-[var(--ff-ink-2)] uppercase">
-            Other categories
-          </div>
-        ) : null}
-        <div className="flex flex-wrap items-start gap-3 px-[18px] pt-1 pb-3.5">
-          {open ? null : (
-            <>
-              <InternetMark group={group} windows={windows} timezone={timezone} now={now} onPress={() => openOn()} />
-              <span aria-hidden className="mt-0.5 mb-3.5 w-px self-stretch bg-[var(--ff-hairline-strong)]" />
-            </>
-          )}
-          {shown.map((item) => (
-            <span key={item.key} className="relative">
-              <CategoryMark item={item} onPress={() => openOn(item.key)} />
-            </span>
-          ))}
-          {hidden ? <MoreMark more={more} total={ordered.length} hidden={hidden} onPress={() => setMore(!more)} /> : null}
-        </div>
-        {open && apps.length ? (
-          <div className="border-t border-[var(--ff-hairline)] px-[18px] pt-2 pb-3.5">
-            <SectionLabel>App rules</SectionLabel>
-            <div className="flex flex-wrap gap-3 pt-2">
-              {apps.map((rule) => {
-                const name = parentFacingRuleLabel(rule, catalogNames);
-                return (
-                  <AppMark
-                    key={rule.id}
-                    label={name}
-                    glyph={glyphForAppName(name)}
-                    state={appMarkState(ruleActivelyBlocking(rule, timezone))}
-                    onPress={() => setSheet({ kind: "app", name, rule })}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-      </div>
+      <GroupCardMarks
+        group={group}
+        windows={windows}
+        timezone={timezone}
+        now={now}
+        rules={rules}
+        catalogNames={catalogNames}
+        open={open}
+        marks={marks}
+        more={more}
+        onOpen={openOn}
+        onToggleMore={() => setMore(!more)}
+        onApp={(rule, name) => setSheet({ kind: "app", name, rule })}
+      />
 
       {open ? (
         <ActionRow

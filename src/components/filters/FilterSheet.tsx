@@ -11,6 +11,7 @@ import { applyFilterAction, filterRuleName, filterSheetCopy } from "@/lib/filter
 import { useAppData } from "@/components/AppDataProvider";
 import type { Group } from "@/lib/types";
 import { NetworkCheckDetails } from "@/components/upstream/NetworkCheckDetails";
+import { FilterSheetContent } from "@/ui/FilterSheetContent";
 
 /** What a mark opens (`src/lib/category-marks.ts`). */
 export type FilterSheetState = CategorySheetState;
@@ -67,27 +68,12 @@ export function FilterSheet({
         style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex flex-col gap-2.5 p-5">
-          <h2 id="filter-sheet-title" className="text-[16px] font-bold tracking-tight">
-            {copy.heading}
-          </h2>
-          <p className="text-[13px] leading-snug" style={{ color: "var(--ff-ink-3)" }}>
-            {copy.body}
-          </p>
-          {copy.windows.length ? (
-            <ul className="text-[13px] leading-snug" style={{ color: "var(--ff-ink-2)" }}>
-              {copy.windows.map((line, index) => (
-                <li key={state.rule?.windows[index]?.id ?? index}>{line}</li>
-              ))}
-            </ul>
-          ) : null}
-          <NetworkCheckDetails check={upstream} />
-          {error ? (
-            <p className="text-[13px]" style={{ color: "var(--ff-danger)" }}>
-              {error}
-            </p>
-          ) : null}
-          {copy.action === "websites" ? (
+        <FilterSheetContent
+          copy={copy}
+          busy={busy}
+          error={error}
+          details={<NetworkCheckDetails check={upstream} />}
+          websitesAction={
             <Link
               href={websitesHref}
               className="mt-1 rounded-[9px] py-2.5 text-center text-[14px] font-semibold"
@@ -95,43 +81,23 @@ export function FilterSheet({
             >
               {copy.actionLabel}
             </Link>
-          ) : (
-            <>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void run()}
-                className="mt-1 rounded-[9px] py-2.5 text-center text-[14px] font-semibold disabled:opacity-50"
-                style={
-                  copy.action === "turnOff"
-                    ? { background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }
-                    : { background: "var(--ff-accent)", color: "var(--ff-ink-on-fill)" }
-                }
-              >
-                {copy.actionLabel}
-              </button>
-              <Link
-                href={
-                  state.rule
-                    ? `/rules/${state.rule.id}`
-                    : `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`
-                }
-                className="text-center text-[14px] font-semibold"
-                style={{ color: "var(--ff-accent)" }}
-              >
-                {copy.editLabel}
-              </Link>
-            </>
-          )}
-        </div>
-        <button
-          type="button"
-          className="w-full py-3 text-center text-[14px]"
-          style={{ borderTop: "1px solid var(--ff-hairline-card)", color: "var(--ff-ink-3)" }}
-          onClick={onClose}
-        >
-          {copy.cancel}
-        </button>
+          }
+          editLink={
+            <Link
+              href={
+                state.rule
+                  ? `/rules/${state.rule.id}`
+                  : `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`
+              }
+              className="text-center text-[14px] font-semibold"
+              style={{ color: "var(--ff-accent)" }}
+            >
+              {copy.editLabel}
+            </Link>
+          }
+          onAction={() => void run()}
+          onCancel={onClose}
+        />
       </div>
     </div>
   );

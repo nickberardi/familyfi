@@ -1,4 +1,6 @@
+import { TextField } from "@/components/ui/Controls";
 import { Icon } from "@/components/ui/Icon";
+import { Segmented } from "@/components/ui/Segmented";
 
 import type { UI } from "./UIContext";
 
@@ -8,4 +10,8 @@ export const defaultUI: UI = {
   shadow: (name) => `var(--ff-${`shadow-${name}`})`,
   font: "var(--ff-font)",
   Icon,
+  TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled, url }) => (
+    <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={url} />
+  ),
+  Segmented: ({ name, value, segments, onChange }) => <Segmented name={name} grow value={value} onChange={onChange} segments={segments} />,
 };

@@ -84,6 +84,8 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
     /** The link to the rule editor, under the button. */
     editLabel: state.rule ? "Edit rule and schedule" : "Schedule it instead",
     cancel: "Cancel",
+    /** A phone showing a cached household can't change the rule until it reconnects. */
+    stale: "Cached household — connect to FamilyFi to change this rule.",
   };
 }
 
