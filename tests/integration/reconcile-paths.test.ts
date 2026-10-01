@@ -36,10 +36,10 @@ function gatewayError(status: number, method: string) {
 }
 
 /** The gateway refuses to delete this one policy until the returned spy is restored. */
-function refuseDelete(client: MockUnifiClient, policyId: string | null) {
+function refuseDelete(client: MockUnifiClient, policyId: string | null, failure: unknown = gatewayError(500, "DELETE")) {
   const real = client.deletePolicy.bind(client);
   return vi.spyOn(client, "deletePolicy").mockImplementation(async (siteId, id) => {
-    if (id === policyId) throw gatewayError(500, "DELETE");
+    if (id === policyId) throw failure;
     return real(siteId, id);
   });
 }
@@ -581,6 +581,87 @@ describe("reconciler paths", () => {
       await runReconcileOnce();
       expect(client.state.policies.some((item) => item.id === policy.unifiPolicyId)).toBe(false);
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
+    });
+  });
+
+  // A client library can reject with a bare string; the run still records it as the error.
+  describe("a gateway that fails with something other than an Error", () => {
+    const failure = "gateway hung up";
+
+    it("records it on a quarantine policy whose create failed", async () => {
+      const client = fixtureUnifiClient();
+      vi.spyOn(client, "createPolicy").mockRejectedValue(failure);
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).toBe(ChangeStatus.partial);
+      expect((await prisma().appPolicy.findFirstOrThrow({ where: { ownerScope: "quarantine" } })).lastError).toBe(failure);
+    });
+
+    it("records it on a quarantine policy the gateway would not delete", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+      const policy = await prisma().appPolicy.findFirstOrThrow({ where: { ownerScope: "quarantine" }, orderBy: { id: "asc" } });
+      const group = await createFamilyGroup();
+      await prisma().device.updateMany({ data: { groupId: group.id, assignment: AssignmentState.assigned } });
+
+      refuseDelete(client, policy.unifiPolicyId, failure);
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).toBe(ChangeStatus.partial);
+      expect((await prisma().appPolicy.findUniqueOrThrow({ where: { id: policy.id } })).lastError).toBe(failure);
+    });
+
+    it("records it on a rule policy whose create failed", async () => {
+      const client = fixtureUnifiClient();
+      const { group } = await groupWithPolicy(client);
+      const rule = await prisma().rule.create({
+        data: { name: "Video", kind: RuleKind.category, groups: { create: [{ groupId: group.id }] }, targetIds: [4] },
+      });
+      vi.spyOn(client, "createPolicy").mockRejectedValue(failure);
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).toBe(ChangeStatus.partial);
+      expect((await prisma().rulePolicy.findFirstOrThrow({ where: { ruleId: rule.id } })).lastError).toBe(failure);
+    });
+
+    it("records it on a rule policy the gateway would not delete", async () => {
+      const client = fixtureUnifiClient();
+      const { group, rulePolicy } = await groupWithRule(client);
+      await prisma().ruleGroup.deleteMany({ where: { groupId: group.id } });
+
+      refuseDelete(client, rulePolicy.unifiPolicyId, failure);
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).toBe(ChangeStatus.partial);
+      expect((await prisma().rulePolicy.findUniqueOrThrow({ where: { id: rulePolicy.id } })).lastError).toBe(failure);
+    });
+
+    it("reports a partial run when an orphaned policy cannot be deleted", async () => {
+      const client = fixtureUnifiClient();
+      const { group, policy } = await groupWithPolicy(client);
+      await prisma().rulePolicy.delete({ where: { id: policy.id } });
+      await prisma().device.update({ where: { mac: MAC }, data: { groupId: null, assignment: AssignmentState.quarantined } });
+      await prisma().group.delete({ where: { id: group.id } });
+
+      refuseDelete(client, policy.unifiPolicyId, failure);
+      await runReconcileOnce();
+
+      const run = await lastRun();
+      expect(run.status).toBe(ChangeStatus.partial);
+      expect(run.error).toBe(failure);
+    });
+
+    it("fails the whole run with it when the gateway cannot be read", async () => {
+      const client = fixtureUnifiClient();
+      vi.spyOn(client, "listZones").mockRejectedValue(failure);
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+
+      const run = await lastRun();
+      expect(run.status).toBe(ChangeStatus.failed);
+      expect(run.error).toBe(failure);
     });
   });
 
