@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import { loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
-import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, type FamilyRole } from "@/lib/group-form";
+import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, rulesNeedDevice, type FamilyRole } from "@/lib/group-form";
 import { deleteGroup, updateGroup } from "@/lib/group-writes";
 import { internetWindowsForGroup } from "@/lib/rules";
 import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
@@ -137,15 +137,15 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
             <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">Devices</h2>
             {members.length === 0 ? (
               <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
-                No devices assigned.
-                {group.internetRuleIds.length || group.suspension.active ? (
+                {GROUP_DETAIL_COPY.noDevices}
+                {rulesNeedDevice(group) ? (
                   <>
                     {" "}
-                    Its rules cannot apply on UniFi until you{" "}
+                    {GROUP_DETAIL_COPY.rulesNeedDevice.before}{" "}
                     <Link href={`/devices?assign=${id}`} className="font-semibold text-[var(--ff-accent)]">
-                      assign a device
+                      {GROUP_DETAIL_COPY.rulesNeedDevice.link}
                     </Link>
-                    .
+                    {GROUP_DETAIL_COPY.rulesNeedDevice.after}
                   </>
                 ) : null}
               </p>

@@ -18,3 +18,11 @@ export function groupPageSummary(kind: Group["kind"], groups: Pick<Group, "kind"
     .filter(Boolean)
     .join(" · ");
 }
+
+/** An open card's links: the focused category's rule, and the action row under the marks. */
+export const GROUP_CARD_COPY = {
+  editRule: "Edit rule",
+  rules: "Rules",
+  details: "Details",
+  detailsLabel: (name: string) => `Details for ${name}`,
+} as const;

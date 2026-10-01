@@ -53,9 +53,8 @@ export function MarkButton({
   return (
     <Pressable role="button" aria-label={categoryMarkLabel(label, state)} onPress={onPress} testID={testID} style={styles.mark}>
       <View style={[styles.circle, { backgroundColor: fill }]}>{children}</View>
-      <Text style={[small, styles.label]} numberOfLines={1}>
-        {label}
-      </Text>
+      {/* Wraps across words in the 52px column, as the web's label does, rather than cutting off. */}
+      <Text style={[small, styles.label]}>{label}</Text>
       {/* Always rendered, even when wordless, so marks in a row keep one baseline. */}
       <Text style={[small, styles.word]}>{word || " "}</Text>
     </Pressable>
@@ -67,7 +66,7 @@ export function CategoryMarkGlyph({ item, size, color }: { item: CategorySlotSta
   const ui = useUI();
   if (item.slot) return <CategoryGlyph slot={item.slot.slot} size={size} color={color} />;
   if (item.icon) return <ui.Icon name={item.icon} size={size} color={color} />;
-  return <Text style={{ fontFamily: ui.font, fontSize: 9, lineHeight: 12, fontWeight: "700", color }}>{item.monogram}</Text>;
+  return <Text style={{ fontFamily: ui.font, fontSize: 9, lineHeight: 13.5, fontWeight: "700", color }}>{item.monogram}</Text>;
 }
 
 /** A category's mark, with its glyph in the state's ink. */
@@ -86,7 +85,7 @@ export function AppMark({ label, glyph, state, onPress }: { label: string; glyph
   const { ink } = useMarkColors(state);
   return (
     <MarkButton label={label} state={state} onPress={onPress}>
-      <Text style={{ fontFamily: ui.font, fontSize: 9, lineHeight: 12, fontWeight: "700", color: ink }}>{glyph}</Text>
+      <Text style={{ fontFamily: ui.font, fontSize: 9, lineHeight: 13.5, fontWeight: "700", color: ink }}>{glyph}</Text>
     </MarkButton>
   );
 }
@@ -99,7 +98,7 @@ export function MoreMark({ more, total, hidden, onPress }: { more: boolean; tota
   return (
     <Pressable role="button" aria-label={words.accessibilityLabel} onPress={onPress} style={styles.mark}>
       <View style={[styles.circle, styles.dashed, { borderColor: ui.color("control-line") }]}>
-        <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 14, fontWeight: "700", color: accent }}>{words.badge}</Text>
+        <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, fontWeight: "700", color: accent }}>{words.badge}</Text>
       </View>
       <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, color: accent }}>{words.word}</Text>
       <Text style={styles.word}> </Text>

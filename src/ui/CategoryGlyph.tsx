@@ -51,14 +51,15 @@ export function CategoryGlyph({ slot, size = 11, color }: { slot: GlyphSlot; siz
     );
   }
 
+  // Offsets are from inside the border on the web and natively alike, as main's CSS drew them.
   if (slot === "gaming") {
     const h = size * 0.65;
     const dot = size * 0.18;
-    const button = { position: "absolute" as const, width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color, top: (h - LINE * 2) / 2 - dot / 2 - 1 };
+    const button = { position: "absolute" as const, width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color, top: h / 2 - dot / 2 - 1 };
     return (
       <View aria-hidden style={{ width: size, height: h, borderRadius: 4, borderWidth: LINE, borderColor: color }}>
-        <View style={[button, { left: size * 0.18 - LINE }]} />
-        <View style={[button, { right: size * 0.18 - LINE }]} />
+        <View style={[button, { left: size * 0.18 }]} />
+        <View style={[button, { right: size * 0.18 }]} />
       </View>
     );
   }
