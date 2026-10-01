@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { windowTimes } from "@/lib/display";
-import { internetDayBands, localWeekday } from "@/lib/rule-windows";
-import { appRulesForGroup, glyphForAppName, internetWindowsForGroup, parentFacingRuleLabel, ruleDayBands, type Rule } from "@/lib/rules";
-import { appMarkState, categoryMarkStyle, ruleActivelyBlocking, type UpstreamCategoryRow } from "@/lib/upstream";
+import { cardMarks, categorySheet, categorySlotStates } from "@/lib/category-marks";
+import { appRulesForGroup, glyphForAppName, internetWindowsForGroup, parentFacingRuleLabel, type Rule } from "@/lib/rules";
+import { appMarkState, ruleActivelyBlocking, type UpstreamCategoryRow } from "@/lib/upstream";
 import type { Group } from "@/lib/types";
-import { Icon } from "./ui/Icon";
-import { DayTimeline, type TimelineBand } from "./DayTimeline";
-import { categorySheet, categorySlotStates, CategoryMarkGlyph, MarkButton, SectionLabel, type CategorySlotState } from "./FilterMarks";
+import { AppMark, CategoryMark, MoreMark } from "@/ui/CategoryMarks";
+import { CategoryZone } from "@/ui/CategoryZone";
+import { SectionLabel } from "./FilterMarks";
 import { FilterSheet, type FilterSheetState } from "./filters/FilterSheet";
 import { InternetZone } from "./InternetZone";
 import { GroupCardFrame } from "@/ui/GroupCardFrame";
@@ -21,11 +20,6 @@ export type CardAction = {
   onClick?: () => void;
   strong?: boolean;
 };
-
-/** Category marks on a closed card, before "More". */
-const CLOSED_MARKS = 4;
-/** Other-category marks on an open card, before "More". */
-const OPEN_MARKS = 5;
 
 /**
  * A person or group of things, as the Family and Things pages show it.
@@ -65,13 +59,7 @@ export function GroupCard({
   const now = new Date();
   const windows = internetWindowsForGroup(rules, group.id, now);
 
-  // FamilyFi's own rules first, then the resolver's verdicts.
-  const slots = categorySlotStates(group, rules, upstreamCategories, timezone);
-  const ordered = [...slots.filter((item) => item.rule?.enabled), ...slots.filter((item) => !item.rule?.enabled)];
-  const focused = ordered.find((item) => item.key === focus) ?? ordered[0];
-  const pool = open ? ordered.filter((item) => item !== focused) : ordered;
-  const cap = open ? OPEN_MARKS : CLOSED_MARKS;
-  const shown = more ? pool : pool.slice(0, cap);
+  const { ordered, focused, shown, hidden } = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, focus, more });
   const apps = appRulesForGroup(rules, group.id);
 
   const openOn = (slot?: string) => {
@@ -99,7 +87,18 @@ export function GroupCard({
               item={focused}
               rules={rules}
               timezone={timezone}
-              onOpenSheet={() => setSheet(categorySheet(focused))}
+              now={now}
+              onAddRule={() => setSheet(categorySheet(focused))}
+              editRule={
+                focused.rule ? (
+                  <Link
+                    href={`/rules/${focused.rule.id}?group=${group.id}`}
+                    className="rounded-[8px] bg-[var(--ff-card)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-accent)] shadow-[inset_0_0_0_1px_var(--ff-control-line)]"
+                  >
+                    Edit rule
+                  </Link>
+                ) : null
+              }
             />
           ) : null}
         </div>
@@ -120,25 +119,10 @@ export function GroupCard({
           )}
           {shown.map((item) => (
             <span key={item.key} className="relative">
-              <MarkButton label={item.label} state={item.state} onClick={() => openOn(item.key)}>
-                <CategoryMarkGlyph item={item} size={15} />
-              </MarkButton>
+              <CategoryMark item={item} onPress={() => openOn(item.key)} />
             </span>
           ))}
-          {pool.length > cap ? (
-            <button
-              type="button"
-              onClick={() => setMore(!more)}
-              aria-label={more ? "Show fewer categories" : `Show all ${ordered.length} categories`}
-              className="flex w-[52px] flex-col items-center gap-1"
-            >
-              <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-dashed border-[var(--ff-control-line)] text-[10px] font-bold text-[var(--ff-accent)]">
-                {more ? "–" : `+${pool.length - cap}`}
-              </span>
-              <span className="text-[10px] text-[var(--ff-accent)]">{more ? "Fewer" : "More"}</span>
-              <span className="text-[9px]">{" "}</span>
-            </button>
-          ) : null}
+          {hidden ? <MoreMark more={more} total={ordered.length} hidden={hidden} onPress={() => setMore(!more)} /> : null}
         </div>
         {open && apps.length ? (
           <div className="border-t border-[var(--ff-hairline)] px-[18px] pt-2 pb-3.5">
@@ -147,14 +131,13 @@ export function GroupCard({
               {apps.map((rule) => {
                 const name = parentFacingRuleLabel(rule, catalogNames);
                 return (
-                  <MarkButton
+                  <AppMark
                     key={rule.id}
                     label={name}
+                    glyph={glyphForAppName(name)}
                     state={appMarkState(ruleActivelyBlocking(rule, timezone))}
-                    onClick={() => setSheet({ kind: "app", name, rule })}
-                  >
-                    <span className="text-[9px] font-bold">{glyphForAppName(name)}</span>
-                  </MarkButton>
+                    onPress={() => setSheet({ kind: "app", name, rule })}
+                  />
                 );
               })}
             </div>
@@ -175,91 +158,6 @@ export function GroupCard({
         <FilterSheet group={group} state={sheet} onClose={() => setSheet(null)} onChanged={onRulesChanged} />
       ) : null}
     </GroupCardFrame>
-  );
-}
-
-/**
- * The focused category: a FamilyFi rule's windows over the group's faded internet time,
- * or, with no rule, what the resolver reports and a way to add one.
- */
-function CategoryZone({
-  group,
-  item,
-  rules,
-  timezone,
-  onOpenSheet,
-}: {
-  group: Group;
-  item: CategorySlotState;
-  rules: Rule[];
-  timezone: string;
-  onOpenSheet: () => void;
-}) {
-  const rule = item.rule?.enabled ? item.rule : undefined;
-  const style = categoryMarkStyle(item.state);
-  if (!rule) {
-    const words = { blocked: "blocked upstream", partial: "partly blocked upstream", open: "open upstream", unknown: "not checked", rule: "" };
-    return (
-      <div className="flex items-center gap-2.5 rounded-[10px] bg-[var(--ff-field-soft)] px-3 py-2.5">
-        <span aria-hidden className="flex h-7 w-7 flex-none items-center justify-center rounded-full" style={{ background: style.fill, color: style.ink }}>
-          <CategoryMarkGlyph item={item} size={14} />
-        </span>
-        <span className="min-w-0 flex-1 text-[14px]">
-          <span className="font-semibold">{item.label}</span>
-          <span className="text-[var(--ff-ink-2)]"> · no rule · {words[item.state]}</span>
-        </span>
-        <button type="button" onClick={onOpenSheet} className="flex flex-none items-center gap-1 text-[14px] font-semibold text-[var(--ff-accent)]">
-          <Icon name="plus" size={14} />
-          Add rule
-        </button>
-      </div>
-    );
-  }
-  const now = new Date();
-  const weekday = localWeekday(now, timezone);
-  const internet = internetWindowsForGroup(rules, group.id, now);
-  const faded = internetDayBands({ suspension: { active: false, until: null }, allowance: { active: false, until: null } }, internet, now, timezone);
-  const bands: TimelineBand[] = [
-    ...faded.map((band) => ({ ...band, kind: "faded" as const })),
-    ...ruleDayBands(rule, weekday).map((band) => ({
-      kind: "category" as const,
-      from: band.from,
-      to: band.to,
-      label: `${item.label} blocked`,
-      source: `${rule.name} rule${band.window.name.trim() && rule.mode === "scheduled" ? ` · ${band.window.name.trim()}` : ""}`,
-    })),
-  ];
-  const when = rule.mode === "always" ? "Always blocked by FamilyFi." : `Blocked ${rule.windows.map((window) => windowTimes(window.start, window.end)).join(" and ")}.`;
-  return (
-    <div className="flex flex-col gap-2.5 rounded-[10px] p-3" style={{ background: item.blocking ? "var(--ff-verdict-rule-fill)" : "var(--ff-field-soft)" }}>
-      <div className="flex flex-wrap items-start gap-2.5">
-        <span
-          aria-hidden
-          className="flex h-7 w-7 flex-none items-center justify-center rounded-full"
-          style={
-            item.blocking
-              ? { background: "var(--ff-verdict-rule-ink)", color: "var(--ff-ink-on-fill)" }
-              : { background: "var(--ff-verdict-rule-fill)", color: "var(--ff-verdict-rule-ink)" }
-          }
-        >
-          <CategoryMarkGlyph item={item} size={14} />
-        </span>
-        <div className="min-w-[140px] flex-1">
-          <h3 className="m-0 text-[14px] font-semibold">
-            {item.label} · {item.blocking ? "blocked" : "allowed now"}
-          </h3>
-          <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-ink-2)]">{when} Everything else stays on.</p>
-        </div>
-        <Link
-          href={`/rules/${rule.id}?group=${group.id}`}
-          className="rounded-[8px] bg-[var(--ff-card)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-accent)] shadow-[inset_0_0_0_1px_var(--ff-control-line)]"
-        >
-          Edit rule
-        </Link>
-      </div>
-      <DayTimeline bands={bands} timezone={timezone} label={`${group.name}’s ${item.label} today`} />
-      {internet.length ? <p className="text-[14px] text-[var(--ff-ink-2)]">No-internet time also covers {item.label}.</p> : null}
-    </div>
   );
 }
 
