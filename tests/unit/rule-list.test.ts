@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runRuleAction, toggleRuleEnabled } from "@/lib/group-writes";
+import { addInternetPreset, runRuleAction, toggleRuleEnabled } from "@/lib/group-writes";
 import type { HouseholdStore, MutateOptions } from "@/lib/household-store";
 import {
   noRulesFor,
@@ -138,5 +138,20 @@ describe("a rule card's writes", () => {
       { path: "/api/v1/rules/r1/allow", init: { method: "POST", body: {} } },
       { path: "/api/v1/rules/r1/disallow", init: { method: "POST", body: undefined } },
     ]);
+  });
+
+  it("adds a common internet schedule for a group, named for it", async () => {
+    const { mutate, sent, options } = recorder();
+    await addInternetPreset(mutate, { id: "g1", name: "A child" }, { name: "Bedtime", label: "Bedtime 9 PM", days: [0, 1], start: "21:00", end: "07:00" });
+    expect(sent).toEqual([
+      {
+        path: "/api/v1/rules",
+        init: {
+          method: "POST",
+          body: { name: "Bedtime", kind: "internet", groupIds: ["g1"], mode: "scheduled", windows: [{ name: "Bedtime", days: [0, 1], start: "21:00", end: "07:00" }] },
+        },
+      },
+    ]);
+    expect(options[0]?.feedback?.notice).toBe("Bedtime added for A child. FamilyFi writes it to the gateway next.");
   });
 });
