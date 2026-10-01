@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { request } from "@/lib/api";
+import { CATEGORIES_COPY, createCategory } from "@/lib/upstream-writes";
 import { suggestedMonogramFor } from "@/lib/upstream";
 import { Field, TextField } from "@/components/ui/Controls";
 
@@ -17,6 +18,7 @@ export function NewCategorySheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const copy = CATEGORIES_COPY.create;
   const [label, setLabel] = useState("");
   const [monogram, setMonogram] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,17 +32,11 @@ export function NewCategorySheet({
     setBusy(true);
     setError("");
     try {
-      await api("/api/v1/upstream/categories", {
-        method: "POST",
-        body: JSON.stringify({
-          label: trimmed,
-          ...(monogram.trim() ? { monogram: monogram.trim() } : {}),
-        }),
-      });
+      await createCategory(request, trimmed, monogram);
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the category.");
+      setError(err instanceof Error ? err.message : copy.failed);
     } finally {
       setBusy(false);
     }
@@ -62,28 +58,28 @@ export function NewCategorySheet({
       >
         <header className="px-5 pb-1 pt-[18px]">
           <h2 id="new-category-title" className="m-0 text-[17px] font-bold tracking-tight">
-            New category
+            {copy.title}
           </h2>
           <p className="mt-1 text-[13px] leading-snug" style={{ color: "var(--ff-ink-3)" }}>
-            A domain list checked against DNS — reporting only, add domains afterward.
+            {copy.body}
           </p>
         </header>
         <div className="flex flex-col gap-3.5 px-5 py-4">
-          <Field label="Name">
+          <Field label={copy.name}>
             <TextField
-              label="Category name"
+              label={copy.nameLabel}
               value={label}
               onChange={setLabel}
-              placeholder="e.g. Gambling"
+              placeholder={copy.namePlaceholder}
               onSubmit={create}
             />
           </Field>
-          <Field label="Monogram — up to 4 characters, e.g. GA, HW">
+          <Field label={copy.monogram}>
             <TextField
-              label="Monogram"
+              label={copy.monogramLabel}
               value={monogram}
               onChange={(value) => setMonogram(value.toUpperCase())}
-              placeholder={trimmed ? suggestedMonogramFor(trimmed) : "e.g. GA"}
+              placeholder={trimmed ? suggestedMonogramFor(trimmed) : copy.monogramPlaceholder}
               maxLength={4}
               onSubmit={create}
             />
@@ -101,7 +97,7 @@ export function NewCategorySheet({
             className="flex-1 px-5 py-[13px] text-[14px]"
             style={{ color: "var(--ff-ink-3)" }}
           >
-            Cancel
+            {copy.cancel}
           </button>
           <button
             type="button"
@@ -113,7 +109,7 @@ export function NewCategorySheet({
               color: canCreate ? "var(--ff-accent)" : "var(--ff-locked)",
             }}
           >
-            Create category
+            {copy.create}
           </button>
         </div>
       </div>

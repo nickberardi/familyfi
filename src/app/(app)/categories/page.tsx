@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { request } from "@/lib/api";
+import { CATEGORIES_COPY as COPY, loadUpstreamCategories, runAllChecks, setCategoryChecking } from "@/lib/upstream-writes";
 import {
   effectiveCheck,
   verdictDetailText,
@@ -30,16 +31,13 @@ export default function CategoriesPage() {
   const load = useCallback(async () => {
     const gen = ++loadGen.current;
     try {
-      const [cats, res] = await Promise.all([
-        api<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories"),
-        api<{ resolver: UpstreamResolverSettings }>("/api/v1/upstream/resolver").catch(() => null),
-      ]);
+      const next = await loadUpstreamCategories(request);
       if (gen !== loadGen.current) return;
-      setCategories(cats.categories);
-      setResolver(res?.resolver ?? null);
+      setCategories(next.categories);
+      setResolver(next.resolver);
     } catch (err) {
       if (gen !== loadGen.current) return;
-      setError(err instanceof Error ? err.message : "Could not load categories.");
+      setError(err instanceof Error ? err.message : COPY.loadFailed);
     }
   }, []);
 
@@ -56,13 +54,10 @@ export default function CategoriesPage() {
     setBusy(true);
     setError("");
     try {
-      await api(`/api/v1/upstream/categories/${category.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ enabled: !category.enabled }),
-      });
+      await setCategoryChecking(request, category, !category.enabled);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change checking.");
+      setError(err instanceof Error ? err.message : COPY.toggleFailed);
     } finally {
       setBusy(false);
     }
@@ -72,10 +67,10 @@ export default function CategoriesPage() {
     setBusy(true);
     setError("");
     try {
-      await api("/api/v1/upstream/checks/run", { method: "POST" });
+      await runAllChecks(request);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not run the checks.");
+      setError(err instanceof Error ? err.message : COPY.sweepFailed);
     } finally {
       setBusy(false);
     }
@@ -84,9 +79,9 @@ export default function CategoriesPage() {
   return (
     <>
       <PageHeader
-        title="Categories"
-        sub="Domain lists checked against your resolver"
-        actionLabel="New category"
+        title={COPY.title}
+        sub={COPY.subtitle}
+        actionLabel={COPY.newCategory}
         onAction={() => setNewOpen(true)}
       />
       <div className="flex flex-col gap-4 px-4 py-4 md:px-6">
@@ -95,9 +90,7 @@ export default function CategoriesPage() {
           policy, and the switch only turns checking on or off.
         */}
         <p className="m-0 max-w-[74ch] text-[12.5px] leading-relaxed" style={{ color: "var(--ff-ink-3)" }}>
-          Domain-list categories, checked against the household&rsquo;s own DNS resolver.
-          Reporting only — FamilyFi never creates a policy from these. The switch only
-          turns checking on or off, it never blocks or unblocks anything.
+          {COPY.stance}
         </p>
 
         <ResolverCard resolver={resolver} onChanged={() => void load()} />
@@ -117,7 +110,7 @@ export default function CategoriesPage() {
             style={{ borderBottom: "1px solid var(--ff-hairline-card)" }}
           >
             <span className="flex-1 text-[14px] font-semibold">
-              {categories.length} categories
+              {COPY.count(categories.length)}
             </span>
             <button
               type="button"
@@ -126,7 +119,7 @@ export default function CategoriesPage() {
               className="rounded-lg px-3 py-[7px] text-[12.5px] font-semibold disabled:opacity-40"
               style={{ border: "1px solid var(--ff-control-line)", color: "var(--ff-ink)" }}
             >
-              Check all now
+              {COPY.checkAll}
             </button>
           </div>
 
@@ -152,7 +145,7 @@ export default function CategoriesPage() {
                 >
                   <span className="block truncate text-[14px] font-semibold">{category.label}</span>
                   <span className="hidden text-[12px] md:block" style={{ color: "var(--ff-ink-3)" }}>
-                    {category.activeDomainCount} domains · {verdictDetailText(check)}
+                    {COPY.rowDetail(category.activeDomainCount, verdictDetailText(check))}
                   </span>
                 </Link>
                 <span
@@ -169,8 +162,8 @@ export default function CategoriesPage() {
                     on={category.enabled}
                     onToggle={() => void toggleEnabled(category)}
                     disabled={busy}
-                    label={`Checking ${category.label}`}
-                    title="Only turns checking on or off — never blocks or unblocks anything"
+                    label={COPY.checkingLabel(category.label)}
+                    title={COPY.checkingTitle}
                   />
                 </div>
               </div>
