@@ -27,7 +27,10 @@ export function InternetZone({
   surface: "phone" | "web";
   onPause: () => void;
   onExtend: () => void;
-  /** Where "Edit internet rule" goes; omitted where the page already links to rules. */
+  /**
+   * Given, the footer offers "Edit internet rule" (to the group's rules, `InternetZoneFooter`);
+   * omitted where the page already links to rules. The no-rule presets show either way.
+   */
   editHref?: string;
 }) {
   const { store } = useAppData();
