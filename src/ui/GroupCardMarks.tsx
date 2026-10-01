@@ -8,7 +8,7 @@ import { appRulesForGroup, glyphForAppName, parentFacingRuleLabel, type Rule } f
 import type { Group } from "@/lib/types";
 import { appMarkState, ruleActivelyBlocking } from "@/lib/upstream";
 
-import { AppMark, CategoryMark, MoreMark, SectionLabel } from "./CategoryMarks";
+import { AddAppMark, AppMark, CategoryMark, MoreMark, SectionLabel } from "./CategoryMarks";
 import { InternetMark } from "./InternetMark";
 import { useUI } from "./UIContext";
 
@@ -31,6 +31,7 @@ export function GroupCardMarks({
   onOpen,
   onToggleMore,
   onApp,
+  onAddApp,
 }: {
   group: Group;
   windows: InternetWindow[];
@@ -46,6 +47,8 @@ export function GroupCardMarks({
   onOpen: (slot?: string) => void;
   onToggleMore: () => void;
   onApp: (rule: Rule, name: string) => void;
+  /** Blocks another app for the group: an Add tile after the app marks, on the group's own page only. */
+  onAddApp?: () => void;
 }) {
   const ui = useUI();
   const apps = open ? appRulesForGroup(rules, group.id) : [];
@@ -68,7 +71,7 @@ export function GroupCardMarks({
         ))}
         {marks.hidden ? <MoreMark more={more} total={marks.ordered.length} hidden={marks.hidden} onPress={onToggleMore} /> : null}
       </View>
-      {apps.length ? (
+      {apps.length || (open && onAddApp) ? (
         <View style={[styles.apps, { borderTopColor: ui.color("hairline") }]}>
           <SectionLabel>App rules</SectionLabel>
           <View style={styles.appMarks}>
@@ -84,6 +87,7 @@ export function GroupCardMarks({
                 />
               );
             })}
+            {open && onAddApp ? <AddAppMark onPress={onAddApp} /> : null}
           </View>
         </View>
       ) : null}
