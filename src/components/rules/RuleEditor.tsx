@@ -45,7 +45,7 @@ import { CategoryGlyph } from "@/components/ui/CategoryGlyph";
 import { TextField, TimeField } from "@/components/ui/Controls";
 import { DayPicker } from "@/components/ui/DayPicker";
 import { Segmented } from "@/components/ui/Segmented";
-import { RuleBar } from "./RulesList";
+import { RuleBar } from "@/ui/RuleBar";
 
 type Params = Promise<{ id: string }>;
 type Search = Promise<{
