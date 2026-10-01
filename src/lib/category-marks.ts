@@ -7,6 +7,7 @@
  * neither borrows the accent. Green is a measured all-clear and grey is "we have not looked" —
  * never the same thing.
  */
+import type { ApiRequest } from "./api-client";
 import { windowTimes } from "./display";
 import type { IconName } from "./icons";
 import { CURATED_CATEGORY_SLOTS, categoryRuleForSlot, type CuratedCategorySlot, type Rule } from "./rules";
@@ -152,4 +153,25 @@ export function categoryRuleWhen(rule: Pick<Rule, "mode" | "windows">): string {
   return rule.mode === "always"
     ? "Always blocked by FamilyFi."
     : `Blocked ${rule.windows.map((window) => windowTimes(window.start, window.end)).join(" and ")}.`;
+}
+
+/** The names UniFi gives its DPI categories and applications, keyed `category:<id>` and `app:<id>`. */
+export type CatalogNames = Map<string, string>;
+
+/**
+ * What a card's marks need beyond the household: the DPI catalog's names (for app rules) and the
+ * resolver's categories with every verdict, from which each card resolves its own — two kids on
+ * different resolvers show different answers on the same page. A list that fails to load is empty.
+ */
+export async function loadFilterCatalog(request: ApiRequest): Promise<{ catalogNames: CatalogNames; upstreamCategories: UpstreamCategoryRow[] }> {
+  type Item = { id: number | string; name: string };
+  const [categories, applications, upstream] = await Promise.all([
+    request<{ categories: Item[] }>("/api/v1/dpi/categories").catch(() => ({ categories: [] as Item[] })),
+    request<{ applications: Item[] }>("/api/v1/dpi/applications").catch(() => ({ applications: [] as Item[] })),
+    request<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({ categories: [] as UpstreamCategoryRow[] })),
+  ]);
+  const catalogNames: CatalogNames = new Map();
+  for (const item of categories.categories) catalogNames.set(`category:${item.id}`, item.name);
+  for (const item of applications.applications) catalogNames.set(`app:${item.id}`, item.name);
+  return { catalogNames, upstreamCategories: upstream.categories };
 }
