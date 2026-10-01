@@ -3,7 +3,7 @@ import { groupAddedNotice, groupEditBody, newGroupBody, type GroupEditDraft, typ
 import { internetRulePath } from "./group-actions";
 import type { HouseholdStore } from "./household-store";
 import type { PauseSheetRequest } from "./pause-sheet";
-import type { Rule } from "./rules";
+import type { InternetRulePreset, Rule } from "./rules";
 import { assignDeviceLocally } from "./household-state";
 import { ruleToggleNotice } from "./rule-list";
 import type { Device, Group } from "./types";
@@ -114,4 +114,22 @@ export function toggleRuleEnabled(mutate: Mutate, rule: Pick<Rule, "id" | "name"
 /** A rule card's direct actions: resume a pause, allow now, or end an allowance. */
 export function runRuleAction(mutate: Mutate, rule: Pick<Rule, "id">, run: "resume" | "allow" | "disallow") {
   return mutate((send) => send(`/api/v1/rules/${rule.id}/${run}`, { method: "POST", body: run === "allow" ? {} : undefined }));
+}
+
+/** One tap to a common internet rule for a group (`internetRulePresets`): a scheduled rule with that one window. */
+export function addInternetPreset(mutate: Mutate, group: Pick<Group, "id" | "name">, preset: InternetRulePreset) {
+  return mutate(
+    (send) =>
+      send<{ rule: Rule }>("/api/v1/rules", {
+        method: "POST",
+        body: {
+          name: preset.name,
+          kind: "internet",
+          groupIds: [group.id],
+          mode: "scheduled",
+          windows: [{ name: preset.name, days: preset.days, start: preset.start, end: preset.end }],
+        },
+      }),
+    { feedback: { notice: `${preset.name} added for ${group.name}. FamilyFi writes it to the gateway next.` } },
+  );
 }
