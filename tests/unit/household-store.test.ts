@@ -199,6 +199,21 @@ describe("household store", () => {
     ]);
   });
 
+  it("sends one delete for a group however often it is asked while the first is in flight", async () => {
+    const child = childGroup();
+    let finish: () => void = () => undefined;
+    const { store, server } = setup({
+      ...reads(() => child),
+      "DELETE /api/v1/groups/group-child": () => new Promise((resolve) => (finish = () => resolve({ json: { change: { changeId: "c1" } } }))),
+    });
+    await store.reload();
+    const first = deleteGroup(store.mutate, child);
+    await expect(deleteGroup(store.mutate, child)).resolves.toBeUndefined();
+    finish();
+    await first;
+    expect(server.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
+  });
+
   it("pauses a rule for every group it covers, with its own notice and Undo", async () => {
     const { store, server } = setup({
       ...reads(() => childGroup()),
