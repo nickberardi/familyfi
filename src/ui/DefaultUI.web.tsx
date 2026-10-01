@@ -14,5 +14,8 @@ export const defaultUI: UI = {
   TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled }) => (
     <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} />
   ),
-  Segmented: ({ name, value, segments, onChange }) => <Segmented name={name} grow value={value} onChange={onChange} segments={segments} />,
+  // A disabled control disables each of its segments, as the web's segmented control draws it.
+  Segmented: ({ name, value, segments, onChange, disabled }) => (
+    <Segmented name={name} grow value={value} onChange={onChange} segments={disabled ? segments.map((segment) => ({ ...segment, disabled: true })) : segments} />
+  ),
 };
