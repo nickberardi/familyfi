@@ -133,6 +133,8 @@ export type UISegmentedProps<T extends string> = {
   segments: readonly { value: T; label: string; disabled?: boolean }[];
   onChange: (next: T) => void;
   disabled?: boolean;
+  /** Only as wide as its segments, where the platform would otherwise stretch it across the row. */
+  fit?: boolean;
   testID?: string;
 };
 

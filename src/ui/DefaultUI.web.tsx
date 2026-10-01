@@ -18,8 +18,8 @@ export const defaultUI: UI = {
     <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={mono} />
   ),
   // A disabled control disables each of its segments, as the web's segmented control draws it.
-  Segmented: ({ name, value, segments, onChange, disabled }) => (
-    <Segmented name={name} grow value={value} onChange={onChange} segments={disabled ? segments.map((segment) => ({ ...segment, disabled: true })) : segments} />
+  Segmented: ({ name, value, segments, onChange, disabled, fit }) => (
+    <Segmented name={name} grow={!fit} value={value} onChange={onChange} segments={disabled ? segments.map((segment) => ({ ...segment, disabled: true })) : segments} />
   ),
   Toggle: ({ label, on, onToggle, onLabel, offLabel, disabled, title }) => (
     <TogglePill label={label} on={on} onToggle={onToggle} onLabel={onLabel} offLabel={offLabel} disabled={disabled} title={title} />
