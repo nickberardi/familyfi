@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { DeviceAssignSelect, networkLabel } from "@/components/DeviceAssign";
+import { assignDevicesCopy, byDeviceName, deviceName } from "@/lib/device-assign";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { TogglePill } from "@/components/ui/Controls";
@@ -68,7 +69,7 @@ function DevicesBody() {
         const hay = [device.hostname ?? "", device.mac, device.ip ?? "", owner?.name ?? "unassigned"].join(" ").toLowerCase();
         return hay.includes(q);
       })
-      .sort((a, b) => (a.hostname ?? a.mac).localeCompare(b.hostname ?? b.mac));
+      .sort(byDeviceName);
   }, [devices, filter, groups, query]);
 
   return (
@@ -77,11 +78,8 @@ function DevicesBody() {
       <div className="flex flex-col gap-4 p-4 md:p-6">
         {assignGroup ? (
           <section className="rounded-[12px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] px-[18px] py-3">
-            <div className="text-[14px] font-semibold text-[var(--ff-paused)]">{assignGroup.name} needs devices</div>
-            <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">
-              {assignGroup.name} has no assigned devices, so its UniFi policies cannot be created. Assign an
-              unassigned device below.
-            </p>
+            <div className="text-[14px] font-semibold text-[var(--ff-paused)]">{assignDevicesCopy(assignGroup).needsTitle}</div>
+            <p className="mt-0.5 text-[14px] leading-5 text-[var(--ff-muted)]">{assignDevicesCopy(assignGroup).needsBody}</p>
           </section>
         ) : null}
         {household ? (
@@ -170,7 +168,7 @@ function DevicesBody() {
                 <div aria-hidden="true" />
               </div>
               {rows.map((device) => {
-                const name = device.hostname ?? "Unnamed device";
+                const name = deviceName(device);
                 return (
                   <div
                     key={device.mac}

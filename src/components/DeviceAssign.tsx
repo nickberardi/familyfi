@@ -2,14 +2,8 @@
 
 import { assignDevice } from "@/lib/group-writes";
 import type { Device, Group } from "@/lib/types";
+export { networkLabel } from "@/lib/device-assign";
 import { useAppData } from "./AppDataProvider";
-
-export function networkLabel(device: Device, networks: { id: string; name: string; vlanId: number }[]) {
-  const match = networks.find((network) => network.id === device.networkId);
-  if (match) return `${match.name} (VLAN ${match.vlanId})`;
-  if (!device.inScope) return "Out of managed VLANs";
-  return device.networkId ?? "Unknown network";
-}
 
 export function DeviceAssignSelect({
   device,
