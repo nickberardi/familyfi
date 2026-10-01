@@ -1,5 +1,4 @@
 "use client";
-
 /**
  * The popover behind a filter mark.
  *
@@ -13,31 +12,18 @@
  * change.
  */
 
+import type { CategorySheetState } from "@/lib/category-marks";
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { daysLabel, windowTimes } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
-import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
-import { checkedAgo, type UpstreamCheckRow } from "@/lib/upstream";
+import { checkedAgo } from "@/lib/upstream";
 import { NetworkCheckDetails } from "@/components/upstream/NetworkCheckDetails";
 
-export type FilterSheetState =
-  | {
-      kind: "category";
-      name: string;
-      /** The UniFi DPI category, or null when UniFi has none for it (AI, Dating, …). */
-      categoryId: number | null;
-      /** The domains its checks use; a Websites rule can block these instead. */
-      domains: string[];
-      rule: Rule | undefined;
-      /** Already resolved for this card's group; null when nothing has been measured. */
-      upstream: UpstreamCheckRow | null;
-      /** Whether the rule is blocking at this moment, not merely switched on. */
-      activelyBlocking: boolean;
-    }
-  | { kind: "app"; name: string; rule: Rule };
+/** What a mark opens (`src/lib/category-marks.ts`). */
+export type FilterSheetState = CategorySheetState;
 
 export function FilterSheet({
   group,
