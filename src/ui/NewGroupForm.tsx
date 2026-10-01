@@ -7,7 +7,7 @@ import { FAMILY_ROLES, MONOGRAM_MAX, monogramPlaceholder, newGroupCopy, normaliz
 import { createGroup } from "@/lib/group-writes";
 import type { HouseholdStore } from "@/lib/household-store";
 
-import { FieldLabel } from "./FieldLabel";
+import { FormField } from "./FormField";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /**
@@ -57,18 +57,15 @@ export function NewGroupForm({
         <Text style={[styles.body, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{copy.body}</Text>
       </View>
       <View style={styles.fields}>
-        <View>
-          <FieldLabel>Name</FieldLabel>
+        <FormField label="Name">
           <ui.TextField label="Name" value={name} onChange={setName} placeholder={copy.namePlaceholder} onSubmit={() => void create()} autoFocus testID="new-group-name" />
-        </View>
+        </FormField>
         {kind === "family" ? (
-          <View>
-            <FieldLabel>Role</FieldLabel>
+          <FormField label="Role">
             <ui.Segmented name="Role" value={familyRole} onChange={(role) => setFamilyRole(role as FamilyRole)} segments={FAMILY_ROLES} testID="new-group-role" />
-          </View>
+          </FormField>
         ) : (
-          <View>
-            <FieldLabel>{copy.monogramLabel}</FieldLabel>
+          <FormField label={copy.monogramLabel}>
             <ui.TextField
               label="Monogram"
               value={monogram}
@@ -79,7 +76,7 @@ export function NewGroupForm({
               capitals
               testID="new-group-monogram"
             />
-          </View>
+          </FormField>
         )}
         {error ? <Text style={[styles.error, { fontFamily: ui.font, color: ui.color("danger") }]}>{error}</Text> : null}
       </View>

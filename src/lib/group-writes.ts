@@ -89,7 +89,7 @@ export function deleteGroup(mutate: Mutate, group: Pick<Group, "id">, onDeleted?
     const result = await send<{ change: { changeId: string } }>(`/api/v1/groups/${group.id}`, { method: "DELETE" });
     onDeleted?.();
     return { ...result, removedGroupId: group.id };
-  });
+  }, { groupId: group.id });
 }
 
 export function assignDevicePath(mac: string): string {

@@ -10,6 +10,7 @@ import {
   normalizeMonogram,
   roleLocked,
 } from "@/lib/group-form";
+import { GROUP_CARD_COPY } from "@/lib/group-page";
 import type { Group } from "@/lib/types";
 
 const group = (overrides: Partial<Group> = {}) =>
@@ -67,5 +68,9 @@ describe("editing a group", () => {
     expect(rulesNeedDevice({ internetRuleIds: [], suspension: { active: false, until: null } } as never)).toBe(false);
     expect(rulesNeedDevice({ internetRuleIds: ["r1"], suspension: { active: false, until: null } } as never)).toBe(true);
     expect(rulesNeedDevice({ internetRuleIds: [], suspension: { active: true, until: null } } as never)).toBe(true);
+  });
+
+  it("names an open card's Details link for its group", () => {
+    expect(GROUP_CARD_COPY.detailsLabel("Sam")).toBe("Details for Sam");
   });
 });

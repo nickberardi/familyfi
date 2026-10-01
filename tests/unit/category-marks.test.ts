@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardMarks, categoryRuleWhen, categorySheet, categorySlotStates, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
+import { cardMarks, categoryRuleWhen, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
@@ -35,5 +35,17 @@ describe("category marks", () => {
     expect(moreMarkLabels(false, 9, 5)).toEqual({ accessibilityLabel: "Show all 9 categories", badge: "+5", word: "More" });
     expect(moreMarkLabels(true, 9, 5)).toMatchObject({ badge: "–", word: "Fewer" });
     expect(categoryRuleWhen({ mode: "always", windows: [] })).toBe("Always blocked by FamilyFi.");
+  });
+
+  it("loads the catalog's names and the resolver's categories, and reads a list that fails as empty", async () => {
+    const lists: Record<string, unknown> = {
+      "/api/v1/dpi/categories": { categories: [{ id: 4, name: "Video Streaming" }] },
+      "/api/v1/dpi/applications": { applications: [{ id: 9, name: "Fixture App" }] },
+    };
+    const request = (async (path: string) => (path in lists ? lists[path] : Promise.reject(new Error("down")))) as never;
+    const { catalogNames, upstreamCategories } = await loadFilterCatalog(request);
+    expect(catalogNames.get("category:4")).toBe("Video Streaming");
+    expect(catalogNames.get("app:9")).toBe("Fixture App");
+    expect(upstreamCategories).toEqual([]);
   });
 });

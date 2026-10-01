@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  GROUP_RESOLVER_COPY,
   canSaveGroupResolver,
   groupResolverNetworkLine,
   groupResolverSummary,
@@ -13,6 +14,8 @@ describe("group resolver", () => {
     expect(groupResolverSummary(null)).toBe("Resolver information is unavailable.");
     expect(groupResolverSummary({ source: "dhcp", networks: [], reason: null })).toContain("UniFi DHCP");
     expect(groupResolverSummary({ source: "unknown", networks: [], reason: "No devices assigned." })).toBe("No devices assigned.");
+    expect(GROUP_RESOLVER_COPY.fieldLabel("A child")).toBe("DNS-over-HTTPS endpoint for A child");
+    expect(GROUP_RESOLVER_COPY.overrideNote("A child")).toMatch(/^DNS-over-HTTPS override for A child\. /);
     expect(groupResolverNetworkLine({ id: "n", name: "Kids", servers: ["192.0.2.1", "192.0.2.2"], reason: null })).toBe("Kids: 192.0.2.1, 192.0.2.2");
   });
 
