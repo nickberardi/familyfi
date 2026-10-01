@@ -46,6 +46,11 @@ export function unassignedBadgeCount(devices: Pick<Device, "assignment" | "inSco
   return devices.filter((device) => device.assignment === "quarantined" && device.inScope).length;
 }
 
+/** A device's MAC and IP, to follow its presence on a narrow line: " · 02:00:…:0A · 10.0.0.7". */
+export function deviceAddressSuffix(device: Pick<Device, "mac" | "ip">): string {
+  return ` · ${device.mac.toUpperCase()}${device.ip ? ` · ${device.ip}` : ""}`;
+}
+
 /** The filter's label, with the Unassigned count when there are any. */
 export function deviceFilterLabel(filter: (typeof DEVICE_FILTERS)[number], devices: Pick<Device, "assignment">[]): string {
   const count = filter.id === "loose" ? unassignedCount(devices) : 0;
