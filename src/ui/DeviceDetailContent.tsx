@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 16, borderRadius: 12, borderWidth: 1, padding: 18 },
   headerWords: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
-  name: { fontSize: 21, lineHeight: 28, fontWeight: "600", letterSpacing: -0.5 },
+  name: { fontSize: 21, lineHeight: 31.5, fontWeight: "600", letterSpacing: -0.5 },
   pill: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   pillText: { fontSize: 14, lineHeight: 21, fontWeight: "600" },

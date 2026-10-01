@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   schedule: { paddingHorizontal: 16, paddingBottom: 16 },
   facts: { marginTop: 12, gap: 6 },
   fact: { flexDirection: "row", gap: 12 },
-  term: { width: 72, flexShrink: 0 },
+  term: { minWidth: 72, flexShrink: 0 },
   value: { flex: 1, minWidth: 0, gap: 2 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   chip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, overflow: "hidden" },

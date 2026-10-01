@@ -23,13 +23,13 @@ export function NetworkCheckDetails({ check }: { check: UpstreamCheckRow | null 
 
 function NetworkCheckResults({ networks }: { networks: NonNullable<UpstreamCheckRow["networks"]> }) {
   const ui = useUI();
-  const muted = { fontFamily: ui.font, fontSize: 12, lineHeight: 16, color: ui.color("ink-3") };
+  const muted = { fontFamily: ui.font, fontSize: 12, lineHeight: 18, color: ui.color("ink-3") };
   return (
     <View style={styles.list}>
       {networks.map((network) => (
         <View key={network.id} style={[styles.network, { borderTopColor: ui.color("hairline") }]}>
           <View style={styles.line}>
-            <Text style={{ fontFamily: ui.font, fontSize: 12.5, lineHeight: 18, fontWeight: "600", color: ui.color("ink") }}>{network.name}</Text>
+            <Text style={{ fontFamily: ui.font, fontSize: 12.5, lineHeight: 18.75, fontWeight: "600", color: ui.color("ink") }}>{network.name}</Text>
             <VerdictChip style={verdictStyle({ verdict: network.verdict })} size="small" />
           </View>
           {network.error ? <Text style={muted}>{network.error}</Text> : null}

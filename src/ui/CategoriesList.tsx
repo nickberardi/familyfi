@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   count: { flex: 1, fontSize: 14, lineHeight: 21, fontWeight: "600" },
   checkAll: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
-  small: { fontSize: 12.5, lineHeight: 18, fontWeight: "600" },
+  small: { fontSize: 12.5, lineHeight: 18.75, fontWeight: "600" },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 12, borderTopWidth: 1 },
   rowWide: { gap: 12, paddingHorizontal: 18 },
   label: { flex: 1, minWidth: 60 },
