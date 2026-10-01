@@ -44,6 +44,15 @@ export function pauseSheetBody(group: Pick<Group, "kind" | "deviceCount">, mode:
   return `${devices} all internet. Category, app and website rules stay as they are. ${outside}`;
 }
 
+/**
+ * Where a timed choice counts from: extending adds to the pause's end while it is still ahead, as
+ * the server does (`extendSuspensionUntil` in `schedule.ts`); anything else starts now.
+ */
+function extendFrom(until: string | null, now: Date): number {
+  const end = until ? Date.parse(until) : NaN;
+  return end > now.getTime() ? end : now.getTime();
+}
+
 export function pauseSheetOptions(
   group: Pick<Group, "suspension">,
   windows: InternetWindow[],
@@ -53,9 +62,10 @@ export function pauseSheetOptions(
 ): PauseSheetOption[] {
   // Extend adds to a timed pause; an open-ended one has nothing to add to, so it re-pauses.
   const extending = mode === "extend" && group.suspension.active && Boolean(group.suspension.until);
+  const from = extendFrom(extending ? group.suspension.until : null, now);
   const timed = (label: string, minutes: number): PauseSheetOption => ({
     label,
-    note: `back at ${formatClock(new Date(now.getTime() + minutes * 60_000), timezone)}`,
+    note: `back at ${formatClock(new Date(from + minutes * 60_000), timezone)}`,
     request: extending ? { kind: "extend", minutes } : { kind: "pauseFor", minutes },
   });
   // Straight into the next internet window: offline until that window ends.
@@ -108,9 +118,10 @@ export function rulePauseSheetOptions(
   now: Date,
 ): PauseSheetOption[] {
   const extending = mode === "extend" && rule.pause.active && Boolean(rule.pause.until);
+  const from = extendFrom(extending ? rule.pause.until : null, now);
   const timed = (label: string, minutes: number): PauseSheetOption => ({
     label,
-    note: `blocks again at ${formatClock(new Date(now.getTime() + minutes * 60_000), timezone)}`,
+    note: `blocks again at ${formatClock(new Date(from + minutes * 60_000), timezone)}`,
     request: extending ? { kind: "extend", minutes } : { kind: "pauseFor", minutes },
   });
   // A window is blocking now: lift the rule until the last active one ends.
