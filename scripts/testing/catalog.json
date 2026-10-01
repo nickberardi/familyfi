@@ -754,6 +754,22 @@
       "categories": [
         "devices"
       ]
+    },
+    "tests/unit/rule-list.test.ts": {
+      "categories": [
+        "rules"
+      ]
+    },
+    "tests/unit/rule-editor.test.ts": {
+      "categories": [
+        "rules",
+        "schedules"
+      ]
+    },
+    "tests/unit/rule-catalog.test.ts": {
+      "categories": [
+        "rules"
+      ]
     }
   }
 }

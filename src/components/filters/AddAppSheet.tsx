@@ -8,7 +8,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { request } from "@/lib/api";
+import { addAppCopy, createAppRule } from "@/lib/filter-sheet";
+import { searchCatalog } from "@/lib/rule-catalog";
 import { useAppData } from "@/components/AppDataProvider";
 import { Segmented } from "@/components/ui/Segmented";
 import type { Group } from "@/lib/types";
@@ -24,7 +26,8 @@ export function AddAppSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { mutate } = useAppData();
+  const { store } = useAppData();
+  const copy = addAppCopy(group);
   const [filter, setFilter] = useState("");
   const [catalog, setCatalog] = useState<DpiItem[]>([]);
   const [selectedDpiId, setSelectedDpiId] = useState<number | "">("");
@@ -34,22 +37,21 @@ export function AddAppSheet({
 
   useEffect(() => {
     let cancelled = false;
-    const path = `/api/v1/dpi/applications${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`;
-    void api<{ applications?: DpiItem[] }>(path)
-      .then((res) => {
+    void searchCatalog(request, "app", filter)
+      .then((items) => {
         if (cancelled) return;
-        setCatalog(res.applications ?? []);
+        setCatalog(items);
         setError("");
       })
       .catch((err: Error) => {
         if (cancelled) return;
         setCatalog([]);
-        setError(err.message || "Could not load the DPI catalog.");
+        setError(err.message || copy.loadFailed);
       });
     return () => {
       cancelled = true;
     };
-  }, [filter]);
+  }, [filter, copy.loadFailed]);
 
   const canCreate = selectedDpiId !== "" && !busy;
 
@@ -58,22 +60,7 @@ export function AddAppSheet({
     setBusy(true);
     setError("");
     try {
-      await mutate(() =>
-        api("/api/v1/rules", {
-          method: "POST",
-          body: JSON.stringify({
-            name: `${catalog.find((item) => item.id === selectedDpiId)?.name ?? "App"} for ${group.name}`.slice(0, 60),
-            kind: "app",
-            scope: "group",
-            groupIds: [group.id],
-            targetIds: [selectedDpiId],
-            mode: enforcement,
-            ...(enforcement === "scheduled"
-              ? { windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }] }
-              : {}),
-          }),
-        }),
-      );
+      await createAppRule(store.mutate, group, catalog.find((item) => item.id === selectedDpiId), selectedDpiId, enforcement);
       onCreated();
       onClose();
     } catch (err) {
@@ -99,21 +86,21 @@ export function AddAppSheet({
       >
         <div className="px-5 pb-1 pt-[18px]">
           <h2 id="add-app-title" className="text-[17px] font-bold tracking-tight">
-            Add app filter
+            {copy.title}
           </h2>
           <p className="mt-1 text-[13px] leading-snug" style={{ color: "var(--ff-ink-3)" }}>
-            Blocks an app for {group.name}.
+            {copy.body}
           </p>
         </div>
 
         <div className="flex flex-col gap-3.5 px-5 py-4">
           <div>
             <div className="mb-1.5 text-[12px] font-semibold" style={{ color: "var(--ff-ink-3)" }}>
-              App
+              {copy.app}
             </div>
             <input
               type="search"
-              placeholder="Search catalog"
+              placeholder={copy.search}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               className="mb-2 w-full rounded-lg border px-3 py-2 text-[15px]"
@@ -124,9 +111,9 @@ export function AddAppSheet({
               style={{ borderColor: "var(--ff-line)" }}
               value={selectedDpiId === "" ? "" : String(selectedDpiId)}
               onChange={(e) => setSelectedDpiId(e.target.value ? Number(e.target.value) : "")}
-              aria-label="DPI application"
+              aria-label={copy.picker}
             >
-              <option value="">Select…</option>
+              <option value="">{copy.pick}</option>
               {catalog.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -137,16 +124,16 @@ export function AddAppSheet({
 
           <div>
             <div className="mb-1.5 text-[12px] font-semibold" style={{ color: "var(--ff-ink-3)" }}>
-              Enforcement
+              {copy.enforcement}
             </div>
             <Segmented
-              name="Enforcement"
+              name={copy.enforcement}
               grow
               value={enforcement}
               onChange={setEnforcement}
               segments={[
-                { value: "always", label: "Always" },
-                { value: "scheduled", label: "Scheduled" },
+                { value: "always", label: copy.always },
+                { value: "scheduled", label: copy.scheduled },
               ]}
             />
           </div>
@@ -165,7 +152,7 @@ export function AddAppSheet({
             className="flex-1 py-3 text-center text-[14px]"
             style={{ color: "var(--ff-ink-3)" }}
           >
-            Cancel
+            {copy.cancel}
           </button>
           <button
             type="button"
@@ -177,7 +164,7 @@ export function AddAppSheet({
               color: canCreate ? "var(--ff-accent)" : "var(--ff-locked)",
             }}
           >
-            Create policy
+            {copy.create}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import type { HouseholdStore } from "./household-store";
 import type { PauseSheetRequest } from "./pause-sheet";
 import type { Rule } from "./rules";
 import { assignDeviceLocally } from "./household-state";
+import { ruleToggleNotice } from "./rule-list";
 import type { Device, Group } from "./types";
 
 /**
@@ -101,4 +102,16 @@ export function assignDevice(mutate: Mutate, device: Pick<Device, "mac">, groupI
   return mutate((send) => send<{ device: Device; change: { changeId: string } }>(assignDevicePath(device.mac), { method: "PUT", body: { groupId } }), {
     optimistic: (state) => assignDeviceLocally(state, device.mac, groupId),
   });
+}
+
+/** Turn a rule on or off for every group it covers. */
+export function toggleRuleEnabled(mutate: Mutate, rule: Pick<Rule, "id" | "name" | "enabled">) {
+  return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${rule.id}`, { method: "PATCH", body: { enabled: !rule.enabled } }), {
+    feedback: { notice: ruleToggleNotice(rule) },
+  });
+}
+
+/** A rule card's direct actions: resume a pause, allow now, or end an allowance. */
+export function runRuleAction(mutate: Mutate, rule: Pick<Rule, "id">, run: "resume" | "allow" | "disallow") {
+  return mutate((send) => send(`/api/v1/rules/${rule.id}/${run}`, { method: "POST", body: run === "allow" ? {} : undefined }));
 }
