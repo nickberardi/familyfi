@@ -12,7 +12,7 @@ export function Disclosure({ title, children, testID }: { title: string; childre
   return (
     <View style={[styles.box, { borderColor: ui.color("hairline-card") }]} testID={testID}>
       <Pressable role="button" aria-expanded={open} onPress={() => setOpen(!open)} testID={testID ? `${testID}-toggle` : undefined}>
-        <Text style={{ fontFamily: ui.font, fontSize: 12.5, lineHeight: 18, fontWeight: "600", color: ui.color("ink") }}>
+        <Text style={{ fontFamily: ui.font, fontSize: 12.5, lineHeight: 18.75, fontWeight: "600", color: ui.color("ink") }}>
           {open ? "▾" : "▸"} {title}
         </Text>
       </Pressable>

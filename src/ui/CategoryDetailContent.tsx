@@ -92,7 +92,7 @@ export function CategoryDetailContent({
       testID={testID}
       style={({ pressed }) => [styles.outline, { borderColor: ui.color("control-line") }, off && { opacity: 0.4 }, pressed && !off && { opacity: PRESS_OPACITY }]}
     >
-      <Text style={[small(12.5, 18, "ink"), styles.bold]}>{label}</Text>
+      <Text style={[small(12.5, 18.75, "ink"), styles.bold]}>{label}</Text>
     </Pressable>
   );
 
@@ -106,7 +106,7 @@ export function CategoryDetailContent({
       testID={testID}
       style={({ pressed }) => [off && { opacity: 0.4 }, pressed && !off && { opacity: PRESS_OPACITY }]}
     >
-      <Text style={[small(12.5, 18, token), styles.bold]}>{label}</Text>
+      <Text style={[small(12.5, 18.75, token), styles.bold]}>{label}</Text>
     </Pressable>
   );
 
@@ -119,12 +119,12 @@ export function CategoryDetailContent({
             <Text role="heading" aria-level={1} style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>
               {category.label}
             </Text>
-            <Text style={[small(12.5, 18), styles.sourceNote]}>{sourceNoteText(category.source)}</Text>
+            <Text style={[small(12.5, 18.75), styles.sourceNote]}>{sourceNoteText(category.source)}</Text>
           </View>
           <VerdictChip style={verdictStyle(check)} size="detail" testID="category-verdict" />
           {outline(COPY.checkNow, () => void run(() => checkCategory(request, category), COPY.checkFailed), "category-check-now")}
         </View>
-        <Text style={[small(12.5, 18), styles.checkLine]}>{categoryCheckLine(check)}</Text>
+        <Text style={[small(12.5, 18.75), styles.checkLine]}>{categoryCheckLine(check)}</Text>
         <NetworkCheckDetails check={check} />
         <View style={[styles.checking, { borderTopColor: ui.color("hairline") }]}>
           <ui.Toggle
@@ -136,7 +136,7 @@ export function CategoryDetailContent({
             disabled={off}
             testID="category-checking"
           />
-          <Text style={small(12.5, 18)}>{enabledNoteText(category.enabled)}</Text>
+          <Text style={small(12.5, 18.75)}>{enabledNoteText(category.enabled)}</Text>
           <View style={styles.grow} />
           {category.source === "user" ? textButton(COPY.deleteCategory, "danger", () => void remove(), "category-delete") : null}
         </View>

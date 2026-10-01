@@ -82,7 +82,7 @@ export function ResolverCard({
           pressed && !disabled && { opacity: PRESS_OPACITY },
         ]}
       >
-        <Text style={[small(options.filled ? 13 : 12.5, 18, tone), styles.bold]}>{label}</Text>
+        <Text style={[small(options.filled ? 13 : 12.5, 18.75, tone), styles.bold]}>{label}</Text>
       </Pressable>
     );
   };
@@ -118,7 +118,7 @@ export function ResolverCard({
           <View style={[styles.schedule, { borderTopColor: ui.color("hairline") }]}>
             <View style={styles.scheduleHead}>
               <View style={styles.grow}>
-                <Text style={[small(12.5, 18, "ink"), styles.bold]}>{COPY.schedule}</Text>
+                <Text style={[small(12.5, 18.75, "ink"), styles.bold]}>{COPY.schedule}</Text>
                 <Text style={[small(12, 18), styles.scheduleLine]}>{resolverScheduleLine(resolver, timezone, new Date())}</Text>
               </View>
               <ui.TimeField

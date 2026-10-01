@@ -416,5 +416,5 @@ const styles = StyleSheet.create({
   domain: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   domainField: { minWidth: 180, flex: 1 },
   write: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 8 },
-  verb: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, fontSize: 12, lineHeight: 16, fontWeight: "700", letterSpacing: 0.3, overflow: "hidden" },
+  verb: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, fontSize: 12, lineHeight: 18, fontWeight: "700", letterSpacing: 0.3, overflow: "hidden" },
 });
