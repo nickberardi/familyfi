@@ -7,7 +7,10 @@ import {
   publishedRoute,
   removeAllConfirm,
   removeConfirm,
+  removePhone,
+  removeRevokedPhones,
   revokeConfirm,
+  revokePhone,
   revokedToggleLabel,
   showAllLabel,
   splitPhones,
@@ -78,5 +81,21 @@ describe("pair device", () => {
     expect(pairingExpired(issued, null, at("2026-09-14T20:00:00Z"))).toBe(false);
     expect(pairingExpired(issued, null, at("2026-09-14T20:05:00Z"))).toBe(true);
     expect(pairingExpired(issued, { status: "expired" }, at("2026-09-14T20:00:00Z"))).toBe(true);
+  });
+
+  it("revokes and removes phones at their routes", async () => {
+    const sent: { path: string; init?: { method?: string } }[] = [];
+    const send = async <T,>(path: string, init?: { method?: string }) => {
+      sent.push({ path, init });
+      return {} as T;
+    };
+    await revokePhone(send, { id: "p1" });
+    await removePhone(send, { id: "p1" });
+    await removeRevokedPhones(send);
+    expect(sent).toEqual([
+      { path: "/api/v1/connection/devices/p1", init: { method: "DELETE" } },
+      { path: "/api/v1/connection/devices/p1?remove=true", init: { method: "DELETE" } },
+      { path: "/api/v1/connection/devices?revoked=true", init: { method: "DELETE" } },
+    ]);
   });
 });

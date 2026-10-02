@@ -28,14 +28,11 @@ function TextButton({ label, token, onPress, testID }: { label: string; token: s
 /** One paired phone or Watch: when it paired and was last seen, the route it paired through, its sessions, and what can be done to it. */
 export function PairedPhoneRow({
   phone,
-  first,
   onRevoke,
   onRepair,
   onRemove,
 }: {
   phone: PairedPhone;
-  /** The first row in its list draws no rule above it. */
-  first?: boolean;
   onRevoke?: () => void;
   onRepair?: () => void;
   onRemove?: () => void;
@@ -44,7 +41,7 @@ export function PairedPhoneRow({
   const text = useText();
   const lines = phoneLines(phone);
   return (
-    <View style={[styles.phone, !first && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]} testID="phone-row">
+    <View style={[styles.phone, { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]} testID="phone-row">
       <View style={[styles.phoneIcon, { backgroundColor: ui.color("field") }]}>
         <ui.Icon name={phone.client === "watch" ? "watch" : "device-mobile"} size={18} color={ui.color("ink")} />
       </View>
@@ -102,16 +99,14 @@ export function PairedDevicesCard({
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="paired-devices">
       <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
-        <Text role="heading" aria-level={2} style={[text(14, 21, "ink"), styles.bold]}>
-          {COPY.paired}
-        </Text>
+        <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
         <Text style={text(14, 21, "muted")}>{COPY.pairedSub}</Text>
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>{canPair ? COPY.noPhones : COPY.remoteFirst}</Text>
       ) : (
-        (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone, index) => (
-          <PairedPhoneRow key={phone.id} phone={phone} first={index === 0} onRevoke={() => onRevoke(phone)} />
+        (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (
+          <PairedPhoneRow key={phone.id} phone={phone} onRevoke={() => onRevoke(phone)} />
         ))
       )}
       {active.length > PHONES_SHOWN ? (
@@ -157,9 +152,7 @@ export function RemoteAccessSummary({ tunnel, published }: { tunnel: RemoteAcces
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="remote-access-summary">
       <View style={[styles.head, styles.remoteHead, { borderBottomColor: ui.color("hairline-card") }]}>
         <View style={styles.grow}>
-          <Text role="heading" aria-level={2} style={[text(14, 21, "ink"), styles.bold]}>
-            {COPY.remote}
-          </Text>
+          <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.remote}</Text>
           <Text style={[text(14, 21, "muted"), styles.line]}>{COPY.remoteSub}</Text>
         </View>
         <Text style={[text(14, 21, tokenOf(status.ink)), styles.bold]} testID="remote-status">

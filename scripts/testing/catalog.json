@@ -214,6 +214,11 @@
         "sessions"
       ]
     },
+    "tests/unit/pair-device.test.ts": {
+      "categories": [
+        "pairing"
+      ]
+    },
     "tests/unit/pairing-code.test.ts": {
       "categories": [
         "pairing"
@@ -295,6 +300,12 @@
         "settings"
       ]
     },
+    "tests/unit/settings-writes.test.ts": {
+      "categories": [
+        "settings",
+        "sync"
+      ]
+    },
     "tests/unit/spike-verify.test.ts": {
       "categories": [
         "unifi"
@@ -350,6 +361,11 @@
     "tests/unit/update-check.test.ts": {
       "categories": [
         "settings"
+      ]
+    },
+    "tests/unit/update-copy.test.ts": {
+      "categories": [
+        "runtime"
       ]
     },
     "tests/unit/upstream-doh.test.ts": {

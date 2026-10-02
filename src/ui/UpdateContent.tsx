@@ -42,10 +42,10 @@ export function UpdateContent({ update, onNotNow }: { update: UpdateCheck | null
           <View style={styles.grow} />
           {update?.releaseUrl ? (
             <View style={styles.external}>
-              <ExternalLink href={update.releaseUrl} style={[text(14, 21, "accent"), styles.bold]} testID="update-release-link">
+              <ExternalLink href={update.releaseUrl} style={[text(14, 21, "ink"), styles.bold]} testID="update-release-link">
                 {COPY.viewOnGitHub}
               </ExternalLink>
-              <ui.Icon name="arrow-square-out" size={14} color={ui.color("accent")} />
+              <ui.Icon name="arrow-square-out" size={14} color={ui.color("ink")} />
             </View>
           ) : null}
         </View>
@@ -60,7 +60,9 @@ export function UpdateContent({ update, onNotNow }: { update: UpdateCheck | null
               <View role="list" style={styles.items}>
                 {section.items.map((item) => (
                   <View key={item} role="listitem" style={styles.item}>
-                    <Text style={text(14, 20, "ink")}>•</Text>
+                    <Text aria-hidden style={text(14, 20, "ink")}>
+                      •
+                    </Text>
                     <Text style={[text(14, 20, "ink"), styles.grow]}>{item}</Text>
                   </View>
                 ))}
