@@ -218,7 +218,7 @@ export function bearerSessionData(now = new Date()) {
 
 export type RefreshResult =
   | { ok: true; session: { username: string; expiresAt: Date; account: { displayName: string; kind: AccountKind } | null }; token: string; refreshToken: string; refreshExpiresAt: Date }
-  | { ok: false; code: "invalid_refresh" | "refresh_reused"; message: string };
+  | { ok: false; code: "invalid_refresh" | "refresh_reused" | "agent_remote"; message: string };
 
 const INVALID_REFRESH = { ok: false as const, code: "invalid_refresh" as const, message: "This refresh token is invalid or expired. Sign in again." };
 
@@ -227,7 +227,8 @@ const INVALID_REFRESH = { ok: false as const, code: "invalid_refresh" as const, 
  * replaced is honoured once for a few seconds, for a device that lost the response; any later use
  * of it means a copy exists, so the whole sign-in is revoked.
  */
-export async function refreshSession(refreshToken: string, now = new Date()): Promise<RefreshResult> {
+export async function refreshSession(refreshToken: string, options: { tunnelled?: boolean; now?: Date } = {}): Promise<RefreshResult> {
+  const now = options.now ?? new Date();
   const presented = sha256(refreshToken);
   const include = { account: true, device: true } as const;
   let session = await prisma().session.findUnique({ where: { refreshTokenHash: presented }, include });
@@ -245,6 +246,8 @@ export async function refreshSession(refreshToken: string, now = new Date()): Pr
     grace = true;
   }
   if (session.revokedAt || session.kind !== SessionKind.bearer || !session.refreshExpiresAt || session.refreshExpiresAt <= now || !session.device || session.device.revokedAt) return INVALID_REFRESH;
+  // Remote access is for the household's phones; an agent renews from the home network or not at all.
+  if (options.tunnelled && session.device.client === PairedDeviceClient.agent) return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
   const next = bearerSessionData(now);
   const rotated = await prisma().session.updateMany({

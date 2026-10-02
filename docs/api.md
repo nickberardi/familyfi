@@ -52,8 +52,8 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/connection/pairings` | Administrator creates a single-use pairing code: five minutes for a phone on a route, fifteen for an agent (`client: agent`, `grant`) at the address it was made from |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
-| POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
-| GET | `/api/v1/connection/devices` | Administrator list of paired phones and Watches, the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
+| POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest; an agent consumes an agent pairing and receives a bearer and refresh token instead |
+| GET | `/api/v1/connection/devices` | Administrator list of paired phones, Watches and agents (agents with their `grant`), the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
 | POST | `/api/v1/connection/devices` | A signed-in paired iPhone automatically enrolls its reachable Watch (`client: "watch"`, `clientId`) as an independent device and receives its own credential and bearer for transfer |
 | DELETE | `/api/v1/connection/devices/{id}` | Administrator or the device itself revokes that device and its sessions. Only an administrator may use `?remove=true` to delete its record |
 | DELETE | `/api/v1/connection/devices?revoked=true` | Administrator removes every revoked phone's record; active phones are untouched |
@@ -171,13 +171,16 @@ address filled in, and carries an agent pairing code. That code is single-use, e
 minutes, and carries the address it was made at: it names no route, certificate pin or Cloudflare
 Access token.
 
-The agent never sends a password. It claims the code with `POST /api/v1/auth/login` and
-`{ client: "agent", pairing }`, which returns a bearer, its device and its `deviceCredential`
-once; later it sends `{ client: "agent", deviceId, deviceCredential }` for a new bearer. It acts
-as the adult who made the pairing. Every adult login is an administrator in practice, so its
+The agent never sends a password. It claims the code at
+`POST /api/v1/connection/pairings/{id}/claim`, like a phone, but is signed in at once: the claim
+returns a one-hour bearer and a refresh token, and no device credential. It renews at
+`POST /api/v1/auth/refresh` like any paired device, so the refresh token is its only long-lived
+secret: it rotates on every use and lapses after 90 days unused. It acts as the adult who made
+the pairing. Every adult login is an administrator in practice, so its
 grant (`AgentGrant`), not that account, bounds it: `read` or `controls`, never accounts, UniFi
 settings, resolvers, household-settings changes or connection management (403 `agent_scope`). It
-is refused through FamilyFi's remote access tunnel (403 `agent_remote`); like browser sign-in, an
+is refused through FamilyFi's remote access tunnel (403 `agent_remote`), at its claim, its refresh
+and every call; like browser sign-in, an
 address the household publishes itself is the household's choice. Agents are paired devices: they appear in `GET /connection/devices` with
 `client: agent` and are revoked like a phone, by an administrator or by themselves. The
 [authorization matrix](../tests/integration/authorization-matrix.test.ts) names, for each route,

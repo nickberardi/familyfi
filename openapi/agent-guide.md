@@ -17,30 +17,40 @@ The code is base64url JSON. Decode it to get `url` (where FamilyFi is) and `code
 python3 -c 'import base64,json,sys; s=sys.argv[1]; print(json.dumps(json.loads(base64.urlsafe_b64decode(s+"="*(-len(s)%4))), indent=2))' '<pairing code>'
 ```
 
-Claim it. You never need a password:
+The `code` is `<pairingId>.<token>`. Claim it; you never need a password:
 
 ```sh
-curl -sS -X POST "$url/api/v1/auth/login" -H 'content-type: application/json' \
-  -d '{"client":"agent","pairing":"<code>","deviceName":"<your name, e.g. Claude Code on a MacBook>"}'
+curl -sS -X POST "$url/api/v1/connection/pairings/<pairingId>/claim" -H 'content-type: application/json' \
+  -d '{"token":"<token>","deviceName":"<your name, e.g. Claude Code on a MacBook>"}'
 ```
 
-The response holds `token` (a bearer), `device.id`, `deviceCredential` and `device.grant`. Keep
-them where your environment keeps secrets, for example:
+The response holds:
+
+- `token`: your bearer. It lasts **one hour** (`session.expiresAt`).
+- `refreshToken`: what renews it. It lasts 90 days from its last use.
+- `device.id` and `device.grant`.
+
+Keep them where your environment keeps secrets, for example:
 
 ```sh
-export FAMILYFI_URL="$url" FAMILYFI_DEVICE_ID="<device.id>" FAMILYFI_DEVICE_CREDENTIAL="<deviceCredential>" FAMILYFI_TOKEN="<token>"
+export FAMILYFI_URL="$url" FAMILYFI_DEVICE_ID="<device.id>" FAMILYFI_REFRESH_TOKEN="<refreshToken>" FAMILYFI_TOKEN="<token>"
 ```
 
-**Never print, log or repeat the credential or token** to the person or in files you commit. Send
-`Authorization: Bearer $FAMILYFI_TOKEN` on every request. The token lasts 30 days. When a request
-answers `401`, get a new one with your credential, again without a password:
+**Never print, log or repeat the refresh token or bearer** to the person or in files you commit.
+Send `Authorization: Bearer $FAMILYFI_TOKEN` on every request.
+
+When a request answers `401`, or the hour is nearly up, renew:
 
 ```sh
-curl -sS -X POST "$FAMILYFI_URL/api/v1/auth/login" -H 'content-type: application/json' \
-  -d "{\"client\":\"agent\",\"deviceId\":\"$FAMILYFI_DEVICE_ID\",\"deviceCredential\":\"$FAMILYFI_DEVICE_CREDENTIAL\"}"
+curl -sS -X POST "$FAMILYFI_URL/api/v1/auth/refresh" -H 'content-type: application/json' \
+  -d "{\"refreshToken\":\"$FAMILYFI_REFRESH_TOKEN\"}"
 ```
 
-If that answers `403 device_not_paired`, you were disconnected. Ask for a new pairing code.
+It returns a new `token` **and a new `refreshToken`**:
+
+- **Always save the new refresh token at once.** The one you sent is spent.
+- Sending a spent refresh token again ends your access, because it looks like a stolen copy.
+- If refresh answers `403` with `invalid_refresh` or `refresh_reused`, your access has ended. That happens when you were disconnected, unused for 90 days, or reused a spent token. Ask the person for a new pairing code. (`agent_remote` only means you are not on the home network.)
 
 FamilyFi refuses agents that come through its remote access tunnel, which is for the household's phones.
 Connect from the home network.
@@ -103,7 +113,8 @@ or manage pairing, remote access or paired devices. These answer:
 | --- | --- | --- |
 | 403 | `agent_scope` | Your grant does not cover this. Ask the person to do it in the web app at `{{origin}}`. |
 | 403 | `agent_remote` | You reached FamilyFi through remote access. Connect from the home network. |
-| 401 | `unauthenticated` | Your token expired or was revoked. Renew it with your credential (step 1). |
+| 401 | `unauthenticated` | Your bearer expired. Renew it with your refresh token (step 1). |
+| 403 | `invalid_refresh`, `refresh_reused` | From refresh: your access has ended. Ask for a new pairing code. |
 
 To disconnect yourself, `DELETE /api/v1/connection/devices/$FAMILYFI_DEVICE_ID`.
 
