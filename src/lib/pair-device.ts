@@ -127,3 +127,20 @@ export function expiresLine(countdownText: string): string {
 export function pairingExpired(issued: { expiresAt: string } | null, state: Pick<PairingState, "status"> | null, now: number): boolean {
   return issued ? new Date(issued.expiresAt).getTime() <= now || state?.status === "expired" : false;
 }
+
+type Send = <T>(path: string, init?: { method?: string; body?: unknown }) => Promise<T>;
+
+/** Sign a paired phone or Watch out now; it must pair again. */
+export function revokePhone(send: Send, phone: Pick<PairedPhone, "id">) {
+  return send(`/api/v1/connection/devices/${phone.id}`, { method: "DELETE" });
+}
+
+/** Take a revoked device off the list for good. */
+export function removePhone(send: Send, phone: Pick<PairedPhone, "id">) {
+  return send(`/api/v1/connection/devices/${phone.id}?remove=true`, { method: "DELETE" });
+}
+
+/** Take every revoked device off the list. */
+export function removeRevokedPhones(send: Send) {
+  return send("/api/v1/connection/devices?revoked=true", { method: "DELETE" });
+}
