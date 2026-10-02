@@ -3,6 +3,7 @@ import type { EndpointCredential } from "./companion-trust";
 import {
   claimHousehold,
   refreshRoutes,
+  renewPaired,
   signInPaired,
   verifyHousehold,
   type ConnectionProfile,
@@ -95,16 +96,76 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     for (const listener of listeners) listener();
   };
 
-  /** Requests for the signed-in household, over its trusted routes, read at the moment they are sent. */
-  const request: ApiRequest = createCompanionRequest(transport, {
+  const connection = {
     routes: () => state.profile?.endpoints ?? [],
     edgeCredentials: () => credentials,
-    token: () => state.session?.token ?? null,
     activeRouteId: () => state.activeRouteId,
-    onRoute: (route) => {
+    onRoute: (route: { id: string }) => {
       if (state.activeRouteId !== route.id) set({ activeRouteId: route.id });
     },
-  });
+  };
+  /** One request over the trusted routes with the bearer held at the moment it is sent. */
+  const send: ApiRequest = createCompanionRequest(transport, { ...connection, token: () => state.session?.token ?? null });
+  /** The refresh call carries no bearer: its refresh token is the credential. */
+  const sendUnsigned: ApiRequest = createCompanionRequest(transport, { ...connection, token: () => null });
+
+  let renewing: Promise<void> | null = null;
+  /**
+   * Trades the refresh token for a new bearer, one renewal at a time: requests that find the bearer
+   * expiring together wait for the same one, so a refresh token is never spent twice. A refused
+   * token (spent, reused, revoked or expired) signs this phone out, as a refused bearer would; a
+   * route that cannot be reached leaves the session as it is, to try again.
+   */
+  function renew(): Promise<void> {
+    renewing ??= (async () => {
+      const asked = state.profile;
+      const held = state.session;
+      if (!asked || !held?.refreshToken) throw new ApiError("Signed out.", 401, "unauthorized");
+      try {
+        const next = await renewPaired(sendUnsigned, held.refreshToken);
+        // Signed out, forgotten or signed in again while it was asked: the answer is for a session the phone no longer holds.
+        if (!holds(asked) || state.session !== held) return;
+        await vault.saveSession(next);
+        if (!holds(asked) || state.session !== held) return;
+        set({ session: next });
+      } catch (error) {
+        if (error instanceof ApiError && holds(asked) && state.session === held) {
+          await vault.signOut();
+          set({ session: null, status: "signedOut" });
+          throw new ApiError(error.message, 401, error.code);
+        }
+        throw error;
+      }
+    })().finally(() => {
+      renewing = null;
+    });
+    return renewing;
+  }
+
+  /** The bearer runs out within this, so it is renewed first rather than refused mid-request. */
+  const RENEW_AHEAD_MS = 60_000;
+  const expiring = () => {
+    const expires = state.session ? Date.parse(state.session.session.expiresAt) : NaN;
+    return Boolean(state.session?.refreshToken) && Number.isFinite(expires) && expires - Date.now() < RENEW_AHEAD_MS;
+  };
+
+  /**
+   * Requests for the signed-in household, over its trusted routes. A bearer about to expire is
+   * renewed first, and a request the server refuses as unauthenticated is renewed and sent once more
+   * (it was refused before it could change anything). An unreachable renewal is left to the request.
+   */
+  const request: ApiRequest = async <T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> => {
+    if (expiring()) await renew().catch((error: unknown) => {
+      if (error instanceof ApiError) throw error;
+    });
+    try {
+      return await send<T>(path, init);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401 || !state.session?.refreshToken || path === "/api/v1/auth/login") throw error;
+      await renew();
+      return send<T>(path, init);
+    }
+  };
 
   /** Still paired with the household `asked` was for: not forgotten, nor replaced by another pairing. */
   const holds = (asked: ConnectionProfile) =>

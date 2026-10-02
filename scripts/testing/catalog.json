@@ -53,6 +53,11 @@
         "repository"
       ]
     },
+    "tests/unit/companion-session-refresh.test.ts": {
+      "categories": [
+        "sessions"
+      ]
+    },
     "tests/unit/connection-routes.test.ts": {
       "categories": [
         "trust"
