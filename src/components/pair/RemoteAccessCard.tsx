@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import {
   HOME_NETWORK_GUIDE,
   OWN_TRANSPORT,
+  REMOTE_STATUS,
   TAILSCALE_GUIDE,
   accessRollout,
   remoteChoice,
@@ -24,15 +25,6 @@ import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 type Top = "off" | "quick" | "named";
 type Via = "home" | "tailscale" | "cloudflare";
 type Cloudflare = "automatic" | "advanced";
-
-const STATUS: Record<RemoteAccess["status"], { label: string; ink: string }> = {
-  off: { label: "Off", ink: "var(--ff-muted)" },
-  "signing-in": { label: "Waiting for Cloudflare…", ink: "var(--ff-muted)" },
-  starting: { label: "Starting…", ink: "var(--ff-muted)" },
-  running: { label: "On", ink: "var(--ff-on-ink)" },
-  error: { label: "Not connected", ink: "var(--ff-danger)" },
-  unavailable: { label: "Unavailable", ink: "var(--ff-danger)" },
-};
 
 const LINK = "inline-flex items-center gap-1 font-semibold text-[var(--ff-accent)] underline";
 
@@ -146,7 +138,7 @@ export function RemoteAccessCard({
   }
 
   const noBinary = tunnel !== null && !tunnel.cloudflared;
-  const status = STATUS[tunnel?.status ?? "off"];
+  const status = REMOTE_STATUS[tunnel?.status ?? "off"];
   const settingUp = tunnel?.status === "signing-in";
   const domainReady = Boolean(tunnel?.hostname) && hostname.trim().toLowerCase() === tunnel?.hostname;
   const isPublished = choice === publishedChoice && publishedChoice !== "off";

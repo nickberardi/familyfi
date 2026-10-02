@@ -108,3 +108,13 @@ export function routeTrust(route: Pick<ConnectionRoute, "trustMode" | "spkiSha25
     route.trustMode === "pinned" && route.spkiSha256 ? `Pinned certificate ${shortPin(route.spkiSha256)}` : "Certificate checked by the system";
   return route.edgeAuth === "serviceToken" ? `${trust} · behind Cloudflare Access` : trust;
 }
+
+/** What remote access is doing, as Pair Device names it. */
+export const REMOTE_STATUS: Record<RemoteAccess["status"], { label: string; ink: string }> = {
+  off: { label: "Off", ink: "var(--ff-muted)" },
+  "signing-in": { label: "Waiting for Cloudflare…", ink: "var(--ff-muted)" },
+  starting: { label: "Starting…", ink: "var(--ff-muted)" },
+  running: { label: "On", ink: "var(--ff-on-ink)" },
+  error: { label: "Not connected", ink: "var(--ff-danger)" },
+  unavailable: { label: "Unavailable", ink: "var(--ff-danger)" },
+};

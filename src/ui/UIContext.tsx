@@ -38,6 +38,8 @@ export type UI = {
   Link: ComponentType<UILinkProps>;
   /** Asks before something that can't be undone; resolves true to go ahead. The web goes ahead without asking. */
   confirm: (request: UIConfirmRequest) => Promise<boolean>;
+  /** Puts text on the clipboard: a pairing code to paste on another phone. */
+  copyText: (value: string) => Promise<void>;
 };
 
 export type UIToggleProps = {

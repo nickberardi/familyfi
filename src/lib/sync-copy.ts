@@ -1,3 +1,5 @@
+import type { SyncStatus } from "./types";
+
 const ACTION: Record<string, string> = {
   pause: "Pause all internet",
   resume: "Resume internet",
@@ -87,4 +89,122 @@ export function formatLogWhen(iso: string, timezone: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(iso));
+}
+
+/** The Sync page's words. */
+export const SYNC_COPY = {
+  title: "Sync",
+  sub: "App-owned policy state, sweeps, and failures.",
+  when: "When",
+  action: "Action",
+  result: "Result",
+  now: "Now",
+  empty: "No changes yet. Reconcile writes desired state to UniFi.",
+  /** Around the mono "FamilyFi" in the ownership note. */
+  ownership: {
+    before: "Only policies FamilyFi created appear here — named with a",
+    prefix: "FamilyFi",
+    after: "prefix. Ownership is the recorded policy ID, not the name. Administrator rules are never modified, disabled, or reordered.",
+  },
+} as const;
+
+export type SyncStat = { label: string; value: string; ink: string; note: string };
+
+/** When the last sweep finished, or started if it is still running. */
+export function lastSweepAt(sync: Pick<SyncStatus, "lastRun"> | null | undefined): string | null {
+  return sync?.lastRun?.finishedAt ?? sync?.lastRun?.startedAt ?? null;
+}
+
+/** The four tiles above the log: policies FamilyFi owns, admin policies touched, failing, last sweep. */
+export function syncStats(sync: SyncStatus | null | undefined, now = new Date()): SyncStat[] {
+  const run = sync?.lastRun;
+  const failing = sync?.failingCount ?? 0;
+  const writeIssue = (sync?.issues ?? []).find((issue) => issue.kind !== "no_members");
+  const failingNote = writeIssue?.message ?? run?.error ?? "see the log";
+  return [
+    { label: "App-owned policies", value: String(sync?.appPolicyCount ?? 0), ink: "var(--ff-ink)", note: "named FamilyFi …" },
+    { label: "Admin policies touched", value: "0", ink: "var(--ff-on)", note: "never modified or reordered" },
+    {
+      label: "Failing",
+      value: String(failing),
+      ink: failing ? "var(--ff-danger)" : "var(--ff-on)",
+      note: failing ? failingNote : "nothing queued",
+    },
+    {
+      label: "Last sweep",
+      value: relativeSweep(lastSweepAt(sync), now),
+      ink: "var(--ff-ink)",
+      note: run ? `${run.status} · revision ${run.appliedRevision ?? run.requestedRevision}` : "no sweep yet",
+    },
+  ];
+}
+
+export type SyncLogRow = {
+  key: string;
+  when: string;
+  action: string;
+  /** A line under the action: an issue's or failure's message, or a change's device. */
+  detail: string | null;
+  detailInk: string;
+  detailMono: boolean;
+  result: string;
+  resultInk: string;
+};
+
+/** The log, as the Sync page lists it: the current issues at the last sweep, then every change, newest first. */
+export function syncLogRows(sync: SyncStatus | null | undefined, timezone: string): SyncLogRow[] {
+  const sweepAt = lastSweepAt(sync);
+  const issues = (sync?.issues ?? []).map((issue): SyncLogRow => ({
+    key: `issue-${issue.groupId}`,
+    when: sweepAt ? formatLogWhen(sweepAt, timezone) : SYNC_COPY.now,
+    action: issueActionLabel(issue.kind),
+    detail: issue.message,
+    detailInk: issueResultColor(issue.kind),
+    detailMono: false,
+    result: issueResultLabel(issue.kind),
+    resultInk: issueResultColor(issue.kind),
+  }));
+  const changes = (sync?.changes ?? []).map((change): SyncLogRow => ({
+    key: change.id,
+    when: formatLogWhen(change.updatedAt, timezone),
+    action: changeActionLabel(change.scope),
+    detail: change.error ?? (change.deviceMac ? changePolicyLabel(change.deviceMac) : null),
+    detailInk: change.error ? "var(--ff-danger)" : "var(--ff-muted)",
+    detailMono: !change.error && Boolean(change.deviceMac),
+    result: changeResultLabel(change.status),
+    resultInk: changeResultColor(change.status),
+  }));
+  return [...issues, ...changes];
+}
+
+/** Whether sync needs attention: the last sweep failed, UniFi is unreachable, or a policy is failing. */
+export function syncFailed(sync: Pick<SyncStatus, "lastRun" | "connectionStatus" | "failingCount"> | null | undefined): boolean {
+  return sync?.lastRun?.status === "failed" || sync?.connectionStatus === "error" || (sync?.failingCount ?? 0) > 0;
+}
+
+/** How many family groups have rules that cannot be created until they have a device: the Family badge. */
+export function familyNeedsDevices(sync: Pick<SyncStatus, "issues"> | null | undefined): number {
+  return (sync?.issues ?? []).filter((issue) => issue.kind === "no_members").length;
+}
+
+/**
+ * The sync status card beside the navigation: what state the gateway is in, why, and whether to
+ * offer Reconcile now. `busy`, `error` and `notice` are the household store's.
+ */
+export function syncStatusCard(
+  sync: SyncStatus | null | undefined,
+  { busy = false, error = "", notice = "" }: { busy?: boolean; error?: string | null; notice?: string | null } = {},
+) {
+  const failed = syncFailed(sync);
+  const unconfigured = sync?.connectionStatus === "unconfigured";
+  const partial = sync?.lastRun?.status === "partial";
+  return {
+    title: unconfigured ? "UniFi not configured" : failed ? "Sync needs attention" : partial ? "Partial apply" : "Gateway in sync",
+    dot: unconfigured ? "var(--ff-muted)" : failed ? "var(--ff-danger)" : "var(--ff-on)",
+    message: busy
+      ? "Writing desired state to UniFi…"
+      : error || notice || (failed ? sync?.lastRun?.error : null) || "Desired state is written on the next reconcile.",
+    showReconcile: busy || unconfigured || failed || partial,
+    reconcile: busy ? "Reconciling…" : "Reconcile now",
+  };
 }
