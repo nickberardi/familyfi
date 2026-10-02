@@ -1,6 +1,6 @@
 /**
- * Putting devices in a group, as every client offers it: the devices waiting for one, how a
- * device is named and placed, and what a group with none is told.
+ * Putting devices in a group, as every client offers it: how a device is named, sorted and placed,
+ * and what a group with none is told.
  */
 import type { Device, Group } from "./types";
 
@@ -22,22 +22,10 @@ export function networkLabel(device: Device, networks: { id: string; name: strin
   return device.networkId ?? "Unknown network";
 }
 
-/** The devices a group can take: every Unassigned (quarantined) one, by name. */
-export function unassignedDevices(devices: Device[]): Device[] {
-  return devices.filter((device) => device.assignment === "quarantined").sort(byDeviceName);
-}
-
-/** What assigning devices to a group says, on the web's Devices page and the app's sheet. */
+/** What a group with no devices is told on the Devices list, opened with `?assign=<group>`. */
 export function assignDevicesCopy(group: Pick<Group, "name">) {
   return {
     needsTitle: `${group.name} needs devices`,
     needsBody: `${group.name} has no assigned devices, so its UniFi policies cannot be created. Assign an unassigned device below.`,
-    title: `Assign devices to ${group.name}`,
-    assigned: "In this group",
-    unassigned: "Unassigned",
-    noneWaiting: "No unassigned devices. New devices appear here when they join a managed network.",
-    assign: "Assign",
-    remove: "Remove",
-    done: "Done",
   } as const;
 }
