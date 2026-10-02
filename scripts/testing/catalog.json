@@ -814,6 +814,11 @@
         "categories",
         "schedules"
       ]
+    },
+    "tests/unit/watch.test.ts": {
+      "categories": [
+        "pairing"
+      ]
     }
   }
 }
