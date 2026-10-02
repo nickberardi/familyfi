@@ -1,6 +1,6 @@
 "use client";
 
-import { agentGrantLabel } from "@/lib/agent-prompt";
+import { scopeLabel } from "@/lib/agent-prompt";
 import { relativeSweep } from "@/lib/sync-copy";
 import type { PairedPhone } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
@@ -22,7 +22,7 @@ export function AgentRow({ agent, onRevoke }: { agent: PairedPhone; onRevoke: ()
       <div className="min-w-[200px] flex-1">
         <div className="text-[14px] font-semibold">{agent.displayName}</div>
         <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">
-          {agentGrantLabel(agent.grant)}
+          {scopeLabel(agent.scope)}
           {actsAs ? ` · acts as ${actsAs}` : ""} · last seen {seen === "now" || seen === "never" ? seen : `${seen} ago`}
         </div>
         {expired ? (

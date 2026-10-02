@@ -33,7 +33,7 @@
         "contracts"
       ]
     },
-    "tests/unit/agent-grant.test.ts": {
+    "tests/unit/device-scope.test.ts": {
       "categories": [
         "pairing",
         "sessions"

@@ -49,11 +49,11 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
-| POST | `/api/v1/connection/pairings` | Administrator creates a single-use pairing code: five minutes for a phone on a route, fifteen for an agent (`client: agent`, `grant`) at the address it was made from |
+| POST | `/api/v1/connection/pairings` | Administrator creates a single-use pairing code: five minutes for a phone on a route, fifteen for an agent (`client: agent`, `scope`) at the address it was made from |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest; an agent consumes an agent pairing and receives a bearer and refresh token instead |
-| GET | `/api/v1/connection/devices` | Administrator list of paired phones, Watches and agents (agents with their `grant`), the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
+| GET | `/api/v1/connection/devices` | Administrator list of paired phones, Watches and agents with each one's `scope`, the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
 | POST | `/api/v1/connection/devices` | A signed-in paired iPhone automatically enrolls its reachable Watch (`client: "watch"`, `clientId`) as an independent device and receives its own credential and bearer for transfer |
 | DELETE | `/api/v1/connection/devices/{id}` | Administrator or the device itself revokes that device and its sessions. Only an administrator may use `?remove=true` to delete its record |
 | DELETE | `/api/v1/connection/devices?revoked=true` | Administrator removes every revoked phone's record; active phones are untouched |
@@ -156,7 +156,7 @@ device that lost the response, and presenting it after that ends the whole sign-
 device, signing out, a password change or removing the account ends them together.
 The iPhone may automatically enroll its reachable Watch without another administrator pairing.
 The Watch receives its own device credential and bearer token, appears as a separate device in
-System → Pair Device, and can be revoked there independently. Its sessions may only read session,
+System → Pair Device, and can be revoked there independently. Its scope is `rulesOnly`: its sessions may only read session,
 connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
 resume, extend, allow, disallow, turn on and turn off any rule, or lift one for a single group; role never limits a control. They cannot
 create, edit or delete rules. Signing out or revoking the phone does
@@ -165,7 +165,7 @@ not revoke the Watch. It renews its own bearer with its own refresh token.
 ### Agents
 
 An administrator connects an AI agent from **System → API** (`/reference`): name it, choose a
-grant, and copy the prompt shown. The prompt points the agent at `/agents.md`, a guide served
+scope (**Full access** or **Read only**), and copy the prompt shown. The prompt points the agent at `/agents.md`, a guide served
 without a session from [`openapi/agent-guide.md`](../openapi/agent-guide.md) with this server's
 address filled in, and carries an agent pairing code. That code is single-use, expires in fifteen
 minutes, and carries the address it was made at: it names no route, certificate pin or Cloudflare
@@ -176,15 +176,30 @@ The agent never sends a password. It claims the code at
 returns a one-hour bearer and a refresh token, and no device credential. It renews at
 `POST /api/v1/auth/refresh` like any paired device, so the refresh token is its only long-lived
 secret: it rotates on every use and lapses after 90 days unused. It acts as the adult who made
-the pairing. Every adult login is an administrator in practice, so its
-grant (`AgentGrant`), not that account, bounds it: `read` or `controls`, never accounts, UniFi
-settings, resolvers, household-settings changes or connection management (403 `agent_scope`). It
+the pairing. Every adult login is an administrator in practice, so its scope, not that account,
+bounds it: `agent:full` or `agent:readOnly`, never accounts, UniFi settings, resolvers,
+household-settings changes or connection management (403 `agent_scope`). It
 is refused through FamilyFi's remote access tunnel (403 `agent_remote`), at its claim, its refresh
 and every call; like browser sign-in, an
 address the household publishes itself is the household's choice. Agents are paired devices: they appear in `GET /connection/devices` with
 `client: agent` and are revoked like a phone, by an administrator or by themselves. The
 [authorization matrix](../tests/integration/authorization-matrix.test.ts) names, for each route,
-the least grant an agent needs.
+which device scopes may call it.
+
+### Device scopes
+
+Every paired device has a `scope` (`DeviceScope`), and each (client, scope) pair is one explicit
+allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not a ladder:
+
+| Pair | May call |
+| --- | --- |
+| `phone:full` | Whatever its account may |
+| `watch:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (401 `watch_scope` beyond that) |
+| `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
+| `agent:readOnly` | Household reads |
+
+No other pair is valid. A phone always pairs as `full` and a Watch enrolls as `rulesOnly`; an
+adult chooses an agent's scope when connecting it.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity

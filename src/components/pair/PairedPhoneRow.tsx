@@ -1,5 +1,6 @@
 "use client";
 
+import { scopeLabel } from "@/lib/agent-prompt";
 import { transportLabel } from "@/lib/connection-routes";
 import { relativeSweep } from "@/lib/sync-copy";
 import type { PairedPhone } from "@/lib/types";
@@ -28,7 +29,9 @@ export function PairedPhoneRow({
         <Icon name={phone.client === "watch" ? "watch" : "device-mobile"} size={18} />
       </span>
       <div className="min-w-[200px] flex-1">
-        <div className="text-[14px] font-semibold">{phone.displayName}</div>
+        <div className="text-[14px] font-semibold">
+          {phone.displayName} <span className="font-normal text-[var(--ff-muted)]">· {scopeLabel(phone.scope)}</span>
+        </div>
         <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">
           Paired {pairedDate(phone.enrolledAt)} · {phone.revokedAt ? `revoked ${pairedDate(phone.revokedAt)}` : `last seen ${seen === "now" || seen === "never" ? seen : `${seen} ago`}`}
         </div>

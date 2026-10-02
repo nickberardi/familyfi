@@ -20,7 +20,7 @@ import {
   TUNNEL_HEADER,
 } from "@/lib/constants";
 import { jsonError } from "./http";
-import { agentRouteAllowed } from "./agent-grant";
+import { deviceRouteAllowed } from "./device-scope";
 
 const ARGON2 = {
   memoryCost: 19456,
@@ -264,22 +264,6 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
   return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
 }
 
-/** Watch credentials can only read state and pause, resume, extend, allow or disallow rules, including a group's own `internet` rule. */
-function watchRouteAllowed(request: Request): boolean {
-  const path = new URL(request.url).pathname;
-  if (request.method === "GET") {
-    return path === "/api/v1/auth/session"
-      || path === "/api/v1/connection"
-      || path === "/api/v1/groups"
-      || path === "/api/v1/rules"
-      || /^\/api\/v1\/changes\/[^/]+$/.test(path);
-  }
-  if (request.method === "DELETE" && /^\/api\/v1\/connection\/devices\/[^/]+$/.test(path)) return true;
-  return request.method === "POST"
-    && (/^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/.test(path)
-      || /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/.test(path));
-}
-
 /** The session token a request carries: its bearer, or else its session cookie. */
 async function presentedToken(request: Request): Promise<string | undefined> {
   const header = request.headers.get("authorization");
@@ -323,16 +307,17 @@ export function toPublicSession(session: {
 export async function requireSession(request: Request) {
   const session = await readSessionFromRequest(request);
   if (!session) return { session: null, error: jsonError(401, "unauthenticated", "Sign in required.") };
-  if (session.device?.client === PairedDeviceClient.watch && !watchRouteAllowed(request)) {
-    return { session: null, error: jsonError(401, "watch_scope", "This Watch session cannot use that endpoint.") };
-  }
-  if (session.device?.client === PairedDeviceClient.agent) {
-    if (request.headers.get(TUNNEL_HEADER) === "tunnel") {
+  const device = session.device;
+  if (device) {
+    if (device.client === PairedDeviceClient.agent && request.headers.get(TUNNEL_HEADER) === "tunnel") {
       return { session: null, error: jsonError(403, "agent_remote", "Agents connect from the home network only.") };
     }
-    const path = new URL(request.url).pathname;
-    if (!agentRouteAllowed({ method: request.method, path, grant: session.device.agentGrant, deviceId: session.device.id })) {
-      return { session: null, error: jsonError(403, "agent_scope", "This agent's grant does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.") };
+    if (!deviceRouteAllowed({ client: device.client, scope: device.scope, deviceId: device.id, method: request.method, path: new URL(request.url).pathname })) {
+      // Each kind keeps the refusal its clients already handle.
+      if (device.client === PairedDeviceClient.agent) {
+        return { session: null, error: jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.") };
+      }
+      return { session: null, error: jsonError(401, "watch_scope", "This Watch session cannot use that endpoint.") };
     }
   }
   return { session, error: null };
