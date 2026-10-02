@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { SessionKind } from "@prisma/client";
+import { PairedDeviceClient, SessionKind } from "@prisma/client";
 import {
   CSRF_COOKIE,
   SESSION_COOKIE,
@@ -13,8 +13,18 @@ import {
   toPublicSession,
 } from "@/server/auth";
 import { clientIp, jsonCaughtError, jsonError } from "@/server/http";
-import { authenticatePairedDevice } from "@/server/connection";
+import { authenticatePairedDevice, claimAgentPairing } from "@/server/connection";
+import { prisma } from "@/server/db";
 import { TUNNEL_HEADER } from "@/lib/constants";
+
+/**
+ * An agent never sends a password. The first call claims its pairing (`pairing` is the code's
+ * `pairingId.token`); every later call renews with the device credential that claim returned.
+ */
+const AgentBody = z.union([
+  z.object({ client: z.literal("agent"), pairing: z.string().regex(/^[^.]+\.[^.]+$/), deviceName: z.string().trim().min(1).max(80).optional() }),
+  z.object({ client: z.literal("agent"), deviceId: z.string().min(1), deviceCredential: z.string().min(1) }),
+]);
 
 const Body = z.object({
   username: z.string(),
@@ -35,6 +45,7 @@ export async function POST(request: Request) {
   } catch {
     return jsonError(400, "invalid_json", "Request body must be JSON.");
   }
+  if (json && typeof json === "object" && "client" in json && json.client === "agent") return agentLogin(request, json);
   const parsed = Body.safeParse(json);
   if (!parsed.success) {
     return jsonError(400, "invalid_request", "Username and password are required.");
@@ -84,6 +95,41 @@ export async function POST(request: Request) {
   }
 }
 
-function pairedDevice(body: { deviceId?: string; deviceCredential?: string }) {
-  return body.deviceId && body.deviceCredential ? authenticatePairedDevice(body.deviceId, body.deviceCredential) : Promise.resolve(null);
+/** A phone or Watch; an agent's credential signs in only as an agent. */
+async function pairedDevice(body: { deviceId?: string; deviceCredential?: string }) {
+  const device = body.deviceId && body.deviceCredential ? await authenticatePairedDevice(body.deviceId, body.deviceCredential) : null;
+  return device?.client === PairedDeviceClient.agent ? null : device;
+}
+
+async function agentLogin(request: Request, json: unknown) {
+  const parsed = AgentBody.safeParse(json);
+  if (!parsed.success) return jsonError(400, "invalid_request", "An agent sends its pairing, or its device ID and credential.");
+  if (request.headers.get(TUNNEL_HEADER) === "tunnel") return jsonError(403, "agent_remote", "Agents connect from the home network only.");
+  try {
+    const body = parsed.data;
+    if ("pairing" in body) {
+      const [id, token] = body.pairing.split(".");
+      const claimed = await claimAgentPairing({ id, token, displayName: body.deviceName, userAgent: request.headers.get("user-agent") });
+      if (!claimed) return jsonError(403, "invalid_pairing", "Pairing code is invalid, expired, or already used.");
+      return NextResponse.json({
+        session: toPublicSession({ username: claimed.account.username, expiresAt: claimed.expiresAt, account: claimed.account }),
+        token: claimed.token,
+        tokenType: "Bearer" as const,
+        device: { id: claimed.device.id, displayName: claimed.device.displayName, grant: claimed.device.agentGrant },
+        deviceCredential: claimed.credential,
+      });
+    }
+    const device = await authenticatePairedDevice(body.deviceId, body.deviceCredential);
+    const account = device?.client === PairedDeviceClient.agent && device.accountId ? await prisma().account.findUnique({ where: { id: device.accountId } }) : null;
+    if (!device || !account) return jsonError(403, "device_not_paired", "This agent is not paired, or was disconnected. Ask for a new pairing code.");
+    const issued = await createSession({ accountId: account.id, username: account.username, kind: SessionKind.bearer, userAgent: request.headers.get("user-agent"), deviceId: device.id });
+    return NextResponse.json({
+      session: toPublicSession({ username: account.username, expiresAt: issued.expiresAt, account }),
+      token: issued.raw,
+      tokenType: "Bearer" as const,
+      device: { id: device.id, displayName: device.displayName, grant: device.agentGrant },
+    });
+  } catch (error) {
+    return jsonCaughtError(error);
+  }
 }

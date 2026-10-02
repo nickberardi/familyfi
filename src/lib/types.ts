@@ -148,17 +148,22 @@ export type ConnectionRoute = {
   edgeTokenVersion: number | null;
 };
 
+/** What a paired agent may do: read household state, or also manage household controls. */
+export type AgentGrant = "read" | "controls";
+
 export type PairedPhone = {
   id: string;
   displayName: string;
-  client: "phone" | "watch";
+  client: "phone" | "watch" | "agent";
+  /** An agent's grant; null for phones and Watches. */
+  grant: AgentGrant | null;
   enrolledAt: string;
   lastSeenAt: string | null;
   revokedAt: string | null;
   pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
   /** The Access token version FamilyFi last handed this device, per protected route. */
   edgeTokens: { endpointId: string; version: number }[];
-  sessions: { id: string; username: string; client: "phone" | "watch"; expiresAt: string; createdAt: string }[];
+  sessions: { id: string; username: string; client: "phone" | "watch" | "agent"; expiresAt: string; createdAt: string }[];
 };
 
 export type PairingState = {

@@ -35,7 +35,8 @@ export default function PairDevicePage() {
       ]);
       setTunnel(state.tunnel);
       setRoutes(endpoints.endpoints);
-      setPhones(devices.devices);
+      // Agents are paired devices too, managed on the API page.
+      setPhones(devices.devices.filter((device) => device.client !== "agent"));
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === "administrator_required") setForbidden(true);
       else setError(caught instanceof Error ? caught.message : "Could not load remote access.");

@@ -11,7 +11,7 @@
 
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import { AccountKind, SessionKind } from "@prisma/client";
+import { AccountKind, AgentGrant, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { beforeAll, describe, expect, it } from "vitest";
 import { CSRF_COOKIE, RECOVERY_USERNAME, SESSION_COOKIE } from "@/lib/constants";
 import { createSession, hashPassword } from "@/server/auth";
@@ -34,8 +34,10 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
  *   access without a paired phone. Its headers go through the phone gateway's own
  *   `tunnelHeaders`, so the cookie is stripped and `x-familyfi-via: tunnel` is stamped
  *   exactly as they would be in production.
+ * - `agent-read` and `agent-controls`: a paired agent on the home network, acting as the
+ *   administrator who paired it, with that grant. Its grant bounds it, not the account.
  */
-const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel"] as const;
+const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel", "agent-read", "agent-controls"] as const;
 type Caller = (typeof CALLERS)[number];
 
 type Outcome = "allowed" | "401" | "403";
@@ -56,7 +58,9 @@ type Outcome = "allowed" | "401" | "403";
  */
 type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token" | "paired-phone";
 
-const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
+type Person = Exclude<Caller, "agent-read" | "agent-controls">;
+
+const EXPECTED: Record<Access, Record<Person, Outcome>> = {
   public: { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "allowed" },
   "home-network": { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
   session: { anonymous: "401", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "401" },
@@ -68,11 +72,26 @@ const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
 };
 
 /**
+ * An agent passes where no session is needed, and on a `session` route only when the route
+ * names a grant it holds. It is never an administrator, a paired phone or a pairing token.
+ */
+function agentOutcome(entry: Entry, grant: AgentGrant): Outcome {
+  if (entry.access === "public" || entry.access === "home-network" || entry.access === "csrf") return "allowed";
+  if (entry.access !== "session" || !entry.agent) return "403";
+  return entry.agent === AgentGrant.read || grant === AgentGrant.controls ? "allowed" : "403";
+}
+
+function expected(entry: Entry): Record<Caller, Outcome> {
+  return { ...EXPECTED[entry.access], "agent-read": agentOutcome(entry, AgentGrant.read), "agent-controls": agentOutcome(entry, AgentGrant.controls) };
+}
+
+/**
+ * `agent` is the least grant a paired agent needs for a `session` route; without it no agent may call it.
  * `question` marks a cell encoded as it behaves today, where the route looks more open
  * than its neighbours suggest. It is for the maintainer to confirm or tighten; changing
  * the access here is the decision, and the route's guard must change with it.
  */
-type Entry = { access: Access; question?: string };
+type Entry = { access: Access; agent?: AgentGrant; question?: string };
 
 /**
  * Administrator is a flag, not a tier: it gates phone pairing and remote access
@@ -91,8 +110,8 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/auth/login": { access: "home-network" },
   "POST /api/v1/auth/logout": { access: "csrf" },
   "POST /api/v1/auth/refresh": { access: "refresh-token" },
-  "GET /api/v1/auth/session": { access: "session" },
-  "GET /api/v1/changes/{id}": { access: "session" },
+  "GET /api/v1/auth/session": { access: "session", agent: "read" },
+  "GET /api/v1/changes/{id}": { access: "session", agent: "read" },
   "GET /api/v1/connection": { access: "session" },
   "GET /api/v1/connection/devices": { access: "administrator" },
   "POST /api/v1/connection/devices": { access: "paired-phone" },
@@ -110,53 +129,53 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/connection/pins": { access: "administrator" },
   "GET /api/v1/connection/tunnel": { access: "administrator" },
   "PUT /api/v1/connection/tunnel": { access: "administrator" },
-  "GET /api/v1/devices": { access: "session" },
-  "GET /api/v1/devices/{mac}": { access: "session" },
-  "DELETE /api/v1/devices/{mac}": { access: "session" },
-  "PUT /api/v1/devices/{mac}/assignment": { access: "session" },
-  "GET /api/v1/dpi/applications": { access: "session" },
-  "GET /api/v1/dpi/categories": { access: "session" },
-  "GET /api/v1/groups": { access: "session" },
+  "GET /api/v1/devices": { access: "session", agent: "read" },
+  "GET /api/v1/devices/{mac}": { access: "session", agent: "read" },
+  "DELETE /api/v1/devices/{mac}": { access: "session", agent: "controls" },
+  "PUT /api/v1/devices/{mac}/assignment": { access: "session", agent: "controls" },
+  "GET /api/v1/dpi/applications": { access: "session", agent: "read" },
+  "GET /api/v1/dpi/categories": { access: "session", agent: "read" },
+  "GET /api/v1/groups": { access: "session", agent: "read" },
   "GET /api/v1/groups/{id}/resolver": { access: "session" },
-  "POST /api/v1/groups": { access: "session" },
-  "GET /api/v1/groups/{id}": { access: "session" },
-  "PUT /api/v1/groups/{id}": { access: "session" },
-  "DELETE /api/v1/groups/{id}": { access: "session" },
+  "POST /api/v1/groups": { access: "session", agent: "controls" },
+  "GET /api/v1/groups/{id}": { access: "session", agent: "read" },
+  "PUT /api/v1/groups/{id}": { access: "session", agent: "controls" },
+  "DELETE /api/v1/groups/{id}": { access: "session", agent: "controls" },
   "PUT /api/v1/groups/{id}/resolver": { access: "session" },
   "DELETE /api/v1/groups/{id}/resolver": { access: "session" },
   "GET /api/v1/health": { access: "public" },
-  "GET /api/v1/rules": { access: "session" },
-  "POST /api/v1/rules": { access: "session" },
-  "GET /api/v1/rules/{id}": { access: "session" },
-  "PATCH /api/v1/rules/{id}": { access: "session" },
-  "DELETE /api/v1/rules/{id}": { access: "session" },
-  "POST /api/v1/rules/{id}/allow": { access: "session" },
-  "POST /api/v1/rules/{id}/disallow": { access: "session" },
-  "POST /api/v1/rules/{id}/extend": { access: "session" },
-  "POST /api/v1/rules/{id}/off": { access: "session" },
-  "POST /api/v1/rules/{id}/on": { access: "session" },
-  "POST /api/v1/rules/{id}/pause": { access: "session" },
-  "POST /api/v1/rules/{id}/resume": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/allow": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/disallow": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/extend": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/pause": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/resume": { access: "session" },
-  "GET /api/v1/settings/household": { access: "session" },
+  "GET /api/v1/rules": { access: "session", agent: "read" },
+  "POST /api/v1/rules": { access: "session", agent: "controls" },
+  "GET /api/v1/rules/{id}": { access: "session", agent: "read" },
+  "PATCH /api/v1/rules/{id}": { access: "session", agent: "controls" },
+  "DELETE /api/v1/rules/{id}": { access: "session", agent: "controls" },
+  "POST /api/v1/rules/{id}/allow": { access: "session", agent: "controls" },
+  "POST /api/v1/rules/{id}/disallow": { access: "session", agent: "controls" },
+  "POST /api/v1/rules/{id}/extend": { access: "session", agent: "controls" },
+  "POST /api/v1/rules/{id}/off": { access: "session", agent: "controls" },
+  "POST /api/v1/rules/{id}/on": { access: "session", agent: "controls" },
+  "POST /api/v1/rules/{id}/pause": { access: "session", agent: "controls" },
+  "POST /api/v1/rules/{id}/resume": { access: "session", agent: "controls" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/allow": { access: "session", agent: "controls" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/disallow": { access: "session", agent: "controls" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/extend": { access: "session", agent: "controls" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/pause": { access: "session", agent: "controls" },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/resume": { access: "session", agent: "controls" },
+  "GET /api/v1/settings/household": { access: "session", agent: "read" },
   "PUT /api/v1/settings/household": { access: "session" },
   "GET /api/v1/settings/unifi": { access: "session" },
   "PUT /api/v1/settings/unifi": { access: "session" },
   "POST /api/v1/settings/unifi/test": { access: "session" },
-  "GET /api/v1/sync": { access: "session" },
-  "POST /api/v1/sync/retry": { access: "session" },
-  "GET /api/v1/upstream/categories": { access: "session" },
-  "POST /api/v1/upstream/categories": { access: "session" },
-  "GET /api/v1/upstream/categories/{id}": { access: "session" },
-  "PATCH /api/v1/upstream/categories/{id}": { access: "session" },
-  "DELETE /api/v1/upstream/categories/{id}": { access: "session" },
-  "POST /api/v1/upstream/categories/{id}/check": { access: "session" },
-  "GET /api/v1/upstream/checks": { access: "session" },
-  "POST /api/v1/upstream/checks/run": { access: "session" },
+  "GET /api/v1/sync": { access: "session", agent: "read" },
+  "POST /api/v1/sync/retry": { access: "session", agent: "controls" },
+  "GET /api/v1/upstream/categories": { access: "session", agent: "read" },
+  "POST /api/v1/upstream/categories": { access: "session", agent: "controls" },
+  "GET /api/v1/upstream/categories/{id}": { access: "session", agent: "read" },
+  "PATCH /api/v1/upstream/categories/{id}": { access: "session", agent: "controls" },
+  "DELETE /api/v1/upstream/categories/{id}": { access: "session", agent: "controls" },
+  "POST /api/v1/upstream/categories/{id}/check": { access: "session", agent: "controls" },
+  "GET /api/v1/upstream/checks": { access: "session", agent: "read" },
+  "POST /api/v1/upstream/checks/run": { access: "session", agent: "controls" },
   "GET /api/v1/upstream/resolver": { access: "session" },
   "PUT /api/v1/upstream/resolver": { access: "session" },
   "DELETE /api/v1/upstream/resolver": { access: "session" },
@@ -201,7 +220,8 @@ async function discoverRoutes(): Promise<Route[]> {
 
 const routes = await discoverRoutes();
 
-const accounts: Partial<Record<Caller, string>> = {};
+const accounts: Partial<Record<Person, string>> = {};
+const agents: Partial<Record<Caller, string>> = {};
 
 async function signedIn(accountId: string, username: string) {
   const issued = await createSession({ accountId, username, kind: SessionKind.cookie });
@@ -218,6 +238,10 @@ async function requestAs(caller: Caller, route: Route): Promise<Request> {
     body: hasBody ? JSON.stringify(BODIES[route.key] ?? {}) : undefined,
   };
   if (caller === "anonymous") return request(url, init);
+  if (caller === "agent-read" || caller === "agent-controls") {
+    const issued = await createSession({ accountId: accounts.administrator!, username: "matrix-admin", kind: SessionKind.bearer, deviceId: agents[caller] });
+    return request(url, { ...init, auth: { cookie: "", csrf: "", token: issued.raw } });
+  }
   const account = caller === "tunnel" ? accounts.administrator! : accounts[caller]!;
   const username = (await prisma().account.findUniqueOrThrow({ where: { id: account } })).username;
   const lan = request(url, { ...init, auth: await signedIn(account, username) });
@@ -240,6 +264,10 @@ describe("authorization matrix", () => {
     const member = await prisma().account.create({ data: { username: "matrix-member", displayName: "Member", kind: AccountKind.personal, isAdmin: false, passwordHash } });
     const administrator = await prisma().account.create({ data: { username: "matrix-admin", displayName: "Administrator", kind: AccountKind.personal, isAdmin: true, passwordHash } });
     Object.assign(accounts, { member: member.id, administrator: administrator.id, recovery: recovery.id });
+    for (const [caller, grant] of [["agent-read", AgentGrant.read], ["agent-controls", AgentGrant.controls]] as const) {
+      const agent = await prisma().pairedDevice.create({ data: { displayName: caller, credentialHash: `matrix-${caller}`, client: PairedDeviceClient.agent, agentGrant: grant, accountId: administrator.id } });
+      agents[caller] = agent.id;
+    }
   });
 
   it("covers every route and method, and names none that do not exist", () => {
@@ -257,6 +285,6 @@ describe("authorization matrix", () => {
       const response = await route.handler(await requestAs(caller, route), { params: Promise.resolve(PARAMS) });
       actual[caller] = outcome(response.status);
     }
-    expect(actual).toEqual(EXPECTED[entry.access]);
+    expect(actual).toEqual(expected(entry));
   });
 });

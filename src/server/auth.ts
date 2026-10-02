@@ -17,8 +17,10 @@ import {
   REFRESH_TOKEN_TTL_MS,
   SESSION_COOKIE,
   SESSION_TTL_MS,
+  TUNNEL_HEADER,
 } from "@/lib/constants";
 import { jsonError } from "./http";
+import { agentRouteAllowed } from "./agent-grant";
 
 const ARGON2 = {
   memoryCost: 19456,
@@ -78,6 +80,13 @@ export function requestIsHttps(request: Request): boolean {
   const forwarded = request.headers.get("x-forwarded-host") || request.headers.get("forwarded");
   if (!proto || !forwarded) return false;
   return proto.split(",")[0]?.trim() === "https";
+}
+
+/** The origin the caller reached this server at, as a browser on the home network sees it. */
+export function requestOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host") || url.host;
+  return `${requestIsHttps(request) ? "https" : "http"}://${host}`;
 }
 
 export function cookieOptions(maxAgeSeconds: number, secure: boolean) {
@@ -313,6 +322,15 @@ export async function requireSession(request: Request) {
   if (!session) return { session: null, error: jsonError(401, "unauthenticated", "Sign in required.") };
   if (session.device?.client === PairedDeviceClient.watch && !watchRouteAllowed(request)) {
     return { session: null, error: jsonError(401, "watch_scope", "This Watch session cannot use that endpoint.") };
+  }
+  if (session.device?.client === PairedDeviceClient.agent) {
+    if (request.headers.get(TUNNEL_HEADER) === "tunnel") {
+      return { session: null, error: jsonError(403, "agent_remote", "Agents connect from the home network only.") };
+    }
+    const path = new URL(request.url).pathname;
+    if (!agentRouteAllowed({ method: request.method, path, grant: session.device.agentGrant, deviceId: session.device.id })) {
+      return { session: null, error: jsonError(403, "agent_scope", "This agent's grant does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.") };
+    }
   }
   return { session, error: null };
 }

@@ -45,6 +45,7 @@ export type IconName =
   | "television"
   | "speaker-high"
   | "watch"
+  | "robot"
   | "printer"
   | "game-controller"
   | "wifi-high"

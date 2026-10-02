@@ -132,6 +132,7 @@ then read its callers and focused tests. Native feature details belong in its ow
 | Settings | Gateway key/network scope, household settings, roles and logins | [gateway settings](../src/server/unifi-settings.ts), [accounts](../src/server/accounts.ts), [authorization matrix](../tests/integration/authorization-matrix.test.ts) |
 | Sync | Reconciliation history and per-change outcomes | [reconciliation](../src/server/reconciliation.ts), [changes](../src/server/changes.ts), [reconciliation path tests](../tests/integration/reconcile-paths.test.ts) |
 | Pair Device | Companion enrollment and remote connection management | [connection](../src/server/connection.ts), [remote access](../src/server/tunnel/remote-access.ts), [pairing browser tests](../tests/browser/pair.spec.ts) |
+| AI agents | Connect an agent from the API page: a prompt with an agent pairing code, the `/agents.md` guide, and the grant that bounds a paired agent | [agent grant](../src/server/agent-grant.ts), [connection](../src/server/connection.ts), [guide](../openapi/agent-guide.md), [agent tests](../tests/integration/agent-pairing.test.ts), [API docs](api.md#agents) |
 | API reference | Authenticated interactive HTTP documentation | [OpenAPI](../openapi/familyfi.v1.yaml), [contract validation](testing.md) |
 
 ## Desired internet block
