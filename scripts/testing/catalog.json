@@ -577,6 +577,12 @@
         "database"
       ]
     },
+    "tests/integration/session-refresh.test.ts": {
+      "categories": [
+        "sessions",
+        "pairing"
+      ]
+    },
     "tests/integration/watch-device-api.test.ts": {
       "categories": [
         "pairing",

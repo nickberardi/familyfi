@@ -44,7 +44,7 @@ Phones on the LAN should use the host's LAN address, not `localhost`. HTTPS is r
 - Children, teens, and Things groups do not receive logins.
 - Browser sessions use an httpOnly cookie plus a CSRF cookie. Native phones must first claim an administrator-generated, five-minute pairing code (scanned as a QR or pasted), then call `POST /api/v1/auth/login` with `"client": "native"`, `deviceId`, and `deviceCredential`; later requests send `Authorization: Bearer`. A bare server address cannot enroll a phone.
 - Five failed attempts in 15 minutes, per username or IP, are rejected with HTTP 429.
-- Sessions last 30 days unless revoked (password change, access removal, or logout).
+- Browser sessions last 30 days unless revoked (password change, access removal, or logout). A paired phone or Watch holds a one-hour bearer that it renews with a refresh token, which lasts 90 days from its last use and ends the same ways, or when the device is revoked.
 
 Email magic links and self-serve email reset from the sign-in prototype are not implemented. Create personal adult accounts with `POST /api/v1/accounts` (adult Family group only). Recovery `admin` cannot be removed; change its password via `FAMILYFI_DEFAULT_PASSWORD` in `.env`.
 

@@ -1,7 +1,7 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { isServerOrigin } from "@/lib/pairing-code";
 import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
-import { SESSION_TTL_MS } from "@/lib/constants";
+import { bearerSessionData } from "./auth";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
 import { edgeCredentials, recordDelivered, storedServiceToken } from "./edge-auth";
@@ -163,9 +163,8 @@ export async function authenticatePairedDevice(id: string, credential: string) {
 /** Enroll the Watch reached by the signed-in phone as its own paired device. */
 export async function enrollWatch(input: { clientId: string; accountId: string; username: string; displayName: string }) {
   const credential = randomToken();
-  const token = randomToken();
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+  const bearer = bearerSessionData(now);
   const result = await prisma().$transaction(async (transaction) => {
     const previous = await transaction.pairedDevice.findUnique({ where: { clientId: input.clientId } });
     if (previous) {
@@ -182,18 +181,19 @@ export async function enrollWatch(input: { clientId: string; accountId: string; 
       },
     });
     const session = await transaction.session.create({
-      data: {
-        tokenHash: sha256(token),
-        kind: SessionKind.bearer,
-        accountId: input.accountId,
-        username: input.username,
-        deviceId: device.id,
-        expiresAt,
-      },
+      data: { ...bearer.data, kind: SessionKind.bearer, accountId: input.accountId, username: input.username, deviceId: device.id },
     });
     return { device, session };
   });
-  return { deviceId: result.device.id, deviceCredential: credential, sessionId: result.session.id, token, expiresAt };
+  return {
+    deviceId: result.device.id,
+    deviceCredential: credential,
+    sessionId: result.session.id,
+    token: bearer.token,
+    expiresAt: bearer.expiresAt,
+    refreshToken: bearer.refreshToken,
+    refreshExpiresAt: bearer.refreshExpiresAt,
+  };
 }
 
 export type PairingStatus = "pending" | "claimed" | "expired";

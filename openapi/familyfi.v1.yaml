@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.19.0
+  version: 0.20.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA and reserved for a future
     native client. Application state is desired configuration; UniFi is
@@ -89,7 +89,9 @@ paths:
         cookie. Native clients first claim an administrator-created pairing,
         then set `client` to `native` with their paired device ID and credential
         to receive a bearer token instead of cookies. Five failed attempts in 15 minutes for a
-        username or IP return 429. Sessions last 30 days unless revoked.
+        username or IP return 429. A browser session lasts 30 days unless revoked. A native
+        bearer lasts one hour and comes with a `refreshToken` that renews it at
+        `POST /api/v1/auth/refresh` for 90 days from its last use.
 
         Through remote access (the Cloudflare tunnel), only `client: native` may sign
         in (403 `remote_browser_login` otherwise), and the paired device is checked
@@ -124,6 +126,40 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/auth/refresh:
+    post:
+      operationId: refreshSession
+      tags: [Auth]
+      summary: Renew a paired device's bearer
+      description: |
+        Trades a paired device's refresh token for a new one-hour bearer and a new refresh token;
+        both old tokens stop working. The refresh token lasts 90 days from its last use. The one
+        just replaced is honoured once within a few seconds, for a device that lost the response;
+        presenting it again after that means a copy exists, so the whole sign-in is revoked
+        (403 `refresh_reused`). An unknown, expired or revoked token, or a revoked device, is
+        403 `invalid_refresh`: sign in again.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: A new token pair.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "500":
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
@@ -2105,7 +2141,7 @@ paths:
       operationId: enrollConnectionDevice
       tags: [Connection]
       summary: Automatically pair a Watch from its signed-in paired iPhone
-      description: Creates an independent paired Watch device and its own 30-day bearer session. A previous enrollment with the same Watch clientId is revoked. Signing out or revoking the phone does not revoke the Watch.
+      description: Creates an independent paired Watch device and its own sign-in, a one-hour bearer and a refresh token that renews it. A previous enrollment with the same Watch clientId is revoked. Signing out or revoking the phone does not revoke the Watch.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -2127,13 +2163,15 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [deviceId, deviceCredential, sessionId, token, expiresAt]
+                required: [deviceId, deviceCredential, sessionId, token, expiresAt, refreshToken, refreshExpiresAt]
                 properties:
                   deviceId: { type: string }
                   deviceCredential: { type: string }
                   sessionId: { type: string }
-                  token: { type: string }
+                  token: { type: string, description: The Watch's bearer; it lasts one hour. }
                   expiresAt: { type: string, format: date-time }
+                  refreshToken: { type: string, description: "Renews the bearer at POST /api/v1/auth/refresh; it rotates on every use." }
+                  refreshExpiresAt: { type: string, format: date-time }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
@@ -2355,7 +2393,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: opaque
-      description: Revocable session token from POST /api/v1/auth/login with client=native.
+      description: |
+        A paired device's one-hour access token, from POST /api/v1/auth/login with client=native,
+        a Watch enrollment, or POST /api/v1/auth/refresh. Renew it with its refresh token before
+        or after it expires; revoking the device ends both.
   parameters:
     CsrfToken:
       name: X-CSRF-Token
@@ -2487,10 +2528,34 @@ components:
           $ref: "#/components/schemas/Session"
         token:
           type: string
-          description: Present for native clients only.
+          description: Present for native clients only. A one-hour bearer.
         tokenType:
           type: string
           enum: [Bearer]
+        refreshToken:
+          type: string
+          description: Native clients only. Renews the bearer at POST /api/v1/auth/refresh and rotates on every use.
+        refreshExpiresAt:
+          type: string
+          format: date-time
+          description: Native clients only. When the refresh token ends if unused; each refresh moves it 90 days out.
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 1 }
+    RefreshResponse:
+      type: object
+      additionalProperties: false
+      required: [session, token, tokenType, refreshToken, refreshExpiresAt]
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        token: { type: string, description: The new one-hour bearer. }
+        tokenType: { type: string, enum: [Bearer] }
+        refreshToken: { type: string, description: The new refresh token. Store it; the one sent is spent. }
+        refreshExpiresAt: { type: string, format: date-time }
     SessionResponse:
       type: object
       additionalProperties: false
@@ -2769,7 +2834,7 @@ components:
               id: { type: string }
               username: { type: string }
               client: { type: string, enum: [phone, watch] }
-              expiresAt: { type: string, format: date-time }
+              expiresAt: { type: string, format: date-time, description: "When this sign-in ends unless renewed: the refresh token's expiry." }
               createdAt: { type: string, format: date-time }
     ConnectionStatus:
       type: object

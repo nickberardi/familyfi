@@ -29,7 +29,7 @@ import { resetDatabase } from "../helpers/db";
 
 const watchId = "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1";
 type Auth = { cookie: string; csrf: string; token?: string };
-type Enrollment = { deviceId: string; deviceCredential: string; sessionId: string; token: string; expiresAt: string };
+type Enrollment = { deviceId: string; deviceCredential: string; sessionId: string; token: string; expiresAt: string; refreshToken: string; refreshExpiresAt: string };
 
 async function pairedPhone() {
   const account = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
@@ -77,7 +77,11 @@ describe("independent Watch device", () => {
     const phone = await pairedPhone();
     const watch = await enrolledWatch(phone.auth);
     expect(watch.token).not.toBe(phone.auth.token);
-    expect(new Date(watch.expiresAt).getTime() - Date.now()).toBeGreaterThan(29 * 24 * 60 * 60 * 1000);
+    // A one-hour bearer, renewed with a refresh token that lasts 90 days from its last use.
+    expect(new Date(watch.expiresAt).getTime() - Date.now()).toBeGreaterThan(59 * 60 * 1000);
+    expect(new Date(watch.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(60 * 60 * 1000);
+    expect(new Date(watch.refreshExpiresAt).getTime() - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
+    expect(watch.refreshToken).not.toBe(watch.token);
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.deviceId } });
     expect(device.client).toBe(PairedDeviceClient.watch);
     expect(device.clientId).toBe(watchId);

@@ -36,7 +36,8 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. |
-| POST | `/api/v1/auth/login` | Cookie session, or a paired native device bearer session |
+| POST | `/api/v1/auth/login` | Cookie session, or a paired native device's one-hour bearer and refresh token |
+| POST | `/api/v1/auth/refresh` | A paired device trades its refresh token for a new one-hour bearer and a new refresh token; reuse of a replaced one ends the sign-in |
 | POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for native |
 | GET | `/api/v1/auth/session` | Current principal |
 | GET/POST | `/api/v1/accounts` | Personal adult accounts; recovery `admin` is listed and cannot be created here |
@@ -145,13 +146,21 @@ for an enabled endpoint; the phone claims it, verifies the instance identity, st
 device credential in Keychain, and then signs in normally with its household account.
 Native bearer sessions are tied to that paired phone. Revoking the phone invalidates every
 one of its bearer sessions and requires a new pairing.
+
+A paired device's bearer lasts one hour. Sign-in (and a Watch enrollment) also returns a
+`refreshToken`, which the device trades at `POST /api/v1/auth/refresh` for a new bearer and a new
+refresh token, before or after the bearer expires. The refresh token lasts 90 days from its last
+use and is spent by each refresh: the one just replaced is honoured once within ten seconds, for a
+device that lost the response, and presenting it after that ends the whole sign-in
+(403 `refresh_reused`), because a copy exists. Both tokens live on one session, so revoking the
+device, signing out, a password change or removing the account ends them together.
 The iPhone may automatically enroll its reachable Watch without another administrator pairing.
 The Watch receives its own device credential and bearer token, appears as a separate device in
 System → Pair Device, and can be revoked there independently. Its sessions may only read session,
 connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
 resume, extend, allow, disallow, turn on and turn off any rule, or lift one for a single group; role never limits a control. They cannot
 create, edit or delete rules. Signing out or revoking the phone does
-not revoke the Watch. Its bearer expires after 30 days; automatic renewal is a separate change.
+not revoke the Watch. It renews its own bearer with its own refresh token.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity

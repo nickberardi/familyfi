@@ -12,6 +12,9 @@ import {
   LOGIN_MAX_FAILURES,
   LOGIN_WINDOW_MS,
   RECOVERY_USERNAME,
+  ACCESS_TOKEN_TTL_MS,
+  REFRESH_REUSE_GRACE_MS,
+  REFRESH_TOKEN_TTL_MS,
   SESSION_COOKIE,
   SESSION_TTL_MS,
 } from "@/lib/constants";
@@ -163,6 +166,13 @@ export async function createSession(input: {
   userAgent?: string | null;
   deviceId?: string | null;
 }) {
+  if (input.kind === SessionKind.bearer) {
+    const bearer = bearerSessionData();
+    await prisma().session.create({
+      data: { ...bearer.data, kind: input.kind, accountId: input.accountId, username: input.username, userAgent: input.userAgent ?? undefined, deviceId: input.deviceId ?? undefined },
+    });
+    return { raw: bearer.token, expiresAt: bearer.expiresAt, refresh: bearer.refreshToken, refreshExpiresAt: bearer.refreshExpiresAt, csrf: randomToken(24) };
+  }
   const raw = randomToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await prisma().session.create({
@@ -176,7 +186,70 @@ export async function createSession(input: {
       deviceId: input.deviceId ?? undefined,
     },
   });
-  return { raw, expiresAt, csrf: randomToken(24) };
+  return { raw, expiresAt, refresh: null, refreshExpiresAt: null, csrf: randomToken(24) };
+}
+
+/**
+ * A paired device's token pair: an access token that lives an hour and the refresh token that
+ * renews it. Only their hashes are stored; the raw values are returned to the device once.
+ */
+export function bearerSessionData(now = new Date()) {
+  const token = randomToken();
+  const refreshToken = randomToken();
+  const expiresAt = new Date(now.getTime() + ACCESS_TOKEN_TTL_MS);
+  const refreshExpiresAt = new Date(now.getTime() + REFRESH_TOKEN_TTL_MS);
+  return {
+    token,
+    refreshToken,
+    expiresAt,
+    refreshExpiresAt,
+    data: { tokenHash: sha256(token), expiresAt, refreshTokenHash: sha256(refreshToken), refreshExpiresAt },
+  };
+}
+
+export type RefreshResult =
+  | { ok: true; session: { username: string; expiresAt: Date; account: { displayName: string; kind: AccountKind } | null }; token: string; refreshToken: string; refreshExpiresAt: Date }
+  | { ok: false; code: "invalid_refresh" | "refresh_reused"; message: string };
+
+const INVALID_REFRESH = { ok: false as const, code: "invalid_refresh" as const, message: "This refresh token is invalid or expired. Sign in again." };
+
+/**
+ * Trades a refresh token for a new token pair, retiring both old tokens. The refresh token just
+ * replaced is honoured once for a few seconds, for a device that lost the response; any later use
+ * of it means a copy exists, so the whole sign-in is revoked.
+ */
+export async function refreshSession(refreshToken: string, now = new Date()): Promise<RefreshResult> {
+  const presented = sha256(refreshToken);
+  const include = { account: true, device: true } as const;
+  let session = await prisma().session.findUnique({ where: { refreshTokenHash: presented }, include });
+  let current = presented;
+  let grace = false;
+  if (!session) {
+    const replaced = await prisma().session.findUnique({ where: { previousRefreshHash: presented }, include });
+    if (!replaced) return INVALID_REFRESH;
+    if (!replaced.previousRefreshUntil || replaced.previousRefreshUntil <= now) {
+      await prisma().session.updateMany({ where: { id: replaced.id, revokedAt: null }, data: { revokedAt: now } });
+      return { ok: false, code: "refresh_reused", message: "This refresh token was already used, so this sign-in has ended. Sign in again." };
+    }
+    session = replaced;
+    current = replaced.refreshTokenHash!;
+    grace = true;
+  }
+  if (session.revokedAt || session.kind !== SessionKind.bearer || !session.refreshExpiresAt || session.refreshExpiresAt <= now || !session.device || session.device.revokedAt) return INVALID_REFRESH;
+
+  const next = bearerSessionData(now);
+  const rotated = await prisma().session.updateMany({
+    where: { id: session.id, refreshTokenHash: current, revokedAt: null },
+    data: {
+      ...next.data,
+      // A grace retry closes the window, so the replaced token is honoured only once.
+      previousRefreshHash: presented,
+      previousRefreshUntil: grace ? now : new Date(now.getTime() + REFRESH_REUSE_GRACE_MS),
+    },
+  });
+  if (rotated.count !== 1) return INVALID_REFRESH;
+  await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: now } });
+  return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
 }
 
 /** Watch credentials can only read state and pause, resume, extend, allow or disallow rules, including a group's own `internet` rule. */
@@ -195,22 +268,21 @@ function watchRouteAllowed(request: Request): boolean {
       || /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/.test(path));
 }
 
-export async function readSessionFromRequest(request: Request) {
+/** The session token a request carries: its bearer, or else its session cookie. */
+async function presentedToken(request: Request): Promise<string | undefined> {
   const header = request.headers.get("authorization");
-  let raw: string | undefined;
-  if (header?.toLowerCase().startsWith("bearer ")) {
-    raw = header.slice(7).trim();
-  } else {
-    raw = cookieValue(request.headers.get("cookie"), SESSION_COOKIE);
-    if (!raw) {
-      try {
-        const jar = await cookies();
-        raw = jar.get(SESSION_COOKIE)?.value;
-      } catch {
-        raw = undefined;
-      }
-    }
+  if (header?.toLowerCase().startsWith("bearer ")) return header.slice(7).trim();
+  const raw = cookieValue(request.headers.get("cookie"), SESSION_COOKIE);
+  if (raw) return raw;
+  try {
+    return (await cookies()).get(SESSION_COOKIE)?.value;
+  } catch {
+    return undefined;
   }
+}
+
+export async function readSessionFromRequest(request: Request) {
+  const raw = await presentedToken(request);
   if (!raw) return null;
   const session = await prisma().session.findUnique({
     where: { tokenHash: sha256(raw) },
@@ -269,11 +341,13 @@ export async function requireCsrf(request: Request) {
   return null;
 }
 
+/**
+ * Signs out the session the request carries, even when its bearer has expired: a paired device's
+ * refresh token lives on the same row and must end with it.
+ */
 export async function revokeSession(request: Request) {
-  const session = await readSessionFromRequest(request);
-  if (session) {
-    await prisma().session.updateMany({ where: { id: session.id }, data: { revokedAt: new Date() } });
-  }
+  const raw = await presentedToken(request);
+  if (raw) await prisma().session.updateMany({ where: { tokenHash: sha256(raw), revokedAt: null }, data: { revokedAt: new Date() } });
 }
 
 export async function revokeAccountSessions(accountId: string) {
