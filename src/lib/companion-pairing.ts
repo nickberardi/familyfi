@@ -37,7 +37,11 @@ export type ConnectionProfile = {
   endpoints: ConnectionRoute[];
 };
 
-export type StoredSession = { token: string; session: Session };
+/**
+ * A signed-in phone's session: its one-hour bearer and the refresh token that renews it (null for a
+ * session issued before refresh tokens, which simply ends when its bearer does).
+ */
+export type StoredSession = { token: string; session: Session; refreshToken: string | null };
 
 export const PAIRING_UNREACHABLE = "Can't reach FamilyFi at the address in this code. Check this phone is on the home network, then try again.";
 
@@ -142,7 +146,7 @@ export async function signInPaired(
   username: string,
   password: string,
 ): Promise<StoredSession> {
-  const result = await request<{ session: Session; token: string }>("/api/v1/auth/login", {
+  const result = await request<{ session: Session; token: string; refreshToken?: string }>("/api/v1/auth/login", {
     method: "POST",
     body: {
       username,
@@ -152,7 +156,19 @@ export async function signInPaired(
       deviceCredential: profile.deviceCredential,
     },
   });
-  return { token: result.token, session: result.session };
+  return { token: result.token, session: result.session, refreshToken: result.refreshToken ?? null };
+}
+
+/**
+ * Trades a refresh token for a new bearer and refresh token (`POST /api/v1/auth/refresh`). The
+ * request carries no bearer: the refresh token is the credential. A refused token throws `ApiError`.
+ */
+export async function renewPaired(request: ApiRequest, refreshToken: string): Promise<StoredSession> {
+  const result = await request<{ session: Session; token: string; refreshToken: string }>("/api/v1/auth/refresh", {
+    method: "POST",
+    body: { refreshToken },
+  });
+  return { token: result.token, session: result.session, refreshToken: result.refreshToken };
 }
 
 /**

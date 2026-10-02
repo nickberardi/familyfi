@@ -40,15 +40,17 @@ export function asTransport(send: (request: TransportRequest) => Promise<Transpo
 /**
  * A companion's `/api/v1` requests over its trusted routes: the route order and Access rules of
  * `companion-trust.ts` over the phone's transport. Each request starts at the route that last
- * answered, as familyfi-ios's client does, then the rest in manifest order. A read (or a sign-in or
- * sign-out, which change nothing in the household) that finds a route unreachable, or behind a Cloudflare
- * Access wall, moves to the next route; a household write never does, since it may have landed.
+ * answered, as familyfi-ios's client does, then the rest in manifest order. A read (or a sign-in,
+ * sign-out or session refresh, which change nothing in the household) that finds a route unreachable,
+ * or behind a Cloudflare Access wall, moves to the next route; a household write never does, since it
+ * may have landed. A refresh that landed unanswered may be sent again: the server honours the token it
+ * just replaced once, for a few seconds, for exactly this.
  */
 
 const TIMEOUT_MS = 15_000;
 const SAFE_METHODS = new Set(["GET", "HEAD"]);
 /** Writes that change nothing in the household, so any route may take them. */
-const FAILOVER_WRITES = new Set(["/api/v1/auth/login", "/api/v1/auth/logout"]);
+const FAILOVER_WRITES = new Set(["/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/refresh"]);
 
 export type CompanionConnection = {
   /** The trusted routes, from the last verified manifest (or a pairing code's stand-in). */
