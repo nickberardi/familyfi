@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         expiresAt: issued.expiresAt,
         account: result.account,
       }),
-      ...(native ? { token: issued.raw, tokenType: "Bearer" as const } : {}),
+      ...(native ? { token: issued.raw, tokenType: "Bearer" as const, refreshToken: issued.refresh, refreshExpiresAt: issued.refreshExpiresAt?.toISOString() } : {}),
     };
 
     const response = NextResponse.json(body);

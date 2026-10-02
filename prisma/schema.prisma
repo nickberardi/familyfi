@@ -253,6 +253,12 @@ model Session {
   userAgent String?
   deviceId  String?
   device    PairedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  /// A paired device's bearer is short-lived; this rotating token renews it. Null for cookie sessions.
+  refreshTokenHash     String?   @unique
+  refreshExpiresAt     DateTime?
+  /// The refresh token last replaced, honoured once until `previousRefreshUntil` so a lost response does not sign the device out.
+  previousRefreshHash  String?   @unique
+  previousRefreshUntil DateTime?
   createdAt DateTime    @default(now())
 
   @@index([username])
