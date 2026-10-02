@@ -74,11 +74,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 14, paddingHorizontal: 18 },
   head: { alignItems: "center", paddingVertical: 10 },
   entry: { alignItems: "flex-start", paddingVertical: 12, borderTopWidth: 1 },
-  when: { flexBasis: 110, flexGrow: 0, flexShrink: 1, minWidth: 92, maxWidth: 128 },
+  // The web's grid columns minmax(92px, 128px) and minmax(80px, 96px): their widest unless the row is narrow.
+  when: { flexBasis: 128, flexGrow: 0, flexShrink: 1, minWidth: 92 },
   action: { flex: 1, minWidth: 0 },
-  result: { flexBasis: 88, flexShrink: 0, minWidth: 80, maxWidth: 96, textAlign: "right" },
+  result: { flexBasis: 96, flexGrow: 0, flexShrink: 1, minWidth: 80, textAlign: "right" },
   bold: { fontWeight: "600" },
   detail: { marginTop: 2 },
   empty: { paddingHorizontal: 18, paddingVertical: 16 },
-  note: { maxWidth: 780, paddingHorizontal: 18, paddingVertical: 14 },
+  // The web's 78ch at 14px.
+  note: { maxWidth: 600, paddingHorizontal: 18, paddingVertical: 14 },
 });

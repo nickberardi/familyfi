@@ -10,6 +10,7 @@ import { addFamilyMember, removeLogin, saveTimezone, setAdmin, setFamilyRole } f
 import { lastSweepAt, relativeSweep } from "@/lib/sync-copy";
 import type { Account, Group, SyncStatus, UnifiSettings } from "@/lib/types";
 
+import { AddMemberField } from "./AddMemberField";
 import { AdminControl } from "./AdminControl";
 import { FamilyRolePicker } from "./FamilyRolePicker";
 import { TimezoneField } from "./TimezoneField";
@@ -30,9 +31,7 @@ function Card({ title, sub, children, testID }: { title: string; sub?: string; c
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID={testID}>
       <View style={[styles.cardHead, { borderBottomColor: ui.color("hairline-card") }]}>
-        <Text role="heading" aria-level={2} style={[text(14, 21, "ink"), styles.bold]}>
-          {title}
-        </Text>
+        <Text style={[text(14, 21, "ink"), styles.bold]}>{title}</Text>
         {sub ? <Text style={text(14, 21, "muted")}>{sub}</Text> : null}
       </View>
       {children}
@@ -222,7 +221,7 @@ export function HouseholdCard({
       })}
       <View style={[styles.row, styles.addRow, { borderTopColor: ui.color("hairline") }]}>
         <View style={styles.grow}>
-          <ui.TextField label={COPY.addMemberPlaceholder} value={name} onChange={setName} placeholder={COPY.addMemberPlaceholder} onSubmit={add} disabled={disabled} testID="settings-add-member" />
+          <AddMemberField value={name} onChange={setName} onSubmit={add} disabled={disabled} />
         </View>
         <FilledButton label={COPY.add} onPress={add} disabled={disabled || !name.trim()} testID="settings-add-member-button" />
       </View>
