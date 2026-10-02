@@ -49,10 +49,12 @@ type Outcome = "allowed" | "401" | "403";
  * - `csrf`: needs the CSRF cookie and header but no session (sign-out).
  * - `pairing-token`: the single-use pairing token is the credential; no session helps
  *   without it.
+ * - `refresh-token`: a paired device's refresh token is the credential; no session helps
+ *   without it.
  * - `paired-phone`: a native bearer tied to the phone named in the path; browser sessions
  *   cannot issue a companion session.
  */
-type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "paired-phone";
+type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token" | "paired-phone";
 
 const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
   public: { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "allowed" },
@@ -61,6 +63,7 @@ const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
   administrator: { anonymous: "401", member: "403", administrator: "allowed", recovery: "allowed", tunnel: "401" },
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
+  "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
   "paired-phone": { anonymous: "401", member: "403", administrator: "403", recovery: "403", tunnel: "401" },
 };
 
@@ -87,6 +90,7 @@ const ACCESS: Record<string, Entry> = {
   "PUT /api/v1/accounts/{id}/password": { access: "session" },
   "POST /api/v1/auth/login": { access: "home-network" },
   "POST /api/v1/auth/logout": { access: "csrf" },
+  "POST /api/v1/auth/refresh": { access: "refresh-token" },
   "GET /api/v1/auth/session": { access: "session" },
   "GET /api/v1/changes/{id}": { access: "session" },
   "GET /api/v1/connection": { access: "session" },
@@ -162,6 +166,7 @@ const ACCESS: Record<string, Entry> = {
 const BODIES: Record<string, unknown> = {
   "POST /api/v1/auth/login": { username: RECOVERY_USERNAME, password: PASSWORD, client: "browser" },
   "POST /api/v1/connection/pairings/{id}/claim": { token: "not-a-pairing-token", deviceName: "Matrix phone" },
+  "POST /api/v1/auth/refresh": { refreshToken: "not-a-refresh-token" },
 };
 
 const PARAMS: Record<string, string> = { id: "matrix-missing-id", ruleId: "matrix-missing-rule", sessionId: "matrix-missing-session", mac: "02:00:00:00:0a:99" };
