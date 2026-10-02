@@ -108,7 +108,6 @@ export const GROUP_DETAIL_COPY = {
   noDevices: "No devices assigned.",
   /** After "No devices assigned." when the group has rules or a pause: the words around the link to assign one. */
   rulesNeedDevice: { before: "Its rules cannot apply on UniFi until you", link: "assign a device", after: "." },
-  manageDevices: "Manage devices",
   delete: "Delete group",
   notFound: "Group not found.",
 } as const;
