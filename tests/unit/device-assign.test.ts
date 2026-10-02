@@ -25,6 +25,7 @@ describe("device assignment", () => {
   it("tells a group with no devices why it needs one", () => {
     expect(assignDevicesCopy({ name: "A child" })).toMatchObject({
       needsTitle: "A child needs devices",
+      needsBody: "A child has no assigned devices, so its UniFi policies cannot be created. Assign an unassigned device below.",
     });
   });
 });
