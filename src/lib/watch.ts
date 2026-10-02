@@ -12,8 +12,11 @@ import type { ConnectionRoute, Group } from "./types";
 /** The most groups a Watch shows, in the order the phone chose. */
 export const WATCH_MAX_GROUPS = 8;
 
-/** The phone's choice of groups for its Watch: only ids and order cross to the Watch. */
-export type WatchSelection = { watchId: string; groupIds: string[] };
+/**
+ * The phone's choice of groups for its Watch: only ids and order cross to the Watch, with the
+ * household's time zone, which a Watch session cannot read but its labels are written in.
+ */
+export type WatchSelection = { watchId: string; groupIds: string[]; timeZone: string };
 
 /** The saved ids that still name a group, each once, at most `WATCH_MAX_GROUPS`. */
 export function reconcileWatchSelection(ids: readonly string[], groups: readonly Pick<Group, "id">[]): string[] {
