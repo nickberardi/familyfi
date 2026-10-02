@@ -127,13 +127,13 @@ function SheetButton({ label, primary, onPress, disabled, testID }: { label: str
 }
 
 /** The pairing sheet's buttons for the step it is on. */
-export function PairingActions({ pairing, onClose }: { pairing: Pairing; onClose: () => void }) {
+export function PairingActions({ pairing, onClose, disabled }: { pairing: Pairing; onClose: () => void; /** No new code while the view is stale. */ disabled?: boolean }) {
   const { copy } = pairing;
   if (!pairing.issued) {
     return (
       <>
         <SheetButton label={copy.cancel} onPress={onClose} testID="pairing-cancel" />
-        <SheetButton label={copy.show} primary disabled={pairing.busy || !pairing.name.trim()} onPress={() => void pairing.generate()} testID="pairing-show" />
+        <SheetButton label={copy.show} primary disabled={disabled || pairing.busy || !pairing.name.trim()} onPress={() => void pairing.generate()} testID="pairing-show" />
       </>
     );
   }
@@ -141,7 +141,7 @@ export function PairingActions({ pairing, onClose }: { pairing: Pairing; onClose
   return (
     <>
       <SheetButton label={copy.cancel} onPress={onClose} testID="pairing-cancel" />
-      <SheetButton label={copy.newCode} primary disabled={pairing.busy} onPress={() => void pairing.generate()} testID="pairing-new-code" />
+      <SheetButton label={copy.newCode} primary disabled={disabled || pairing.busy} onPress={() => void pairing.generate()} testID="pairing-new-code" />
     </>
   );
 }

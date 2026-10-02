@@ -16,10 +16,17 @@ function useText() {
   return (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
 }
 
-function TextButton({ label, token, onPress, testID }: { label: string; token: string; onPress: () => void; testID?: string }) {
+function TextButton({ label, token, onPress, disabled, testID }: { label: string; token: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   const text = useText();
   return (
-    <Pressable role="button" onPress={onPress} testID={testID} style={({ pressed }) => pressed && { opacity: PRESS_OPACITY }}>
+    <Pressable
+      role="button"
+      aria-disabled={disabled}
+      disabled={disabled}
+      onPress={onPress}
+      testID={testID}
+      style={({ pressed }) => [disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+    >
       <Text style={[text(14, 21, token), styles.bold]}>{label}</Text>
     </Pressable>
   );
@@ -31,8 +38,11 @@ export function PairedPhoneRow({
   onRevoke,
   onRepair,
   onRemove,
+  disabled,
 }: {
   phone: PairedPhone;
+  /** No changes while the phone's view of the household is stale. */
+  disabled?: boolean;
   onRevoke?: () => void;
   onRepair?: () => void;
   onRemove?: () => void;
@@ -63,9 +73,9 @@ export function PairedPhoneRow({
           {session.line}
         </Text>
       ))}
-      {onRevoke ? <TextButton label={COPY.revoke} token="danger" onPress={onRevoke} testID={`phone-revoke-${phone.id}`} /> : null}
-      {onRepair ? <TextButton label={COPY.repair} token="accent" onPress={onRepair} testID={`phone-repair-${phone.id}`} /> : null}
-      {onRemove ? <TextButton label={COPY.remove} token="danger" onPress={onRemove} testID={`phone-remove-${phone.id}`} /> : null}
+      {onRevoke ? <TextButton label={COPY.revoke} token="danger" onPress={onRevoke} disabled={disabled} testID={`phone-revoke-${phone.id}`} /> : null}
+      {onRepair ? <TextButton label={COPY.repair} token="accent" onPress={onRepair} disabled={disabled} testID={`phone-repair-${phone.id}`} /> : null}
+      {onRemove ? <TextButton label={COPY.remove} token="danger" onPress={onRemove} disabled={disabled} testID={`phone-remove-${phone.id}`} /> : null}
     </View>
   );
 }
@@ -81,8 +91,11 @@ export function PairedDevicesCard({
   onRepair,
   onRemove,
   onRemoveAllRevoked,
+  disabled,
 }: {
   phones: PairedPhone[];
+  /** No changes while the phone's view of the household is stale. */
+  disabled?: boolean;
   /** Whether a route is published, so a phone can pair (or re-pair) now. */
   canPair: boolean;
   onRevoke: (phone: PairedPhone) => void;
@@ -106,7 +119,7 @@ export function PairedDevicesCard({
         <Text style={[text(14, 21, "muted"), styles.empty]}>{canPair ? COPY.noPhones : COPY.remoteFirst}</Text>
       ) : (
         (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (
-          <PairedPhoneRow key={phone.id} phone={phone} onRevoke={() => onRevoke(phone)} />
+          <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />
         ))
       )}
       {active.length > PHONES_SHOWN ? (
@@ -125,12 +138,13 @@ export function PairedDevicesCard({
                 <PairedPhoneRow
                   key={phone.id}
                   phone={phone}
+                  disabled={disabled}
                   onRepair={canPair && phone.client === "phone" ? () => onRepair(phone) : undefined}
                   onRemove={() => onRemove(phone)}
                 />
               ))}
               <View style={[styles.listButton, rule]}>
-                <TextButton label={COPY.removeAllRevoked} token="danger" onPress={() => onRemoveAllRevoked(revoked.length)} testID="phones-remove-revoked" />
+                <TextButton label={COPY.removeAllRevoked} token="danger" onPress={() => onRemoveAllRevoked(revoked.length)} disabled={disabled} testID="phones-remove-revoked" />
               </View>
             </>
           ) : null}
