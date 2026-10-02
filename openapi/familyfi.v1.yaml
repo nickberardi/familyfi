@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.20.0
+  version: 0.21.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -96,16 +96,6 @@ paths:
         Through remote access (the Cloudflare tunnel), only `client: native` may sign
         in (403 `remote_browser_login` otherwise), and the paired device is checked
         before the password (403 `device_not_paired`, with no attempt recorded).
-
-        An agent (`client: agent`) never sends a username or password. Its first call
-        sends `pairing`, the `code` (`pairingId.token`) from an agent pairing code, and
-        claims it: the response adds `device` and the `deviceCredential`, returned only
-        this once. Later calls send `deviceId` and `deviceCredential` for a new bearer.
-        The agent acts as the adult who made the pairing, bounded by its `grant`
-        (403 `agent_scope` beyond it). An agent's credential cannot sign in as `native`.
-        Agents sign in from the home network only (403 `agent_remote`); an unknown,
-        used or expired pairing is 403 `invalid_pairing`, and a revoked agent is 403
-        `device_not_paired`.
       security: []
       requestBody:
         required: true
@@ -118,10 +108,6 @@ paths:
                 value: { username: admin, password: "example-password", client: browser }
               native:
                 value: { username: admin, password: "example-password", client: native, deviceId: "paired-device-id", deviceCredential: "device-keychain-credential" }
-              agentClaim:
-                value: { client: agent, pairing: "pairing-id.single-use-token", deviceName: "Claude Code on a MacBook" }
-              agentRenew:
-                value: { client: agent, deviceId: "agent-device-id", deviceCredential: "agent-credential" }
       responses:
         "200":
           description: Authenticated.
@@ -154,7 +140,8 @@ paths:
         just replaced is honoured once within a few seconds, for a device that lost the response;
         presenting it again after that means a copy exists, so the whole sign-in is revoked
         (403 `refresh_reused`). An unknown, expired or revoked token, or a revoked device, is
-        403 `invalid_refresh`: sign in again.
+        403 `invalid_refresh`: sign in again. An agent's refresh through remote access is 403
+        `agent_remote`.
       security: []
       requestBody:
         required: true
@@ -2153,6 +2140,12 @@ paths:
       operationId: claimConnectionPairing
       tags: [Connection]
       summary: Claim a single-use pairing code
+      description: |
+        A phone claims its code and receives its device credential, route and signed manifest. An
+        agent claims an agent pairing code and is signed in at once, with a one-hour bearer and a
+        refresh token and no device credential; it never sends a password. Agent claims are refused
+        through remote access (403 `agent_remote`). An unknown, used or expired code, or one made
+        for the other kind of client, is 403 `invalid_pairing`.
       security: []
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingClaim" } } } }
@@ -2523,7 +2516,7 @@ components:
     LoginRequest:
       type: object
       additionalProperties: false
-      description: A browser or native client sends `username` and `password`. An agent sends neither.
+      required: [username, password]
       properties:
         username:
           type: string
@@ -2533,22 +2526,14 @@ components:
           minLength: 1
         client:
           type: string
-          enum: [browser, native, agent]
+          enum: [browser, native]
           default: browser
-        pairing:
-          type: string
-          description: "Agent claim only: the agent pairing code's `code`, `pairingId.token`."
-        deviceName:
-          type: string
-          minLength: 1
-          maxLength: 80
-          description: "Agent claim only: the name to list the agent under; defaults to the name the pairing was made with."
         deviceId:
           type: string
-          description: Required when client is native, and when an agent renews; returned by its pairing claim.
+          description: Required when client is native; returned by pairing claim.
         deviceCredential:
           type: string
-          description: Required when client is native, and when an agent renews; stored only by the device.
+          description: Required when client is native; stored only in the device keychain.
     Session:
       type: object
       additionalProperties: false
@@ -2831,12 +2816,27 @@ components:
     ConnectionPairingClaimResponse:
       type: object
       additionalProperties: false
-      required: [device, deviceCredential, endpoint, manifest]
+      description: |
+        A phone's claim returns `deviceCredential`, `endpoint` and `manifest`; it then signs in with a
+        password. An agent's claim returns none of those: it is signed in already, as the adult who
+        made the pairing, with `session`, `token`, `tokenType`, `refreshToken` and `refreshExpiresAt`.
+      required: [device]
       properties:
-        device: { type: object, required: [id, displayName], properties: { id: { type: string }, displayName: { type: string } } }
+        device:
+          type: object
+          required: [id, displayName]
+          properties:
+            id: { type: string }
+            displayName: { type: string }
+            grant: { $ref: "#/components/schemas/AgentGrant" }
         deviceCredential: { type: string }
         endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" }
         manifest: { $ref: "#/components/schemas/ConnectionEndpointManifest" }
+        session: { $ref: "#/components/schemas/Session" }
+        token: { type: string, description: "An agent's one-hour bearer." }
+        tokenType: { type: string, enum: [Bearer] }
+        refreshToken: { type: string, description: "Renews an agent's bearer at POST /api/v1/auth/refresh; it rotates on every use." }
+        refreshExpiresAt: { type: string, format: date-time }
     ConnectionEndpointManifest:
       type: object
       additionalProperties: false

@@ -13,14 +13,17 @@ import { GET as listDevices } from "@/app/api/v1/connection/devices/route";
 import { DELETE as revokeDevice } from "@/app/api/v1/connection/devices/[id]/route";
 import { POST as createPairing } from "@/app/api/v1/connection/pairings/route";
 import { GET as pairingStatus } from "@/app/api/v1/connection/pairings/[id]/route";
-import { POST as claimPhonePairing } from "@/app/api/v1/connection/pairings/[id]/claim/route";
+import { POST as claimRoute } from "@/app/api/v1/connection/pairings/[id]/claim/route";
+import { POST as refresh } from "@/app/api/v1/auth/refresh/route";
+import { claimAgentPairing, claimPairing } from "@/server/connection";
+import { sha256 } from "@/server/crypto";
 import { GET as listGroups, POST as createGroup } from "@/app/api/v1/groups/route";
 import { GET as settingsUnifi } from "@/app/api/v1/settings/unifi/route";
 import { GET as household } from "@/app/api/v1/settings/household/route";
 import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
-import { decodePairingCode, issuedPairing } from "../helpers/pairing";
+import { issuedPairing } from "../helpers/pairing";
 import { TEST_ORIGIN } from "../helpers/test-env";
 
 const json = { "content-type": "application/json" };
@@ -38,15 +41,26 @@ async function agentPairing(auth: SessionAuth, grant: "read" | "controls", heade
   return createPairing(request("/api/v1/connection/pairings", { method: "POST", auth, headers: { ...json, ...headers }, body: JSON.stringify({ client: "agent", deviceName: "Claude Code", grant }) }));
 }
 
-function agentLogin(body: Record<string, unknown>, headers: Record<string, string> = {}) {
-  return login(request("/api/v1/auth/login", { method: "POST", headers: { ...json, ...headers }, body: JSON.stringify({ client: "agent", ...body }) }));
+function claim(issued: { pairingId: string; token: string }, headers: Record<string, string> = {}) {
+  return claimRoute(
+    request(`/api/v1/connection/pairings/${issued.pairingId}/claim`, { method: "POST", headers: { ...json, ...headers }, body: JSON.stringify({ token: issued.token, deviceName: "Claude Code on a MacBook" }) }),
+    { params: Promise.resolve({ id: issued.pairingId }) },
+  );
 }
 
-type Claimed = { token: string; deviceCredential: string; device: { id: string; displayName: string; grant: string }; session: { username: string } };
+function refreshWith(refreshToken: string, headers: Record<string, string> = {}) {
+  return refresh(request("/api/v1/auth/refresh", { method: "POST", headers: { ...json, ...headers }, body: JSON.stringify({ refreshToken }) }));
+}
+
+async function errorCode(response: Response) {
+  return ((await response.json()) as { error: { code: string } }).error.code;
+}
+
+type Claimed = { token: string; refreshToken: string; refreshExpiresAt: string; device: { id: string; displayName: string; grant: string }; session: { username: string; expiresAt: string } };
 
 async function connectedAgent(auth: SessionAuth, grant: "read" | "controls") {
   const issued = await issuedPairing(await agentPairing(auth, grant));
-  const response = await agentLogin({ pairing: issued.payload.code, deviceName: "Claude Code on a MacBook" });
+  const response = await claim(issued);
   expect(response.status).toBe(200);
   return { issued, claimed: (await response.json()) as Claimed };
 }
@@ -56,7 +70,7 @@ describe("paired agents", () => {
     await resetDatabase();
   });
 
-  it("pairs from a code that carries this address and nothing for remote access, without a password", async () => {
+  it("pairs at the claim, signed in at once with a bearer and refresh token and no password or credential", async () => {
     const auth = await adult();
     const { issued, claimed } = await connectedAgent(auth, "controls");
     expect(Object.keys(issued.payload).sort()).toEqual(["code", "fingerprint", "url", "version"]);
@@ -65,6 +79,10 @@ describe("paired agents", () => {
     expect(new Date((await prisma().pairing.findUniqueOrThrow({ where: { id: issued.id } })).expiresAt).getTime() - Date.now()).toBeGreaterThan(14 * 60 * 1000);
 
     expect(claimed.session.username).toBe("parent");
+    expect(claimed).not.toHaveProperty("deviceCredential");
+    expect(claimed).not.toHaveProperty("manifest");
+    expect(new Date(claimed.session.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(60 * 60 * 1000);
+    expect(new Date(claimed.refreshExpiresAt).getTime() - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
     expect(claimed.device).toMatchObject({ displayName: "Claude Code on a MacBook", grant: "controls" });
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: claimed.device.id } });
     expect(device.client).toBe(PairedDeviceClient.agent);
@@ -78,40 +96,41 @@ describe("paired agents", () => {
   it("claims a code once, and only as an agent", async () => {
     const auth = await adult();
     const { issued } = await connectedAgent(auth, "read");
-    const again = await agentLogin({ pairing: issued.payload.code });
+    const again = await claim(issued);
     expect(again.status).toBe(403);
-    expect(((await again.json()) as { error: { code: string } }).error.code).toBe("invalid_pairing");
+    expect(await errorCode(again)).toBe("invalid_pairing");
 
+    // The phone claim never takes an agent's code, so no agent gets a phone's credential and manifest.
     const unclaimed = await issuedPairing(await agentPairing(auth, "read"));
-    const asPhone = await claimPhonePairing(
-      request(`/api/v1/connection/pairings/${unclaimed.pairingId}/claim`, { method: "POST", headers: json, body: JSON.stringify({ token: unclaimed.token, deviceName: "Phone" }) }),
-      { params: Promise.resolve({ id: unclaimed.pairingId }) },
-    );
-    expect(asPhone.status).toBe(403);
+    expect(await claimPairing({ id: unclaimed.pairingId, token: unclaimed.token, displayName: "Phone" })).toBeNull();
+    // Nor does the agent claim take a phone's code.
+    const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
+    const phoneToken = "phone-pairing-token";
+    const phonePairing = await prisma().pairing.create({ data: { displayName: "Phone", createdByAccountId: parent.id, tokenHash: sha256(phoneToken), expiresAt: new Date(Date.now() + 60_000) } });
+    expect(await claimAgentPairing({ id: phonePairing.id, token: phoneToken })).toBeNull();
   });
 
   it("refuses an expired code", async () => {
     const auth = await adult();
     const issued = await issuedPairing(await agentPairing(auth, "read"));
     await prisma().pairing.update({ where: { id: issued.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    expect((await agentLogin({ pairing: issued.payload.code })).status).toBe(403);
+    expect((await claim(issued)).status).toBe(403);
   });
 
-  it("renews with its credential and no password; the credential cannot sign in as a phone", async () => {
+  it("renews with its rotating refresh token, and never signs in at /auth/login", async () => {
     const auth = await adult();
     const { claimed } = await connectedAgent(auth, "read");
-    const renewed = await agentLogin({ deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential });
+    const renewed = await refreshWith(claimed.refreshToken);
     expect(renewed.status).toBe(200);
     const body = (await renewed.json()) as Claimed;
     expect(body.token).not.toBe(claimed.token);
-    expect(body).not.toHaveProperty("deviceCredential");
+    expect(body.refreshToken).not.toBe(claimed.refreshToken);
     expect((await listGroups(request("/api/v1/groups", { auth: bearer(body.token) }))).status).toBe(200);
+    expect((await listGroups(request("/api/v1/groups", { auth: bearer(claimed.token) }))).status).toBe(401);
 
-    const asPhone = await login(request("/api/v1/auth/login", {
-      method: "POST", headers: json,
-      body: JSON.stringify({ username: "parent", password: "parent-password-1", client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential }),
-    }));
-    expect(asPhone.status).toBe(403);
+    // A full sign-in body fails only because `agent` is not a sign-in client.
+    const asAgent = await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "parent", password: "parent-password-1", client: "agent" }) }));
+    expect(asAgent.status).toBe(400);
   });
 
   it("is bounded by its grant, not by the administrator it acts as", async () => {
@@ -155,11 +174,20 @@ describe("paired agents", () => {
     const remote = await listGroups(request("/api/v1/groups", { auth: bearer(claimed.token), headers: tunnelled }));
     expect(remote.status).toBe(403);
     expect(((await remote.json()) as { error: { code: string } }).error.code).toBe("agent_remote");
-    expect((await agentLogin({ deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential }, tunnelled)).status).toBe(403);
+    const remoteRefresh = await refreshWith(claimed.refreshToken, tunnelled);
+    expect(remoteRefresh.status).toBe(403);
+    expect(await errorCode(remoteRefresh)).toBe("agent_remote");
+    // Refused, not rotated: the refresh token still works at home.
+    expect((await refreshWith(claimed.refreshToken)).status).toBe(200);
+
+    const unclaimed = await issuedPairing(await agentPairing(auth, "read"));
+    const remoteClaim = await claim(unclaimed, tunnelled);
+    expect(remoteClaim.status).toBe(403);
+    expect(await errorCode(remoteClaim)).toBe("agent_remote");
     expect((await agentPairing(auth, "read", tunnelled)).status).toBe(403);
   });
 
-  it("revoking it, by an administrator or by itself, ends its sessions and its credential", async () => {
+  it("revoking it, by an administrator or by itself, ends its bearer and its refresh token", async () => {
     const auth = await adult();
     for (const revoker of ["administrator", "itself"] as const) {
       const { claimed } = await connectedAgent(auth, "read");
@@ -167,7 +195,7 @@ describe("paired agents", () => {
       const revoked = await revokeDevice(request(`/api/v1/connection/devices/${claimed.device.id}`, { method: "DELETE", auth: by }), { params: Promise.resolve({ id: claimed.device.id }) });
       expect(revoked.status).toBe(200);
       expect((await listGroups(request("/api/v1/groups", { auth: bearer(claimed.token) }))).status).toBe(401);
-      expect((await agentLogin({ deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential })).status).toBe(403);
+      expect((await refreshWith(claimed.refreshToken)).status).toBe(403);
     }
   });
 
@@ -196,7 +224,7 @@ describe("paired agents", () => {
   it("acts as the recovery account when that account paired it", async () => {
     const recovery = authFromLogin(await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD }) })));
     const issued = await issuedPairing(await agentPairing(recovery, "read"));
-    const response = await agentLogin({ pairing: decodePairingCode(issued.pairingCode).payload.code });
+    const response = await claim(issued);
     expect(response.status).toBe(200);
     expect(((await response.json()) as Claimed).session.username).toBe("admin");
   });

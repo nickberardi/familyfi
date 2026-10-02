@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TUNNEL_HEADER } from "@/lib/constants";
 import { originAllowed, refreshSession, toPublicSession } from "@/server/auth";
 import { jsonCaughtError, jsonError } from "@/server/http";
 
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(json);
   if (!parsed.success) return jsonError(400, "invalid_request", "A refresh token is required.");
   try {
-    const result = await refreshSession(parsed.data.refreshToken);
+    const result = await refreshSession(parsed.data.refreshToken, { tunnelled: request.headers.get(TUNNEL_HEADER) === "tunnel" });
     if (!result.ok) return jsonError(403, result.code, result.message);
     return Response.json({
       session: toPublicSession(result.session),

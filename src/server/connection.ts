@@ -1,6 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { AccountKind, type AgentGrant, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
-import { SESSION_TTL_MS } from "@/lib/constants";
 import { bearerSessionData } from "./auth";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -172,30 +171,32 @@ export async function createAgentPairing(input: { url: string; displayName: stri
   return { pairing, pairingCode };
 }
 
-/** Claims an agent pairing: the agent becomes a paired device with its own credential and a bearer for the adult who paired it. */
+/**
+ * Claims an agent pairing: the agent becomes a paired device signed in as the adult who paired it,
+ * with a one-hour bearer and the rotating refresh token that renews it. Its refresh token is its only
+ * long-lived secret: the device credential a phone signs in with is never returned to an agent.
+ */
 export async function claimAgentPairing(input: { id: string; token: string; displayName?: string; userAgent?: string | null }) {
   const pairing = await prisma().pairing.findUnique({ where: { id: input.id } });
   if (!pairing || pairing.client !== PairedDeviceClient.agent || !pairing.agentGrant || pairing.claimedAt || pairing.expiresAt <= new Date() || !safeEqual(pairing.tokenHash, sha256(input.token))) return null;
   const account = await prisma().account.findUnique({ where: { id: pairing.createdByAccountId } });
   if (!account) return null;
-  const credential = randomToken();
-  const token = randomToken();
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+  const bearer = bearerSessionData(now);
   const device = await prisma().$transaction(async (transaction) => {
     const claimed = await transaction.pairing.updateMany({ where: { id: pairing.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
     const agent = await transaction.pairedDevice.create({
-      data: { displayName: input.displayName ?? pairing.displayName, credentialHash: sha256(credential), client: PairedDeviceClient.agent, agentGrant: pairing.agentGrant, accountId: account.id, lastSeenAt: now },
+      data: { displayName: input.displayName ?? pairing.displayName, credentialHash: sha256(randomToken()), client: PairedDeviceClient.agent, agentGrant: pairing.agentGrant, accountId: account.id, lastSeenAt: now },
     });
     await transaction.pairing.update({ where: { id: pairing.id }, data: { claimedDeviceId: agent.id } });
     await transaction.session.create({
-      data: { tokenHash: sha256(token), kind: SessionKind.bearer, accountId: account.id, username: account.username, deviceId: agent.id, expiresAt, userAgent: input.userAgent ?? undefined },
+      data: { ...bearer.data, kind: SessionKind.bearer, accountId: account.id, username: account.username, deviceId: agent.id, userAgent: input.userAgent ?? undefined },
     });
     return agent;
   });
   if (!device) return null;
-  return { device, account, credential, token, expiresAt };
+  return { device, account, token: bearer.token, expiresAt: bearer.expiresAt, refreshToken: bearer.refreshToken, refreshExpiresAt: bearer.refreshExpiresAt };
 }
 
 export async function authenticatePairedDevice(id: string, credential: string) {
