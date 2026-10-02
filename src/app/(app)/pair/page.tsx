@@ -1,67 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
 import { RemoteAccessCard } from "@/components/pair/RemoteAccessCard";
-import { api, ApiError } from "@/lib/api";
-import { PAIR_COPY, confirmLine, publishedRoute, removeAllConfirm, removeConfirm, revokeConfirm, splitPhones } from "@/lib/pair-device";
-import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
+import { request } from "@/lib/api";
+import { PAIR_COPY, confirmLine, removeAllConfirm, removeConfirm, removePhone, removeRevokedPhones, revokeConfirm, revokePhone } from "@/lib/pair-device";
+import type { PairedPhone } from "@/lib/types";
 import { PairedDevicesCard } from "@/ui/PairedDevices";
+import { usePairDevice } from "@/ui/use-pair-device";
 
 const CARD = "overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]";
 const TITLE = PAIR_COPY.title;
 const SUB = PAIR_COPY.sub;
 
 export default function PairDevicePage() {
-  const [tunnel, setTunnel] = useState<RemoteAccess | null>(null);
-  const [routes, setRoutes] = useState<ConnectionRoute[] | null>(null);
-  const [phones, setPhones] = useState<PairedPhone[]>([]);
-  const [forbidden, setForbidden] = useState(false);
-  const [error, setError] = useState("");
+  const { tunnel, setTunnel, routes, phones, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
   const [pairing, setPairing] = useState(false);
   const [replacing, setReplacing] = useState<PairedPhone | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const [state, endpoints, devices] = await Promise.all([
-        api<{ tunnel: RemoteAccess }>("/api/v1/connection/tunnel"),
-        api<{ endpoints: ConnectionRoute[] }>("/api/v1/connection/endpoints"),
-        api<{ devices: PairedPhone[] }>("/api/v1/connection/devices"),
-      ]);
-      setTunnel(state.tunnel);
-      setRoutes(endpoints.endpoints);
-      setPhones(devices.devices);
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.code === "administrator_required") setForbidden(true);
-      else setError(caught instanceof Error ? caught.message : PAIR_COPY.loadFailed);
-    }
-  }, []);
-
-  // Poll quickly while a tunnel is on its way, so its address and status appear by themselves.
-  const waiting = tunnel?.status === "signing-in" || tunnel?.status === "starting";
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch
-    void load();
-    const timer = setInterval(() => void load(), waiting ? 2000 : 15000);
-    return () => clearInterval(timer);
-  }, [load, waiting]);
-
-  async function run(action: () => Promise<unknown>) {
-    setError("");
-    try {
-      await action();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : PAIR_COPY.actionFailed);
-    }
-    await load();
-  }
-
-  const { active } = splitPhones(phones);
-  const pairedThrough = (id: string) => active.filter((phone) => phone.pairedVia?.endpointId === id).length;
-  // Phones pair through the one published route, once it is live.
-  const published = publishedRoute(tunnel, routes);
-  const canPair = published !== null;
 
   if (forbidden) {
     return (
@@ -91,7 +47,7 @@ export default function PairDevicePage() {
           canPair={canPair}
           onRevoke={(phone) => {
             if (!window.confirm(confirmLine(revokeConfirm(phone)))) return;
-            void run(() => api(`/api/v1/connection/devices/${phone.id}`, { method: "DELETE" }));
+            void run(() => revokePhone(request, phone));
           }}
           onRepair={(phone) => {
             setReplacing(phone);
@@ -99,11 +55,11 @@ export default function PairDevicePage() {
           }}
           onRemove={(phone) => {
             if (!window.confirm(confirmLine(removeConfirm(phone)))) return;
-            void run(() => api(`/api/v1/connection/devices/${phone.id}?remove=true`, { method: "DELETE" }));
+            void run(() => removePhone(request, phone));
           }}
           onRemoveAllRevoked={(count) => {
             if (!window.confirm(confirmLine(removeAllConfirm(count)))) return;
-            void run(() => api("/api/v1/connection/devices?revoked=true", { method: "DELETE" }));
+            void run(() => removeRevokedPhones(request));
           }}
         />
       </div>

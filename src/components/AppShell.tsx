@@ -8,40 +8,13 @@ import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api, request } from "@/lib/api";
 import { unassignedBadgeCount } from "@/lib/device-list";
-import type { IconName } from "@/lib/icons";
+import { NAV } from "@/lib/nav";
 import { familyNeedsDevices as familyNeedsDevicesCount, syncFailed as syncNeedsAttention } from "@/lib/sync-copy";
 import { reconcileNow } from "@/lib/sync-writes";
 import { AccountCard, DeviceAttentionCard, SyncStatusCard, UpdateAlertCard } from "@/ui/StatusCards";
 import { appVersionLabel } from "@/lib/version";
 import { useAppData } from "./AppDataProvider";
 import { useUpdateCheck } from "@/ui/use-update-check";
-
-const NAV: { title: string; items: { href: string; label: string; icon: IconName }[] }[] = [
-  {
-    title: "Household",
-    items: [
-      { href: "/family", label: "Family", icon: "users-three" },
-      { href: "/things", label: "Things", icon: "house-line" },
-    ],
-  },
-  {
-    title: "Network",
-    items: [
-      { href: "/devices", label: "Devices", icon: "device-mobile" },
-      { href: "/rules", label: "Rules", icon: "list-checks" },
-      { href: "/categories", label: "Categories", icon: "squares-four" },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      { href: "/sync", label: "Sync", icon: "arrows-clockwise" },
-      { href: "/pair", label: "Pair Device", icon: "qr-code" },
-      { href: "/settings", label: "Settings", icon: "gear" },
-      { href: "/reference", label: "API", icon: "code" },
-    ],
-  },
-];
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);

@@ -104,6 +104,7 @@ export function pendingHouseholdNote({ code }: PendingEnrollment): string {
 
 /** A paired phone's Connection screen: the household it trusts, its routes, and leaving it. */
 export const CONNECTION_COPY = {
+  title: "Connection",
   routes: "Routes",
   inUse: "In use",
   off: "Off",

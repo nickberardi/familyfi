@@ -8,6 +8,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { SETTINGS_COPY, createLoginTitle, loginFormState, usernameFromName } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
 import type { Group } from "@/lib/types";
+import { NewLoginFields } from "@/ui/NewLoginFields";
 import { GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
 
 const FIELD =
@@ -304,39 +305,13 @@ export default function SettingsPage() {
               <div className="text-[17px] font-bold tracking-tight">{createLoginTitle(loginFor)}</div>
               <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{SETTINGS_COPY.loginNote}</p>
             </div>
-            <div className="flex flex-col gap-3 px-[18px] py-3.5">
-              <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
-                {SETTINGS_COPY.username}
-                <input
-                  className={FIELD}
-                  value={loginUser}
-                  onChange={(e) => setLoginUser(e.target.value)}
-                  autoComplete="off"
-                />
-              </label>
-              <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
-                {SETTINGS_COPY.password}
-                <input
-                  className={FIELD}
-                  type="password"
-                  value={pw1}
-                  onChange={(e) => setPw1(e.target.value)}
-                  placeholder={SETTINGS_COPY.passwordPlaceholder}
-                />
-              </label>
-              <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
-                {SETTINGS_COPY.confirmPassword}
-                <input
-                  className={FIELD}
-                  type="password"
-                  value={pw2}
-                  onChange={(e) => setPw2(e.target.value)}
-                  placeholder={SETTINGS_COPY.confirmPlaceholder}
-                />
-              </label>
-              <p className="text-[14px]" style={{ color: login.passwordsOk ? "var(--ff-on)" : "var(--ff-muted)" }}>
-                {login.hint}
-              </p>
+            <div className="px-[18px] py-3.5">
+              <NewLoginFields
+                username={loginUser}
+                password={pw1}
+                confirm={pw2}
+                onChange={(field, value) => (field === "username" ? setLoginUser(value) : field === "password" ? setPw1(value) : setPw2(value))}
+              />
             </div>
             <div className="flex border-t border-[var(--ff-hairline-card)]">
               <button
