@@ -97,6 +97,8 @@ export const DARK: Partial<Record<ColorToken, string>> = {
   "accent-tint": "rgba(112, 181, 255, 0.12)",
   "accent-wash": "rgba(112, 181, 255, 0.1)",
   "card": "#1c1c1e",
+  // The dark card at the veil's 70%, as LIGHT's is the light card at 70%.
+  "card-veil": "rgba(28, 28, 30, 0.7)",
   "chevron": "rgba(255, 255, 255, 0.3)",
   "control-line": "rgba(255, 255, 255, 0.2)",
   "danger": "rgb(255, 128, 120)",
