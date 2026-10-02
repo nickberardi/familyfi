@@ -49,7 +49,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
-| POST | `/api/v1/connection/pairings` | Administrator creates a single-use, five-minute pairing code |
+| POST | `/api/v1/connection/pairings` | Administrator creates a single-use pairing code: five minutes for a phone on a route, fifteen for an agent (`client: agent`, `grant`) at the address it was made from |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest |
@@ -162,11 +162,32 @@ resume, extend, allow, disallow, turn on and turn off any rule, or lift one for 
 create, edit or delete rules. Signing out or revoking the phone does
 not revoke the Watch. It renews its own bearer with its own refresh token.
 
+### Agents
+
+An administrator connects an AI agent from **System → API** (`/reference`): name it, choose a
+grant, and copy the prompt shown. The prompt points the agent at `/agents.md`, a guide served
+without a session from [`openapi/agent-guide.md`](../openapi/agent-guide.md) with this server's
+address filled in, and carries an agent pairing code. That code is single-use, expires in fifteen
+minutes, and carries the address it was made at: it names no route, certificate pin or Cloudflare
+Access token.
+
+The agent never sends a password. It claims the code with `POST /api/v1/auth/login` and
+`{ client: "agent", pairing }`, which returns a bearer, its device and its `deviceCredential`
+once; later it sends `{ client: "agent", deviceId, deviceCredential }` for a new bearer. It acts
+as the adult who made the pairing. Every adult login is an administrator in practice, so its
+grant (`AgentGrant`), not that account, bounds it: `read` or `controls`, never accounts, UniFi
+settings, resolvers, household-settings changes or connection management (403 `agent_scope`). It
+is refused through FamilyFi's remote access tunnel (403 `agent_remote`); like browser sign-in, an
+address the household publishes itself is the household's choice. Agents are paired devices: they appear in `GET /connection/devices` with
+`client: agent` and are revoked like a phone, by an administrator or by themselves. The
+[authorization matrix](../tests/integration/authorization-matrix.test.ts) names, for each route,
+the least grant an agent needs.
+
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity
 or pin change requires a new administrator-generated pairing.
 
-The signed-in **System → API** page (`/reference`) renders this OpenAPI file with Swagger UI. Try it out sends the session cookie and CSRF header. `GET /openapi` returns the YAML and requires a session.
+The signed-in **System → API** page (`/reference`) renders this OpenAPI file with Swagger UI. Try it out sends the session cookie and CSRF header. `GET /openapi` returns the YAML and requires a session: a browser cookie, or a phone's or agent's bearer.
 
 CI holds the implementation to this document: `pnpm test-api` fails when a route or method is missing from it, and every response the integration tests receive must use a status documented for that route and, when JSON, match its schema.
 

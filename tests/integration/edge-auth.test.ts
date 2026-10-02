@@ -242,4 +242,18 @@ describe("Cloudflare Access service tokens", () => {
     expect(phone.payload.endpoints).toEqual([expect.objectContaining({ id, edgeAuth: "none" })]);
     expect(await prisma().deviceEdgeToken.count()).toBe(0);
   });
+
+  it("never hands the token to an agent, in its pairing code or its claim", async () => {
+    const auth = await adminAuth();
+    await protectedRoute(auth);
+    const pairing = await issuedPairing(await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { client: "agent", deviceName: "Agent", grant: "controls" }))));
+    expect(pairing.payload).not.toHaveProperty("access");
+    const claim = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client: "agent", pairing: pairing.payload.code }) }));
+    expect(claim.status).toBe(200);
+    const text = await claim.text();
+    expect(text).not.toContain(TOKEN.clientSecret);
+    expect(text).not.toContain("edgeCredentials");
+    const { token } = JSON.parse(text) as { token: string };
+    expect((await connection(request("/api/v1/connection", { auth: { cookie: "", csrf: "", token } }))).status).toBe(403);
+  });
 });

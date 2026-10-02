@@ -33,6 +33,12 @@
         "contracts"
       ]
     },
+    "tests/unit/agent-grant.test.ts": {
+      "categories": [
+        "pairing",
+        "sessions"
+      ]
+    },
     "tests/unit/accounts.test.ts": {
       "categories": [
         "accounts"
@@ -369,6 +375,12 @@
     "tests/unit/version.test.ts": {
       "categories": [
         "runtime"
+      ]
+    },
+    "tests/integration/agent-pairing.test.ts": {
+      "categories": [
+        "pairing",
+        "sessions"
       ]
     },
     "tests/integration/api-contract.test.ts": {

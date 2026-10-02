@@ -1,42 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { useState } from "react";
 import { countdown, transportLabel } from "@/lib/connection-routes";
-import type { ConnectionRoute, PairedPhone, PairingState } from "@/lib/types";
-import { Icon } from "@/components/ui/Icon";
+import type { ConnectionRoute, PairedPhone } from "@/lib/types";
+import { CopyRow } from "@/components/ui/CopyRow";
 import { QrCode } from "@/components/ui/QrCode";
+import { usePairingCode } from "./pairing-code-session";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "./SheetFrame";
-
-type Issued = { id: string; expiresAt: string; pairingCode: string };
-
-function CopyRow({ label, value, testId }: { label: string; value: string; testId: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div>
-      <div className="text-[14px] font-semibold text-[var(--ff-muted)]">{label}</div>
-      <div className="mt-1 flex items-center gap-2">
-        <code data-testid={testId} className="min-w-0 flex-1 rounded-lg bg-[var(--ff-field)] px-3 py-2 font-mono text-[14px] break-all">
-          {value}
-        </code>
-        <button
-          type="button"
-          aria-label={`Copy ${label.toLowerCase()}`}
-          className="flex flex-none items-center gap-1.5 rounded-lg border border-[var(--ff-line)] px-2.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]"
-          onClick={() => {
-            void navigator.clipboard?.writeText(value).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            });
-          }}
-        >
-          <Icon name="copy" size={16} />
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Pair a phone through the published route: name the phone, then show the single-use pairing code,
@@ -57,64 +27,10 @@ export function PairPhoneSheet({
   onPaired: () => void;
 }) {
   const [name, setName] = useState(replacing?.displayName ?? "iPhone");
-  const [issued, setIssued] = useState<Issued | null>(null);
-  const [state, setState] = useState<PairingState | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const pending = useRef<string | null>(null);
-
-  const expired = issued ? new Date(issued.expiresAt).getTime() <= now || state?.status === "expired" : false;
-  const claimed = state?.status === "claimed";
-
-  useEffect(() => {
-    if (!issued || claimed) return;
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tick);
-  }, [issued, claimed]);
-
-  useEffect(() => {
-    if (!issued || claimed || expired) return;
-    const poll = setInterval(() => {
-      void api<{ pairing: PairingState }>(`/api/v1/connection/pairings/${issued.id}`)
-        .then(({ pairing }) => {
-          setState(pairing);
-          if (pairing.status === "claimed") {
-            pending.current = null;
-            onPaired();
-          }
-        })
-        .catch(() => undefined);
-    }, 3000);
-    return () => clearInterval(poll);
-  }, [issued, claimed, expired, onPaired]);
-
-  useEffect(
-    () => () => {
-      if (pending.current) void api(`/api/v1/connection/pairings/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
-    },
-    [],
-  );
-
-  async function generate() {
-    setError("");
-    setBusy(true);
-    try {
-      if (pending.current) await api(`/api/v1/connection/pairings/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
-      const { pairing } = await api<{ pairing: Issued }>("/api/v1/connection/pairings", {
-        method: "POST",
-        body: JSON.stringify({ endpointId: route.id, deviceName: name.trim(), ...(replacing ? { replacesDeviceId: replacing.id } : {}) }),
-      });
-      pending.current = pairing.id;
-      setIssued(pairing);
-      setState(null);
-      setNow(Date.now());
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not create a pairing code.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { issued, state, expired, claimed, remaining, error, busy, generate } = usePairingCode({
+    body: () => ({ endpointId: route.id, deviceName: name.trim(), ...(replacing ? { replacesDeviceId: replacing.id } : {}) }),
+    onClaimed: onPaired,
+  });
 
   if (!issued) {
     return (
@@ -196,7 +112,7 @@ export function PairPhoneSheet({
             ) : null}
           </div>
           <p data-testid="pairing-countdown" className="text-center text-[14px] text-[var(--ff-muted)]">
-            {expired ? "This code expired. Make a new one." : `Expires in ${countdown(new Date(issued.expiresAt).getTime() - now)}`}
+            {expired ? "This code expired. Make a new one." : `Expires in ${countdown(remaining)}`}
           </p>
           <CopyRow label="Pairing code" value={issued.pairingCode} testId="pairing-code" />
         </>

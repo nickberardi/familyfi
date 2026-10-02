@@ -35,6 +35,13 @@ enum SessionKind {
 enum PairedDeviceClient {
   phone
   watch
+  agent
+}
+
+/// What an agent may do. It bounds the agent whatever the account it acts as may do.
+enum AgentGrant {
+  read
+  controls
 }
 
 enum ConnectionTransport {
@@ -164,6 +171,11 @@ model PairedDevice {
   credentialHash  String         @unique
   client          PairedDeviceClient @default(phone)
   clientId        String?        @unique
+  /// An agent's grant; null for phones and Watches.
+  agentGrant      AgentGrant?
+  /// The account an agent acts as: the adult who paired it. Phones and Watches sign in as an account instead.
+  accountId       String?
+  account         Account?       @relation("agentAccount", fields: [accountId], references: [id], onDelete: Cascade)
   revokedAt       DateTime?
   lastSeenAt      DateTime?
   createdAt       DateTime       @default(now())
@@ -202,6 +214,9 @@ model Pairing {
   claimedDevice      PairedDevice?       @relation(fields: [claimedDeviceId], references: [id], onDelete: SetNull)
   /// A phone this pairing re-pairs: when the pairing is claimed, that old record is revoked and removed.
   replacesDeviceId   String?
+  /// The kind of client this pairing admits. An agent pairing has no route: its code carries the address it was made from.
+  client             PairedDeviceClient  @default(phone)
+  agentGrant         AgentGrant?
   createdAt          DateTime            @default(now())
 
   @@index([expiresAt])
@@ -239,6 +254,7 @@ model Account {
   sessions      Session[]
   loginAttempts LoginAttempt[]
   authoredChanges ChangeResult[] @relation("changeActorAccount")
+  agents        PairedDevice[] @relation("agentAccount")
 }
 
 model Session {
