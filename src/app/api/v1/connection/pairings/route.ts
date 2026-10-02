@@ -6,7 +6,7 @@ import { prisma } from "@/server/db";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
 
-const AgentBody = z.object({ client: z.literal("agent"), deviceName: z.string().trim().min(1).max(80), grant: z.enum(["read", "controls"]) });
+const AgentBody = z.object({ client: z.literal("agent"), deviceName: z.string().trim().min(1).max(80), scope: z.enum(["full", "readOnly"]) });
 const Body = z.object({ endpointId: z.string().min(1), deviceName: z.string().trim().min(1).max(80), replacesDeviceId: z.string().min(1).optional() });
 
 export async function POST(request: Request) {
@@ -15,11 +15,11 @@ export async function POST(request: Request) {
     if (!body.ok) return body.response;
     if (body.value && typeof body.value === "object" && "client" in body.value && body.value.client === "agent") {
       const agent = AgentBody.safeParse(body.value);
-      if (!agent.success) return jsonError(400, "invalid_request", "An agent's name and grant (read or controls) are required.");
+      if (!agent.success) return jsonError(400, "invalid_request", "An agent's name and scope (full or readOnly) are required.");
       // The code carries the address it was made at, so it must be one an agent at home can reach.
       if (request.headers.get(TUNNEL_HEADER) === "tunnel") return jsonError(403, "agent_remote", "Connect an agent from the FamilyFi web app on the home network.");
       if (!session.accountId) return jsonError(403, "administrator_required", "Sign in with a personal account to connect an agent.");
-      const { pairing, pairingCode } = await createAgentPairing({ url: requestOrigin(request), displayName: agent.data.deviceName, grant: agent.data.grant, createdByAccountId: session.accountId });
+      const { pairing, pairingCode } = await createAgentPairing({ url: requestOrigin(request), displayName: agent.data.deviceName, scope: agent.data.scope, createdByAccountId: session.accountId });
       return Response.json({ pairing: { id: pairing.id, expiresAt: pairing.expiresAt.toISOString(), pairingCode } }, { status: 201 });
     }
     const parsed = Body.safeParse(body.value);

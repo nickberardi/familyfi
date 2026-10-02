@@ -1,5 +1,6 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { AccountKind, type AgentGrant, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
+import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, DeviceScope, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
+import { isValidScope } from "./device-scope";
 import { bearerSessionData } from "./auth";
 import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -13,7 +14,7 @@ const SPKI_SHA256 = /^[A-Za-z0-9_-]{43}$/;
 
 type ConnectionSession = Session & { account: { kind: AccountKind; isAdmin: boolean } | null; device?: { client: PairedDeviceClient } | null };
 
-/** An agent is never an administrator, whoever paired it: its grant bounds it. */
+/** An agent is never an administrator, whoever paired it: its scope bounds it. */
 export function isAdministrator(session: ConnectionSession): boolean {
   if (session.device?.client === PairedDeviceClient.agent) return false;
   return session.account?.kind === AccountKind.recovery || session.account?.isAdmin === true;
@@ -144,7 +145,7 @@ export async function claimPairing(input: { id: string; token: string; displayNa
     });
     if (claimed.count !== 1) return null;
     const pairedDevice = await transaction.pairedDevice.create({
-      data: { displayName: input.displayName, credentialHash: sha256(credential), lastSeenAt: now },
+      data: { displayName: input.displayName, credentialHash: sha256(credential), client: PairedDeviceClient.phone, scope: DeviceScope.full, lastSeenAt: now },
     });
     await transaction.pairing.update({ where: { id: pairing.id }, data: { claimedDeviceId: pairedDevice.id } });
     // A re-pair retires the record it replaces, so the same phone is never listed twice.
@@ -160,11 +161,12 @@ export async function claimPairing(input: { id: string; token: string; displayNa
  * from, which is on the home network because browser sign-in is. It never carries a certificate pin
  * or a Cloudflare Access token, and the agent acts as the adult who made it.
  */
-export async function createAgentPairing(input: { url: string; displayName: string; grant: AgentGrant; createdByAccountId: string }) {
+export async function createAgentPairing(input: { url: string; displayName: string; scope: DeviceScope; createdByAccountId: string }) {
+  if (!isValidScope(PairedDeviceClient.agent, input.scope)) throw new Error(`An agent cannot hold the ${input.scope} scope.`);
   const token = randomToken();
   const expiresAt = new Date(Date.now() + AGENT_PAIRING_TTL_MS);
   const pairing = await prisma().pairing.create({
-    data: { client: PairedDeviceClient.agent, agentGrant: input.grant, displayName: input.displayName, createdByAccountId: input.createdByAccountId, tokenHash: sha256(token), expiresAt },
+    data: { client: PairedDeviceClient.agent, scope: input.scope, displayName: input.displayName, createdByAccountId: input.createdByAccountId, tokenHash: sha256(token), expiresAt },
   });
   const household = await ensureConnectionIdentity();
   const pairingCode = encodePairingCode({ version: PAIRING_CODE_VERSION, url: input.url, code: `${pairing.id}.${token}`, fingerprint: instanceFingerprint(household.instancePublicKey!) });
@@ -178,16 +180,17 @@ export async function createAgentPairing(input: { url: string; displayName: stri
  */
 export async function claimAgentPairing(input: { id: string; token: string; displayName?: string; userAgent?: string | null }) {
   const pairing = await prisma().pairing.findUnique({ where: { id: input.id } });
-  if (!pairing || pairing.client !== PairedDeviceClient.agent || !pairing.agentGrant || pairing.claimedAt || pairing.expiresAt <= new Date() || !safeEqual(pairing.tokenHash, sha256(input.token))) return null;
+  if (!pairing || pairing.client !== PairedDeviceClient.agent || !pairing.scope || pairing.claimedAt || pairing.expiresAt <= new Date() || !safeEqual(pairing.tokenHash, sha256(input.token))) return null;
   const account = await prisma().account.findUnique({ where: { id: pairing.createdByAccountId } });
   if (!account) return null;
+  const scope = pairing.scope;
   const now = new Date();
   const bearer = bearerSessionData(now);
   const device = await prisma().$transaction(async (transaction) => {
     const claimed = await transaction.pairing.updateMany({ where: { id: pairing.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
     const agent = await transaction.pairedDevice.create({
-      data: { displayName: input.displayName ?? pairing.displayName, credentialHash: sha256(randomToken()), client: PairedDeviceClient.agent, agentGrant: pairing.agentGrant, accountId: account.id, lastSeenAt: now },
+      data: { displayName: input.displayName ?? pairing.displayName, credentialHash: sha256(randomToken()), client: PairedDeviceClient.agent, scope, accountId: account.id, lastSeenAt: now },
     });
     await transaction.pairing.update({ where: { id: pairing.id }, data: { claimedDeviceId: agent.id } });
     await transaction.session.create({
@@ -223,6 +226,7 @@ export async function enrollWatch(input: { clientId: string; accountId: string; 
         displayName: input.displayName,
         credentialHash: sha256(credential),
         client: PairedDeviceClient.watch,
+        scope: DeviceScope.rulesOnly,
         clientId: input.clientId,
         lastSeenAt: now,
       },

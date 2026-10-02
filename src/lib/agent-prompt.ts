@@ -1,15 +1,18 @@
-import type { AgentGrant } from "./types";
+import type { DeviceScope } from "./types";
 
 /** What the adult pastes into an agent: where the guide is, and the single-use code it connects with. */
 export function agentPrompt(origin: string, pairingCode: string): string {
   return `Read ${origin}/agents.md and follow it to connect to my FamilyFi. My pairing code is ${pairingCode}`;
 }
 
-export const AGENT_GRANTS: readonly { value: AgentGrant; label: string; detail: string }[] = [
-  { value: "controls", label: "Manage controls", detail: "Read the household, and change groups, rules, pauses, allowances and device assignment." },
-  { value: "read", label: "Read only", detail: "Read groups, rules, devices and sync status. It cannot change anything." },
+/** The scopes an adult may give an agent. */
+export const AGENT_SCOPES: readonly { value: "full" | "readOnly"; label: string; detail: string }[] = [
+  { value: "full", label: "Full access", detail: "Read the household, and change groups, rules, pauses, allowances and device assignment." },
+  { value: "readOnly", label: "Read only", detail: "Read groups, rules, devices and sync status. It cannot change anything." },
 ];
 
-export function agentGrantLabel(grant: AgentGrant | null): string {
-  return AGENT_GRANTS.find((option) => option.value === grant)?.label ?? "Read only";
+const SCOPE_LABELS: Record<DeviceScope, string> = { full: "Full access", rulesOnly: "Rules only", readOnly: "Read only" };
+
+export function scopeLabel(scope: DeviceScope): string {
+  return SCOPE_LABELS[scope];
 }

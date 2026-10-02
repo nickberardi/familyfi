@@ -246,7 +246,7 @@ describe("Cloudflare Access service tokens", () => {
   it("never hands the token to an agent, in its pairing code or its claim", async () => {
     const auth = await adminAuth();
     await protectedRoute(auth);
-    const pairing = await issuedPairing(await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { client: "agent", deviceName: "Agent", grant: "controls" }))));
+    const pairing = await issuedPairing(await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { client: "agent", deviceName: "Agent", scope: "full" }))));
     expect(pairing.payload).not.toHaveProperty("access");
     const claim = await claimPairing(
       request(`/api/v1/connection/pairings/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: "Agent" }) }),

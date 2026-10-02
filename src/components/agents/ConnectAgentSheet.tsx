@@ -1,23 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { AGENT_GRANTS, agentPrompt } from "@/lib/agent-prompt";
+import { AGENT_SCOPES, agentPrompt } from "@/lib/agent-prompt";
 import { countdown } from "@/lib/connection-routes";
-import type { AgentGrant } from "@/lib/types";
 import { CopyRow } from "@/components/ui/CopyRow";
 import { Segmented } from "@/components/ui/Segmented";
 import { usePairingCode } from "@/components/pair/pairing-code-session";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 
 /**
- * Connect an agent: name it and choose its grant, then show the prompt to paste into it. The prompt
+ * Connect an agent: name it and choose its scope, then show the prompt to paste into it. The prompt
  * carries a single-use pairing code; closing the sheet or making a new one cancels a code nobody claimed.
  */
 export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => void; onConnected: () => void }) {
   const [name, setName] = useState("AI agent");
-  const [grant, setGrant] = useState<AgentGrant>("controls");
+  const [scope, setScope] = useState<"full" | "readOnly">("full");
   const { issued, state, expired, claimed, remaining, error, busy, generate } = usePairingCode({
-    body: () => ({ client: "agent", deviceName: name.trim(), grant }),
+    body: () => ({ client: "agent", deviceName: name.trim(), scope }),
     onClaimed: onConnected,
   });
 
@@ -51,9 +50,9 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
         <div className="text-[14px] font-semibold text-[var(--ff-muted)]">
           What it may do
           <div className="mt-1">
-            <Segmented name="What the agent may do" value={grant} segments={AGENT_GRANTS} onChange={setGrant} grow />
+            <Segmented name="What the agent may do" value={scope} segments={AGENT_SCOPES} onChange={setScope} grow />
           </div>
-          <p className="mt-1.5 font-normal">{AGENT_GRANTS.find((option) => option.value === grant)?.detail}</p>
+          <p className="mt-1.5 font-normal">{AGENT_SCOPES.find((option) => option.value === scope)?.detail}</p>
           <p className="mt-1.5 font-normal">No agent can change accounts, gateway settings, remote access or paired devices.</p>
         </div>
         {errorLine}
@@ -66,7 +65,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
       title={claimed ? "Agent connected" : "Paste this into your agent"}
       sub={
         claimed
-          ? `${state?.device?.displayName ?? "The agent"} is connected. It acts as you, within its grant.`
+          ? `${state?.device?.displayName ?? "The agent"} is connected. It acts as you, within its scope.`
           : "The agent reads the guide, then connects with the code. This sheet updates when it does."
       }
       onClose={onClose}

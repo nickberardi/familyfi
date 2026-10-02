@@ -23,7 +23,7 @@ export async function POST(request: Request, context: Ctx) {
     const agent = await claimAgentPairing({ id, token: parsed.data.token, displayName: parsed.data.deviceName, userAgent: request.headers.get("user-agent") });
     if (!agent) return jsonError(403, "invalid_pairing", "Pairing code is invalid, expired, or already used.");
     return Response.json({
-      device: { id: agent.device.id, displayName: agent.device.displayName, grant: agent.device.agentGrant },
+      device: { id: agent.device.id, displayName: agent.device.displayName, scope: agent.device.scope },
       session: toPublicSession({ username: agent.account.username, expiresAt: agent.expiresAt, account: agent.account }),
       token: agent.token,
       tokenType: "Bearer",

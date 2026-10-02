@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { FamilyRole, GroupKind, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { DeviceScope, FamilyRole, GroupKind, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { createSession } from "@/server/auth";
 import { authenticatePairedDevice } from "@/server/connection";
 import { prisma } from "@/server/db";
@@ -84,6 +84,7 @@ describe("independent Watch device", () => {
     expect(watch.refreshToken).not.toBe(watch.token);
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.deviceId } });
     expect(device.client).toBe(PairedDeviceClient.watch);
+    expect(device.scope).toBe(DeviceScope.rulesOnly);
     expect(device.clientId).toBe(watchId);
     expect(device.id).not.toBe(phone.device.id);
     expect((await authenticatePairedDevice(watch.deviceId, watch.deviceCredential))?.id).toBe(watch.deviceId);
@@ -97,8 +98,8 @@ describe("independent Watch device", () => {
     const listed = await listDevices(request("/api/v1/connection/devices", { auth: await administrator() }));
     const devices = (await listed.json() as { devices: { id: string; client: string }[] }).devices;
     expect(devices).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: phone.device.id, client: "phone" }),
-      expect.objectContaining({ id: watch.deviceId, client: "watch" }),
+      expect.objectContaining({ id: phone.device.id, client: "phone", scope: "full" }),
+      expect.objectContaining({ id: watch.deviceId, client: "watch", scope: "rulesOnly" }),
     ]));
   });
 

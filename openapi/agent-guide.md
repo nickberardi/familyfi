@@ -28,7 +28,7 @@ The response holds:
 
 - `token`: your bearer. It lasts **one hour** (`session.expiresAt`).
 - `refreshToken`: what renews it. It lasts 90 days from its last use.
-- `device.id` and `device.grant`.
+- `device.id` and `device.scope`.
 
 Keep them where your environment keeps secrets, for example:
 
@@ -100,18 +100,18 @@ failed. A successful household sync is not proof that your change applied.
 
 ## 6. What you cannot do
 
-Your grant is in `device.grant`:
+Your scope is in `device.scope`:
 
-- `read`: you may only read household state.
-- `controls`: you may also manage groups, rules, pauses, allowances, devices and their
+- `readOnly`: you may only read household state.
+- `full`: you may also manage groups, rules, pauses, allowances, devices and their
   assignment, sync and DNS categories.
 
-Under any grant, you cannot reach accounts, gateway settings or resolvers, change household settings,
+Under any scope, you cannot reach accounts, gateway settings or resolvers, change household settings,
 or manage pairing, remote access or paired devices. These answer:
 
 | Status | `error.code` | Meaning |
 | --- | --- | --- |
-| 403 | `agent_scope` | Your grant does not cover this. Ask the person to do it in the web app at `{{origin}}`. |
+| 403 | `agent_scope` | Your scope does not cover this. Ask the person to do it in the web app at `{{origin}}`. |
 | 403 | `agent_remote` | You reached FamilyFi through remote access. Connect from the home network. |
 | 401 | `unauthenticated` | Your bearer expired. Renew it with your refresh token (step 1). |
 | 403 | `invalid_refresh`, `refresh_reused` | From refresh: your access has ended. Ask for a new pairing code. |

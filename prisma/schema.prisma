@@ -38,10 +38,12 @@ enum PairedDeviceClient {
   agent
 }
 
-/// What an agent may do. It bounds the agent whatever the account it acts as may do.
-enum AgentGrant {
-  read
-  controls
+/// What a paired device may call. Each (client, scope) pair is one allowlist in src/server/device-scope.ts:
+/// phone:full, watch:rulesOnly, agent:full, agent:readOnly. It bounds the device whatever its account may do.
+enum DeviceScope {
+  full
+  rulesOnly
+  readOnly
 }
 
 enum ConnectionTransport {
@@ -171,8 +173,7 @@ model PairedDevice {
   credentialHash  String         @unique
   client          PairedDeviceClient @default(phone)
   clientId        String?        @unique
-  /// An agent's grant; null for phones and Watches.
-  agentGrant      AgentGrant?
+  scope           DeviceScope    @default(full)
   /// The account an agent acts as: the adult who paired it. Phones and Watches sign in as an account instead.
   accountId       String?
   account         Account?       @relation("agentAccount", fields: [accountId], references: [id], onDelete: Cascade)
@@ -216,7 +217,8 @@ model Pairing {
   replacesDeviceId   String?
   /// The kind of client this pairing admits. An agent pairing has no route: its code carries the address it was made from.
   client             PairedDeviceClient  @default(phone)
-  agentGrant         AgentGrant?
+  /// The scope an agent pairing grants; a phone pairing always gives `full`.
+  scope              DeviceScope?
   createdAt          DateTime            @default(now())
 
   @@index([expiresAt])

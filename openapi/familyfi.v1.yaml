@@ -2750,28 +2750,32 @@ components:
           properties:
             id: { type: string }
             displayName: { type: string }
-    AgentGrant:
+    DeviceScope:
       type: string
-      enum: [read, controls]
+      enum: [full, rulesOnly, readOnly]
       description: |
-        What a paired agent may do, whatever its account may. `read` reads household state: groups,
-        rules, devices, sync, changes, DNS categories and household settings (its timezone). `controls`
-        also changes groups, rules and their pause and allow verbs, devices and their assignment, sync
-        and DNS categories. No grant reaches accounts, UniFi settings or resolvers, changes household
-        settings, or manages connections; an agent may only revoke itself there. Beyond its grant an agent
-        gets 403 `agent_scope`, and over remote access 403 `agent_remote`.
+        What a paired device may call. Each (client, scope) pair is one explicit allowlist, not a
+        ladder, and only four exist. `phone:full` may do whatever its account may. `watch:rulesOnly`
+        reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
+        extends, allows, disallows and turns rules on and off (401 `watch_scope` beyond that).
+        `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
+        and household settings (its timezone). `agent:full` also changes groups, rules and their
+        verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
+        UniFi settings or resolvers, changes household settings, or manages connections; it may only
+        revoke itself there. Beyond its scope an agent gets 403 `agent_scope`, and over remote access
+        403 `agent_remote`.
     ConnectionPairingCreate:
       type: object
       additionalProperties: false
       description: |
         A phone pairing names the route the phone pairs over (`endpointId`, required) and expires
-        in five minutes. An agent pairing (`client: agent`, with a `grant`) has no route: its code
+        in five minutes. An agent pairing (`client: agent`, with a `scope` of `full` or `readOnly`) has no route: its code
         carries the address it was made at, with no certificate pin or Cloudflare Access token, and
         it expires in fifteen minutes. It cannot be made through remote access (403 `agent_remote`).
       required: [deviceName]
       properties:
         client: { type: string, enum: [phone, agent], default: phone }
-        grant: { $ref: "#/components/schemas/AgentGrant" }
+        scope: { type: string, enum: [full, readOnly], description: "An agent pairing's DeviceScope; agents hold only these two." }
         endpointId: { type: string }
         deviceName: { type: string, minLength: 1, maxLength: 80 }
         replacesDeviceId: { type: string, description: "Re-pair: when this pairing is claimed, the phone with this id is revoked and its record removed, so it is not listed twice. 404 if it no longer exists." }
@@ -2828,7 +2832,7 @@ components:
           properties:
             id: { type: string }
             displayName: { type: string }
-            grant: { $ref: "#/components/schemas/AgentGrant" }
+            scope: { $ref: "#/components/schemas/DeviceScope" }
         deviceCredential: { type: string }
         endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" }
         manifest: { $ref: "#/components/schemas/ConnectionEndpointManifest" }
@@ -2857,14 +2861,12 @@ components:
     ConnectionDevice:
       type: object
       additionalProperties: false
-      required: [id, displayName, client, grant, enrolledAt, lastSeenAt, revokedAt, pairedVia, edgeTokens, sessions]
+      required: [id, displayName, client, scope, enrolledAt, lastSeenAt, revokedAt, pairedVia, edgeTokens, sessions]
       properties:
         id: { type: string }
         displayName: { type: string }
         client: { type: string, enum: [phone, watch, agent] }
-        grant:
-          description: An agent's grant; null for phones and Watches.
-          oneOf: [{ $ref: "#/components/schemas/AgentGrant" }, { type: "null" }]
+        scope: { $ref: "#/components/schemas/DeviceScope" }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
         revokedAt: { type: [string, "null"], format: date-time }

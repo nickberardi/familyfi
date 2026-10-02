@@ -148,15 +148,14 @@ export type ConnectionRoute = {
   edgeTokenVersion: number | null;
 };
 
-/** What a paired agent may do: read household state, or also manage household controls. */
-export type AgentGrant = "read" | "controls";
+/** What a paired device may call. Valid pairs: phone `full`, Watch `rulesOnly`, agent `full` or `readOnly`. */
+export type DeviceScope = "full" | "rulesOnly" | "readOnly";
 
 export type PairedPhone = {
   id: string;
   displayName: string;
   client: "phone" | "watch" | "agent";
-  /** An agent's grant; null for phones and Watches. */
-  grant: AgentGrant | null;
+  scope: DeviceScope;
   enrolledAt: string;
   lastSeenAt: string | null;
   revokedAt: string | null;
