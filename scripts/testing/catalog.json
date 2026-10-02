@@ -641,6 +641,11 @@
         "sync"
       ]
     },
+    "tests/browser/smoke.spec.ts > Sync summary cards keep equal columns when a row breaks": {
+      "categories": [
+        "sync"
+      ]
+    },
     "tests/browser/smoke.spec.ts > a device opened from its group returns to that group": {
       "categories": [
         "devices"

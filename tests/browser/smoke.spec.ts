@@ -244,6 +244,19 @@ test("desktop Sync summary keeps four cards on one row", { tag: "@desktop" }, as
   expect(new Set(tops).size).toBe(1);
 });
 
+test("Sync summary cards keep equal columns when a row breaks", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  // Three columns fit beside the sidebar here and four do not, so the last card starts a row alone.
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.goto("/sync");
+  const cards = page.getByText("App-owned policies", { exact: true }).locator("..").locator("..");
+  await expect(cards.locator(":scope > div")).toHaveCount(4);
+  const widths = await cards.locator(":scope > div").evaluateAll((items) =>
+    items.map((item) => Math.round(item.getBoundingClientRect().width)),
+  );
+  expect(new Set(widths).size).toBe(1);
+});
+
 test("a device opened from its group returns to that group", async ({ page }) => {
   await signIn(page);
   const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as {

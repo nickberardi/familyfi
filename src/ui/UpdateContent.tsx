@@ -41,12 +41,9 @@ export function UpdateContent({ update, onNotNow }: { update: UpdateCheck | null
           <Text style={[text(14, 21, "muted"), { fontFamily: MONO }]}>{latest}</Text>
           <View style={styles.grow} />
           {update?.releaseUrl ? (
-            <View style={styles.external}>
-              <ExternalLink href={update.releaseUrl} style={[text(14, 21, "ink"), styles.bold]} testID="update-release-link">
-                {COPY.viewOnGitHub}
-              </ExternalLink>
-              <ui.Icon name="arrow-square-out" size={14} color={ui.color("ink")} />
-            </View>
+            <ExternalLink href={update.releaseUrl} style={[text(14, 21, "ink"), styles.bold]} color={ui.color("ink")} testID="update-release-link">
+              {COPY.viewOnGitHub}
+            </ExternalLink>
           ) : null}
         </View>
         {sections.length === 0 ? (
@@ -113,7 +110,6 @@ const styles = StyleSheet.create({
   headRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 10 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
-  external: { flexDirection: "row", alignItems: "center", gap: 4 },
   section: { paddingHorizontal: 18, paddingVertical: 14 },
   sectionTitle: { letterSpacing: 0.35, textTransform: "uppercase" },
   items: { marginTop: 8, gap: 6 },
