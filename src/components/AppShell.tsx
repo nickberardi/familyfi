@@ -6,14 +6,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
-import { api } from "@/lib/api";
+import { api, request } from "@/lib/api";
 import { unassignedBadgeCount } from "@/lib/device-list";
-import { initials } from "@/lib/display";
 import type { IconName } from "@/lib/icons";
-import { noMembersAttention } from "@/lib/sync-copy";
+import { familyNeedsDevices as familyNeedsDevicesCount, syncFailed as syncNeedsAttention } from "@/lib/sync-copy";
+import { reconcileNow } from "@/lib/sync-writes";
+import { AccountCard, DeviceAttentionCard, SyncStatusCard, UpdateAlertCard } from "@/ui/StatusCards";
 import { appVersionLabel } from "@/lib/version";
 import { useAppData } from "./AppDataProvider";
-import { UpdateAlert, useUpdateCheck } from "./UpdateAlert";
+import { useUpdateCheck } from "@/ui/use-update-check";
 
 const NAV: { title: string; items: { href: string; label: string; icon: IconName }[] }[] = [
   {
@@ -155,9 +156,9 @@ function NavGroups({
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, devices, sync, unifi, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
+  const { session, devices, sync, unifi, store, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
-  const update = useUpdateCheck();
+  const update = useUpdateCheck(request);
   // Closing on a route change is the drawer's own signal, same as the design's
   // `pickAndClose` on each item — but this also catches the back button, a redirect,
   // or anywhere else navigation happens outside a drawer tap. Adjusted during render
@@ -169,10 +170,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (navOpen) setNavOpen(false);
   }
   const unassignedCount = unassignedBadgeCount(devices);
-  const coverageFailing = (sync?.failingCount ?? 0) > 0;
-  const deviceAttention = noMembersAttention(sync?.issues ?? []);
-  const familyNeedsDevices = (sync?.issues ?? []).filter((issue) => issue.kind === "no_members").length;
-  const syncFailed = sync?.lastRun?.status === "failed" || sync?.connectionStatus === "error" || coverageFailing;
+  const familyNeedsDevices = familyNeedsDevicesCount(sync);
+  const syncFailed = syncNeedsAttention(sync);
 
   const navDrawer = useMemo(() => ({ toggle: () => setNavOpen((open) => !open) }), []);
 
@@ -182,25 +181,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
 
-  const syncTitle =
-    sync?.connectionStatus === "unconfigured"
-      ? "UniFi not configured"
-      : syncFailed
-        ? "Sync needs attention"
-        : sync?.lastRun?.status === "partial"
-          ? "Partial apply"
-          : "Gateway in sync";
-  const syncDot =
-    sync?.connectionStatus === "unconfigured"
-      ? "var(--ff-muted)"
-      : syncFailed
-        ? "var(--ff-danger)"
-        : "var(--ff-on)";
-  const showReconcile =
-    busy ||
-    sync?.connectionStatus === "unconfigured" ||
-    syncFailed ||
-    sync?.lastRun?.status === "partial";
   const statusLine = `${appVersionLabel()} · ${unifi?.configured ? "Household gateway" : "Setup needed"}`;
 
   return (
@@ -217,58 +197,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           </nav>
           <div className="ff-sidebar-end flex flex-col gap-2.5">
-            <UpdateAlert update={update} />
-            <div className="rounded-[9px] border border-[var(--ff-line)] bg-[var(--ff-card)] p-2.5">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ background: syncDot }} />
-                <span className="text-[14px] font-semibold">{syncTitle}</span>
-              </div>
-              <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">
-                {busy
-                  ? "Writing desired state to UniFi…"
-                  : error || notice || (syncFailed ? sync?.lastRun?.error : null) || "Desired state is written on the next reconcile."}
-              </p>
-              {showReconcile ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void mutate(() => api("/api/v1/sync/retry", { method: "POST", body: JSON.stringify({}) }))
-                  }
-                  className="mt-2 w-full rounded-[6px] bg-[var(--ff-accent-fill)] py-1.5 text-center text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
-                >
-                  {busy ? "Reconciling…" : "Reconcile now"}
-                </button>
-              ) : null}
-            </div>
-            {deviceAttention ? (
-              <div className="rounded-[9px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] p-2.5">
-                <div className="text-[14px] font-semibold text-[var(--ff-paused)]">{deviceAttention.title}</div>
-                <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{deviceAttention.message}</p>
-                <Link
-                  href={deviceAttention.href}
-                  className="mt-2 block w-full rounded-[6px] bg-[var(--ff-paused-fill-strong)] py-1.5 text-center text-[14px] font-semibold text-[var(--ff-paused)]"
-                >
-                  Assign devices
-                </Link>
-              </div>
-            ) : null}
-            <div className="flex items-center gap-2.5 rounded-[10px] bg-[var(--ff-card-veil)] p-2.5">
-              <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-person-fill)] text-[14px] font-semibold text-[var(--ff-on)]">
-                {initials(session?.displayName ?? "A")}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] font-semibold">{session?.displayName ?? "…"}</div>
-                <div className="text-[14px] text-[var(--ff-muted)]">{session?.username}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                className="flex-none rounded-[7px] border border-[var(--ff-line)] px-2 py-1 text-[14px] font-semibold text-[var(--ff-accent)]"
-              >
-                Sign out
-              </button>
-            </div>
+            <UpdateAlertCard update={update} />
+            <SyncStatusCard
+              sync={sync}
+              busy={busy}
+              error={error}
+              notice={notice}
+              onReconcile={() => void reconcileNow(store.mutate)}
+            />
+            <DeviceAttentionCard sync={sync} />
+            <AccountCard session={session} onSignOut={() => void signOut()} />
           </div>
         </aside>
         {/* The page scrolls here, so it takes focus: a keyboard user can scroll content with no controls in it. */}
@@ -321,7 +259,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   onNavigate={() => setNavOpen(false)}
                 />
               </nav>
-              <UpdateAlert update={update} />
+              <UpdateAlertCard update={update} />
             </div>
           </>
         ) : null}

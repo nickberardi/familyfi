@@ -14,4 +14,5 @@ export const defaultUI: UI = {
   Select: () => null,
   Link: ({ children }) => children,
   confirm: () => Promise.resolve(false),
+  copyText: () => Promise.resolve(),
 };

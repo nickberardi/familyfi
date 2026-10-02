@@ -73,4 +73,7 @@ export const defaultUI: UI = {
     </NextLink>
   ),
   confirm: () => Promise.resolve(true),
+  copyText: async (value) => {
+    await navigator.clipboard?.writeText(value);
+  },
 };
