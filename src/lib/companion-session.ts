@@ -186,6 +186,8 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
       };
     },
     request,
+    /** The Access credentials for the household's routes, as the phone holds them: for its Watch's setup. */
+    edgeCredentials: () => credentials,
     /** Reads what the phone kept, and lands the launch. Storage that cannot be read (a lost key) lands on setup, where pairing again replaces it. */
     async load() {
       let stored;
