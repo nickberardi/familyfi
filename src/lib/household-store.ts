@@ -36,6 +36,8 @@ export type HouseholdState = {
   accounts: Account[];
   /** The last refresh failed, so what is shown may be out of date. */
   stale: boolean;
+  /** The last refresh could not reach the server at all (no route answered), rather than being refused. */
+  unreachable: boolean;
   error: string;
   notice: string;
   noticeAction: NoticeAction | null;
@@ -100,6 +102,7 @@ export function createHouseholdStore(deps: {
     household: null,
     accounts: [],
     stale: false,
+    unreachable: false,
     error: "",
     notice: "",
     noticeAction: null,
@@ -166,22 +169,23 @@ export function createHouseholdStore(deps: {
         household: household.household,
         accounts: accounts.accounts,
         stale: false,
+        unreachable: false,
         // Reaching the server again answers any message about not reaching it.
         ...(connectionMessages.has(state.error) ? { error: "" } : {}),
       });
     } catch (error) {
       if (gen !== loadGen) return;
       if (error instanceof ApiError && error.status === 401) {
-        set({ status: "signedOut", loaded: true, stale: true });
+        set({ status: "signedOut", loaded: true, stale: true, unreachable: false });
         return;
       }
       if (offlineGuard) {
         // Keep what is shown, but say it may be out of date. A write's own failure message,
         // already shown, says more than this one, so it stays.
-        set({ loaded: true, stale: true, error: state.error || offlineGuard.stale });
+        set({ loaded: true, stale: true, unreachable: error instanceof TransportError, error: state.error || offlineGuard.stale });
       } else {
         // The first load says why it failed; a later refresh keeps the page as it is.
-        set({ loaded: true, stale: true, ...(state.loaded ? {} : { error: error instanceof Error ? error.message : "Request failed." }) });
+        set({ loaded: true, stale: true, unreachable: error instanceof TransportError, ...(state.loaded ? {} : { error: error instanceof Error ? error.message : "Request failed." }) });
       }
     }
   }

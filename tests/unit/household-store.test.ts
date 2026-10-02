@@ -373,7 +373,7 @@ describe("household store with an offline guard (a phone)", () => {
     await store.reload();
     reachable = false;
     await store.reload();
-    expect(store.getState()).toMatchObject({ stale: true, error: GUARD.stale });
+    expect(store.getState()).toMatchObject({ stale: true, unreachable: true, error: GUARD.stale });
     expect(store.getState().groups).toHaveLength(1);
     expect(store.canControl()).toBe(false);
 
@@ -384,9 +384,19 @@ describe("household store with an offline guard (a phone)", () => {
     // Coming back does not replay the refused tap, and answers the "not sent" message.
     reachable = true;
     await store.reload();
-    expect(store.getState()).toMatchObject({ stale: false, error: "" });
+    expect(store.getState()).toMatchObject({ stale: false, unreachable: false, error: "" });
     expect(store.canControl()).toBe(true);
     expect(server.calls.some((call) => call.method === "POST")).toBe(false);
+  });
+
+  it("tells a refused refresh from one that reached nothing", async () => {
+    const routes = reads(() => childGroup());
+    const { store } = setup(
+      { ...routes, "GET /api/v1/groups": () => Promise.reject(new ApiError("Server error.", 500, "internal")) as never },
+      { offlineGuard: GUARD },
+    );
+    await store.reload();
+    expect(store.getState()).toMatchObject({ stale: true, unreachable: false });
   });
 
   it("says a write that lost its connection may not have been sent, and reads the truth", async () => {

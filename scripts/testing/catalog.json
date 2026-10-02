@@ -58,6 +58,12 @@
         "sessions"
       ]
     },
+    "tests/unit/connection-hops.test.ts": {
+      "categories": [
+        "pairing",
+        "sync"
+      ]
+    },
     "tests/unit/connection-routes.test.ts": {
       "categories": [
         "trust"
