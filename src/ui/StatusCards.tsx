@@ -65,7 +65,7 @@ export function UpdateAlertCard({ update }: { update: UpdateCheck | null }) {
   return (
     <Card label={alert.title} testID="update-alert">
       <View style={styles.titleRow}>
-        <View style={[styles.dot, { backgroundColor: ui.color("accent") }]} />
+        <View aria-hidden style={[styles.dot, { backgroundColor: ui.color("accent") }]} />
         <Text style={[text(14, 21, "ink"), styles.bold]}>{alert.title}</Text>
       </View>
       <Text style={[text(14, 20, "muted"), styles.body]}>{alert.body}</Text>
@@ -144,9 +144,7 @@ export function AccountCard({ session, onSignOut, label = "Sign out" }: { sessio
         <Text style={[text(14, 21, "ink"), styles.bold]} numberOfLines={1}>
           {session?.displayName ?? "…"}
         </Text>
-        <Text style={text(14, 21, "muted")} numberOfLines={1}>
-          {session?.username}
-        </Text>
+        <Text style={text(14, 21, "muted")}>{session?.username}</Text>
       </View>
       <Pressable
         role="button"

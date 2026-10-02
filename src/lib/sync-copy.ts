@@ -168,7 +168,7 @@ export function syncLogRows(sync: SyncStatus | null | undefined, timezone: strin
     key: change.id,
     when: formatLogWhen(change.updatedAt, timezone),
     action: changeActionLabel(change.scope),
-    detail: change.error ?? (change.deviceMac ? changePolicyLabel(change.deviceMac) : null),
+    detail: change.error || (change.deviceMac ? changePolicyLabel(change.deviceMac) : null),
     detailInk: change.error ? "var(--ff-danger)" : "var(--ff-muted)",
     detailMono: !change.error && Boolean(change.deviceMac),
     result: changeResultLabel(change.status),

@@ -5,6 +5,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import { SYNC_COPY as COPY, syncLogRows, syncStats } from "@/lib/sync-copy";
 import type { SyncStatus } from "@/lib/types";
 
+import { SyncTiles } from "./SyncTiles";
 import { tokenOf, useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
@@ -21,7 +22,7 @@ export function SyncContent({ sync, timezone, now }: { sync: SyncStatus | null; 
 
   return (
     <View style={styles.stack} testID="sync-content">
-      <View style={styles.tiles}>
+      <SyncTiles>
         {syncStats(sync, now).map((stat) => (
           <View key={stat.label} style={[styles.card, styles.tile, card]} testID={`sync-stat-${stat.label}`}>
             <Text style={[text(14, 21, "muted"), styles.statLabel]}>{stat.label}</Text>
@@ -29,7 +30,7 @@ export function SyncContent({ sync, timezone, now }: { sync: SyncStatus | null; 
             <Text style={[text(14, 21, "muted"), styles.statNote]}>{stat.note}</Text>
           </View>
         ))}
-      </View>
+      </SyncTiles>
 
       <View style={[styles.card, styles.log, card]} testID="sync-log">
         <View style={[styles.row, styles.head, { backgroundColor: ui.color("field-soft") }]}>
@@ -64,7 +65,6 @@ export function SyncContent({ sync, timezone, now }: { sync: SyncStatus | null; 
 
 const styles = StyleSheet.create({
   stack: { gap: 16 },
-  tiles: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   card: { borderRadius: 12, borderWidth: 1 },
   tile: { flexGrow: 1, flexBasis: 200, minWidth: 0, paddingHorizontal: 18, paddingVertical: 16 },
   statLabel: { fontWeight: "600", letterSpacing: 0.35, textTransform: "uppercase" },
