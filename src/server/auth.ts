@@ -313,11 +313,11 @@ export async function requireSession(request: Request) {
       return { session: null, error: jsonError(403, "agent_remote", "Agents connect from the home network only.") };
     }
     if (!deviceRouteAllowed({ client: device.client, scope: device.scope, deviceId: device.id, method: request.method, path: new URL(request.url).pathname })) {
-      // Each kind keeps the refusal its clients already handle.
+      // Signed in but not allowed: 403, never 401, which clients read as "renew or sign in again".
       if (device.client === PairedDeviceClient.agent) {
         return { session: null, error: jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.") };
       }
-      return { session: null, error: jsonError(401, "watch_scope", "This Watch session cannot use that endpoint.") };
+      return { session: null, error: jsonError(403, "watch_scope", "This Watch session cannot use that endpoint.") };
     }
   }
   return { session, error: null };

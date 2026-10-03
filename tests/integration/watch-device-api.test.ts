@@ -93,7 +93,7 @@ describe("independent Watch device", () => {
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(200);
     expect((await listGroups(request("/api/v1/groups", { auth: bearer(watch.token) }))).status).toBe(200);
     const denied = await household(request("/api/v1/settings/household", { auth: bearer(watch.token) }));
-    expect(denied.status).toBe(401);
+    expect(denied.status).toBe(403);
     expect((await denied.json() as { error: { code: string } }).error.code).toBe("watch_scope");
     const listed = await listDevices(request("/api/v1/connection/devices", { auth: await administrator() }));
     const devices = (await listed.json() as { devices: { id: string; client: string }[] }).devices;
@@ -140,7 +140,9 @@ describe("independent Watch device", () => {
     expect((await enrollRequest(await administrator())).status).toBe(403);
     expect((await enrollRequest(phone.auth, watchId, "phone")).status).toBe(400);
     const watch = await enrolledWatch(phone.auth);
-    expect((await enrollRequest(bearer(watch.token))).status).toBe(401);
+    const byWatch = await enrollRequest(bearer(watch.token));
+    expect(byWatch.status).toBe(403);
+    expect(((await byWatch.json()) as { error: { code: string } }).error.code).toBe("watch_scope");
     expect((await enrollRequest(bearer("invalid"))).status).toBe(401);
   });
 
@@ -203,7 +205,7 @@ describe("independent Watch device", () => {
     expect((await turnOnRule(request(path("on"), { method: "POST", auth }), ctx)).status).toBe(200);
 
     const scope = async (response: Response) => {
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403);
       expect(((await response.json()) as { error: { code: string } }).error.code).toBe("watch_scope");
     };
     await scope(await createRule(request("/api/v1/rules", { method: "POST", auth, headers: json, body: "{}" })));

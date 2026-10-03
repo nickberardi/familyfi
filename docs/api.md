@@ -194,7 +194,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | Pair | May call |
 | --- | --- |
 | `phone:full` | Whatever its account may |
-| `watch:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (401 `watch_scope` beyond that) |
+| `watch:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
 

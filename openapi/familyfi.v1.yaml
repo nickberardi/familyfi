@@ -2757,7 +2757,7 @@ components:
         What a paired device may call. Each (client, scope) pair is one explicit allowlist, not a
         ladder, and only four exist. `phone:full` may do whatever its account may. `watch:rulesOnly`
         reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
-        extends, allows, disallows and turns rules on and off (401 `watch_scope` beyond that).
+        extends, allows, disallows and turns rules on and off (403 `watch_scope` beyond that).
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,

@@ -79,13 +79,13 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
 
 /**
  * A paired device passes where no session is needed, and otherwise only where the route names
- * its scope; even then it is never an administrator. Refused, a Watch gets 401 and an agent 403.
+ * its scope; even then it is never an administrator. Refused, any device gets 403.
  */
 function deviceOutcome(entry: Entry, device: Device): Outcome {
   if (entry.access === "public" || entry.access === "home-network" || entry.access === "csrf") return "allowed";
   if (entry.access === "pairing-token" || entry.access === "refresh-token") return "403";
   if (entry.devices?.includes(device)) return entry.access === "session" ? "allowed" : "403";
-  return device.startsWith("watch:") ? "401" : "403";
+  return "403";
 }
 
 function expected(entry: Entry): Record<Caller, Outcome> {
