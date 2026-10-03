@@ -114,7 +114,8 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
    * Trades the refresh token for a new bearer, one renewal at a time: requests that find the bearer
    * expiring together wait for the same one, so a refresh token is never spent twice. A refused
    * token (spent, reused, revoked or expired) signs this phone out, as a refused bearer would; a
-   * route that cannot be reached leaves the session as it is, to try again.
+   * route that cannot be reached, or a server that fails to answer (5xx, 429), leaves the session as
+   * it is, to try again.
    */
   function renew(): Promise<void> {
     renewing ??= (async () => {
@@ -129,7 +130,7 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
         if (!holds(asked) || state.session !== held) return;
         set({ session: next });
       } catch (error) {
-        if (error instanceof ApiError && holds(asked) && state.session === held) {
+        if (refused(error) && holds(asked) && state.session === held) {
           await vault.signOut();
           set({ session: null, status: "signedOut" });
           throw new ApiError(error.message, 401, error.code);
@@ -142,6 +143,10 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     return renewing;
   }
 
+  /** The server refused the refresh token itself (400 malformed, 401, 403 spent, reused, revoked or expired). */
+  const refused = (error: unknown): error is ApiError =>
+    error instanceof ApiError && (error.status === 400 || error.status === 401 || error.status === 403);
+
   /** The bearer runs out within this, so it is renewed first rather than refused mid-request. */
   const RENEW_AHEAD_MS = 60_000;
   const expiring = () => {
@@ -152,17 +157,20 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
   /**
    * Requests for the signed-in household, over its trusted routes. A bearer about to expire is
    * renewed first, and a request the server refuses as unauthenticated is renewed and sent once more
-   * (it was refused before it could change anything). An unreachable renewal is left to the request.
+   * (it was refused before it could change anything). A renewal that cannot reach the server, or
+   * that the server fails to answer, is left to the request. A request refused because another
+   * renewal replaced its bearer meanwhile is sent again with the new one, without renewing again.
    */
   const request: ApiRequest = async <T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> => {
     if (expiring()) await renew().catch((error: unknown) => {
-      if (error instanceof ApiError) throw error;
+      if (refused(error)) throw error;
     });
+    const sentWith = state.session?.token ?? null;
     try {
       return await send<T>(path, init);
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401 || !state.session?.refreshToken || path === "/api/v1/auth/login") throw error;
-      await renew();
+      if (state.session.token === sentWith) await renew();
       return send<T>(path, init);
     }
   };
