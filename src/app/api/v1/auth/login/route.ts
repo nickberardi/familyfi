@@ -13,15 +13,13 @@ import {
   toPublicSession,
 } from "@/server/auth";
 import { clientIp, jsonCaughtError, jsonError } from "@/server/http";
-import { authenticatePairedDevice } from "@/server/connection";
 import { TUNNEL_HEADER } from "@/lib/constants";
 
+/** Sign-in is for people in a browser. Phones, Watches and agents join by pairing (`/paired/invites`). */
 const Body = z.object({
   username: z.string(),
   password: z.string(),
-  client: z.enum(["browser", "native"]).optional(),
-  deviceId: z.string().min(1).optional(),
-  deviceCredential: z.string().min(1).optional(),
+  client: z.literal("browser").optional(),
 });
 
 export async function POST(request: Request) {
@@ -41,49 +39,29 @@ export async function POST(request: Request) {
   }
 
   try {
-    const native = parsed.data.client === "native";
-    const tunnelled = request.headers.get(TUNNEL_HEADER) === "tunnel";
-    // Through remote access only a paired phone may sign in, and the phone is checked
-    // before the password, so the internet cannot test passwords without one.
-    if (tunnelled && !native) return jsonError(403, "remote_browser_login", "Sign in to the FamilyFi web app from the home network.");
-    let device = tunnelled ? await pairedDevice(parsed.data) : null;
-    if (tunnelled && !device) return jsonError(403, "device_not_paired", "Pair this phone with a household administrator before signing in.");
+    // A paired device signs in by pairing, never here. Through remote access nobody signs in here,
+    // so the internet cannot test passwords.
+    if (request.headers.get(TUNNEL_HEADER) === "tunnel") return jsonError(403, "remote_browser_login", "Sign in to the FamilyFi web app from the home network.");
 
     const result = await authenticate(parsed.data.username, parsed.data.password, clientIp(request));
     if (!result.ok) return jsonError(result.status, result.code, result.message);
 
-    if (native && !device) device = await pairedDevice(parsed.data);
-    if (native && !device) return jsonError(403, "device_not_paired", "Pair this phone with a household administrator before signing in.");
     const issued = await createSession({
       accountId: result.account.id,
       username: result.account.username,
-      kind: native ? SessionKind.bearer : SessionKind.cookie,
+      kind: SessionKind.cookie,
       userAgent: request.headers.get("user-agent"),
-      deviceId: device?.id,
     });
 
-    const body = {
-      session: toPublicSession({
-        username: result.account.username,
-        expiresAt: issued.expiresAt,
-        account: result.account,
-      }),
-      ...(native ? { token: issued.raw, tokenType: "Bearer" as const, refreshToken: issued.refresh, refreshExpiresAt: issued.refreshExpiresAt?.toISOString() } : {}),
-    };
-
-    const response = NextResponse.json(body);
-    if (!native) {
-      const maxAge = Math.floor((issued.expiresAt.getTime() - Date.now()) / 1000);
-      const secure = requestIsHttps(request);
-      response.cookies.set(SESSION_COOKIE, issued.raw, sessionCookieOptions(maxAge, secure));
-      response.cookies.set(CSRF_COOKIE, issued.csrf, csrfCookieOptions(maxAge, secure));
-    }
+    const response = NextResponse.json({
+      session: toPublicSession({ username: result.account.username, expiresAt: issued.expiresAt, account: result.account }),
+    });
+    const maxAge = Math.floor((issued.expiresAt.getTime() - Date.now()) / 1000);
+    const secure = requestIsHttps(request);
+    response.cookies.set(SESSION_COOKIE, issued.raw, sessionCookieOptions(maxAge, secure));
+    response.cookies.set(CSRF_COOKIE, issued.csrf, csrfCookieOptions(maxAge, secure));
     return response;
   } catch (error) {
     return jsonCaughtError(error);
   }
-}
-
-function pairedDevice(body: { deviceId?: string; deviceCredential?: string }) {
-  return body.deviceId && body.deviceCredential ? authenticatePairedDevice(body.deviceId, body.deviceCredential) : Promise.resolve(null);
 }

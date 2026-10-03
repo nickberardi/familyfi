@@ -11,7 +11,7 @@
 
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import { AccountKind, SessionKind } from "@prisma/client";
+import { AccountKind, DeviceScope, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { beforeAll, describe, expect, it } from "vitest";
 import { CSRF_COOKIE, RECOVERY_USERNAME, SESSION_COOKIE } from "@/lib/constants";
 import { createSession, hashPassword } from "@/server/auth";
@@ -34,8 +34,12 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
  *   access without a paired phone. Its headers go through the phone gateway's own
  *   `tunnelHeaders`, so the cookie is stripped and `x-familyfi-via: tunnel` is stamped
  *   exactly as they would be in production.
+ * - `agent:full`, `agent:readOnly` and `watch:rulesOnly`: a paired device on the home network,
+ *   signed in as the administrator, with that scope. Its scope bounds it, not the account.
  */
-const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel"] as const;
+const DEVICES = ["agent:full", "agent:readOnly", "watch:rulesOnly"] as const;
+type Device = (typeof DEVICES)[number];
+const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel", ...DEVICES] as const;
 type Caller = (typeof CALLERS)[number];
 
 type Outcome = "allowed" | "401" | "403";
@@ -51,12 +55,16 @@ type Outcome = "allowed" | "401" | "403";
  *   without it.
  * - `refresh-token`: a paired device's refresh token is the credential; no session helps
  *   without it.
- * - `paired-phone`: a native bearer tied to the phone named in the path; browser sessions
- *   cannot issue a companion session.
  */
-type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token" | "paired-phone";
+type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token";
 
-const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
+type Person = Exclude<Caller, Device>;
+
+function isDevice(caller: Caller): caller is Device {
+  return (DEVICES as readonly Caller[]).includes(caller);
+}
+
+const EXPECTED: Record<Access, Record<Person, Outcome>> = {
   public: { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "allowed" },
   "home-network": { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
   session: { anonymous: "401", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "401" },
@@ -64,19 +72,41 @@ const EXPECTED: Record<Access, Record<Caller, Outcome>> = {
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
   "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
-  "paired-phone": { anonymous: "401", member: "403", administrator: "403", recovery: "403", tunnel: "401" },
 };
 
 /**
+ * A paired device passes where no session is needed, and otherwise only where the route names
+ * its scope; even then it is never an administrator. Refused, any device gets 403.
+ */
+function deviceOutcome(entry: Entry, device: Device): Outcome {
+  if (entry.access === "public" || entry.access === "home-network" || entry.access === "csrf") return "allowed";
+  if (entry.access === "pairing-token" || entry.access === "refresh-token") return "403";
+  if (entry.devices?.includes(device)) return entry.access === "session" ? "allowed" : "403";
+  return "403";
+}
+
+function expected(entry: Entry): Record<Caller, Outcome> {
+  return { ...EXPECTED[entry.access], ...Object.fromEntries(DEVICES.map((device) => [device, deviceOutcome(entry, device)])) } as Record<Caller, Outcome>;
+}
+
+/**
+ * `devices` names the paired-device scopes whose allowlist (`src/server/device-scope.ts`) includes the
+ * route; a device whose scope is not named may not call it.
  * `question` marks a cell encoded as it behaves today, where the route looks more open
  * than its neighbours suggest. It is for the maintainer to confirm or tighten; changing
  * the access here is the decision, and the route's guard must change with it.
  */
-type Entry = { access: Access; question?: string };
+type Entry = { access: Access; devices?: readonly Device[]; question?: string };
+
+const READERS: readonly Device[] = ["agent:full", "agent:readOnly"];
+const READERS_AND_WATCH: readonly Device[] = ["agent:full", "agent:readOnly", "watch:rulesOnly"];
+const CONTROLLERS: readonly Device[] = ["agent:full"];
+const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly"];
 
 /**
- * Administrator is a flag, not a tier: it gates phone pairing and remote access
- * (`/api/v1/connection/*`) and nothing else. Every adult with a login is trusted with
+ * Administrator is a flag, not a tier: it gates paired devices and remote access
+ * (`/api/v1/paired/*`, `/api/v1/connection/*`) and nothing else. A phone's `?claim=true` invite
+ * for its Watch is checked inside `POST /paired/invites` (paired-invites.test.ts), not here. Every adult with a login is trusted with
  * the household, so accounts, household settings and the UniFi connection are `session`,
  * a member can grant themselves administrator, and that is intended.
  */
@@ -91,72 +121,73 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/auth/login": { access: "home-network" },
   "POST /api/v1/auth/logout": { access: "csrf" },
   "POST /api/v1/auth/refresh": { access: "refresh-token" },
-  "GET /api/v1/auth/session": { access: "session" },
-  "GET /api/v1/changes/{id}": { access: "session" },
-  "GET /api/v1/connection": { access: "session" },
-  "GET /api/v1/connection/devices": { access: "administrator" },
-  "POST /api/v1/connection/devices": { access: "paired-phone" },
-  "DELETE /api/v1/connection/devices": { access: "administrator" },
-  "DELETE /api/v1/connection/devices/{id}": { access: "administrator" },
+  "GET /api/v1/auth/session": { access: "session", devices: READERS_AND_WATCH },
+  "GET /api/v1/changes/{id}": { access: "session", devices: READERS_AND_WATCH },
+  "GET /api/v1/connection": { access: "session", devices: ["watch:rulesOnly"] },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
   "POST /api/v1/connection/endpoints": { access: "administrator" },
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "DELETE /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "GET /api/v1/connection/identity": { access: "public" },
-  "POST /api/v1/connection/pairings": { access: "administrator" },
-  "GET /api/v1/connection/pairings/{id}": { access: "administrator" },
-  "DELETE /api/v1/connection/pairings/{id}": { access: "administrator" },
-  "POST /api/v1/connection/pairings/{id}/claim": { access: "pairing-token" },
   "POST /api/v1/connection/pins": { access: "administrator" },
   "GET /api/v1/connection/tunnel": { access: "administrator" },
   "PUT /api/v1/connection/tunnel": { access: "administrator" },
-  "GET /api/v1/devices": { access: "session" },
-  "GET /api/v1/devices/{mac}": { access: "session" },
-  "DELETE /api/v1/devices/{mac}": { access: "session" },
-  "PUT /api/v1/devices/{mac}/assignment": { access: "session" },
-  "GET /api/v1/dpi/applications": { access: "session" },
-  "GET /api/v1/dpi/categories": { access: "session" },
-  "GET /api/v1/groups": { access: "session" },
+  "GET /api/v1/devices": { access: "session", devices: READERS },
+  "GET /api/v1/devices/{mac}": { access: "session", devices: READERS },
+  "DELETE /api/v1/devices/{mac}": { access: "session", devices: CONTROLLERS },
+  "PUT /api/v1/devices/{mac}/assignment": { access: "session", devices: CONTROLLERS },
+  "POST /api/v1/paired/invites": { access: "administrator" },
+  "GET /api/v1/paired/invites/{id}": { access: "administrator" },
+  "DELETE /api/v1/paired/invites/{id}": { access: "administrator" },
+  "POST /api/v1/paired/invites/{id}/claim": { access: "pairing-token" },
+  "GET /api/v1/paired/devices": { access: "administrator" },
+  "DELETE /api/v1/paired/devices": { access: "administrator" },
+  "GET /api/v1/paired/devices/{id}": { access: "administrator" },
+  "PATCH /api/v1/paired/devices/{id}": { access: "administrator" },
+  "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["watch:rulesOnly"] },
+  "GET /api/v1/dpi/applications": { access: "session", devices: READERS },
+  "GET /api/v1/dpi/categories": { access: "session", devices: READERS },
+  "GET /api/v1/groups": { access: "session", devices: READERS_AND_WATCH },
   "GET /api/v1/groups/{id}/resolver": { access: "session" },
-  "POST /api/v1/groups": { access: "session" },
-  "GET /api/v1/groups/{id}": { access: "session" },
-  "PUT /api/v1/groups/{id}": { access: "session" },
-  "DELETE /api/v1/groups/{id}": { access: "session" },
+  "POST /api/v1/groups": { access: "session", devices: CONTROLLERS },
+  "GET /api/v1/groups/{id}": { access: "session", devices: READERS },
+  "PUT /api/v1/groups/{id}": { access: "session", devices: CONTROLLERS },
+  "DELETE /api/v1/groups/{id}": { access: "session", devices: CONTROLLERS },
   "PUT /api/v1/groups/{id}/resolver": { access: "session" },
   "DELETE /api/v1/groups/{id}/resolver": { access: "session" },
   "GET /api/v1/health": { access: "public" },
-  "GET /api/v1/rules": { access: "session" },
-  "POST /api/v1/rules": { access: "session" },
-  "GET /api/v1/rules/{id}": { access: "session" },
-  "PATCH /api/v1/rules/{id}": { access: "session" },
-  "DELETE /api/v1/rules/{id}": { access: "session" },
-  "POST /api/v1/rules/{id}/allow": { access: "session" },
-  "POST /api/v1/rules/{id}/disallow": { access: "session" },
-  "POST /api/v1/rules/{id}/extend": { access: "session" },
-  "POST /api/v1/rules/{id}/off": { access: "session" },
-  "POST /api/v1/rules/{id}/on": { access: "session" },
-  "POST /api/v1/rules/{id}/pause": { access: "session" },
-  "POST /api/v1/rules/{id}/resume": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/allow": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/disallow": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/extend": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/pause": { access: "session" },
-  "POST /api/v1/groups/{id}/rules/{ruleId}/resume": { access: "session" },
-  "GET /api/v1/settings/household": { access: "session" },
+  "GET /api/v1/rules": { access: "session", devices: READERS_AND_WATCH },
+  "POST /api/v1/rules": { access: "session", devices: CONTROLLERS },
+  "GET /api/v1/rules/{id}": { access: "session", devices: READERS },
+  "PATCH /api/v1/rules/{id}": { access: "session", devices: CONTROLLERS },
+  "DELETE /api/v1/rules/{id}": { access: "session", devices: CONTROLLERS },
+  "POST /api/v1/rules/{id}/allow": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/rules/{id}/disallow": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/rules/{id}/extend": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/rules/{id}/off": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/rules/{id}/on": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/rules/{id}/pause": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/rules/{id}/resume": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/allow": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/disallow": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/extend": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/pause": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "POST /api/v1/groups/{id}/rules/{ruleId}/resume": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  "GET /api/v1/settings/household": { access: "session", devices: READERS },
   "PUT /api/v1/settings/household": { access: "session" },
   "GET /api/v1/settings/unifi": { access: "session" },
   "PUT /api/v1/settings/unifi": { access: "session" },
   "POST /api/v1/settings/unifi/test": { access: "session" },
-  "GET /api/v1/sync": { access: "session" },
-  "POST /api/v1/sync/retry": { access: "session" },
-  "GET /api/v1/upstream/categories": { access: "session" },
-  "POST /api/v1/upstream/categories": { access: "session" },
-  "GET /api/v1/upstream/categories/{id}": { access: "session" },
-  "PATCH /api/v1/upstream/categories/{id}": { access: "session" },
-  "DELETE /api/v1/upstream/categories/{id}": { access: "session" },
-  "POST /api/v1/upstream/categories/{id}/check": { access: "session" },
-  "GET /api/v1/upstream/checks": { access: "session" },
-  "POST /api/v1/upstream/checks/run": { access: "session" },
+  "GET /api/v1/sync": { access: "session", devices: READERS },
+  "POST /api/v1/sync/retry": { access: "session", devices: CONTROLLERS },
+  "GET /api/v1/upstream/categories": { access: "session", devices: READERS },
+  "POST /api/v1/upstream/categories": { access: "session", devices: CONTROLLERS },
+  "GET /api/v1/upstream/categories/{id}": { access: "session", devices: READERS },
+  "PATCH /api/v1/upstream/categories/{id}": { access: "session", devices: CONTROLLERS },
+  "DELETE /api/v1/upstream/categories/{id}": { access: "session", devices: CONTROLLERS },
+  "POST /api/v1/upstream/categories/{id}/check": { access: "session", devices: CONTROLLERS },
+  "GET /api/v1/upstream/checks": { access: "session", devices: READERS },
+  "POST /api/v1/upstream/checks/run": { access: "session", devices: CONTROLLERS },
   "GET /api/v1/upstream/resolver": { access: "session" },
   "PUT /api/v1/upstream/resolver": { access: "session" },
   "DELETE /api/v1/upstream/resolver": { access: "session" },
@@ -165,7 +196,7 @@ const ACCESS: Record<string, Entry> = {
 /** Bodies that get a caller past validation to the check under test. Everything else sends `{}`. */
 const BODIES: Record<string, unknown> = {
   "POST /api/v1/auth/login": { username: RECOVERY_USERNAME, password: PASSWORD, client: "browser" },
-  "POST /api/v1/connection/pairings/{id}/claim": { token: "not-a-pairing-token", deviceName: "Matrix phone" },
+  "POST /api/v1/paired/invites/{id}/claim": { token: "not-a-pairing-token", deviceName: "Matrix phone" },
   "POST /api/v1/auth/refresh": { refreshToken: "not-a-refresh-token" },
 };
 
@@ -201,7 +232,8 @@ async function discoverRoutes(): Promise<Route[]> {
 
 const routes = await discoverRoutes();
 
-const accounts: Partial<Record<Caller, string>> = {};
+const accounts: Partial<Record<Person, string>> = {};
+const devices: Partial<Record<Device, string>> = {};
 
 async function signedIn(accountId: string, username: string) {
   const issued = await createSession({ accountId, username, kind: SessionKind.cookie });
@@ -218,6 +250,10 @@ async function requestAs(caller: Caller, route: Route): Promise<Request> {
     body: hasBody ? JSON.stringify(BODIES[route.key] ?? {}) : undefined,
   };
   if (caller === "anonymous") return request(url, init);
+  if (isDevice(caller)) {
+    const issued = await createSession({ accountId: accounts.administrator!, username: "matrix-admin", kind: SessionKind.bearer, deviceId: devices[caller] });
+    return request(url, { ...init, auth: { cookie: "", csrf: "", token: issued.raw } });
+  }
   const account = caller === "tunnel" ? accounts.administrator! : accounts[caller]!;
   const username = (await prisma().account.findUniqueOrThrow({ where: { id: account } })).username;
   const lan = request(url, { ...init, auth: await signedIn(account, username) });
@@ -240,6 +276,11 @@ describe("authorization matrix", () => {
     const member = await prisma().account.create({ data: { username: "matrix-member", displayName: "Member", kind: AccountKind.personal, isAdmin: false, passwordHash } });
     const administrator = await prisma().account.create({ data: { username: "matrix-admin", displayName: "Administrator", kind: AccountKind.personal, isAdmin: true, passwordHash } });
     Object.assign(accounts, { member: member.id, administrator: administrator.id, recovery: recovery.id });
+    for (const device of DEVICES) {
+      const [client, scope] = device.split(":") as [PairedDeviceClient, DeviceScope];
+      const created = await prisma().pairedDevice.create({ data: { displayName: device, client, scope, accountId: client === PairedDeviceClient.agent ? administrator.id : null } });
+      devices[device] = created.id;
+    }
   });
 
   it("covers every route and method, and names none that do not exist", () => {
@@ -257,6 +298,6 @@ describe("authorization matrix", () => {
       const response = await route.handler(await requestAs(caller, route), { params: Promise.resolve(PARAMS) });
       actual[caller] = outcome(response.status);
     }
-    expect(actual).toEqual(EXPECTED[entry.access]);
+    expect(actual).toEqual(expected(entry));
   });
 });

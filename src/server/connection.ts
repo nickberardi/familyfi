@@ -1,18 +1,20 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { isServerOrigin } from "@/lib/pairing-code";
-import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
-import { bearerSessionData } from "./auth";
-import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
+import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, type Session } from "@prisma/client";
+import { decryptSecret, encryptSecret, randomToken } from "./crypto";
 import { prisma } from "./db";
-import { edgeCredentials, recordDelivered, storedServiceToken } from "./edge-auth";
-import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
+import { edgeCredentials, recordDelivered } from "./edge-auth";
 
-const PAIRING_TTL_MS = 5 * 60 * 1000;
 const SPKI_SHA256 = /^[A-Za-z0-9_-]{43}$/;
 
-type ConnectionSession = Session & { account: { kind: AccountKind; isAdmin: boolean } | null };
+type ConnectionSession = Session & { account: { kind: AccountKind; isAdmin: boolean } | null; device?: { client: PairedDeviceClient } | null };
 
+/**
+ * Only a person in a browser, or their phone, may administer. A Watch or an agent is never an
+ * administrator, whoever it acts as: its scope bounds it.
+ */
 export function isAdministrator(session: ConnectionSession): boolean {
+  if (session.device && session.device.client !== PairedDeviceClient.phone) return false;
   return session.account?.kind === AccountKind.recovery || session.account?.isAdmin === true;
 }
 
@@ -107,107 +109,6 @@ export function assertEndpoint(input: { url: string; transport: ConnectionTransp
   if (input.trustMode === ConnectionTrustMode.system && input.spkiSha256) throw new Error("System-trusted endpoints cannot include an SPKI pin.");
   if (input.spkiSha256 && !SPKI_SHA256.test(input.spkiSha256)) throw new Error("SPKI SHA-256 must be base64url SHA-256 data.");
   return url.origin;
-}
-
-export async function createPairing(input: { endpointId: string; displayName: string; createdByAccountId: string; replacesDeviceId?: string | null }) {
-  const token = randomToken();
-  const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
-  const pairing = await prisma().pairing.create({ data: { endpointId: input.endpointId, displayName: input.displayName, createdByAccountId: input.createdByAccountId, replacesDeviceId: input.replacesDeviceId ?? null, tokenHash: sha256(token), expiresAt }, include: { endpoint: true } });
-  const household = await ensureConnectionIdentity();
-  const endpoint = pairing.endpoint!;
-  // A route behind Cloudflare Access is unreachable without its token, so the code carries it: a phone
-  // pairs over the protected route itself. The token only gets past Cloudflare; pairing still needs the single-use code.
-  const edgeToken = storedServiceToken(endpoint);
-  const pairingCode = encodePairingCode({
-    version: PAIRING_CODE_VERSION,
-    url: endpoint.url,
-    code: `${pairing.id}.${token}`,
-    fingerprint: instanceFingerprint(household.instancePublicKey!),
-    ...(endpoint.trustMode === ConnectionTrustMode.pinned && endpoint.spkiSha256 ? { pin: endpoint.spkiSha256 } : {}),
-    ...(edgeToken ? { access: edgeToken } : {}),
-  });
-  return { pairing, pairingCode };
-}
-
-export async function claimPairing(input: { id: string; token: string; displayName: string }) {
-  const pairing = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true } });
-  if (!pairing || !pairing.endpoint || pairing.claimedAt || pairing.expiresAt <= new Date() || !safeEqual(pairing.tokenHash, sha256(input.token))) return null;
-  const credential = randomToken();
-  const now = new Date();
-  const device = await prisma().$transaction(async (transaction) => {
-    const claimed = await transaction.pairing.updateMany({
-      where: { id: pairing.id, claimedAt: null, expiresAt: { gt: now } },
-      data: { claimedAt: now },
-    });
-    if (claimed.count !== 1) return null;
-    const pairedDevice = await transaction.pairedDevice.create({
-      data: { displayName: input.displayName, credentialHash: sha256(credential), lastSeenAt: now },
-    });
-    await transaction.pairing.update({ where: { id: pairing.id }, data: { claimedDeviceId: pairedDevice.id } });
-    // A re-pair retires the record it replaces, so the same phone is never listed twice.
-    if (pairing.replacesDeviceId) await removeDevice(pairing.replacesDeviceId, transaction, now);
-    return pairedDevice;
-  });
-  if (!device) return null;
-  return { device, credential, endpoint: publicEndpoint(pairing.endpoint), manifest: await signedEndpointManifest({ deviceId: device.id }) };
-}
-
-export async function authenticatePairedDevice(id: string, credential: string) {
-  const device = await prisma().pairedDevice.findUnique({ where: { id } });
-  if (!device || device.revokedAt || !safeEqual(device.credentialHash, sha256(credential))) return null;
-  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-  if (!device.lastSeenAt || device.lastSeenAt < fifteenMinutesAgo) await prisma().pairedDevice.update({ where: { id }, data: { lastSeenAt: new Date() } });
-  return device;
-}
-
-/** Enroll the Watch reached by the signed-in phone as its own paired device. */
-export async function enrollWatch(input: { clientId: string; accountId: string; username: string; displayName: string }) {
-  const credential = randomToken();
-  const now = new Date();
-  const bearer = bearerSessionData(now);
-  const result = await prisma().$transaction(async (transaction) => {
-    const previous = await transaction.pairedDevice.findUnique({ where: { clientId: input.clientId } });
-    if (previous) {
-      await transaction.session.updateMany({ where: { deviceId: previous.id, revokedAt: null }, data: { revokedAt: now } });
-      await transaction.pairedDevice.update({ where: { id: previous.id }, data: { revokedAt: now, clientId: null } });
-    }
-    const device = await transaction.pairedDevice.create({
-      data: {
-        displayName: input.displayName,
-        credentialHash: sha256(credential),
-        client: PairedDeviceClient.watch,
-        clientId: input.clientId,
-        lastSeenAt: now,
-      },
-    });
-    const session = await transaction.session.create({
-      data: { ...bearer.data, kind: SessionKind.bearer, accountId: input.accountId, username: input.username, deviceId: device.id },
-    });
-    return { device, session };
-  });
-  return {
-    deviceId: result.device.id,
-    deviceCredential: credential,
-    sessionId: result.session.id,
-    token: bearer.token,
-    expiresAt: bearer.expiresAt,
-    refreshToken: bearer.refreshToken,
-    refreshExpiresAt: bearer.refreshExpiresAt,
-  };
-}
-
-export type PairingStatus = "pending" | "claimed" | "expired";
-
-export function pairingStatus(pairing: { claimedAt: Date | null; expiresAt: Date }, now = new Date()): PairingStatus {
-  if (pairing.claimedAt) return "claimed";
-  return pairing.expiresAt <= now ? "expired" : "pending";
-}
-
-/** Ends a pending pairing early. Expiring it, rather than deleting it, keeps the claim path's single check. */
-export async function cancelPairing(id: string): Promise<boolean> {
-  const now = new Date();
-  const cancelled = await prisma().pairing.updateMany({ where: { id, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
-  return cancelled.count === 1;
 }
 
 export async function hasPendingPairing(endpointId: string): Promise<boolean> {

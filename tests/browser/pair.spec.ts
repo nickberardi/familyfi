@@ -121,17 +121,14 @@ test("publishes a home-network route, pairs a phone through it, and revokes it",
     expect(payload.url).toBe(url);
     expect(payload.pin).toBeUndefined();
     expect(payload.access).toBeUndefined();
-    const claim = await page.request.post(`/api/v1/connection/pairings/${pairingId}/claim`, {
+    const claim = await page.request.post(`/api/v1/paired/invites/${pairingId}/claim`, {
       data: { token: pairingToken, deviceName: "Playwright iPhone" },
     });
     expect(claim.ok()).toBe(true);
-    const claimed = (await claim.json()) as { device: { id: string }; deviceCredential: string };
+    // Pairing signs the phone in: its bearer comes with the claim, and there is no password step.
+    const { token } = (await claim.json()) as { device: { id: string }; token: string };
 
     await expect(page.getByTestId("pairing-claimed")).toContainText("Paired Playwright iPhone", { timeout: 10_000 });
-    const native = await page.request.post("/api/v1/auth/login", {
-      data: { username: "admin", password, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential },
-    });
-    const { token } = (await native.json()) as { token: string };
     const bearer = { authorization: `Bearer ${token}` };
     expect((await page.request.get("/api/v1/connection", { headers: bearer })).status()).toBe(200);
 
@@ -275,14 +272,11 @@ test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a 
     const qrSheet = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
     const { payload, pairingId, token: pairingToken } = decodePairingCode((await qrSheet.getByTestId("pairing-code").textContent()) ?? "");
     expect(payload.access).toEqual({ clientId: first.id, clientSecret: first.secret });
-    const claim = await page.request.post(`/api/v1/connection/pairings/${pairingId}/claim`, { data: { token: pairingToken, deviceName: phone } });
+    const claim = await page.request.post(`/api/v1/paired/invites/${pairingId}/claim`, { data: { token: pairingToken, deviceName: phone } });
     expect(claim.ok()).toBe(true);
-    const claimed = (await claim.json()) as { device: { id: string }; deviceCredential: string };
+    const claimed = (await claim.json()) as { device: { id: string }; token: string };
     await page.getByRole("dialog", { name: "Phone paired" }).getByRole("button", { name: "Done" }).click();
-    const native = await page.request.post("/api/v1/auth/login", {
-      data: { username: "admin", password, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential },
-    });
-    const bearer = { authorization: `Bearer ${((await native.json()) as { token: string }).token}` };
+    const bearer = { authorization: `Bearer ${claimed.token}` };
 
     // Replacing the token: the phone is waited for until its next manifest carries the new one.
     await saved.getByRole("button", { name: "Edit" }).click();
@@ -299,7 +293,7 @@ test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a 
 
     await page.getByTestId("saved-route").getByRole("button", { name: "Turn off Access" }).click();
     await expect(page.getByTestId("saved-route")).toContainText("No Cloudflare Access");
-    await page.request.delete(`/api/v1/connection/devices/${claimed.device.id}?remove=true`, { headers: await csrf(page) });
+    await page.request.delete(`/api/v1/paired/devices/${claimed.device.id}?remove=true`, { headers: await csrf(page) });
   } finally {
     await cleanUp(page, [url]);
   }
@@ -315,9 +309,9 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
 
   async function pairAndRevoke(name: string) {
-    const { pairing } = (await (await page.request.post("/api/v1/connection/pairings", { headers, data: { endpointId: route, deviceName: name } })).json()) as { pairing: { id: string; pairingCode: string } };
-    const claimed = (await (await page.request.post(`/api/v1/connection/pairings/${pairing.id}/claim`, { data: { token: decodePairingCode(pairing.pairingCode).token, deviceName: name } })).json()) as { device: { id: string } };
-    await page.request.delete(`/api/v1/connection/devices/${claimed.device.id}`, { headers });
+    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: route, displayName: name } })).json()) as { invite: { id: string; code: string } };
+    const claimed = (await (await page.request.post(`/api/v1/paired/invites/${invite.id}/claim`, { data: { token: decodePairingCode(invite.code).token, deviceName: name } })).json()) as { device: { id: string } };
+    await page.request.delete(`/api/v1/paired/devices/${claimed.device.id}`, { headers });
   }
 
   try {
@@ -333,7 +327,7 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
     await expect(sheet.getByTestId("pairing-route")).toContainText(url);
     await sheet.getByRole("button", { name: "Show pairing code" }).click();
     const { pairingId, token: pairingToken } = decodePairingCode((await page.getByTestId("pairing-code").textContent()) ?? "");
-    expect((await page.request.post(`/api/v1/connection/pairings/${pairingId}/claim`, { data: { token: pairingToken, deviceName: `Old phone ${tag}` } })).ok()).toBe(true);
+    expect((await page.request.post(`/api/v1/paired/invites/${pairingId}/claim`, { data: { token: pairingToken, deviceName: `Old phone ${tag}` } })).ok()).toBe(true);
     await expect(page.getByTestId("pairing-claimed")).toBeVisible({ timeout: 10_000 });
     await shot(page, "repaired");
     await page.getByRole("button", { name: "Done" }).click();
@@ -347,9 +341,9 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
     await expect(lost).toHaveCount(0);
     await shot(page, "removed");
   } finally {
-    const list = (await (await page.request.get("/api/v1/connection/devices")).json()) as { devices: { id: string; displayName: string }[] };
+    const list = (await (await page.request.get("/api/v1/paired/devices")).json()) as { devices: { id: string; displayName: string }[] };
     for (const device of list.devices.filter((item) => item.displayName.includes(tag))) {
-      await page.request.delete(`/api/v1/connection/devices/${device.id}?remove=true`, { headers });
+      await page.request.delete(`/api/v1/paired/devices/${device.id}?remove=true`, { headers });
     }
     await cleanUp(page, [url]);
   }

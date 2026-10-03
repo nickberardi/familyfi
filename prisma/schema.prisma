@@ -35,6 +35,15 @@ enum SessionKind {
 enum PairedDeviceClient {
   phone
   watch
+  agent
+}
+
+/// What a paired device may call. Each (client, scope) pair is one allowlist in src/server/device-scope.ts:
+/// phone:full, watch:rulesOnly, agent:full, agent:readOnly. It bounds the device whatever its account may do.
+enum DeviceScope {
+  full
+  rulesOnly
+  readOnly
 }
 
 enum ConnectionTransport {
@@ -161,15 +170,23 @@ model ConnectionEndpoint {
 model PairedDevice {
   id              String         @id @default(cuid())
   displayName     String
-  credentialHash  String         @unique
   client          PairedDeviceClient @default(phone)
   clientId        String?        @unique
+  scope           DeviceScope    @default(full)
+  /// The account this device acts as, fixed by the invite it was paired with.
+  accountId       String?
+  account         Account?       @relation("pairedDeviceAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  /// The paired device that vouched for this one: a Watch's phone. Revoking the parent leaves the child.
+  parentDeviceId  String?
+  parentDevice    PairedDevice?  @relation("pairedDeviceParent", fields: [parentDeviceId], references: [id], onDelete: SetNull)
+  children        PairedDevice[] @relation("pairedDeviceParent")
   revokedAt       DateTime?
   lastSeenAt      DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   sessions        Session[]
-  pairings        Pairing[]
+  pairings        Pairing[]      @relation("pairingClaimedDevice")
+  parentedPairings Pairing[]     @relation("pairingParentDevice")
   authoredChanges ChangeResult[] @relation("changeActorDevice")
   edgeTokens      DeviceEdgeToken[]
 }
@@ -199,9 +216,20 @@ model Pairing {
   expiresAt          DateTime
   claimedAt          DateTime?
   claimedDeviceId    String?             @unique
-  claimedDevice      PairedDevice?       @relation(fields: [claimedDeviceId], references: [id], onDelete: SetNull)
+  claimedDevice      PairedDevice?       @relation("pairingClaimedDevice", fields: [claimedDeviceId], references: [id], onDelete: SetNull)
+  /// The account the paired device will act as: an adult chosen by whoever made the invite. Every invite
+  /// made since pairing became the sign-in has one; an older one without it can never be claimed.
+  accountId          String?
+  account            Account?            @relation("pairingAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  /// The paired device that made this invite for its companion (`claim=true`).
+  parentDeviceId     String?
+  parentDevice       PairedDevice?       @relation("pairingParentDevice", fields: [parentDeviceId], references: [id], onDelete: SetNull)
   /// A phone this pairing re-pairs: when the pairing is claimed, that old record is revoked and removed.
   replacesDeviceId   String?
+  /// The kind of client this pairing admits. An agent pairing has no route: its code carries the address it was made from.
+  client             PairedDeviceClient  @default(phone)
+  /// The scope an agent pairing grants; a phone pairing always gives `full`.
+  scope              DeviceScope?
   createdAt          DateTime            @default(now())
 
   @@index([expiresAt])
@@ -239,6 +267,8 @@ model Account {
   sessions      Session[]
   loginAttempts LoginAttempt[]
   authoredChanges ChangeResult[] @relation("changeActorAccount")
+  pairedDevices PairedDevice[] @relation("pairedDeviceAccount")
+  pairings      Pairing[]      @relation("pairingAccount")
 }
 
 model Session {
