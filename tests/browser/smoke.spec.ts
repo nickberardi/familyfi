@@ -361,6 +361,10 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   await page.getByLabel("Window 1 name").fill("Bed");
   await page.getByRole("button", { name: "+ Add window" }).click();
   await page.getByLabel("Window 2 name").fill("Study");
+  // "+ Add window" starts on weekdays; every day here, so the window is on today's bar on any day.
+  const studyDaysOff = page.getByRole("group", { name: "Days" }).nth(1).locator('button[aria-pressed="false"]');
+  for (let left = await studyDaysOff.count(); left > 0; left -= 1) await studyDaysOff.first().click();
+  await expect(studyDaysOff).toHaveCount(0);
   // Two windows: each policy is named after the rule, then its window.
   await expect(page.getByText("Names in UniFi · one policy per window")).toBeVisible();
   await expect(page.getByText(`${ruleName} – Bed`)).toHaveCount(2);
