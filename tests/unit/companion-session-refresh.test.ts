@@ -136,6 +136,18 @@ describe("a paired phone's session refresh", () => {
     expect(phone.getState().session?.token).toBe("new");
   });
 
+  it("signs out even when the secure store fails to forget the refused token", async () => {
+    const home = household(() => ({ status: 403, code: "refresh_reused" }));
+    const { phone, storage } = await signedIn(session("old", "r1", 3_600_000), home.transport);
+    storage.delete = async () => {
+      throw new Error("keychain unavailable");
+    };
+    home.expire();
+    await expect(phone.request("/api/v1/groups")).rejects.toMatchObject({ status: 401 });
+    expect(phone.getState().status).toBe("signedOut");
+    expect(phone.getState().session).toBeNull();
+  });
+
   it("keeps a renewed bearer when storing it fails", async () => {
     const home = household(() => ({ status: 200, token: "new", refreshToken: "r2" }));
     const { phone, storage } = await signedIn(session("old", "r1", 30_000), home.transport);

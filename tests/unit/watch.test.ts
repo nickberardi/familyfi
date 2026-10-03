@@ -23,8 +23,9 @@ describe("watch", () => {
   it("hands the Watch its own tokens and the household's trust, never the phone's credential", () => {
     const profile = { instanceId: "ff_1", publicKeyX: "x", endpoints: [], deviceId: "phone-device", deviceCredential: "phone-secret" };
     const enrollment = { deviceId: "w", deviceCredential: "w-secret", sessionId: "s", token: "t", expiresAt: "e", refreshToken: "r", refreshExpiresAt: "re" };
-    const payload = watchProvisioning("watch-1", enrollment, profile, []);
+    const payload = watchProvisioning("WATCH-1", enrollment, profile, []);
     expect(payload).toEqual({
+      // As enrolled: lowercased.
       watchId: "watch-1",
       deviceId: "w",
       deviceCredential: "w-secret",

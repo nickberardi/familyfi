@@ -44,13 +44,21 @@ export function asTransport(send: (request: TransportRequest) => Promise<Transpo
  * sign-out or session refresh, which change nothing in the household) that finds a route unreachable,
  * or behind a Cloudflare Access wall, moves to the next route; a household write never does, since it
  * may have landed. A refresh that landed unanswered may be sent again: the server honours the token it
- * just replaced once, for a few seconds, for exactly this.
+ * just replaced once, for `REFRESH_REUSE_GRACE_MS`, for exactly this, so a refresh gives up on a route
+ * well within that grace, leaving the next route time to use it.
  */
 
 const TIMEOUT_MS = 15_000;
+const REFRESH_PATH = "/api/v1/auth/refresh";
+/**
+ * Two routes' attempts fit within the server's grace for the token a refresh just replaced
+ * (`REFRESH_REUSE_GRACE_MS`, 10 s, in the server's constants, which a companion does not import;
+ * the companion request tests hold the two together).
+ */
+const REFRESH_TIMEOUT_MS = 5_000;
 const SAFE_METHODS = new Set(["GET", "HEAD"]);
 /** Writes that change nothing in the household, so any route may take them. */
-const FAILOVER_WRITES = new Set(["/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/refresh"]);
+const FAILOVER_WRITES = new Set(["/api/v1/auth/login", "/api/v1/auth/logout", REFRESH_PATH]);
 
 export type CompanionConnection = {
   /** The trusted routes, from the last verified manifest (or a pairing code's stand-in). */
@@ -95,7 +103,7 @@ export function createCompanionRequest(transport: Transport, connection: Compani
           body: init.body === undefined ? undefined : JSON.stringify(init.body),
           trustMode: route.trustMode,
           pin: route.trustMode === "pinned" ? route.spkiSha256 : null,
-          timeoutMs: TIMEOUT_MS,
+          timeoutMs: path === REFRESH_PATH ? REFRESH_TIMEOUT_MS : TIMEOUT_MS,
         });
       } catch (error) {
         lastFailure = error;
