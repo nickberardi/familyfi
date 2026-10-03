@@ -104,8 +104,13 @@ describe("a paired phone's session refresh", () => {
     expect(refreshes).toBe(1);
   });
 
-  it("signs the phone out when its refresh token is refused", async () => {
-    const home = household(() => ({ status: 403, code: "refresh_reused" }));
+  it.each([
+    [403, "refresh_reused"],
+    [403, "invalid_refresh"],
+    [401, "unauthorized"],
+    [400, "invalid_request"],
+  ])("signs the phone out when the server refuses its refresh token (%i %s)", async (status, code) => {
+    const home = household(() => ({ status, code }));
     const { phone, storage } = await signedIn(session("old", "r1", 3_600_000), home.transport);
     home.expire();
     const error = await phone.request("/api/v1/groups").catch((caught: unknown) => caught);
@@ -129,6 +134,19 @@ describe("a paired phone's session refresh", () => {
     reachable = true;
     await phone.request("/api/v1/groups");
     expect(phone.getState().session?.token).toBe("new");
+  });
+
+  it("keeps a renewed bearer when storing it fails", async () => {
+    const home = household(() => ({ status: 200, token: "new", refreshToken: "r2" }));
+    const { phone, storage } = await signedIn(session("old", "r1", 30_000), home.transport);
+    const set = storage.set;
+    storage.set = async (key, value) => {
+      if (key === "bearerSession") throw new Error("keychain unavailable");
+      return set(key, value);
+    };
+    await phone.request("/api/v1/groups");
+    expect(phone.getState().session).toMatchObject({ token: "new", refreshToken: "r2" });
+    expect(home.calls.at(-1)!.auth).toBe("Bearer new");
   });
 
   it.each([500, 502, 503, 429])("keeps the session when the server answers the refresh with %i", async (status) => {

@@ -126,9 +126,10 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
         const next = await renewPaired(sendUnsigned, held.refreshToken);
         // Signed out, forgotten or signed in again while it was asked: the answer is for a session the phone no longer holds.
         if (!holds(asked) || state.session !== held) return;
-        await vault.saveSession(next);
-        if (!holds(asked) || state.session !== held) return;
+        // The server has already replaced the old refresh token: hold the new one even if storing it
+        // fails, so this launch keeps working.
         set({ session: next });
+        await vault.saveSession(next).catch(() => undefined);
       } catch (error) {
         if (refused(error) && holds(asked) && state.session === held) {
           await vault.signOut();
