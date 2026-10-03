@@ -14,15 +14,33 @@ import type { Group, PairedPhone, Session } from "./types";
 export const WATCH_MAX_GROUPS = 8;
 
 /**
- * The phone's choice of groups for each of its Watches (by the Watch's lowercased id): only ids and
- * order cross to the Watches, with the household's time zone, which a Watch session cannot read but
- * its labels are written in. Each Watch takes its own entry.
+ * The phone's choice of groups for each of its Watches, by the Watch's lowercased id, with the paired
+ * device it was enrolled as: only ids and order cross to the Watches, with the household's time zone,
+ * which a Watch session cannot read but its labels are written in. Each Watch takes its own entry.
  */
-export type WatchSelection = { watches: Record<string, string[]>; timeZone: string };
+export type WatchSelection = { watches: Record<string, WatchEntry>; timeZone: string };
+export type WatchEntry = { deviceId: string; groupIds: string[] };
 
 /** A Watch's chosen group ids, or none yet. */
 export function watchGroupIds(selection: WatchSelection | null, watchId: string): string[] {
-  return selection?.watches[watchId.toLowerCase()] ?? [];
+  return selection?.watches[watchId.toLowerCase()]?.groupIds ?? [];
+}
+
+/**
+ * The selection once a Watch is set up as `deviceId`: setting the same Watch up again keeps its
+ * groups; a new Watch starts with none.
+ */
+export function withWatch(selection: WatchSelection | null, watchId: string, deviceId: string, timeZone: string): WatchSelection {
+  return {
+    watches: { ...selection?.watches, [watchId.toLowerCase()]: { deviceId, groupIds: watchGroupIds(selection, watchId) } },
+    timeZone,
+  };
+}
+
+/** The selection with only the Watches still set up from this phone (by paired device id). */
+export function keepWatches(selection: WatchSelection, deviceIds: readonly string[]): WatchSelection {
+  const kept = new Set(deviceIds);
+  return { ...selection, watches: Object.fromEntries(Object.entries(selection.watches).filter(([, entry]) => kept.has(entry.deviceId))) };
 }
 
 /** The saved ids that still name a group, each once, at most `WATCH_MAX_GROUPS`. */

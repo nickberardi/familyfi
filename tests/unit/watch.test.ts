@@ -5,12 +5,14 @@ import type { PairedPhone } from "@/lib/types";
 import {
   WATCH_MAX_GROUPS,
   enrollWatch,
+  keepWatches,
   listWatches,
   orderedWatchGroups,
   reconcileWatchSelection,
   removeWatch,
   watchGroupIds,
   watchProvisioning,
+  withWatch,
   type WatchEnrollment,
 } from "@/lib/watch";
 
@@ -44,10 +46,25 @@ describe("watch", () => {
   });
 
   it("keeps each Watch's groups apart, by its lowercased id", () => {
-    const selection = { watches: { "watch-1": ["a"], "watch-2": ["b", "c"] }, timeZone: "America/New_York" };
+    const selection = { watches: { "watch-1": { deviceId: "d1", groupIds: ["a"] }, "watch-2": { deviceId: "d2", groupIds: ["b", "c"] } }, timeZone: "America/New_York" };
     expect(watchGroupIds(selection, "WATCH-2")).toEqual(["b", "c"]);
     expect(watchGroupIds(selection, "watch-3")).toEqual([]);
     expect(watchGroupIds(null, "watch-1")).toEqual([]);
+  });
+
+  it("keeps a Watch's groups when it is set up again, and starts a new Watch with none", () => {
+    const first = withWatch(null, "WATCH-1", "d1", "UTC");
+    expect(first).toEqual({ watches: { "watch-1": { deviceId: "d1", groupIds: [] } }, timeZone: "UTC" });
+    const chosen = { ...first, watches: { "watch-1": { deviceId: "d1", groupIds: ["a"] } } };
+    const again = withWatch(chosen, "watch-1", "d1b", "America/New_York");
+    expect(again.watches["watch-1"]).toEqual({ deviceId: "d1b", groupIds: ["a"] });
+    expect(again.timeZone).toBe("America/New_York");
+    expect(withWatch(again, "watch-2", "d2", "UTC").watches["watch-2"]).toEqual({ deviceId: "d2", groupIds: [] });
+  });
+
+  it("forgets the Watches no longer set up from this phone", () => {
+    const selection = withWatch(withWatch(null, "watch-1", "d1", "UTC"), "watch-2", "d2", "UTC");
+    expect(Object.keys(keepWatches(selection, ["d2"]).watches)).toEqual(["watch-2"]);
   });
 
   it("invites and claims the Watch in one call, with its id lowercased", async () => {
