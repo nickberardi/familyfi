@@ -4,10 +4,10 @@
  *
  * 1. Read the code, scanned or pasted. Nothing touches the network for a code that fails.
  * 2. Ask the route in the code who it is, and check the identity against the code's fingerprint.
- * 3. Only when the person confirms ("Trust this household"), spend the code: the claim returns the
- *    device credential and a manifest, which must be signed by the key just checked, name the same
- *    household, and include the route the phone paired over.
- * 4. Sign in with the device credential.
+ * 3. Only when the person confirms ("Trust this household"), spend the code. Pairing is the sign-in:
+ *    the claim signs the phone in as the adult the invite names, and returns its session and a
+ *    manifest, which must be signed by the key just checked, name the same household, and include
+ *    the route the phone paired over. There is no password and no device credential.
  */
 import { ApiError, TransportError, type ApiRequest } from "./api-client";
 import { COMPANION_OFFLINE_GUARD } from "./household-store";
@@ -32,15 +32,12 @@ export type ConnectionProfile = {
   keyFingerprint: string;
   /** The household's Ed25519 public key (JWK `x`), which every later manifest must be signed by. */
   publicKeyX: string;
+  /** This phone's paired device, which "Unpair this phone" revokes. */
   deviceId: string;
-  deviceCredential: string;
   endpoints: ConnectionRoute[];
 };
 
-/**
- * A signed-in phone's session: its one-hour bearer and the refresh token that renews it (null for a
- * session issued before refresh tokens, which simply ends when its bearer does).
- */
+/** A signed-in phone's session: its one-hour bearer and the rotating refresh token that renews it. */
 export type StoredSession = { token: string; session: Session; refreshToken: string | null };
 
 export const PAIRING_UNREACHABLE = "Can't reach FamilyFi at the address in this code. Check this phone is on the home network, then try again.";
@@ -103,27 +100,34 @@ export async function verifyHousehold(transport: Transport, text: string): Promi
   return { code, identity };
 }
 
-type ClaimResponse = {
+/** What a claim answers (`POST /api/v1/paired/invites/{id}/claim`), every client the same way. */
+export type ClaimResponse = {
   device: { id: string; displayName: string };
-  deviceCredential: string;
-  manifest: EndpointManifest;
+  session: Session;
+  token: string;
+  refreshToken: string;
+  refreshExpiresAt: string;
+  connection: { manifest: EndpointManifest };
 };
 
-/** Step 3: spend the code. Called only from the explicit trust action. */
+/**
+ * Step 3: spend the code, which signs the phone in. Called only from the explicit trust action.
+ * The code's `pairingId` is the invite's id.
+ */
 export async function claimHousehold(
   transport: Transport,
   pending: PendingEnrollment,
   deviceName: string,
-): Promise<{ profile: ConnectionProfile; edgeCredentials: EndpointCredential[] }> {
+): Promise<{ profile: ConnectionProfile; edgeCredentials: EndpointCredential[]; session: StoredSession }> {
   const { code, identity } = pending;
   const claim = await codeRequest(transport, code)<ClaimResponse>(
-    `/api/v1/connection/pairings/${encodeURIComponent(code.pairingId)}/claim`,
+    `/api/v1/paired/invites/${encodeURIComponent(code.pairingId)}/claim`,
     {
       method: "POST",
       body: { token: code.token, deviceName },
     },
   );
-  const manifest = verifyManifest(claim.manifest, identity.publicKey.x, identity.instanceId);
+  const manifest = verifyManifest(claim.connection.manifest, identity.publicKey.x, identity.instanceId);
   requireEndpoint(manifest, code.endpoint.url);
   return {
     profile: {
@@ -132,31 +136,11 @@ export async function claimHousehold(
       keyFingerprint: identity.keyFingerprint,
       publicKeyX: identity.publicKey.x,
       deviceId: claim.device.id,
-      deviceCredential: claim.deviceCredential,
       endpoints: manifest.endpoints,
     },
     edgeCredentials: manifest.edgeCredentials,
+    session: { token: claim.token, session: claim.session, refreshToken: claim.refreshToken },
   };
-}
-
-/** Step 4: sign in as a paired phone. */
-export async function signInPaired(
-  request: ApiRequest,
-  profile: ConnectionProfile,
-  username: string,
-  password: string,
-): Promise<StoredSession> {
-  const result = await request<{ session: Session; token: string; refreshToken?: string }>("/api/v1/auth/login", {
-    method: "POST",
-    body: {
-      username,
-      password,
-      client: "native",
-      deviceId: profile.deviceId,
-      deviceCredential: profile.deviceCredential,
-    },
-  });
-  return { token: result.token, session: result.session, refreshToken: result.refreshToken ?? null };
 }
 
 /**

@@ -7,7 +7,8 @@ import { PAIR_COPY, publishedRoute, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 /**
- * Pair Device's data: remote access, its routes and the paired phones, reloaded every 15 seconds,
+ * Pair Device's data: remote access, its routes and the paired devices (phones, Watches and
+ * agents), reloaded every 15 seconds,
  * and every 2 while a tunnel is on its way so its address and status appear by themselves. A
  * member who is not an admin is told so instead.
  */
@@ -23,7 +24,7 @@ export function usePairDevice(request: ApiRequest) {
       const [state, endpoints, devices] = await Promise.all([
         request<{ tunnel: RemoteAccess }>("/api/v1/connection/tunnel"),
         request<{ endpoints: ConnectionRoute[] }>("/api/v1/connection/endpoints"),
-        request<{ devices: PairedPhone[] }>("/api/v1/connection/devices"),
+        request<{ devices: PairedPhone[] }>("/api/v1/paired/devices"),
       ]);
       setTunnel(state.tunnel);
       setRoutes(endpoints.endpoints);
@@ -57,6 +58,8 @@ export function usePairDevice(request: ApiRequest) {
   );
 
   const { active } = splitPhones(phones);
+  // Agents are home-network only and never hold an Access token, so remote access counts phones and Watches.
+  const remote = phones.filter((device) => device.client !== "agent");
   // Phones pair through the one published route, once it is live.
   const published = publishedRoute(tunnel, routes);
   return {
@@ -64,6 +67,7 @@ export function usePairDevice(request: ApiRequest) {
     setTunnel,
     routes,
     phones,
+    remote,
     forbidden,
     error,
     load,

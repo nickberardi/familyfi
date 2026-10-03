@@ -6,8 +6,8 @@
 import type { PendingEnrollment } from "./companion-pairing";
 import { shortPin } from "./connection-routes";
 
-/** The four steps the setup header's progress shows, in order. */
-export const SETUP_PROGRESS = ["welcome", "code", "confirm", "signIn"] as const;
+/** The three steps the setup header's progress shows, in order. Trusting the household signs the phone in. */
+export const SETUP_PROGRESS = ["welcome", "code", "confirm"] as const;
 export type SetupProgressStep = (typeof SETUP_PROGRESS)[number];
 
 export const SETUP_STEPS = {
@@ -25,11 +25,7 @@ export const SETUP_STEPS = {
   },
   confirm: {
     title: "Is this your household?",
-    body: "Check the household details before trusting this server. Your one-time key is not used until you confirm.",
-  },
-  signIn: {
-    title: "Sign in to FamilyFi",
-    body: "Your FamilyFi login — the same one as the web app. The UniFi key stays on the Pi and never reaches this phone.",
+    body: "Check the household details before trusting this server. Your one-time key is not used until you confirm; trusting it signs this phone in.",
   },
 } as const;
 
@@ -45,7 +41,6 @@ export const SETUP_ACTIONS = {
   openSettings: "Open Settings",
   trust: "Trust this instance",
   reject: "Not my household — start over",
-  pairAnother: "Pair a different phone",
   reveal: "Reveal",
   hide: "Hide",
 } as const;
@@ -102,7 +97,10 @@ export function pendingHouseholdNote({ code }: PendingEnrollment): string {
     : "The server identity matched the pairing code, and its certificate passed HTTPS validation.";
 }
 
-/** A paired phone's Connection screen: the household it trusts, its routes, and leaving it. */
+/**
+ * A paired phone's Connection screen: the household it trusts, who it is signed in as, its routes,
+ * and unpairing it. Pairing is the sign-in, so unpairing replaces signing out and forgetting.
+ */
 export const CONNECTION_COPY = {
   title: "Connection",
   routes: "Routes",
@@ -110,15 +108,20 @@ export const CONNECTION_COPY = {
   off: "Off",
   check: "Check routes again",
   checking: "Checking routes…",
-  signOut: "Sign out",
-  forget: "Forget this household",
-  forgetTitle: "Forget this household?",
-  forgetBody: "This phone stops trusting it. To use FamilyFi again, pair with a new code.",
-  forgetConfirm: "Forget",
+  unpair: "Unpair this phone",
+  unpairTitle: "Unpair this phone?",
+  unpairBody:
+    "This phone stops working with this household, and so do the Watches it set up. To use FamilyFi again, pair with a new code from FamilyFi on the web.",
+  unpairConfirm: "Unpair",
   cancel: "Cancel",
 } as const;
 
-/** The trusted household's line: its signing key, and who is signed in. */
-export function connectionHousehold(keyFingerprint: string, signedInAs: string | null): string {
-  return `Signing key ${shortPin(keyFingerprint)}${signedInAs ? ` · signed in as ${signedInAs}` : ""}`;
+/** The trusted household's line: its signing key. */
+export function connectionHousehold(keyFingerprint: string): string {
+  return `Signing key ${shortPin(keyFingerprint)}`;
+}
+
+/** Who the phone acts as: the adult the pairing code was made for. */
+export function connectionSignedInAs(displayName: string): string {
+  return `Signed in as ${displayName}`;
 }

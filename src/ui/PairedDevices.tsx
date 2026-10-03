@@ -32,7 +32,10 @@ function TextButton({ label, token, onPress, disabled, testID }: { label: string
   );
 }
 
-/** One paired phone or Watch: when it paired and was last seen, the route it paired through, its sessions, and what can be done to it. */
+/**
+ * One paired phone, Watch or agent: its scope, when it paired and was last seen, the route it paired
+ * through (or the adult an agent acts as), its sessions, and what can be done to it.
+ */
 export function PairedPhoneRow({
   phone,
   onRevoke,
@@ -53,10 +56,12 @@ export function PairedPhoneRow({
   return (
     <View style={[styles.phone, { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]} testID="phone-row">
       <View style={[styles.phoneIcon, { backgroundColor: ui.color("field") }]}>
-        <ui.Icon name={phone.client === "watch" ? "watch" : "device-mobile"} size={18} color={ui.color("ink")} />
+        <ui.Icon name={phone.client === "watch" ? "watch" : phone.client === "agent" ? "robot" : "device-mobile"} size={18} color={ui.color("ink")} />
       </View>
       <View style={styles.phoneWords}>
-        <Text style={[text(14, 21, "ink"), styles.bold]}>{phone.displayName}</Text>
+        <Text style={[text(14, 21, "ink"), styles.bold]}>
+          {phone.displayName} <Text style={[text(14, 21, "muted"), styles.regular]}>· {lines.scope}</Text>
+        </Text>
         <Text style={[text(14, 21, "muted"), styles.line]}>{lines.status}</Text>
         <Text style={[text(14, 21, "muted"), styles.line]}>
           {lines.via ? (
@@ -81,7 +86,7 @@ export function PairedPhoneRow({
 }
 
 /**
- * The household's paired phones and Watches, most recently seen first, with revoked ones folded
+ * The household's paired phones, Watches and agents, most recently seen first, with revoked ones folded
  * away. Each callback asks first where the platform does, then makes the change.
  */
 export function PairedDevicesCard({
@@ -197,6 +202,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 10, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   remoteHead: { alignItems: "center", gap: 12 },
   bold: { fontWeight: "600" },
+  regular: { fontWeight: "400" },
   grow: { flex: 1, minWidth: 200 },
   line: { marginTop: 2 },
   empty: { paddingHorizontal: 18, paddingVertical: 16 },

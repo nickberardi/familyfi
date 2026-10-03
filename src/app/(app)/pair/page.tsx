@@ -15,7 +15,7 @@ const TITLE = PAIR_COPY.title;
 const SUB = PAIR_COPY.sub;
 
 export default function PairDevicePage() {
-  const { tunnel, setTunnel, routes, phones, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
+  const { tunnel, setTunnel, routes, phones, remote, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
   const [pairing, setPairing] = useState(false);
   const [replacing, setReplacing] = useState<PairedPhone | null>(null);
 
@@ -40,7 +40,7 @@ export default function PairDevicePage() {
           </p>
         ) : null}
 
-        <RemoteAccessCard tunnel={tunnel} routes={routes} phones={phones} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
+        <RemoteAccessCard tunnel={tunnel} routes={routes} phones={remote} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
 
         <PairedDevicesCard
           phones={phones}

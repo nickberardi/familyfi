@@ -6,6 +6,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { countdown, transportLabel } from "@/lib/connection-routes";
 import { expiresLine } from "@/lib/pair-device";
 
+import { PairingAccountField } from "./PairingAccountField";
 import { PairingNameField } from "./PairingNameField";
 import { QrCode } from "./QrCode";
 import { PRESS_OPACITY, useUI } from "./UIContext";
@@ -50,7 +51,10 @@ function CopyRow({ label, value, copyLabel, copiedLabel }: { label: string; valu
   );
 }
 
-/** What the pairing sheet shows: the route and the phone's name, then the code as a QR and text, then the phone that used it. */
+/**
+ * What the pairing sheet shows: the route, the phone's name and the administrator it signs in as,
+ * then the code as a QR and text, then the phone that used it.
+ */
 export function PairingBody({ pairing }: { pairing: Pairing }) {
   const ui = useUI();
   const text = useText();
@@ -72,6 +76,7 @@ export function PairingBody({ pairing }: { pairing: Pairing }) {
           <Text style={[text(14, 21, "muted"), styles.routeLine]}>{copy.routeNote}</Text>
         </View>
         <PairingNameField label={copy.phone} value={pairing.name} onChange={pairing.setName} />
+        <PairingAccountField label={copy.signsInAs} accounts={pairing.accounts} value={pairing.accountId} onChange={pairing.setAccountId} />
         {error}
       </View>
     );
@@ -86,7 +91,7 @@ export function PairingBody({ pairing }: { pairing: Pairing }) {
       ) : (
         <>
           <View style={styles.qr}>
-            <QrCode value={issued.pairingCode} label={copy.qrLabel} />
+            <QrCode value={issued.code} label={copy.qrLabel} />
             {pairing.expired ? (
               <View style={[styles.veil, { backgroundColor: ui.color("card-veil") }]}>
                 <Text style={[text(17, 25.5, "ink"), styles.heavy]}>{copy.expired}</Text>
@@ -96,7 +101,7 @@ export function PairingBody({ pairing }: { pairing: Pairing }) {
           <Text style={[text(14, 21, "muted"), styles.center]} testID="pairing-countdown">
             {pairing.expired ? copy.expiredLine : expiresLine(countdown(new Date(issued.expiresAt).getTime() - pairing.now))}
           </Text>
-          <CopyRow label={copy.codeLabel} value={issued.pairingCode} copyLabel={copy.copy} copiedLabel={copy.copied} />
+          <CopyRow label={copy.codeLabel} value={issued.code} copyLabel={copy.copy} copiedLabel={copy.copied} />
         </>
       )}
       {error}
@@ -133,7 +138,7 @@ export function PairingActions({ pairing, onClose, disabled }: { pairing: Pairin
     return (
       <>
         <SheetButton label={copy.cancel} onPress={onClose} testID="pairing-cancel" />
-        <SheetButton label={copy.show} primary disabled={disabled || pairing.busy || !pairing.name.trim()} onPress={() => void pairing.generate()} testID="pairing-show" />
+        <SheetButton label={copy.show} primary disabled={disabled || pairing.busy || !pairing.name.trim() || !pairing.accountId} onPress={() => void pairing.generate()} testID="pairing-show" />
       </>
     );
   }
