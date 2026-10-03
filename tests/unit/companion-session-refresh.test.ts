@@ -131,6 +131,62 @@ describe("a paired phone's session refresh", () => {
     expect(phone.getState().session?.token).toBe("new");
   });
 
+  it.each([500, 502, 503, 429])("keeps the session when the server answers the refresh with %i", async (status) => {
+    let failing = true;
+    const home = household(() => (failing ? { status, code: "unavailable" } : { status: 200, token: "new", refreshToken: "r2" }));
+    const { phone, storage } = await signedIn(session("old", "r1", 3_600_000), home.transport);
+    home.expire();
+    await expect(phone.request("/api/v1/groups")).rejects.toMatchObject({ status });
+    expect(phone.getState().status).toBe("signedIn");
+    expect(storage.values.has("bearerSession")).toBe(true);
+    failing = false;
+    await phone.request("/api/v1/groups");
+    expect(phone.getState().session?.token).toBe("new");
+  });
+
+  it("keeps the session and sends anyway when the server fails to answer a renewal ahead of expiry", async () => {
+    const home = household(() => ({ status: 502, code: "bad_gateway" }));
+    const { phone } = await signedIn(session("old", "r1", 30_000), home.transport);
+    await phone.request("/api/v1/groups");
+    expect(home.calls.map((call) => call.path)).toEqual(["/api/v1/auth/refresh", "/api/v1/groups"]);
+    expect(phone.getState().status).toBe("signedIn");
+  });
+
+  it("never renews after a refused sign-in", async () => {
+    const home = household(() => ({ status: 200, token: "new", refreshToken: "r2" }));
+    const { phone } = await signedIn(session("old", "r1", 3_600_000), home.transport);
+    home.expire();
+    await expect(phone.request("/api/v1/auth/login", { method: "POST", body: {} })).rejects.toMatchObject({ status: 401 });
+    expect(home.calls.map((call) => call.path)).toEqual(["/api/v1/auth/login"]);
+  });
+
+  it("resends with the new bearer, without renewing again, a request refused after another request renewed", async () => {
+    let refreshes = 0;
+    const home = household(() => {
+      refreshes += 1;
+      return { status: 200, token: `new${refreshes}`, refreshToken: `r${refreshes + 1}` };
+    });
+    // The first groups request is answered only once the rules request has renewed and been answered.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let first = true;
+    const transport = asTransport(async (request) => {
+      if (first && request.url.endsWith("/api/v1/groups")) {
+        first = false;
+        await held;
+      }
+      return home.transport(request);
+    });
+    const { phone } = await signedIn(session("old", "r1", 3_600_000), transport);
+    home.expire();
+    const slow = phone.request("/api/v1/groups");
+    await phone.request("/api/v1/rules");
+    release();
+    await slow;
+    expect(refreshes).toBe(1);
+    expect(home.calls.filter((call) => call.path === "/api/v1/groups").map((call) => call.auth)).toEqual(["Bearer old", "Bearer new1"]);
+  });
+
   it("leaves a session with no refresh token to end with its bearer", async () => {
     const home = household(() => ({ status: 200, token: "new", refreshToken: "r2" }));
     const { phone } = await signedIn(session("old", null, 3_600_000), home.transport);
