@@ -9,8 +9,10 @@ import {
   listWatches,
   orderedWatchGroups,
   reconcileWatchSelection,
+  reconcileWatches,
   removeWatch,
   watchGroupIds,
+  watchIdForDevice,
   watchProvisioning,
   withWatch,
   type WatchEnrollment,
@@ -60,6 +62,17 @@ describe("watch", () => {
     expect(again.watches["watch-1"]).toEqual({ deviceId: "d1b", groupIds: ["a"] });
     expect(again.timeZone).toBe("America/New_York");
     expect(withWatch(again, "watch-2", "d2", "UTC").watches["watch-2"]).toEqual({ deviceId: "d2", groupIds: [] });
+  });
+
+  it("reconciles each Watch's groups and finds a Watch's entry by its paired device", () => {
+    const selection = { watches: { "watch-1": { deviceId: "d1", groupIds: ["a", "gone"] }, "watch-2": { deviceId: "d2", groupIds: ["b", "b"] } }, timeZone: "UTC" };
+    expect(reconcileWatches(selection, groups, "America/New_York")).toEqual({
+      watches: { "watch-1": { deviceId: "d1", groupIds: ["a"] }, "watch-2": { deviceId: "d2", groupIds: ["b"] } },
+      timeZone: "America/New_York",
+    });
+    expect(watchIdForDevice(selection, "d2")).toBe("watch-2");
+    expect(watchIdForDevice(selection, "d3")).toBeNull();
+    expect(watchIdForDevice(null, "d1")).toBeNull();
   });
 
   it("forgets the Watches no longer set up from this phone", () => {

@@ -43,11 +43,24 @@ export function keepWatches(selection: WatchSelection, deviceIds: readonly strin
   return { ...selection, watches: Object.fromEntries(Object.entries(selection.watches).filter(([, entry]) => kept.has(entry.deviceId))) };
 }
 
+/** The Watch id (as enrolled) of the entry for one of this phone's paired Watches, or null. */
+export function watchIdForDevice(selection: WatchSelection | null, deviceId: string): string | null {
+  return Object.entries(selection?.watches ?? {}).find(([, entry]) => entry.deviceId === deviceId)?.[0] ?? null;
+}
+
 /** The saved ids that still name a group, each once, at most `WATCH_MAX_GROUPS`. */
 export function reconcileWatchSelection(ids: readonly string[], groups: readonly Pick<Group, "id">[]): string[] {
   const known = new Set(groups.map((group) => group.id));
   const seen = new Set<string>();
   return ids.filter((id) => known.has(id) && !seen.has(id) && Boolean(seen.add(id))).slice(0, WATCH_MAX_GROUPS);
+}
+
+/** Every Watch's groups reconciled with the household's (`reconcileWatchSelection`), in its time zone. */
+export function reconcileWatches(selection: WatchSelection, groups: readonly Pick<Group, "id">[], timeZone: string): WatchSelection {
+  return {
+    watches: Object.fromEntries(Object.entries(selection.watches).map(([id, entry]) => [id, { ...entry, groupIds: reconcileWatchSelection(entry.groupIds, groups) }])),
+    timeZone,
+  };
 }
 
 /** The chosen groups, in the chosen order. */
