@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { AccountKind } from "@prisma/client";
-import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as currentSession } from "@/app/api/v1/auth/session/route";
 import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
 import { DELETE as removeRevoked, GET as listDevices } from "@/app/api/v1/paired/devices/route";
-import { DELETE as revokeDevice, GET as getDevice, PATCH as updateDevice } from "@/app/api/v1/paired/devices/[id]/route";
+import { DELETE as revokeDevice, PATCH as updateDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 import { bearer, claimInvite, claimWatchRequest, issuedInvite, pairPhone, type Claim } from "../helpers/pairing";
@@ -62,14 +60,15 @@ describe("/paired/devices", () => {
     expect((await listDevices(request("/api/v1/paired/devices?client=tablet", { auth }))).status).toBe(400);
   });
 
-  it("shows a phone of an adult who is not an administrator only itself and its Watch", async () => {
+  it("lets a phone set up several Watches, each listed under it", async () => {
     const auth = await admin();
-    const member = await prisma().account.create({ data: { username: "member", displayName: "Member", kind: AccountKind.personal, isAdmin: false, passwordHash: await hashPassword("member-password-1") } });
-    await pairPhone(auth, { displayName: "Someone else's phone" });
-    const phone = await pairPhone(auth, { accountId: member.id, displayName: "Member's phone" });
-    const watch = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
-    expect((await list(bearer(phone.token))).map((device) => device.id).sort()).toEqual([phone.device.id, watch.device.id].sort());
-    expect((await getDevice(request(`/api/v1/paired/devices/${watch.device.id}`, { auth: bearer(phone.token) }), params(watch.device.id))).status).toBe(200);
+    const phone = await pairPhone(auth);
+    const first = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
+    const second = (await (await claimWatchRequest(bearer(phone.token), { clientId: "0f7b2c4e-2d7a-4b0e-9c1d-5a6e7f8091a2" })).json()) as Claim;
+    expect(first.device.id).not.toBe(second.device.id);
+    const watches = await list(bearer(phone.token), "?client=watch&status=active");
+    expect(watches.map((device) => device.id).sort()).toEqual([first.device.id, second.device.id].sort());
+    expect(watches.every((device) => device.parentDeviceId === phone.device.id)).toBe(true);
   });
 
   it("renames a device and changes an agent's scope, but only to a scope its kind may hold", async () => {
@@ -101,10 +100,24 @@ describe("/paired/devices", () => {
     expect((await revoke(phone.device.id, auth)).status).toBe(200);
   });
 
-  it("leaves a Watch working when its phone is revoked", async () => {
+  it("revokes a phone's Watches with it", async () => {
     const { auth, phone, watch } = await household();
     expect((await revoke(phone.device.id, auth)).status).toBe(200);
-    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
+    expect((await list(auth, "?status=revoked")).map((device) => device.id).sort()).toEqual([phone.device.id, watch.device.id].sort());
+  });
+
+  it("revokes a phone's Watches when an administrator removes its record", async () => {
+    const { auth, phone, watch } = await household();
+    const removed = await revokeDevice(request(`/api/v1/paired/devices/${phone.device.id}?remove=true`, { method: "DELETE", auth }), params(phone.device.id));
+    expect(removed.status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
+  });
+
+  it("revokes the Watches of a phone that unpairs itself", async () => {
+    const { phone, watch } = await household();
+    expect((await revoke(phone.device.id, bearer(phone.token))).status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
   });
 
   it("clears revoked records in bulk and leaves active ones", async () => {

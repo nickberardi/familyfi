@@ -49,7 +49,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
-| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone (`client: phone`, its route, the adult it signs in as; five minutes) or an agent (`client: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired phone invites and claims its Watch in one call |
+| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone (`client: phone`, its route, the administrator it signs in as; five minutes) or an agent (`client: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired phone invites and claims its Watch in one call |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/paired/invites/{id}/claim` | Join with the code: every client is signed in at once (bearer and refresh token, never a password or device credential); a phone also gets its route and signed manifest |
@@ -145,10 +145,12 @@ Administrators do all of this from **System → Pair Device** in the web app. Ad
 Every paired device joins through `/paired/invites` and is managed through `/paired/devices`.
 Pairing is the authentication: an invite names the account the device acts as, and claiming it
 signs the device in, with no password and no device credential. An administrator invites a phone
-with a five-minute, single-use QR for an enabled route and chooses which adult it signs in as;
+with a five-minute, single-use QR for an enabled route and chooses which administrator it signs in
+as (only administrators have paired phones: an invite for any other account is refused, 400
+`administrator_account_required`);
 the phone claims it, verifies the instance identity, and is signed in, with its route and signed
 manifest in the claim. Bearer sessions are tied to that paired phone. Revoking the phone
-invalidates every one of its sessions and requires a new invite. Sign-in with a password is for
+invalidates every one of its sessions, and its Watches', and requires a new invite. Sign-in with a password is for
 browsers only.
 
 A paired device's bearer lasts one hour. Its claim also returns a `refreshToken`, which the device trades at `POST /api/v1/auth/refresh` for a new bearer and a new
@@ -165,8 +167,9 @@ account, appears as a separate device in System → Pair Device, and can be revo
 or by its phone. Its scope is `rulesOnly`: its sessions may only read session,
 connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
 resume, extend, allow, disallow, turn on and turn off any rule, or lift one for a single group; role never limits a control. They cannot
-create, edit or delete rules. Signing out or revoking the phone does
-not revoke the Watch. It renews its own bearer with its own refresh token.
+create, edit or delete rules. A phone may set up several Watches. Revoking or removing the phone
+revokes its Watches too; signing the phone out does not. It renews its own bearer with its own
+refresh token.
 
 ### Agents
 

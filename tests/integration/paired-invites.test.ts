@@ -124,6 +124,15 @@ describe("POST /paired/invites", () => {
     expect((await invitePhoneRequest(auth, { endpointId: "missing-route" })).status).toBe(404);
   });
 
+  it("pairs a phone only as an administrator, since only administrators have paired phones", async () => {
+    const auth = await admin();
+    const member = await adult("member", false);
+    const route = await homeRoute();
+    const refused = await invitePhoneRequest(auth, { endpointId: route.id, accountId: member.id });
+    expect(refused.status).toBe(400);
+    expect(await errorCode(refused)).toBe("administrator_account_required");
+  });
+
   it("refuses an invite from an adult who is not an administrator", async () => {
     await adult("member", false);
     const member = authFromLogin(await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "member", password: "adult-password-1" }) })));

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.22.0
+  version: 0.22.1
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2103,7 +2103,8 @@ paths:
         published route, five minutes) or an agent (on the home network, fifteen minutes) and gets
         a single-use `code`; the device claims it at `POST /paired/invites/{id}/claim`, which signs
         it in. Pairing is the authentication: the invite names the account the device acts as —
-        for a phone, `accountId` (default: whoever makes it); for an agent, whoever makes it.
+        for a phone, `accountId` (default: whoever makes it), which must be an administrator (400
+        `administrator_account_required` otherwise); for an agent, whoever makes it.
 
         With `?claim=true` a signed-in paired phone invites its Watch and claims it in one
         transaction, and the response is the claim: the phone hands the Watch its tokens and
@@ -2236,9 +2237,10 @@ paths:
       summary: Revoke a paired device and its sessions, or remove its record
       description: |
         An administrator, the device itself, or the phone that vouched for it (its parent) may
-        revoke it: its bearer and refresh token end, and it must pair again. Revoking a phone leaves
-        its Watch working. Only an administrator may use `?remove=true` to delete the record for
-        good. Sessions, invites and change history keep their rows with the reference cleared.
+        revoke it: its bearer and refresh token end, and it must pair again. Revoking or removing a
+        phone revokes its Watches too. Only an administrator may use `?remove=true` to delete the
+        record for good. Sessions, invites and change history keep their rows with the reference
+        cleared.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
@@ -2751,8 +2753,8 @@ components:
       additionalProperties: false
       description: |
         An administrator's invite. A phone needs the route it pairs over (`endpointId`) and may name
-        the adult it signs in as (`accountId`, default: whoever makes it), and `replacesDeviceId` to
-        re-pair a phone. An agent needs a `scope` of `full` or `readOnly`.
+        the administrator it signs in as (`accountId`, default: whoever makes it), and
+        `replacesDeviceId` to re-pair a phone. An agent needs a `scope` of `full` or `readOnly`.
       required: [client, displayName]
       properties:
         client: { type: string, enum: [phone, agent] }

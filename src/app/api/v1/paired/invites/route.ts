@@ -1,4 +1,4 @@
-import { PairedDeviceClient, SessionKind } from "@prisma/client";
+import { AccountKind, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { z } from "zod";
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { requestOrigin } from "@/server/auth";
@@ -45,7 +45,12 @@ export async function POST(request: Request) {
     const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: input.endpointId, householdId: "default", enabled: true } });
     if (!endpoint) return jsonError(404, "not_found", "Connection endpoint not found.");
     const accountId = input.accountId ?? session.accountId;
-    if (!(await prisma().account.findUnique({ where: { id: accountId } }))) return jsonError(404, "not_found", "The account to sign the phone in as no longer exists.");
+    const account = await prisma().account.findUnique({ where: { id: accountId } });
+    if (!account) return jsonError(404, "not_found", "The account to sign the phone in as no longer exists.");
+    // Only administrators have paired phones: a phone controls the household and its agents.
+    if (account.kind !== AccountKind.recovery && !account.isAdmin) {
+      return jsonError(400, "administrator_account_required", "A phone signs in only as an administrator.");
+    }
     // Only a phone is re-paired as a phone: a Watch or agent is never replaced, and so never removed, this way.
     if (input.replacesDeviceId && (await prisma().pairedDevice.findUnique({ where: { id: input.replacesDeviceId } }))?.client !== PairedDeviceClient.phone) {
       return jsonError(404, "not_found", "The phone to re-pair no longer exists.");

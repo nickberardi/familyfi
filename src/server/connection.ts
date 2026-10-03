@@ -121,13 +121,35 @@ export function isUniqueViolation(error: unknown): boolean {
 
 type Db = Parameters<Parameters<ReturnType<typeof prisma>["$transaction"]>[0]>[0];
 
+/** Ends the sessions of a device's companions (a phone's Watches) and revokes them: they belong to it. */
+async function revokeCompanions(id: string, db: Db, now: Date) {
+  const companions = await db.pairedDevice.findMany({ where: { parentDeviceId: id, revokedAt: null }, select: { id: true } });
+  if (!companions.length) return;
+  const ids = companions.map((companion) => companion.id);
+  await db.session.updateMany({ where: { deviceId: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
+  await db.pairedDevice.updateMany({ where: { id: { in: ids } }, data: { revokedAt: now } });
+}
+
 /**
- * Deletes a paired phone's record for good, signing out anything it still had. Sessions,
- * pairings and change history keep their rows with the phone reference cleared, so the
- * Sync log still shows what changed, just not from which phone.
+ * Revokes a paired device and ends its sessions; a phone's Watches go with it. Resolves false when
+ * there is no such device still active.
+ */
+export async function revokeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {
+  const updated = await db.pairedDevice.updateMany({ where: { id, revokedAt: null }, data: { revokedAt: now } });
+  if (!updated.count) return false;
+  await db.session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
+  await revokeCompanions(id, db, now);
+  return true;
+}
+
+/**
+ * Deletes a paired device's record for good, signing out anything it still had; a phone's Watches
+ * are revoked with it. Sessions, pairings and change history keep their rows with the device
+ * reference cleared, so the Sync log still shows what changed, just not from which device.
  */
 export async function removeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {
   await db.session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
+  await revokeCompanions(id, db, now);
   const removed = await db.pairedDevice.deleteMany({ where: { id } });
   return removed.count === 1;
 }

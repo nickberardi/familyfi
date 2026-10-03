@@ -112,17 +112,24 @@ describe("independent Watch device", () => {
     ]));
   });
 
-  it("keeps Watch access after phone sign-out or revocation, but revokes it as its own device", async () => {
+  it("keeps Watch access after its phone signs out, and revokes it with its phone", async () => {
     const phone = await pairedPhone();
     const watch = await enrolledWatch(phone.auth);
     expect((await logout(request("/api/v1/auth/logout", { method: "POST", auth: phone.auth }))).status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(200);
     const admin = await administrator();
     expect((await revoke(phone.device.id, admin)).status).toBe(200);
-    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(200);
-    expect((await revoke(watch.deviceId, admin)).status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
     expect(await isRevoked(watch.deviceId)).toBe(true);
+  });
+
+  it("revokes a Watch as its own device, leaving its phone", async () => {
+    const phone = await pairedPhone();
+    const watch = await enrolledWatch(phone.auth);
+    expect((await revoke(watch.deviceId, await administrator())).status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
+    expect(await isRevoked(watch.deviceId)).toBe(true);
+    expect(await isRevoked(phone.device.id)).toBe(false);
   });
 
   it("lets its phone, its parent, revoke it", async () => {

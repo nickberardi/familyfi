@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isAdministrator, removeDevice } from "@/server/connection";
+import { isAdministrator, removeDevice, revokeDevice } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { isValidScope } from "@/server/device-scope";
 import { readJson, withAdmin, withMutation, withSession } from "@/server/guard";
@@ -42,7 +42,10 @@ export async function PATCH(request: Request, context: Ctx) {
   });
 }
 
-/** Revoke a paired device: an administrator, the device itself, or the phone that vouched for it. `?remove=true` (administrator only) deletes the record. */
+/**
+ * Revoke a paired device: an administrator, the device itself, or the phone that vouched for it.
+ * Revoking a phone revokes its Watches. `?remove=true` (administrator only) deletes the record.
+ */
 export async function DELETE(request: Request, context: Ctx) {
   return withMutation(request, async (session) => {
     const { id } = await context.params;
@@ -56,10 +59,8 @@ export async function DELETE(request: Request, context: Ctx) {
       if (!(await removeDevice(id))) return jsonError(404, "not_found", "Paired device not found.");
       return Response.json({ ok: true });
     }
-    const now = new Date();
-    const updated = await prisma().pairedDevice.updateMany({ where: { id, revokedAt: null }, data: { revokedAt: now } });
-    if (!updated.count) return jsonError(404, "not_found", "Paired device not found.");
-    await prisma().session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
+    const revoked = await prisma().$transaction((db) => revokeDevice(id, db as never));
+    if (!revoked) return jsonError(404, "not_found", "Paired device not found.");
     return Response.json({ ok: true });
   });
 }
