@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.22.1
+  version: 0.22.2
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -286,6 +286,9 @@ paths:
       operationId: updateAccount
       tags: [Accounts]
       summary: Update a personal account
+      description: |
+        Only administrators have paired devices. Setting `isAdmin` to false signs out and removes every
+        phone, Watch and agent acting as the adult, and cancels their pending invites, in the same step.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/AccountId"

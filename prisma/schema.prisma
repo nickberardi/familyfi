@@ -176,7 +176,7 @@ model PairedDevice {
   /// The account this device acts as, fixed by the invite it was paired with.
   accountId       String?
   account         Account?       @relation("pairedDeviceAccount", fields: [accountId], references: [id], onDelete: Cascade)
-  /// The paired device that vouched for this one: a Watch's phone. Revoking the parent leaves the child.
+  /// The paired device that vouched for this one: a Watch's phone. Revoking the parent revokes the child.
   parentDeviceId  String?
   parentDevice    PairedDevice?  @relation("pairedDeviceParent", fields: [parentDeviceId], references: [id], onDelete: SetNull)
   children        PairedDevice[] @relation("pairedDeviceParent")

@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { AccountKind } from "@prisma/client";
+import { hashPassword } from "@/server/auth";
+import { AccountKind } from "@prisma/client";
+import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as currentSession } from "@/app/api/v1/auth/session/route";
+import { PUT as updateAccount } from "@/app/api/v1/accounts/[id]/route";
 import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
 import { DELETE as removeRevoked, GET as listDevices } from "@/app/api/v1/paired/devices/route";
 import { DELETE as revokeDevice, PATCH as updateDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
-import { bearer, claimInvite, claimWatchRequest, issuedInvite, pairPhone, type Claim } from "../helpers/pairing";
+import { bearer, claimInvite, claimWatchRequest, homeRoute, invitePhoneRequest, issuedInvite, pairPhone, type Claim } from "../helpers/pairing";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const json = { "content-type": "application/json" };
@@ -69,6 +74,34 @@ describe("/paired/devices", () => {
     const watches = await list(bearer(phone.token), "?client=watch&status=active");
     expect(watches.map((device) => device.id).sort()).toEqual([first.device.id, second.device.id].sort());
     expect(watches.every((device) => device.parentDeviceId === phone.device.id)).toBe(true);
+  });
+
+  it("shows a phone whose adult is no longer an administrator only itself and its Watch", async () => {
+    const { auth, agent } = await household();
+    const adult = await prisma().account.create({ data: { username: "parent", displayName: "Parent", kind: AccountKind.personal, isAdmin: true, passwordHash: await hashPassword("parent-password-1") } });
+    const phone = await pairPhone(auth, { accountId: adult.id });
+    const watch = (await (await claimWatchRequest(bearer(phone.token), { clientId: "0f7b2c4e-2d7a-4b0e-9c1d-5a6e7f8091a2" })).json()) as Claim;
+    await prisma().account.update({ where: { id: adult.id }, data: { isAdmin: false } });
+    const seen = (await list(bearer(phone.token))).map((device) => device.id);
+    expect(seen.sort()).toEqual([phone.device.id, watch.device.id].sort());
+    expect(seen).not.toContain(agent.device.id);
+  });
+
+  it("unpairs and removes an adult's devices, and cancels their invites, when they stop being an administrator", async () => {
+    const auth = await admin();
+    const adult = await prisma().account.create({ data: { username: "parent", displayName: "Parent", kind: AccountKind.personal, isAdmin: true, passwordHash: await hashPassword("parent-password-1") } });
+    const phone = await pairPhone(auth, { accountId: adult.id });
+    const watch = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
+    const pending = await issuedInvite(await invitePhoneRequest(auth, { endpointId: (await homeRoute()).id, accountId: adult.id, displayName: "Spare" }));
+    // Someone else's phone stays.
+    const kept = await pairPhone(auth);
+
+    const demoted = await updateAccount(request(`/api/v1/accounts/${adult.id}`, { method: "PUT", auth, headers: json, body: JSON.stringify({ isAdmin: false }) }), params(adult.id));
+    expect(demoted.status).toBe(200);
+    for (const token of [phone.token, watch.token]) expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(token) }))).status).toBe(401);
+    expect(await prisma().pairedDevice.count({ where: { id: { in: [phone.device.id, watch.device.id] } } })).toBe(0);
+    expect((await claimInvite(pending, "Spare")).status).not.toBe(200);
+    expect((await list(auth)).map((device) => device.id)).toEqual([kept.device.id]);
   });
 
   it("renames a device and changes an agent's scope, but only to a scope its kind may hold", async () => {

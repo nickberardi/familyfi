@@ -154,6 +154,18 @@ export async function removeDevice(id: string, db: Db = prisma() as unknown as D
   return removed.count === 1;
 }
 
+/**
+ * An adult who is no longer an administrator keeps no paired devices: every phone, Watch and agent
+ * acting as them is signed out and its record deleted, and any invite still pending for them is
+ * cancelled, so a code made before the change cannot be claimed after it.
+ */
+export async function removeAccountDevices(accountId: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<number> {
+  const devices = await db.pairedDevice.findMany({ where: { accountId }, select: { id: true } });
+  for (const device of devices) await removeDevice(device.id, db, now);
+  await db.pairing.updateMany({ where: { accountId, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
+  return devices.length;
+}
+
 /** Deletes every revoked phone's record; the live-test harness alone can leave hundreds. */
 export async function removeRevokedDevices(): Promise<number> {
   const removed = await prisma().pairedDevice.deleteMany({ where: { revokedAt: { not: null } } });
