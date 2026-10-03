@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.21.0
+  version: 0.22.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -35,6 +35,8 @@ tags:
     description: Category and app rules including network scope (Internet parents remain groups)
   - name: Upstream
     description: Domain-list categories checked against the household resolver (reporting only)
+  - name: Paired
+    description: Phones, Watches and agents that call the API. Invites join them; devices manage them.
   - name: Connection
     description: |
       Paired native devices, trusted HTTPS endpoints, and connection status.
@@ -85,17 +87,12 @@ paths:
       description: |
         Authenticate the recovery username `admin` against FAMILYFI_DEFAULT_PASSWORD,
         or a personal adult account against its stored password hash.
-        Browser clients receive an httpOnly session cookie and a readable CSRF
-        cookie. Native clients first claim an administrator-created pairing,
-        then set `client` to `native` with their paired device ID and credential
-        to receive a bearer token instead of cookies. Five failed attempts in 15 minutes for a
-        username or IP return 429. A browser session lasts 30 days unless revoked. A native
-        bearer lasts one hour and comes with a `refreshToken` that renews it at
-        `POST /api/v1/auth/refresh` for 90 days from its last use.
-
-        Through remote access (the Cloudflare tunnel), only `client: native` may sign
-        in (403 `remote_browser_login` otherwise), and the paired device is checked
-        before the password (403 `device_not_paired`, with no attempt recorded).
+        Sign-in is for people in a browser: it sets an httpOnly session cookie and a
+        readable CSRF cookie, and the session lasts 30 days unless revoked. Phones,
+        Watches and agents never sign in here; they join through `/paired/invites`,
+        which signs them in. Five failed attempts in 15 minutes for a username or IP
+        return 429. Nobody signs in through remote access (403 `remote_browser_login`),
+        so the internet cannot test passwords.
       security: []
       requestBody:
         required: true
@@ -106,8 +103,6 @@ paths:
             examples:
               browser:
                 value: { username: admin, password: "example-password", client: browser }
-              native:
-                value: { username: admin, password: "example-password", client: native, deviceId: "paired-device-id", deviceCredential: "device-keychain-credential" }
       responses:
         "200":
           description: Authenticated.
@@ -2098,131 +2093,152 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "422": { description: "`probe_failed` — the address could not be reached or the text is not a certificate", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
-  /api/v1/connection/pairings:
+  /api/v1/paired/invites:
     post:
-      operationId: createConnectionPairing
-      tags: [Connection]
-      summary: Create an admin-authorized phone pairing code
+      operationId: createPairedInvite
+      tags: [Paired]
+      summary: Invite a device to join, or (claim=true) invite and claim a phone's Watch
+      description: |
+        Every paired device joins with an invite. An administrator invites a phone (over a
+        published route, five minutes) or an agent (on the home network, fifteen minutes) and gets
+        a single-use `code`; the device claims it at `POST /paired/invites/{id}/claim`, which signs
+        it in. Pairing is the authentication: the invite names the account the device acts as —
+        for a phone, `accountId` (default: whoever makes it); for an agent, whoever makes it.
+
+        With `?claim=true` a signed-in paired phone invites its Watch and claims it in one
+        transaction, and the response is the claim: the phone hands the Watch its tokens and
+        manifest, and becomes its parent. Only a phone, and only for a Watch (403
+        `paired_phone_required` otherwise). A previous Watch with the same `clientId` is revoked.
+
+        An agent invite is refused through remote access (403 `agent_remote`).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingCreate" } } } }
+      parameters:
+        - { name: claim, in: query, required: false, schema: { type: string, enum: ["true"] } }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/PairedInviteCreate"
+                - $ref: "#/components/schemas/PairedWatchCreate"
       responses:
-        "201": { description: Pairing code, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingResponse" } } } }
+        "201":
+          description: An invite and its code; with `?claim=true`, the claimed invite and the Watch's claim.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PairedInviteIssued"
+                  - $ref: "#/components/schemas/PairedWatchClaimed"
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
-  /api/v1/connection/pairings/{id}:
+  /api/v1/paired/invites/{id}:
     get:
-      operationId: getConnectionPairing
-      tags: [Connection]
-      summary: Pairing status, so an admin screen can tell when the phone claimed it
+      operationId: getPairedInvite
+      tags: [Paired]
+      summary: An invite's status, so the screen that made it can tell when it was claimed
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:
-        "200": { description: Pairing status, content: { application/json: { schema: { type: object, additionalProperties: false, required: [pairing], properties: { pairing: { $ref: "#/components/schemas/ConnectionPairingStatus" } } } } } }
+        "200": { description: Invite status, content: { application/json: { schema: { type: object, additionalProperties: false, required: [invite], properties: { invite: { $ref: "#/components/schemas/PairedInviteStatus" } } } } } }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
     delete:
-      operationId: cancelConnectionPairing
-      tags: [Connection]
-      summary: Cancel a pending pairing before it expires
+      operationId: cancelPairedInvite
+      tags: [Paired]
+      summary: Cancel a pending invite before it expires
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
       responses:
         "200": { description: Cancelled, content: { application/json: { schema: { type: object, required: [ok], properties: { ok: { type: boolean } } } } } }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-        "404": { description: "No pending pairing with that id: unknown, claimed, expired, or already cancelled", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
-  /api/v1/connection/pairings/{id}/claim:
+        "404": { description: "No pending invite with that id: unknown, claimed, expired, or already cancelled", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /api/v1/paired/invites/{id}/claim:
     post:
-      operationId: claimConnectionPairing
-      tags: [Connection]
-      summary: Claim a single-use pairing code
+      operationId: claimPairedInvite
+      tags: [Paired]
+      summary: Join with an invite's single-use code
       description: |
-        A phone claims its code and receives its device credential, route and signed manifest. An
-        agent claims an agent pairing code and is signed in at once, with a one-hour bearer and a
-        refresh token and no device credential; it never sends a password. Agent claims are refused
-        through remote access (403 `agent_remote`). An unknown, used or expired code, or one made
-        for the other kind of client, is 403 `invalid_pairing`.
+        Signs the device in, as the account its invite names: every client gets the same answer,
+        its device, a one-hour bearer and a rotating refresh token, and never a password or device
+        credential. A phone also gets `connection` (the route it paired through and its signed
+        manifest). Agent claims are refused through remote access (403 `agent_remote`). An
+        unknown, used, expired or cancelled code is 403 `invalid_pairing`.
       security: []
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingClaim" } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PairedInviteClaim" } } } }
       responses:
-        "200": { description: Device enrollment, content: { application/json: { schema: { $ref: "#/components/schemas/ConnectionPairingClaimResponse" } } } }
+        "200": { description: Joined and signed in, content: { application/json: { schema: { $ref: "#/components/schemas/PairedClaim" } } } }
         "400": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/connection/devices:
+  /api/v1/paired/devices:
     get:
-      operationId: listConnectionDevices
-      tags: [Connection]
-      summary: List paired devices and sessions
+      operationId: listPairedDevices
+      tags: [Paired]
+      summary: Paired devices the caller may see
+      description: An administrator sees every paired device; a paired device sees itself and the companions it vouched for (a phone's Watch). Anyone else is refused.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { name: client, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [phone, watch, agent] } } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [active, revoked] } }
       responses:
-        "200": { description: Devices, content: { application/json: { schema: { type: object, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/ConnectionDevice" } } } } } } }
-        "401": { $ref: "#/components/responses/Error" }
-        "403": { $ref: "#/components/responses/Error" }
-    post:
-      operationId: enrollConnectionDevice
-      tags: [Connection]
-      summary: Automatically pair a Watch from its signed-in paired iPhone
-      description: Creates an independent paired Watch device and its own sign-in, a one-hour bearer and a refresh token that renews it. A previous enrollment with the same Watch clientId is revoked. Signing out or revoking the phone does not revoke the Watch.
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [client, clientId]
-              properties:
-                client: { type: string, enum: [watch] }
-                clientId: { type: string, format: uuid }
-                displayName: { type: string, minLength: 1, maxLength: 80 }
-      responses:
-        "201":
-          description: Watch device enrolled and signed in
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [deviceId, deviceCredential, sessionId, token, expiresAt, refreshToken, refreshExpiresAt]
-                properties:
-                  deviceId: { type: string }
-                  deviceCredential: { type: string }
-                  sessionId: { type: string }
-                  token: { type: string, description: The Watch's bearer; it lasts one hour. }
-                  expiresAt: { type: string, format: date-time }
-                  refreshToken: { type: string, description: "Renews the bearer at POST /api/v1/auth/refresh; it rotates on every use." }
-                  refreshExpiresAt: { type: string, format: date-time }
+        "200": { description: Devices, content: { application/json: { schema: { type: object, additionalProperties: false, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/PairedDevice" } } } } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
     delete:
-      operationId: removeRevokedConnectionDevices
-      tags: [Connection]
+      operationId: removeRevokedPairedDevices
+      tags: [Paired]
       summary: Remove every revoked device record
-      description: Requires `?revoked=true`. Active devices are never touched. Sessions, pairings and change history keep their rows with the device reference cleared.
+      description: Requires `?status=revoked`. Active devices are never touched. Sessions, invites and change history keep their rows with the device reference cleared.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters: [{ name: revoked, in: query, required: true, schema: { type: string, enum: ["true"] } }, { $ref: "#/components/parameters/CsrfToken" }]
+      parameters: [{ name: status, in: query, required: true, schema: { type: string, enum: [revoked] } }, { $ref: "#/components/parameters/CsrfToken" }]
       responses:
         "200": { description: Removed, content: { application/json: { schema: { type: object, additionalProperties: false, required: [removed], properties: { removed: { type: integer, minimum: 0 } } } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/connection/devices/{id}:
+  /api/v1/paired/devices/{id}:
+    get:
+      operationId: getPairedDevice
+      tags: [Paired]
+      summary: One paired device the caller may see
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Device, content: { application/json: { schema: { type: object, additionalProperties: false, required: [device], properties: { device: { $ref: "#/components/schemas/PairedDevice" } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    patch:
+      operationId: updatePairedDevice
+      tags: [Paired]
+      summary: Rename a paired device or change its scope
+      description: Administrator only. The scope must stay a valid pair for the device's client (400 `invalid_scope`); in practice only an agent's scope changes, between `full` and `readOnly`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PairedDeviceUpdate" } } } }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { type: object, additionalProperties: false, required: [device], properties: { device: { $ref: "#/components/schemas/PairedDevice" } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
     delete:
-      operationId: revokeConnectionDevice
-      tags: [Connection]
+      operationId: revokePairedDevice
+      tags: [Paired]
       summary: Revoke a paired device and its sessions, or remove its record
       description: |
-        An administrator or the paired device itself may revoke it: every bearer session ends
-        and it must pair again. Only an administrator may use `?remove=true` to delete its record
-        for good after revoking it. Sessions, pairings and change history keep their rows with the
-        device reference cleared.
+        An administrator, the device itself, or the phone that vouched for it (its parent) may
+        revoke it: its bearer and refresh token end, and it must pair again. Revoking a phone leaves
+        its Watch working. Only an administrator may use `?remove=true` to delete the record for
+        good. Sessions, invites and change history keep their rows with the reference cleared.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
@@ -2422,8 +2438,8 @@ components:
       scheme: bearer
       bearerFormat: opaque
       description: |
-        A paired device's one-hour access token, from POST /api/v1/auth/login with client=native,
-        a Watch enrollment, or POST /api/v1/auth/refresh. Renew it with its refresh token before
+        A paired device's one-hour access token, from its claim (POST /api/v1/paired/invites/{id}/claim,
+        or a phone's ?claim=true for its Watch) or POST /api/v1/auth/refresh. Renew it with its refresh token before
         or after it expires; revoking the device ends both.
   parameters:
     CsrfToken:
@@ -2526,14 +2542,8 @@ components:
           minLength: 1
         client:
           type: string
-          enum: [browser, native]
+          enum: [browser]
           default: browser
-        deviceId:
-          type: string
-          description: Required when client is native; returned by pairing claim.
-        deviceCredential:
-          type: string
-          description: Required when client is native; stored only in the device keychain.
     Session:
       type: object
       additionalProperties: false
@@ -2554,19 +2564,6 @@ components:
       properties:
         session:
           $ref: "#/components/schemas/Session"
-        token:
-          type: string
-          description: Present for native clients only. A one-hour bearer.
-        tokenType:
-          type: string
-          enum: [Bearer]
-        refreshToken:
-          type: string
-          description: Native clients only. Renews the bearer at POST /api/v1/auth/refresh and rotates on every use.
-        refreshExpiresAt:
-          type: string
-          format: date-time
-          description: Native clients only. When the refresh token ends if unused; each refresh moves it 90 days out.
     RefreshRequest:
       type: object
       additionalProperties: false
@@ -2735,21 +2732,6 @@ components:
         validTo: { type: string, format: date-time }
         systemTrusted: { type: [boolean, "null"], description: "Whether FamilyFi's CA store trusts the chain for this host; null for a pasted certificate. True means a pin is unnecessary." }
         source: { type: string, enum: [probe, certificate] }
-    ConnectionPairingStatus:
-      type: object
-      additionalProperties: false
-      required: [id, status, expiresAt, device]
-      properties:
-        id: { type: string }
-        status: { type: string, enum: [pending, claimed, expired], description: A cancelled pairing reads as expired. }
-        expiresAt: { type: string, format: date-time }
-        device:
-          type: [object, "null"]
-          additionalProperties: false
-          required: [id, displayName]
-          properties:
-            id: { type: string }
-            displayName: { type: string }
     DeviceScope:
       type: string
       enum: [full, rulesOnly, readOnly]
@@ -2761,86 +2743,135 @@ components:
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
-        UniFi settings or resolvers, changes household settings, or manages connections; it may only
-        revoke itself there. Beyond its scope an agent gets 403 `agent_scope`, and over remote access
+        UniFi settings or resolvers, changes household settings, or manages connections or paired
+        devices; it may only revoke itself. Beyond its scope an agent gets 403 `agent_scope`, and over remote access
         403 `agent_remote`.
-    ConnectionPairingCreate:
+    PairedInviteCreate:
       type: object
       additionalProperties: false
       description: |
-        A phone pairing names the route the phone pairs over (`endpointId`, required) and expires
-        in five minutes. An agent pairing (`client: agent`, with a `scope` of `full` or `readOnly`) has no route: its code
-        carries the address it was made at, with no certificate pin or Cloudflare Access token, and
-        it expires in fifteen minutes. It cannot be made through remote access (403 `agent_remote`).
-      required: [deviceName]
+        An administrator's invite. A phone needs the route it pairs over (`endpointId`) and may name
+        the adult it signs in as (`accountId`, default: whoever makes it), and `replacesDeviceId` to
+        re-pair a phone. An agent needs a `scope` of `full` or `readOnly`.
+      required: [client, displayName]
       properties:
-        client: { type: string, enum: [phone, agent], default: phone }
-        scope: { type: string, enum: [full, readOnly], description: "An agent pairing's DeviceScope; agents hold only these two." }
+        client: { type: string, enum: [phone, agent] }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
         endpointId: { type: string }
-        deviceName: { type: string, minLength: 1, maxLength: 80 }
-        replacesDeviceId: { type: string, description: "Re-pair: when this pairing is claimed, the phone with this id is revoked and its record removed, so it is not listed twice. 404 if it no longer exists." }
-    ConnectionPairingClaim:
+        accountId: { type: string }
+        replacesDeviceId: { type: string, description: "Re-pair: when this invite is claimed, the phone with this id is revoked and its record removed, so it is not listed twice. 404 if it no longer exists." }
+        scope: { type: string, enum: [full, readOnly], description: "An agent's DeviceScope; agents hold only these two." }
+    PairedWatchCreate:
+      type: object
+      additionalProperties: false
+      description: A phone's Watch, invited and claimed at once with `?claim=true`.
+      required: [client, clientId]
+      properties:
+        client: { type: string, enum: [watch] }
+        clientId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+    PairedInviteIssued:
+      type: object
+      additionalProperties: false
+      required: [invite]
+      properties:
+        invite:
+          type: object
+          additionalProperties: false
+          required: [id, expiresAt, code]
+          properties:
+            id: { type: string }
+            expiresAt: { type: string, format: date-time }
+            code:
+              type: string
+              pattern: "^[A-Za-z0-9_-]+$"
+              description: |
+                The single string a phone scans as a QR or pastes, or an agent is given in its prompt:
+                base64url, without padding, of UTF-8 JSON. Version 1 is
+                `{"version":1,"url","code","fingerprint"}` plus at most one of `pin` and `access`:
+
+                - `url`: the origin to join over (a phone's published HTTPS route; for an agent, the
+                  address the invite was made at).
+                - `code`: the single-use claim, `inviteId.token`; the token after the first `.` is
+                  what `POST /paired/invites/{id}/claim` takes.
+                - `fingerprint`: the household key fingerprint, which must equal
+                  `GET /connection/identity`'s `keyFingerprint`.
+                - `pin`: only on a phone's pinned LAN route, the SHA-256 SPKI pin.
+                - `access`: only on a phone's route behind Cloudflare Access, the service token
+                  (`clientId`, `clientSecret`) that gets it past Access to join. Never for an agent.
+    PairedInviteStatus:
+      type: object
+      additionalProperties: false
+      required: [id, status, expiresAt, device]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, claimed, expired], description: A cancelled invite reads as expired. }
+        expiresAt: { type: string, format: date-time }
+        device:
+          type: [object, "null"]
+          additionalProperties: false
+          required: [id, displayName]
+          properties:
+            id: { type: string }
+            displayName: { type: string }
+    PairedInviteClaim:
       type: object
       additionalProperties: false
       required: [token, deviceName]
       properties:
         token: { type: string }
         deviceName: { type: string, minLength: 1, maxLength: 80 }
-    ConnectionPairingResponse:
-      type: object
-      additionalProperties: false
-      required: [pairing]
-      properties:
-        pairing:
-          type: object
-          additionalProperties: false
-          required: [id, expiresAt, pairingCode]
-          properties:
-            id: { type: string }
-            expiresAt: { type: string, format: date-time }
-            pairingCode:
-              type: string
-              pattern: "^[A-Za-z0-9_-]+$"
-              description: |
-                The single string a phone scans as a QR or pastes: base64url, without padding, of
-                UTF-8 JSON. Version 1 is `{"version":1,"url","code","fingerprint"}` plus at most
-                one of `pin` and `access`:
-
-                - `url`: the HTTPS origin to pair over.
-                - `code`: the single-use claim, `pairingId.token`; the token after the first `.`
-                  is what `POST /connection/pairings/{id}/claim` takes.
-                - `fingerprint`: the household key fingerprint, which must equal
-                  `GET /connection/identity`'s `keyFingerprint`.
-                - `pin`: only on a pinned LAN route, the SHA-256 SPKI pin the phone holds it to.
-                - `access`: only on a route behind Cloudflare Access, the service token
-                  (`clientId`, `clientSecret`) that gets a phone past Access to pair.
-
-                Route details (id, priority, token version) are not in the code: the claim's
-                signed manifest carries them. A phone rejects any other version.
-    ConnectionPairingClaimResponse:
+    PairedClaim:
       type: object
       additionalProperties: false
       description: |
-        A phone's claim returns `deviceCredential`, `endpoint` and `manifest`; it then signs in with a
-        password. An agent's claim returns none of those: it is signed in already, as the adult who
-        made the pairing, with `session`, `token`, `tokenType`, `refreshToken` and `refreshExpiresAt`.
-      required: [device]
+        What every claim answers, signed in as the account the invite named. `connection` is only
+        for clients that may work away from home — phones and Watches: the route a phone paired
+        through, and the signed manifest (with Cloudflare Access `edgeCredentials`). Never for agents.
+      required: [device, session, token, tokenType, refreshToken, refreshExpiresAt]
       properties:
         device:
           type: object
-          required: [id, displayName]
+          additionalProperties: false
+          required: [id, displayName, client, scope]
           properties:
             id: { type: string }
             displayName: { type: string }
+            client: { type: string, enum: [phone, watch, agent] }
             scope: { $ref: "#/components/schemas/DeviceScope" }
-        deviceCredential: { type: string }
-        endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" }
-        manifest: { $ref: "#/components/schemas/ConnectionEndpointManifest" }
         session: { $ref: "#/components/schemas/Session" }
-        token: { type: string, description: "An agent's one-hour bearer." }
+        token: { type: string, description: The one-hour bearer. }
         tokenType: { type: string, enum: [Bearer] }
-        refreshToken: { type: string, description: "Renews an agent's bearer at POST /api/v1/auth/refresh; it rotates on every use." }
+        refreshToken: { type: string, description: "Renews the bearer at POST /api/v1/auth/refresh; it rotates on every use." }
         refreshExpiresAt: { type: string, format: date-time }
+        connection:
+          type: object
+          additionalProperties: false
+          required: [manifest]
+          properties:
+            endpoint: { $ref: "#/components/schemas/ConnectionEndpoint" }
+            manifest: { $ref: "#/components/schemas/ConnectionEndpointManifest" }
+    PairedWatchClaimed:
+      type: object
+      additionalProperties: false
+      description: "`?claim=true`: the Watch's invite, already claimed, with the same claim every client gets."
+      required: [invite, device, session, token, tokenType, refreshToken, refreshExpiresAt]
+      properties:
+        invite:
+          type: object
+          additionalProperties: false
+          required: [id, expiresAt, status]
+          properties:
+            id: { type: string }
+            expiresAt: { type: string, format: date-time }
+            status: { type: string, enum: [claimed] }
+        device: { $ref: "#/components/schemas/PairedClaim/properties/device" }
+        session: { $ref: "#/components/schemas/Session" }
+        token: { type: string, description: The Watch's one-hour bearer. }
+        tokenType: { type: string, enum: [Bearer] }
+        refreshToken: { type: string, description: "Renews the Watch's bearer at POST /api/v1/auth/refresh; it rotates on every use." }
+        refreshExpiresAt: { type: string, format: date-time }
+        connection: { $ref: "#/components/schemas/PairedClaim/properties/connection" }
     ConnectionEndpointManifest:
       type: object
       additionalProperties: false
@@ -2858,21 +2889,30 @@ components:
             Cloudflare Access. Send `CF-Access-Client-Id` and `CF-Access-Client-Secret` to that route
             only. A browser session never receives `edgeCredentials`.
         signature: { type: string, description: Base64url Ed25519 signature over signedPayload bytes. }
-    ConnectionDevice:
+    PairedDevice:
       type: object
       additionalProperties: false
-      required: [id, displayName, client, scope, enrolledAt, lastSeenAt, revokedAt, pairedVia, edgeTokens, sessions]
+      required: [id, displayName, client, scope, actsAs, parentDeviceId, enrolledAt, lastSeenAt, revokedAt, pairedVia, edgeTokens, sessions]
       properties:
         id: { type: string }
         displayName: { type: string }
         client: { type: string, enum: [phone, watch, agent] }
         scope: { $ref: "#/components/schemas/DeviceScope" }
+        actsAs:
+          type: [object, "null"]
+          description: The account this device acts as, named by its invite.
+          additionalProperties: false
+          required: [username, displayName]
+          properties:
+            username: { type: string }
+            displayName: { type: string }
+        parentDeviceId: { type: [string, "null"], description: "The device that vouched for this one: a Watch's phone." }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
         revokedAt: { type: [string, "null"], format: date-time }
         pairedVia:
           type: [object, "null"]
-          description: The route this device paired through; null for automatically enrolled Watches or if that route is deleted.
+          description: The route this device paired through; null for Watches and agents, or if that route is deleted.
           additionalProperties: false
           required: [endpointId, url, transport]
           properties:
@@ -2901,6 +2941,13 @@ components:
               client: { type: string, enum: [phone, watch, agent] }
               expiresAt: { type: string, format: date-time, description: "When this sign-in ends unless renewed: the refresh token's expiry." }
               createdAt: { type: string, format: date-time }
+    PairedDeviceUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        scope: { $ref: "#/components/schemas/DeviceScope" }
     ConnectionStatus:
       type: object
       additionalProperties: false

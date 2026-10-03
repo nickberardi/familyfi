@@ -546,6 +546,18 @@
         "database"
       ]
     },
+    "tests/integration/paired-invites.test.ts": {
+      "categories": [
+        "pairing",
+        "sessions"
+      ]
+    },
+    "tests/integration/paired-devices.test.ts": {
+      "categories": [
+        "pairing",
+        "devices"
+      ]
+    },
     "tests/integration/session-refresh.test.ts": {
       "categories": [
         "sessions",

@@ -17,10 +17,10 @@ The code is base64url JSON. Decode it to get `url` (where FamilyFi is) and `code
 python3 -c 'import base64,json,sys; s=sys.argv[1]; print(json.dumps(json.loads(base64.urlsafe_b64decode(s+"="*(-len(s)%4))), indent=2))' '<pairing code>'
 ```
 
-The `code` is `<pairingId>.<token>`. Claim it; you never need a password:
+The `code` is `<inviteId>.<token>`. Claim it; you never need a password:
 
 ```sh
-curl -sS -X POST "$url/api/v1/connection/pairings/<pairingId>/claim" -H 'content-type: application/json' \
+curl -sS -X POST "$url/api/v1/paired/invites/<inviteId>/claim" -H 'content-type: application/json' \
   -d '{"token":"<token>","deviceName":"<your name, e.g. Claude Code on a MacBook>"}'
 ```
 
@@ -116,6 +116,6 @@ or manage pairing, remote access or paired devices. These answer:
 | 401 | `unauthenticated` | Your bearer expired. Renew it with your refresh token (step 1). |
 | 403 | `invalid_refresh`, `refresh_reused` | From refresh: your access has ended. Ask for a new pairing code. |
 
-To disconnect yourself, `DELETE /api/v1/connection/devices/$FAMILYFI_DEVICE_ID`.
+To disconnect yourself, `DELETE /api/v1/paired/devices/$FAMILYFI_DEVICE_ID`.
 
 Background on FamilyFi: <https://github.com/nickberardi/familyfi>.

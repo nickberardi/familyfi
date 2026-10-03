@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { PairingState } from "@/lib/types";
 
-export type IssuedPairing = { id: string; expiresAt: string; pairingCode: string };
+export type IssuedPairing = { id: string; expiresAt: string; code: string };
 
 /**
- * A single-use pairing code on screen: make it, count it down, and poll until something claims it.
+ * A single-use invite code on screen: make it, count it down, and poll until something claims it.
  * Making a new code, or leaving, cancels one nobody claimed, so a code left on screen dies with it.
  */
 export function usePairingCode({ body, onClaimed }: { body: () => Record<string, unknown>; onClaimed: () => void }) {
@@ -30,10 +30,10 @@ export function usePairingCode({ body, onClaimed }: { body: () => Record<string,
   useEffect(() => {
     if (!issued || claimed || expired) return;
     const poll = setInterval(() => {
-      void api<{ pairing: PairingState }>(`/api/v1/connection/pairings/${issued.id}`)
-        .then(({ pairing }) => {
-          setState(pairing);
-          if (pairing.status === "claimed") {
+      void api<{ invite: PairingState }>(`/api/v1/paired/invites/${issued.id}`)
+        .then(({ invite }) => {
+          setState(invite);
+          if (invite.status === "claimed") {
             pending.current = null;
             onClaimed();
           }
@@ -45,7 +45,7 @@ export function usePairingCode({ body, onClaimed }: { body: () => Record<string,
 
   useEffect(
     () => () => {
-      if (pending.current) void api(`/api/v1/connection/pairings/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
+      if (pending.current) void api(`/api/v1/paired/invites/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
     },
     [],
   );
@@ -54,10 +54,10 @@ export function usePairingCode({ body, onClaimed }: { body: () => Record<string,
     setError("");
     setBusy(true);
     try {
-      if (pending.current) await api(`/api/v1/connection/pairings/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
-      const { pairing } = await api<{ pairing: IssuedPairing }>("/api/v1/connection/pairings", { method: "POST", body: JSON.stringify(body()) });
-      pending.current = pairing.id;
-      setIssued(pairing);
+      if (pending.current) await api(`/api/v1/paired/invites/${pending.current}`, { method: "DELETE" }).catch(() => undefined);
+      const { invite } = await api<{ invite: IssuedPairing }>("/api/v1/paired/invites", { method: "POST", body: JSON.stringify(body()) });
+      pending.current = invite.id;
+      setIssued(invite);
       setState(null);
       setNow(Date.now());
     } catch (caught) {

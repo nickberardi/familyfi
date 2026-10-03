@@ -36,9 +36,9 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. |
-| POST | `/api/v1/auth/login` | Cookie session, or a paired native device's one-hour bearer and refresh token |
+| POST | `/api/v1/auth/login` | Browser cookie session only; paired devices join by invite. Refused through remote access |
 | POST | `/api/v1/auth/refresh` | A paired device trades its refresh token for a new one-hour bearer and a new refresh token; reuse of a replaced one ends the sign-in |
-| POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for native |
+| POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for paired devices |
 | GET | `/api/v1/auth/session` | Current principal |
 | GET/POST | `/api/v1/accounts` | Personal adult accounts; recovery `admin` is listed and cannot be created here |
 | GET/PUT/DELETE | `/api/v1/accounts/{id}` | Recovery admin cannot be edited or deleted |
@@ -49,14 +49,13 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
-| POST | `/api/v1/connection/pairings` | Administrator creates a single-use pairing code: five minutes for a phone on a route, fifteen for an agent (`client: agent`, `scope`) at the address it was made from |
+| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone (`client: phone`, its route, the adult it signs in as; five minutes) or an agent (`client: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired phone invites and claims its Watch in one call |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
-| GET/DELETE | `/api/v1/connection/pairings/{id}` | Administrator reads a pairing's status (`pending`, `claimed`, `expired`) or cancels it early |
-| POST | `/api/v1/connection/pairings/{id}/claim` | Phone consumes a pairing and receives its device credential and signed endpoint manifest; an agent consumes an agent pairing and receives a bearer and refresh token instead |
-| GET | `/api/v1/connection/devices` | Administrator list of paired phones, Watches and agents with each one's `scope`, the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
-| POST | `/api/v1/connection/devices` | A signed-in paired iPhone automatically enrolls its reachable Watch (`client: "watch"`, `clientId`) as an independent device and receives its own credential and bearer for transfer |
-| DELETE | `/api/v1/connection/devices/{id}` | Administrator or the device itself revokes that device and its sessions. Only an administrator may use `?remove=true` to delete its record |
-| DELETE | `/api/v1/connection/devices?revoked=true` | Administrator removes every revoked phone's record; active phones are untouched |
+| GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
+| POST | `/api/v1/paired/invites/{id}/claim` | Join with the code: every client is signed in at once (bearer and refresh token, never a password or device credential); a phone also gets its route and signed manifest |
+| GET | `/api/v1/paired/devices` | Paired devices with each one's `scope`, the account it acts as (`actsAs`) and its parent: all of them for an administrator, itself and its Watch for a paired device; `?client=` and `?status=` narrow it; the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
+| GET/PATCH/DELETE | `/api/v1/paired/devices/{id}` | Read one; an administrator renames it or changes an agent's scope; an administrator, the device itself or its parent phone revokes it and its sessions. Only an administrator may use `?remove=true` to delete its record |
+| DELETE | `/api/v1/paired/devices?status=revoked` | Administrator removes every revoked device's record; active ones are untouched |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds` |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
@@ -119,7 +118,7 @@ Every route says whether Access guards it (`edgeAuth`: `none` or `serviceToken`)
 token's `edgeTokenVersion`, but never the token. A paired device's signed payload adds
 `edgeCredentials`: `[{ endpointId, version, clientId, clientSecret }]` for each enabled protected
 route; a browser session's manifest never carries it. Each time a device is handed a token, its
-version is recorded, and `GET /api/v1/connection/devices` reports it as `edgeTokens`, so Pair Device
+version is recorded, and `GET /api/v1/paired/devices` reports it as `edgeTokens`, so Pair Device
 can show who still holds an old one after a replacement. `version` rises each time the
 operator replaces the token; a phone replaces what it holds whenever a verified manifest carries a
 higher one. The phone gateway strips both headers before a request reaches the app.
@@ -141,22 +140,29 @@ rejects every other public key. FamilyFi does not distribute a household CA.
 
 Administrators do all of this from **System → Pair Device** in the web app. Administrator reads need only the session; writes also need the CSRF header.
 
-Pairing is separate from sign-in: an administrator generates a five-minute, single-use QR
-for an enabled endpoint; the phone claims it, verifies the instance identity, stores its
-device credential in Keychain, and then signs in normally with its household account.
-Native bearer sessions are tied to that paired phone. Revoking the phone invalidates every
-one of its bearer sessions and requires a new pairing.
+### Pairing
 
-A paired device's bearer lasts one hour. Sign-in (and a Watch enrollment) also returns a
-`refreshToken`, which the device trades at `POST /api/v1/auth/refresh` for a new bearer and a new
+Every paired device joins through `/paired/invites` and is managed through `/paired/devices`.
+Pairing is the authentication: an invite names the account the device acts as, and claiming it
+signs the device in, with no password and no device credential. An administrator invites a phone
+with a five-minute, single-use QR for an enabled route and chooses which adult it signs in as;
+the phone claims it, verifies the instance identity, and is signed in, with its route and signed
+manifest in the claim. Bearer sessions are tied to that paired phone. Revoking the phone
+invalidates every one of its sessions and requires a new invite. Sign-in with a password is for
+browsers only.
+
+A paired device's bearer lasts one hour. Its claim also returns a `refreshToken`, which the device trades at `POST /api/v1/auth/refresh` for a new bearer and a new
 refresh token, before or after the bearer expires. The refresh token lasts 90 days from its last
 use and is spent by each refresh: the one just replaced is honoured once within ten seconds, for a
 device that lost the response, and presenting it after that ends the whole sign-in
 (403 `refresh_reused`), because a copy exists. Both tokens live on one session, so revoking the
-device, signing out, a password change or removing the account ends them together.
-The iPhone may automatically enroll its reachable Watch without another administrator pairing.
-The Watch receives its own device credential and bearer token, appears as a separate device in
-System → Pair Device, and can be revoked there independently. Its scope is `rulesOnly`: its sessions may only read session,
+device, signing out, a password change or removing the account ends them together. Removing an
+account also removes the paired devices that act as it.
+The iPhone invites and claims its reachable Watch in one call (`POST /paired/invites?claim=true`),
+without an administrator: the Watch makes no network call to join, the phone hands it its bearer,
+refresh token and manifest, and the phone is recorded as its parent. The Watch acts as the phone's
+account, appears as a separate device in System → Pair Device, and can be revoked there, by itself
+or by its phone. Its scope is `rulesOnly`: its sessions may only read session,
 connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
 resume, extend, allow, disallow, turn on and turn off any rule, or lift one for a single group; role never limits a control. They cannot
 create, edit or delete rules. Signing out or revoking the phone does
@@ -172,8 +178,8 @@ minutes, and carries the address it was made at: it names no route, certificate 
 Access token.
 
 The agent never sends a password. It claims the code at
-`POST /api/v1/connection/pairings/{id}/claim`, like a phone, but is signed in at once: the claim
-returns a one-hour bearer and a refresh token, and no device credential. It renews at
+`POST /api/v1/paired/invites/{id}/claim`, like a phone: the claim returns a one-hour bearer and a
+refresh token, with no route, manifest or device credential. It renews at
 `POST /api/v1/auth/refresh` like any paired device, so the refresh token is its only long-lived
 secret: it rotates on every use and lapses after 90 days unused. It acts as the adult who made
 the pairing. Every adult login is an administrator in practice, so its scope, not that account,
@@ -181,8 +187,9 @@ bounds it: `agent:full` or `agent:readOnly`, never accounts, UniFi settings, res
 household-settings changes or connection management (403 `agent_scope`). It
 is refused through FamilyFi's remote access tunnel (403 `agent_remote`), at its claim, its refresh
 and every call; like browser sign-in, an
-address the household publishes itself is the household's choice. Agents are paired devices: they appear in `GET /connection/devices` with
-`client: agent` and are revoked like a phone, by an administrator or by themselves. The
+address the household publishes itself is the household's choice. Agents are paired devices: they appear in `GET /paired/devices` with
+`client: agent`, an administrator may change their scope, and they are revoked like a phone, by an
+administrator or by themselves. The
 [authorization matrix](../tests/integration/authorization-matrix.test.ts) names, for each route,
 which device scopes may call it.
 

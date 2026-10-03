@@ -16,7 +16,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
   const [name, setName] = useState("AI agent");
   const [scope, setScope] = useState<"full" | "readOnly">("full");
   const { issued, state, expired, claimed, remaining, error, busy, generate } = usePairingCode({
-    body: () => ({ client: "agent", deviceName: name.trim(), scope }),
+    body: () => ({ client: "agent", displayName: name.trim(), scope }),
     onClaimed: onConnected,
   });
 
@@ -92,7 +92,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
         </p>
       ) : (
         <>
-          <CopyRow label="Prompt" value={agentPrompt(window.location.origin, issued.pairingCode)} testId="agent-prompt" />
+          <CopyRow label="Prompt" value={agentPrompt(window.location.origin, issued.code)} testId="agent-prompt" />
           <p data-testid="agent-countdown" className="text-[14px] text-[var(--ff-muted)]">
             {expired ? "This code expired. Make a new one." : `The code works once and expires in ${countdown(remaining)}.`}
           </p>

@@ -4,14 +4,14 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as identity } from "@/app/api/v1/connection/identity/route";
 import { GET as listEndpoints, POST as createEndpoint } from "@/app/api/v1/connection/endpoints/route";
 import { PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
-import { GET as listDevices } from "@/app/api/v1/connection/devices/route";
-import { POST as createPairing } from "@/app/api/v1/connection/pairings/route";
-import { POST as claimPairing } from "@/app/api/v1/connection/pairings/[id]/claim/route";
+import { GET as listDevices } from "@/app/api/v1/paired/devices/route";
+import { POST as createPairing } from "@/app/api/v1/paired/invites/route";
+import { POST as claimPairing } from "@/app/api/v1/paired/invites/[id]/claim/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
 import { PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
-import { issuedPairing } from "../helpers/pairing";
+import { issuedInvite as issuedPairing } from "../helpers/pairing";
 import { resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -54,22 +54,17 @@ async function protectedRoute(auth: SessionAuth) {
 }
 
 async function pairPhone(auth: SessionAuth, endpointId: string, name: string) {
-  const issued = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId, deviceName: name })));
+  const issued = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId, displayName: name })));
   const pairing = await issuedPairing(issued);
   const claim = await claimPairing(
-    request(`/api/v1/connection/pairings/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: name }) }),
+    request(`/api/v1/paired/invites/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: name }) }),
     params(pairing.id),
   );
   expect(claim.status).toBe(200);
-  const claimed = (await claim.json()) as { device: { id: string }; deviceCredential: string; manifest: Manifest };
-  const signIn = await login(
-    request("/api/v1/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "admin", password: PASSWORD, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential }),
-    }),
-  );
-  const bearer: SessionAuth = { cookie: "", csrf: "", token: ((await signIn.json()) as { token: string }).token };
+  const body = (await claim.json()) as { device: { id: string }; token: string; connection: { manifest: Manifest } };
+  // Pairing signs the phone in: its bearer comes with the claim.
+  const claimed = { device: body.device, manifest: body.connection.manifest };
+  const bearer: SessionAuth = { cookie: "", csrf: "", token: body.token };
   return { payload: pairing.payload, claimed, bearer };
 }
 
@@ -95,7 +90,7 @@ async function route(auth: SessionAuth, id: string) {
 
 /** The token version each device was last handed for a route, by device name. */
 async function held(auth: SessionAuth, endpointId: string) {
-  const listed = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as {
+  const listed = (await (await listDevices(request("/api/v1/paired/devices", { auth }))).json()) as {
     devices: { displayName: string; edgeTokens: { endpointId: string; version: number }[] }[];
   };
   return Object.fromEntries(listed.devices.map((device) => [device.displayName, device.edgeTokens.find((token) => token.endpointId === endpointId)?.version ?? null]));
@@ -207,7 +202,7 @@ describe("Cloudflare Access service tokens", () => {
     const picked = await manifestFor(kitchen.bearer);
     expect(picked.payload.edgeCredentials).toEqual([{ endpointId: id, version: 2, ...ROTATED }]);
     expect(await held(auth, id)).toEqual({ "Kitchen iPhone": 2, "Bedroom iPhone": 1 });
-    const devices = JSON.stringify(await (await listDevices(request("/api/v1/connection/devices", { auth }))).json());
+    const devices = JSON.stringify(await (await listDevices(request("/api/v1/paired/devices", { auth }))).json());
     expect(devices).not.toContain(ROTATED.clientSecret);
   });
 
@@ -246,10 +241,10 @@ describe("Cloudflare Access service tokens", () => {
   it("never hands the token to an agent, in its pairing code or its claim", async () => {
     const auth = await adminAuth();
     await protectedRoute(auth);
-    const pairing = await issuedPairing(await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { client: "agent", deviceName: "Agent", scope: "full" }))));
+    const pairing = await issuedPairing(await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "agent", displayName: "Agent", scope: "full" }))));
     expect(pairing.payload).not.toHaveProperty("access");
     const claim = await claimPairing(
-      request(`/api/v1/connection/pairings/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: "Agent" }) }),
+      request(`/api/v1/paired/invites/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: "Agent" }) }),
       params(pairing.id),
     );
     expect(claim.status).toBe(200);

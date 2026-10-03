@@ -3,11 +3,11 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as identity } from "@/app/api/v1/connection/identity/route";
 import { GET as listEndpoints, POST as createEndpoint } from "@/app/api/v1/connection/endpoints/route";
 import { DELETE as deleteEndpoint, PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
-import { POST as createPairing } from "@/app/api/v1/connection/pairings/route";
-import { DELETE as cancelPairing, GET as pairingStatus } from "@/app/api/v1/connection/pairings/[id]/route";
-import { DELETE as removeRevoked, GET as listDevices } from "@/app/api/v1/connection/devices/route";
-import { POST as claimPairing } from "@/app/api/v1/connection/pairings/[id]/claim/route";
-import { DELETE as revokeDevice } from "@/app/api/v1/connection/devices/[id]/route";
+import { POST as createPairing } from "@/app/api/v1/paired/invites/route";
+import { DELETE as cancelPairing, GET as pairingStatus } from "@/app/api/v1/paired/invites/[id]/route";
+import { DELETE as removeRevoked, GET as listDevices } from "@/app/api/v1/paired/devices/route";
+import { POST as claimPairing } from "@/app/api/v1/paired/invites/[id]/claim/route";
+import { DELETE as revokeDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -20,7 +20,7 @@ import { TUNNEL_HEADER } from "@/lib/constants";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
-import { issuedPairing } from "../helpers/pairing";
+import { issuedInvite as issuedPairing } from "../helpers/pairing";
 import { resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -52,7 +52,7 @@ describe("companion connection API", () => {
     expect((await second.json()) as { instanceId: string }).toMatchObject({ instanceId: body.instanceId });
   });
 
-  it("requires an administrator, uses a pairing once, binds login, and revokes all phone sessions", async () => {
+  it("requires an administrator, uses an invite once, signs the phone in, and revokes all its sessions", async () => {
     const unauthenticated = await createEndpoint(
       request("/api/v1/connection/endpoints", {
         method: "POST",
@@ -73,9 +73,9 @@ describe("companion connection API", () => {
     const endpoint = (await endpointResponse.json()) as { endpoint: { id: string } };
 
     const pairingResponse = await createPairing(
-      request("/api/v1/connection/pairings", {
+      request("/api/v1/paired/invites", {
         method: "POST", auth, headers: { "content-type": "application/json" },
-        body: JSON.stringify({ endpointId: endpoint.endpoint.id, deviceName: "Kitchen iPhone" }),
+        body: JSON.stringify({ client: "phone", endpointId: endpoint.endpoint.id, displayName: "Kitchen iPhone" }),
       }),
     );
     expect(pairingResponse.status).toBe(201);
@@ -92,19 +92,23 @@ describe("companion connection API", () => {
     });
 
     const claim = await claimPairing(
-      request(`/api/v1/connection/pairings/${pairing.pairing.id}/claim`, {
+      request(`/api/v1/paired/invites/${pairing.pairing.id}/claim`, {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ token: pairing.pairing.token, deviceName: "Nick's iPhone" }),
       }),
       { params: Promise.resolve({ id: pairing.pairing.id }) },
     );
     expect(claim.status).toBe(200);
-    const claimed = (await claim.json()) as { device: { id: string }; deviceCredential: string; manifest: { signature: string } };
-    expect(claimed.deviceCredential).toBeTruthy();
-    expect(claimed.manifest.signature).toBeTruthy();
+    const claimed = (await claim.json()) as { device: { id: string; client: string; scope: string }; token: string; session: { username: string }; connection: { endpoint: { url: string }; manifest: { signature: string } } };
+    // Pairing is the sign-in: no password, no device credential.
+    expect(claimed).not.toHaveProperty("deviceCredential");
+    expect(claimed.device).toMatchObject({ client: "phone", scope: "full" });
+    expect(claimed.session.username).toBe("admin");
+    expect(claimed.connection.endpoint.url).toBe("https://familyfi.local");
+    expect(claimed.connection.manifest.signature).toBeTruthy();
 
     const repeatClaim = await claimPairing(
-      request(`/api/v1/connection/pairings/${pairing.pairing.id}/claim`, {
+      request(`/api/v1/paired/invites/${pairing.pairing.id}/claim`, {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ token: pairing.pairing.token, deviceName: "Another phone" }),
       }),
@@ -112,18 +116,10 @@ describe("companion connection API", () => {
     );
     expect(repeatClaim.status).toBe(403);
 
-    const nativeLogin = await login(
-      request("/api/v1/auth/login", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username: "admin", password: PASSWORD, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential }),
-      }),
-    );
-    const nativeBody = (await nativeLogin.json()) as { token: string };
-    expect(nativeLogin.status).toBe(200);
-    const bearer = { cookie: "", csrf: "", token: nativeBody.token };
+    const bearer = { cookie: "", csrf: "", token: claimed.token };
     expect((await connection(request("/api/v1/connection", { auth: bearer }))).status).toBe(200);
 
-    const revoked = await revokeDevice(request(`/api/v1/connection/devices/${claimed.device.id}`, { method: "DELETE", auth }), {
+    const revoked = await revokeDevice(request(`/api/v1/paired/devices/${claimed.device.id}`, { method: "DELETE", auth }), {
       params: Promise.resolve({ id: claimed.device.id }),
     });
     expect(revoked.status).toBe(200);
@@ -144,13 +140,13 @@ async function addRoute(auth: SessionAuth, url = "https://familyfi.home:8443") {
 }
 
 async function issuePairing(auth: SessionAuth, endpointId: string) {
-  const response = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId, deviceName: "Kitchen iPhone" })));
+  const response = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId, displayName: "Kitchen iPhone" })));
   return issuedPairing(response);
 }
 
 async function claim(id: string, token: string) {
   return claimPairing(
-    request(`/api/v1/connection/pairings/${id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, deviceName: "Nick's iPhone" }) }),
+    request(`/api/v1/paired/invites/${id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, deviceName: "Nick's iPhone" }) }),
     params(id),
   );
 }
@@ -164,7 +160,7 @@ describe("companion admin surface", () => {
     const auth = await adminAuth();
     const noCsrf = { cookie: auth.cookie, csrf: "" };
     expect((await listEndpoints(request("/api/v1/connection/endpoints", { auth: noCsrf }))).status).toBe(200);
-    expect((await listDevices(request("/api/v1/connection/devices", { auth: noCsrf }))).status).toBe(200);
+    expect((await listDevices(request("/api/v1/paired/devices", { auth: noCsrf }))).status).toBe(200);
     const write = await createEndpoint(request("/api/v1/connection/endpoints", json(noCsrf, "POST", { url: "https://a.home", transport: "lan", trustMode: "system" })));
     expect(write.status).toBe(403);
   });
@@ -195,15 +191,15 @@ describe("companion admin surface", () => {
     const route = (await addRoute(auth)).body.endpoint.id;
     const pairing = await issuePairing(auth, route);
 
-    const status = await pairingStatus(request(`/api/v1/connection/pairings/${pairing.id}`, { auth }), params(pairing.id));
-    expect(((await status.json()) as { pairing: { status: string } }).pairing.status).toBe("pending");
+    const status = await pairingStatus(request(`/api/v1/paired/invites/${pairing.id}`, { auth }), params(pairing.id));
+    expect(((await status.json()) as { invite: { status: string } }).invite.status).toBe("pending");
 
     const blocked = await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route));
     expect(blocked.status).toBe(409);
     expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe("endpoint_in_use");
 
-    expect((await cancelPairing(request(`/api/v1/connection/pairings/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(200);
-    expect((await cancelPairing(request(`/api/v1/connection/pairings/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(404);
+    expect((await cancelPairing(request(`/api/v1/paired/invites/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(200);
+    expect((await cancelPairing(request(`/api/v1/paired/invites/${pairing.id}`, json(auth, "DELETE")), params(pairing.id))).status).toBe(404);
     expect((await claim(pairing.id, pairing.token)).status).toBe(403);
 
     expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
@@ -216,15 +212,15 @@ describe("companion admin surface", () => {
     const pairing = await issuePairing(auth, route);
     expect((await claim(pairing.id, pairing.token)).status).toBe(200);
 
-    const status = await pairingStatus(request(`/api/v1/connection/pairings/${pairing.id}`, { auth }), params(pairing.id));
-    expect(((await status.json()) as { pairing: { status: string; device: { displayName: string } } }).pairing).toMatchObject({ status: "claimed", device: { displayName: "Nick's iPhone" } });
+    const status = await pairingStatus(request(`/api/v1/paired/invites/${pairing.id}`, { auth }), params(pairing.id));
+    expect(((await status.json()) as { invite: { status: string; device: { displayName: string } } }).invite).toMatchObject({ status: "claimed", device: { displayName: "Nick's iPhone" } });
 
     type Devices = { devices: { pairedVia: { endpointId: string; url: string; transport: string } | null }[] };
-    const before = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as Devices;
+    const before = (await (await listDevices(request("/api/v1/paired/devices", { auth }))).json()) as Devices;
     expect(before.devices[0].pairedVia).toEqual({ endpointId: route, url: "https://familyfi.home:8443", transport: "lan" });
 
     expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
-    const after = (await (await listDevices(request("/api/v1/connection/devices", { auth }))).json()) as Devices;
+    const after = (await (await listDevices(request("/api/v1/paired/devices", { auth }))).json()) as Devices;
     expect(after.devices[0].pairedVia).toBeNull();
   });
 });
@@ -351,22 +347,20 @@ describe("remote access", () => {
     return login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json", [TUNNEL_HEADER]: "tunnel" }, body: JSON.stringify({ username: "admin", password: PASSWORD, ...body }) }));
   }
 
-  it("keeps browser sign-in off the tunnel and checks the phone before the password", async () => {
-    const browser = await tunnelLogin({ client: "browser" });
+  it("keeps sign-in off the tunnel, where a phone joins by its invite instead", async () => {
+    const browser = await tunnelLogin({ client: "browser", password: "wrong-guess" });
     expect(browser.status).toBe(403);
     expect(((await browser.json()) as { error: { code: string } }).error.code).toBe("remote_browser_login");
-
-    const unpaired = await tunnelLogin({ client: "native", password: "wrong-guess", deviceId: "nope", deviceCredential: "nope" });
-    expect(unpaired.status).toBe(403);
-    expect(((await unpaired.json()) as { error: { code: string } }).error.code).toBe("device_not_paired");
     // The password was never checked, so the internet learns nothing and burns no attempt.
     expect(await prisma().loginAttempt.count()).toBe(0);
 
     const auth = await adminAuth();
     const route = (await addRoute(auth)).body.endpoint.id;
     const pairing = await issuePairing(auth, route);
-    const claimed = (await (await claim(pairing.id, pairing.token)).json()) as { device: { id: string }; deviceCredential: string };
-    const phone = await tunnelLogin({ client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential });
+    const phone = await claimPairing(
+      request(`/api/v1/paired/invites/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json", [TUNNEL_HEADER]: "tunnel" }, body: JSON.stringify({ token: pairing.token, deviceName: "Nick's iPhone" }) }),
+      params(pairing.id),
+    );
     expect(phone.status).toBe(200);
     expect(((await phone.json()) as { tokenType: string }).tokenType).toBe("Bearer");
   });
@@ -390,16 +384,14 @@ describe("removing and re-pairing phones", () => {
   });
 
   async function pairPhone(auth: SessionAuth, route: string, body: Record<string, unknown> = {}) {
-    const response = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId: route, deviceName: "Kitchen iPhone", ...body })));
+    const response = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId: route, displayName: "Kitchen iPhone", ...body })));
     const pairing = await issuedPairing(response);
-    const claimed = (await (await claim(pairing.id, pairing.token)).json()) as { device: { id: string }; deviceCredential: string };
-    const native = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "native", deviceId: claimed.device.id, deviceCredential: claimed.deviceCredential }) }));
-    const { token } = (await native.json()) as { token: string };
-    return { id: claimed.device.id, bearer: { cookie: "", csrf: "", token } };
+    const claimed = (await (await claim(pairing.id, pairing.token)).json()) as { device: { id: string }; token: string };
+    return { id: claimed.device.id, bearer: { cookie: "", csrf: "", token: claimed.token } };
   }
 
   const revoke = (auth: SessionAuth, id: string, query = "") =>
-    revokeDevice(request(`/api/v1/connection/devices/${id}${query}`, { method: "DELETE", auth }), { params: Promise.resolve({ id }) });
+    revokeDevice(request(`/api/v1/paired/devices/${id}${query}`, { method: "DELETE", auth }), { params: Promise.resolve({ id }) });
 
   it("removes one phone for good, signing it out even if it was still active", async () => {
     const auth = await adminAuth();
@@ -420,8 +412,8 @@ describe("removing and re-pairing phones", () => {
     await revoke(auth, a.id);
     await revoke(auth, b.id);
 
-    expect((await removeRevoked(request("/api/v1/connection/devices", { method: "DELETE", auth }))).status).toBe(400);
-    const removed = await removeRevoked(request("/api/v1/connection/devices?revoked=true", { method: "DELETE", auth }));
+    expect((await removeRevoked(request("/api/v1/paired/devices", { method: "DELETE", auth }))).status).toBe(400);
+    const removed = await removeRevoked(request("/api/v1/paired/devices?status=revoked", { method: "DELETE", auth }));
     expect(await removed.json()).toEqual({ removed: 2 });
     expect((await prisma().pairedDevice.findMany()).map((device) => device.id)).toEqual([keep.id]);
     expect((await connection(request("/api/v1/connection", { auth: keep.bearer }))).status).toBe(200);
@@ -433,7 +425,7 @@ describe("removing and re-pairing phones", () => {
     const old = await pairPhone(auth, route);
     await revoke(auth, old.id);
 
-    const unknown = await createPairing(request("/api/v1/connection/pairings", json(auth, "POST", { endpointId: route, deviceName: "x", replacesDeviceId: "missing" })));
+    const unknown = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId: route, displayName: "x", replacesDeviceId: "missing" })));
     expect(unknown.status).toBe(404);
 
     const fresh = await pairPhone(auth, route, { replacesDeviceId: old.id });

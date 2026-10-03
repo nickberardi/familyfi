@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { countdown, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, PairedPhone } from "@/lib/types";
 import { CopyRow } from "@/components/ui/CopyRow";
 import { QrCode } from "@/components/ui/QrCode";
+import { useAppData } from "@/components/AppDataProvider";
 import { usePairingCode } from "./pairing-code-session";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "./SheetFrame";
 
@@ -26,9 +27,18 @@ export function PairPhoneSheet({
   onClose: () => void;
   onPaired: () => void;
 }) {
+  const { accounts, session } = useAppData();
   const [name, setName] = useState(replacing?.displayName ?? "iPhone");
+  // Pairing signs the phone in: it acts as this adult, the person signed in here unless chosen otherwise.
+  const defaultAccount = accounts.find((account) => account.username === session?.username)?.id ?? accounts[0]?.id ?? "";
+  const [accountId, setAccountId] = useState(defaultAccount);
+  // The sheet can open before the household's accounts have loaded; pick the default once they arrive.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fill an unset choice once the data arrives
+    if (!accountId && defaultAccount) setAccountId(defaultAccount);
+  }, [accountId, defaultAccount]);
   const { issued, state, expired, claimed, remaining, error, busy, generate } = usePairingCode({
-    body: () => ({ endpointId: route.id, deviceName: name.trim(), ...(replacing ? { replacesDeviceId: replacing.id } : {}) }),
+    body: () => ({ client: "phone", endpointId: route.id, displayName: name.trim(), accountId, ...(replacing ? { replacesDeviceId: replacing.id } : {}) }),
     onClaimed: onPaired,
   });
 
@@ -39,7 +49,7 @@ export function PairPhoneSheet({
         sub={
           replacing
             ? "Makes a new single-use code for this phone. Once the phone uses it, its old entry is removed from the list."
-            : "Makes a single-use code that lets one phone join this household. It expires in five minutes and does not sign anyone in."
+            : "Makes a single-use code that pairs one phone and signs it in as the adult you choose. It expires in five minutes."
         }
         onClose={onClose}
         footer={
@@ -47,7 +57,7 @@ export function PairPhoneSheet({
             <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>
               Cancel
             </button>
-            <button type="button" className={PRIMARY_BUTTON} disabled={busy || !name.trim()} onClick={() => void generate()}>
+            <button type="button" className={PRIMARY_BUTTON} disabled={busy || !name.trim() || !accountId} onClick={() => void generate()}>
               Show pairing code
             </button>
           </>
@@ -64,6 +74,16 @@ export function PairPhoneSheet({
           Phone
           <input className={FIELD} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
         </label>
+        <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
+          Signs in as
+          <select data-testid="pairing-account" className={FIELD} value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
         {error ? (
           <p role="alert" className="text-[14px] font-semibold text-[var(--ff-danger)]">
             {error}
@@ -78,7 +98,7 @@ export function PairPhoneSheet({
       title={claimed ? "Phone paired" : "Scan with the FamilyFi app"}
       sub={
         claimed
-          ? `${state?.device?.displayName ?? "The phone"} is paired${replacing ? " and its old entry is gone" : ""}. Sign in on the phone to finish.`
+          ? `${state?.device?.displayName ?? "The phone"} is paired and signed in${replacing ? "; its old entry is gone" : ""}.`
           : "Open FamilyFi on the phone and scan the QR, or copy the pairing code and paste it in the app. Then confirm the household it shows."
       }
       onClose={onClose}
@@ -106,7 +126,7 @@ export function PairPhoneSheet({
       ) : (
         <>
           <div className="relative mx-auto">
-            <QrCode value={issued.pairingCode} label="Pairing QR code" />
+            <QrCode value={issued.code} label="Pairing QR code" />
             {expired ? (
               <div className="absolute inset-0 flex items-center justify-center bg-[var(--ff-card-veil)] text-[17px] font-bold">Expired</div>
             ) : null}
@@ -114,7 +134,7 @@ export function PairPhoneSheet({
           <p data-testid="pairing-countdown" className="text-center text-[14px] text-[var(--ff-muted)]">
             {expired ? "This code expired. Make a new one." : `Expires in ${countdown(remaining)}`}
           </p>
-          <CopyRow label="Pairing code" value={issued.pairingCode} testId="pairing-code" />
+          <CopyRow label="Pairing code" value={issued.code} testId="pairing-code" />
         </>
       )}
       {error ? (

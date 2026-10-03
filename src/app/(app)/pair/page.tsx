@@ -31,12 +31,11 @@ export default function PairDevicePage() {
       const [state, endpoints, devices] = await Promise.all([
         api<{ tunnel: RemoteAccess }>("/api/v1/connection/tunnel"),
         api<{ endpoints: ConnectionRoute[] }>("/api/v1/connection/endpoints"),
-        api<{ devices: PairedPhone[] }>("/api/v1/connection/devices"),
+        api<{ devices: PairedPhone[] }>("/api/v1/paired/devices"),
       ]);
       setTunnel(state.tunnel);
       setRoutes(endpoints.endpoints);
-      // Agents are paired devices too, managed on the API page.
-      setPhones(devices.devices.filter((device) => device.client !== "agent"));
+      setPhones(devices.devices);
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === "administrator_required") setForbidden(true);
       else setError(caught instanceof Error ? caught.message : "Could not load remote access.");
@@ -65,6 +64,8 @@ export default function PairDevicePage() {
   const active = phones.filter((phone) => !phone.revokedAt);
   const revoked = phones.filter((phone) => phone.revokedAt);
   const pairedThrough = (id: string) => active.filter((phone) => phone.pairedVia?.endpointId === id).length;
+  // Agents are home-network only and never hold an Access token, so remote access counts phones and Watches.
+  const remote = phones.filter((device) => device.client !== "agent");
   // Phones pair through the one published route, once it is live.
   const published = routes?.find((route) => route.id === tunnel?.endpointId && route.enabled) ?? null;
   const canPair = published !== null;
@@ -90,16 +91,16 @@ export default function PairDevicePage() {
           </p>
         ) : null}
 
-        <RemoteAccessCard tunnel={tunnel} routes={routes} phones={phones} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
+        <RemoteAccessCard tunnel={tunnel} routes={routes} phones={remote} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
 
         <section className={CARD}>
           <div className={CARD_HEAD}>
             <span className="text-[14px] font-semibold">Paired devices</span>
-            <span className="text-[14px] text-[var(--ff-muted)]">Revoke a lost phone or Watch independently</span>
+            <span className="text-[14px] text-[var(--ff-muted)]">Phones, Watches and agents; revoke any of them on its own</span>
           </div>
           {active.length === 0 ? (
             <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
-              {canPair ? "No phones yet. Use Pair a phone to add one." : "Turn on remote access, then pair a phone."}
+              {canPair ? "No paired devices yet. Use Pair a phone to add one, or connect an agent from the API page." : "Turn on remote access, then pair a phone. Agents connect from the API page."}
             </p>
           ) : (
             (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (
@@ -108,7 +109,7 @@ export default function PairDevicePage() {
                 phone={phone}
                 onRevoke={() => {
                   if (!window.confirm(`Revoke ${phone.displayName}? It is signed out now and must be paired again.`)) return;
-                  void run(() => api(`/api/v1/connection/devices/${phone.id}`, { method: "DELETE" }));
+                  void run(() => api(`/api/v1/paired/devices/${phone.id}`, { method: "DELETE" }));
                 }}
               />
             ))
@@ -148,7 +149,7 @@ export default function PairDevicePage() {
                       }
                       onRemove={() => {
                         if (!window.confirm(`Remove ${phone.displayName} from the list? This can't be undone; setup would be needed again.`)) return;
-                        void run(() => api(`/api/v1/connection/devices/${phone.id}?remove=true`, { method: "DELETE" }));
+                        void run(() => api(`/api/v1/paired/devices/${phone.id}?remove=true`, { method: "DELETE" }));
                       }}
                     />
                   ))}
@@ -158,7 +159,7 @@ export default function PairDevicePage() {
                       className="text-[14px] font-semibold text-[var(--ff-danger)]"
                       onClick={() => {
                         if (!window.confirm(`Remove all ${revoked.length} revoked devices from the list? This can't be undone.`)) return;
-                        void run(() => api("/api/v1/connection/devices?revoked=true", { method: "DELETE" }));
+                        void run(() => api("/api/v1/paired/devices?status=revoked", { method: "DELETE" }));
                       }}
                     >
                       Remove all revoked

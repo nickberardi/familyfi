@@ -9,33 +9,25 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { POST as logout } from "@/app/api/v1/auth/logout/route";
 import { POST as refresh } from "@/app/api/v1/auth/refresh/route";
 import { GET as currentSession } from "@/app/api/v1/auth/session/route";
-import { DELETE as revokeDevice } from "@/app/api/v1/connection/devices/[id]/route";
-import { GET as listDevices, POST as enroll } from "@/app/api/v1/connection/devices/route";
-import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { DELETE as revokeDevice } from "@/app/api/v1/paired/devices/[id]/route";
+import { GET as listDevices } from "@/app/api/v1/paired/devices/route";
+import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
+import { bearer, claimWatchRequest, pairPhone } from "../helpers/pairing";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
-const CREDENTIAL = "refresh-test-phone-credential";
 const json = { "content-type": "application/json" };
 
 type Pair = { token: string; refreshToken: string; refreshExpiresAt: string; session: { expiresAt: string } };
 
-function bearer(token: string): SessionAuth {
-  return { cookie: "", csrf: "", token };
+function adminAuth() {
+  return login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }) })).then((response) => authFromLogin(response));
 }
 
-async function phone() {
-  return prisma().pairedDevice.create({ data: { displayName: "Test phone", credentialHash: sha256(CREDENTIAL) } });
-}
-
+/** A phone joined by an invite: pairing signs it in, with no password. */
 async function phoneLogin(): Promise<Pair & { deviceId: string }> {
-  const device = await phone();
-  const response = await login(request("/api/v1/auth/login", {
-    method: "POST", headers: json,
-    body: JSON.stringify({ username: "admin", password: PASSWORD, client: "native", deviceId: device.id, deviceCredential: CREDENTIAL }),
-  }));
-  expect(response.status).toBe(200);
-  return { ...((await response.json()) as Pair), deviceId: device.id };
+  const claim = await pairPhone(await adminAuth());
+  return { ...claim, deviceId: claim.device.id };
 }
 
 function refreshWith(refreshToken: string, headers: Record<string, string> = {}) {
@@ -68,7 +60,7 @@ describe("refresh tokens for paired devices", () => {
     await resetDatabase();
   });
 
-  it("gives a native sign-in a one-hour bearer and a 90-day refresh token; a browser gets neither", async () => {
+  it("gives a paired phone a one-hour bearer and a 90-day refresh token; a browser gets neither", async () => {
     const pair = await phoneLogin();
     const accessLeft = new Date(pair.session.expiresAt).getTime() - Date.now();
     expect(accessLeft).toBeGreaterThan(ACCESS_TOKEN_TTL_MS - 60_000);
@@ -76,17 +68,15 @@ describe("refresh tokens for paired devices", () => {
     expect(new Date(pair.refreshExpiresAt).getTime() - Date.now()).toBeGreaterThan(REFRESH_TOKEN_TTL_MS - 60_000);
 
     const browser = await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }) }));
+    expect(browser.status).toBe(200);
     expect(await browser.json()).not.toHaveProperty("refreshToken");
     const cookie = await prisma().session.findFirstOrThrow({ where: { kind: SessionKind.cookie } });
     expect(cookie.refreshTokenHash).toBeNull();
   });
 
-  it("gives an enrolled Watch its own refresh token", async () => {
+  it("gives a Watch its phone claimed its own refresh token", async () => {
     const pair = await phoneLogin();
-    const response = await enroll(request("/api/v1/connection/devices", {
-      method: "POST", auth: bearer(pair.token), headers: json,
-      body: JSON.stringify({ client: "watch", clientId: "4a5f0d3e-0c1d-4f0a-9a54-1d3b2d6c9f10" }),
-    }));
+    const response = await claimWatchRequest(bearer(pair.token));
     expect(response.status).toBe(201);
     const watch = (await response.json()) as { token: string; refreshToken: string };
     const renewed = await refreshed(watch.refreshToken);
@@ -149,7 +139,7 @@ describe("refresh tokens for paired devices", () => {
 
   it("ends refresh when the device is revoked, on sign-out, and on a password change", async () => {
     const revoked = await phoneLogin();
-    const response = await revokeDevice(request(`/api/v1/connection/devices/${revoked.deviceId}`, { method: "DELETE", auth: bearer(revoked.token) }), { params: Promise.resolve({ id: revoked.deviceId }) });
+    const response = await revokeDevice(request(`/api/v1/paired/devices/${revoked.deviceId}`, { method: "DELETE", auth: bearer(revoked.token) }), { params: Promise.resolve({ id: revoked.deviceId }) });
     expect(response.status).toBe(200);
     expect((await refreshWith(revoked.refreshToken)).status).toBe(403);
 
@@ -200,8 +190,8 @@ describe("refresh tokens for paired devices", () => {
   it("lists a paired device's sign-in until its refresh token ends, not its bearer", async () => {
     const pair = await phoneLogin();
     await prisma().session.updateMany({ where: { refreshTokenHash: sha256(pair.refreshToken) }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    const admin = authFromLogin(await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }) })));
-    const { devices } = (await (await listDevices(request("/api/v1/connection/devices", { auth: admin }))).json()) as { devices: { id: string; sessions: { expiresAt: string }[] }[] };
+    const admin = await adminAuth();
+    const { devices } = (await (await listDevices(request("/api/v1/paired/devices", { auth: admin }))).json()) as { devices: { id: string; sessions: { expiresAt: string }[] }[] };
     const listed = devices.find((device) => device.id === pair.deviceId)!;
     expect(listed.sessions).toHaveLength(1);
     expect(listed.sessions[0].expiresAt).toBe(pair.refreshExpiresAt);

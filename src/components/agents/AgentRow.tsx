@@ -12,7 +12,7 @@ import { Icon } from "@/components/ui/Icon";
  */
 export function AgentRow({ agent, onRevoke }: { agent: PairedPhone; onRevoke: () => void }) {
   const seen = agent.lastSeenAt ? relativeSweep(agent.lastSeenAt) : "never";
-  const actsAs = agent.sessions[0]?.username;
+  const actsAs = agent.actsAs?.displayName;
   const expired = agent.sessions.length === 0;
   return (
     <div data-testid="agent-row" className="flex flex-wrap items-center gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-3 first:border-t-0">

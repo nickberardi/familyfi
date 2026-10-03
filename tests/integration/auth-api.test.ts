@@ -8,7 +8,6 @@ import { DELETE as deleteAccount, PUT as updateAccount } from "@/app/api/v1/acco
 import { PUT as setPassword } from "@/app/api/v1/accounts/[id]/password/route";
 import { GET as getHealth } from "@/app/api/v1/health/route";
 import { hashPassword } from "@/server/auth";
-import { sha256 } from "@/server/crypto";
 import { prisma } from "@/server/db";
 import { publicAccount } from "@/server/accounts";
 import { refreshUpdateCheck } from "@/server/update-check";
@@ -16,6 +15,7 @@ import { APP_VERSION } from "@/lib/version";
 import { CSRF_HEADER } from "@/lib/constants";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
+import { bearer, pairPhone } from "../helpers/pairing";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
@@ -30,22 +30,11 @@ async function browserLogin(username = "admin", password = PASSWORD) {
   return { response, auth: response.ok ? authFromLogin(response) : null };
 }
 
-async function nativeLogin(username = "admin", password = PASSWORD) {
-  const deviceCredential = "test-paired-device-credential";
-  const device = await prisma().pairedDevice.upsert({
-    where: { credentialHash: sha256(deviceCredential) },
-    update: { revokedAt: null },
-    create: { displayName: "Test phone", credentialHash: sha256(deviceCredential) },
-  });
-  const response = await login(
-    request("/api/v1/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, password, client: "native", deviceId: device.id, deviceCredential }),
-    }),
-  );
-  const body = (await response.clone().json()) as { token?: string };
-  return { response, auth: response.ok && body.token ? authFromLogin(response, body.token) : null, token: body.token };
+/** A paired phone's bearer: pairing signs it in, as the adult its invite names. */
+async function pairedPhoneLogin() {
+  const { auth: admin } = await browserLogin();
+  const claim = await pairPhone(admin!);
+  return { auth: bearer(claim.token) };
 }
 
 describe("auth and accounts API", () => {
@@ -116,7 +105,7 @@ describe("auth and accounts API", () => {
     );
     expect(noCsrf.status).toBe(403);
 
-    const { auth: native } = await nativeLogin();
+    const { auth: native } = await pairedPhoneLogin();
     const listed = await listAccounts(request("/api/v1/accounts", { auth: native! }));
     expect(listed.status).toBe(200);
     const accounts = (await listed.json()) as { accounts: ReturnType<typeof publicAccount>[] };
@@ -124,8 +113,13 @@ describe("auth and accounts API", () => {
     expect(JSON.stringify(accounts)).not.toContain("passwordHash");
   });
 
-  it("issues a native bearer token and revokes it on logout", async () => {
-    const { auth } = await nativeLogin();
+  it("refuses a phone's password sign-in: phones join by pairing", async () => {
+    const refused = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "native" }) }));
+    expect(refused.status).toBe(400);
+  });
+
+  it("revokes a paired phone's bearer on logout", async () => {
+    const { auth } = await pairedPhoneLogin();
     const out = await logout(request("/api/v1/auth/logout", { method: "POST", auth: auth! }));
     expect(out.status).toBe(200);
     const me = await session(request("/api/v1/auth/session", { auth: auth! }));
