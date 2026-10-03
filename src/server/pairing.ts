@@ -156,14 +156,16 @@ export async function claimInvite(input: { id: string; token: string; displayNam
   const invite = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true, account: true } });
   if (!invite || invite.client === PairedDeviceClient.watch || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
   if (invite.client === PairedDeviceClient.phone && !invite.endpoint) return null;
+  const account = invite.account;
+  if (!account) return null;
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
-    return join(db, { invite, account: invite.account, displayName: input.displayName, userAgent: input.userAgent, now });
+    return join(db, { invite, account, displayName: input.displayName, userAgent: input.userAgent, now });
   });
   if (!joined) return null;
-  return claimResponse({ invite, account: invite.account, ...joined }, invite.endpoint);
+  return claimResponse({ invite, account, ...joined }, invite.endpoint);
 }
 
 /**

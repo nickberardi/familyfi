@@ -323,8 +323,8 @@ describe("certificate pins", () => {
       const created = (await route.json()) as { endpoint: { id: string } };
       const pairing = await issuePairing(auth, created.endpoint.id);
       const claimed = await claim(pairing.id, pairing.token);
-      const body = (await claimed.json()) as { endpoint: { spkiSha256: string } };
-      expect(body.endpoint.spkiSha256).toBe(pin.spkiSha256);
+      const body = (await claimed.json()) as { connection: { endpoint: { spkiSha256: string } } };
+      expect(body.connection.endpoint.spkiSha256).toBe(pin.spkiSha256);
 
       const bad = await computePin(request("/api/v1/connection/pins", json(auth, "POST", { certificate: "nope" })));
       expect(bad.status).toBe(422);

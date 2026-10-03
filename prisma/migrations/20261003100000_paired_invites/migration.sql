@@ -15,11 +15,10 @@ ALTER TABLE "PairedDevice" DROP COLUMN "credentialHash";
 ALTER TABLE "PairedDevice" ADD COLUMN "parentDeviceId" TEXT;
 ALTER TABLE "PairedDevice" ADD CONSTRAINT "PairedDevice_parentDeviceId_fkey" FOREIGN KEY ("parentDeviceId") REFERENCES "PairedDevice"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- An invite whose maker no longer exists cannot name an account; invites are short-lived anyway.
-DELETE FROM "Pairing" WHERE "createdByAccountId" NOT IN (SELECT "id" FROM "Account");
+-- An invite acts as the account that made it. One whose maker no longer exists keeps its row with no
+-- account and can never be claimed; invites are short-lived, so it has long expired anyway.
 ALTER TABLE "Pairing" ADD COLUMN "accountId" TEXT;
-UPDATE "Pairing" SET "accountId" = "createdByAccountId";
-ALTER TABLE "Pairing" ALTER COLUMN "accountId" SET NOT NULL;
+UPDATE "Pairing" SET "accountId" = "createdByAccountId" WHERE "createdByAccountId" IN (SELECT "id" FROM "Account");
 ALTER TABLE "Pairing" ADD CONSTRAINT "Pairing_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 -- A phone invite made before scopes were written on it still admits a full-access phone.
 UPDATE "Pairing" SET "scope" = 'full' WHERE "client" = 'phone' AND "scope" IS NULL;
