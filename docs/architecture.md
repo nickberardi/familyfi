@@ -10,7 +10,7 @@ rules; [API guidance](api.md) owns the shared client contract.
 ```mermaid
 flowchart LR
   Web[Web browser] -->|Cookie session and CSRF| API[Next.js /api/v1]
-  Native[Native companion] -->|Paired device and bearer session| API
+  Native[Native companion] -->|Paired by invite; bearer and refresh token| API
   Native -->|Remote route| Gateway[Phone-only gateway]
   Gateway -->|API only, cookies stripped| API
   API --> DB[(PostgreSQL)]
@@ -49,7 +49,7 @@ foreign key.
 | `Household` | Gateway configuration, managed network scope, timezone, desired revision, resolver defaults and connection identity |
 | `Group` → `Device` | Family/Things controls: pause and allowance, as the verbs on the built-in `internet` rule; each discovered network device has an optional group. Unassigned devices are quarantined. |
 | `Account` → `Session` | Login identity and permissions. An account can link to a family group; group membership and authentication are separate concepts. |
-| `PairedDevice` → `Session` | Companion enrollment and device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
+| `PairedDevice` → `Session` | Paired phones, Watches and agents (with their scope, the account they act as, and a Watch's parent phone) and their device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
 | `ConnectionEndpoint`, `Pairing`, `DeviceEdgeToken` | Routes, one-time enrollment and delivery records for encrypted edge credentials; see [connection guidance](api.md#companion-connection-and-https) |
 | `Rule` → `RuleGroup`, `RuleWindow`, `RulePolicy`; `Group` → `AppPolicy` | A household rule blocks all internet, a DPI category, apps or websites for one or more groups (or managed networks), always or in named windows; `RulePolicy` records one UniFi policy per window and zone. A group's `AppPolicy` is its pause policy, and app policies also represent quarantine. `PolicyOperation` records external write attempts and creation evidence. |
 | `ChangeResult` → `SyncRun` | A requested revision and its outcome versus a reconciliation pass that may settle multiple requests. Actor account/device links attribute the request. |
@@ -94,10 +94,13 @@ Evidence: [reconciliation tests](../tests/integration/reconcile.test.ts),
 
 ### Pairing, sign-in and remote access
 
-An administrator creates a one-time pairing through the web Pair Device page. The companion claims
-it and subsequently signs in with its account and paired-device credential. Pairing establishes
-device trust; the account session provides user authorization. Watch enrollment gives the Watch
-its own device identity and restricted session; the server checks those restrictions on each request.
+Every paired device joins through an invite (`/paired/invites`) and is managed through
+`/paired/devices`. An administrator creates a one-time invite through the web Pair Device page,
+choosing the adult the phone signs in as; the companion claims it and is signed in, with no
+password. A phone invites and claims its Watch itself (`?claim=true`). Pairing establishes both
+device trust and the account the device acts as; the device's scope bounds what that session may
+do, and the server checks it on each request. A Watch gets its own device identity and its
+narrower `rulesOnly` scope.
 
 Remote routes reach the [phone-only gateway](../src/server/tunnel/phone-gateway.ts), which forwards
 only API traffic, strips cookies and stamps tunnel provenance. The ordinary web UI is not exposed
@@ -131,7 +134,7 @@ then read its callers and focused tests. Native feature details belong in its ow
 | Categories | Domain lists, resolver configuration and DNS observations | [probe](../src/server/upstream/probe.ts), [category API tests](../tests/integration/upstream-categories-api.test.ts), [browser tests](../tests/browser/categories.spec.ts) |
 | Settings | Gateway key/network scope, household settings, roles and logins | [gateway settings](../src/server/unifi-settings.ts), [accounts](../src/server/accounts.ts), [authorization matrix](../tests/integration/authorization-matrix.test.ts) |
 | Sync | Reconciliation history and per-change outcomes | [reconciliation](../src/server/reconciliation.ts), [changes](../src/server/changes.ts), [reconciliation path tests](../tests/integration/reconcile-paths.test.ts) |
-| Pair Device | Companion enrollment and remote connection management | [connection](../src/server/connection.ts), [remote access](../src/server/tunnel/remote-access.ts), [pairing browser tests](../tests/browser/pair.spec.ts) |
+| Pair Device | Companion pairing and remote connection management | [pairing](../src/server/pairing.ts), [paired devices](../src/server/paired-devices.ts), [connection](../src/server/connection.ts), [remote access](../src/server/tunnel/remote-access.ts), [pairing browser tests](../tests/browser/pair.spec.ts) |
 | AI agents | Connect an agent from the API page: a prompt with an agent pairing code, the `/agents.md` guide, and the scope that bounds every paired device | [device scopes](../src/server/device-scope.ts), [connection](../src/server/connection.ts), [guide](../openapi/agent-guide.md), [agent tests](../tests/integration/agent-pairing.test.ts), [API docs](api.md#agents) |
 | API reference | Authenticated interactive HTTP documentation | [OpenAPI](../openapi/familyfi.v1.yaml), [contract validation](testing.md) |
 

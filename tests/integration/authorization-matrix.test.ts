@@ -55,10 +55,8 @@ type Outcome = "allowed" | "401" | "403";
  *   without it.
  * - `refresh-token`: a paired device's refresh token is the credential; no session helps
  *   without it.
- * - `paired-phone`: a native bearer tied to the phone named in the path; browser sessions
- *   cannot issue a companion session.
  */
-type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token" | "paired-phone";
+type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token";
 
 type Person = Exclude<Caller, Device>;
 
@@ -74,7 +72,6 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
   "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
-  "paired-phone": { anonymous: "401", member: "403", administrator: "403", recovery: "403", tunnel: "401" },
 };
 
 /**
@@ -107,8 +104,9 @@ const CONTROLLERS: readonly Device[] = ["agent:full"];
 const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly"];
 
 /**
- * Administrator is a flag, not a tier: it gates phone pairing and remote access
- * (`/api/v1/connection/*`) and nothing else. Every adult with a login is trusted with
+ * Administrator is a flag, not a tier: it gates paired devices and remote access
+ * (`/api/v1/paired/*`, `/api/v1/connection/*`) and nothing else. A phone's `?claim=true` invite
+ * for its Watch is checked inside `POST /paired/invites` (paired-invites.test.ts), not here. Every adult with a login is trusted with
  * the household, so accounts, household settings and the UniFi connection are `session`,
  * a member can grant themselves administrator, and that is intended.
  */
@@ -126,19 +124,11 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/auth/session": { access: "session", devices: READERS_AND_WATCH },
   "GET /api/v1/changes/{id}": { access: "session", devices: READERS_AND_WATCH },
   "GET /api/v1/connection": { access: "session", devices: ["watch:rulesOnly"] },
-  "GET /api/v1/connection/devices": { access: "administrator" },
-  "POST /api/v1/connection/devices": { access: "paired-phone" },
-  "DELETE /api/v1/connection/devices": { access: "administrator" },
-  "DELETE /api/v1/connection/devices/{id}": { access: "administrator", devices: ["watch:rulesOnly"] },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
   "POST /api/v1/connection/endpoints": { access: "administrator" },
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "DELETE /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "GET /api/v1/connection/identity": { access: "public" },
-  "POST /api/v1/connection/pairings": { access: "administrator" },
-  "GET /api/v1/connection/pairings/{id}": { access: "administrator" },
-  "DELETE /api/v1/connection/pairings/{id}": { access: "administrator" },
-  "POST /api/v1/connection/pairings/{id}/claim": { access: "pairing-token" },
   "POST /api/v1/connection/pins": { access: "administrator" },
   "GET /api/v1/connection/tunnel": { access: "administrator" },
   "PUT /api/v1/connection/tunnel": { access: "administrator" },
@@ -146,6 +136,15 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/devices/{mac}": { access: "session", devices: READERS },
   "DELETE /api/v1/devices/{mac}": { access: "session", devices: CONTROLLERS },
   "PUT /api/v1/devices/{mac}/assignment": { access: "session", devices: CONTROLLERS },
+  "POST /api/v1/paired/invites": { access: "administrator" },
+  "GET /api/v1/paired/invites/{id}": { access: "administrator" },
+  "DELETE /api/v1/paired/invites/{id}": { access: "administrator" },
+  "POST /api/v1/paired/invites/{id}/claim": { access: "pairing-token" },
+  "GET /api/v1/paired/devices": { access: "administrator" },
+  "DELETE /api/v1/paired/devices": { access: "administrator" },
+  "GET /api/v1/paired/devices/{id}": { access: "administrator" },
+  "PATCH /api/v1/paired/devices/{id}": { access: "administrator" },
+  "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["watch:rulesOnly"] },
   "GET /api/v1/dpi/applications": { access: "session", devices: READERS },
   "GET /api/v1/dpi/categories": { access: "session", devices: READERS },
   "GET /api/v1/groups": { access: "session", devices: READERS_AND_WATCH },
@@ -197,7 +196,7 @@ const ACCESS: Record<string, Entry> = {
 /** Bodies that get a caller past validation to the check under test. Everything else sends `{}`. */
 const BODIES: Record<string, unknown> = {
   "POST /api/v1/auth/login": { username: RECOVERY_USERNAME, password: PASSWORD, client: "browser" },
-  "POST /api/v1/connection/pairings/{id}/claim": { token: "not-a-pairing-token", deviceName: "Matrix phone" },
+  "POST /api/v1/paired/invites/{id}/claim": { token: "not-a-pairing-token", deviceName: "Matrix phone" },
   "POST /api/v1/auth/refresh": { refreshToken: "not-a-refresh-token" },
 };
 
@@ -279,7 +278,7 @@ describe("authorization matrix", () => {
     Object.assign(accounts, { member: member.id, administrator: administrator.id, recovery: recovery.id });
     for (const device of DEVICES) {
       const [client, scope] = device.split(":") as [PairedDeviceClient, DeviceScope];
-      const created = await prisma().pairedDevice.create({ data: { displayName: device, credentialHash: `matrix-${device}`, client, scope, accountId: client === PairedDeviceClient.agent ? administrator.id : null } });
+      const created = await prisma().pairedDevice.create({ data: { displayName: device, client, scope, accountId: client === PairedDeviceClient.agent ? administrator.id : null } });
       devices[device] = created.id;
     }
   });

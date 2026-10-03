@@ -29,13 +29,15 @@ describe("resetDatabase", () => {
     const endpoint = await prisma().connectionEndpoint.create({
       data: { url: "https://familyfi.lan:7443", transport: ConnectionTransport.lan },
     });
-    const phone = await prisma().pairedDevice.create({ data: { displayName: "Phone", credentialHash: "reset-test" } });
+    const phone = await prisma().pairedDevice.create({ data: { displayName: "Phone" } });
+    const admin = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
     await prisma().pairing.create({
       data: {
         endpointId: endpoint.id,
         tokenHash: "reset-test",
         displayName: "Phone",
-        createdByAccountId: "reset-test",
+        accountId: admin.id,
+        createdByAccountId: admin.id,
         expiresAt: new Date(Date.now() + 60_000),
         claimedDeviceId: phone.id,
       },

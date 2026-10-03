@@ -28,10 +28,11 @@ const NEVER_FOR_AGENTS: [string, string][] = [
   ["GET", "/api/v1/groups/g1/resolver"],
   ["PUT", "/api/v1/upstream/resolver"],
   ["GET", "/api/v1/connection"],
-  ["GET", "/api/v1/connection/devices"],
-  ["POST", "/api/v1/connection/pairings"],
+  ["GET", "/api/v1/paired/devices"],
+  ["POST", "/api/v1/paired/invites"],
+  ["PATCH", "/api/v1/paired/devices/someone-else"],
   ["PUT", "/api/v1/connection/tunnel"],
-  ["DELETE", "/api/v1/connection/devices/someone-else"],
+  ["DELETE", "/api/v1/paired/devices/someone-else"],
 ];
 
 describe("device scopes", () => {
@@ -55,7 +56,7 @@ describe("device scopes", () => {
       expect(allowed(watch, rulesOnly, "GET", path), path).toBe(true);
     }
     for (const [method, path] of RULE_VERBS) expect(allowed(watch, rulesOnly, method, path), path).toBe(true);
-    expect(allowed(watch, rulesOnly, "DELETE", "/api/v1/connection/devices/device-1")).toBe(true);
+    expect(allowed(watch, rulesOnly, "DELETE", "/api/v1/paired/devices/device-1")).toBe(true);
     for (const path of ["/api/v1/groups/g1", "/api/v1/rules/r1", "/api/v1/devices", "/api/v1/settings/household", "/api/v1/sync", "/openapi"]) {
       expect(allowed(watch, rulesOnly, "GET", path), path).toBe(false);
     }
@@ -80,8 +81,8 @@ describe("device scopes", () => {
   });
 
   it("lets an agent disconnect only itself", () => {
-    expect(allowed(agent, readOnly, "DELETE", "/api/v1/connection/devices/device-1")).toBe(true);
-    expect(allowed(agent, full, "DELETE", "/api/v1/connection/devices/device-2")).toBe(false);
+    expect(allowed(agent, readOnly, "DELETE", "/api/v1/paired/devices/device-1")).toBe(true);
+    expect(allowed(agent, full, "DELETE", "/api/v1/paired/devices/device-2")).toBe(false);
   });
 
   it("does not match a longer path that starts like an allowed one", () => {

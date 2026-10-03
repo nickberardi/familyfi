@@ -156,6 +156,10 @@ export type PairedPhone = {
   displayName: string;
   client: "phone" | "watch" | "agent";
   scope: DeviceScope;
+  /** The account this device acts as. */
+  actsAs: { username: string; displayName: string } | null;
+  /** The device that vouched for this one: a Watch's phone. */
+  parentDeviceId: string | null;
   enrolledAt: string;
   lastSeenAt: string | null;
   revokedAt: string | null;

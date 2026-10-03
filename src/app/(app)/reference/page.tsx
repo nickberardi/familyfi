@@ -24,8 +24,8 @@ export default function ApiPage() {
 
   const load = useCallback(async () => {
     try {
-      const { devices } = await api<{ devices: PairedPhone[] }>("/api/v1/connection/devices");
-      setAgents(devices.filter((device) => device.client === "agent" && !device.revokedAt));
+      const { devices } = await api<{ devices: PairedPhone[] }>("/api/v1/paired/devices?client=agent&status=active");
+      setAgents(devices);
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === "administrator_required") setForbidden(true);
       else setError(caught instanceof Error ? caught.message : "Could not load agents.");
@@ -41,7 +41,7 @@ export default function ApiPage() {
     if (!window.confirm(`Revoke ${agent.displayName}? It loses access now and needs a new pairing code to come back.`)) return;
     setError("");
     try {
-      await api(`/api/v1/connection/devices/${agent.id}`, { method: "DELETE" });
+      await api(`/api/v1/paired/devices/${agent.id}`, { method: "DELETE" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That didn't work.");
     }

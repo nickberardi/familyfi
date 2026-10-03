@@ -26,7 +26,7 @@ export function PairedPhoneRow({
   return (
     <div data-testid="phone-row" className="flex flex-wrap items-center gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-3 first:border-t-0">
       <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ff-field)]">
-        <Icon name={phone.client === "watch" ? "watch" : "device-mobile"} size={18} />
+        <Icon name={phone.client === "watch" ? "watch" : phone.client === "agent" ? "robot" : "device-mobile"} size={18} />
       </span>
       <div className="min-w-[200px] flex-1">
         <div className="text-[14px] font-semibold">
@@ -41,7 +41,11 @@ export function PairedPhoneRow({
               via <span className="font-mono">{phone.pairedVia.url}</span> · {transportLabel(phone.pairedVia.transport)}
             </>
           ) : (
-            phone.client === "watch" ? "Paired automatically from an iPhone" : "via a route that was removed"
+            phone.client === "watch"
+              ? "Paired automatically from an iPhone"
+              : phone.client === "agent"
+                ? `AI agent on the home network${phone.actsAs ? ` · acts as ${phone.actsAs.displayName}` : ""}`
+                : "via a route that was removed"
           )}
         </div>
       </div>

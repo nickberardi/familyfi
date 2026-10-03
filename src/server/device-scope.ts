@@ -30,7 +30,7 @@ function watchRulesOnly({ method, path }: ScopedCall): boolean {
       || /^\/api\/v1\/changes\/[^/]+$/.test(path);
   }
   // The route itself lets a Watch revoke only itself.
-  if (method === "DELETE" && /^\/api\/v1\/connection\/devices\/[^/]+$/.test(path)) return true;
+  if (method === "DELETE" && /^\/api\/v1\/paired\/devices\/[^/]+$/.test(path)) return true;
   return method === "POST" && (RULE_VERBS.test(path) || GROUP_RULE_VERBS.test(path));
 }
 
@@ -66,7 +66,7 @@ const AGENT_WRITES: Record<string, RegExp[]> = {
 
 function agentReadOnly({ method, path, deviceId }: ScopedCall): boolean {
   // Any agent may disconnect itself.
-  if (method === "DELETE" && path === `/api/v1/connection/devices/${encodeURIComponent(deviceId)}`) return true;
+  if (method === "DELETE" && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`) return true;
   return (method === "GET" || method === "HEAD") && AGENT_READS.some((pattern) => pattern.test(path));
 }
 
