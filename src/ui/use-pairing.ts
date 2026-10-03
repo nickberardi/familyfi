@@ -50,7 +50,10 @@ export function usePairing({
         setAccounts(pairingAccounts(all));
         setAccountId((current) => current || defaultPairingAccount(all, username));
       })
-      .catch(() => undefined);
+      // Without them the code cannot be shown, so say why.
+      .catch((caught: unknown) => {
+        if (live) setError(caught instanceof ApiError ? caught.message : pairingSheetCopy().accountsFailed);
+      });
     return () => {
       live = false;
     };

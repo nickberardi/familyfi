@@ -127,6 +127,7 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     expiredLine: "This code expired. Make a new one.",
     claimedLine: `Paired ${claimedName ?? ""} ✓`,
     issueFailed: "Could not create a pairing code.",
+    accountsFailed: "Could not load the administrators a phone can sign in as.",
     copy: "Copy",
     copied: "Copied",
   };
