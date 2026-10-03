@@ -217,9 +217,10 @@ model Pairing {
   claimedAt          DateTime?
   claimedDeviceId    String?             @unique
   claimedDevice      PairedDevice?       @relation("pairingClaimedDevice", fields: [claimedDeviceId], references: [id], onDelete: SetNull)
-  /// The account the paired device will act as: an adult chosen by whoever made the invite.
-  accountId          String
-  account            Account             @relation("pairingAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  /// The account the paired device will act as: an adult chosen by whoever made the invite. Every invite
+  /// made since pairing became the sign-in has one; an older one without it can never be claimed.
+  accountId          String?
+  account            Account?            @relation("pairingAccount", fields: [accountId], references: [id], onDelete: Cascade)
   /// The paired device that made this invite for its companion (`claim=true`).
   parentDeviceId     String?
   parentDevice       PairedDevice?       @relation("pairingParentDevice", fields: [parentDeviceId], references: [id], onDelete: SetNull)
