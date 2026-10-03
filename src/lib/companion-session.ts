@@ -127,13 +127,16 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
         // Signed out, forgotten or signed in again while it was asked: the answer is for a session the phone no longer holds.
         if (!holds(asked) || state.session !== held) return;
         // The server has already replaced the old refresh token: hold the new one even if storing it
-        // fails, so this launch keeps working.
+        // fails, so this launch keeps working. The next launch then holds the replaced token, which
+        // the server refuses after its grace, and signs in again.
         set({ session: next });
         await vault.saveSession(next).catch(() => undefined);
       } catch (error) {
         if (refused(error) && holds(asked) && state.session === held) {
-          await vault.signOut();
+          // Signed out here first: a store that fails to forget the token must not leave the phone
+          // looking signed in with a refused one.
           set({ session: null, status: "signedOut" });
+          await vault.signOut().catch(() => undefined);
           throw new ApiError(error.message, 401, error.code);
         }
         throw error;

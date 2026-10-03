@@ -22,6 +22,7 @@ import {
 import { COMPANION_OFFLINE_GUARD } from "@/lib/household-store";
 import { ACCESS_REVOKED } from "@/lib/sign-in";
 import { createCompanionRequest, type Transport, type TransportRequest, type TransportResponse } from "@/lib/companion-request";
+import { REFRESH_REUSE_GRACE_MS } from "@/lib/constants";
 import { createCompanionSession, type SecureStorage } from "@/lib/companion-session";
 import { IDENTITY_MISMATCH, MANIFEST_MISSING_ENDPOINT, MANIFEST_SIGNATURE_INVALID, type EndpointCredential } from "@/lib/companion-trust";
 import { PAIRING_CODE_INCOMPLETE } from "@/lib/pairing-code";
@@ -287,6 +288,21 @@ describe("companion requests", () => {
         : json(200, { ok: true });
     const request = createCompanionRequest(transport, { routes: () => routes, edgeCredentials: () => [CREDENTIAL] });
     await expect(request("/api/v1/groups")).resolves.toEqual({ ok: true });
+  });
+
+  it("gives up on a route for a session refresh within half the server's grace, so the next route can still use the token", async () => {
+    const calls: TransportRequest[] = [];
+    const transport: Transport = async (request) => {
+      calls.push(request);
+      return request.url.startsWith(LAN.url) ? unreachable() : json(200, { ok: true });
+    };
+    const request = createCompanionRequest(transport, { routes: () => routes, edgeCredentials: () => [CREDENTIAL] });
+    await request("/api/v1/auth/refresh", { method: "POST", body: { refreshToken: "r" } });
+    await request("/api/v1/groups");
+    const [lan, edge, read] = calls;
+    expect(lan!.timeoutMs * 2).toBeLessThanOrEqual(REFRESH_REUSE_GRACE_MS);
+    expect(edge!.timeoutMs).toBe(lan!.timeoutMs);
+    expect(read!.timeoutMs).toBeGreaterThan(REFRESH_REUSE_GRACE_MS);
   });
 
   it("refuses any path outside /api/v1", async () => {

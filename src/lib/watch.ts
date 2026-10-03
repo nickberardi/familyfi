@@ -71,7 +71,8 @@ export function watchProvisioning(
   edgeCredentials: EndpointCredential[],
 ): WatchProvisioning {
   return {
-    watchId,
+    // Lowercased, as it was enrolled (`enrollWatch`).
+    watchId: watchId.toLowerCase(),
     deviceId: enrollment.deviceId,
     deviceCredential: enrollment.deviceCredential,
     sessionId: enrollment.sessionId,
