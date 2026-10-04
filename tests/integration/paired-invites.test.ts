@@ -140,7 +140,9 @@ describe("POST /paired/invites", () => {
     const invite = await issuedInvite(await invitePhoneRequest(auth, { endpointId: route.id, accountId: parent.id }));
     // Demoted behind the API's back, so the invite was not cancelled: the claim refuses it anyway.
     await prisma().account.update({ where: { id: parent.id }, data: { isAdmin: false } });
-    expect((await claimInvite(invite, "iPhone")).status).not.toBe(200);
+    const refused = await claimInvite(invite, "iPhone");
+    expect(refused.status).toBe(403);
+    expect(await errorCode(refused)).toBe("invalid_pairing");
     expect(await prisma().pairedDevice.count({ where: { accountId: parent.id } })).toBe(0);
   });
 });

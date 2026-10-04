@@ -22,7 +22,7 @@ export default function LoginPage() {
         <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
           Use username <span className="font-semibold text-[var(--ff-ink)]">admin</span> with the
           recovery password from the FamilyFi server log, or a personal adult account. Only adults
-          marked as admins have logins.
+          marked as admins can sign in.
         </p>
         <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
           {appVersionLabel()} · sessions last 30 days on this browser

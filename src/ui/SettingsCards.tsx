@@ -5,7 +5,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { initials } from "@/lib/display";
 import type { HouseholdStore } from "@/lib/household-store";
-import { SETTINGS_COPY as COPY, gatewayFacts, householdMemberNote, keyState, keyStatusLine, recoveryNote, removeLoginConfirm } from "@/lib/settings-copy";
+import { SETTINGS_COPY as COPY, gatewayFacts, householdMemberNote, keyState, keyStatusLine, recoveryNote, removeAdminConfirm, removeLoginConfirm } from "@/lib/settings-copy";
 import { addFamilyMember, removeLogin, saveTimezone, setAdmin, setFamilyRole } from "@/lib/settings-writes";
 import { lastSweepAt, relativeSweep } from "@/lib/sync-copy";
 import type { Account, Group, SyncStatus, UnifiSettings } from "@/lib/types";
@@ -199,7 +199,12 @@ export function HouseholdCard({
                 on={Boolean(account?.isAdmin)}
                 disabled={disabled}
                 testID={`settings-admin-${group.id}`}
-                onPress={() => (account ? void setAdmin(mutate, account, !account.isAdmin) : onCreateLogin(group))}
+                onPress={async () => {
+                  if (!account) return onCreateLogin(group);
+                  // Turning it off signs them out and removes their paired devices, so it asks first.
+                  if (account.isAdmin && !(await ui.confirm({ ...removeAdminConfirm(account, group), destructive: true }))) return;
+                  void setAdmin(mutate, account, !account.isAdmin);
+                }}
               />
             ) : null}
             {account ? (

@@ -3,8 +3,8 @@ import { DeviceScope, PairedDeviceClient } from "@prisma/client";
 /**
  * What a paired device may call. Every paired device has a scope, and each (client, scope) pair is
  * one explicit allowlist, never a ladder: an agent's `full` is the agent list, not a phone's minus
- * exceptions. Every adult login is an administrator in practice, so the scope bounds the device
- * whatever its account may do. A pair not named here allows nothing.
+ * exceptions. Only administrators use FamilyFi, so every device acts as one, and the scope bounds the
+ * device whatever its account may do. A pair not named here allows nothing.
  *
  * - `phone:full`: everything its account may do.
  * - `watch:rulesOnly`: lists, the rule verbs, and `GET /connection` for the manifest it needs away from home.

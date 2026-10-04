@@ -185,8 +185,7 @@ The agent never sends a password. It claims the code at
 refresh token, with no route, manifest or device credential. It renews at
 `POST /api/v1/auth/refresh` like any paired device, so the refresh token is its only long-lived
 secret: it rotates on every use and lapses after 90 days unused. It acts as the adult who made
-the pairing. Every adult login is an administrator in practice, so its scope, not that account,
-bounds it: `agent:full` or `agent:readOnly`, never accounts, UniFi settings, resolvers,
+the pairing. Only administrators use FamilyFi, so its scope, not that account, bounds it: `agent:full` or `agent:readOnly`, never accounts, UniFi settings, resolvers,
 household-settings changes or connection management (403 `agent_scope`). It
 is refused through FamilyFi's remote access tunnel (403 `agent_remote`), at its claim, its refresh
 and every call; like browser sign-in, an

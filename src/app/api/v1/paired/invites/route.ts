@@ -1,8 +1,7 @@
 import { PairedDeviceClient, SessionKind } from "@prisma/client";
 import { z } from "zod";
 import { TUNNEL_HEADER } from "@/lib/constants";
-import { requestOrigin } from "@/server/auth";
-import { isAdministratorAccount } from "@/server/auth";
+import { isAdministratorAccount, requestOrigin } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { readJson, withAdmin, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
