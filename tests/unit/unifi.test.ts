@@ -10,6 +10,8 @@ import { internetBlockPolicy, toPolicyUpdate } from "@/server/unifi/payloads";
 import { toUnifiSchedule } from "@/server/unifi/schedule-map";
 import { planPolicies } from "@/server/unifi/plan";
 import { quarantinePolicyName } from "@/server/unifi/names";
+import { loadNetworkClientIds, loadNetworkDetails } from "@/server/unifi/networks";
+import { MockUnifiClient, createMockUnifiState } from "@/server/unifi/mock";
 import { AssignmentState } from "@prisma/client";
 import { UNIFI_PAGE_LIMIT } from "@/server/unifi/types";
 import type { ClientOverview, FirewallPolicy, FirewallZone, NetworkDetails, UnifiPage } from "@/server/unifi/types";
@@ -32,10 +34,36 @@ describe("resolveIntegrationBase", () => {
     expect(() => resolveIntegrationBase({ baseUrl: "https://192.168.0.1" })).toThrow(/integration/);
   });
 
+  it("names what is wrong with a configuration it refuses", () => {
+    expect(() => resolveIntegrationBase({ baseUrl: "https://192.168.0.1/proxy/network/integration", consoleId: "abc" })).toThrow(
+      /not both/,
+    );
+    expect(() => resolveIntegrationBase({ consoleId: "abc/../x" })).toThrow(/console ID/);
+    expect(() => resolveIntegrationBase({})).toThrow(/Needs a local integration URL/);
+    expect(() => resolveIntegrationBase({ baseUrl: "http://192.168.0.1/proxy/network/integration" })).toThrow(/must use https/);
+  });
+
   it("builds the cloud connector base", () => {
     expect(resolveIntegrationBase({ consoleId: "abc:123" })).toBe(
       "https://api.ui.com/v1/connector/consoles/abc:123/proxy/network/integration",
     );
+  });
+});
+
+describe("network loading", () => {
+  it("keeps a network's overview, and no clients, when its details cannot be read", async () => {
+    const first = { id: "net-1", name: "Kids", default: false, enabled: true, management: "GATEWAY", vlanId: 20 };
+    const client = new MockUnifiClient(createMockUnifiState({ networks: [first] }));
+    client.getNetwork = async () => {
+      throw new Error("unreadable");
+    };
+    client.getNetworkReferences = async () => {
+      throw new Error("unreadable");
+    };
+    const networks = await loadNetworkDetails(client, "site");
+    expect(networks[0]).toEqual(first);
+    const clients = await loadNetworkClientIds(client, "site", networks);
+    expect(clients.get(first.id)).toEqual(new Set());
   });
 });
 
