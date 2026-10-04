@@ -44,6 +44,13 @@ describe("settings copy", () => {
         },
       ),
     ).toContain("admin · login melinda");
+    // Only administrators use FamilyFi: a login without it says it cannot sign in.
+    expect(
+      householdMemberNote(
+        { familyRole: "adult", deviceCount: 0 },
+        { id: "a2", username: "sam", displayName: "Sam", kind: "personal", isAdmin: false, groupId: "g2", recovery: false },
+      ),
+    ).toBe("Adult · login sam · not an admin, can't sign in · 0 devices");
   });
 
   it("suggests a personal username from a given name", () => {

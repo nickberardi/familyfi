@@ -45,7 +45,7 @@ export async function PUT(request: Request, ctx: Ctx) {
         return jsonError(400, "invalid_group", error instanceof Error ? error.message : "Invalid group.");
       }
     }
-    // Paired devices are for administrators: losing it unpairs and removes theirs, in the same step.
+    // Only administrators use FamilyFi: losing it signs them out and unpairs and removes their devices, in one step.
     const demoted = existing.isAdmin && parsed.data.isAdmin === false;
     const account = await prisma().$transaction(async (db) => {
       const updated = await db.account.update({
@@ -56,7 +56,11 @@ export async function PUT(request: Request, ctx: Ctx) {
           isAdmin: parsed.data.isAdmin,
         },
       });
-      if (demoted) await removeAccountDevices(id, db as never);
+      if (demoted) {
+        await removeAccountDevices(id, db as never);
+        // Nor do they sign in: their browser sessions end too.
+        await db.session.updateMany({ where: { accountId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+      }
       return updated;
     });
     const change = await enqueueChange("account");

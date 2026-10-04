@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FamilyRole, GroupKind } from "@prisma/client";
+import { AccountKind, FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { POST as logout } from "@/app/api/v1/auth/logout/route";
 import { GET as session } from "@/app/api/v1/auth/session/route";
@@ -250,5 +250,32 @@ describe("auth and accounts API", () => {
     );
     expect(JSON.stringify(await listed.json())).not.toContain("$argon");
     expect(listed.headers.get(CSRF_HEADER)).toBeNull();
+  });
+
+  it("signs in administrators only, and signs an adult out when they stop being one", async () => {
+    const { auth: admin } = await browserLogin();
+    const adult = await prisma().account.create({ data: { username: "sam", displayName: "Sam", kind: AccountKind.personal, isAdmin: false, passwordHash: await hashPassword("sam-password-1") } });
+    const refused = await browserLogin("sam", "sam-password-1");
+    expect(refused.response.status).toBe(403);
+    expect(((await refused.response.json()) as { error: { code: string } }).error.code).toBe("administrator_account_required");
+    expect(refused.auth).toBeNull();
+
+    await prisma().account.update({ where: { id: adult.id }, data: { isAdmin: true } });
+    const { auth: sam } = await browserLogin("sam", "sam-password-1");
+    expect((await session(request("/api/v1/auth/session", { auth: sam! }))).status).toBe(200);
+    const demoted = await updateAccount(
+      request(`/api/v1/accounts/${adult.id}`, { method: "PUT", auth: admin!, headers: { "content-type": "application/json" }, body: JSON.stringify({ isAdmin: false }) }),
+      { params: Promise.resolve({ id: adult.id }) },
+    );
+    expect(demoted.status).toBe(200);
+    expect((await session(request("/api/v1/auth/session", { auth: sam! }))).status).toBe(401);
+  });
+
+  it("refuses a session left over for an adult who is no longer an administrator", async () => {
+    await prisma().account.create({ data: { username: "sam", displayName: "Sam", kind: AccountKind.personal, isAdmin: true, passwordHash: await hashPassword("sam-password-1") } });
+    const { auth: sam } = await browserLogin("sam", "sam-password-1");
+    // Demoted behind the API's back: its session is still on record, but no longer honoured.
+    await prisma().account.update({ where: { username: "sam" }, data: { isAdmin: false } });
+    expect((await session(request("/api/v1/auth/session", { auth: sam! }))).status).toBe(401);
   });
 });

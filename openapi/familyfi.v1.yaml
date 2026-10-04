@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.22.2
+  version: 0.22.3
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -86,7 +86,9 @@ paths:
       summary: Sign in
       description: |
         Authenticate the recovery username `admin` against FAMILYFI_DEFAULT_PASSWORD,
-        or a personal adult account against its stored password hash.
+        or a personal adult account against its stored password hash. Only administrators
+        use FamilyFi: a personal account without administrator access is refused with 403
+        `administrator_account_required`, and has no session or paired device.
         Sign-in is for people in a browser: it sets an httpOnly session cookie and a
         readable CSRF cookie, and the session lasts 30 days unless revoked. Phones,
         Watches and agents never sign in here; they join through `/paired/invites`,
@@ -287,8 +289,8 @@ paths:
       tags: [Accounts]
       summary: Update a personal account
       description: |
-        Only administrators have paired devices. Setting `isAdmin` to false signs out and removes every
-        phone, Watch and agent acting as the adult, and cancels their pending invites, in the same step.
+        Only administrators use FamilyFi. Setting `isAdmin` to false ends the adult's sessions, removes
+        every phone, Watch and agent acting as them, and cancels their pending invites, in the same step.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/AccountId"

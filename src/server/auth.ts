@@ -1,6 +1,6 @@
 import { hash, verify } from "@node-rs/argon2";
 import { cookies } from "next/headers";
-import { AccountKind, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { type Account, AccountKind, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { cookieValue } from "@/lib/cookie";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -135,6 +135,14 @@ async function recordAttempt(input: {
   });
 }
 
+/**
+ * Only administrators use FamilyFi: an adult without administrator access is like a child, with no
+ * sign-in, session or paired device. The recovery account always is one.
+ */
+export function isAdministratorAccount(account: Pick<Account, "kind" | "isAdmin"> | null | undefined): boolean {
+  return account?.kind === AccountKind.recovery || account?.isAdmin === true;
+}
+
 export async function authenticate(usernameRaw: string, password: string, ip: string) {
   const username = usernameRaw.trim().toLowerCase();
   if (!username || !password) {
@@ -165,6 +173,9 @@ export async function authenticate(usernameRaw: string, password: string, ip: st
     return { ok: false as const, status: 401 as const, code: "invalid_credentials", message: "Invalid username or password." };
   }
 
+  if (!isAdministratorAccount(account)) {
+    return { ok: false as const, status: 403 as const, code: "administrator_account_required", message: "Only administrators sign in to FamilyFi." };
+  }
   return { ok: true as const, account };
 }
 
@@ -246,6 +257,8 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
     grace = true;
   }
   if (session.revokedAt || session.kind !== SessionKind.bearer || !session.refreshExpiresAt || session.refreshExpiresAt <= now || !session.device || session.device.revokedAt) return INVALID_REFRESH;
+  // A device acting as an adult who is no longer an administrator has no sign-in to renew.
+  if (session.account && !isAdministratorAccount(session.account)) return INVALID_REFRESH;
   // Remote access is for the household's phones; an agent renews from the home network or not at all.
   if (options.tunnelled && session.device.client === PairedDeviceClient.agent) return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
@@ -285,6 +298,8 @@ export async function readSessionFromRequest(request: Request) {
     include: { account: true, device: true },
   });
   if (!session || session.revokedAt || session.expiresAt <= new Date() || (session.kind === SessionKind.bearer && (!session.device || session.device.revokedAt))) return null;
+  // Only administrators use FamilyFi; demotion ends their sessions, and this refuses any left over.
+  if (session.account && !isAdministratorAccount(session.account)) return null;
   if (session.device && (!session.device.lastSeenAt || session.device.lastSeenAt < new Date(Date.now() - 15 * 60 * 1000))) {
     await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date() } });
   }

@@ -36,12 +36,12 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. |
-| POST | `/api/v1/auth/login` | Browser cookie session only; paired devices join by invite. Refused through remote access |
+| POST | `/api/v1/auth/login` | Browser cookie session only; paired devices join by invite. Administrators only (403 `administrator_account_required` otherwise). Refused through remote access |
 | POST | `/api/v1/auth/refresh` | A paired device trades its refresh token for a new one-hour bearer and a new refresh token; reuse of a replaced one ends the sign-in |
 | POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for paired devices |
 | GET | `/api/v1/auth/session` | Current principal |
 | GET/POST | `/api/v1/accounts` | Personal adult accounts; recovery `admin` is listed and cannot be created here |
-| GET/PUT/DELETE | `/api/v1/accounts/{id}` | Recovery admin cannot be edited or deleted; an adult who stops being an administrator (`isAdmin: false`) loses their paired devices: every phone, Watch and agent acting as them is signed out and removed, and their pending invites are cancelled |
+| GET/PUT/DELETE | `/api/v1/accounts/{id}` | Recovery admin cannot be edited or deleted; an adult who stops being an administrator (`isAdmin: false`) is signed out everywhere: their sessions end, every phone, Watch and agent acting as them is removed, and their pending invites are cancelled |
 | PUT | `/api/v1/accounts/{id}/password` | Revokes that account's sessions; recovery uses `.env` |
 | GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false is an emergency UniFi `enabled: false` on quarantine policies |
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |

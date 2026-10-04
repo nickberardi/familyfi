@@ -52,7 +52,8 @@ export function householdMemberNote(group: Pick<Group, "familyRole" | "deviceCou
   const devices = `${group.deviceCount} ${group.deviceCount === 1 ? "device" : "devices"}`;
   if (group.familyRole === "adult") {
     if (account?.isAdmin) return `Adult · admin · login ${account.username} · ${devices}`;
-    if (account) return `Adult · login ${account.username} · no admin · ${devices}`;
+    // Only administrators use FamilyFi: a login without it cannot sign in.
+    if (account) return `Adult · login ${account.username} · not an admin, can't sign in · ${devices}`;
     return `Adult · no FamilyFi login · ${devices}`;
   }
   if (group.familyRole === "teen") return `Teen · pause and schedule · ${devices}`;

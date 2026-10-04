@@ -133,10 +133,14 @@ describe("POST /paired/invites", () => {
     expect(await errorCode(refused)).toBe("administrator_account_required");
   });
 
-  it("refuses an invite from an adult who is not an administrator", async () => {
-    await adult("member", false);
-    const member = authFromLogin(await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "member", password: "adult-password-1" }) })));
+  it("voids an invite for an adult who has since stopped being an administrator", async () => {
+    const auth = await admin();
+    const parent = await adult("parent");
     const route = await homeRoute();
-    expect((await invitePhoneRequest(member, { endpointId: route.id })).status).toBe(403);
+    const invite = await issuedInvite(await invitePhoneRequest(auth, { endpointId: route.id, accountId: parent.id }));
+    // Demoted behind the API's back, so the invite was not cancelled: the claim refuses it anyway.
+    await prisma().account.update({ where: { id: parent.id }, data: { isAdmin: false } });
+    expect((await claimInvite(invite, "iPhone")).status).not.toBe(200);
+    expect(await prisma().pairedDevice.count({ where: { accountId: parent.id } })).toBe(0);
   });
 });
