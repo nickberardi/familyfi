@@ -7,8 +7,8 @@
  * `src/ui` component, and fails
  * with the full chain when it reaches server code or a Node-only package.
  *
- * Next's `server-only` marker would do this at build time, but it throws in Vitest and
- * the spike CLI, which both import `src/server` outside Next's bundler.
+ * Next's `server-only` marker would do this at build time, but it throws in Vitest, which
+ * imports `src/server` outside Next's bundler.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";

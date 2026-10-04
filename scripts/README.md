@@ -1,7 +1,7 @@
 # scripts
 
-The top level of this folder holds the scripts you run: `test.py`, `release.sh`, `doh-probe.mjs`
-and the `spike/` CLI. `testing/` is the implementation behind `test.py`, `ci/` holds the helpers
+The top level of this folder holds the scripts you run: `test.py`, `release.sh` and
+`doh-probe.mjs`. `testing/` is the implementation behind `test.py`, `ci/` holds the helpers
 that the harness and the workflows both call, and `runtime/` the environment and database
 bootstrap that the dev server, the tests and the container start through. You normally don't
 call `ci/` or `runtime/` directly. `test.py` and `release.sh` print their full usage with
@@ -17,7 +17,6 @@ scripts/
 ├── release.sh         checks and tests, then build, push and publish a release from this machine
 ├── doh-probe.mjs      ask a DNS-over-HTTPS endpoint which transports it actually serves
 ├── update-mac-vendors.py  rebuild the committed IEEE MAC registrant database; run on request
-├── spike/             UniFi integration spike CLI (make spike; docs/spike/OPERATOR.md)
 └── runtime/           with-env, validate-env, docker-entrypoint and the rest of startup;
                        the only part of scripts/ the container image carries
 ```
@@ -205,4 +204,4 @@ scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag
   and prepares the database before running a command. `package.json`, the Makefile, Prisma's
   config, Playwright and the container's `docker-entrypoint.sh` all start through it. The
   Dockerfile copies this folder and nothing else from `scripts/`, and `ci/check-image.sh` fails
-  an image that carries `ci/` or `spike/`.
+  an image that carries `ci/`.

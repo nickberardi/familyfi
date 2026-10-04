@@ -22,9 +22,6 @@ export async function policyOnRecord(scope: OwnershipScope, siteId: string, poli
   return appPolicies + rulePolicies + creations > 0;
 }
 
-/** Whether a policy is on record. The database by default; `pnpm spike verify` keeps its record in memory. */
-export type PolicyRecordCheck = (scope: OwnershipScope, siteId: string, policyId: string) => Promise<boolean>;
-
 /**
  * The client every FamilyFi write goes through. Updating or deleting a policy that is not
  * on record throws `PolicyOwnershipError` before any request is sent, whichever code path
@@ -33,10 +30,9 @@ export type PolicyRecordCheck = (scope: OwnershipScope, siteId: string, policyId
 export function withPolicyOwnership(
   client: UnifiClient,
   scope: OwnershipScope,
-  onRecord: PolicyRecordCheck = policyOnRecord,
 ): UnifiClient {
   const assertOnRecord = async (action: "update" | "delete", siteId: string, policyId: string) => {
-    if (!(await onRecord(scope, siteId, policyId))) throw new PolicyOwnershipError(action, policyId);
+    if (!(await policyOnRecord(scope, siteId, policyId))) throw new PolicyOwnershipError(action, policyId);
   };
   const guarded: Pick<UnifiClient, "updatePolicy" | "deletePolicy"> = {
     async updatePolicy(siteId, policyId, body) {

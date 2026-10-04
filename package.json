@@ -21,7 +21,6 @@
     "test-api": "node scripts/ci/check-openapi.mjs",
     "db-upgrade": "node scripts/runtime/with-env.mjs node scripts/ci/check-migration-upgrade.mjs",
     "db-drift": "node scripts/runtime/with-env.mjs prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
-    "spike": "node scripts/runtime/with-env.mjs tsx scripts/spike/index.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -62,7 +61,6 @@
     "prisma": "^7.10.0",
     "react-native": "0.87.1",
     "tailwindcss": "^4",
-    "tsx": "^4.20.5",
     "typescript": "^6",
     "vitest": "^5.0.1",
     "yaml": "^2.8.1"

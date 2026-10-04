@@ -137,7 +137,7 @@ describe("naming conventions (AGENTS.md)", () => {
     // Variables that configure an external system, or are framework contracts,
     // keep that system's convention — see AGENTS.md.
     const foreign =
-      /^(POSTGRES_|DB_|UNIFI_|DATABASE_URL|PORT|NODE_ENV|NODE_TLS_REJECT_UNAUTHORIZED|NEXT_|GITHUB_|CI$|HOME$|PATH$)/;
+      /^(POSTGRES_|DB_|DATABASE_URL|PORT|NODE_ENV|NEXT_|GITHUB_|CI$|HOME$|PATH$)/;
     // Ours, but development/test/CI-only and never set on a real deployment, so
     // they are not public surface and take no prefix.
     const internal = new Set([

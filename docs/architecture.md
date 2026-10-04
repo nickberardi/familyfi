@@ -221,7 +221,7 @@ Every curated slot also has a domain list of the same slug behind it in
 `src/lib/upstream-domains.ts`, which is what lets its mark report a DNS verdict when no
 policy is blocking; a unit test holds that pairing.
 
-Mocks and fixtures do not prove enforcement. `FAMILYFI_MODE` `dev`, `test` and `demo` route Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; production starts only `prod` and `demo` ([modes](setup.md#modes)). The spike CLI (`scripts/spike`) is for live gateway experiments; see [spike/OPERATOR.md](spike/OPERATOR.md).
+Mocks and fixtures do not prove enforcement. `FAMILYFI_MODE` `dev`, `test` and `demo` route Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; production starts only `prod` and `demo` ([modes](setup.md#modes)).
 
 ## Upstream DNS categories
 

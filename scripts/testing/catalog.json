@@ -341,11 +341,6 @@
         "sync"
       ]
     },
-    "tests/unit/spike-verify.test.ts": {
-      "categories": [
-        "unifi"
-      ]
-    },
     "tests/unit/spki.test.ts": {
       "categories": [
         "trust"

@@ -17,7 +17,7 @@ Copy `.env.example` to `.env` and set:
 | `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |
 | `FAMILYFI_PHONE_GATEWAY_PORT` | Optional. Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
 
-Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a temporary key; that path is not the application credential store.
+The app reads no UniFi settings from the environment; the UniFi key lives in Settings.
 
 ## Local development
 
@@ -66,7 +66,7 @@ Email magic links and self-serve email reset from the sign-in prototype are not 
 
 ## UniFi connection (application)
 
-Paste the Network Integration API key in Settings (`PUT /api/v1/settings/unifi`). The app encrypts it with `FAMILYFI_ENCRYPTION_KEY`. For a local console with a private CA, send `tlsInsecure: true`. Choose `manageAllNetworks: true` or `managedNetworkIds: ["…"]` so discovery/quarantine only watch those VLANs; the default is none until you pick. The spike CLI env key is not used by the running app.
+Paste the Network Integration API key in Settings (`PUT /api/v1/settings/unifi`). The app encrypts it with `FAMILYFI_ENCRYPTION_KEY`. For a local console with a private CA, send `tlsInsecure: true`. Choose `manageAllNetworks: true` or `managedNetworkIds: ["…"]` so discovery/quarantine only watch those VLANs; the default is none until you pick.
 
 With `FAMILYFI_MODE=dev` (never in production), Settings Test/Save talk to the in-process mock. A dummy key of at least 8 characters is enough; the seeded household already uses `mock-unifi-key` and `https://127.0.0.1/proxy/network/integration`.
 

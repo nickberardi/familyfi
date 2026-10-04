@@ -181,9 +181,9 @@ For a tag-based release, create and push an annotated tag on the intended commit
 
 Bump `package.json` and `openapi/familyfi.v1.yaml` `info.version` together before a later tag, so Settings, the sign-in screen, and `GET /api/v1/health` show the same number as the image tag. `tests/unit/version.test.ts` fails the build when the two drift apart.
 
-Each release's notes cite the latest verification record for every scenario in [testing.md](testing.md#what-no-test-proves), linking the file under `docs/verification/`, or say "not run" for a scenario that has none. Run `pnpm spike verify` on a console first when the release changes how FamilyFi writes policies.
+Release notes say whether anyone checked a block on a real gateway since the last release. Nothing in CI proves enforcement ([testing.md](testing.md#what-no-test-proves)), so a release that changes how FamilyFi writes policies says so plainly.
 
-Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does not set that flag, so the operator must mark it after creation. The local release script sets it automatically. Verification links in release notes also require review; the current publishers do not collect those records automatically.
+Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does not set that flag, so the operator must mark it after creation. The local release script sets it automatically.
 
 ### Local release
 

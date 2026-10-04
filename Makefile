@@ -6,7 +6,7 @@ WITH_ENV := node scripts/runtime/with-env.mjs
 # Tests and checks run through one harness; these targets are aliases for it (scripts/README.md).
 TEST := scripts/test.py
 
-.PHONY: setup hooks dev release test test-unit test-coverage test-api test-api-breaking test-api-version test-integration test-browser test-mutation spike lint typecheck build \
+.PHONY: setup hooks dev release test test-unit test-coverage test-api test-api-breaking test-api-version test-integration test-browser test-mutation lint typecheck build \
 	docker-build docker-dev-up docker-up docker-down docker-logs docker-smoke db-dev db-drift db-upgrade secrets
 
 setup:
@@ -77,9 +77,6 @@ test-browser:
 # Weekly in CI, and by hand. Report: reports/mutation/index.html.
 test-mutation:
 	$(TEST) check mutation
-
-spike:
-	$(PNPM) spike -- $(SPIKE_ARGS)
 
 lint:
 	$(TEST) check lint

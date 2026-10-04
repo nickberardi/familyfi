@@ -11,7 +11,7 @@ export {
   DEV_MOCK_BASE_URL,
   DEV_MOCK_SITE_ID,
 } from "./dev-mock";
-export { mapClientsToZones, selectExternalZone, groupMacsBySourceZone } from "./mapping";
+export { mapClientsToZones, selectExternalZone } from "./mapping";
 export {
   internetBlockPolicy,
   dpiCategoryBlockPolicy,
@@ -19,15 +19,13 @@ export {
   dpiCategoryNetworkBlockPolicy,
   dpiAppNetworkBlockPolicy,
   domainBlockPolicy,
-  spikePolicyName,
   toPolicyUpdate,
-  isOwnedPolicyName,
   INTERNET_BLOCK_ACTION,
 } from "./payloads";
 export { quarantinePolicyName, pauseRuleName, rulePolicyNames } from "./names";
 export { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./plan-rules";
 export { CURATED_MAP_STATUS, CURATED_CATEGORY_CANDIDATES, curatedCategoryIds } from "./curated-categories";
-export { relativeOrderPreserved, orderedPolicyIds } from "./ordering";
+export { orderedPolicyIds } from "./ordering";
 export { toUnifiSchedule } from "./schedule-map";
 export { planPolicies, plannedKey, type PlannedPolicy } from "./plan";
 export { networkInScope, resolveNetworkScope } from "./scope";

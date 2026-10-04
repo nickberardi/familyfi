@@ -55,7 +55,7 @@ The authorization matrix runs with the integration suite. When you add a route, 
   - MAC addresses in tests are locally administered (for example `02:…`);
   - fixture IPv4 addresses come from the documentation ranges `192.0.2.0/24`, `198.51.100.0/24` and `203.0.113.0/24`;
   - never commit a live UniFi response.
-- **The UniFi mock answers like the real API.** `tests/unit/unifi-client-contract.test.ts` runs the cases in `src/server/unifi/contract-cases.ts` against `MockUnifiClient` and `HttpUnifiClient`, and `pnpm spike verify` runs the same cases against a real console. Change the mock and those cases together.
+- **The UniFi mock answers like the real API.** `tests/unit/unifi-client-contract.test.ts` runs the cases in `src/server/unifi/contract-cases.ts` against `MockUnifiClient` and `HttpUnifiClient`. Change the mock and those cases together.
 - **Display behaviour is shared with iOS through `tests/fixtures/display-vectors.json`.** See [Display vectors](#display-vectors).
 - **Every test has a category.** A new test file needs an entry in `scripts/testing/catalog.json`, keyed by its path, so `--category` finds it; every run and `check catalog` fail on an uncategorized test or an entry that names none. Pick existing categories where they fit.
 - **Every invariant in AGENTS.md names its tests.** A new invariant comes with them; `tests/unit/invariants.test.ts` fails when one names none or a missing file.
@@ -121,18 +121,4 @@ Empty. An advisory that cannot be fixed yet goes in `pnpm.auditConfig.ignoreGhsa
 
 ## What no test proves
 
-The mock stands in for a gateway, so nothing in CI shows that a real UniFi console enforces a block. That proof comes from the operator running `pnpm spike verify` against a console ([spike/OPERATOR.md](spike/OPERATOR.md#verification-run)), which writes a dated, sanitized record to [`docs/verification/`](verification/README.md) and rewrites this table. Each row links the latest record that ran the scenario; "API only" means the console accepted and read back the policies but nobody watched a test device.
-
-<!-- verification-status:start (pnpm spike verify writes this table) -->
-| Scenario | Latest result | Record |
-| --- | --- | --- |
-| Client contract (the cases CI runs against the mock) | not run | |
-| IPv4 MAC block and restore | not run | |
-| IPv6 block and restore | not run | |
-| Bedtime schedule crossing midnight | not run | |
-| Two concurrent MACs | not run | |
-| Pause and resume leave the schedule intact | not run | |
-| Refuses to write an administrator-created policy | not run | |
-<!-- verification-status:end -->
-
-IPv4 MAC block and restore was checked by hand on a household gateway with the spike CLI before this mode existed; that run left no record, so the table does not count it.
+The mock stands in for a gateway, so nothing in CI shows that a real UniFi console enforces a block. FamilyFi has no tool for checking that against a console; the contract cases above keep the mock to the documented API, and only someone watching a test device on a real gateway can confirm a block holds.

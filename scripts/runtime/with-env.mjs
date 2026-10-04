@@ -44,11 +44,5 @@ if (inMemoryDatabase() && !process.env.FAMILYFI_DATABASE_SERVED) {
     }
   }
 
-  const childEnv = { ...process.env };
-  const isSpike = args.some((arg) => String(arg).includes("scripts/spike/"));
-  const tlsInsecure = ["1", "true", "yes"].includes((process.env.UNIFI_TLS_INSECURE ?? "").trim().toLowerCase());
-  if (isSpike && tlsInsecure) {
-    childEnv.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  }
-  exec(command, args, childEnv);
+  exec(command, args, { ...process.env });
 }

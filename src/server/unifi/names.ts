@@ -12,10 +12,6 @@ export function pauseRuleName(input: { name: string; kind: "family" | "things" }
   return `${subject} Internet Pause`;
 }
 
-export function spikePolicyName(zoneName: string): string {
-  return clipName(`${FAMILYFI_POLICY_PREFIX}Spike ${zoneLabel(zoneName)} Devices`);
-}
-
 function possessive(name: string): string {
   const trimmed = name.trim() || "Group";
   if (/s$/i.test(trimmed)) return `${trimmed}'`;

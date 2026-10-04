@@ -1,14 +1,13 @@
 /**
  * The behaviour FamilyFi relies on from the UniFi Integration API, checked the same way
  * against the mock every other test uses and against the real `HttpUnifiClient`. The
- * HTTP side answers as the API is documented (docs/architecture.md) and as the spike saw
- * it on a live console: 404 for an id it does not have, PUT replacing the whole policy,
+ * HTTP side answers as the API is documented (docs/architecture.md) and as a live console
+ * was seen to: 404 for an id it does not have, PUT replacing the whole policy,
  * and an ordering read that needs a source zone. The mock used to throw plain errors,
  * merge on PUT and ignore the zone, so reconcile's recreate-on-404 path could never run
  * in a test; this keeps the two from drifting apart again.
  *
- * The cases themselves live in `src/server/unifi/contract-cases.ts`, so `pnpm spike verify`
- * can run the same contract against a real console.
+ * The cases themselves live in `src/server/unifi/contract-cases.ts`.
  */
 
 import { describe, expect, it } from "vitest";
@@ -81,7 +80,6 @@ const subjects: [string, () => UnifiClient][] = [
 ];
 
 describe.each(subjects)("UniFi client contract: %s", (_name, make) => {
-  // The shared cases: `pnpm spike verify` runs these same ones against a real console.
   for (const contractCase of UNIFI_CLIENT_CONTRACT) {
     it(contractCase.name, () =>
       contractCase.run({ client: make(), siteId: SITE, sourceZoneId: DEV_MOCK_INTERNAL_ZONE, destinationZoneId: EXTERNAL_ZONE }),

@@ -33,9 +33,8 @@ describe("missingClientFields", () => {
 });
 
 describe("shouldPrepareDatabase", () => {
-  it("runs for Next and skips the spike CLI and nested prisma commands", () => {
+  it("runs for Next and skips nested prisma commands", () => {
     expect(shouldPrepareDatabase("next", ["dev"])).toBe(true);
-    expect(shouldPrepareDatabase("npx", ["tsx", "scripts/spike/index.ts"])).toBe(false);
     expect(shouldPrepareDatabase("./node_modules/.bin/prisma", ["migrate", "deploy"])).toBe(false);
   });
 });

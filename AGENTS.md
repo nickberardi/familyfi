@@ -57,7 +57,6 @@ pass. Keep these distinctions when naming features and choosing data owners.
 | HTTP contract or authentication | [API](docs/api.md), `openapi/familyfi.v1.yaml`, authorization matrix in `tests/integration/authorization-matrix.test.ts` |
 | Database, environment or deployment | [Setup](docs/setup.md), [operations](docs/operations.md), [naming and migration rules](docs/development.md#naming) |
 | Tests, CI or scripts | [Testing](docs/testing.md), [scripts](scripts/README.md) |
-| Live UniFi verification | [Operator checklist](docs/spike/OPERATOR.md), only when the operator requested live work |
 
 For UI references, read `Web Design.dc.html`, `Sign In.dc.html`, and the `_ds/` bundle's `readme.md`, `tokens/` and `_ds_bundle.js` when available. They are optional local references, never dependencies. Repository rules, current components and tokens, and architecture take precedence over prototype behaviour, sizes, colours and delivery mechanisms. Missing `designs/` does not block UI work.
 

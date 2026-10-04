@@ -103,13 +103,3 @@ export function mapClientsToZones(input: {
   });
 }
 
-export function groupMacsBySourceZone(mappings: ClientZoneMapping[]): Map<string, string[]> {
-  const grouped = new Map<string, string[]>();
-  for (const mapping of mappings) {
-    if (!mapping.sourceZoneId || !mapping.macAddress) continue;
-    const list = grouped.get(mapping.sourceZoneId) ?? [];
-    if (!list.includes(mapping.macAddress)) list.push(mapping.macAddress);
-    grouped.set(mapping.sourceZoneId, list);
-  }
-  return grouped;
-}

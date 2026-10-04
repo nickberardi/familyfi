@@ -5,14 +5,11 @@ import { HttpUnifiClient, assertNotPolicyOrderingPut } from "@/server/unifi/clie
 import { UnifiConfigError } from "@/server/unifi/errors";
 import { resolveIntegrationBase } from "@/server/unifi/base-url";
 import { collectPages } from "@/server/unifi/paginate";
-import { MockUnifiClient, createMockUnifiState } from "@/server/unifi/mock";
 import { mapClientsToZones, selectExternalZone } from "@/server/unifi/mapping";
-import { orderedPolicyIds, relativeOrderPreserved } from "@/server/unifi/ordering";
-import { internetBlockPolicy, spikePolicyName, toPolicyUpdate } from "@/server/unifi/payloads";
+import { internetBlockPolicy, toPolicyUpdate } from "@/server/unifi/payloads";
 import { toUnifiSchedule } from "@/server/unifi/schedule-map";
-import { sanitizeUnifiText } from "@/server/unifi/sanitize";
-import { applyInternetBlocks, discoverInventory, setPoliciesEnabled, deletePolicies } from "@/server/unifi/spike";
 import { planPolicies } from "@/server/unifi/plan";
+import { quarantinePolicyName } from "@/server/unifi/names";
 import { AssignmentState } from "@prisma/client";
 import { UNIFI_PAGE_LIMIT } from "@/server/unifi/types";
 import type { ClientOverview, FirewallPolicy, FirewallZone, NetworkDetails, UnifiPage } from "@/server/unifi/types";
@@ -72,7 +69,7 @@ describe("payloads", () => {
   it("matches the sanitized create-policy fixture", () => {
     const expected = readJson<ReturnType<typeof internetBlockPolicy>>("create-policy.request.json");
     const actual = internetBlockPolicy({
-      name: spikePolicyName("Internal"),
+      name: quarantinePolicyName("Internal"),
       sourceZoneId: "33333333-3333-4333-8333-333333333333",
       destinationZoneId: "33333333-3333-4333-8333-333333333335",
       macAddresses: ["02:00:00:00:00:01", "02-00-00-00-00-03"],
@@ -121,21 +118,6 @@ describe("mapping", () => {
   });
 });
 
-describe("ordering", () => {
-  it("treats new ids as insertions that must not scramble prior ids", () => {
-    const before = ["a", "b", "c"];
-    expect(relativeOrderPreserved(before, ["a", "spike", "b", "c"])).toBe(true);
-    expect(relativeOrderPreserved(before, ["a", "c", "b"])).toBe(false);
-  });
-});
-
-describe("sanitize", () => {
-  it("replaces MACs and documentation IPs", () => {
-    expect(sanitizeUnifiText("host 0a:85:90:1a:44:0e at 203.0.113.9")).toMatch(/02:00:00:00:00:01/);
-    expect(sanitizeUnifiText("host 0a:85:90:1a:44:0e at 203.0.113.9")).toMatch(/192\.0\.2\./);
-  });
-});
-
 describe("HttpUnifiClient", () => {
   it("sends X-API-KEY, paginates, and refuses ordering PUT", async () => {
     const headers: string[] = [];
@@ -161,47 +143,6 @@ describe("HttpUnifiClient", () => {
     expect(headers[0]).toBe("secret-key");
     expect(() => assertNotPolicyOrderingPut("PUT", "/v1/sites/x/firewall/policies/ordering")).toThrow(/never reorders/);
     expect(() => assertNotPolicyOrderingPut("GET", "/v1/sites/x/firewall/policies/ordering")).not.toThrow();
-  });
-});
-
-describe("mocked spike flow", () => {
-  it("creates BLOCK MAC policies, disables via PUT, deletes, and never calls ordering PUT", async () => {
-    const adminId = "55555555-5555-4555-8555-555555555555";
-    const state = createMockUnifiState({
-      version: "9.5.0",
-      sites: readJson<UnifiPage<{ id: string; name: string; internalReference: string }>>("sites.page.json").data,
-      networks: readJson<UnifiPage<NetworkDetails>>("networks.page.json").data,
-      zones: readJson<UnifiPage<FirewallZone>>("zones.page.json").data,
-      clients: readJson<UnifiPage<ClientOverview>>("clients.page.json").data,
-      policies: readJson<UnifiPage<FirewallPolicy>>("policies.page.json").data,
-      ordering: { beforeSystemDefined: [], afterSystemDefined: [adminId] },
-    });
-    const client = new MockUnifiClient(state);
-    const inventory = await discoverInventory(client);
-    expect(inventory.applicationVersion).toBe("9.5.0");
-    const applied = await applyInternetBlocks(client, inventory, [
-      "02:00:00:00:00:01",
-      "02:00:00:00:00:02",
-    ]);
-    expect(applied.created).toHaveLength(2);
-    expect(applied.created.every((policy) => policy.action.type === "BLOCK")).toBe(true);
-    expect(applied.adminOrderPreserved).toBe(true);
-    expect(orderedPolicyIds(applied.orderingAfter)[0]).toBe(adminId);
-
-    const disabled = await setPoliciesEnabled(client, inventory.site.id, applied.created, false);
-    expect(disabled.every((policy) => policy.enabled === false)).toBe(true);
-
-    const cleanup = await deletePolicies(
-      client,
-      inventory.site.id,
-      applied.created.map((policy) => policy.id),
-    );
-    expect(cleanup.failed).toHaveLength(0);
-    // The console keeps one ordering per source zone; the administrator's policy is in Internal.
-    const adminZone = state.policies.find((policy) => policy.id === adminId)!.source.zoneId;
-    const finalOrder = await client.getPolicyOrdering(inventory.site.id, adminZone);
-    expect(finalOrder.afterSystemDefined).toEqual([adminId]);
-    expect(client.calls.some((call) => call.method === "PUT" && call.path.includes("ordering"))).toBe(false);
   });
 });
 
