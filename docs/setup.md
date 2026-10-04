@@ -40,7 +40,7 @@ Phones on the LAN should use the host's LAN address, not `localhost`. HTTPS is r
 
 - Username `admin` is reserved and cannot be removed through household administration.
 - Adults granted admin access get personal usernames and passwords. Those names cannot be `admin`.
-- Every adult with a login is trusted with the household: accounts, household settings and the UniFi connection. **Admin** is a flag, not a tier. It gates only paired devices and remote access (`/api/v1/paired/*`, `/api/v1/connection/*`), and any adult can turn it on, their own included. `tests/integration/authorization-matrix.test.ts` holds each route to this.
+- Only administrators use FamilyFi: an adult without admin access is like a child or teen, with no sign-in, session or paired device. Every administrator is trusted with the whole household: accounts, household settings, the UniFi connection, paired devices and remote access. Turning an adult's admin off signs them out and removes their paired devices and pending invites. `tests/integration/authorization-matrix.test.ts` holds each route to this.
 - Children, teens, and Things groups do not receive logins.
 - Browser sessions use an httpOnly cookie plus a CSRF cookie. A phone joins by claiming an administrator-generated, five-minute invite code (scanned as a QR or pasted) at `POST /api/v1/paired/invites/{id}/claim`, which signs it in as the adult the administrator chose; later requests send `Authorization: Bearer`. Phones never sign in with a password, and a bare server address cannot enroll one.
 - Five failed attempts in 15 minutes, per username or IP, are rejected with HTTP 429.

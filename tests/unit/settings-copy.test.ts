@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLoginTitle, gatewayFacts, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeLoginConfirm, usernameFromName } from "@/lib/settings-copy";
+import { createLoginTitle, gatewayFacts, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeAdminConfirm, removeLoginConfirm, usernameFromName } from "@/lib/settings-copy";
 import type { UnifiSettings } from "@/lib/types";
 
 const unifi: UnifiSettings = {
@@ -51,6 +51,13 @@ describe("settings copy", () => {
         { id: "a2", username: "sam", displayName: "Sam", kind: "personal", isAdmin: false, groupId: "g2", recovery: false },
       ),
     ).toBe("Adult · login sam · not an admin, can't sign in · 0 devices");
+  });
+
+  it("asks before turning admin off, since that signs the adult out and removes their devices", () => {
+    const confirm = removeAdminConfirm({ username: "sam" }, { name: "Sam" });
+    expect(confirm.confirmLabel).toBe("Turn off admin");
+    expect(confirm.message).toContain("signed out");
+    expect(confirm.message).toContain("phones, Watches and agents");
   });
 
   it("suggests a personal username from a given name", () => {

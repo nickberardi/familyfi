@@ -10,7 +10,7 @@ import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
  * Pair Device's data: remote access, its routes and the paired devices (phones, Watches and
  * agents), reloaded every 15 seconds,
  * and every 2 while a tunnel is on its way so its address and status appear by themselves. A
- * member who is not an admin is told so instead.
+ * session that may not manage paired devices (a Watch's or an agent's) is told so instead.
  */
 export function usePairDevice(request: ApiRequest) {
   const [tunnel, setTunnel] = useState<RemoteAccess | null>(null);

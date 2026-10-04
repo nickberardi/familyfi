@@ -138,6 +138,15 @@ export function loginFormState(username: string, password: string, confirm: stri
 }
 
 /** What removing a login does, where the platform asks first. */
+/** Turning an adult's admin off: they lose FamilyFi entirely, so it asks first. */
+export function removeAdminConfirm(account: Pick<Account, "username">, group: Pick<Group, "name">) {
+  return {
+    title: "Turn off admin?",
+    message: `${account.username} is signed out and can no longer sign in to FamilyFi, and the phones, Watches and agents acting as ${group.name} are removed. ${group.name} stays in the household.`,
+    confirmLabel: "Turn off admin",
+  };
+}
+
 export function removeLoginConfirm(account: Pick<Account, "username">, group: Pick<Group, "name">) {
   return {
     title: "Remove login?",
