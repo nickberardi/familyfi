@@ -1,3 +1,5 @@
+import { DEV_ADMIN } from "./dev-household";
+
 const LINE = "=".repeat(66);
 
 export function recoveryAdminBanner(password: string): string {
@@ -20,7 +22,7 @@ export function unifiMockBanner(): string {
     "  UniFi mock enabled (dummy household, no live console)",
     "    Settings API key: mock-unifi-key",
     "    Console: 127.0.0.1  (https://127.0.0.1/proxy/network/integration)",
-    "    Extra adult login: pat  (same password as admin)",
+    `    Administrator login: ${DEV_ADMIN.username}  (same password as admin)`,
     "  Turn UNIFI_MOCK off to talk to a real gateway. Mocks do not prove enforcement.",
     LINE,
     "",
