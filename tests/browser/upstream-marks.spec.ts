@@ -30,8 +30,8 @@ async function clearSlotRules(page: Page, groupId: string, categoryId: number) {
 }
 
 /**
- * The household's resolver blocks Adult and some of Dating, and neither has a UniFi
- * category to put a FamilyFi rule beside. So the kid gets verdicts of its own for two
+ * The household's resolver blocks Adult and some of Dating, and neither is a curated
+ * mark slot a card can put a FamilyFi rule beside. So the kid gets verdicts of its own for two
  * that do: Social blocked and Gaming partial. VPN stays the household's measured open,
  * and Video its one unmeasured category.
  */
