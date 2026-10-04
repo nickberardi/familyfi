@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { buildDatabaseUrl } from "@/server/database-url";
+import { buildDatabaseUrl, OLD_DATABASE_NAMES } from "@/server/database-url";
 import { createPrismaClient } from "@/server/db";
 import { resetEnvCacheForTests } from "@/server/env";
 
-export const TEST_POSTGRES_DB = "familyfi_test";
+export const TEST_DB_NAME = "familyfi_test";
 export const TEST_ORIGIN = "http://familyfi.test";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -41,24 +41,28 @@ function loadDotEnvIfPresent() {
 export function applyIntegrationEnv() {
   loadDotEnvIfPresent();
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
-  process.env.DB_MODE = "external";
-  // Each test picks its own mode; a developer's .env (FAMILYFI_MODE, or its old name UNIFI_MOCK) must not.
+  // A developer's .env may still use the database settings' old names; tests read only the new ones.
+  for (const [name, old] of Object.entries(OLD_DATABASE_NAMES)) {
+    process.env[name] ||= process.env[old];
+    delete process.env[old];
+  }
+  process.env.DB_SERVER = "external";
+  // Each test picks its own mode; a developer's .env must not.
   delete process.env.FAMILYFI_MODE;
-  delete process.env.UNIFI_MOCK;
-  process.env.POSTGRES_DB = TEST_POSTGRES_DB;
+  process.env.DB_NAME = TEST_DB_NAME;
   process.env.FAMILYFI_DEFAULT_PASSWORD ||= "ci-recovery-password";
   process.env.FAMILYFI_SESSION_SECRET ||= "ci-only-session-secret-32chars!!";
   process.env.FAMILYFI_ENCRYPTION_KEY ||=
     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
-  if (!process.env.POSTGRES_PASSWORD) {
-    throw new Error("POSTGRES_PASSWORD is required for integration tests (use .env or CI env).");
+  if (!process.env.DB_PASSWORD) {
+    throw new Error("DB_PASSWORD is required for integration tests (use .env or CI env).");
   }
   process.env.DATABASE_URL = buildDatabaseUrl({
     DB_HOST: process.env.DB_HOST,
-    POSTGRES_PORT: process.env.POSTGRES_PORT,
-    POSTGRES_DB: TEST_POSTGRES_DB,
-    POSTGRES_USER: process.env.POSTGRES_USER,
-    POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
+    DB_PORT: process.env.DB_PORT,
+    DB_NAME: TEST_DB_NAME,
+    DB_USER: process.env.DB_USER,
+    DB_PASSWORD: process.env.DB_PASSWORD,
     DB_SSL_MODE: process.env.DB_SSL_MODE,
     DB_SSL_ROOT_CERT: process.env.DB_SSL_ROOT_CERT,
   });
@@ -68,10 +72,10 @@ export function applyIntegrationEnv() {
 export async function ensureTestDatabase() {
   const adminUrl = buildDatabaseUrl({
     DB_HOST: process.env.DB_HOST,
-    POSTGRES_PORT: process.env.POSTGRES_PORT,
-    POSTGRES_DB: "postgres",
-    POSTGRES_USER: process.env.POSTGRES_USER,
-    POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
+    DB_PORT: process.env.DB_PORT,
+    DB_NAME: "postgres",
+    DB_USER: process.env.DB_USER,
+    DB_PASSWORD: process.env.DB_PASSWORD,
     DB_SSL_MODE: process.env.DB_SSL_MODE,
     DB_SSL_ROOT_CERT: process.env.DB_SSL_ROOT_CERT,
   });
@@ -85,10 +89,10 @@ export async function ensureTestDatabase() {
   }
   try {
     const rows = await admin.$queryRawUnsafe<{ datname: string }[]>(
-      `SELECT datname FROM pg_database WHERE datname = '${TEST_POSTGRES_DB}'`,
+      `SELECT datname FROM pg_database WHERE datname = '${TEST_DB_NAME}'`,
     );
     if (rows.length === 0) {
-      await admin.$executeRawUnsafe(`CREATE DATABASE ${TEST_POSTGRES_DB}`);
+      await admin.$executeRawUnsafe(`CREATE DATABASE ${TEST_DB_NAME}`);
     }
   } finally {
     await admin.$disconnect();

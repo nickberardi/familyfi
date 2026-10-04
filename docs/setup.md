@@ -12,18 +12,20 @@ Copy `.env.example` to `.env` and set:
 | `FAMILYFI_SESSION_SECRET` | Binds cookie sessions. Generated on first setup if missing or invalid; never rotated automatically afterward. |
 | `FAMILYFI_ENCRYPTION_KEY` | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
 | `FAMILYFI_MODE` | `prod` (default), `dev`, `test` or `demo`; see [Modes](#modes). |
-| `DB_MODE` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`), `external` (use `DB_HOST` below), or `memory` (an in-memory database, `dev` and `test` only). |
-| `DB_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Connection parts. Prisma `DATABASE_URL` is derived, with credentials URL-encoded. Do not treat a hand-written `DATABASE_URL` as source of truth. |
+| `DB_SERVER` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`), `external` (use `DB_HOST` below), or `memory` (an in-memory database, `dev` and `test` only). |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Connection parts. Prisma `DATABASE_URL` is derived, with credentials URL-encoded. Do not treat a hand-written `DATABASE_URL` as source of truth. |
 | `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |
 | `FAMILYFI_PHONE_GATEWAY_PORT` | Optional. Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
 
-Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a temporary key; that path is not the application credential store.
+The database settings were once `DB_MODE` and `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD`. Those names still work while the new name is unset, and startup warns about each one; rename them in `.env`. Compose passes the values to the PostgreSQL container under the names that image expects.
+
+The app reads no UniFi settings from the environment: paste the Integration API key in Settings. The spike CLI's `SPIKE_*` settings are separate ([operator checklist](spike/OPERATOR.md)).
 
 ## Local development
 
 1. Install Node.js 26+ and pnpm 10. `.node-version` names the version CI and the Docker image use; `nvm`, `fnm` and similar tools read it.
 2. Install Docker if you want `make setup` to start PostgreSQL for you.
-3. `cp .env.example .env` and set `POSTGRES_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. Watch the server log for `username: admin` and `password:`.
+3. `cp .env.example .env` and set `DB_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. Watch the server log for `username: admin` and `password:`.
 4. `make setup` then `make dev`. `make dev` waits for PostgreSQL, applies pending Prisma migrations, regenerates the database client, then starts Next. The first start can take a few extra seconds. If port 3000 is already taken, `make dev` asks whether to kill that process.
 5. Open http://localhost:3000 and sign in as `admin`.
 
@@ -36,17 +38,17 @@ Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a te
 | Mode | Gateway | Database | Data | Configuration |
 | --- | --- | --- | --- | --- |
 | `prod` (default) | the household's UniFi gateway | PostgreSQL | the household's | open |
-| `dev` | the UniFi mock | PostgreSQL, or in memory with `DB_MODE=memory` | the seed household | open |
+| `dev` | the UniFi mock | PostgreSQL, or in memory with `DB_SERVER=memory` | the seed household | open |
 | `test` | the UniFi mock | as `dev`; `scripts/test.py` gives each run its own | the seed household, or each test's | open |
 | `demo` | the UniFi mock | in memory, always | the seed household, reset nightly | locked ([demo mode](operations.md#demo-mode)) |
 
-Under `NODE_ENV=production` only `prod` and `demo` start, and `test` under CI (the browser tests run the production build); anything else stops startup with a message. `UNIFI_MOCK=1` is the old name for `dev`: it still works outside production, with a warning, and is ignored in production. Mocks do not prove firewall enforcement.
+Under `NODE_ENV=production` only `prod` and `demo` start, and `test` under CI (the browser tests run the production build); anything else stops startup with a message. `UNIFI_MOCK` is no longer read; startup warns when it is set. Mocks do not prove firewall enforcement.
 
 ### Dummy household (no UniFi console)
 
 Set `FAMILYFI_MODE=dev` in `.env` and restart `make dev`. The app fakes the Network Integration API with synthetic fixtures, seeds a small household (Pat / Betsy / Sam / Living Room, three devices), and encrypts the dummy key `mock-unifi-key` so Settings looks connected. Sign in as `admin` or `pat` (same `FAMILYFI_DEFAULT_PASSWORD`). Use this for UI work (adding a user, jittery buttons, layout). Set `FAMILYFI_MODE=prod` (or remove it) before pointing at a real gateway.
 
-Add `DB_MODE=memory` to run without PostgreSQL or Docker: `make dev` starts an in-memory database with the server, applies the migrations and seeds it, and nothing is kept when the server stops.
+Add `DB_SERVER=memory` to run without PostgreSQL or Docker: `make dev` starts an in-memory database with the server, applies the migrations and seeds it, and nothing is kept when the server stops.
 
 If Docker is unavailable, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`.
 

@@ -10,7 +10,7 @@ import { withUpstreamLock } from "./upstream/transaction";
  * Reconcile the shipped seed in `src/lib/upstream-domains.ts` against the database.
  *
  * This runs on every boot, beside `ensureRecoveryAccount()`, because it is the only
- * place a real deployment creates app-owned rows — `dev-seed.ts` is `UNIFI_MOCK` only
+ * place a real deployment creates app-owned rows — `dev-seed.ts` runs only outside `prod`
  * and a migration cannot import the seed module. Running it every boot is also what
  * makes a release's new canary domains arrive in an existing household.
  *

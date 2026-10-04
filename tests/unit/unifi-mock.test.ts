@@ -11,7 +11,7 @@ const validEnv = {
   FAMILYFI_DEFAULT_PASSWORD: "recovery-pass",
   FAMILYFI_SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
   FAMILYFI_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-  POSTGRES_PASSWORD: "db-pass",
+  DB_PASSWORD: "db-pass",
 };
 
 function stubHousehold(): Household {
@@ -38,14 +38,14 @@ describe("UniFi mock", () => {
     resetDevMockClientForTests();
   });
 
-  it("is opt-in, and UNIFI_MOCK is ignored in production", () => {
+  it("is opt-in, and the retired UNIFI_MOCK turns nothing on", () => {
     expect(unifiMockEnabled({ NODE_ENV: "development" })).toBe(false);
     expect(unifiMockEnabled({ NODE_ENV: "development", FAMILYFI_MODE: "dev" })).toBe(true);
-    expect(unifiMockEnabled({ NODE_ENV: "development", UNIFI_MOCK: "1" })).toBe(true);
+    expect(unifiMockEnabled({ NODE_ENV: "development", UNIFI_MOCK: "1" })).toBe(false);
     expect(unifiMockEnabled({ NODE_ENV: "production", UNIFI_MOCK: "1" })).toBe(false);
     expect(unifiMockEnabled({ NODE_ENV: "production", CI: "1", FAMILYFI_MODE: "test" })).toBe(true);
-    expect(loadEnv({ ...validEnv, NODE_ENV: "production", UNIFI_MOCK: "1" }).UNIFI_MOCK).toBe(false);
-    expect(loadEnv({ ...validEnv, NODE_ENV: "test", FAMILYFI_MODE: "test" }).UNIFI_MOCK).toBe(true);
+    expect(loadEnv({ ...validEnv, NODE_ENV: "development", UNIFI_MOCK: "1" }).FAMILYFI_MODE).toBe("prod");
+    expect(loadEnv({ ...validEnv, NODE_ENV: "test", FAMILYFI_MODE: "test" }).FAMILYFI_MODE).toBe("test");
   });
 
   it("returns a shared MockUnifiClient for probe and household clients", async () => {

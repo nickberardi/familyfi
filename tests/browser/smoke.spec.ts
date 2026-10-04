@@ -285,7 +285,7 @@ test("device assignment updates immediately", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Devices" })).toBeVisible();
   await expect(page.getByText("Loading household…")).toHaveCount(0);
   const select = page.locator("select").first();
-  await expect(select, "UNIFI_MOCK household must seed devices in CI").toHaveCount(1);
+  await expect(select, "The mock household must seed devices in CI").toHaveCount(1);
   const deleteButton = page.getByRole("button", { name: /^Delete .+ \([0-9A-F:]+\)$/ }).first();
   await expect(deleteButton).toBeVisible();
   const bounds = await deleteButton.boundingBox();
@@ -296,7 +296,7 @@ test("device assignment updates immediately", async ({ page }) => {
   expect(groups.ok()).toBeTruthy();
   const body = (await groups.json()) as { groups: { id: string; name: string }[] };
   const target = body.groups.find((group) => group.id !== current) ?? body.groups[0];
-  expect(target, "UNIFI_MOCK household must seed groups in CI").toBeTruthy();
+  expect(target, "The mock household must seed groups in CI").toBeTruthy();
   await select.selectOption(target!.id);
   await expect(select).toHaveValue(target!.id);
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
@@ -334,11 +334,11 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
     groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
   const adult = body.groups.find((group) => group.familyRole === "adult");
-  expect(adult, "UNIFI_MOCK seed must include an adult with no rules").toBeTruthy();
+  expect(adult, "The mock seed must include an adult with no rules").toBeTruthy();
   // Distinct seeded kids per project, so desktop and phone never edit the same group.
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
-  expect(child, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+  expect(child, "The mock seed must include Betsy and Sam").toBeTruthy();
   const ruleName = `QA lights out ${test.info().project.name} ${Date.now() % 100000}`;
 
   await page.goto("/rules");
@@ -411,7 +411,7 @@ test("Rules: pause a rule from its card and resume it", async ({ page }) => {
   const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string }[] };
   const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
-  expect(child, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+  expect(child, "The mock seed must include Betsy and Sam").toBeTruthy();
   const ruleName = `QA pause ${test.info().project.name} ${Date.now() % 100000}`;
   const created = await page.request.post("/api/v1/rules", {
     headers: await csrfHeaders(page),
@@ -443,7 +443,7 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
   const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string; deviceCount: number }[] };
   // The Living Room TV group, so the family cards other tests use are left alone.
   const tv = body.groups.find((group) => group.name === "Living Room");
-  expect(tv, "UNIFI_MOCK seed must include the Living Room things group").toBeTruthy();
+  expect(tv, "The mock seed must include the Living Room things group").toBeTruthy();
 
   // A no-internet window offers "Allow internet now" instead of a pause, so turn the
   // seeded TV rule off while this runs: the test must not depend on the time of day.
@@ -468,7 +468,7 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
     const devicesRes = await page.request.get("/api/v1/devices");
     const { devices } = (await devicesRes.json()) as { devices: { groupId: string | null; hostname: string | null }[] };
     const named = devices.find((device) => device.groupId === tv!.id && device.hostname?.trim());
-    expect(named, "UNIFI_MOCK seed must name a Living Room device").toBeTruthy();
+    expect(named, "The mock seed must name a Living Room device").toBeTruthy();
     await expect(sheet.getByText(named!.hostname!.trim(), { exact: false })).toBeVisible();
     await expect(sheet.getByText(/Category, app and website rules stay as they are/)).toBeVisible();
     const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/pause`));
@@ -518,7 +518,7 @@ test("cards show every household category; one UniFi cannot block offers a Websi
   await signIn(page);
   const body = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
   const kid = body.groups.find((group) => group.kind === "family" && group.name === (test.info().project.name === "phone" ? "Sam" : "Betsy"));
-  expect(kid, "UNIFI_MOCK seed must include Betsy and Sam").toBeTruthy();
+  expect(kid, "The mock seed must include Betsy and Sam").toBeTruthy();
 
   await page.goto("/family");
   const marks = page.getByTestId(`filter-marks-${kid!.id}`);
@@ -587,7 +587,7 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const child =
     body.groups.find((group) => group.kind === "family" && group.name === preferredName) ??
     body.groups.find((group) => group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"));
-  expect(child, "UNIFI_MOCK seed must include a family child").toBeTruthy();
+  expect(child, "The mock seed must include a family child").toBeTruthy();
   const adult = body.groups.find((group) => group.familyRole === "adult");
   expect(adult).toBeTruthy();
 

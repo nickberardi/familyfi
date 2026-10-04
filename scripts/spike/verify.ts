@@ -392,7 +392,7 @@ const SCENARIOS: Record<ScenarioId, Scenario> = {
   },
 
   "concurrent-macs": async (run, context) => {
-    if (context.targets.length < 2) return "needs a second test MAC in UNIFI_SPIKE_MACS";
+    if (context.targets.length < 2) return "needs a second test MAC in SPIKE_MACS";
     const [first, second] = context.targets as [Target, Target];
     const policies = await run.api("blocks both test MACs at once", () => createBlocks(context, "Concurrent", [first, second]));
     await run.device("both test devices lose internet", "On both test devices, internet fails. Other devices keep internet.");
@@ -493,10 +493,10 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyOutcome> 
       "Refusing verify without --confirm. It creates, changes and deletes firewall policies on the console, and blocks the test devices' internet.",
     );
   }
-  const consoleModel = options.mock ? "UNIFI_MOCK" : assertLabel("--console-model", options.console.model);
+  const consoleModel = options.mock ? "mock" : assertLabel("--console-model", options.console.model);
   const consoleFirmware = options.mock ? "mock" : assertLabel("--console-firmware", options.console.firmware);
   const macs = [...new Set(options.macs.map(normalizeMac))];
-  if (macs.length === 0) throw new VerifyRefusedError("Set UNIFI_SPIKE_MACS or pass --mac <address> for at least one test device.");
+  if (macs.length === 0) throw new VerifyRefusedError("Set SPIKE_MACS or pass --mac <address> for at least one test device.");
   const log = options.log ?? (() => undefined);
   const observe = options.observe ?? (async () => null);
   const now = options.now ?? (() => new Date());

@@ -102,7 +102,7 @@ class ResourceTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"DATABASE_URL": "postgresql://household"}):
             env = self.owned().test_env("host", "Pacific/Kiritimati")
         self.assertNotIn("DATABASE_URL", env)
-        self.assertEqual((env["POSTGRES_DB"], env["TZ"]), ("familyfi_test", "Pacific/Kiritimati"))
+        self.assertEqual((env["DB_NAME"], env["TZ"]), ("familyfi_test", "Pacific/Kiritimati"))
         self.assertEqual(len(env["FAMILYFI_ENCRYPTION_KEY"]), 64)
 
 

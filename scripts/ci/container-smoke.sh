@@ -44,12 +44,12 @@ run_app() {
     -e FAMILYFI_DEFAULT_PASSWORD="$admin_password" \
     -e FAMILYFI_SESSION_SECRET="$session_secret" \
     -e FAMILYFI_ENCRYPTION_KEY="$encryption_key" \
-    -e DB_MODE=external \
+    -e DB_SERVER=external \
     -e DB_HOST="$db" \
-    -e POSTGRES_PORT=5432 \
-    -e POSTGRES_DB=familyfi \
-    -e POSTGRES_USER=familyfi \
-    -e POSTGRES_PASSWORD="$password" \
+    -e DB_PORT=5432 \
+    -e DB_NAME=familyfi \
+    -e DB_USER=familyfi \
+    -e DB_PASSWORD="$password" \
     "$image" >/dev/null
 }
 

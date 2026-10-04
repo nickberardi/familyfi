@@ -14,7 +14,7 @@ describe("ensureSecrets", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
     const envPath = path.join(dir, ".env");
     const examplePath = path.join(dir, ".env.example");
-    writeFileSync(examplePath, "FAMILYFI_DEFAULT_PASSWORD=\nPOSTGRES_PASSWORD=\n");
+    writeFileSync(examplePath, "FAMILYFI_DEFAULT_PASSWORD=\nDB_PASSWORD=\n");
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
     expect(result.written).toEqual(["FAMILYFI_DEFAULT_PASSWORD", "FAMILYFI_SESSION_SECRET", "FAMILYFI_ENCRYPTION_KEY"]);
@@ -48,7 +48,7 @@ describe("ensureSecrets", () => {
     const password = "recovery-pass";
     const session = "abcdefghijklmnopqrstuvwxyz012345";
     const key = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
-    writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
+    writeFileSync(examplePath, "DB_PASSWORD=\n");
     writeFileSync(
       envPath,
       `FAMILYFI_DEFAULT_PASSWORD=${password}\nFAMILYFI_SESSION_SECRET=${session}\nFAMILYFI_ENCRYPTION_KEY=${key}\n`,
@@ -65,7 +65,7 @@ describe("ensureSecrets", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-env-"));
     const envPath = path.join(dir, ".env");
     const examplePath = path.join(dir, ".env.example");
-    writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
+    writeFileSync(examplePath, "DB_PASSWORD=\n");
     writeFileSync(envPath, "FAMILYFI_DEFAULT_PASSWORD=short\nFAMILYFI_SESSION_SECRET=short\nFAMILYFI_ENCRYPTION_KEY=nope\n");
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
@@ -80,7 +80,7 @@ describe("ensureSecrets", () => {
     const dataDir = path.join(dir, "var-lib-familyfi-data");
     const envPath = path.join(dataDir, ".env");
     const examplePath = path.join(dir, ".env.example");
-    writeFileSync(examplePath, "POSTGRES_PASSWORD=\n");
+    writeFileSync(examplePath, "DB_PASSWORD=\n");
     const env: Record<string, string | undefined> = {};
     const result = ensureSecrets({ envPath, examplePath, env });
     expect(result.envPath).toBe(envPath);

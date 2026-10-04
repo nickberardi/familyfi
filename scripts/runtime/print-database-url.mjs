@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { inMemoryDatabase, memoryDatabase } from "./mode.mjs";
+import { inMemoryDatabase, memoryDatabase, setting } from "./mode.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -53,16 +53,17 @@ export function loadDotEnv() {
 
 /** @param {Record<string, string | undefined>} [source] */
 export function buildDatabaseUrl(source = process.env) {
+  /** @type {Record<string, string | undefined>} */
   const env = inMemoryDatabase(source)
-    ? { ...source, DB_SSL_ROOT_CERT: undefined, ...memoryDatabase(source.POSTGRES_PORT?.trim()) }
+    ? { ...source, DB_SSL_ROOT_CERT: undefined, ...memoryDatabase(setting(source, "DB_PORT")) }
     : source;
-  const host = env.DB_HOST || "127.0.0.1";
-  const port = env.POSTGRES_PORT || "5432";
-  const name = env.POSTGRES_DB || "familyfi";
-  const user = env.POSTGRES_USER || "familyfi";
-  const password = env.POSTGRES_PASSWORD ?? "";
-  const sslMode = env.DB_SSL_MODE;
-  const sslRoot = env.DB_SSL_ROOT_CERT;
+  const host = setting(env, "DB_HOST") || "127.0.0.1";
+  const port = setting(env, "DB_PORT") || "5432";
+  const name = setting(env, "DB_NAME") || "familyfi";
+  const user = setting(env, "DB_USER") || "familyfi";
+  const password = setting(env, "DB_PASSWORD") ?? "";
+  const sslMode = setting(env, "DB_SSL_MODE");
+  const sslRoot = setting(env, "DB_SSL_ROOT_CERT");
   let url = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(name)}`;
   const params = [];
   if (sslMode) params.push(`sslmode=${encodeURIComponent(sslMode)}`);

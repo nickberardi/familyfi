@@ -1,18 +1,20 @@
+# Database settings use DB_*. The old POSTGRES_* names in .env still fill in while the new name is
+# unset; the postgres image itself takes POSTGRES_*.
 services:
   db:
     image: postgres:18-alpine
-    container_name: ${POSTGRES_CONTAINER_NAME:-familyfi-postgres}
+    container_name: ${DB_CONTAINER_NAME:-${POSTGRES_CONTAINER_NAME:-familyfi-postgres}}
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-familyfi}
-      POSTGRES_USER: ${POSTGRES_USER:-familyfi}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-${POSTGRES_DB:-familyfi}}
+      POSTGRES_USER: ${DB_USER:-${POSTGRES_USER:-familyfi}}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:?Set DB_PASSWORD in .env}}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${DB_PORT:-${POSTGRES_PORT:-5432}}:5432"
     volumes:
-      - familyfi-postgres:${POSTGRES_DATA_PATH:-/var/lib/postgresql}
+      - familyfi-postgres:${DB_DATA_PATH:-${POSTGRES_DATA_PATH:-/var/lib/postgresql}}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,12 +28,12 @@ services:
       NODE_ENV: production
       PORT: "7001"
       HOSTNAME: 0.0.0.0
-      DB_MODE: bundled
+      DB_SERVER: bundled
       DB_HOST: db
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:-familyfi}
-      POSTGRES_USER: ${POSTGRES_USER:-familyfi}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      DB_PORT: ${DB_PORT:-${POSTGRES_PORT:-5432}}
+      DB_NAME: ${DB_NAME:-${POSTGRES_DB:-familyfi}}
+      DB_USER: ${DB_USER:-${POSTGRES_USER:-familyfi}}
+      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:?Set DB_PASSWORD in .env}}
       # Set to expose the phone-only gateway to a tunnel sidecar on this Compose network
       # (see docs/setup.md). Never add it to `ports`.
       FAMILYFI_PHONE_GATEWAY_PORT: ${FAMILYFI_PHONE_GATEWAY_PORT:-}
@@ -46,7 +48,7 @@ services:
 volumes:
   familyfi-postgres:
     driver: local
-    name: ${POSTGRES_VOLUME_NAME:-familyfi-postgres_data}
+    name: ${DB_VOLUME_NAME:-${POSTGRES_VOLUME_NAME:-familyfi-postgres_data}}
   familyfi-app:
     driver: local
     name: ${APP_DATA_VOLUME_NAME:-familyfi-app_data}

@@ -1,4 +1,4 @@
-import { inMemoryDatabase, modeIssues } from "./mode.mjs";
+import { inMemoryDatabase, modeIssues, setting } from "./mode.mjs";
 
 /** @param {Record<string, string | undefined>} [env] */
 export function envIssues(env = process.env) {
@@ -19,11 +19,12 @@ export function envIssues(env = process.env) {
   }
   issues.push(...modeIssues(env));
   // The in-memory database brings its own settings (mode.mjs).
-  if (!env.POSTGRES_PASSWORD && !inMemoryDatabase(env)) {
-    issues.push("POSTGRES_PASSWORD must be set.");
+  if (!setting(env, "DB_PASSWORD") && !inMemoryDatabase(env)) {
+    issues.push("DB_PASSWORD must be set.");
   }
-  if (env.DB_MODE && !["bundled", "external", "memory"].includes(env.DB_MODE)) {
-    issues.push("DB_MODE must be bundled, external or memory.");
+  const server = setting(env, "DB_SERVER");
+  if (server && !["bundled", "external", "memory"].includes(server)) {
+    issues.push("DB_SERVER must be bundled, external or memory.");
   }
   return issues;
 }
@@ -33,6 +34,6 @@ export function assertEnv(env = process.env) {
   if (!issues.length) return;
   console.error("FamilyFi is missing required settings in .env:");
   for (const issue of issues) console.error(`  - ${issue}`);
-  console.error("Fix POSTGRES_PASSWORD in .env (and any other listed settings), then rerun.");
+  console.error("Fix DB_PASSWORD in .env (and any other listed settings), then rerun.");
   process.exit(1);
 }

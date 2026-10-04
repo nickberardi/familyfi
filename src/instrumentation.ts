@@ -2,7 +2,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.NEXT_PHASE) return;
   if (process.env.npm_lifecycle_event === "build") return;
-  const { ConfigurationError, legacyUnifiMock, loadEnv } = await import("./server/env");
+  const { ConfigurationError, loadEnv, oldSettingNames } = await import("./server/env");
   let settings;
   try {
     settings = loadEnv();
@@ -14,14 +14,8 @@ export async function register() {
   const { logDemoMode, logRecoveryAdmin, logUnifiMock } = await import("./server/startup-banner");
   logRecoveryAdmin(settings.FAMILYFI_DEFAULT_PASSWORD);
   if (settings.FAMILYFI_MODE === "demo") logDemoMode();
-  else if (settings.UNIFI_MOCK) logUnifiMock(settings.FAMILYFI_MODE);
-  if (legacyUnifiMock()) {
-    console.warn(
-      settings.FAMILYFI_MODE === "dev"
-        ? "UNIFI_MOCK is deprecated; set FAMILYFI_MODE=dev instead."
-        : "UNIFI_MOCK is set but ignored because NODE_ENV is production; FAMILYFI_MODE picks the mode.",
-    );
-  }
+  else if (settings.FAMILYFI_MODE !== "prod") logUnifiMock(settings.FAMILYFI_MODE);
+  oldSettingNames().forEach((warning) => console.warn(warning));
   const { startUpdateCheck } = await import("./server/update-check");
   const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
   const { ensureUpstreamCategories } = await import("./server/upstream-seed");
@@ -31,7 +25,7 @@ export async function register() {
     await ensureRecoveryAccount();
     await ensureHousehold();
     await ensureUpstreamCategories();
-    if (settings.UNIFI_MOCK) {
+    if (settings.FAMILYFI_MODE !== "prod") {
       const { ensureDevDummyData } = await import("./server/dev-seed");
       await ensureDevDummyData();
     }
