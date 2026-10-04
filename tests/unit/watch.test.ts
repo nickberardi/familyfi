@@ -11,6 +11,7 @@ import {
   reconcileWatchSelection,
   reconcileWatches,
   removeWatch,
+  renameWatch,
   watchGroupIds,
   watchIdForDevice,
   watchProvisioning,
@@ -115,7 +116,7 @@ describe("watch", () => {
     expect(() => watchProvisioning("watch-1", enrollment(forged), { instanceId: "ff_1", publicKeyX: home.x })).toThrow(MANIFEST_SIGNATURE_INVALID);
   });
 
-  it("lists the Watches this phone set up, and removes one", async () => {
+  it("lists the Watches this phone set up, removes one, and renames one", async () => {
     const watch = (id: string, parentDeviceId: string | null) => ({ id, parentDeviceId }) as PairedPhone;
     const sent: unknown[] = [];
     const request = (async (path: string, init?: unknown) => {
@@ -124,9 +125,11 @@ describe("watch", () => {
     }) as never;
     expect((await listWatches(request, "phone-1")).map((each) => each.id)).toEqual(["w1"]);
     await removeWatch(request, { id: "w1" });
+    await renameWatch(request, { id: "w1" }, "  Kitchen Watch ");
     expect(sent).toEqual([
       ["/api/v1/paired/devices?client=watch&status=active", undefined],
       ["/api/v1/paired/devices/w1", { method: "DELETE" }],
+      ["/api/v1/paired/devices/w1", { method: "PATCH", body: { displayName: "Kitchen Watch" } }],
     ]);
   });
 });
