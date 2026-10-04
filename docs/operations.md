@@ -171,7 +171,7 @@ Release images run `prisma migrate deploy` on start. Local `make dev` does the s
 
 A household may skip releases: any release from v0.1.0 on upgrades straight to the newest. CI proves it on every push by filling a database built by each release since v0.1.0 and upgrading it (`pnpm db-upgrade`). The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/ci/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
 
-Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose reads `DB_*` from `.env`, hands the database service the `POSTGRES_*` names its image expects, and passes `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET`, `FAMILYFI_ENCRYPTION_KEY`, and `DB_*` into the app container. The image does not read a mounted `.env` file.
+Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose reads `DB_*` from `.env`, hands the database service the `POSTGRES_*` names its image expects, and passes `DB_*` into the app container, which reaches PostgreSQL on port 5432 inside the Compose network. The app generates `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET` and `FAMILYFI_ENCRYPTION_KEY` on first boot and keeps them in `/var/lib/familyfi/data/.env` on its volume. It does not read the host's `.env`. `make docker-up` warns about database settings that still use their old names.
 
 ## Releases
 

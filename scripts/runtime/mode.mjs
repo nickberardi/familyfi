@@ -1,7 +1,7 @@
 /**
  * `FAMILYFI_MODE` for the startup scripts, which run before the app and cannot import its
- * TypeScript. Mirrors `familyfiMode`, `modeIssues`, `inMemoryDatabase`, `memoryDatabase` and the
- * old database names in src/server/env.ts and src/server/database-url.ts;
+ * TypeScript. Mirrors `familyfiMode`, `modeIssues`, `inMemoryDatabase`, `memoryDatabase`, the old
+ * database names and `oldSettingNames` in src/server/env.ts and src/server/database-url.ts;
  * tests/unit/familyfi-mode.test.ts holds them equal.
  */
 
@@ -39,6 +39,26 @@ function truthy(value) {
 /** @param {Env} env */
 function requested(env) {
   return (env.FAMILYFI_MODE ?? "").trim().toLowerCase();
+}
+
+/**
+ * Warnings for settings under a retired name. validate-env.mjs prints them, so a Compose household,
+ * whose app container only ever sees the new names, hears about its .env.
+ * @param {Env} [env]
+ */
+export function oldSettingNames(env = process.env) {
+  const warnings = [];
+  for (const [name, old] of Object.entries(OLD_DATABASE_NAMES)) {
+    if (env[old]?.trim()) {
+      warnings.push(
+        env[name]?.trim()
+          ? `${old} is ignored because ${name} is set; remove ${old}.`
+          : `${old} is the old name for ${name}; rename it.`,
+      );
+    }
+  }
+  if (env.UNIFI_MOCK?.trim()) warnings.push("UNIFI_MOCK is no longer read; set FAMILYFI_MODE=dev instead.");
+  return warnings;
 }
 
 /** @param {Env} env */

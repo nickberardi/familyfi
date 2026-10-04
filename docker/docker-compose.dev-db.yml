@@ -9,7 +9,7 @@ services:
     ports:
       - "${DB_PORT:-${POSTGRES_PORT:-5432}}:5432"
     volumes:
-      - familyfi-dev-postgres:${DB_DATA_PATH:-${POSTGRES_DATA_PATH:-/var/lib/postgresql}}
+      - familyfi-dev-postgres:${POSTGRES_DATA_PATH:-/var/lib/postgresql}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
@@ -20,4 +20,4 @@ services:
 volumes:
   familyfi-dev-postgres:
     driver: local
-    name: ${DB_VOLUME_NAME:-${POSTGRES_VOLUME_NAME:-familyfi-dev-postgres_data}}
+    name: ${POSTGRES_VOLUME_NAME:-familyfi-dev-postgres_data}

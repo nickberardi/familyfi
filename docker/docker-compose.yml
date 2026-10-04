@@ -3,7 +3,7 @@
 services:
   db:
     image: postgres:18-alpine
-    container_name: ${DB_CONTAINER_NAME:-${POSTGRES_CONTAINER_NAME:-familyfi-postgres}}
+    container_name: ${POSTGRES_CONTAINER_NAME:-familyfi-postgres}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-${POSTGRES_DB:-familyfi}}
@@ -12,7 +12,7 @@ services:
     ports:
       - "${DB_PORT:-${POSTGRES_PORT:-5432}}:5432"
     volumes:
-      - familyfi-postgres:${DB_DATA_PATH:-${POSTGRES_DATA_PATH:-/var/lib/postgresql}}
+      - familyfi-postgres:${POSTGRES_DATA_PATH:-/var/lib/postgresql}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
@@ -30,7 +30,8 @@ services:
       HOSTNAME: 0.0.0.0
       DB_SERVER: bundled
       DB_HOST: db
-      DB_PORT: ${DB_PORT:-${POSTGRES_PORT:-5432}}
+      # PostgreSQL's port inside the Compose network; DB_PORT above only picks the host's published port.
+      DB_PORT: "5432"
       DB_NAME: ${DB_NAME:-${POSTGRES_DB:-familyfi}}
       DB_USER: ${DB_USER:-${POSTGRES_USER:-familyfi}}
       DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:?Set DB_PASSWORD in .env}}
@@ -48,7 +49,7 @@ services:
 volumes:
   familyfi-postgres:
     driver: local
-    name: ${DB_VOLUME_NAME:-${POSTGRES_VOLUME_NAME:-familyfi-postgres_data}}
+    name: ${POSTGRES_VOLUME_NAME:-familyfi-postgres_data}
   familyfi-app:
     driver: local
     name: ${APP_DATA_VOLUME_NAME:-familyfi-app_data}

@@ -43,7 +43,7 @@ export function applyIntegrationEnv() {
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
   // A developer's .env may still use the database settings' old names; tests read only the new ones.
   for (const [name, old] of Object.entries(OLD_DATABASE_NAMES)) {
-    process.env[name] ||= process.env[old];
+    if (process.env[old] && !process.env[name]) process.env[name] = process.env[old];
     delete process.env[old];
   }
   process.env.DB_SERVER = "external";

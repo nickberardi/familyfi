@@ -107,6 +107,9 @@ describe("FAMILYFI_MODE", () => {
     expect(inMemoryDatabase({ FAMILYFI_MODE: "dev", DB_MODE: "memory" })).toBe(true);
     expect(inMemoryDatabase({ FAMILYFI_MODE: "dev", DB_SERVER: "external", DB_MODE: "memory" })).toBe(false);
     expect(runtime.OLD_DATABASE_NAMES).toEqual(OLD_DATABASE_NAMES);
+    for (const source of [old, { POSTGRES_PASSWORD: "old", DB_PASSWORD: "new" }, { UNIFI_MOCK: "1" }, {}]) {
+      expect(runtime.oldSettingNames(source)).toEqual(oldSettingNames(source));
+    }
   });
 
   it("needs no DB_PASSWORD in memory, and still needs the secrets", () => {

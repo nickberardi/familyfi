@@ -17,7 +17,7 @@ Copy `.env.example` to `.env` and set:
 | `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |
 | `FAMILYFI_PHONE_GATEWAY_PORT` | Optional. Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
 
-The database settings were once `DB_MODE` and `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD`. Those names still work while the new name is unset, and startup warns about each one; rename them in `.env`. Compose passes the values to the PostgreSQL container under the names that image expects.
+The database settings were once `DB_MODE` and `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD`. Those names still work while the new name is unset. `make setup`, `make docker-up` and the server's startup warn about each one; rename them in `.env`. Compose passes the values to the PostgreSQL container under the names that image expects.
 
 The app reads no UniFi settings from the environment: paste the Integration API key in Settings. The spike CLI's `SPIKE_*` settings are separate ([operator checklist](spike/OPERATOR.md)).
 
