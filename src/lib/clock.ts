@@ -85,6 +85,14 @@ export function addCalendarDays(year: number, month: number, day: number, offset
   return { year: utc.getUTCFullYear(), month: utc.getUTCMonth() + 1, day: utc.getUTCDate() };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The instant the zone's clock reads the given time. The zone's offset is read on either
+ * side of that time, so a day the clocks change is no different from any other. A time
+ * that happens twice is its first occurrence; a time the clocks skip is read with the offset
+ * from before the change, which moves it forward by the jump (02:30 becomes 03:30).
+ */
 export function zonedWallTimeToUtc(
   timeZone: string,
   year: number,
@@ -93,8 +101,15 @@ export function zonedWallTimeToUtc(
   hour: number,
   minute: number,
 ): Date {
-  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
-  const seen = zonedParts(new Date(utcGuess), timeZone);
-  const seenAsUtc = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute, 0);
-  return new Date(utcGuess - (seenAsUtc - utcGuess));
+  const wall = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const candidates = [wall - DAY_MS, wall, wall + DAY_MS].map((probe) => wall - (wallClock(probe, timeZone) - probe));
+  const exact = candidates.filter((instant) => wallClock(instant, timeZone) === wall);
+  // A skipped time: clocks skip forward, so the offset from before the change is the smallest and its reading the latest.
+  return new Date(exact.length ? Math.min(...exact) : Math.max(...candidates));
+}
+
+/** The zone's clock reading at `instant`, as if that reading were UTC. */
+function wallClock(instant: number, timeZone: string): number {
+  const seen = zonedParts(new Date(instant), timeZone);
+  return Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute, 0);
 }

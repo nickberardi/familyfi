@@ -114,9 +114,9 @@ model Household {
   dohProbeEnabled        Boolean   @default(true)
   dohProbeTime           String    @default("00:00")
   dohProbeDays           Int[]     @default([0])
-  dohProbeLastRunAt      DateTime?
+  dohProbeLastRunAt      DateTime? @db.Timestamptz(3)
   dohProbeTimeoutMs      Int       @default(5000)
-  dohProbeDisabledAt     DateTime?
+  dohProbeDisabledAt     DateTime? @db.Timestamptz(3)
   upstreamResolverSnapshot Json?
   connectionStatus       String    @default("unconfigured")
   connectionError        String?
@@ -129,8 +129,8 @@ model Household {
   /// The one route Remote access publishes to phones; null is Off.
   remoteEndpointId       String?
   revision               Int       @default(0)
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
   connectionEndpoints    ConnectionEndpoint[]
   pairings               Pairing[]
 }
@@ -158,9 +158,9 @@ model ConnectionEndpoint {
   edgeTokenAuthTag           Bytes?
   /// Starts at 1 and rises each time the token is replaced, so phones and the Pair Device page can tell tokens apart.
   edgeTokenVersion           Int      @default(0)
-  edgeTokenRotatedAt         DateTime?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  edgeTokenRotatedAt         DateTime? @db.Timestamptz(3)
+  createdAt    DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime            @updatedAt @db.Timestamptz(3)
   pairings     Pairing[]
   edgeTokens   DeviceEdgeToken[]
 
@@ -180,10 +180,10 @@ model PairedDevice {
   parentDeviceId  String?
   parentDevice    PairedDevice?  @relation("pairedDeviceParent", fields: [parentDeviceId], references: [id], onDelete: SetNull)
   children        PairedDevice[] @relation("pairedDeviceParent")
-  revokedAt       DateTime?
-  lastSeenAt      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  revokedAt       DateTime? @db.Timestamptz(3)
+  lastSeenAt      DateTime? @db.Timestamptz(3)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
   sessions        Session[]
   pairings        Pairing[]      @relation("pairingClaimedDevice")
   parentedPairings Pairing[]     @relation("pairingParentDevice")
@@ -198,7 +198,7 @@ model DeviceEdgeToken {
   endpointId String
   endpoint   ConnectionEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
   version    Int
-  fetchedAt  DateTime           @default(now())
+  fetchedAt  DateTime           @default(now()) @db.Timestamptz(3)
 
   @@id([deviceId, endpointId])
   @@index([endpointId])
@@ -213,8 +213,8 @@ model Pairing {
   tokenHash          String              @unique
   displayName        String
   createdByAccountId String
-  expiresAt          DateTime
-  claimedAt          DateTime?
+  expiresAt          DateTime @db.Timestamptz(3)
+  claimedAt          DateTime? @db.Timestamptz(3)
   claimedDeviceId    String?             @unique
   claimedDevice      PairedDevice?       @relation("pairingClaimedDevice", fields: [claimedDeviceId], references: [id], onDelete: SetNull)
   /// The account the paired device will act as: an adult chosen by whoever made the invite. Every invite
@@ -230,7 +230,7 @@ model Pairing {
   client             PairedDeviceClient  @default(phone)
   /// The scope an agent pairing grants; a phone pairing always gives `full`.
   scope              DeviceScope?
-  createdAt          DateTime            @default(now())
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
 
   @@index([expiresAt])
 }
@@ -243,8 +243,8 @@ model Group {
   familyRole       FamilyRole?
   dohOverrideUrl   String?
   upstreamResolverSnapshot Json?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @db.Timestamptz(3)
   devices          Device[]
   accounts         Account[]
   appPolicies      AppPolicy[]
@@ -262,8 +262,8 @@ model Account {
   isAdmin       Boolean        @default(true)
   groupId       String?
   group         Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
   sessions      Session[]
   loginAttempts LoginAttempt[]
   authoredChanges ChangeResult[] @relation("changeActorAccount")
@@ -278,18 +278,18 @@ model Session {
   accountId String?
   account   Account?    @relation(fields: [accountId], references: [id], onDelete: Cascade)
   username  String
-  expiresAt DateTime
-  revokedAt DateTime?
+  expiresAt DateTime @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
   userAgent String?
   deviceId  String?
   device    PairedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   /// A paired device's bearer is short-lived; this rotating token renews it. Null for cookie sessions.
   refreshTokenHash     String?   @unique
-  refreshExpiresAt     DateTime?
+  refreshExpiresAt     DateTime? @db.Timestamptz(3)
   /// The refresh token last replaced, honoured once until `previousRefreshUntil` so a lost response does not sign the device out.
   previousRefreshHash  String?   @unique
-  previousRefreshUntil DateTime?
-  createdAt DateTime    @default(now())
+  previousRefreshUntil DateTime? @db.Timestamptz(3)
+  createdAt DateTime    @default(now()) @db.Timestamptz(3)
 
   @@index([username])
   @@index([expiresAt])
@@ -303,7 +303,7 @@ model LoginAttempt {
   username  String
   ip        String
   success   Boolean
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([username, createdAt])
   @@index([ip, createdAt])
@@ -319,15 +319,15 @@ model Device {
   groupId    String?
   group      Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
   assignment AssignmentState @default(quarantined)
-  lastSeenAt DateTime?
+  lastSeenAt DateTime? @db.Timestamptz(3)
   presenceOnline Boolean?
-  presenceCheckedAt DateTime?
-  connectedAt DateTime?
+  presenceCheckedAt DateTime? @db.Timestamptz(3)
+  connectedAt DateTime? @db.Timestamptz(3)
   connectionType String?
   accessPointName String?
   manufacturer String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  createdAt  DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime        @updatedAt @db.Timestamptz(3)
 }
 
 model AppPolicy {
@@ -345,8 +345,8 @@ model AppPolicy {
   observedEnabled     Boolean?
   observedFingerprint String?
   lastError           String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime         @updatedAt @db.Timestamptz(3)
 }
 
 model PolicyOperation {
@@ -358,8 +358,8 @@ model PolicyOperation {
   payloadFingerprint String?
   unifiPolicyId      String?
   status             String                @default("pending")
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
 }
 
 model SyncRun {
@@ -367,8 +367,8 @@ model SyncRun {
   requestedRevision Int
   appliedRevision   Int?
   status            ChangeStatus   @default(pending)
-  startedAt         DateTime       @default(now())
-  finishedAt        DateTime?
+  startedAt         DateTime       @default(now()) @db.Timestamptz(3)
+  finishedAt        DateTime? @db.Timestamptz(3)
   error             String?
   changes           ChangeResult[]
 }
@@ -383,8 +383,8 @@ model ChangeResult {
   scope             String
   deviceMac         String?
   error             String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
   actorAccountId    String?
   actorAccount      Account?     @relation("changeActorAccount", fields: [actorAccountId], references: [id], onDelete: SetNull)
   actorDeviceId     String?
@@ -396,8 +396,8 @@ model ChangeResult {
 model ReconciliationLock {
   id        String   @id @default("global")
   owner     String
-  expiresAt DateTime
-  updatedAt DateTime @updatedAt
+  expiresAt DateTime @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 enum RuleKind {
@@ -438,7 +438,7 @@ model Rule {
   mode             RuleMode     @default(always)
   /// A pause or allowance lifts the rule for every group it covers until `pauseUntil`, or until ended.
   pauseActive      Boolean      @default(false)
-  pauseUntil       DateTime?
+  pauseUntil       DateTime? @db.Timestamptz(3)
   pauseKind        RuleLiftKind @default(pause)
   /// Who paused it, as they were named then.
   pausedByAccountId String?
@@ -448,12 +448,12 @@ model Rule {
   /// the rule list; its policies exist only while it is enabled.
   systemGroupId    String?      @unique
   systemGroup      Group?       @relation("SystemRule", fields: [systemGroupId], references: [id], onDelete: Cascade)
-  expiresAt        DateTime?
+  expiresAt        DateTime? @db.Timestamptz(3)
   /// Who started the block, as they were named then.
   blockedByAccountId String?
   blockedByName    String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
   groups           RuleGroup[]
   windows          RuleWindow[]
   policies         RulePolicy[]
@@ -468,7 +468,7 @@ model RuleGroup {
   group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
   /// The same lift for this group alone: its devices leave the rule's policies until `pauseUntil`.
   pauseActive       Boolean      @default(false)
-  pauseUntil        DateTime?
+  pauseUntil        DateTime? @db.Timestamptz(3)
   pauseKind         RuleLiftKind @default(pause)
   pausedByAccountId String?
   pausedByName      String?
@@ -507,8 +507,8 @@ model RulePolicy {
   observedEnabled     Boolean?
   observedFingerprint String?
   lastError           String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
 
   @@unique([ruleId, windowKey, connectionIdentity, siteId, zoneId])
   @@index([connectionIdentity, siteId])
@@ -533,9 +533,9 @@ model UpstreamCategory {
   monogram  String
   source    UpstreamSource   @default(user)
   enabled   Boolean          @default(true)
-  disabledAt DateTime?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  disabledAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
   domains   UpstreamDomain[]
   checks    UpstreamCheck[]
 
@@ -548,9 +548,9 @@ model UpstreamDomain {
   category   UpstreamCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   domain     String
   source     UpstreamSource
-  removedAt  DateTime?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  removedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime         @updatedAt @db.Timestamptz(3)
 
   @@unique([categoryId, domain])
   @@index([categoryId])
@@ -568,7 +568,7 @@ model UpstreamCheck {
   blockedCount Int
   totalCount   Int
   results      Json
-  checkedAt    DateTime         @default(now())
+  checkedAt    DateTime         @default(now()) @db.Timestamptz(3)
   durationMs   Int
   error        String?
   resolverContext Json?

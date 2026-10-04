@@ -54,6 +54,12 @@
         "test-infrastructure"
       ]
     },
+    "tests/unit/clock.test.ts": {
+      "categories": [
+        "schedules",
+        "display"
+      ]
+    },
     "tests/unit/client-boundary.test.ts": {
       "categories": [
         "repository"
@@ -471,6 +477,12 @@
       "categories": [
         "trust",
         "pairing"
+      ]
+    },
+    "tests/integration/database-time-zone.test.ts": {
+      "categories": [
+        "database",
+        "schedules"
       ]
     },
     "tests/integration/demo-lock.test.ts": {

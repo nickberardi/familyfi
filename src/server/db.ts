@@ -7,8 +7,12 @@ import { missingClientFields, modelFieldsFromPrismaSchema } from "./prisma-schem
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+/**
+ * Sessions run in UTC whatever the server, database or role is set to: the pg adapter sends
+ * times without an offset and reads them back as UTC, so another session zone would move them.
+ */
 export function createPrismaClient(url: string): PrismaClient {
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url, options: "-c TimeZone=UTC" }) });
 }
 
 export class SchemaMismatchError extends Error {

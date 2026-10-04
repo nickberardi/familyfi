@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.22.4
+  version: 0.23.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2597,10 +2597,14 @@ components:
     SessionResponse:
       type: object
       additionalProperties: false
-      required: [session]
+      required: [session, timezone]
       properties:
         session:
           $ref: "#/components/schemas/Session"
+        timezone:
+          type: string
+          description: The household's IANA time zone, for clock times and window labels. A Watch reads it here because it may not read household settings.
+          example: America/New_York
     Account:
       type: object
       additionalProperties: false

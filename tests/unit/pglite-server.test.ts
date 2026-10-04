@@ -13,12 +13,13 @@ async function connect(): Promise<pg.Client> {
   return client;
 }
 
+// Starting PGlite loads its WASM, which takes longer than the 10 s default under CI's coverage run.
 beforeAll(async () => {
   database = await startMemoryDatabase({ port: 0 });
   const client = await connect();
   await client.query("CREATE TABLE item (id int PRIMARY KEY, name text UNIQUE)");
   await client.query("INSERT INTO item VALUES (1, 'a'), (2, 'b')");
-});
+}, 60_000);
 
 afterAll(async () => {
   await Promise.all(clients.map((client) => client.end().catch(() => {})));

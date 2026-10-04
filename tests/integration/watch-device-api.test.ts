@@ -112,6 +112,14 @@ describe("independent Watch device", () => {
     ]));
   });
 
+  it("reads the household's time zone from its session, since it may not read settings", async () => {
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "Australia/Lord_Howe" } });
+    const watch = await enrolledWatch((await pairedPhone()).auth);
+    const response = await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }));
+    expect(response.status).toBe(200);
+    expect((await response.json() as { timezone: string }).timezone).toBe("Australia/Lord_Howe");
+  });
+
   it("keeps Watch access after its phone signs out, and revokes it with its phone", async () => {
     const phone = await pairedPhone();
     const watch = await enrolledWatch(phone.auth);
