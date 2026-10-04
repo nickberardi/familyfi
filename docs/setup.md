@@ -4,20 +4,63 @@ FamilyFi is one Next.js application (web/PWA plus `/api/v1`) and PostgreSQL. Uni
 
 ## Environment
 
-Copy `.env.example` to `.env` and set:
+Copy `.env.example` to `.env` and set what you need. This is every setting FamilyFi reads; nothing else in the environment changes how it runs.
+
+### The app
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FAMILYFI_MODE` | `prod` | `prod`, `dev`, `test` or `demo`; see [Modes](#modes). |
+| `FAMILYFI_DEFAULT_PASSWORD` | generated | Password for username `admin`. Generated on first setup if missing. Printed in the server log at every startup. Change it in `.env` to pick your own; the new value is used on the next `admin` sign-in. |
+| `FAMILYFI_SESSION_SECRET` | generated | Binds cookie sessions. Generated on first setup if missing or invalid; never rotated automatically afterward. |
+| `FAMILYFI_ENCRYPTION_KEY` | generated | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
+| `FAMILYFI_DEMO_URL` | none | `demo` only. The demo's public HTTPS origin, published as the phones' route ([demo mode](operations.md#demo-mode)). |
+| `FAMILYFI_PHONE_GATEWAY_PORT` | off | Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
+| `PORT` | `3000` (`7001` in the image) | The port the server listens on. |
+| `NODE_ENV` | set by Next.js | `production` under `next start` and in the image. Only `prod` and `demo` start in production, and `test` when `CI` is set. |
+
+The app reads no UniFi settings from the environment; the UniFi key lives in Settings. `UNIFI_MOCK` is no longer read; startup warns when it is set.
+
+### Database
+
+`DB_*` settings are FamilyFi's own choice of database; `POSTGRES_*` settings configure the PostgreSQL it uses.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DB_MODE` | `bundled` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`), `external` (use `DB_HOST`), or `memory` (an in-memory database, `dev` and `test` only; `demo` always uses it). |
+| `DB_HOST` | `127.0.0.1` | PostgreSQL's host for `external`. |
+| `POSTGRES_PORT` | `5432` (`5433` in memory) | PostgreSQL's port. In Compose it is only the host's published port; the app container always uses 5432. |
+| `POSTGRES_DB`, `POSTGRES_USER` | `familyfi` | Database and user. |
+| `POSTGRES_PASSWORD` | none | Required, except in memory. |
+| `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | off | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |
+
+Prisma's `DATABASE_URL` is derived from these, with credentials URL-encoded. Do not set it by hand or treat a hand-written one as the source of truth.
+
+### Docker Compose
+
+Read by `docker/docker-compose.yml` (and `docker-compose.dev-db.yml`), not by the app.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FAMILYFI_PORT` | `7001` | The host port `make docker-up` publishes. |
+| `FAMILYFI_IMAGE` | `ghcr.io/nickberardi/familyfi:latest` | The image `make docker-up` runs. |
+| `APP_CONTAINER_NAME`, `POSTGRES_CONTAINER_NAME` | `familyfi-app`, `familyfi-postgres` | Container names. |
+| `APP_DATA_VOLUME_NAME`, `POSTGRES_VOLUME_NAME` | `familyfi-app_data`, `familyfi-postgres_data` (`familyfi-dev-postgres_data` for the dev database) | Volume names. |
+| `POSTGRES_DATA_PATH` | `/var/lib/postgresql` | Where the PostgreSQL volume mounts. |
+
+### Development and tests only
+
+Never part of a deployment.
 
 | Variable | Purpose |
 | --- | --- |
-| `FAMILYFI_DEFAULT_PASSWORD` | Password for username `admin`. Generated on first setup if missing. Printed in the server log at every startup. Change it in `.env` to pick your own; the new value is used on the next `admin` sign-in. |
-| `FAMILYFI_SESSION_SECRET` | Binds cookie sessions. Generated on first setup if missing or invalid; never rotated automatically afterward. |
-| `FAMILYFI_ENCRYPTION_KEY` | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
-| `FAMILYFI_MODE` | `prod` (default), `dev`, `test` or `demo`; see [Modes](#modes). |
-| `DB_MODE` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`), `external` (use `DB_HOST` below), or `memory` (an in-memory database, `dev` and `test` only). |
-| `DB_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Connection parts. Prisma `DATABASE_URL` is derived, with credentials URL-encoded. Do not treat a hand-written `DATABASE_URL` as source of truth. |
-| `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |
-| `FAMILYFI_PHONE_GATEWAY_PORT` | Optional. Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
+| `KILL_PORT` | `1` stops whatever holds the dev port without asking; `0` never does. Unset, `make dev` asks. |
+| `SKIP_DB_PREPARE` | Skips what `with-env.mjs` does before a command: wait for PostgreSQL, `prisma generate` outside production, and `prisma migrate deploy`. |
+| `CLOUDFLARED_BIN` | Points integration tests at a stand-in `cloudflared`. |
+| `CI` | Lets the production build start in `test` mode, as CI's browser tests run it. |
+| `BASE_REF`, `BREAKING_API_APPROVED` | The OpenAPI checks' base branch and the `breaking_api` label. |
 
-The app reads no UniFi settings from the environment; the UniFi key lives in Settings.
+`FAMILYFI_DATABASE_SERVED` is set by the in-memory launcher for the command it runs, so a second database is not started; never set it yourself.
 
 ## Local development
 
@@ -40,7 +83,7 @@ The app reads no UniFi settings from the environment; the UniFi key lives in Set
 | `test` | the UniFi mock | as `dev`; `scripts/test.py` gives each run its own | the seed household, or each test's | open |
 | `demo` | the UniFi mock | in memory, always | the seed household, reset nightly | locked ([demo mode](operations.md#demo-mode)) |
 
-Under `NODE_ENV=production` only `prod` and `demo` start, and `test` under CI (the browser tests run the production build); anything else stops startup with a message. `UNIFI_MOCK` is no longer read; startup warns when it is set. Mocks do not prove firewall enforcement.
+Under `NODE_ENV=production` only `prod` and `demo` start, and `test` under CI (the browser tests run the production build); anything else stops startup with a message. Mocks do not prove firewall enforcement.
 
 ### Dummy household (no UniFi console)
 
