@@ -1632,6 +1632,57 @@
     },
     {
       "fn": "nextClockOnDays",
+      "name": "03:00 the night New York springs forward",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "hhmm": "03:00",
+        "now": "2026-03-08T05:00:00Z"
+      },
+      "expected": "2026-03-08T07:00:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "03:00 the night New York falls back",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "hhmm": "03:00",
+        "now": "2026-11-01T04:00:00Z"
+      },
+      "expected": "2026-11-01T08:00:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
+      "name": "the first of a time that happens twice",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          0
+        ],
+        "hhmm": "01:30",
+        "now": "2026-11-01T04:00:00Z"
+      },
+      "expected": "2026-11-01T05:30:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
       "name": "UTC+14",
       "input": {
         "timeZone": "Pacific/Kiritimati",
@@ -4399,6 +4450,24 @@
         "timeZone": "America/New_York"
       },
       "expected": false
+    },
+    {
+      "fn": "windowEndsAt",
+      "name": "an overnight window ends at 03:00 the night New York falls back",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            6
+          ],
+          "start": "21:00",
+          "end": "03:00",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-11-01T04:30:00Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "2026-11-01T08:00:00.000Z"
     },
     {
       "fn": "windowEndsAt",

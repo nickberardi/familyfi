@@ -54,6 +54,12 @@
         "test-infrastructure"
       ]
     },
+    "tests/unit/clock.test.ts": {
+      "categories": [
+        "schedules",
+        "display"
+      ]
+    },
     "tests/unit/client-boundary.test.ts": {
       "categories": [
         "repository"
