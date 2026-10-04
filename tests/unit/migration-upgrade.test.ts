@@ -35,9 +35,13 @@ describe("supportedReleases", () => {
     expect(supportedReleases(releases, "bbb", "v0.2.0")).toEqual(["v0.2.0", "v0.9.1"]);
   });
 
-  it("covers every release from the supported floor by default", () => {
+  it("covers every release from the supported floor", () => {
+    expect(supportedReleases(releases, "head", "v0.1.0")).toEqual(["v0.1.0", "v0.2.0", "v0.9.1", "v0.10.0"]);
+  });
+
+  it("starts by default at the first release on the flattened baseline", () => {
     expect(OLDEST_SUPPORTED_RELEASE).toMatch(/^v\d+\.\d+\.\d+$/);
-    expect(supportedReleases(releases, "head")).toEqual(["v0.1.0", "v0.2.0", "v0.9.1", "v0.10.0"]);
+    expect(supportedReleases(releases, "head")).toEqual([]);
   });
 });
 
