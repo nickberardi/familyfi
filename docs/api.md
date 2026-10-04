@@ -4,6 +4,8 @@ The web UI and native clients use `/api/v1`. The source of truth is [`openapi/fa
 
 Browser mutations after login send `X-CSRF-Token` matching the `familyfi_csrf` cookie. Native clients send `Authorization: Bearer`.
 
+A response field the server always sends is `required` in the document, and an empty one is `null`, never left out, so a generated client never sees it as possibly absent. The few fields the server does leave out are listed in [`tests/contract/openapi.test.ts`](../tests/contract/openapi.test.ts), which fails when a response schema leaves any other field optional.
+
 Normal payloads never return password hashes, `FAMILYFI_DEFAULT_PASSWORD`, raw UniFi keys, or firewall JSON.
 
 ## Shared behaviour and consumer adoption
