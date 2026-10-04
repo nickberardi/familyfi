@@ -1,9 +1,10 @@
 "use client";
 
 import { Toast } from "@/ui/Toast";
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AboutSheet } from "@/components/AboutSheet";
 import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api, request } from "@/lib/api";
@@ -34,23 +35,30 @@ export function useNavDrawer(): { toggle: () => void } {
 }
 
 /**
- * The lockup plus the version/status line, shared by the rail and the drawer.
+ * The lockup plus the version/status line, shared by the rail and the drawer. The
+ * lockup opens About, as the design's does.
  *
  * The pieces are composed here rather than through `Logo` because the rail sets the
  * shield larger than the wordmark's own ladder would give it — the design's rail is a
  * 56px shield over a 22.5px wordmark — and the drawer wants the same block at the
  * width a phone leaves for it.
  */
-function NavBrand({ statusLine, compact }: { statusLine: string; compact?: boolean }) {
+function NavBrand({ statusLine, compact, onAbout }: { statusLine: string; compact?: boolean; onAbout: () => void }) {
   return (
     <div className="flex flex-none flex-col items-center gap-1.5 px-2.5 pt-0.5">
-      <div className="flex flex-col items-center gap-2.5">
+      <button
+        type="button"
+        onClick={onAbout}
+        aria-label="About FamilyFi"
+        title="About FamilyFi"
+        className="flex flex-col items-center gap-2.5 rounded-lg border-0 bg-transparent p-0"
+      >
         <Shield size={compact ? 44 : 56} />
         <div className="grid justify-items-center gap-1.5">
           <Wordmark size={compact ? 19 : 22.5} />
           <Tagline size={compact ? 6.5 : 7.5} />
         </div>
-      </div>
+      </button>
       <div className="text-center text-[14px] text-[var(--ff-muted)]">{statusLine}</div>
     </div>
   );
@@ -126,11 +134,26 @@ function NavGroups({
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+/** The quiet row under the nav groups that opens About, on the rail and in the drawer. */
+function AboutRow({ onAbout }: { onAbout: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onAbout}
+      className="flex flex-none items-center gap-1.5 self-start rounded-[7px] border-0 bg-transparent px-2.5 py-0.5 text-[14px] text-[var(--ff-muted)]"
+    >
+      <Icon name="info" size={14} />
+      About FamilyFi
+    </button>
+  );
+}
+
+export function AppShell({ children, demo = false }: { children: React.ReactNode; demo?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, devices, sync, unifi, store, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const update = useUpdateCheck(request);
   // Closing on a route change is the drawer's own signal, same as the design's
   // `pickAndClose` on each item — but this also catches the back button, a redirect,
@@ -154,13 +177,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
 
+  // Opening About from the drawer closes it, as the design's `openAboutClose` does.
+  function openAbout() {
+    setNavOpen(false);
+    setAboutOpen(true);
+  }
+  const closeAbout = useCallback(() => setAboutOpen(false), []);
+
   const statusLine = `${appVersionLabel()} · ${unifi?.configured ? "Household gateway" : "Setup needed"}`;
 
   return (
     <NavDrawerCtx.Provider value={navDrawer}>
       <div className="ff-shell">
         <aside className="ff-sidebar flex-col gap-5 overflow-hidden border-r border-[var(--ff-line)] bg-[var(--ff-rail)] px-3 py-5">
-          <NavBrand statusLine={statusLine} />
+          <NavBrand statusLine={statusLine} onAbout={openAbout} />
           <nav className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
             <NavGroups
               pathname={pathname}
@@ -168,6 +198,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               familyNeedsDevices={familyNeedsDevices}
               syncFailed={syncFailed}
             />
+            <div className="mt-5">
+              <AboutRow onAbout={openAbout} />
+            </div>
           </nav>
           <div className="ff-sidebar-end flex flex-col gap-2.5">
             <UpdateAlertCard update={update} />
@@ -222,7 +255,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="fixed inset-y-0 left-0 z-[71] flex w-[min(78%,280px)] flex-col gap-5 overflow-y-auto p-3 md:hidden"
               style={{ background: "var(--ff-rail)", boxShadow: "var(--ff-shadow-sheet)" }}
             >
-              <NavBrand statusLine={statusLine} compact />
+              <NavBrand statusLine={statusLine} compact onAbout={openAbout} />
               <nav className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
                 <NavGroups
                   pathname={pathname}
@@ -231,11 +264,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   syncFailed={syncFailed}
                   onNavigate={() => setNavOpen(false)}
                 />
+                <div className="mt-5">
+                  <AboutRow onAbout={openAbout} />
+                </div>
               </nav>
               <UpdateAlertCard update={update} />
             </div>
           </>
         ) : null}
+        {aboutOpen ? <AboutSheet demo={demo} onClose={closeAbout} /> : null}
       </div>
     </NavDrawerCtx.Provider>
   );

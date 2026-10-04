@@ -647,6 +647,11 @@
         "devices"
       ]
     },
+    "tests/browser/about.spec.ts": {
+      "categories": [
+        "navigation"
+      ]
+    },
     "tests/browser/accessibility.spec.ts": {
       "categories": [
         "accessibility"
