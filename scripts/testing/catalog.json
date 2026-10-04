@@ -466,6 +466,12 @@
         "pairing"
       ]
     },
+    "tests/integration/database-time-zone.test.ts": {
+      "categories": [
+        "database",
+        "schedules"
+      ]
+    },
     "tests/integration/dev-mock.test.ts": {
       "categories": [
         "unifi"

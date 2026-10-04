@@ -87,9 +87,9 @@ CREATE TABLE "Household" (
     "dohProbeEnabled" BOOLEAN NOT NULL DEFAULT true,
     "dohProbeTime" TEXT NOT NULL DEFAULT '00:00',
     "dohProbeDays" INTEGER[] NOT NULL DEFAULT ARRAY[0]::INTEGER[],
-    "dohProbeLastRunAt" TIMESTAMP(3),
+    "dohProbeLastRunAt" TIMESTAMPTZ(3),
     "dohProbeTimeoutMs" INTEGER NOT NULL DEFAULT 5000,
-    "dohProbeDisabledAt" TIMESTAMP(3),
+    "dohProbeDisabledAt" TIMESTAMPTZ(3),
     "upstreamResolverSnapshot" JSONB,
     "connectionStatus" TEXT NOT NULL DEFAULT 'unconfigured',
     "connectionError" TEXT,
@@ -101,8 +101,8 @@ CREATE TABLE "Household" (
     "instancePrivateKeyAuthTag" BYTEA,
     "remoteEndpointId" TEXT,
     "revision" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Household_pkey" PRIMARY KEY ("id")
 );
@@ -126,9 +126,9 @@ CREATE TABLE "ConnectionEndpoint" (
     "edgeTokenIv" BYTEA,
     "edgeTokenAuthTag" BYTEA,
     "edgeTokenVersion" INTEGER NOT NULL DEFAULT 0,
-    "edgeTokenRotatedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "edgeTokenRotatedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "ConnectionEndpoint_pkey" PRIMARY KEY ("id")
 );
@@ -142,10 +142,10 @@ CREATE TABLE "PairedDevice" (
     "scope" "DeviceScope" NOT NULL DEFAULT 'full',
     "accountId" TEXT,
     "parentDeviceId" TEXT,
-    "revokedAt" TIMESTAMP(3),
-    "lastSeenAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMPTZ(3),
+    "lastSeenAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "PairedDevice_pkey" PRIMARY KEY ("id")
 );
@@ -155,7 +155,7 @@ CREATE TABLE "DeviceEdgeToken" (
     "deviceId" TEXT NOT NULL,
     "endpointId" TEXT NOT NULL,
     "version" INTEGER NOT NULL,
-    "fetchedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "fetchedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "DeviceEdgeToken_pkey" PRIMARY KEY ("deviceId","endpointId")
 );
@@ -168,15 +168,15 @@ CREATE TABLE "Pairing" (
     "tokenHash" TEXT NOT NULL,
     "displayName" TEXT NOT NULL,
     "createdByAccountId" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "claimedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMPTZ(3) NOT NULL,
+    "claimedAt" TIMESTAMPTZ(3),
     "claimedDeviceId" TEXT,
     "accountId" TEXT,
     "parentDeviceId" TEXT,
     "replacesDeviceId" TEXT,
     "client" "PairedDeviceClient" NOT NULL DEFAULT 'phone',
     "scope" "DeviceScope",
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Pairing_pkey" PRIMARY KEY ("id")
 );
@@ -190,8 +190,8 @@ CREATE TABLE "Group" (
     "familyRole" "FamilyRole",
     "dohOverrideUrl" TEXT,
     "upstreamResolverSnapshot" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Group_pkey" PRIMARY KEY ("id")
 );
@@ -205,8 +205,8 @@ CREATE TABLE "Account" (
     "passwordHash" TEXT,
     "isAdmin" BOOLEAN NOT NULL DEFAULT true,
     "groupId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Account_pkey" PRIMARY KEY ("id")
 );
@@ -218,15 +218,15 @@ CREATE TABLE "Session" (
     "kind" "SessionKind" NOT NULL,
     "accountId" TEXT,
     "username" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "revokedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMPTZ(3) NOT NULL,
+    "revokedAt" TIMESTAMPTZ(3),
     "userAgent" TEXT,
     "deviceId" TEXT,
     "refreshTokenHash" TEXT,
-    "refreshExpiresAt" TIMESTAMP(3),
+    "refreshExpiresAt" TIMESTAMPTZ(3),
     "previousRefreshHash" TEXT,
-    "previousRefreshUntil" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "previousRefreshUntil" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
 );
@@ -238,7 +238,7 @@ CREATE TABLE "LoginAttempt" (
     "username" TEXT NOT NULL,
     "ip" TEXT NOT NULL,
     "success" BOOLEAN NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "LoginAttempt_pkey" PRIMARY KEY ("id")
 );
@@ -253,15 +253,15 @@ CREATE TABLE "Device" (
     "zoneId" TEXT,
     "groupId" TEXT,
     "assignment" "AssignmentState" NOT NULL DEFAULT 'quarantined',
-    "lastSeenAt" TIMESTAMP(3),
+    "lastSeenAt" TIMESTAMPTZ(3),
     "presenceOnline" BOOLEAN,
-    "presenceCheckedAt" TIMESTAMP(3),
-    "connectedAt" TIMESTAMP(3),
+    "presenceCheckedAt" TIMESTAMPTZ(3),
+    "connectedAt" TIMESTAMPTZ(3),
     "connectionType" TEXT,
     "accessPointName" TEXT,
     "manufacturer" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Device_pkey" PRIMARY KEY ("id")
 );
@@ -281,8 +281,8 @@ CREATE TABLE "AppPolicy" (
     "observedEnabled" BOOLEAN,
     "observedFingerprint" TEXT,
     "lastError" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "AppPolicy_pkey" PRIMARY KEY ("id")
 );
@@ -297,8 +297,8 @@ CREATE TABLE "PolicyOperation" (
     "payloadFingerprint" TEXT,
     "unifiPolicyId" TEXT,
     "status" TEXT NOT NULL DEFAULT 'pending',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "PolicyOperation_pkey" PRIMARY KEY ("id")
 );
@@ -309,8 +309,8 @@ CREATE TABLE "SyncRun" (
     "requestedRevision" INTEGER NOT NULL,
     "appliedRevision" INTEGER,
     "status" "ChangeStatus" NOT NULL DEFAULT 'pending',
-    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "finishedAt" TIMESTAMP(3),
+    "startedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" TIMESTAMPTZ(3),
     "error" TEXT,
 
     CONSTRAINT "SyncRun_pkey" PRIMARY KEY ("id")
@@ -326,8 +326,8 @@ CREATE TABLE "ChangeResult" (
     "scope" TEXT NOT NULL,
     "deviceMac" TEXT,
     "error" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
     "actorAccountId" TEXT,
     "actorDeviceId" TEXT,
 
@@ -338,8 +338,8 @@ CREATE TABLE "ChangeResult" (
 CREATE TABLE "ReconciliationLock" (
     "id" TEXT NOT NULL DEFAULT 'global',
     "owner" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "expiresAt" TIMESTAMPTZ(3) NOT NULL,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "ReconciliationLock_pkey" PRIMARY KEY ("id")
 );
@@ -357,16 +357,16 @@ CREATE TABLE "Rule" (
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "mode" "RuleMode" NOT NULL DEFAULT 'always',
     "pauseActive" BOOLEAN NOT NULL DEFAULT false,
-    "pauseUntil" TIMESTAMP(3),
+    "pauseUntil" TIMESTAMPTZ(3),
     "pauseKind" "RuleLiftKind" NOT NULL DEFAULT 'pause',
     "pausedByAccountId" TEXT,
     "pausedByName" TEXT,
     "systemGroupId" TEXT,
-    "expiresAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMPTZ(3),
     "blockedByAccountId" TEXT,
     "blockedByName" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Rule_pkey" PRIMARY KEY ("id")
 );
@@ -376,7 +376,7 @@ CREATE TABLE "RuleGroup" (
     "ruleId" TEXT NOT NULL,
     "groupId" TEXT NOT NULL,
     "pauseActive" BOOLEAN NOT NULL DEFAULT false,
-    "pauseUntil" TIMESTAMP(3),
+    "pauseUntil" TIMESTAMPTZ(3),
     "pauseKind" "RuleLiftKind" NOT NULL DEFAULT 'pause',
     "pausedByAccountId" TEXT,
     "pausedByName" TEXT,
@@ -412,8 +412,8 @@ CREATE TABLE "RulePolicy" (
     "observedEnabled" BOOLEAN,
     "observedFingerprint" TEXT,
     "lastError" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "RulePolicy_pkey" PRIMARY KEY ("id")
 );
@@ -426,9 +426,9 @@ CREATE TABLE "UpstreamCategory" (
     "monogram" TEXT NOT NULL,
     "source" "UpstreamSource" NOT NULL DEFAULT 'user',
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "disabledAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "disabledAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "UpstreamCategory_pkey" PRIMARY KEY ("id")
 );
@@ -439,9 +439,9 @@ CREATE TABLE "UpstreamDomain" (
     "categoryId" TEXT NOT NULL,
     "domain" TEXT NOT NULL,
     "source" "UpstreamSource" NOT NULL,
-    "removedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "removedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "UpstreamDomain_pkey" PRIMARY KEY ("id")
 );
@@ -455,7 +455,7 @@ CREATE TABLE "UpstreamCheck" (
     "blockedCount" INTEGER NOT NULL,
     "totalCount" INTEGER NOT NULL,
     "results" JSONB NOT NULL,
-    "checkedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "checkedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "durationMs" INTEGER NOT NULL,
     "error" TEXT,
     "resolverContext" JSONB,
