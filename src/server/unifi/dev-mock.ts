@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { DEV_APPS, DEV_DEVICES, devDeviceIp } from "../dev-household";
 import { MockUnifiClient, createMockUnifiState, type MockUnifiState } from "./mock";
 import type {
   ClientOverview,
@@ -27,11 +28,20 @@ const FRIENDLY_NETWORKS: Record<string, string> = {
   [DEV_MOCK_INTERNAL_NETWORK]: "LAN",
   [DEV_MOCK_IOT_NETWORK]: "IoT",
 };
-const FRIENDLY_CLIENTS: Record<string, string> = {
-  "44444444-4444-4444-8444-444444444441": "Kids iPad",
-  "44444444-4444-4444-8444-444444444442": "Living Room TV",
-  "44444444-4444-4444-8444-444444444443": "Sam Phone",
-};
+
+/** The household's online devices, connected an hour or so ago, in place of the fixture's three. */
+function householdClients(accessPoints: SiteDeviceOverview[]): ClientOverview[] {
+  const connectedAt = new Date(Date.now() - 75 * 60 * 1000).toISOString();
+  return DEV_DEVICES.filter((item) => item.online).map((item, index) => ({
+    id: `44444444-4444-4444-8444-${(0x100 + index).toString(16).padStart(12, "0")}`,
+    name: item.name,
+    type: item.type,
+    connectedAt,
+    ipAddress: devDeviceIp(item),
+    macAddress: item.mac,
+    ...(item.accessPoint === undefined ? {} : { uplinkDeviceId: accessPoints[item.accessPoint]?.id }),
+  }));
+}
 
 function fixturesDir() {
   return join(process.cwd(), "tests/fixtures/unifi");
@@ -49,13 +59,15 @@ function applyFriendlyNames(state: MockUnifiState): MockUnifiState {
       ...network,
       name: FRIENDLY_NETWORKS[network.id] ?? network.name,
     })),
-    clients: state.clients.map((client) => ({
-      ...client,
-      name: FRIENDLY_CLIENTS[client.id] ?? client.name,
-    })),
+    clients: householdClients(state.siteDevices),
+    dpiApplications: [...state.dpiApplications, ...DEV_APPS.map((app) => ({ ...app }))],
   };
 }
 
+/**
+ * The fixture gateway. With `friendlyNames` it is the `UNIFI_MOCK` household's gateway:
+ * named site and networks, the household's devices as clients, and a few named apps.
+ */
 export function createFixtureUnifiState(options?: { friendlyNames?: boolean }): MockUnifiState {
   const admin = readJson<UnifiPage<FirewallPolicy>>("policies.page.json").data[0]!;
   const rogue: FirewallPolicy = {
