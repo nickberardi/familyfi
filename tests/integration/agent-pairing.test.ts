@@ -15,6 +15,7 @@ import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
 import { GET as inviteStatus } from "@/app/api/v1/paired/invites/[id]/route";
 import { POST as refresh } from "@/app/api/v1/auth/refresh/route";
 import { inviteAgent } from "@/server/pairing";
+import { withAdmin } from "@/server/guard";
 import { GET as listGroups, POST as createGroup } from "@/app/api/v1/groups/route";
 import { GET as settingsUnifi } from "@/app/api/v1/settings/unifi/route";
 import { GET as household } from "@/app/api/v1/settings/household/route";
@@ -219,5 +220,19 @@ describe("paired agents", () => {
     const response = await claim(issued);
     expect(response.status).toBe(200);
     expect(((await response.json()) as Claimed).session.username).toBe("admin");
+  });
+
+  it("is never an administrator: the admin guard refuses it even on a path its scope reaches", async () => {
+    // No route lets an agent's scope reach an administrator's handler today; this pins the guard's own
+    // check, so a later allowlist change cannot hand an agent administration.
+    const { claimed } = await connectedAgent(await adult(), "full");
+    let ran = false;
+    const response = await withAdmin(request("/api/v1/groups", { auth: bearer(claimed.token) }), async () => {
+      ran = true;
+      return Response.json({});
+    });
+    expect(response.status).toBe(403);
+    expect(await errorCode(response)).toBe("administrator_required");
+    expect(ran).toBe(false);
   });
 });
