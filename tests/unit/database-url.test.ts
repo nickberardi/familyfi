@@ -5,10 +5,10 @@ describe("buildDatabaseUrl", () => {
   it("percent-encodes credentials", () => {
     const url = buildDatabaseUrl({
       DB_HOST: "db.internal",
-      DB_PORT: "5432",
-      DB_NAME: "family fi",
-      DB_USER: "fam@ily",
-      DB_PASSWORD: "p@ss/w:rd",
+      POSTGRES_PORT: "5432",
+      POSTGRES_DB: "family fi",
+      POSTGRES_USER: "fam@ily",
+      POSTGRES_PASSWORD: "p@ss/w:rd",
     });
     expect(url).toBe(
       "postgresql://fam%40ily:p%40ss%2Fw%3Ard@db.internal:5432/family%20fi",
@@ -18,7 +18,7 @@ describe("buildDatabaseUrl", () => {
   it("appends ssl settings", () => {
     const url = buildDatabaseUrl({
       DB_HOST: "db.example",
-      DB_PASSWORD: "x",
+      POSTGRES_PASSWORD: "x",
       DB_SSL_MODE: "require",
       DB_SSL_ROOT_CERT: "/certs/ca.pem",
     });

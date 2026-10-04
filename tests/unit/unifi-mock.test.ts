@@ -11,7 +11,7 @@ const validEnv = {
   FAMILYFI_DEFAULT_PASSWORD: "recovery-pass",
   FAMILYFI_SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
   FAMILYFI_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-  DB_PASSWORD: "db-pass",
+  POSTGRES_PASSWORD: "db-pass",
 };
 
 function stubHousehold(): Household {

@@ -137,9 +137,9 @@ describe("naming conventions (AGENTS.md)", () => {
     // Variables that configure an external system, or are framework contracts,
     // keep that system's convention — see AGENTS.md.
     const foreign =
-      /^(DB_|DATABASE_URL|PORT|NODE_ENV|NODE_TLS_REJECT_UNAUTHORIZED|NEXT_|GITHUB_|CI$|HOME$|PATH$)/;
+      /^(POSTGRES_|DB_|UNIFI_|DATABASE_URL|PORT|NODE_ENV|NODE_TLS_REJECT_UNAUTHORIZED|NEXT_|GITHUB_|CI$|HOME$|PATH$)/;
     // Ours, but development/test/CI-only and never set on a real deployment, so
-    // they are not public surface and take no prefix. SPIKE_* configures the spike CLI.
+    // they are not public surface and take no prefix.
     const internal = new Set([
       "KILL_PORT",
       "SKIP_DB_PREPARE",
@@ -158,7 +158,7 @@ describe("naming conventions (AGENTS.md)", () => {
       const text = readFileSync(file, "utf8");
       for (const m of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)) {
         const name = m[1];
-        if (name.startsWith("FAMILYFI_") || name.startsWith("SPIKE_") || internal.has(name) || foreign.test(name)) continue;
+        if (name.startsWith("FAMILYFI_") || internal.has(name) || foreign.test(name)) continue;
         offenders.add(`${rel(file)}: ${name}`);
       }
     }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildDatabaseUrl, memoryDatabase, OLD_DATABASE_NAMES } from "@/server/database-url";
+import { buildDatabaseUrl, memoryDatabase } from "@/server/database-url";
 import {
   ConfigurationError,
   demoModeEnabled,
@@ -8,8 +8,8 @@ import {
   inMemoryDatabase,
   loadEnv,
   modeIssues,
-  oldSettingNames,
   unifiMockEnabled,
+  unifiMockWarning,
 } from "@/server/env";
 import { demoLocked, nextDemoResetAt } from "@/server/demo";
 import { findCloudflared } from "@/server/tunnel/cloudflared";
@@ -22,16 +22,16 @@ const secrets = {
   FAMILYFI_SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
   FAMILYFI_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 };
-const realDatabase = { DB_SERVER: "external", DB_HOST: "db.example", DB_PORT: "5432", DB_PASSWORD: "db-pass", DB_SSL_MODE: "require", DB_SSL_ROOT_CERT: "/certs/ca.pem" };
+const realDatabase = { DB_MODE: "external", DB_HOST: "db.example", POSTGRES_PORT: "5432", POSTGRES_PASSWORD: "db-pass", DB_SSL_MODE: "require", DB_SSL_ROOT_CERT: "/certs/ca.pem" };
 const memoryUrl = (port = "5433") => `postgresql://postgres:postgres@127.0.0.1:${port}/template1?sslmode=disable`;
 
 /** Every combination the mode reads, so the TypeScript and the startup scripts' copy stay equal. */
 const CASES: Record<string, string | undefined>[] = [];
 for (const NODE_ENV of [undefined, "development", "test", "production"])
   for (const FAMILYFI_MODE of [undefined, "dev", "test", "demo", "prod", " Demo ", "staging"])
-    for (const CI of [undefined, "1"])
-      for (const DB_SERVER of [undefined, "external", "memory"])
-        for (const DB_MODE of [undefined, "external", "memory"]) CASES.push({ NODE_ENV, FAMILYFI_MODE, CI, DB_SERVER, DB_MODE });
+    for (const UNIFI_MOCK of [undefined, "1"])
+      for (const CI of [undefined, "1"])
+        for (const DB_MODE of [undefined, "external", "memory"]) CASES.push({ NODE_ENV, FAMILYFI_MODE, UNIFI_MOCK, CI, DB_MODE });
 
 describe("FAMILYFI_MODE", () => {
   it("defaults to prod, a real gateway on PostgreSQL", () => {
@@ -64,59 +64,34 @@ describe("FAMILYFI_MODE", () => {
 
   it("no longer reads UNIFI_MOCK, and warns when it is set", () => {
     expect(familyfiMode({ UNIFI_MOCK: "1" })).toBe("prod");
-    expect(runtime.familyfiMode({ UNIFI_MOCK: "1" })).toBe("prod");
-    expect(oldSettingNames({ UNIFI_MOCK: "1" })).toEqual(["UNIFI_MOCK is no longer read; set FAMILYFI_MODE=dev instead."]);
+    expect(familyfiMode({ NODE_ENV: "test", UNIFI_MOCK: "true" })).toBe("prod");
+    expect(unifiMockWarning({ UNIFI_MOCK: "1" })).toBe("UNIFI_MOCK is no longer read; set FAMILYFI_MODE=dev instead.");
+    expect(unifiMockWarning({})).toBeUndefined();
   });
 
   it("puts demo on the in-memory database, whatever database is configured", () => {
     const loaded = loadEnv({ ...secrets, ...realDatabase, NODE_ENV: "production", FAMILYFI_MODE: "demo" });
     expect(loaded.DATABASE_URL).toBe(memoryUrl("5432"));
-    expect(loaded.DB_SERVER).toBe("memory");
+    expect(loaded.DB_MODE).toBe("memory");
     expect(loadEnv({ ...secrets, NODE_ENV: "production", FAMILYFI_MODE: "demo" }).DATABASE_URL).toBe(memoryUrl());
     expect(runtimeDatabaseUrl({ ...realDatabase, FAMILYFI_MODE: "demo" })).toBe(memoryUrl("5432"));
     expect(buildDatabaseUrl(memoryDatabase())).toBe(memoryUrl());
   });
 
-  it("puts dev and test in memory only with DB_SERVER=memory, and never prod", () => {
+  it("puts dev and test in memory only with DB_MODE=memory, and never prod", () => {
     expect(inMemoryDatabase({ FAMILYFI_MODE: "dev" })).toBe(false);
-    expect(inMemoryDatabase({ FAMILYFI_MODE: "dev", DB_SERVER: "memory" })).toBe(true);
-    expect(inMemoryDatabase({ FAMILYFI_MODE: "test", DB_SERVER: "memory" })).toBe(true);
-    expect(inMemoryDatabase({ DB_SERVER: "memory" })).toBe(false);
-    expect(modeIssues({ DB_SERVER: "memory" })).toEqual(["DB_SERVER=memory is for dev, test and demo; prod keeps its household in PostgreSQL."]);
-    expect(loadEnv({ ...secrets, FAMILYFI_MODE: "dev", DB_SERVER: "memory", DB_PORT: "41234" }).DATABASE_URL).toBe(memoryUrl("41234"));
-  });
-
-  it("still reads the database settings' old names, with a warning, while the new name is unset", () => {
-    const old = { DB_MODE: "external", DB_HOST: "db.example", POSTGRES_PORT: "6543", POSTGRES_DB: "home", POSTGRES_USER: "fam", POSTGRES_PASSWORD: "old-pass" };
-    const url = "postgresql://fam:old-pass@db.example:6543/home";
-    expect(loadEnv({ ...secrets, ...old })).toMatchObject({ DB_SERVER: "external", DB_PASSWORD: "old-pass", DATABASE_URL: url });
-    expect(runtimeDatabaseUrl(old)).toBe(url);
-    expect(runtimeEnvIssues({ ...secrets, ...old })).toEqual([]);
-    expect(oldSettingNames(old)).toEqual([
-      "DB_MODE is the old name for DB_SERVER; rename it.",
-      "POSTGRES_PORT is the old name for DB_PORT; rename it.",
-      "POSTGRES_DB is the old name for DB_NAME; rename it.",
-      "POSTGRES_USER is the old name for DB_USER; rename it.",
-      "POSTGRES_PASSWORD is the old name for DB_PASSWORD; rename it.",
-    ]);
-    // The new name wins.
-    expect(loadEnv({ ...secrets, ...old, DB_PASSWORD: "new-pass" }).DB_PASSWORD).toBe("new-pass");
-    expect(oldSettingNames({ POSTGRES_PASSWORD: "old", DB_PASSWORD: "new" })).toEqual([
-      "POSTGRES_PASSWORD is ignored because DB_PASSWORD is set; remove POSTGRES_PASSWORD.",
-    ]);
     expect(inMemoryDatabase({ FAMILYFI_MODE: "dev", DB_MODE: "memory" })).toBe(true);
-    expect(inMemoryDatabase({ FAMILYFI_MODE: "dev", DB_SERVER: "external", DB_MODE: "memory" })).toBe(false);
-    expect(runtime.OLD_DATABASE_NAMES).toEqual(OLD_DATABASE_NAMES);
-    for (const source of [old, { POSTGRES_PASSWORD: "old", DB_PASSWORD: "new" }, { UNIFI_MOCK: "1" }, {}]) {
-      expect(runtime.oldSettingNames(source)).toEqual(oldSettingNames(source));
-    }
+    expect(inMemoryDatabase({ FAMILYFI_MODE: "test", DB_MODE: "memory" })).toBe(true);
+    expect(inMemoryDatabase({ DB_MODE: "memory" })).toBe(false);
+    expect(modeIssues({ DB_MODE: "memory" })).toEqual(["DB_MODE=memory is for dev, test and demo; prod keeps its household in PostgreSQL."]);
+    expect(loadEnv({ ...secrets, FAMILYFI_MODE: "dev", DB_MODE: "memory", POSTGRES_PORT: "41234" }).DATABASE_URL).toBe(memoryUrl("41234"));
   });
 
-  it("needs no DB_PASSWORD in memory, and still needs the secrets", () => {
+  it("needs no POSTGRES_PASSWORD in memory, and still needs the secrets", () => {
     expect(() => loadEnv({ ...secrets, NODE_ENV: "production" })).toThrow(ConfigurationError);
-    expect(runtimeEnvIssues({ ...secrets })).toEqual(["DB_PASSWORD must be set."]);
+    expect(runtimeEnvIssues({ ...secrets })).toEqual(["POSTGRES_PASSWORD must be set."]);
     expect(runtimeEnvIssues({ ...secrets, FAMILYFI_MODE: "demo" })).toEqual([]);
-    expect(runtimeEnvIssues({ ...secrets, FAMILYFI_MODE: "dev", DB_SERVER: "memory" })).toEqual([]);
+    expect(runtimeEnvIssues({ ...secrets, FAMILYFI_MODE: "dev", DB_MODE: "memory" })).toEqual([]);
     expect(() => loadEnv({ FAMILYFI_MODE: "demo" })).toThrow(ConfigurationError);
     expect(runtimeEnvIssues({ FAMILYFI_MODE: "demo" })).toHaveLength(3);
   });
@@ -128,7 +103,7 @@ describe("FAMILYFI_MODE", () => {
       expect(runtime.familyfiMode(source), JSON.stringify(source)).toBe(familyfiMode(source));
       expect(runtime.modeIssues(source), JSON.stringify(source)).toEqual(modeIssues(source));
       expect(runtime.inMemoryDatabase(source), JSON.stringify(source)).toBe(inMemoryDatabase(source));
-      const full = { ...secrets, DB_PASSWORD: "db-pass", ...source };
+      const full = { ...secrets, POSTGRES_PASSWORD: "db-pass", ...source };
       expect(runtimeEnvIssues(full), JSON.stringify(source)).toEqual(envIssues(full));
     }
   });

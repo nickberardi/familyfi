@@ -146,14 +146,12 @@ class Resources:
             "FAMILYFI_DEFAULT_PASSWORD": secrets.token_urlsafe(18),
             "FAMILYFI_SESSION_SECRET": secrets.token_hex(16),
             "FAMILYFI_ENCRYPTION_KEY": secrets.token_hex(32),
-            "DB_PASSWORD": secrets.token_urlsafe(18)})
-        env = {**self.env, **values, "DB_SERVER": "external", "DB_HOST": "127.0.0.1",
-               "DB_NAME": TEST_DATABASE, "DB_USER": "familyfi",
+            "POSTGRES_PASSWORD": secrets.token_urlsafe(18)})
+        env = {**self.env, **values, "DB_MODE": "external", "DB_HOST": "127.0.0.1",
+               "POSTGRES_DB": TEST_DATABASE, "POSTGRES_USER": "familyfi",
                # Not a developer's mode from the shell or .env: the browser run sets test, and tests set their own.
                "FAMILYFI_MODE": "prod"}
-        # The port is the run's own, and the database settings' old names would fill in for nothing here.
-        for name in ("DB_PORT", "DB_MODE", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"):
-            env.pop(name, None)
+        env.pop("POSTGRES_PORT", None)
         if timezone:
             env["TZ"] = timezone
         return env
@@ -163,13 +161,12 @@ class Resources:
         name = f"familyfi-test-{self.directory.name}-{platform}"
         self.manifest["containers"].append({"name": name, "platform": platform}); self.save()
         self.command(["docker", "run", "--detach", "--name", name, "--label", f"{LABEL}={self.directory.name}",
-                      "--publish", "127.0.0.1::5432", "--env", f"POSTGRES_USER={env['DB_USER']}",
-                      "--env", f"POSTGRES_DB={env['DB_NAME']}", "--env", "POSTGRES_PASSWORD",
+                      "--publish", "127.0.0.1::5432", "--env", f"POSTGRES_USER={env['POSTGRES_USER']}",
+                      "--env", f"POSTGRES_DB={env['POSTGRES_DB']}", "--env", "POSTGRES_PASSWORD",
                       # Over TCP: while the image initialises, a temporary server answers on the socket only, then restarts.
-                      "--health-cmd", f"pg_isready -h 127.0.0.1 -U {env['DB_USER']} -d {env['DB_NAME']}",
+                      "--health-cmd", f"pg_isready -h 127.0.0.1 -U {env['POSTGRES_USER']} -d {env['POSTGRES_DB']}",
                       "--health-interval", "1s", "--health-timeout", "5s", "--health-retries", "60",
-                      # The password reaches the container from the environment, never the command line.
-                      POSTGRES_IMAGE], env={**env, "POSTGRES_PASSWORD": env["DB_PASSWORD"]}, timeout=300, idle=0)
+                      POSTGRES_IMAGE], env=env, timeout=300, idle=0)
         deadline = time.monotonic() + 90
         while True:
             status = self.command(["docker", "inspect", "--format", "{{.State.Health.Status}}", name],
@@ -180,7 +177,7 @@ class Resources:
                 raise RuntimeError(f"PostgreSQL for {platform} did not become healthy ({status})")
             time.sleep(1)
         published = self.command(["docker", "port", name, "5432/tcp"], timeout=30, idle=0).split()[0]
-        env["DB_PORT"] = published.rsplit(":", 1)[1]
+        env["POSTGRES_PORT"] = published.rsplit(":", 1)[1]
         return env
 
     def memory_database(self, platform, env, log):
@@ -194,8 +191,8 @@ class Resources:
         with open(log, "ab") as output:
             process = subprocess.Popen(["node", MEMORY_LAUNCHER, "--serve"], cwd=self.root, start_new_session=True,
                                        stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
-                                       env={**env, "FAMILYFI_MODE": "test", "DB_SERVER": "memory",
-                                            "DB_PORT": str(port)})
+                                       env={**env, "FAMILYFI_MODE": "test", "DB_MODE": "memory",
+                                            "POSTGRES_PORT": str(port)})
         self.track_process(process)
         deadline = time.monotonic() + 60
         while True:
@@ -209,7 +206,8 @@ class Resources:
                     raise RuntimeError(f"In-memory database for {platform} did not start; see {log}")
                 time.sleep(0.25)
         # Its own settings (scripts/runtime/mode.mjs); the database name is whatever PGlite serves.
-        env.update(DB_PORT=str(port), DB_USER="postgres", DB_PASSWORD="postgres", DB_SSL_MODE="disable")
+        env.update(POSTGRES_PORT=str(port), POSTGRES_USER="postgres", POSTGRES_PASSWORD="postgres",
+                   DB_SSL_MODE="disable")
         return env
 
     def migrate(self, env, **kwargs):

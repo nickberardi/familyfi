@@ -12,7 +12,7 @@ TEST := scripts/test.py
 setup:
 	corepack enable >/dev/null 2>&1 || true
 	$(PNPM) install
-	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set DB_PASSWORD"; fi
+	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set POSTGRES_PASSWORD"; fi
 	node scripts/runtime/validate-env.mjs
 	@if command -v docker >/dev/null 2>&1; then \
 		docker compose -p familyfi --env-file .env -f docker/docker-compose.dev-db.yml up -d --wait; \
@@ -94,12 +94,12 @@ docker-build:
 	docker build -f docker/Dockerfile -t familyfi:dev .
 
 docker-dev-up:
-	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set DB_PASSWORD"; fi
+	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set POSTGRES_PASSWORD"; fi
 	node scripts/runtime/validate-env.mjs
 	FAMILYFI_IMAGE=familyfi:dev $(COMPOSE) -f docker/docker-compose.dev.yml up -d --build
 
 docker-up:
-	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set DB_PASSWORD"; fi
+	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set POSTGRES_PASSWORD"; fi
 	node scripts/runtime/validate-env.mjs
 	FAMILYFI_IMAGE=$(FAMILYFI_IMAGE) $(COMPOSE) up -d
 

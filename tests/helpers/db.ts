@@ -3,7 +3,7 @@ import { prisma } from "@/server/db";
 import { ensureHousehold, ensureRecoveryAccount } from "@/server/auth";
 import { setAutoReconcileForTests, setReconcileClientForTests } from "@/server/reconciliation";
 import { resetDevMockClientForTests } from "@/server/unifi/dev-mock";
-import { TEST_DB_NAME } from "./test-env";
+import { TEST_POSTGRES_DB } from "./test-env";
 
 export const SITE_ID = "11111111-1111-4111-8111-111111111111";
 export const INTERNAL_ZONE = "33333333-3333-4333-8333-333333333333";
@@ -21,8 +21,8 @@ export async function resetDatabase() {
   // PGlite of `scripts/test.py run --database memory` serves one database of its own name, and exists
   // only for the run.
   const [{ name, version }] = await db.$queryRaw<{ name: string; version: string }[]>`SELECT current_database() AS name, version() AS version`;
-  if (name !== TEST_DB_NAME && !version.includes("wasm32")) {
-    throw new Error(`resetDatabase only runs against ${TEST_DB_NAME}, not ${name}.`);
+  if (name !== TEST_POSTGRES_DB && !version.includes("wasm32")) {
+    throw new Error(`resetDatabase only runs against ${TEST_POSTGRES_DB}, not ${name}.`);
   }
   for (const table of await tablesChildrenFirst()) {
     await db.$executeRawUnsafe(`DELETE FROM "${table}"`);

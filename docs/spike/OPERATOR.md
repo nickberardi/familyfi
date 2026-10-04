@@ -5,42 +5,30 @@ Use a test phone or laptop you can inconvenience. Do not pick a household produc
 ## Prerequisites
 
 1. UniFi Network 10.4.x-compatible console with an integration API key.
-2. Local base `https://<console-ip>/proxy/network/integration` **or** cloud `SPIKE_CONSOLE_ID`.
+2. Local base `https://<console-ip>/proxy/network/integration` **or** cloud `UNIFI_CONSOLE_ID`.
 3. One or two test MACs that currently have internet and LAN access.
 4. A way to observe the **client** (browser, ping, existing video stream), not only the API.
 
 ## Commands
 
-Put the spike's settings in `.env` or the environment. The running app never reads them; it keeps its UniFi key in Settings.
-
-| Setting | Meaning |
-| --- | --- |
-| `SPIKE_API_KEY` | An operator-created UniFi Integration API key. |
-| `SPIKE_BASE_URL` or `SPIKE_CONSOLE_ID` | The local integration URL, `https://<console-ip>/proxy/network/integration`, or the cloud connector's console ID. |
-| `SPIKE_SITE_ID` | Needed when the console has more than one site. |
-| `SPIKE_MACS` | Comma-separated test MACs. |
-| `SPIKE_INSTALL_ID` | Defaults to `local`, matching the spike's older policy names. |
-| `SPIKE_TLS_INSECURE=1` | For local consoles with a private CA. |
-| `SPIKE_CONFIRM=1` | Required for `apply`, `disable` and `cleanup`. |
-| `SPIKE_SANITIZE=1` | Redacts identifiers in printed output. |
-| `SPIKE_STATE_FILE` | Where the spike records the policies it created. |
+Put CLI-only variables in `.env` or the environment. They are not the application credential store.
 
 ```bash
 # Read-only inventory (do not commit the output)
 make spike SPIKE_ARGS=discover
 
 # Mutating steps require confirmation
-SPIKE_CONFIRM=1 SPIKE_MACS=aa:bb:cc:dd:ee:ff make spike SPIKE_ARGS=apply
+UNIFI_SPIKE_CONFIRM=1 UNIFI_SPIKE_MACS=aa:bb:cc:dd:ee:ff make spike SPIKE_ARGS=apply
 # On the test device: internet should fail; LAN (printer, other LAN host) should still work.
 # Already-open streams should drop or stall. Unrelated devices should stay online.
 
-SPIKE_CONFIRM=1 make spike SPIKE_ARGS=disable
+UNIFI_SPIKE_CONFIRM=1 make spike SPIKE_ARGS=disable
 # On the test device: internet should return (subject to existing admin rules).
 
-SPIKE_CONFIRM=1 make spike SPIKE_ARGS=cleanup
+UNIFI_SPIKE_CONFIRM=1 make spike SPIKE_ARGS=cleanup
 ```
 
-Local consoles with a private certificate: `SPIKE_TLS_INSECURE=1`. Multiple sites: `SPIKE_SITE_ID`.
+Local consoles with a private certificate: `UNIFI_TLS_INSECURE=1`. Multiple sites: `UNIFI_SITE_ID`.
 
 ## What counts as pass
 
@@ -67,17 +55,17 @@ If official MAC enforcement or coexistence fails, stop. Do not switch to client 
 | `ownership-refusal` | Tries to update and delete an administrator-created policy through the ownership guard | Nothing. It must refuse before sending anything |
 
 ```bash
-SPIKE_MACS=aa:bb:cc:dd:ee:ff,aa:bb:cc:dd:ee:00 pnpm spike verify --confirm \
+UNIFI_SPIKE_MACS=aa:bb:cc:dd:ee:ff,aa:bb:cc:dd:ee:00 pnpm spike verify --confirm \
   --console-model "UCG Max" --console-firmware 4.3.6 --timezone America/New_York
 ```
 
-- `--confirm` is required every time; `SPIKE_CONFIRM` does not count.
+- `--confirm` is required every time; `UNIFI_SPIKE_CONFIRM` does not count.
 - `--console-firmware` is the UniFi OS version from the console's settings. The UniFi Network version is read from the console.
 - `--timezone` is the console's clock, which the bedtime windows are built on.
 - At each device check the CLI asks what you see: `y`, `n`, or `s` to skip. A `n` fails the scenario and moves on. A skipped check, or `--no-device-checks`, records the scenario as "API only".
 - `--only bedtime-midnight` runs one scenario, for example again just before midnight.
 
-Every write goes through the app's ownership guard with this run's own creations as the record, so the run cannot change a policy it did not create. Each scenario deletes its policies when it ends, pass or fail. If a delete fails, the ids go to the spike state file: run `SPIKE_CONFIRM=1 pnpm spike cleanup`. The run ends by checking every other policy and their order are as it found them.
+Every write goes through the app's ownership guard with this run's own creations as the record, so the run cannot change a policy it did not create. Each scenario deletes its policies when it ends, pass or fail. If a delete fails, the ids go to the spike state file: run `UNIFI_SPIKE_CONFIRM=1 pnpm spike cleanup`. The run ends by checking every other policy and their order are as it found them.
 
 Commit the record's `.json` and `.md` with the rewritten table in `docs/testing.md`. Read the `.md` first: it should say nothing about your household beyond the console model.
 

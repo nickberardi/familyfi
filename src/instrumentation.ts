@@ -2,7 +2,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.NEXT_PHASE) return;
   if (process.env.npm_lifecycle_event === "build") return;
-  const { ConfigurationError, loadEnv, oldSettingNames } = await import("./server/env");
+  const { ConfigurationError, loadEnv, unifiMockWarning } = await import("./server/env");
   let settings;
   try {
     settings = loadEnv();
@@ -15,7 +15,8 @@ export async function register() {
   logRecoveryAdmin(settings.FAMILYFI_DEFAULT_PASSWORD);
   if (settings.FAMILYFI_MODE === "demo") logDemoMode();
   else if (settings.FAMILYFI_MODE !== "prod") logUnifiMock(settings.FAMILYFI_MODE);
-  oldSettingNames().forEach((warning) => console.warn(warning));
+  const retired = unifiMockWarning();
+  if (retired) console.warn(retired);
   const { startUpdateCheck } = await import("./server/update-check");
   const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
   const { ensureUpstreamCategories } = await import("./server/upstream-seed");

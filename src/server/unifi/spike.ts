@@ -77,7 +77,7 @@ export async function discoverInventory(
   const site = siteId ? sites.find((item) => item.id === siteId) : sites.length === 1 ? sites[0] : undefined;
   if (!site) {
     const names = sites.map((item) => `${item.name} (${item.id})`).join(", ");
-    throw new Error(`Set SPIKE_SITE_ID. Sites: ${names}`);
+    throw new Error(`Set UNIFI_SITE_ID. Sites: ${names}`);
   }
   const [zones, networks, clients, policies] = await Promise.all([
     client.listZones(site.id),

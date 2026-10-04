@@ -53,18 +53,18 @@ To build the Docker image locally:
 git clone https://github.com/nickberardi/familyfi.git
 cd familyfi
 cp .env.example .env
-# Set DB_PASSWORD. Recovery password and crypto secrets are generated on first setup if omitted.
+# Set POSTGRES_PASSWORD. Recovery password and crypto secrets are generated on first setup if omitted.
 make docker-dev-up
 make docker-logs   # look for username: admin and the recovery password
 ```
 
-Open http://localhost:7001 (override with `FAMILYFI_PORT`). Compose starts the app and PostgreSQL together. For an existing server when you are not using that stack, set `DB_SERVER=external` and the `DB_*` values.
+Open http://localhost:7001 (override with `FAMILYFI_PORT`). Compose starts the app and PostgreSQL together. For an existing server when you are not using that stack, set `DB_MODE=external` and the `DB_*` values.
 
 To install a published GHCR image (see [releases](docs/operations.md#releases)):
 
 ```bash
 cp .env.example .env
-# Set DB_PASSWORD.
+# Set POSTGRES_PASSWORD.
 make docker-up     # pulls ghcr.io/nickberardi/familyfi
 ```
 
@@ -74,12 +74,12 @@ make docker-up     # pulls ghcr.io/nickberardi/familyfi
 
 ```bash
 cp .env.example .env
-# Set DB_PASSWORD.
+# Set POSTGRES_PASSWORD.
 make setup
 make dev
 ```
 
-Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docker is available, then migrates. If Docker is not available, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`. For UI work without a UniFi console, set `FAMILYFI_MODE=dev`, and add `DB_SERVER=memory` to skip PostgreSQL too (see [docs/setup.md](docs/setup.md#modes)).
+Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docker is available, then migrates. If Docker is not available, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`. For UI work without a UniFi console, set `FAMILYFI_MODE=dev`, and add `DB_MODE=memory` to skip PostgreSQL too (see [docs/setup.md](docs/setup.md#modes)).
 
 ## First run
 

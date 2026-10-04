@@ -2,7 +2,6 @@
 import { applyDatabaseUrl } from "./print-database-url.mjs";
 import { ensureSecrets, recoveryAdminBanner } from "./ensure-secrets.mjs";
 import { assertEnv } from "./env-issues.mjs";
-import { oldSettingNames } from "./mode.mjs";
 
 applyDatabaseUrl();
 const result = ensureSecrets();
@@ -14,5 +13,4 @@ if (result.written.includes("FAMILYFI_DEFAULT_PASSWORD")) {
   console.log(recoveryAdminBanner(result.defaultPassword));
 }
 assertEnv();
-for (const warning of oldSettingNames()) console.warn(`warning: ${warning}`);
 console.log("environment ok");

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The in-memory database's launcher: demo (`FAMILYFI_MODE=demo`, docs/operations.md#demo-mode), and
- * dev or test with `DB_SERVER=memory`. It holds the database, an in-memory PGlite served on loopback
+ * dev or test with `DB_MODE=memory`. It holds the database, an in-memory PGlite served on loopback
  * with `memoryDatabase`'s settings (mode.mjs), which lives exactly as long as this process.
  *
  *   node scripts/runtime/memory-database.mjs --requested   exits 0 when the in-memory database is in use, 1 when not
@@ -11,7 +11,7 @@
  */
 import { spawn } from "node:child_process";
 import { PGlite } from "@electric-sql/pglite";
-import { inMemoryDatabase, memoryDatabase, setting } from "./mode.mjs";
+import { inMemoryDatabase, memoryDatabase } from "./mode.mjs";
 import { applyDatabaseUrl } from "./print-database-url.mjs";
 import { servePGlite } from "./pglite-server.mjs";
 
@@ -19,7 +19,7 @@ import { servePGlite } from "./pglite-server.mjs";
 export const SERVED = "FAMILYFI_DATABASE_SERVED";
 
 /** An empty in-memory database, served until `stop`. Port 0 picks a free port (tests); `port` is the one served. */
-export async function startMemoryDatabase({ port = Number(memoryDatabase().DB_PORT) } = {}) {
+export async function startMemoryDatabase({ port = Number(memoryDatabase().POSTGRES_PORT) } = {}) {
   const db = await PGlite.create();
   const server = await servePGlite(db, { host: memoryDatabase().DB_HOST, port });
   return {
@@ -44,10 +44,10 @@ async function main(argv) {
   applyDatabaseUrl();
   if (argv[0] === "--requested") process.exit(inMemoryDatabase() ? 0 : 1);
   if (!inMemoryDatabase()) {
-    console.error("memory-database.mjs runs only with FAMILYFI_MODE=demo, or dev or test with DB_SERVER=memory.");
+    console.error("memory-database.mjs runs only with FAMILYFI_MODE=demo, or dev or test with DB_MODE=memory.");
     process.exit(1);
   }
-  const port = Number(memoryDatabase(setting(process.env, "DB_PORT")).DB_PORT);
+  const port = Number(memoryDatabase(process.env.POSTGRES_PORT?.trim()).POSTGRES_PORT);
   const database = await startMemoryDatabase({ port });
   const stop = async (code) => {
     await database.stop();

@@ -14,7 +14,7 @@ export type SpikeLiveState = {
 const defaultPath = join(dirname(fileURLToPath(import.meta.url)), ".live-state.json");
 
 export function spikeStatePath(): string {
-  return process.env.SPIKE_STATE_FILE?.trim() || defaultPath;
+  return process.env.UNIFI_SPIKE_STATE_FILE?.trim() || defaultPath;
 }
 
 export function readSpikeState(): SpikeLiveState | null {

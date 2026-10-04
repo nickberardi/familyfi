@@ -36,20 +36,20 @@ API success is not client proof. After apply/disable, check internet and LAN
 on the test device itself (see docs/spike/OPERATOR.md).
 
 Credentials (CLI-only):
-  SPIKE_API_KEY                 operator-created UniFi key
-  SPIKE_BASE_URL                https://<console-ip>/proxy/network/integration
-  or SPIKE_CONSOLE_ID           cloud connector console id
-  SPIKE_SITE_ID                 required when the console has more than one site
-  SPIKE_MACS                    comma-separated test MACs
-  SPIKE_INSTALL_ID              default local (legacy spike name matching)
-  SPIKE_TLS_INSECURE=1          local consoles with a private CA
-  SPIKE_CONFIRM=1               required for apply and cleanup
+  UNIFI_API_KEY                 operator-created UniFi key
+  UNIFI_BASE_URL                https://<console-ip>/proxy/network/integration
+  or UNIFI_CONSOLE_ID           cloud connector console id
+  UNIFI_SITE_ID                 required when the console has more than one site
+  UNIFI_SPIKE_MACS              comma-separated test MACs
+  UNIFI_SPIKE_INSTALL_ID        default local (legacy spike name matching)
+  UNIFI_TLS_INSECURE=1          local consoles with a private CA
+  UNIFI_SPIKE_CONFIRM=1         required for apply and cleanup
   FAMILYFI_MODE=dev             verify only: run against the local mock (never a record)
 
 Commands:
   discover    list sites, zones, networks, clients (local stdout)
   snapshot    print policy names and ordering ids
-  apply       create BLOCK policies for SPIKE_MACS toward External
+  apply       create BLOCK policies for UNIFI_SPIKE_MACS toward External
   disable     PUT enabled=false on spike-created policies
   enable      PUT enabled=true on spike-created policies
   cleanup     delete spike-created policies and compare admin order
@@ -59,7 +59,7 @@ Commands:
                 --confirm                 required: it blocks the test devices' internet
                 --console-model <name>    for example "UCG Max"
                 --console-firmware <ver>  UniFi OS version, from the console's settings
-                --mac <address>           test device (repeatable; or SPIKE_MACS)
+                --mac <address>           test device (repeatable; or UNIFI_SPIKE_MACS)
                 --timezone <IANA zone>    the console's clock (default: this machine's)
                 --only <id,id>            run some scenarios (${VERIFY_SCENARIOS.map((scenario) => scenario.id).join(", ")})
                 --no-device-checks        API checks only; enforcement is recorded as not observed
@@ -76,13 +76,13 @@ function envFlag(name: string): boolean {
 }
 
 function requireConfirm(command: string): void {
-  if (envFlag("SPIKE_CONFIRM") || process.argv.includes("--yes")) return;
-  console.error(`Refusing ${command} without SPIKE_CONFIRM=1 (or --yes).`);
+  if (envFlag("UNIFI_SPIKE_CONFIRM") || process.argv.includes("--yes")) return;
+  console.error(`Refusing ${command} without UNIFI_SPIKE_CONFIRM=1 (or --yes).`);
   process.exit(2);
 }
 
 function parseMacs(): string[] {
-  const fromEnv = process.env.SPIKE_MACS ?? "";
+  const fromEnv = process.env.UNIFI_SPIKE_MACS ?? "";
   const fromArgs = flagValues("--mac");
   const raw = [fromEnv, ...fromArgs].join(",");
   const macs = raw
@@ -104,24 +104,24 @@ function flagValues(name: string): string[] {
 }
 
 function createClient(): HttpUnifiClient {
-  const apiKey = process.env.SPIKE_API_KEY?.trim();
+  const apiKey = process.env.UNIFI_API_KEY?.trim();
   if (!apiKey) {
-    throw new UnifiConfigError("Set SPIKE_API_KEY and either SPIKE_BASE_URL or SPIKE_CONSOLE_ID.");
+    throw new UnifiConfigError("Set UNIFI_API_KEY and either UNIFI_BASE_URL or UNIFI_CONSOLE_ID.");
   }
-  if (envFlag("SPIKE_TLS_INSECURE")) {
+  if (envFlag("UNIFI_TLS_INSECURE")) {
     // Spike process only. Local consoles often present a private CA.
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   }
   return new HttpUnifiClient({
     apiKey,
-    baseUrl: process.env.SPIKE_BASE_URL,
-    consoleId: process.env.SPIKE_CONSOLE_ID,
+    baseUrl: process.env.UNIFI_BASE_URL,
+    consoleId: process.env.UNIFI_CONSOLE_ID,
   });
 }
 
 function printJson(value: unknown): void {
-  const payload = envFlag("SPIKE_SANITIZE") ? sanitizeUnifiValue(value) : value;
-  if (!envFlag("SPIKE_SANITIZE")) {
+  const payload = envFlag("UNIFI_SPIKE_SANITIZE") ? sanitizeUnifiValue(value) : value;
+  if (!envFlag("UNIFI_SPIKE_SANITIZE")) {
     console.error("Do not commit this output. It may contain household MACs, names, and IPs.");
   }
   console.log(JSON.stringify(payload, null, 2));
@@ -132,8 +132,8 @@ async function main(): Promise<number> {
   const command = argv[0] ?? "help";
   if (command === "help" || command === "--help" || command === "-h") {
     console.log(help());
-    const key = process.env.SPIKE_API_KEY?.trim();
-    const target = process.env.SPIKE_BASE_URL || process.env.SPIKE_CONSOLE_ID;
+    const key = process.env.UNIFI_API_KEY?.trim();
+    const target = process.env.UNIFI_BASE_URL || process.env.UNIFI_CONSOLE_ID;
     if (!key || !target) return 2;
     return 0;
   }
@@ -141,15 +141,15 @@ async function main(): Promise<number> {
   if (command === "verify") return verify();
 
   const client = createClient();
-  const installId = process.env.SPIKE_INSTALL_ID?.trim() || "local";
-  const siteId = process.env.SPIKE_SITE_ID?.trim() || flagValue("--site");
+  const installId = process.env.UNIFI_SPIKE_INSTALL_ID?.trim() || "local";
+  const siteId = process.env.UNIFI_SITE_ID?.trim() || flagValue("--site");
 
   if (command === "discover") {
     const inventory = await discoverInventory(client, siteId);
     printJson({
       api: UNIFI_API_VERSION,
       applicationVersion: inventory.applicationVersion,
-      connection: process.env.SPIKE_CONSOLE_ID ? "cloud" : "local",
+      connection: process.env.UNIFI_CONSOLE_ID ? "cloud" : "local",
       site: inventory.site,
       externalZone: { id: inventory.externalZone.id, name: inventory.externalZone.name },
       zones: inventory.zones.map((zone) => ({ id: zone.id, name: zone.name, networkIds: zone.networkIds })),
@@ -197,7 +197,7 @@ async function main(): Promise<number> {
     requireConfirm("apply");
     const macs = parseMacs();
     if (macs.length === 0) {
-      console.error("Set SPIKE_MACS or pass --mac <address>.");
+      console.error("Set UNIFI_SPIKE_MACS or pass --mac <address>.");
       return 2;
     }
     const inventory = await discoverInventory(client, siteId);
@@ -216,7 +216,7 @@ async function main(): Promise<number> {
       next: [
         "On each test device: confirm internet is down (new + already-open sessions) and LAN still works.",
         "Unrelated devices must keep internet.",
-        "Then: SPIKE_CONFIRM=1 pnpm spike -- disable",
+        "Then: UNIFI_SPIKE_CONFIRM=1 pnpm spike -- disable",
       ],
     });
     return result.adminOrderPreserved ? 0 : 1;
@@ -341,10 +341,10 @@ async function verify(): Promise<number> {
       confirm: true,
       client,
       mock,
-      siteId: process.env.SPIKE_SITE_ID?.trim() || flagValue("--site"),
+      siteId: process.env.UNIFI_SITE_ID?.trim() || flagValue("--site"),
       macs,
       console: { model: flagValue("--console-model") ?? "", firmware: flagValue("--console-firmware") ?? "" },
-      connection: mock ? "mock" : process.env.SPIKE_CONSOLE_ID ? "cloud" : "local",
+      connection: mock ? "mock" : process.env.UNIFI_CONSOLE_ID ? "cloud" : "local",
       familyfi: { version: APP_VERSION, commit: familyfiCommit() },
       timeZone,
       only: only as ScenarioId[],
@@ -372,7 +372,7 @@ async function verify(): Promise<number> {
       createdAt: new Date().toISOString(),
     });
     console.error(
-      `${leftoverPolicyIds.length} verification policies could not be deleted. Their ids are in the spike state file: run SPIKE_CONFIRM=1 pnpm spike cleanup.`,
+      `${leftoverPolicyIds.length} verification policies could not be deleted. Their ids are in the spike state file: run UNIFI_SPIKE_CONFIRM=1 pnpm spike cleanup.`,
     );
   }
 

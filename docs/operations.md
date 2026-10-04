@@ -138,9 +138,9 @@ FamilyFi another way.
 
 `make docker-up` and `make docker-dev-up` use `docker/docker-compose.yml`, which starts the app and PostgreSQL together. The database uses a named volume and is not published on the host. The app container is pointed at the `db` service.
 
-- `DB_SERVER=bundled` (default): the app expects Compose-managed PostgreSQL (`DB_HOST=db` in that stack).
-- `DB_SERVER=external`: the app uses `DB_HOST` and related settings for a server you already run (CI, container smoke, or `make setup` / `make db-dev`).
-- `DB_SERVER=memory`: an in-memory database that starts and ends with the server, for `FAMILYFI_MODE=dev` and `test` ([modes](setup.md#modes)). Demo mode always uses it; `prod` refuses it.
+- `DB_MODE=bundled` (default): the app expects Compose-managed PostgreSQL (`DB_HOST=db` in that stack).
+- `DB_MODE=external`: the app uses `DB_HOST` and related settings for a server you already run (CI, container smoke, or `make setup` / `make db-dev`).
+- `DB_MODE=memory`: an in-memory database that starts and ends with the server, for `FAMILYFI_MODE=dev` and `test` ([modes](setup.md#modes)). Demo mode always uses it; `prod` refuses it.
 
 Users should not edit Compose YAML to pick a server.
 
@@ -148,7 +148,7 @@ Users should not edit Compose YAML to pick a server.
 
 `FAMILYFI_MODE=demo` runs the production image as a public demo, such as the one App Review and the familyfi.dev site point at. Nothing in it is real or kept:
 
-- **Database.** The entrypoint hands over to `scripts/runtime/memory-database.mjs`, which serves an in-memory [PGlite](https://pglite.dev) database on loopback (port 5433, or `DB_PORT`; through its own small wire-protocol server, `pglite-server.mjs`), applies the migrations and runs FamilyFi against it. The other `DB_*` settings are ignored and need not be set. No volume is needed; every start begins empty.
+- **Database.** The entrypoint hands over to `scripts/runtime/memory-database.mjs`, which serves an in-memory [PGlite](https://pglite.dev) database on loopback (port 5433, or `POSTGRES_PORT`; through its own small wire-protocol server, `pglite-server.mjs`), applies the migrations and runs FamilyFi against it. The other `DB_*` and `POSTGRES_*` settings are ignored and need not be set. No volume is needed; every start begins empty.
 - **Household.** The UniFi mock stands in for the gateway, and the boot seed adds the dummy household, as `FAMILYFI_MODE=dev` does in development. Visitors use groups, rules, pauses, devices and pairing as at home.
 - **Locked configuration.** Every visitor shares one household, so configuration writes answer 403 `demo_locked` ([API](api.md#shared-behaviour-and-consumer-adoption)): household and UniFi settings, accounts and passwords, resolvers, connection routes and their certificate pins, and remote access. The demo never opens a Cloudflare tunnel from its host.
 - **Sign-in.** `admin` and `pat`, both with `FAMILYFI_DEFAULT_PASSWORD`. Set it on the host so the password survives restarts, and give it to reviewers out of band. The session secret and encryption key may be left to generate on each start.
@@ -171,7 +171,7 @@ Release images run `prisma migrate deploy` on start. Local `make dev` does the s
 
 A household may skip releases: any release from v0.1.0 on upgrades straight to the newest. CI proves it on every push by filling a database built by each release since v0.1.0 and upgrading it (`pnpm db-upgrade`). The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/ci/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
 
-Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose reads `DB_*` from `.env`, hands the database service the `POSTGRES_*` names its image expects, and passes `DB_*` into the app container, which reaches PostgreSQL on port 5432 inside the Compose network. The app generates `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET` and `FAMILYFI_ENCRYPTION_KEY` on first boot and keeps them in `/var/lib/familyfi/data/.env` on its volume. It does not read the host's `.env`. `make docker-up` warns about database settings that still use their old names.
+Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose interpolates `POSTGRES_*` for the database service and passes `DB_*` and `POSTGRES_*` into the app container, which reaches PostgreSQL on port 5432 inside the Compose network. The app generates `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET` and `FAMILYFI_ENCRYPTION_KEY` on first boot and keeps them in `/var/lib/familyfi/data/.env` on its volume; it does not read the host's `.env`.
 
 ## Releases
 

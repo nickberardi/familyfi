@@ -33,7 +33,7 @@ def listing_env():
     # here too; its config refuses CI without a recovery password. The integration setup
     # collects without a database while FAMILYFI_TEST_DISCOVERY is set.
     env = {**os.environ, "CI": "1", "FAMILYFI_DEFAULT_PASSWORD": "listing-only",
-           "DB_PASSWORD": "listing-only", "FAMILYFI_TEST_DISCOVERY": "1"}
+           "POSTGRES_PASSWORD": "listing-only", "FAMILYFI_TEST_DISCOVERY": "1"}
     env.pop("PLAYWRIGHT_JSON_OUTPUT_FILE", None)
     env.pop("DATABASE_URL", None)
     return env

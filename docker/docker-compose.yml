@@ -1,20 +1,18 @@
-# Database settings use DB_*. The old POSTGRES_* names in .env still fill in while the new name is
-# unset; the postgres image itself takes POSTGRES_*.
 services:
   db:
     image: postgres:18-alpine
     container_name: ${POSTGRES_CONTAINER_NAME:-familyfi-postgres}
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME:-${POSTGRES_DB:-familyfi}}
-      POSTGRES_USER: ${DB_USER:-${POSTGRES_USER:-familyfi}}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:?Set DB_PASSWORD in .env}}
+      POSTGRES_DB: ${POSTGRES_DB:-familyfi}
+      POSTGRES_USER: ${POSTGRES_USER:-familyfi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "${DB_PORT:-${POSTGRES_PORT:-5432}}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - familyfi-postgres:${POSTGRES_DATA_PATH:-/var/lib/postgresql}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,13 +26,13 @@ services:
       NODE_ENV: production
       PORT: "7001"
       HOSTNAME: 0.0.0.0
-      DB_SERVER: bundled
+      DB_MODE: bundled
       DB_HOST: db
-      # PostgreSQL's port inside the Compose network; DB_PORT above only picks the host's published port.
-      DB_PORT: "5432"
-      DB_NAME: ${DB_NAME:-${POSTGRES_DB:-familyfi}}
-      DB_USER: ${DB_USER:-${POSTGRES_USER:-familyfi}}
-      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:?Set DB_PASSWORD in .env}}
+      # PostgreSQL's port inside the Compose network; POSTGRES_PORT only picks the host's published port.
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-familyfi}
+      POSTGRES_USER: ${POSTGRES_USER:-familyfi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       # Set to expose the phone-only gateway to a tunnel sidecar on this Compose network
       # (see docs/setup.md). Never add it to `ports`.
       FAMILYFI_PHONE_GATEWAY_PORT: ${FAMILYFI_PHONE_GATEWAY_PORT:-}

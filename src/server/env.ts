@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buildDatabaseUrl, memoryDatabase, OLD_DATABASE_NAMES } from "./database-url";
+import { buildDatabaseUrl, memoryDatabase } from "./database-url";
 
 export class ConfigurationError extends Error {
   readonly issues: string[];
@@ -16,12 +16,12 @@ const EnvSchema = z.object({
   FAMILYFI_DEFAULT_PASSWORD: z.string().min(12),
   FAMILYFI_SESSION_SECRET: z.string().min(32),
   FAMILYFI_ENCRYPTION_KEY: z.string().min(1),
-  DB_SERVER: z.enum(["bundled", "external", "memory"]).default("bundled"),
+  DB_MODE: z.enum(["bundled", "external", "memory"]).default("bundled"),
   DB_HOST: z.string().default("127.0.0.1"),
-  DB_PORT: z.string().default("5432"),
-  DB_NAME: z.string().default("familyfi"),
-  DB_USER: z.string().default("familyfi"),
-  DB_PASSWORD: z.string().min(1),
+  POSTGRES_PORT: z.string().default("5432"),
+  POSTGRES_DB: z.string().default("familyfi"),
+  POSTGRES_USER: z.string().default("familyfi"),
+  POSTGRES_PASSWORD: z.string().min(1),
   DB_SSL_MODE: z.string().optional(),
   DB_SSL_ROOT_CERT: z.string().optional(),
 });
@@ -34,7 +34,7 @@ export type AppEnv = z.infer<typeof EnvSchema> & { DATABASE_URL: string; FAMILYF
  * configuration is locked:
  *
  * - `prod`: a household's real gateway on PostgreSQL. The default.
- * - `dev`: the UniFi mock and the seed household, for local work. PostgreSQL, or in memory with `DB_SERVER=memory`.
+ * - `dev`: the UniFi mock and the seed household, for local work. PostgreSQL, or in memory with `DB_MODE=memory`.
  * - `test`: as `dev`, for automated runs, including a production build under CI.
  * - `demo`: the hosted public demo. The mock and the seed on an in-memory database, reset nightly, configuration locked.
  *
@@ -53,23 +53,9 @@ function isMode(value: string | undefined): value is FamilyFiMode {
   return (FAMILYFI_MODES as readonly string[]).includes(value ?? "");
 }
 
-/**
- * Startup warnings for settings under a retired name: the database settings' old names, still read
- * while the new name is unset, and `UNIFI_MOCK`, which is no longer read at all.
- */
-export function oldSettingNames(source: Record<string, string | undefined> = process.env): string[] {
-  const warnings: string[] = [];
-  for (const [name, old] of Object.entries(OLD_DATABASE_NAMES)) {
-    if (source[old]?.trim()) {
-      warnings.push(
-        source[name]?.trim()
-          ? `${old} is ignored because ${name} is set; remove ${old}.`
-          : `${old} is the old name for ${name}; rename it.`,
-      );
-    }
-  }
-  if (source.UNIFI_MOCK?.trim()) warnings.push("UNIFI_MOCK is no longer read; set FAMILYFI_MODE=dev instead.");
-  return warnings;
+/** `UNIFI_MOCK` was the switch before `FAMILYFI_MODE`. It is no longer read; startup says so when it is set. */
+export function unifiMockWarning(source: Record<string, string | undefined> = process.env): string | undefined {
+  return read(source, "UNIFI_MOCK") ? "UNIFI_MOCK is no longer read; set FAMILYFI_MODE=dev instead." : undefined;
 }
 
 function modeRefusal(source: Record<string, string | undefined>): string | undefined {
@@ -98,8 +84,8 @@ export function modeIssues(source: Record<string, string | undefined> = process.
   const issues: string[] = [];
   const refusal = modeRefusal(source);
   if (refusal) issues.push(refusal);
-  if (read(source, "DB_SERVER") === "memory" && familyfiMode(source) === "prod") {
-    issues.push("DB_SERVER=memory is for dev, test and demo; prod keeps its household in PostgreSQL.");
+  if (read(source, "DB_MODE") === "memory" && familyfiMode(source) === "prod") {
+    issues.push("DB_MODE=memory is for dev, test and demo; prod keeps its household in PostgreSQL.");
   }
   return issues;
 }
@@ -114,10 +100,10 @@ export function unifiMockEnabled(source: Record<string, string | undefined> = pr
   return familyfiMode(source) !== "prod";
 }
 
-/** In memory in demo, and in dev or test with `DB_SERVER=memory`; never in prod. */
+/** In memory in demo, and in dev or test with `DB_MODE=memory`; never in prod. */
 export function inMemoryDatabase(source: Record<string, string | undefined> = process.env): boolean {
   const mode = familyfiMode(source);
-  return mode === "demo" || (mode !== "prod" && read(source, "DB_SERVER") === "memory");
+  return mode === "demo" || (mode !== "prod" && read(source, "DB_MODE") === "memory");
 }
 
 let cached: AppEnv | undefined;
@@ -126,16 +112,13 @@ const ISSUE_BY_FIELD: Record<string, string> = {
   FAMILYFI_DEFAULT_PASSWORD: "FAMILYFI_DEFAULT_PASSWORD must be at least 12 characters.",
   FAMILYFI_SESSION_SECRET: "FAMILYFI_SESSION_SECRET must be at least 32 characters.",
   FAMILYFI_ENCRYPTION_KEY: "FAMILYFI_ENCRYPTION_KEY must be 32 bytes as 64 hex characters (or base64).",
-  DB_PASSWORD: "DB_PASSWORD must be set.",
-  DB_SERVER: "DB_SERVER must be bundled, external or memory.",
+  POSTGRES_PASSWORD: "POSTGRES_PASSWORD must be set.",
+  DB_MODE: "DB_MODE must be bundled, external or memory.",
 };
 
-/** A setting, trimmed. A database setting falls back to its old name (`OLD_DATABASE_NAMES`) while unset. */
 function read(source: Record<string, string | undefined>, key: string): string | undefined {
-  const value = source[key]?.trim();
-  if (value) return value;
-  const old = OLD_DATABASE_NAMES[key as keyof typeof OLD_DATABASE_NAMES];
-  return (old && source[old]?.trim()) || value;
+  const value = source[key];
+  return typeof value === "string" ? value.trim() : undefined;
 }
 
 function parseEncryptionKey(value: string): Buffer {
@@ -152,17 +135,17 @@ function settingsFrom(source: Record<string, string | undefined>) {
     FAMILYFI_DEFAULT_PASSWORD: read(source, "FAMILYFI_DEFAULT_PASSWORD"),
     FAMILYFI_SESSION_SECRET: read(source, "FAMILYFI_SESSION_SECRET"),
     FAMILYFI_ENCRYPTION_KEY: read(source, "FAMILYFI_ENCRYPTION_KEY"),
-    DB_SERVER: read(source, "DB_SERVER") || "bundled",
+    DB_MODE: read(source, "DB_MODE") || "bundled",
     DB_HOST: read(source, "DB_HOST"),
-    DB_PORT: read(source, "DB_PORT"),
-    DB_NAME: read(source, "DB_NAME"),
-    DB_USER: read(source, "DB_USER"),
-    DB_PASSWORD: read(source, "DB_PASSWORD"),
+    POSTGRES_PORT: read(source, "POSTGRES_PORT"),
+    POSTGRES_DB: read(source, "POSTGRES_DB"),
+    POSTGRES_USER: read(source, "POSTGRES_USER"),
+    POSTGRES_PASSWORD: read(source, "POSTGRES_PASSWORD"),
     DB_SSL_MODE: read(source, "DB_SSL_MODE"),
     DB_SSL_ROOT_CERT: read(source, "DB_SSL_ROOT_CERT"),
   };
   if (!inMemoryDatabase(source)) return settings;
-  return { ...settings, DB_SERVER: "memory", DB_SSL_ROOT_CERT: undefined, ...memoryDatabase(settings.DB_PORT) };
+  return { ...settings, DB_MODE: "memory", DB_SSL_ROOT_CERT: undefined, ...memoryDatabase(settings.POSTGRES_PORT) };
 }
 
 export function envIssues(source: Record<string, string | undefined> = process.env): string[] {
