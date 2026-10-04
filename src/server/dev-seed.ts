@@ -68,12 +68,15 @@ async function ensureDummyHouseholdMembers() {
   if (existing > 0) return;
 
   const groupIds = new Map<string, string>();
-  for (const group of DEV_GROUPS) {
+  // Groups list by creation time; a millisecond apart, they list in this order, never tied.
+  const created0 = Date.now() - DEV_GROUPS.length;
+  for (const [index, group] of DEV_GROUPS.entries()) {
+    const createdAt = new Date(created0 + index);
     const created = await prisma().group.create({
       data:
         group.kind === "family"
-          ? { kind: GroupKind.family, name: group.name, familyRole: FamilyRole[group.familyRole] }
-          : { kind: GroupKind.things, name: group.name, monogram: group.monogram },
+          ? { kind: GroupKind.family, name: group.name, familyRole: FamilyRole[group.familyRole], createdAt }
+          : { kind: GroupKind.things, name: group.name, monogram: group.monogram, createdAt },
     });
     groupIds.set(group.name, created.id);
   }
@@ -167,6 +170,7 @@ async function writeUpstreamChecks(verdicts: readonly DevVerdict[], scopes: (str
       select: { domain: true },
       orderBy: { domain: "asc" },
     });
+    if (item.verdict === "partial" && domains.length < 2) continue;
     const blockedCount = item.verdict === "blocked" ? domains.length : item.verdict === "open" ? 0 : Math.min(item.blockedCount ?? 1, domains.length - 1);
     const results = domains.map(({ domain }, index) => ({
       domain,
