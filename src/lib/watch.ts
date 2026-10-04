@@ -136,6 +136,11 @@ export function removeWatch(request: ApiRequest, watch: Pick<PairedPhone, "id">)
   return request(`/api/v1/paired/devices/${encodeURIComponent(watch.id)}`, { method: "DELETE" });
 }
 
+/** Renames one of this phone's Watches, as the household lists it; a Watch reports only "Apple Watch". */
+export function renameWatch(request: ApiRequest, watch: Pick<PairedPhone, "id">, displayName: string): Promise<{ device: PairedPhone }> {
+  return request(`/api/v1/paired/devices/${encodeURIComponent(watch.id)}`, { method: "PATCH", body: { displayName: displayName.trim() } });
+}
+
 /** The Watch setup screen's words. */
 export const WATCH_COPY = {
   title: "Watch",
@@ -156,6 +161,10 @@ export const WATCH_COPY = {
   moveDown: "Move down",
   add: "Add",
   remove: "Remove",
+  rename: "Rename",
+  renameTitle: "Rename this Watch",
+  renameBody: "The name FamilyFi lists it by, here and on the web.",
+  renameConfirm: "Save",
   removeWatch: "Remove Watch",
   removeTitle: "Remove this Watch?",
   removeBody: "It stops working with this household. To use FamilyFi on it again, set it up from this phone.",
