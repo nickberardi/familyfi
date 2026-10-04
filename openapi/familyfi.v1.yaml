@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.23.0
+  version: 0.24.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2487,7 +2487,7 @@ components:
     Health:
       type: object
       additionalProperties: false
-      required: [status, db, version]
+      required: [status, db, version, update]
       properties:
         status:
           type: string
@@ -2608,7 +2608,7 @@ components:
     Account:
       type: object
       additionalProperties: false
-      required: [id, username, displayName, kind, isAdmin, recovery]
+      required: [id, username, displayName, kind, isAdmin, groupId, recovery]
       properties:
         id: { type: string }
         username: { type: string }
@@ -2872,7 +2872,7 @@ components:
       type: object
       additionalProperties: false
       description: "`?claim=true`: the Watch's invite, already claimed, with the same claim every client gets."
-      required: [invite, device, session, token, tokenType, refreshToken, refreshExpiresAt]
+      required: [invite, device, session, token, tokenType, refreshToken, refreshExpiresAt, connection]
       properties:
         invite:
           type: object
@@ -2994,7 +2994,7 @@ components:
     UnifiSettings:
       type: object
       additionalProperties: false
-      required: [configured, connectionStatus, tlsInsecure, manageAllNetworks, managedNetworkIds, networks]
+      required: [configured, mode, baseUrl, consoleId, siteId, apiKeyMasked, tlsInsecure, manageAllNetworks, managedNetworkIds, networks, connectionStatus, connectionError]
       properties:
         configured: { type: boolean }
         mode: { type: [string, "null"] }
@@ -3015,7 +3015,7 @@ components:
     UnifiNetwork:
       type: object
       additionalProperties: false
-      required: [id, name, vlanId]
+      required: [id, name, vlanId, zoneId]
       properties:
         id: { type: string }
         name: { type: string }
@@ -3283,7 +3283,7 @@ components:
     Group:
       type: object
       additionalProperties: false
-      required: [id, kind, name, deviceCount, suspension, allowance, internetRuleIds, access, dohOverrideUrl]
+      required: [id, kind, name, monogram, familyRole, deviceCount, suspension, allowance, internetRuleIds, access, dohOverrideUrl]
       properties:
         id: { type: string }
         kind: { type: string, enum: [family, things] }
@@ -3328,7 +3328,7 @@ components:
     Device:
       type: object
       additionalProperties: false
-      required: [mac, assignment, unresolved, inScope]
+      required: [mac, manufacturer, hostname, ip, networkId, zoneId, groupId, assignment, lastSeenAt, presence, presenceCheckedAt, connectedAt, connectionType, accessPointName, unresolved, inScope]
       properties:
         mac: { type: string }
         manufacturer:
@@ -3367,7 +3367,7 @@ components:
     Change:
       type: object
       additionalProperties: false
-      required: [id, revision, status, scope, updatedAt]
+      required: [id, revision, appliedRevision, status, scope, deviceMac, actorAccountId, actorDeviceId, error, updatedAt]
       properties:
         id: { type: string }
         revision: { type: integer }
@@ -3382,7 +3382,7 @@ components:
     SyncStatus:
       type: object
       additionalProperties: false
-      required: [revision, connectionStatus, appPolicyCount, failingCount, changes, issues]
+      required: [revision, connectionStatus, appPolicyCount, failingCount, issues, lastRun, changes]
       properties:
         revision: { type: integer }
         connectionStatus: { type: string }
@@ -3402,6 +3402,7 @@ components:
         lastRun:
           type: [object, "null"]
           additionalProperties: false
+          required: [id, status, requestedRevision, appliedRevision, startedAt, finishedAt, error]
           properties:
             id: { type: string }
             status: { type: string }
@@ -3448,7 +3449,7 @@ components:
     UpstreamCheck:
       type: object
       additionalProperties: false
-      required: [verdict, blockedCount, totalCount, checkedAt, error, groupId, results]
+      required: [verdict, blockedCount, totalCount, checkedAt, error, groupId, results, source, networks]
       properties:
         verdict:
           type: string
@@ -3519,7 +3520,7 @@ components:
     UpstreamCheckRow:
       type: object
       additionalProperties: false
-      required: [categoryId, slug, label, verdict, blockedCount, totalCount, checkedAt, error, groupId, results]
+      required: [categoryId, slug, label, verdict, blockedCount, totalCount, checkedAt, error, groupId, results, source, networks]
       properties:
         categoryId: { type: string }
         slug: { type: string }
@@ -3593,7 +3594,7 @@ components:
     UpstreamResolver:
       type: object
       additionalProperties: false
-      required: [configured, url, probeEnabled, probeTime, probeDays, timeoutMs, lastRunAt, nextRunAt]
+      required: [configured, source, networks, reason, url, probeEnabled, probeTime, probeDays, timeoutMs, lastRunAt, nextRunAt]
       properties:
         configured: { type: boolean }
         source: { type: string, enum: [doh, dhcp, unknown] }
