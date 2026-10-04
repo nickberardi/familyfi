@@ -32,7 +32,8 @@ test("Categories lists the seeded set and states the reporting-only stance", asy
   await expect(page.getByText("Video", { exact: true })).toBeVisible();
 
   await expect(page.getByText("DNS resolver", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Using DNS servers assigned by UniFi DHCP/i)).toBeVisible();
+  // The mock household reports through Cloudflare for Families, shown in full.
+  await expect(page.getByText("https://family.cloudflare-dns.com/dns-query", { exact: true })).toBeVisible();
 });
 
 /** Domain names drawn struck through, by their rendered style: the list is shared React Native, so no inline style to match. */

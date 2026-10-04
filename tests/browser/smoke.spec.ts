@@ -336,9 +336,9 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   const adult = body.groups.find((group) => group.familyRole === "adult");
   expect(adult, "The mock seed must include an adult with no rules").toBeTruthy();
   // Distinct seeded kids per project, so desktop and phone never edit the same group.
-  const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
+  const preferredName = test.info().project.name === "phone" ? "Abby" : "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
-  expect(child, "The mock seed must include Betsy and Sam").toBeTruthy();
+  expect(child, "The mock seed must include Betsy and Abby").toBeTruthy();
   const ruleName = `QA lights out ${test.info().project.name} ${Date.now() % 100000}`;
 
   await page.goto("/rules");
@@ -409,9 +409,9 @@ test("Rules: pause a rule from its card and resume it", async ({ page }) => {
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");
   const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string }[] };
-  const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
+  const preferredName = test.info().project.name === "phone" ? "Abby" : "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
-  expect(child, "The mock seed must include Betsy and Sam").toBeTruthy();
+  expect(child, "The mock seed must include Betsy and Abby").toBeTruthy();
   const ruleName = `QA pause ${test.info().project.name} ${Date.now() % 100000}`;
   const created = await page.request.post("/api/v1/rules", {
     headers: await csrfHeaders(page),
@@ -441,9 +441,9 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");
   const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string; deviceCount: number }[] };
-  // The Living Room TV group, so the family cards other tests use are left alone.
-  const tv = body.groups.find((group) => group.name === "Living Room");
-  expect(tv, "The mock seed must include the Living Room things group").toBeTruthy();
+  // The TV group, so the family cards other tests use are left alone.
+  const tv = body.groups.find((group) => group.name === "TV");
+  expect(tv, "The mock seed must include the TV things group").toBeTruthy();
 
   // A no-internet window offers "Allow internet now" instead of a pause, so turn the
   // seeded TV rule off while this runs: the test must not depend on the time of day.
@@ -468,7 +468,7 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
     const devicesRes = await page.request.get("/api/v1/devices");
     const { devices } = (await devicesRes.json()) as { devices: { groupId: string | null; hostname: string | null }[] };
     const named = devices.find((device) => device.groupId === tv!.id && device.hostname?.trim());
-    expect(named, "The mock seed must name a Living Room device").toBeTruthy();
+    expect(named, "The mock seed must name a TV device").toBeTruthy();
     await expect(sheet.getByText(named!.hostname!.trim(), { exact: false })).toBeVisible();
     await expect(sheet.getByText(/Category, app and website rules stay as they are/)).toBeVisible();
     const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/pause`));
@@ -492,7 +492,7 @@ test("Websites rule blocks named domains, with the encrypted DNS caveat", async 
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");
   const body = (await groupsRes.json()) as { groups: { id: string; name: string }[] };
-  const child = body.groups.find((group) => group.name === (test.info().project.name === "phone" ? "Sam" : "Betsy"));
+  const child = body.groups.find((group) => group.name === (test.info().project.name === "phone" ? "Abby" : "Betsy"));
   const ruleName = `QA sites ${test.info().project.name} ${Date.now() % 100000}`;
 
   await page.goto(`/rules/new?group=${child!.id}`);
@@ -517,8 +517,8 @@ test("Websites rule blocks named domains, with the encrypted DNS caveat", async 
 test("cards show every household category; one UniFi cannot block offers a Websites rule", async ({ page }) => {
   await signIn(page);
   const body = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
-  const kid = body.groups.find((group) => group.kind === "family" && group.name === (test.info().project.name === "phone" ? "Sam" : "Betsy"));
-  expect(kid, "The mock seed must include Betsy and Sam").toBeTruthy();
+  const kid = body.groups.find((group) => group.kind === "family" && group.name === (test.info().project.name === "phone" ? "Abby" : "Betsy"));
+  expect(kid, "The mock seed must include Betsy and Abby").toBeTruthy();
 
   await page.goto("/family");
   const marks = page.getByTestId(`filter-marks-${kid!.id}`);
@@ -583,7 +583,7 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
     groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
   // Prefer distinct seeded kids per project to reduce desktop/phone races (same as Rules shell).
-  const preferredName = test.info().project.name === "phone" ? "Sam" : "Betsy";
+  const preferredName = test.info().project.name === "phone" ? "Abby" : "Betsy";
   const child =
     body.groups.find((group) => group.kind === "family" && group.name === preferredName) ??
     body.groups.find((group) => group.kind === "family" && (group.familyRole === "child" || group.familyRole === "teen"));
@@ -610,8 +610,8 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   }
   await page.reload();
   // Video is left unmeasured by the mock seed, so with no rule it must read "not
-  // blocked" — a mark with no verdict must never imply one. Social and Gaming carry
-  // seeded verdicts and are asserted in upstream-marks.spec.
+  // blocked" — a mark with no verdict must never imply one. The DNS-derived states are
+  // asserted in upstream-marks.spec.
   await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
   await expect(page.getByText(/Porn/i)).toHaveCount(0);
   // No App + on list cards

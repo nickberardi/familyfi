@@ -6,6 +6,7 @@ import { clientForHousehold, probeClient } from "@/server/unifi/connection";
 import { HttpUnifiClient } from "@/server/unifi/client";
 import { resetDevMockClientForTests, getSharedDevMockClient } from "@/server/unifi/dev-mock";
 import { unifiMockBanner } from "@/server/startup-banner";
+import { DEV_ADMIN } from "@/server/dev-household";
 
 const validEnv = {
   FAMILYFI_DEFAULT_PASSWORD: "recovery-pass",
@@ -72,7 +73,7 @@ describe("UniFi mock", () => {
     const again = clientForHousehold(stubHousehold());
     const policies = await again.listPolicies("11111111-1111-4111-8111-111111111111");
     expect(policies.some((policy) => policy.id === created.id)).toBe(true);
-    expect(getSharedDevMockClient().state.clients.some((client) => client.name === "Kids iPad")).toBe(true);
+    expect(getSharedDevMockClient().state.clients.some((client) => client.name === "Cassie's iPad")).toBe(true);
   });
 
   it("uses HttpUnifiClient in prod", () => {
@@ -87,6 +88,6 @@ describe("UniFi mock", () => {
   it("documents the dummy key in the startup banner", () => {
     expect(unifiMockBanner()).toContain("UniFi mock enabled");
     expect(unifiMockBanner()).toContain("mock-unifi-key");
-    expect(unifiMockBanner()).toContain("pat");
+    expect(unifiMockBanner()).toContain(`Administrator login: ${DEV_ADMIN.username}`);
   });
 });

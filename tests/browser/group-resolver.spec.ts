@@ -37,7 +37,7 @@ test("a group can take its own resolver and hand it back", async ({ page }) => {
   if (await card.getByRole("button", { name: "Remove override" }).count()) {
     await card.getByRole("button", { name: "Remove override" }).click();
   }
-  await expect(card.getByText(/Uses the DNS servers assigned/i)).toBeVisible();
+  await expect(card.getByText(/Uses the household's DNS-over-HTTPS override/i)).toBeVisible();
 
   await card.getByRole("button", { name: "Override for this member" }).click();
   await page
@@ -50,7 +50,7 @@ test("a group can take its own resolver and hand it back", async ({ page }) => {
   await expect(card.getByRole("button", { name: "Replace" })).toBeVisible();
 
   await card.getByRole("button", { name: "Remove override" }).click();
-  await expect(card.getByText(/Uses the DNS servers assigned/i)).toBeVisible();
+  await expect(card.getByText(/Uses the household's DNS-over-HTTPS override/i)).toBeVisible();
 });
 
 test("a bad endpoint is refused with a reason", async ({ page }) => {

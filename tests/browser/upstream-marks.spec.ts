@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { seedGroupUpstreamChecks } from "@/server/dev-seed";
 
 const username = process.env.FAMILYFI_RECOVERY_USERNAME ?? "admin";
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
@@ -28,19 +29,37 @@ async function clearSlotRules(page: Page, groupId: string, categoryId: number) {
   }
 }
 
+/**
+ * The household's resolver blocks Adult and some of Dating, and neither is a curated
+ * mark slot a card can put a FamilyFi rule beside. So the kid gets verdicts of its own for two
+ * that do: Social blocked and Gaming partial. VPN stays the household's measured open,
+ * and Video its one unmeasured category.
+ */
+const KID_VERDICTS = [
+  { slug: "social", verdict: "blocked" },
+  { slug: "gaming", verdict: "partial", blockedCount: 7 },
+] as const;
+let seededKid: string | null = null;
+
+test.afterAll(async () => {
+  if (seededKid) await seedGroupUpstreamChecks(seededKid, null);
+});
+
 async function childGroup(page: Page) {
   const body = (await (await page.request.get("/api/v1/groups")).json()) as {
     groups: { id: string; name: string; kind: string; familyRole: string | null }[];
   };
   const kid = body.groups.find((group) => group.kind === "family" && group.familyRole !== "adult");
   expect(kid, "seed must include a child or teen").toBeTruthy();
+  await seedGroupUpstreamChecks(kid!.id, KID_VERDICTS);
+  seededKid = kid!.id;
   return kid!;
 }
 
 /**
  * The precedence rule, end to end: a mark shows a FamilyFi policy when one is blocking,
- * and otherwise reports what the group's resolver is doing. The mock household seeds a
- * blocked verdict for Social and a partial one for Gaming, and leaves Video unmeasured.
+ * and otherwise reports what the group's resolver is doing. The kid has a blocked verdict
+ * for Social and a partial one for Gaming, and Video is left unmeasured.
  */
 test("a mark reports DNS when no FamilyFi rule is blocking", async ({ page }) => {
   await signIn(page);
@@ -110,19 +129,19 @@ test("a FamilyFi rule outranks the DNS verdict on the same mark", async ({ page 
  * "We looked and nothing is blocking it" and "we never looked" both mean no block, and
  * before this they were one grey mark reading "Off". Now one is green and the other
  * stays neutral, because green is an assurance and we can only give it for a category
- * we actually measured. The mock seeds VPN open and leaves Messaging unmeasured.
+ * we actually measured. The mock seeds VPN open and leaves Video unmeasured.
  */
 test("a measured all-clear is not the same mark as an unmeasured category", async ({ page }) => {
   await signIn(page);
   const kid = await childGroup(page);
   await clearSlotRules(page, kid.id, 11);
-  await clearSlotRules(page, kid.id, 0);
+  await clearSlotRules(page, kid.id, 4);
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
   // Anchored, because "VPN not blocked" is a prefix of the unmeasured wording.
   const open = marks.getByRole("button", { name: /^VPN not blocked$/ });
-  const unknown = marks.getByRole("button", { name: /^Messaging not blocked by FamilyFi$/ });
+  const unknown = marks.getByRole("button", { name: /^Video not blocked by FamilyFi$/ });
   await expect(open).toBeVisible();
   await expect(unknown).toBeVisible();
 
@@ -148,7 +167,7 @@ test("a mark's word names its state, and says nothing when nothing was measured"
   await clearSlotRules(page, kid.id, 24);
   await clearSlotRules(page, kid.id, 8);
   await clearSlotRules(page, kid.id, 11);
-  await clearSlotRules(page, kid.id, 0);
+  await clearSlotRules(page, kid.id, 4);
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
@@ -160,8 +179,8 @@ test("a mark's word names its state, and says nothing when nothing was measured"
   );
   await expect(marks.getByRole("button", { name: /^VPN not blocked$/ })).toContainText("Open");
   // Unmeasured is the one wordless state: we did not look, and no word says that.
-  await expect(marks.getByRole("button", { name: /^Messaging not blocked by FamilyFi$/ })).toHaveText(
-    /^Messaging\s*$/,
+  await expect(marks.getByRole("button", { name: /^Video not blocked by FamilyFi$/ })).toHaveText(
+    /^Video\s*$/,
   );
   await expect(marks.getByText(/^(On|DNS|Part)$/)).toHaveCount(0);
 });

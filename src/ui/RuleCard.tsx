@@ -46,14 +46,18 @@ export function RuleCard({
   const overrides = ruleGroupStateLines(rule, groupNames, timezone, now);
   const actions = ruleActionSpecs(rule, timezone, now);
   const lines = [...(state ? [state] : []), ...overrides];
+  // An off or paused rule fades its mark only: its text, and the bar's hours, keep full contrast.
+  const faded = ruleCardDimmed(rule, now) ? styles.faded : null;
   return (
     <View
       role="article"
       testID={`rule-card-${rule.id}`}
-      style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card"), opacity: ruleCardDimmed(rule, now) ? 0.7 : 1 }]}
+      style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]}
     >
       <View style={styles.head}>
-        <RuleMark rule={rule} />
+        <View style={faded}>
+          <RuleMark rule={rule} />
+        </View>
         <ui.Link href={ruleHref(rule)} grow testID={`rule-open-${rule.id}`}>
           <Text role="heading" aria-level={2} style={[text(16, 24), styles.name, { color: ui.color("ink") }]}>
             {rule.name}
@@ -125,6 +129,7 @@ export function RuleCard({
 
 const styles = StyleSheet.create({
   card: { overflow: "hidden", borderRadius: 12, borderWidth: 1 },
+  faded: { opacity: 0.4 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, paddingBottom: 12 },
   name: { margin: 0, fontWeight: "600", letterSpacing: -0.4 },
   blocks: { marginTop: 2 },
