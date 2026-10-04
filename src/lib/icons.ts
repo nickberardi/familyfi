@@ -27,12 +27,15 @@ export type IconName =
   | "gear"
   | "code"
   | "qr-code"
+  | "info"
   // Actions
   | "copy"
   | "arrow-square-out"
   | "plus"
   | "caret-up"
   | "caret-down"
+  // About
+  | "github-logo"
   // Rule kinds
   | "globe-simple"
   | "app-window"

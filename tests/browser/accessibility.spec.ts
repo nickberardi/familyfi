@@ -57,6 +57,17 @@ test.describe("accessibility", () => {
     }
   });
 
+  test("about sheet", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/family");
+    await page.waitForLoadState("networkidle");
+    const opener = page.getByRole("button", { name: "Open navigation" });
+    if (await opener.isVisible()) await opener.click();
+    await page.getByRole("button", { name: "About FamilyFi" }).last().click();
+    await expect(page.getByRole("dialog", { name: "About FamilyFi" })).toBeVisible();
+    await expectAccessible(page, "/family about sheet", { navigate: false });
+  });
+
   test("detail pages", async ({ page }) => {
     await signIn(page);
     const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; kind: string }[] };
