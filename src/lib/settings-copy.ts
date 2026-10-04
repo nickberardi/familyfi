@@ -137,7 +137,6 @@ export function loginFormState(username: string, password: string, confirm: stri
   return { hint, passwordsOk, canCreate: passwordsOk && username.trim().length >= 2 };
 }
 
-/** What removing a login does, where the platform asks first. */
 /** Turning an adult's admin off: they lose FamilyFi entirely, so it asks first. */
 export function removeAdminConfirm(account: Pick<Account, "username">, group: Pick<Group, "name">) {
   return {
@@ -147,6 +146,7 @@ export function removeAdminConfirm(account: Pick<Account, "username">, group: Pi
   };
 }
 
+/** What removing a login does, where the platform asks first. */
 export function removeLoginConfirm(account: Pick<Account, "username">, group: Pick<Group, "name">) {
   return {
     title: "Remove login?",

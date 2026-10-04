@@ -105,7 +105,9 @@ choosing the adult the phone signs in as; the companion claims it and is signed 
 password. A phone invites and claims its Watch itself (`?claim=true`). Pairing establishes both
 device trust and the account the device acts as; the device's scope bounds what that session may
 do, and the server checks it on each request. A Watch gets its own device identity and its
-narrower `rulesOnly` scope.
+narrower `rulesOnly` scope. Only administrators sign in or have paired devices: an adult without
+administrator access has no sign-in, session or device, and demoting one ends all three (see the
+[invariant](../AGENTS.md#invariants)).
 
 Remote routes reach the [phone-only gateway](../src/server/tunnel/phone-gateway.ts), which forwards
 only API traffic, strips cookies and stamps tunnel provenance. The ordinary web UI is not exposed

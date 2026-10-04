@@ -21,8 +21,8 @@ Shared instructions for Codex, Claude Code and contributors. `CLAUDE.md` imports
 ### Product context
 
 FamilyFi lets a household manage internet access for people and groups of things through its
-UniFi gateway. Adults use rules (all internet, categories, apps or websites, always or in named windows), pauses, allowances and device assignment;
-administrators also configure the gateway, accounts and companion connections. DNS category
+UniFi gateway. Administrators use rules (all internet, categories, apps or websites, always or in named windows), pauses, allowances and device assignment,
+and configure the gateway, accounts and companion connections; only administrators use FamilyFi. DNS category
 reports describe filtering observed through a resolver; they do not enforce it.
 
 This repository owns the web UI, server, database, HTTP contract and shared display fixtures.
