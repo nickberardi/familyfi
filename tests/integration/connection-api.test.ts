@@ -19,6 +19,7 @@ import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tu
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
+import { ensureDemoRoute } from "@/server/demo";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { issuedInvite as issuedPairing } from "../helpers/pairing";
 import { resetDatabase } from "../helpers/db";
@@ -287,6 +288,36 @@ describe("who runs a route", () => {
     expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${route}`, json(auth, "DELETE")), params(route))).status).toBe(200);
     const after = (await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: { mode: string; status: string; endpointId: string | null } };
     expect(after.tunnel).toMatchObject({ mode: "off", status: "off", endpointId: null });
+  });
+
+  it("keeps the demo's published route out of visitors' reach", async () => {
+    const previous = { demo: process.env.FAMILYFI_DEMO, url: process.env.FAMILYFI_DEMO_URL };
+    try {
+      const auth = await adminAuth();
+      const own = (await addRoute(auth)).body.endpoint.id;
+      process.env.FAMILYFI_DEMO = "1";
+      process.env.FAMILYFI_DEMO_URL = "https://demo.familyfi.test";
+      await ensureDemoRoute();
+      const demo = (await prisma().connectionEndpoint.findUniqueOrThrow({ where: { url: "https://demo.familyfi.test" } })).id;
+      for (const response of [
+        await updateEndpoint(request(`/api/v1/connection/endpoints/${demo}`, json(auth, "PUT", { url: "https://elsewhere.example.com" })), params(demo)),
+        await deleteEndpoint(request(`/api/v1/connection/endpoints/${demo}`, json(auth, "DELETE")), params(demo)),
+      ]) {
+        expect(response.status).toBe(409);
+        expect(((await response.json()) as { error: { code: string } }).error.code).toBe("managed_route");
+      }
+      const off = await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "off" })));
+      expect(((await off.json()) as { error: { code: string } }).error.code).toBe("invalid_tunnel");
+      const state = (await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: { endpointId: string } };
+      expect(state.tunnel.endpointId).toBe(demo);
+      // A visitor's own routes stay theirs to change.
+      expect((await deleteEndpoint(request(`/api/v1/connection/endpoints/${own}`, json(auth, "DELETE")), params(own))).status).toBe(200);
+    } finally {
+      for (const [key, value] of [["FAMILYFI_DEMO", previous.demo], ["FAMILYFI_DEMO_URL", previous.url]] as const) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it("refuses a hostname and a route together", async () => {

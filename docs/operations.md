@@ -143,6 +143,22 @@ FamilyFi another way.
 
 Users should not edit Compose YAML to pick a server.
 
+## Demo mode
+
+`FAMILYFI_DEMO=1` runs the production image as a public demo, such as the one App Review and the familyfi.dev site point at. Nothing in it is real or kept:
+
+- **Database.** The entrypoint hands over to `scripts/runtime/demo.mjs`, which serves an in-memory [PGlite](https://pglite.dev) database on `127.0.0.1:5433`, applies the migrations and runs FamilyFi against it. The `DB_*` and `POSTGRES_*` settings are ignored and need not be set. No volume is needed; every start begins empty.
+- **Household.** The UniFi mock stands in for the gateway, and the boot seed adds the dummy household, as `UNIFI_MOCK=1` does in development. A gateway address and key typed into Settings still reach only the mock. Remote access reads as unavailable: the demo never opens a Cloudflare tunnel from its host.
+- **Sign-in.** `admin` and `pat`, both with `FAMILYFI_DEFAULT_PASSWORD`. Set it on the host so the password survives restarts, and give it to reviewers out of band. The session secret and encryption key may be left to generate on each start.
+- **Phones.** Set `FAMILYFI_DEMO_URL` to the demo's public HTTPS origin (for example `https://demo.familyfi.dev`). It is published as the household's remote route, a route the host runs in front of the web app with the phone's system certificate check and no Cloudflare Access, so Pair Device issues pairing codes for it as it would at home. Phones show it as a Cloudflare Tunnel route. The ingress terminates TLS and must pass `X-Forwarded-Proto` and `X-Forwarded-Host`, which sign-in's origin and secure-cookie checks read.
+- **Reset.** The process exits at 03:00 in the household's time zone each night; run the container with a restart policy (`--restart unless-stopped`, or the platform's own) so it comes back with a fresh household. A web banner says the demo resets nightly.
+
+The `Demo image` workflow publishes `ghcr.io/nickberardi/familyfi:demo` from each push to `main`. To try it locally:
+
+```bash
+docker run --rm -p 7001:7001 -e FAMILYFI_DEMO=1 -e FAMILYFI_DEFAULT_PASSWORD=choose-a-password ghcr.io/nickberardi/familyfi:demo
+```
+
 ## Outages
 
 While FamilyFi is stopped or cannot reach UniFi, the gateway keeps the last applied policies **including UniFi policy schedules**. Rule windows can still start and end. A timed pause can outlast its expiry until FamilyFi deletes its pause policy, and an allowance until FamilyFi puts the group's devices back in its internet rules. New devices on **managed** VLANs can have internet until the next successful quarantine reconciliation. Unmanaged VLANs are never ingested. Startup reconciliation applies current desired state; it does not replay missed transitions.

@@ -92,6 +92,18 @@
         "runtime"
       ]
     },
+    "tests/unit/demo-boot.test.ts": {
+      "categories": [
+        "database",
+        "runtime"
+      ]
+    },
+    "tests/unit/demo-mode.test.ts": {
+      "categories": [
+        "runtime",
+        "unifi"
+      ]
+    },
     "tests/unit/device-presence.test.ts": {
       "categories": [
         "devices"

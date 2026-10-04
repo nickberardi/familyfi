@@ -1,3 +1,6 @@
+import { demoRequested } from "./print-database-url.mjs";
+
+/** @param {Record<string, string | undefined>} [env] */
 export function envIssues(env = process.env) {
   const issues = [];
   const password = env.FAMILYFI_DEFAULT_PASSWORD ?? "";
@@ -14,7 +17,8 @@ export function envIssues(env = process.env) {
   if (!hex && !b64) {
     issues.push("FAMILYFI_ENCRYPTION_KEY must be 32 bytes as 64 hex characters (or base64).");
   }
-  if (!env.POSTGRES_PASSWORD) {
+  // Demo mode's database is in memory, with fixed settings (print-database-url.mjs).
+  if (!env.POSTGRES_PASSWORD && !demoRequested(env)) {
     issues.push("POSTGRES_PASSWORD must be set.");
   }
   if (env.DB_MODE && !["bundled", "external"].includes(env.DB_MODE)) {

@@ -8,6 +8,20 @@ export type DatabaseSettings = {
   DB_SSL_ROOT_CERT?: string;
 };
 
+/**
+ * The in-memory PGlite database demo mode runs on, served on loopback by `scripts/runtime/demo.mjs`
+ * (which keeps its own copy, `DEMO_DATABASE` in `print-database-url.mjs`). Not configurable: demo
+ * mode never reaches another database. PGlite's socket server does not answer TLS negotiation.
+ */
+export const DEMO_DATABASE = {
+  DB_HOST: "127.0.0.1",
+  POSTGRES_PORT: "5433",
+  POSTGRES_DB: "template1",
+  POSTGRES_USER: "postgres",
+  POSTGRES_PASSWORD: "postgres",
+  DB_SSL_MODE: "disable",
+} as const satisfies DatabaseSettings;
+
 export function buildDatabaseUrl(settings: DatabaseSettings): string {
   const host = settings.DB_HOST || "127.0.0.1";
   const port = settings.POSTGRES_PORT || "5432";

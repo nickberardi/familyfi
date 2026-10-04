@@ -2,6 +2,7 @@ import { ConnectionTransport, EdgeAuth } from "@prisma/client";
 import { z } from "zod";
 import { publicEndpoint, assertEndpoint, hasPendingPairing, isManagedRoute, isUniqueViolation } from "@/server/connection";
 import { prisma } from "@/server/db";
+import { DEMO_ROUTE_FIXED, isDemoRoute } from "@/server/demo";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
@@ -23,6 +24,7 @@ export async function PUT(request: Request, context: Ctx) {
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");
     if (isManagedRoute(current)) return jsonError(409, "managed_route", MANAGED);
+    if (isDemoRoute(current)) return jsonError(409, "managed_route", DEMO_ROUTE_FIXED);
     const { edgeAuth, serviceToken, ...changes } = parsed.data;
     const trustMode = changes.trustMode ?? current.trustMode;
     const transport = changes.transport ?? current.transport;
@@ -60,6 +62,7 @@ export async function DELETE(request: Request, context: Ctx) {
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");
     if (isManagedRoute(current)) return jsonError(409, "managed_route", MANAGED);
+    if (isDemoRoute(current)) return jsonError(409, "managed_route", DEMO_ROUTE_FIXED);
     if (await hasPendingPairing(id)) {
       return jsonError(409, "endpoint_in_use", "A pairing code for this route is still active. Cancel it or wait for it to expire.");
     }

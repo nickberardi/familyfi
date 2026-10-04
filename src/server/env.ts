@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buildDatabaseUrl } from "./database-url";
+import { buildDatabaseUrl, DEMO_DATABASE } from "./database-url";
 
 export class ConfigurationError extends Error {
   readonly issues: string[];
@@ -26,7 +26,7 @@ const EnvSchema = z.object({
   DB_SSL_ROOT_CERT: z.string().optional(),
 });
 
-export type AppEnv = z.infer<typeof EnvSchema> & { DATABASE_URL: string; UNIFI_MOCK: boolean };
+export type AppEnv = z.infer<typeof EnvSchema> & { DATABASE_URL: string; UNIFI_MOCK: boolean; FAMILYFI_DEMO: boolean };
 
 function truthyFlag(value: string | undefined): boolean {
   if (!value) return false;
@@ -39,8 +39,18 @@ export function unifiMockRequested(source: Record<string, string | undefined> = 
   return truthyFlag(read(source, "UNIFI_MOCK"));
 }
 
-/** Opt-in UniFi stand-in for local UI work. Never enabled in production unless CI opts in. */
+/**
+ * The hosted public demo: the UniFi mock and the seed household on an in-memory database that
+ * `scripts/runtime/demo.mjs` starts, so nothing is kept and no real gateway or database is reached.
+ * Only this explicit switch turns it on; `UNIFI_MOCK` stays ignored in production.
+ */
+export function demoModeEnabled(source: Record<string, string | undefined> = process.env): boolean {
+  return truthyFlag(read(source, "FAMILYFI_DEMO"));
+}
+
+/** Opt-in UniFi stand-in for local UI work and demo mode. Never enabled in production otherwise, unless CI opts in. */
 export function unifiMockEnabled(source: Record<string, string | undefined> = process.env): boolean {
+  if (demoModeEnabled(source)) return true;
   if (source.NODE_ENV === "production") {
     // `next start` forces production; browser CI still needs the mock household.
     if (!(truthyFlag(read(source, "CI")) && unifiMockRequested(source))) return false;
@@ -71,8 +81,9 @@ function parseEncryptionKey(value: string): Buffer {
   throw new ConfigurationError([ISSUE_BY_FIELD.FAMILYFI_ENCRYPTION_KEY]);
 }
 
-export function envIssues(source: Record<string, string | undefined> = process.env): string[] {
-  const parsed = EnvSchema.safeParse({
+/** The settings as read, with demo mode's in-memory database in place of any configured one. */
+function settingsFrom(source: Record<string, string | undefined>) {
+  const settings = {
     NODE_ENV: source.NODE_ENV,
     FAMILYFI_DEFAULT_PASSWORD: read(source, "FAMILYFI_DEFAULT_PASSWORD"),
     FAMILYFI_SESSION_SECRET: read(source, "FAMILYFI_SESSION_SECRET"),
@@ -85,7 +96,12 @@ export function envIssues(source: Record<string, string | undefined> = process.e
     POSTGRES_PASSWORD: read(source, "POSTGRES_PASSWORD"),
     DB_SSL_MODE: read(source, "DB_SSL_MODE"),
     DB_SSL_ROOT_CERT: read(source, "DB_SSL_ROOT_CERT"),
-  });
+  };
+  return demoModeEnabled(source) ? { ...settings, DB_SSL_ROOT_CERT: undefined, ...DEMO_DATABASE } : settings;
+}
+
+export function envIssues(source: Record<string, string | undefined> = process.env): string[] {
+  const parsed = EnvSchema.safeParse(settingsFrom(source));
   const issues: string[] = [];
   const seen = new Set<string>();
   const add = (message: string) => {
@@ -112,24 +128,11 @@ export function envIssues(source: Record<string, string | undefined> = process.e
 export function loadEnv(source: Record<string, string | undefined> = process.env): AppEnv {
   const issues = envIssues(source);
   if (issues.length) throw new ConfigurationError(issues);
-  const parsed = EnvSchema.parse({
-    NODE_ENV: source.NODE_ENV,
-    FAMILYFI_DEFAULT_PASSWORD: read(source, "FAMILYFI_DEFAULT_PASSWORD"),
-    FAMILYFI_SESSION_SECRET: read(source, "FAMILYFI_SESSION_SECRET"),
-    FAMILYFI_ENCRYPTION_KEY: read(source, "FAMILYFI_ENCRYPTION_KEY"),
-    DB_MODE: read(source, "DB_MODE") || "bundled",
-    DB_HOST: read(source, "DB_HOST"),
-    POSTGRES_PORT: read(source, "POSTGRES_PORT"),
-    POSTGRES_DB: read(source, "POSTGRES_DB"),
-    POSTGRES_USER: read(source, "POSTGRES_USER"),
-    POSTGRES_PASSWORD: read(source, "POSTGRES_PASSWORD"),
-    DB_SSL_MODE: read(source, "DB_SSL_MODE"),
-    DB_SSL_ROOT_CERT: read(source, "DB_SSL_ROOT_CERT"),
-  });
+  const parsed = EnvSchema.parse(settingsFrom(source));
   parseEncryptionKey(parsed.FAMILYFI_ENCRYPTION_KEY);
   const DATABASE_URL = buildDatabaseUrl(parsed);
   source.DATABASE_URL = DATABASE_URL;
-  return { ...parsed, DATABASE_URL, UNIFI_MOCK: unifiMockEnabled(source) };
+  return { ...parsed, DATABASE_URL, UNIFI_MOCK: unifiMockEnabled(source), FAMILYFI_DEMO: demoModeEnabled(source) };
 }
 
 export function env(): AppEnv {

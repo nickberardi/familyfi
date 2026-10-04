@@ -27,10 +27,27 @@ export function unifiMockBanner(): string {
   ].join("\n");
 }
 
+export function demoModeBanner(): string {
+  return [
+    "",
+    LINE,
+    "  Demo mode (FAMILYFI_DEMO): the seed household on an in-memory database",
+    "    The UniFi mock stands in for the gateway; no real gateway is reached.",
+    "    Nothing is kept: every start, and the nightly reset at 03:00, begins afresh.",
+    "    Extra adult login: pat  (same password as admin)",
+    LINE,
+    "",
+  ].join("\n");
+}
+
 export function logRecoveryAdmin(password: string, output: (line: string) => void = console.log): void {
   output(recoveryAdminBanner(password));
 }
 
 export function logUnifiMock(output: (line: string) => void = console.log): void {
   output(unifiMockBanner());
+}
+
+export function logDemoMode(output: (line: string) => void = console.log): void {
+  output(demoModeBanner());
 }

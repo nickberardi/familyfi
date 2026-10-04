@@ -11,9 +11,10 @@ export async function register() {
     console.error("FamilyFi is missing required settings in .env:\n" + detail);
     return;
   }
-  const { logRecoveryAdmin, logUnifiMock } = await import("./server/startup-banner");
+  const { logDemoMode, logRecoveryAdmin, logUnifiMock } = await import("./server/startup-banner");
   logRecoveryAdmin(settings.FAMILYFI_DEFAULT_PASSWORD);
-  if (settings.UNIFI_MOCK) logUnifiMock();
+  if (settings.FAMILYFI_DEMO) logDemoMode();
+  else if (settings.UNIFI_MOCK) logUnifiMock();
   else if (unifiMockRequested()) {
     console.warn("UNIFI_MOCK is set but ignored because NODE_ENV is production.");
   }
@@ -32,6 +33,16 @@ export async function register() {
     }
   } catch {
     // Database may not be up yet during `next build` or a local start.
+  }
+  if (settings.FAMILYFI_DEMO) {
+    const { ensureDemoRoute, startDemoReset } = await import("./server/demo");
+    try {
+      await ensureDemoRoute();
+      const at = await startDemoReset();
+      console.log(`demo mode: the household resets at ${at.toISOString()}`);
+    } catch (error) {
+      console.error("Demo mode setup failed:", error);
+    }
   }
   startUpdateCheck();
   startReconciliation();
