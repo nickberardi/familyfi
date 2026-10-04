@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   confirmLine,
+  defaultPairingAccount,
+  pairingAccounts,
   pairingExpired,
   pairingSheetCopy,
   phoneLines,
@@ -15,12 +17,15 @@ import {
   showAllLabel,
   splitPhones,
 } from "@/lib/pair-device";
-import type { ConnectionRoute, PairedPhone } from "@/lib/types";
+import type { Account, ConnectionRoute, PairedPhone } from "@/lib/types";
 
 const phone = (over: Partial<PairedPhone> = {}): PairedPhone => ({
   id: "p1",
   displayName: "A phone",
   client: "phone",
+  scope: "full",
+  actsAs: { username: "admin", displayName: "An adult" },
+  parentDeviceId: null,
   enrolledAt: "2026-09-01T12:00:00Z",
   lastSeenAt: "2026-09-14T19:58:00Z",
   revokedAt: null,
@@ -46,7 +51,8 @@ describe("pair device", () => {
   });
 
   it("asks before revoking or removing, in the web's words", () => {
-    expect(confirmLine(revokeConfirm(phone()))).toBe("Revoke A phone? It is signed out now and must be paired again.");
+    expect(confirmLine(revokeConfirm(phone()))).toBe("Revoke A phone? It is signed out now and must be paired again. The Watches it set up stop working too.");
+    expect(confirmLine(revokeConfirm(phone({ client: "watch", displayName: "A Watch" })))).toBe("Revoke A Watch? It is signed out now and must be paired again.");
     expect(confirmLine(removeConfirm(phone()))).toBe("Remove A phone from the list? This can't be undone; setup would be needed again.");
     expect(confirmLine(removeAllConfirm(3))).toBe("Remove all 3 revoked devices from the list? This can't be undone.");
     expect(showAllLabel(12)).toBe("Show all 12 devices");
@@ -70,8 +76,9 @@ describe("pair device", () => {
     expect(pairingSheetCopy().name.title).toBe("Pair a phone");
     expect(pairingSheetCopy({ replacing: { displayName: "Old phone" } }).name.title).toBe("Re-pair Old phone");
     expect(pairingSheetCopy().code.title).toBe("Scan with the FamilyFi app");
-    expect(pairingSheetCopy({ claimed: true, claimedName: "New phone" }).code).toEqual({ title: "Phone paired", sub: "New phone is paired. Sign in on the phone to finish." });
-    expect(pairingSheetCopy({ claimed: true, replacing: { displayName: "Old" } }).code.sub).toBe("The phone is paired and its old entry is gone. Sign in on the phone to finish.");
+    expect(pairingSheetCopy().name.sub).toBe("Makes a single-use code that pairs one phone and signs it in as the adult you choose. It expires in five minutes.");
+    expect(pairingSheetCopy({ claimed: true, claimedName: "New phone" }).code).toEqual({ title: "Phone paired", sub: "New phone is paired and signed in." });
+    expect(pairingSheetCopy({ claimed: true, replacing: { displayName: "Old" } }).code.sub).toBe("The phone is paired and signed in; its old entry is gone.");
   });
 
   it("expires a code at its time, or when the server says so", () => {
@@ -93,9 +100,32 @@ describe("pair device", () => {
     await removePhone(send, { id: "p1" });
     await removeRevokedPhones(send);
     expect(sent).toEqual([
-      { path: "/api/v1/connection/devices/p1", init: { method: "DELETE" } },
-      { path: "/api/v1/connection/devices/p1?remove=true", init: { method: "DELETE" } },
-      { path: "/api/v1/connection/devices?revoked=true", init: { method: "DELETE" } },
+      { path: "/api/v1/paired/devices/p1", init: { method: "DELETE" } },
+      { path: "/api/v1/paired/devices/p1?remove=true", init: { method: "DELETE" } },
+      { path: "/api/v1/paired/devices?status=revoked", init: { method: "DELETE" } },
     ]);
+  });
+
+  it("names a device's scope, and the adult an agent acts as", () => {
+    expect(phoneLines(phone()).scope).toBe("Full access");
+    const agent = phone({ client: "agent", scope: "readOnly", pairedVia: null, actsAs: { username: "admin", displayName: "An adult" } });
+    expect(phoneLines(agent).scope).toBe("Read only");
+    expect(phoneLines(agent).viaMissing).toBe("AI agent on the home network · acts as An adult");
+    expect(phoneLines(phone({ client: "watch", scope: "rulesOnly", pairedVia: null })).viaMissing).toBe("Paired automatically from an iPhone");
+  });
+
+  it("offers a phone only administrators to sign in as, the one signed in here first", () => {
+    const account = (over: Partial<Account>): Account => ({
+      id: "a1", username: "admin", displayName: "An adult", kind: "personal", isAdmin: true, groupId: null, recovery: false, ...over,
+    });
+    const accounts = [
+      account({ id: "member", username: "member", isAdmin: false }),
+      account({ id: "recovery", username: "recovery", kind: "recovery", isAdmin: false, recovery: true }),
+      account({ id: "admin", username: "admin" }),
+    ];
+    expect(pairingAccounts(accounts).map((each) => each.id)).toEqual(["recovery", "admin"]);
+    expect(defaultPairingAccount(accounts, "admin")).toBe("admin");
+    expect(defaultPairingAccount(accounts, "member")).toBe("recovery");
+    expect(defaultPairingAccount([], "admin")).toBe("");
   });
 });

@@ -1,18 +1,20 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { isServerOrigin } from "@/lib/pairing-code";
-import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, SessionKind, type Session } from "@prisma/client";
-import { bearerSessionData } from "./auth";
-import { decryptSecret, encryptSecret, randomToken, safeEqual, sha256 } from "./crypto";
+import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, PairedDeviceClient, RouteKind, type Session } from "@prisma/client";
+import { decryptSecret, encryptSecret, randomToken } from "./crypto";
 import { prisma } from "./db";
-import { edgeCredentials, recordDelivered, storedServiceToken } from "./edge-auth";
-import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
+import { edgeCredentials, recordDelivered } from "./edge-auth";
 
-const PAIRING_TTL_MS = 5 * 60 * 1000;
 const SPKI_SHA256 = /^[A-Za-z0-9_-]{43}$/;
 
-type ConnectionSession = Session & { account: { kind: AccountKind; isAdmin: boolean } | null };
+type ConnectionSession = Session & { account: { kind: AccountKind; isAdmin: boolean } | null; device?: { client: PairedDeviceClient } | null };
 
+/**
+ * Only a person in a browser, or their phone, may administer. A Watch or an agent is never an
+ * administrator, whoever it acts as: its scope bounds it.
+ */
 export function isAdministrator(session: ConnectionSession): boolean {
+  if (session.device && session.device.client !== PairedDeviceClient.phone) return false;
   return session.account?.kind === AccountKind.recovery || session.account?.isAdmin === true;
 }
 
@@ -109,107 +111,6 @@ export function assertEndpoint(input: { url: string; transport: ConnectionTransp
   return url.origin;
 }
 
-export async function createPairing(input: { endpointId: string; displayName: string; createdByAccountId: string; replacesDeviceId?: string | null }) {
-  const token = randomToken();
-  const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
-  const pairing = await prisma().pairing.create({ data: { endpointId: input.endpointId, displayName: input.displayName, createdByAccountId: input.createdByAccountId, replacesDeviceId: input.replacesDeviceId ?? null, tokenHash: sha256(token), expiresAt }, include: { endpoint: true } });
-  const household = await ensureConnectionIdentity();
-  const endpoint = pairing.endpoint!;
-  // A route behind Cloudflare Access is unreachable without its token, so the code carries it: a phone
-  // pairs over the protected route itself. The token only gets past Cloudflare; pairing still needs the single-use code.
-  const edgeToken = storedServiceToken(endpoint);
-  const pairingCode = encodePairingCode({
-    version: PAIRING_CODE_VERSION,
-    url: endpoint.url,
-    code: `${pairing.id}.${token}`,
-    fingerprint: instanceFingerprint(household.instancePublicKey!),
-    ...(endpoint.trustMode === ConnectionTrustMode.pinned && endpoint.spkiSha256 ? { pin: endpoint.spkiSha256 } : {}),
-    ...(edgeToken ? { access: edgeToken } : {}),
-  });
-  return { pairing, pairingCode };
-}
-
-export async function claimPairing(input: { id: string; token: string; displayName: string }) {
-  const pairing = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true } });
-  if (!pairing || !pairing.endpoint || pairing.claimedAt || pairing.expiresAt <= new Date() || !safeEqual(pairing.tokenHash, sha256(input.token))) return null;
-  const credential = randomToken();
-  const now = new Date();
-  const device = await prisma().$transaction(async (transaction) => {
-    const claimed = await transaction.pairing.updateMany({
-      where: { id: pairing.id, claimedAt: null, expiresAt: { gt: now } },
-      data: { claimedAt: now },
-    });
-    if (claimed.count !== 1) return null;
-    const pairedDevice = await transaction.pairedDevice.create({
-      data: { displayName: input.displayName, credentialHash: sha256(credential), lastSeenAt: now },
-    });
-    await transaction.pairing.update({ where: { id: pairing.id }, data: { claimedDeviceId: pairedDevice.id } });
-    // A re-pair retires the record it replaces, so the same phone is never listed twice.
-    if (pairing.replacesDeviceId) await removeDevice(pairing.replacesDeviceId, transaction, now);
-    return pairedDevice;
-  });
-  if (!device) return null;
-  return { device, credential, endpoint: publicEndpoint(pairing.endpoint), manifest: await signedEndpointManifest({ deviceId: device.id }) };
-}
-
-export async function authenticatePairedDevice(id: string, credential: string) {
-  const device = await prisma().pairedDevice.findUnique({ where: { id } });
-  if (!device || device.revokedAt || !safeEqual(device.credentialHash, sha256(credential))) return null;
-  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-  if (!device.lastSeenAt || device.lastSeenAt < fifteenMinutesAgo) await prisma().pairedDevice.update({ where: { id }, data: { lastSeenAt: new Date() } });
-  return device;
-}
-
-/** Enroll the Watch reached by the signed-in phone as its own paired device. */
-export async function enrollWatch(input: { clientId: string; accountId: string; username: string; displayName: string }) {
-  const credential = randomToken();
-  const now = new Date();
-  const bearer = bearerSessionData(now);
-  const result = await prisma().$transaction(async (transaction) => {
-    const previous = await transaction.pairedDevice.findUnique({ where: { clientId: input.clientId } });
-    if (previous) {
-      await transaction.session.updateMany({ where: { deviceId: previous.id, revokedAt: null }, data: { revokedAt: now } });
-      await transaction.pairedDevice.update({ where: { id: previous.id }, data: { revokedAt: now, clientId: null } });
-    }
-    const device = await transaction.pairedDevice.create({
-      data: {
-        displayName: input.displayName,
-        credentialHash: sha256(credential),
-        client: PairedDeviceClient.watch,
-        clientId: input.clientId,
-        lastSeenAt: now,
-      },
-    });
-    const session = await transaction.session.create({
-      data: { ...bearer.data, kind: SessionKind.bearer, accountId: input.accountId, username: input.username, deviceId: device.id },
-    });
-    return { device, session };
-  });
-  return {
-    deviceId: result.device.id,
-    deviceCredential: credential,
-    sessionId: result.session.id,
-    token: bearer.token,
-    expiresAt: bearer.expiresAt,
-    refreshToken: bearer.refreshToken,
-    refreshExpiresAt: bearer.refreshExpiresAt,
-  };
-}
-
-export type PairingStatus = "pending" | "claimed" | "expired";
-
-export function pairingStatus(pairing: { claimedAt: Date | null; expiresAt: Date }, now = new Date()): PairingStatus {
-  if (pairing.claimedAt) return "claimed";
-  return pairing.expiresAt <= now ? "expired" : "pending";
-}
-
-/** Ends a pending pairing early. Expiring it, rather than deleting it, keeps the claim path's single check. */
-export async function cancelPairing(id: string): Promise<boolean> {
-  const now = new Date();
-  const cancelled = await prisma().pairing.updateMany({ where: { id, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
-  return cancelled.count === 1;
-}
-
 export async function hasPendingPairing(endpointId: string): Promise<boolean> {
   return (await prisma().pairing.count({ where: { endpointId, claimedAt: null, expiresAt: { gt: new Date() } } })) > 0;
 }
@@ -220,15 +121,49 @@ export function isUniqueViolation(error: unknown): boolean {
 
 type Db = Parameters<Parameters<ReturnType<typeof prisma>["$transaction"]>[0]>[0];
 
+/** Ends the sessions of a device's companions (a phone's Watches) and revokes them: they belong to it. */
+async function revokeCompanions(id: string, db: Db, now: Date) {
+  const companions = await db.pairedDevice.findMany({ where: { parentDeviceId: id, revokedAt: null }, select: { id: true } });
+  if (!companions.length) return;
+  const ids = companions.map((companion) => companion.id);
+  await db.session.updateMany({ where: { deviceId: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
+  await db.pairedDevice.updateMany({ where: { id: { in: ids } }, data: { revokedAt: now } });
+}
+
 /**
- * Deletes a paired phone's record for good, signing out anything it still had. Sessions,
- * pairings and change history keep their rows with the phone reference cleared, so the
- * Sync log still shows what changed, just not from which phone.
+ * Revokes a paired device and ends its sessions; a phone's Watches go with it. Resolves false when
+ * there is no such device still active.
+ */
+export async function revokeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {
+  const updated = await db.pairedDevice.updateMany({ where: { id, revokedAt: null }, data: { revokedAt: now } });
+  if (!updated.count) return false;
+  await db.session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
+  await revokeCompanions(id, db, now);
+  return true;
+}
+
+/**
+ * Deletes a paired device's record for good, signing out anything it still had; a phone's Watches
+ * are revoked with it. Sessions, pairings and change history keep their rows with the device
+ * reference cleared, so the Sync log still shows what changed, just not from which device.
  */
 export async function removeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {
   await db.session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
+  await revokeCompanions(id, db, now);
   const removed = await db.pairedDevice.deleteMany({ where: { id } });
   return removed.count === 1;
+}
+
+/**
+ * An adult who is no longer an administrator keeps no paired devices: every phone, Watch and agent
+ * acting as them is signed out and its record deleted, and any invite still pending for them is
+ * cancelled, so a code made before the change cannot be claimed after it.
+ */
+export async function removeAccountDevices(accountId: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<number> {
+  const devices = await db.pairedDevice.findMany({ where: { accountId }, select: { id: true } });
+  for (const device of devices) await removeDevice(device.id, db, now);
+  await db.pairing.updateMany({ where: { accountId, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
+  return devices.length;
 }
 
 /** Deletes every revoked phone's record; the live-test harness alone can leave hundreds. */

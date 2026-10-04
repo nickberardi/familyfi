@@ -148,17 +148,25 @@ export type ConnectionRoute = {
   edgeTokenVersion: number | null;
 };
 
+/** What a paired device may call. Valid pairs: phone `full`, Watch `rulesOnly`, agent `full` or `readOnly`. */
+export type DeviceScope = "full" | "rulesOnly" | "readOnly";
+
 export type PairedPhone = {
   id: string;
   displayName: string;
-  client: "phone" | "watch";
+  client: "phone" | "watch" | "agent";
+  scope: DeviceScope;
+  /** The account this device acts as. */
+  actsAs: { username: string; displayName: string } | null;
+  /** The device that vouched for this one: a Watch's phone. */
+  parentDeviceId: string | null;
   enrolledAt: string;
   lastSeenAt: string | null;
   revokedAt: string | null;
   pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
   /** The Access token version FamilyFi last handed this device, per protected route. */
   edgeTokens: { endpointId: string; version: number }[];
-  sessions: { id: string; username: string; client: "phone" | "watch"; expiresAt: string; createdAt: string }[];
+  sessions: { id: string; username: string; client: "phone" | "watch" | "agent"; expiresAt: string; createdAt: string }[];
 };
 
 export type PairingState = {

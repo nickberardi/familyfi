@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PendingEnrollment } from "@/lib/companion-pairing";
-import { connectionHousehold, pendingHouseholdNote, pendingHouseholdSections, trustExplanation } from "@/lib/companion-setup";
+import { connectionHousehold, connectionSignedInAs, pendingHouseholdNote, pendingHouseholdSections, trustExplanation } from "@/lib/companion-setup";
 import { shortPin } from "@/lib/connection-routes";
 import type { ConnectionRoute } from "@/lib/types";
 
@@ -62,8 +62,8 @@ describe("confirming a household", () => {
 });
 
 describe("the Connection screen", () => {
-  it("names the signing key, and who is signed in", () => {
-    expect(connectionHousehold(FINGERPRINT, "Admin")).toBe(`Signing key ${shortPin(FINGERPRINT)} · signed in as Admin`);
-    expect(connectionHousehold(FINGERPRINT, null)).toBe(`Signing key ${shortPin(FINGERPRINT)}`);
+  it("names the signing key, and who the phone is signed in as", () => {
+    expect(connectionHousehold(FINGERPRINT)).toBe(`Signing key ${shortPin(FINGERPRINT)}`);
+    expect(connectionSignedInAs("An adult")).toBe("Signed in as An adult");
   });
 });

@@ -1,6 +1,6 @@
 /**
- * Pairing and the companion transport against a fake household: identity, claim, sign-in and the
- * route list, over a transport that records every request. The household's key is made and used the
+ * Pairing and the companion transport against a fake household: identity, the claim (which signs the
+ * phone in), unpairing and the route list, over a transport that records every request. The household's key is made and used the
  * way the server makes and uses it (`src/server/connection.ts`), and the code the way it encodes one.
  */
 import { generateKeyPairSync, sign } from "node:crypto";
@@ -16,11 +16,9 @@ import {
   pairingFailure,
   refreshRoutes,
   routeCheckError,
-  signInPaired,
   verifyHousehold,
 } from "@/lib/companion-pairing";
 import { COMPANION_OFFLINE_GUARD } from "@/lib/household-store";
-import { ACCESS_REVOKED } from "@/lib/sign-in";
 import { createCompanionRequest, type Transport, type TransportRequest, type TransportResponse } from "@/lib/companion-request";
 import { REFRESH_REUSE_GRACE_MS } from "@/lib/constants";
 import { createCompanionSession, type SecureStorage } from "@/lib/companion-session";
@@ -83,33 +81,24 @@ function household({ manifestEndpoints = [LAN, EDGE], otherSigner = false } = {}
         publicKey: { kty: "OKP", crv: "Ed25519", x },
         keyFingerprint: fingerprint,
       }),
-    "POST /api/v1/connection/pairings/cm1/claim": () =>
+    "POST /api/v1/paired/invites/cm1/claim": () =>
       json(200, {
-        device: { id: "dev-1", displayName: "A phone" },
-        deviceCredential: "device-secret",
-        manifest: manifest({
-          instanceId: "ff_home",
-          endpoints: manifestEndpoints,
-          edgeCredentials: manifestEndpoints.includes(EDGE) ? [CREDENTIAL] : [],
-        }),
+        device: { id: "dev-1", displayName: "A phone", client: "phone", scope: "full" },
+        session: { username: "admin", displayName: "An adult", kind: "recovery", expiresAt: "2030-01-01T00:00:00Z" },
+        token: "bearer-1",
+        tokenType: "Bearer",
+        refreshToken: "refresh-1",
+        refreshExpiresAt: "2030-03-01T00:00:00Z",
+        connection: {
+          endpoint: LAN,
+          manifest: manifest({
+            instanceId: "ff_home",
+            endpoints: manifestEndpoints,
+            edgeCredentials: manifestEndpoints.includes(EDGE) ? [CREDENTIAL] : [],
+          }),
+        },
       }),
-    "POST /api/v1/auth/login": (request) => {
-      const body = JSON.parse(request.body ?? "{}");
-      if (body.password === "revoked")
-        return json(403, { error: { code: "device_not_paired", message: "Pair this phone with a household administrator before signing in." } });
-      return body.client === "native" && body.deviceCredential === "device-secret" && body.password === "right"
-        ? json(200, {
-            session: {
-              username: "admin",
-              displayName: "An adult",
-              kind: "recovery",
-              expiresAt: "2030-01-01T00:00:00Z",
-            },
-            token: "bearer-1",
-            tokenType: "Bearer",
-          })
-        : json(401, { error: { code: "invalid_credentials", message: "Invalid username or password." } });
-    },
+    "DELETE /api/v1/paired/devices/dev-1": () => json(200, { ok: true }),
     "GET /api/v1/connection": () =>
       json(200, {
         endpointManifest: manifest({
@@ -136,7 +125,7 @@ const json = (status: number, body: unknown): TransportResponse => ({
 });
 
 describe("pairing a phone", () => {
-  it("verifies the household, claims only when asked, and signs in with the device credential", async () => {
+  it("verifies the household, and claims only when asked, which signs the phone in with no password or device credential", async () => {
     const home = household();
     const pending = await verifyHousehold(home.transport, home.code);
     expect(pending.identity.householdName).toBe("A household");
@@ -145,26 +134,23 @@ describe("pairing a phone", () => {
       ["GET", "/api/v1/connection/identity", "pinned", LAN.spkiSha256],
     ]);
 
-    const { profile, edgeCredentials } = await claimHousehold(home.transport, pending, "A phone");
-    expect(profile).toMatchObject({
+    const { profile, edgeCredentials, session } = await claimHousehold(home.transport, pending, "A phone");
+    expect(profile).toEqual({
       instanceId: "ff_home",
-      deviceId: "dev-1",
-      deviceCredential: "device-secret",
+      householdName: "A household",
       keyFingerprint: home.fingerprint,
+      publicKeyX: expect.any(String),
+      deviceId: "dev-1",
+      endpoints: [LAN, EDGE],
     });
-    expect(profile.endpoints.map((route) => route.id)).toEqual(["r-lan", "r-edge"]);
     expect(edgeCredentials).toEqual([CREDENTIAL]);
+    expect(session).toEqual({
+      token: "bearer-1",
+      refreshToken: "refresh-1",
+      session: { username: "admin", displayName: "An adult", kind: "recovery", expiresAt: "2030-01-01T00:00:00Z" },
+    });
+    expect([home.calls[1]!.method, new URL(home.calls[1]!.url).pathname]).toEqual(["POST", "/api/v1/paired/invites/cm1/claim"]);
     expect(JSON.parse(home.calls[1]!.body!)).toEqual({ token: "token-1", deviceName: "A phone" });
-
-    const request = createCompanionRequest(home.transport, {
-      routes: () => profile.endpoints,
-      edgeCredentials: () => edgeCredentials,
-    });
-    await expect(signInPaired(request, profile, "admin", "wrong")).rejects.toMatchObject({
-      status: 401,
-      message: "Invalid username or password.",
-    });
-    await expect(signInPaired(request, profile, "admin", "right")).resolves.toMatchObject({ token: "bearer-1" });
   });
 
   it("never reaches the network for a malformed code, and never claims for a household the code did not name", async () => {
@@ -322,7 +308,7 @@ describe("a companion session", () => {
     };
   };
 
-  it("pairs, signs in, signs out keeping the pairing, and lands the next launch on sign-in", async () => {
+  it("pairs, which signs the phone in, lands the next launch signed in, and unpairs by revoking it on the server", async () => {
     const home = household();
     const storage = memory();
     const session = createCompanionSession({ transport: home.transport, storage, deviceName: () => "A phone" });
@@ -333,23 +319,22 @@ describe("a companion session", () => {
     expect(session.getState().pending?.identity.householdName).toBe("A household");
     expect(storage.keys()).toEqual([]); // nothing kept before the person trusts it
     await session.trust();
-    expect(session.getState()).toMatchObject({ status: "signedOut", pending: null });
-    expect(storage.keys()).toEqual(["connectionProfile", "edgeCredentials"]);
+    expect(session.getState()).toMatchObject({ status: "signedIn", pending: null, session: { token: "bearer-1", refreshToken: "refresh-1" } });
+    expect(storage.keys()).toEqual(["bearerSession", "connectionProfile", "edgeCredentials"]);
 
-    expect(await session.signIn("admin", "wrong")).toBe("Invalid username or password.");
-    expect(await session.signIn("admin", "right")).toBeNull();
-    expect(session.getState().status).toBe("signedIn");
-    expect(session.getState().activeRouteId).toBe("r-lan");
-
-    await session.signOut();
-    expect(session.getState().status).toBe("signedOut");
     const relaunch = createCompanionSession({ transport: home.transport, storage, deviceName: () => "A phone" });
     await relaunch.load();
-    expect(relaunch.getState()).toMatchObject({ status: "signedOut", profile: { deviceId: "dev-1" } });
+    expect(relaunch.getState()).toMatchObject({ status: "signedIn", profile: { deviceId: "dev-1" } });
 
-    await relaunch.forget();
+    await relaunch.unpair();
+    expect(relaunch.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
     expect(storage.keys()).toEqual([]);
-    expect(relaunch.getState().status).toBe("unpaired");
+    await settle(() => home.calls.some((call) => call.method === "DELETE"));
+    expect(home.calls.at(-1)).toMatchObject({
+      method: "DELETE",
+      url: expect.stringMatching(/\/api\/v1\/paired\/devices\/dev-1$/),
+      headers: { Authorization: "Bearer bearer-1" },
+    });
   });
 
   it("keeps a refreshed route list, and neither saves nor announces an unchanged one", async () => {
@@ -390,7 +375,7 @@ describe("a companion session", () => {
 
     const refreshing = session.refresh();
     await Promise.resolve();
-    await session.forget();
+    await session.lost();
     answer!();
     await refreshing;
     expect(storage.keys()).toEqual([]);
@@ -417,44 +402,11 @@ describe("a companion session", () => {
 
     const refreshing = session.refresh();
     for (let i = 0; i < 20 && !saving; i++) await new Promise((resolve) => setTimeout(resolve, 0));
-    await session.forget();
+    await session.lost();
     saving!();
     await refreshing;
     expect(storage.keys()).toEqual([]);
     expect(session.getState()).toMatchObject({ status: "unpaired", profile: null });
-  });
-
-  it("never signs in to a household forgotten while signing in", async () => {
-    const home = household();
-    const storage = memory();
-    let answer: (() => void) | null = null;
-    const slow: Transport = async (request) => {
-      if (new URL(request.url).pathname === "/api/v1/auth/login") await new Promise<void>((resolve) => (answer = resolve));
-      return home.transport(request);
-    };
-    const session = createCompanionSession({ transport: slow, storage, deviceName: () => "A phone" });
-    await session.load();
-    await session.verify(home.code);
-    await session.trust();
-
-    const signingIn = session.signIn("admin", "right");
-    for (let i = 0; i < 20 && !answer; i++) await new Promise((resolve) => setTimeout(resolve, 0));
-    await session.forget();
-    answer!();
-    await expect(signingIn).resolves.toBeNull();
-    expect(storage.keys()).toEqual([]);
-    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
-  });
-
-  it("ends the server session when it forgets a signed-in household", async () => {
-    const home = household();
-    const session = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
-    await session.load();
-    await session.verify(home.code);
-    await session.trust();
-    await session.signIn("admin", "right");
-    await session.forget();
-    expect(home.calls.at(-1)).toMatchObject({ method: "POST", url: expect.stringMatching(/\/api\/v1\/auth\/logout$/) });
   });
 
   const paired = async (home: ReturnType<typeof household>, transport: Transport, storage: SecureStorage = memory()) => {
@@ -468,67 +420,56 @@ describe("a companion session", () => {
     for (let i = 0; i < 20 && !until(); i++) await new Promise((resolve) => setTimeout(resolve, 0));
   };
 
-  it("signs out and forgets at once, without waiting for an unreachable server", async () => {
+  it("unpairs at once, without waiting for an unreachable server", async () => {
     const home = household();
-    const hanging: Transport = (request) =>
-      new URL(request.url).pathname === "/api/v1/auth/logout" ? new Promise(() => undefined) : home.transport(request);
-    const session = await paired(home, hanging);
-    await session.signIn("admin", "right");
-    await session.signOut();
-    expect(session.getState().status).toBe("signedOut");
-    await session.signIn("admin", "right");
-    await session.forget();
-    expect(session.getState().status).toBe("unpaired");
+    const hanging: Transport = (request) => (request.method === "DELETE" ? new Promise(() => undefined) : home.transport(request));
+    const storage = memory();
+    const session = await paired(home, hanging, storage);
+    await session.unpair();
+    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null });
+    expect(storage.keys()).toEqual([]);
   });
 
-  it("drops a sign-in when forget lands while its session is saved, and ends that session on the server", async () => {
+  it("renews an expired bearer before revoking, so unpairing a phone left idle still revokes it", async () => {
     const home = household();
     const storage = memory();
-    let saving: (() => void) | null = null;
-    const slow: SecureStorage = {
-      ...storage,
-      set: async (key, value) => {
-        if (key === "bearerSession") await new Promise<void>((resolve) => (saving = resolve));
-        await storage.set(key, value);
-      },
-    };
-    const session = await paired(home, home.transport, slow);
-    const signingIn = session.signIn("admin", "right");
-    await settle(() => !!saving);
-    await session.forget();
-    saving!();
-    await expect(signingIn).resolves.toBeNull();
-    await settle(() => home.calls.some((call) => call.url.endsWith("/api/v1/auth/logout")));
-    expect(storage.keys()).toEqual([]);
-    expect(session.getState()).toMatchObject({ status: "unpaired", session: null });
-    expect(home.calls.at(-1)).toMatchObject({ method: "POST", headers: { Authorization: "Bearer bearer-1" } });
+    await paired(home, home.transport, storage);
+    // An hour later: the stored bearer has run out.
+    const held = JSON.parse((await storage.get("bearerSession"))!);
+    await storage.set("bearerSession", JSON.stringify({ ...held, session: { ...held.session, expiresAt: "2020-01-01T00:00:00Z" } }));
+    const later = createCompanionSession({
+      transport: async (request) =>
+        new URL(request.url).pathname === "/api/v1/auth/refresh"
+          ? json(200, { session: held.session, token: "bearer-2", refreshToken: "refresh-2" })
+          : home.transport(request),
+      storage,
+      deviceName: () => "A phone",
+    });
+    await later.load();
+    await later.unpair();
+    await settle(() => home.calls.some((call) => call.method === "DELETE"));
+    expect(home.calls.at(-1)).toMatchObject({ method: "DELETE", headers: { Authorization: "Bearer bearer-2" } });
   });
 
-  it("keeps a sign-in when the routes change while it is in flight", async () => {
-    const home = household();
-    let answer: (() => void) | null = null;
-    const slow: Transport = async (request) => {
-      if (new URL(request.url).pathname === "/api/v1/auth/login") await new Promise<void>((resolve) => (answer = resolve));
-      return home.transport(request);
-    };
-    const session = await paired(home, slow);
-    const signingIn = session.signIn("admin", "right");
-    await settle(() => !!answer);
-    await session.refresh(); // the manifest moves an Access token up, replacing the profile
-    answer!();
-    await expect(signingIn).resolves.toBeNull();
-    expect(session.getState().status).toBe("signedIn");
-  });
-
-  it("forgets a revoked phone at sign-in and says why on Welcome, until the next pairing", async () => {
+  it("forgets a phone the household no longer accepts, and lands on setup with no notice", async () => {
     const home = household();
     const storage = memory();
     const session = await paired(home, home.transport, storage);
-    await expect(session.signIn("admin", "revoked")).resolves.toBeNull();
-    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null, notice: ACCESS_REVOKED });
+    await session.lost();
+    expect(session.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
+    expect(session.getState()).not.toHaveProperty("notice");
     expect(storage.keys()).toEqual([]);
-    await session.verify(home.code);
-    expect(session.getState().notice).toBeNull();
+  });
+
+  it("treats a pairing kept without its session as no pairing", async () => {
+    const home = household();
+    const storage = memory();
+    await paired(home, home.transport, storage);
+    await storage.delete("bearerSession");
+    const relaunch = createCompanionSession({ transport: home.transport, storage, deviceName: () => "A phone" });
+    await relaunch.load();
+    expect(relaunch.getState()).toMatchObject({ status: "unpaired", profile: null });
+    expect(storage.keys()).toEqual([]);
   });
 
   it("drops a household the person rejects without spending its code", async () => {

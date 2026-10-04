@@ -4,20 +4,19 @@ import {
   claimHousehold,
   refreshRoutes,
   renewPaired,
-  signInPaired,
   verifyHousehold,
   type ConnectionProfile,
   type PendingEnrollment,
   type StoredSession,
 } from "./companion-pairing";
 import { createCompanionRequest, type Transport } from "./companion-request";
-import { ACCESS_REVOKED, SIGN_IN_UNREACHABLE, signInError } from "./sign-in";
 
 /**
  * A paired phone's session: what it keeps between launches, and the steps that change it. Plain
  * TypeScript, so a native client wraps it in its own provider, as the web wraps the household store.
  * Nothing is kept until it verified: the profile is written only after the household's identity and
- * signed manifest checked out.
+ * signed manifest checked out. Pairing is the sign-in: a paired phone is signed in, and a phone whose
+ * session ends is no longer paired, so it pairs again with a new code.
  */
 
 /** The platform's secure storage (the Keychain or Keystore). */
@@ -40,7 +39,7 @@ export function createSessionVault(storage: SecureStorage) {
     try {
       return JSON.parse(value) as T;
     } catch {
-      // Unreadable: treat as absent, so the phone pairs or signs in again rather than half-trusting.
+      // Unreadable: treat as absent, so the phone pairs again rather than half-trusting.
       await storage.delete(key);
       return null;
     }
@@ -49,18 +48,16 @@ export function createSessionVault(storage: SecureStorage) {
     profile: () => read<ConnectionProfile>(PROFILE),
     edgeCredentials: async () => (await read<EndpointCredential[]>(EDGE)) ?? [],
     session: () => read<StoredSession>(SESSION),
-    async savePairing(profile: ConnectionProfile, edgeCredentials: EndpointCredential[]) {
+    async savePairing(profile: ConnectionProfile, edgeCredentials: EndpointCredential[], session: StoredSession) {
       await storage.set(PROFILE, JSON.stringify(profile));
       await storage.set(EDGE, JSON.stringify(edgeCredentials));
-      await storage.delete(SESSION);
+      await storage.set(SESSION, JSON.stringify(session));
     },
     async saveRoutes(profile: ConnectionProfile, edgeCredentials: EndpointCredential[]) {
       await storage.set(PROFILE, JSON.stringify(profile));
       await storage.set(EDGE, JSON.stringify(edgeCredentials));
     },
     saveSession: (session: StoredSession) => storage.set(SESSION, JSON.stringify(session)),
-    /** Signing out ends the session and keeps the pairing, so the next sign-in needs no new code. */
-    signOut: () => storage.delete(SESSION),
     /** Forgetting the household removes everything; the phone must pair again. */
     async forget() {
       await Promise.all([storage.delete(SESSION), storage.delete(EDGE), storage.delete(PROFILE)]);
@@ -68,8 +65,8 @@ export function createSessionVault(storage: SecureStorage) {
   };
 }
 
-/** Where a launch lands: pairing, sign-in once paired, or the household once signed in. */
-export type SessionStatus = "loading" | "unpaired" | "signedOut" | "signedIn";
+/** Where a launch lands: pairing, or the household once paired (pairing signs the phone in). */
+export type SessionStatus = "loading" | "unpaired" | "signedIn";
 
 export type CompanionSessionState = {
   status: SessionStatus;
@@ -79,8 +76,6 @@ export type CompanionSessionState = {
   pending: PendingEnrollment | null;
   /** The route that last answered. */
   activeRouteId: string | null;
-  /** Why the phone is back at setup, when the household ended its pairing: shown on Welcome until the next pairing. */
-  notice: string | null;
 };
 
 export type CompanionSession = ReturnType<typeof createCompanionSession>;
@@ -88,7 +83,7 @@ export type CompanionSession = ReturnType<typeof createCompanionSession>;
 export function createCompanionSession(deps: { transport: Transport; storage: SecureStorage; deviceName: () => string }) {
   const { transport, deviceName } = deps;
   const vault = createSessionVault(deps.storage);
-  let state: CompanionSessionState = { status: "loading", profile: null, session: null, pending: null, activeRouteId: null, notice: null };
+  let state: CompanionSessionState = { status: "loading", profile: null, session: null, pending: null, activeRouteId: null };
   let credentials: EndpointCredential[] = [];
   const listeners = new Set<() => void>();
   const set = (patch: Partial<CompanionSessionState>) => {
@@ -113,9 +108,9 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
   /**
    * Trades the refresh token for a new bearer, one renewal at a time: requests that find the bearer
    * expiring together wait for the same one, so a refresh token is never spent twice. A refused
-   * token (spent, reused, revoked or expired) signs this phone out, as a refused bearer would; a
-   * route that cannot be reached, or a server that fails to answer (5xx, 429), leaves the session as
-   * it is, to try again.
+   * token (spent, reused, revoked or expired) means the household ended this phone's pairing, so the
+   * phone forgets it and pairs again; a route that cannot be reached, or a server that fails to
+   * answer (5xx, 429), leaves the session as it is, to try again.
    */
   function renew(): Promise<void> {
     renewing ??= (async () => {
@@ -124,19 +119,18 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
       if (!asked || !held?.refreshToken) throw new ApiError("Signed out.", 401, "unauthorized");
       try {
         const next = await renewPaired(sendUnsigned, held.refreshToken);
-        // Signed out, forgotten or signed in again while it was asked: the answer is for a session the phone no longer holds.
+        // Forgotten or paired again while it was asked: the answer is for a session the phone no longer holds.
         if (!holds(asked) || state.session !== held) return;
         // The server has already replaced the old refresh token: hold the new one even if storing it
         // fails, so this launch keeps working. The next launch then holds the replaced token, which
-        // the server refuses after its grace, and signs in again.
+        // the server refuses after its grace, and pairs again.
         set({ session: next });
         await vault.saveSession(next).catch(() => undefined);
       } catch (error) {
         if (refused(error) && holds(asked) && state.session === held) {
-          // Signed out here first: a store that fails to forget the token must not leave the phone
-          // looking signed in with a refused one.
-          set({ session: null, status: "signedOut" });
-          await vault.signOut().catch(() => undefined);
+          // Forgotten here first: a store that fails to forget must not leave the phone looking
+          // paired with a refused token.
+          await lose();
           throw new ApiError(error.message, 401, error.code);
         }
         throw error;
@@ -173,7 +167,7 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     try {
       return await send<T>(path, init);
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 401 || !state.session?.refreshToken || path === "/api/v1/auth/login") throw error;
+      if (!(error instanceof ApiError) || error.status !== 401 || !state.session?.refreshToken) throw error;
       if (state.session.token === sentWith) await renew();
       return send<T>(path, init);
     }
@@ -182,12 +176,26 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
   /** Still paired with the household `asked` was for: not forgotten, nor replaced by another pairing. */
   const holds = (asked: ConnectionProfile) =>
     state.profile?.instanceId === asked.instanceId && state.profile.deviceId === asked.deviceId;
-  /** Ends a session on the server in the background, with the routes and credentials it was made over. */
-  const endOnServer = (profile: ConnectionProfile, edge: EndpointCredential[], token: string) =>
-    void createCompanionRequest(transport, { routes: () => profile.endpoints, edgeCredentials: () => edge, token: () => token })(
-      "/api/v1/auth/logout",
-      { method: "POST" },
-    ).catch(() => undefined);
+  /** Revokes this phone on the server with the routes and session it held, renewing the bearer first if it has run out. */
+  const revokeOnServer = async (profile: ConnectionProfile, edge: EndpointCredential[], held: StoredSession) => {
+    const over = (token: string | null) =>
+      createCompanionRequest(transport, { routes: () => profile.endpoints, edgeCredentials: () => edge, token: () => token });
+    let token = held.token;
+    if (held.refreshToken && Date.parse(held.session.expiresAt) - Date.now() < RENEW_AHEAD_MS) {
+      token = (await renewPaired(over(null), held.refreshToken).catch(() => null))?.token ?? token;
+    }
+    await over(token)(`/api/v1/paired/devices/${encodeURIComponent(profile.deviceId)}`, { method: "DELETE" }).catch(() => undefined);
+  };
+
+  /**
+   * The phone is no longer paired (unpaired, or the household ended its session): it forgets the
+   * household at once and lands on setup. Storage that fails to forget does not keep it paired.
+   */
+  const lose = async () => {
+    credentials = [];
+    set({ profile: null, session: null, pending: null, activeRouteId: null, status: "unpaired" });
+    await vault.forget().catch(() => undefined);
+  };
 
   return {
     getState: () => state,
@@ -198,8 +206,6 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
       };
     },
     request,
-    /** The Access credentials for the household's routes, as the phone holds them: for its Watch's setup. */
-    edgeCredentials: () => credentials,
     /** Reads what the phone kept, and lands the launch. Storage that cannot be read (a lost key) lands on setup, where pairing again replaces it. */
     async load() {
       let stored;
@@ -211,71 +217,45 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
         return;
       }
       const [profile, session, edge] = stored;
+      // A pairing without its session (one kept from before pairing signed in) is no pairing at all.
+      if (!profile || !session) {
+        await lose();
+        return;
+      }
       credentials = edge;
-      set({ profile, session: profile ? session : null, status: !profile ? "unpaired" : session ? "signedIn" : "signedOut" });
+      set({ profile, session, status: "signedIn" });
     },
     /** Reads a pairing code and verifies the household it names. Throws; `pairingErrorMessage` words it. */
     async verify(code: string) {
-      set({ pending: await verifyHousehold(transport, code), notice: null });
+      set({ pending: await verifyHousehold(transport, code) });
     },
-    /** The explicit trust action: spends the code, and keeps the household only if its manifest verifies. */
+    /**
+     * The explicit trust action: spends the code, which signs the phone in, and keeps the household
+     * only if its manifest verifies.
+     */
     async trust() {
       if (!state.pending) return;
       const claimed = await claimHousehold(transport, state.pending, deviceName());
-      await vault.savePairing(claimed.profile, claimed.edgeCredentials);
+      await vault.savePairing(claimed.profile, claimed.edgeCredentials, claimed.session);
       credentials = claimed.edgeCredentials;
-      set({ pending: null, profile: claimed.profile, session: null, status: "signedOut" });
+      set({ pending: null, profile: claimed.profile, session: claimed.session, status: "signedIn" });
     },
     /** "Not my household — start over": drops the unspent code. */
     reject: () => set({ pending: null }),
-    /** For the shared sign-in form: resolves to an error to show, or null. */
-    async signIn(username: string, password: string): Promise<string | null> {
-      const asked = state.profile;
-      if (!asked) return SIGN_IN_UNREACHABLE;
-      try {
-        const edge = credentials;
-        const session = await signInPaired(request, asked, username, password);
-        // Forgotten or re-paired while signing in: the session is for a household the phone no longer holds.
-        if (!holds(asked)) {
-          endOnServer(asked, edge, session.token);
-          return null;
-        }
-        await vault.saveSession(session);
-        if (!holds(asked)) {
-          await vault.signOut();
-          endOnServer(asked, edge, session.token);
-          return null;
-        }
-        set({ session, status: "signedIn" });
-        return null;
-      } catch (error) {
-        // The household no longer knows this phone (an administrator revoked it): a password cannot help, so
-        // forget the pairing and start setup again, as familyfi-ios does.
-        if (error instanceof ApiError && error.code === "device_not_paired" && holds(asked)) {
-          await vault.forget();
-          credentials = [];
-          set({ profile: null, session: null, pending: null, activeRouteId: null, status: "unpaired", notice: ACCESS_REVOKED });
-          return null;
-        }
-        return error instanceof ApiError ? signInError({ ok: false, body: { error: { message: error.message } } }) : SIGN_IN_UNREACHABLE;
-      }
-    },
-    /** Signs out on the phone at once, and ends the session on the server in the background when it can be reached. */
-    async signOut() {
-      const { profile, session } = state;
-      await vault.signOut();
-      set({ session: null, status: profile ? "signedOut" : "unpaired" });
-      if (profile && session) endOnServer(profile, credentials, session.token);
-    },
-    /** Forgets the household at once, so the phone must pair again; its session ends on the server in the background. */
-    async forget() {
+    /**
+     * "Unpair this phone": forgets the household at once, so the phone pairs again with a new code,
+     * and revokes it on the server in the background, which also revokes the Watches it set up. It
+     * revokes with the session it held, renewed first when its bearer has run out; unreachable, the
+     * household keeps the record until an administrator revokes it.
+     */
+    async unpair() {
       const { profile, session } = state;
       const edge = credentials;
-      await vault.forget();
-      credentials = [];
-      set({ profile: null, session: null, pending: null, activeRouteId: null, status: "unpaired" });
-      if (profile && session) endOnServer(profile, edge, session.token);
+      await lose();
+      if (profile && session) void revokeOnServer(profile, edge, session);
     },
+    /** The household ended this phone's session (it answers 401): the phone is no longer paired. */
+    lost: () => lose(),
     /** Re-reads the routes, keeping them only from a manifest the trusted key signed. */
     async refresh() {
       const asked = state.profile;

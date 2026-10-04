@@ -33,6 +33,12 @@
         "contracts"
       ]
     },
+    "tests/unit/device-scope.test.ts": {
+      "categories": [
+        "pairing",
+        "sessions"
+      ]
+    },
     "tests/unit/accounts.test.ts": {
       "categories": [
         "accounts"
@@ -425,6 +431,12 @@
         "runtime"
       ]
     },
+    "tests/integration/agent-pairing.test.ts": {
+      "categories": [
+        "pairing",
+        "sessions"
+      ]
+    },
     "tests/integration/api-contract.test.ts": {
       "categories": [
         "contracts"
@@ -586,6 +598,18 @@
       "categories": [
         "categories",
         "database"
+      ]
+    },
+    "tests/integration/paired-invites.test.ts": {
+      "categories": [
+        "pairing",
+        "sessions"
+      ]
+    },
+    "tests/integration/paired-devices.test.ts": {
+      "categories": [
+        "pairing",
+        "devices"
       ]
     },
     "tests/integration/session-refresh.test.ts": {

@@ -14,6 +14,3 @@ export function signInError(response: { ok: boolean; body: unknown }): string | 
   const message = (response.body as { error?: { message?: unknown } } | null)?.error?.message;
   return typeof message === "string" && message ? message : SIGN_IN_FAILED;
 }
-
-/** A paired phone whose household no longer knows it (an administrator revoked it), back at setup. */
-export const ACCESS_REVOKED = "This phone's access was revoked. Pair it again to continue.";

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { FamilyRole, GroupKind, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { DeviceScope, FamilyRole, GroupKind, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { createSession } from "@/server/auth";
-import { authenticatePairedDevice } from "@/server/connection";
 import { prisma } from "@/server/db";
-import { POST as enroll, GET as listDevices } from "@/app/api/v1/connection/devices/route";
-import { DELETE as revokeDevice } from "@/app/api/v1/connection/devices/[id]/route";
+import { POST as invite } from "@/app/api/v1/paired/invites/route";
+import { GET as listDevices } from "@/app/api/v1/paired/devices/route";
+import { DELETE as revokeDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { GET as currentSession } from "@/app/api/v1/auth/session/route";
 import { POST as logout } from "@/app/api/v1/auth/logout/route";
 import { GET as listGroups } from "@/app/api/v1/groups/route";
@@ -29,12 +29,13 @@ import { resetDatabase } from "../helpers/db";
 
 const watchId = "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1";
 type Auth = { cookie: string; csrf: string; token?: string };
-type Enrollment = { deviceId: string; deviceCredential: string; sessionId: string; token: string; expiresAt: string; refreshToken: string; refreshExpiresAt: string };
+type Enrollment = { deviceId: string; token: string; expiresAt: string; refreshToken: string; refreshExpiresAt: string; connection?: { manifest: unknown } };
+type Claimed = { invite: { status: string }; device: { id: string; client: string; scope: string }; session: { expiresAt: string }; token: string; refreshToken: string; refreshExpiresAt: string; connection?: { manifest: unknown } };
 
 async function pairedPhone() {
   const account = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
   const device = await prisma().pairedDevice.create({
-    data: { displayName: "Parent's iPhone", credentialHash: "test-phone-credential" },
+    data: { displayName: "Parent's iPhone", accountId: account.id },
   });
   const session = await createSession({
     accountId: account.id, username: account.username, kind: SessionKind.bearer, deviceId: device.id,
@@ -42,8 +43,9 @@ async function pairedPhone() {
   return { device, auth: { cookie: "", csrf: "", token: session.raw } };
 }
 
+/** A phone invites its Watch and claims it in one call. */
 function enrollRequest(auth: Auth, clientId = watchId, client = "watch") {
-  return enroll(request("/api/v1/connection/devices", {
+  return invite(request("/api/v1/paired/invites?claim=true", {
     method: "POST", auth, headers: { "content-type": "application/json" },
     body: JSON.stringify({ client, clientId, displayName: "Kitchen Watch" }),
   }));
@@ -52,7 +54,13 @@ function enrollRequest(auth: Auth, clientId = watchId, client = "watch") {
 async function enrolledWatch(auth: Auth, clientId = watchId): Promise<Enrollment> {
   const response = await enrollRequest(auth, clientId);
   expect(response.status).toBe(201);
-  return response.json() as Promise<Enrollment>;
+  const claimed = (await response.json()) as Claimed;
+  expect(claimed.invite.status).toBe("claimed");
+  return { deviceId: claimed.device.id, token: claimed.token, expiresAt: claimed.session.expiresAt, refreshToken: claimed.refreshToken, refreshExpiresAt: claimed.refreshExpiresAt, connection: claimed.connection };
+}
+
+async function isRevoked(deviceId: string) {
+  return (await prisma().pairedDevice.findUniqueOrThrow({ where: { id: deviceId } })).revokedAt !== null;
 }
 
 function bearer(token: string): Auth { return { cookie: "", csrf: "", token }; }
@@ -66,14 +74,14 @@ async function administrator(): Promise<Auth> {
 }
 
 async function revoke(id: string, auth: Auth) {
-  return revokeDevice(request(`/api/v1/connection/devices/${id}`, { method: "DELETE", auth }),
+  return revokeDevice(request(`/api/v1/paired/devices/${id}`, { method: "DELETE", auth }),
     { params: Promise.resolve({ id }) });
 }
 
 describe("independent Watch device", () => {
   beforeEach(async () => { await resetDatabase(); });
 
-  it("enrolls a separate device with its own credential, session, and restricted access", async () => {
+  it("is invited and claimed by its phone as a separate device with its own session, parent and restricted access", async () => {
     const phone = await pairedPhone();
     const watch = await enrolledWatch(phone.auth);
     expect(watch.token).not.toBe(phone.auth.token);
@@ -84,35 +92,51 @@ describe("independent Watch device", () => {
     expect(watch.refreshToken).not.toBe(watch.token);
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.deviceId } });
     expect(device.client).toBe(PairedDeviceClient.watch);
+    expect(device.scope).toBe(DeviceScope.rulesOnly);
     expect(device.clientId).toBe(watchId);
     expect(device.id).not.toBe(phone.device.id);
-    expect((await authenticatePairedDevice(watch.deviceId, watch.deviceCredential))?.id).toBe(watch.deviceId);
-    const session = await prisma().session.findUniqueOrThrow({ where: { id: watch.sessionId } });
-    expect(session.deviceId).toBe(watch.deviceId);
+    expect(device.parentDeviceId).toBe(phone.device.id);
+    expect(device.accountId).toBe(phone.device.accountId);
+    // It works away from home like its phone, so the claim carries its manifest.
+    expect(watch.connection?.manifest).toBeTruthy();
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(200);
     expect((await listGroups(request("/api/v1/groups", { auth: bearer(watch.token) }))).status).toBe(200);
     const denied = await household(request("/api/v1/settings/household", { auth: bearer(watch.token) }));
-    expect(denied.status).toBe(401);
+    expect(denied.status).toBe(403);
     expect((await denied.json() as { error: { code: string } }).error.code).toBe("watch_scope");
-    const listed = await listDevices(request("/api/v1/connection/devices", { auth: await administrator() }));
+    const listed = await listDevices(request("/api/v1/paired/devices", { auth: await administrator() }));
     const devices = (await listed.json() as { devices: { id: string; client: string }[] }).devices;
     expect(devices).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: phone.device.id, client: "phone" }),
-      expect.objectContaining({ id: watch.deviceId, client: "watch" }),
+      expect.objectContaining({ id: phone.device.id, client: "phone", scope: "full" }),
+      expect.objectContaining({ id: watch.deviceId, client: "watch", scope: "rulesOnly" }),
     ]));
   });
 
-  it("keeps Watch access after phone sign-out or revocation, but revokes it as its own device", async () => {
+  it("keeps Watch access after its phone signs out, and revokes it with its phone", async () => {
     const phone = await pairedPhone();
     const watch = await enrolledWatch(phone.auth);
     expect((await logout(request("/api/v1/auth/logout", { method: "POST", auth: phone.auth }))).status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(200);
     const admin = await administrator();
     expect((await revoke(phone.device.id, admin)).status).toBe(200);
-    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(200);
-    expect((await revoke(watch.deviceId, admin)).status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
-    expect(await authenticatePairedDevice(watch.deviceId, watch.deviceCredential)).toBeNull();
+    expect(await isRevoked(watch.deviceId)).toBe(true);
+  });
+
+  it("revokes a Watch as its own device, leaving its phone", async () => {
+    const phone = await pairedPhone();
+    const watch = await enrolledWatch(phone.auth);
+    expect((await revoke(watch.deviceId, await administrator())).status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
+    expect(await isRevoked(watch.deviceId)).toBe(true);
+    expect(await isRevoked(phone.device.id)).toBe(false);
+  });
+
+  it("lets its phone, its parent, revoke it", async () => {
+    const phone = await pairedPhone();
+    const watch = await enrolledWatch(phone.auth);
+    expect((await revoke(watch.deviceId, phone.auth)).status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
   });
 
   it("re-pairing the same Watch retires its previous device and session", async () => {
@@ -121,7 +145,7 @@ describe("independent Watch device", () => {
     const current = await enrolledWatch(phone.auth);
     expect(current.deviceId).not.toBe(previous.deviceId);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(previous.token) }))).status).toBe(401);
-    expect(await authenticatePairedDevice(previous.deviceId, previous.deviceCredential)).toBeNull();
+    expect(await isRevoked(previous.deviceId)).toBe(true);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(current.token) }))).status).toBe(200);
   });
 
@@ -134,22 +158,27 @@ describe("independent Watch device", () => {
     expect((await currentSession(request("/api/v1/auth/session", { auth: phone.auth }))).status).toBe(200);
   });
 
-  it("only a signed-in paired phone can enroll a Watch", async () => {
+  it("only a signed-in paired phone can invite and claim a Watch", async () => {
     const phone = await pairedPhone();
-    expect((await enrollRequest(await administrator())).status).toBe(403);
+    // An administrator's browser never receives another device's tokens.
+    const fromBrowser = await enrollRequest(await administrator());
+    expect(fromBrowser.status).toBe(403);
+    expect(((await fromBrowser.json()) as { error: { code: string } }).error.code).toBe("paired_phone_required");
     expect((await enrollRequest(phone.auth, watchId, "phone")).status).toBe(400);
     const watch = await enrolledWatch(phone.auth);
-    expect((await enrollRequest(bearer(watch.token))).status).toBe(401);
+    const byWatch = await enrollRequest(bearer(watch.token));
+    expect(byWatch.status).toBe(403);
+    expect(((await byWatch.json()) as { error: { code: string } }).error.code).toBe("watch_scope");
     expect((await enrollRequest(bearer("invalid"))).status).toBe(401);
   });
 
   it("expires the Watch session without affecting its device or the phone", async () => {
     const phone = await pairedPhone();
     const watch = await enrolledWatch(phone.auth);
-    await prisma().session.update({ where: { id: watch.sessionId }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    await prisma().session.updateMany({ where: { deviceId: watch.deviceId }, data: { expiresAt: new Date(Date.now() - 1000) } });
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(watch.token) }))).status).toBe(401);
     expect((await currentSession(request("/api/v1/auth/session", { auth: phone.auth }))).status).toBe(200);
-    expect((await authenticatePairedDevice(watch.deviceId, watch.deviceCredential))?.id).toBe(watch.deviceId);
+    expect(await isRevoked(watch.deviceId)).toBe(false);
   });
 
   it("lets a Watch pause, resume, extend and allow adult, child and things groups alike", async () => {
@@ -202,7 +231,7 @@ describe("independent Watch device", () => {
     expect((await turnOnRule(request(path("on"), { method: "POST", auth }), ctx)).status).toBe(200);
 
     const scope = async (response: Response) => {
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403);
       expect(((await response.json()) as { error: { code: string } }).error.code).toBe("watch_scope");
     };
     await scope(await createRule(request("/api/v1/rules", { method: "POST", auth, headers: json, body: "{}" })));

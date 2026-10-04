@@ -3,6 +3,7 @@ import { z } from "zod";
 import { assertAdultFamilyGroup, publicAccount } from "@/server/accounts";
 import { enqueueChange } from "@/server/changes";
 import { revokeAccountSessions } from "@/server/auth";
+import { removeAccountDevices } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -44,13 +45,19 @@ export async function PUT(request: Request, ctx: Ctx) {
         return jsonError(400, "invalid_group", error instanceof Error ? error.message : "Invalid group.");
       }
     }
-    const account = await prisma().account.update({
-      where: { id },
-      data: {
-        displayName: parsed.data.displayName,
-        groupId: parsed.data.groupId,
-        isAdmin: parsed.data.isAdmin,
-      },
+    // Paired devices are for administrators: losing it unpairs and removes theirs, in the same step.
+    const demoted = existing.isAdmin && parsed.data.isAdmin === false;
+    const account = await prisma().$transaction(async (db) => {
+      const updated = await db.account.update({
+        where: { id },
+        data: {
+          displayName: parsed.data.displayName,
+          groupId: parsed.data.groupId,
+          isAdmin: parsed.data.isAdmin,
+        },
+      });
+      if (demoted) await removeAccountDevices(id, db as never);
+      return updated;
     });
     const change = await enqueueChange("account");
     return Response.json({ account: publicAccount(account), change });

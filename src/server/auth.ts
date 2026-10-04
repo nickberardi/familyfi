@@ -17,8 +17,10 @@ import {
   REFRESH_TOKEN_TTL_MS,
   SESSION_COOKIE,
   SESSION_TTL_MS,
+  TUNNEL_HEADER,
 } from "@/lib/constants";
 import { jsonError } from "./http";
+import { deviceRouteAllowed } from "./device-scope";
 
 const ARGON2 = {
   memoryCost: 19456,
@@ -78,6 +80,13 @@ export function requestIsHttps(request: Request): boolean {
   const forwarded = request.headers.get("x-forwarded-host") || request.headers.get("forwarded");
   if (!proto || !forwarded) return false;
   return proto.split(",")[0]?.trim() === "https";
+}
+
+/** The origin the caller reached this server at, as a browser on the home network sees it. */
+export function requestOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host") || url.host;
+  return `${requestIsHttps(request) ? "https" : "http"}://${host}`;
 }
 
 export function cookieOptions(maxAgeSeconds: number, secure: boolean) {
@@ -209,7 +218,7 @@ export function bearerSessionData(now = new Date()) {
 
 export type RefreshResult =
   | { ok: true; session: { username: string; expiresAt: Date; account: { displayName: string; kind: AccountKind } | null }; token: string; refreshToken: string; refreshExpiresAt: Date }
-  | { ok: false; code: "invalid_refresh" | "refresh_reused"; message: string };
+  | { ok: false; code: "invalid_refresh" | "refresh_reused" | "agent_remote"; message: string };
 
 const INVALID_REFRESH = { ok: false as const, code: "invalid_refresh" as const, message: "This refresh token is invalid or expired. Sign in again." };
 
@@ -218,7 +227,8 @@ const INVALID_REFRESH = { ok: false as const, code: "invalid_refresh" as const, 
  * replaced is honoured once for a few seconds, for a device that lost the response; any later use
  * of it means a copy exists, so the whole sign-in is revoked.
  */
-export async function refreshSession(refreshToken: string, now = new Date()): Promise<RefreshResult> {
+export async function refreshSession(refreshToken: string, options: { tunnelled?: boolean; now?: Date } = {}): Promise<RefreshResult> {
+  const now = options.now ?? new Date();
   const presented = sha256(refreshToken);
   const include = { account: true, device: true } as const;
   let session = await prisma().session.findUnique({ where: { refreshTokenHash: presented }, include });
@@ -236,6 +246,8 @@ export async function refreshSession(refreshToken: string, now = new Date()): Pr
     grace = true;
   }
   if (session.revokedAt || session.kind !== SessionKind.bearer || !session.refreshExpiresAt || session.refreshExpiresAt <= now || !session.device || session.device.revokedAt) return INVALID_REFRESH;
+  // Remote access is for the household's phones; an agent renews from the home network or not at all.
+  if (options.tunnelled && session.device.client === PairedDeviceClient.agent) return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
   const next = bearerSessionData(now);
   const rotated = await prisma().session.updateMany({
@@ -250,22 +262,6 @@ export async function refreshSession(refreshToken: string, now = new Date()): Pr
   if (rotated.count !== 1) return INVALID_REFRESH;
   await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: now } });
   return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
-}
-
-/** Watch credentials can only read state and pause, resume, extend, allow or disallow rules, including a group's own `internet` rule. */
-function watchRouteAllowed(request: Request): boolean {
-  const path = new URL(request.url).pathname;
-  if (request.method === "GET") {
-    return path === "/api/v1/auth/session"
-      || path === "/api/v1/connection"
-      || path === "/api/v1/groups"
-      || path === "/api/v1/rules"
-      || /^\/api\/v1\/changes\/[^/]+$/.test(path);
-  }
-  if (request.method === "DELETE" && /^\/api\/v1\/connection\/devices\/[^/]+$/.test(path)) return true;
-  return request.method === "POST"
-    && (/^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/.test(path)
-      || /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/.test(path));
 }
 
 /** The session token a request carries: its bearer, or else its session cookie. */
@@ -311,8 +307,18 @@ export function toPublicSession(session: {
 export async function requireSession(request: Request) {
   const session = await readSessionFromRequest(request);
   if (!session) return { session: null, error: jsonError(401, "unauthenticated", "Sign in required.") };
-  if (session.device?.client === PairedDeviceClient.watch && !watchRouteAllowed(request)) {
-    return { session: null, error: jsonError(401, "watch_scope", "This Watch session cannot use that endpoint.") };
+  const device = session.device;
+  if (device) {
+    if (device.client === PairedDeviceClient.agent && request.headers.get(TUNNEL_HEADER) === "tunnel") {
+      return { session: null, error: jsonError(403, "agent_remote", "Agents connect from the home network only.") };
+    }
+    if (!deviceRouteAllowed({ client: device.client, scope: device.scope, deviceId: device.id, method: request.method, path: new URL(request.url).pathname })) {
+      // Signed in but not allowed: 403, never 401, which clients read as "renew or sign in again".
+      if (device.client === PairedDeviceClient.agent) {
+        return { session: null, error: jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.") };
+      }
+      return { session: null, error: jsonError(403, "watch_scope", "This Watch session cannot use that endpoint.") };
+    }
   }
   return { session, error: null };
 }

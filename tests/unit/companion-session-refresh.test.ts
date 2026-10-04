@@ -23,7 +23,6 @@ const PROFILE: ConnectionProfile = {
   keyFingerprint: "k",
   publicKeyX: "x",
   deviceId: "d1",
-  deviceCredential: "c1",
   endpoints: [ROUTE],
 };
 
@@ -109,16 +108,16 @@ describe("a paired phone's session refresh", () => {
     [403, "invalid_refresh"],
     [401, "unauthorized"],
     [400, "invalid_request"],
-  ])("signs the phone out when the server refuses its refresh token (%i %s)", async (status, code) => {
+  ])("unpairs the phone when the server refuses its refresh token (%i %s): it pairs again", async (status, code) => {
     const home = household(() => ({ status, code }));
     const { phone, storage } = await signedIn(session("old", "r1", 3_600_000), home.transport);
     home.expire();
     const error = await phone.request("/api/v1/groups").catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(401);
-    expect(phone.getState().status).toBe("signedOut");
+    expect(phone.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
     expect(storage.values.has("bearerSession")).toBe(false);
-    expect(storage.values.has("connectionProfile")).toBe(true);
+    expect(storage.values.has("connectionProfile")).toBe(false);
   });
 
   it("keeps the session when the refresh cannot reach the household", async () => {
@@ -136,7 +135,7 @@ describe("a paired phone's session refresh", () => {
     expect(phone.getState().session?.token).toBe("new");
   });
 
-  it("signs out even when the secure store fails to forget the refused token", async () => {
+  it("unpairs even when the secure store fails to forget the refused token", async () => {
     const home = household(() => ({ status: 403, code: "refresh_reused" }));
     const { phone, storage } = await signedIn(session("old", "r1", 3_600_000), home.transport);
     storage.delete = async () => {
@@ -144,8 +143,7 @@ describe("a paired phone's session refresh", () => {
     };
     home.expire();
     await expect(phone.request("/api/v1/groups")).rejects.toMatchObject({ status: 401 });
-    expect(phone.getState().status).toBe("signedOut");
-    expect(phone.getState().session).toBeNull();
+    expect(phone.getState()).toMatchObject({ status: "unpaired", profile: null, session: null });
   });
 
   it("keeps a renewed bearer when storing it fails", async () => {
@@ -180,14 +178,6 @@ describe("a paired phone's session refresh", () => {
     await phone.request("/api/v1/groups");
     expect(home.calls.map((call) => call.path)).toEqual(["/api/v1/auth/refresh", "/api/v1/groups"]);
     expect(phone.getState().status).toBe("signedIn");
-  });
-
-  it("never renews after a refused sign-in", async () => {
-    const home = household(() => ({ status: 200, token: "new", refreshToken: "r2" }));
-    const { phone } = await signedIn(session("old", "r1", 3_600_000), home.transport);
-    home.expire();
-    await expect(phone.request("/api/v1/auth/login", { method: "POST", body: {} })).rejects.toMatchObject({ status: 401 });
-    expect(home.calls.map((call) => call.path)).toEqual(["/api/v1/auth/login"]);
   });
 
   it("resends with the new bearer, without renewing again, a request refused after another request renewed", async () => {
