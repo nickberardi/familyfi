@@ -12,7 +12,7 @@ The pre-push hook runs lint, typecheck and the unit tests on every push; `make s
 | Code, dependencies, configuration or tooling | `make lint typecheck test-coverage` |
 | Pages, components or `globals.css` | `make test-browser` |
 | An `/api/v1` route or payload | `make test-api` and relevant integration tests. Update `openapi/familyfi.v1.yaml` when HTTP behaviour changes; an internal refactor alone needs no spec edit. For spec changes also run `make test-api-version test-api-breaking` (breaking check needs Go) and coordinate iOS as required in `AGENTS.md`. |
-| `prisma/schema.prisma` or a migration | `make db-drift db-upgrade`. `db-drift` migrates a fresh database and compares it with the schema; `db-upgrade` upgrades a filled database from every supported release, so a household that skipped releases is covered. `pnpm db-upgrade --from v0.5.0` or `--latest` runs one start point against the development database while you iterate |
+| `prisma/schema.prisma` or a migration | `make db-drift db-upgrade`. `db-drift` migrates a fresh database and compares it with the schema; `db-upgrade` upgrades a filled database from every supported release, so a household that skipped releases is covered. `pnpm db-upgrade --from v0.22.3` or `--latest` runs one start point against the development database while you iterate |
 
 Start with focused tests while iterating (`scripts/test.py list` finds them; `run <file>` or `run --category <name>` runs them); the table is the handoff requirement. The pre-push hook still runs its checks on every push, including documentation changes. If a required check cannot run, report the command, blocker and unverified behaviour. Do not bypass it or claim the change is fully verified. CI remains the merge check.
 

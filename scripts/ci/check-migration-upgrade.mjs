@@ -27,13 +27,12 @@ import { applyDatabaseUrl } from "../runtime/print-database-url.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 /**
- * The oldest release a household may upgrade from. Every release from v0.1.0 on is a
- * published image, built on Prisma 7, and its migrations are still byte-for-byte the
- * start of today's history, so any of them can be running in a household today. Raise
- * this only with a release note telling households on older versions to step through an
- * intermediate release first.
+ * The oldest release a household may upgrade from: the first release built on the flattened
+ * baseline (issue #153). Prerelease databases from the old history are not upgraded; they
+ * start over. Until this release is tagged there is nothing to upgrade from. Raise this only
+ * with a release note telling households on older versions which release to step through.
  */
-export const OLDEST_SUPPORTED_RELEASE = "v0.1.0";
+export const OLDEST_SUPPORTED_RELEASE = "v0.22.3";
 
 /** Every scratch database starts with this, and nothing without it is ever dropped. */
 export const SCRATCH_PREFIX = "familyfi_upgrade_";
@@ -218,8 +217,11 @@ async function fillEveryTable(client) {
         for (const column of columns) {
           if (singleton && column.name === "id") continue;
           const parent = parents.find((key) => key.column === column.name);
-          const targets = parent && inserted.get(parent.parent);
-          const value = await sampleValue(client, table, column, targets?.[row % targets.length], row);
+          // A reference to the same table (a Watch's parent phone) points at the row before,
+          // or stays empty on the first.
+          const self = keys.some((key) => key.child === table && key.parent === table && key.column === column.name);
+          const targets = self ? ids : parent && inserted.get(parent.parent);
+          const value = self && !ids.length ? null : await sampleValue(client, table, column, targets?.[row % targets.length], row);
           if (value !== null) values.push([column.name, value]);
         }
         await client.query("SAVEPOINT fill_row");
@@ -326,7 +328,10 @@ async function main() {
     starts = [options.from];
   } else {
     const all = supportedReleases(parseReleaseTags(git("ls-remote", "--tags", "origin", "v*")), git("rev-parse", "HEAD"));
-    if (!all.length) throw new Error("No release tag found on origin.");
+    if (!all.length) {
+      console.log(`No release from ${OLDEST_SUPPORTED_RELEASE} on is tagged yet, so there is nothing to upgrade from.`);
+      return;
+    }
     starts = options.latest ? all.slice(-1) : all;
   }
   git("fetch", "--quiet", "--depth=1", "origin", "--no-tags", ...starts.map((tag) => `refs/tags/${tag}:refs/tags/${tag}`));
