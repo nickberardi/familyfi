@@ -42,6 +42,9 @@ export function applyIntegrationEnv() {
   loadDotEnvIfPresent();
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
   process.env.DB_MODE = "external";
+  // Each test picks its own mode; a developer's .env (FAMILYFI_MODE, or its old name UNIFI_MOCK) must not.
+  delete process.env.FAMILYFI_MODE;
+  delete process.env.UNIFI_MOCK;
   process.env.POSTGRES_DB = TEST_POSTGRES_DB;
   process.env.FAMILYFI_DEFAULT_PASSWORD ||= "ci-recovery-password";
   process.env.FAMILYFI_SESSION_SECRET ||= "ci-only-session-secret-32chars!!";
