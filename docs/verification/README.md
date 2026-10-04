@@ -11,6 +11,6 @@ A record holds only:
 
 It never holds a UniFi response, a key, a MAC address, an IP address or a policy id. The writer redacts them, and `tests/unit/repository-hygiene.test.ts` fails the build if one reaches this directory anyway.
 
-A run against `UNIFI_MOCK` is not a record: the mock stands in for a gateway and proves nothing about enforcement. The writer refuses to put one here, and the hygiene test refuses one that arrives by hand.
+A run against the UniFi mock (`FAMILYFI_MODE=dev`) is not a record: the mock stands in for a gateway and proves nothing about enforcement. The writer refuses to put one here, and the hygiene test refuses one that arrives by hand.
 
 To run one, see [spike/OPERATOR.md](../spike/OPERATOR.md#verification-run). Commit the two files and the updated table in `docs/testing.md` together.

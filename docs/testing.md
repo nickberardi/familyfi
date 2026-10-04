@@ -18,10 +18,10 @@ Start with focused tests while iterating (`scripts/test.py list` finds them; `ru
 
 **Prerequisites:**
 - Python 3.11 or newer on `PATH`, for `scripts/test.py`.
-- Docker, for integration tests, browser tests and database checks. Each run starts its own PostgreSQL containers and removes them afterwards.
+- Docker, for integration tests, browser tests and database checks. Each run starts its own PostgreSQL containers and removes them afterwards. Without Docker, `--database memory` runs integration and browser tests on an in-memory PGlite instead; it is a quick local pass, not a substitute for CI. PGlite is one database session that serves one transaction at a time, so it hides concurrency that PostgreSQL shows, and the few tests that need PostgreSQL itself are reported `not-run`.
 - Chromium for the browser tests, installed once with `pnpm exec playwright install chromium`.
 
-Tests always use a `familyfi_test` database in the run's own container. `resetDatabase` refuses any other database, and the harness never points a test at the development database.
+Tests always use a `familyfi_test` database in the run's own container, or the run's own in-memory PGlite. `resetDatabase` refuses any other database, and the harness never points a test at the development database.
 
 ## The suites
 

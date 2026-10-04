@@ -13,15 +13,15 @@ export function recoveryAdminBanner(password: string): string {
   ].join("\n");
 }
 
-export function unifiMockBanner(): string {
+export function unifiMockBanner(mode = "dev"): string {
   return [
     "",
     LINE,
-    "  UniFi mock enabled (dummy household, no live console)",
+    `  FAMILYFI_MODE=${mode}: UniFi mock enabled (dummy household, no live console)`,
     "    Settings API key: mock-unifi-key",
     "    Console: 127.0.0.1  (https://127.0.0.1/proxy/network/integration)",
     "    Extra adult login: pat  (same password as admin)",
-    "  Turn UNIFI_MOCK off to talk to a real gateway. Mocks do not prove enforcement.",
+    "  Set FAMILYFI_MODE=prod to talk to a real gateway. Mocks do not prove enforcement.",
     LINE,
     "",
   ].join("\n");
@@ -31,7 +31,7 @@ export function demoModeBanner(): string {
   return [
     "",
     LINE,
-    "  Demo mode (FAMILYFI_DEMO): the seed household on an in-memory database",
+    "  FAMILYFI_MODE=demo: the seed household on an in-memory database",
     "    The UniFi mock stands in for the gateway; no real gateway is reached.",
     "    Nothing is kept: every start, and the nightly reset at 03:00, begins afresh.",
     "    Extra adult login: pat  (same password as admin)",
@@ -44,8 +44,8 @@ export function logRecoveryAdmin(password: string, output: (line: string) => voi
   output(recoveryAdminBanner(password));
 }
 
-export function logUnifiMock(output: (line: string) => void = console.log): void {
-  output(unifiMockBanner());
+export function logUnifiMock(mode = "dev", output: (line: string) => void = console.log): void {
+  output(unifiMockBanner(mode));
 }
 
 export function logDemoMode(output: (line: string) => void = console.log): void {

@@ -68,6 +68,7 @@ may be left off while the rest names one file; an ambiguous one fails and lists 
 | `--exclude-host` | Leave out host tests another job already runs |
 | `--coverage` | Measure coverage against the floors in `tests/vitest.coverage.config.ts`. Only the whole host Vitest suite, since the floors are for all of it |
 | `--timezone ZONE` | `TZ` of the test processes, e.g. `Pacific/Kiritimati` |
+| `--database postgres,memory` | `postgres` (default, as CI runs): a PostgreSQL container per environment. `memory`: an in-memory PGlite (`scripts/runtime/memory-database.mjs --serve`), with no Docker; a test whose catalog entry says it needs PostgreSQL itself (`"postgres": "<why>"`) is reported `not-run` with that reason. Not with `--coverage` |
 | `--show-browser` | Run Playwright headed |
 | `--plan` | Print the execution plan; start nothing |
 | `--timeout SECONDS` / `--idle SECONDS` | Wall-clock and no-output limits per command (default 2400 and 180) |

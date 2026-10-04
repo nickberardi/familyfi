@@ -13,17 +13,17 @@ const API_KEY = "unifi-key-that-must-never-be-stored-in-plaintext";
 
 /** AGENTS.md: FamilyFi encrypts the operator's Integration API key with FAMILYFI_ENCRYPTION_KEY. */
 describe("stored UniFi API key", () => {
-  const previous = process.env.UNIFI_MOCK;
+  const previous = process.env.FAMILYFI_MODE;
 
   beforeEach(async () => {
-    process.env.UNIFI_MOCK = "1";
+    process.env.FAMILYFI_MODE = "dev";
     resetDevMockClientForTests();
     await resetDatabase();
   });
 
   afterEach(() => {
-    if (previous === undefined) delete process.env.UNIFI_MOCK;
-    else process.env.UNIFI_MOCK = previous;
+    if (previous === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = previous;
     resetDevMockClientForTests();
   });
 

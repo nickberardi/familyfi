@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { startDemoDatabase } from "../../scripts/runtime/demo.mjs";
+import { startMemoryDatabase } from "../../scripts/runtime/memory-database.mjs";
 
-/** Demo mode's database server (`scripts/runtime/pglite-server.mjs`), spoken to by `pg` as Prisma's adapter does. */
+/** The in-memory database's server (`scripts/runtime/pglite-server.mjs`), spoken to by `pg` as Prisma's adapter does. */
 let database: { port: number; stop: () => Promise<void> };
 const clients: pg.Client[] = [];
 
@@ -14,7 +14,7 @@ async function connect(): Promise<pg.Client> {
 }
 
 beforeAll(async () => {
-  database = await startDemoDatabase({ port: 0 });
+  database = await startMemoryDatabase({ port: 0 });
   const client = await connect();
   await client.query("CREATE TABLE item (id int PRIMARY KEY, name text UNIQUE)");
   await client.query("INSERT INTO item VALUES (1, 'a'), (2, 'b')");

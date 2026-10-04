@@ -3,7 +3,7 @@ WORKDIR /app
 RUN npm install -g pnpm@10.15.1
 COPY package.json pnpm-lock.yaml prisma.config.ts ./
 COPY prisma ./prisma
-COPY scripts/runtime/print-database-url.mjs ./scripts/runtime/print-database-url.mjs
+COPY scripts/runtime/print-database-url.mjs scripts/runtime/mode.mjs ./scripts/runtime/
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build

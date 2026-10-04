@@ -11,7 +11,8 @@ Copy `.env.example` to `.env` and set:
 | `FAMILYFI_DEFAULT_PASSWORD` | Password for username `admin`. Generated on first setup if missing. Printed in the server log at every startup. Change it in `.env` to pick your own; the new value is used on the next `admin` sign-in. |
 | `FAMILYFI_SESSION_SECRET` | Binds cookie sessions. Generated on first setup if missing or invalid; never rotated automatically afterward. |
 | `FAMILYFI_ENCRYPTION_KEY` | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
-| `DB_MODE` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`) or `external` (use `DB_HOST` below). |
+| `FAMILYFI_MODE` | `prod` (default), `dev`, `test` or `demo`; see [Modes](#modes). |
+| `DB_MODE` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`), `external` (use `DB_HOST` below), or `memory` (an in-memory database, `dev` and `test` only). |
 | `DB_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Connection parts. Prisma `DATABASE_URL` is derived, with credentials URL-encoded. Do not treat a hand-written `DATABASE_URL` as source of truth. |
 | `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |
 | `FAMILYFI_PHONE_GATEWAY_PORT` | Optional. Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
@@ -28,9 +29,24 @@ Do not set a runtime `UNIFI_API_KEY` for the web app. The spike CLI may use a te
 
 `make setup` will not overwrite an existing `.env`.
 
+### Modes
+
+`FAMILYFI_MODE` names the kind of work a process does, and each mode fixes four things:
+
+| Mode | Gateway | Database | Data | Configuration |
+| --- | --- | --- | --- | --- |
+| `prod` (default) | the household's UniFi gateway | PostgreSQL | the household's | open |
+| `dev` | the UniFi mock | PostgreSQL, or in memory with `DB_MODE=memory` | the seed household | open |
+| `test` | the UniFi mock | as `dev`; `scripts/test.py` gives each run its own | the seed household, or each test's | open |
+| `demo` | the UniFi mock | in memory, always | the seed household, reset nightly | locked ([demo mode](operations.md#demo-mode)) |
+
+Under `NODE_ENV=production` only `prod` and `demo` start, and `test` under CI (the browser tests run the production build); anything else stops startup with a message. `UNIFI_MOCK=1` is the old name for `dev`: it still works outside production, with a warning, and is ignored in production. Mocks do not prove firewall enforcement.
+
 ### Dummy household (no UniFi console)
 
-Set `UNIFI_MOCK=1` in `.env` and restart `make dev`. The app fakes the Network Integration API with synthetic fixtures, seeds a small household (Pat / Betsy / Sam / Living Room, three devices), and encrypts the dummy key `mock-unifi-key` so Settings looks connected. Sign in as `admin` or `pat` (same `FAMILYFI_DEFAULT_PASSWORD`). Use this for UI work (adding a user, jittery buttons, layout). Turn the flag off before pointing at a real gateway. Mocks do not prove firewall enforcement.
+Set `FAMILYFI_MODE=dev` in `.env` and restart `make dev`. The app fakes the Network Integration API with synthetic fixtures, seeds a small household (Pat / Betsy / Sam / Living Room, three devices), and encrypts the dummy key `mock-unifi-key` so Settings looks connected. Sign in as `admin` or `pat` (same `FAMILYFI_DEFAULT_PASSWORD`). Use this for UI work (adding a user, jittery buttons, layout). Set `FAMILYFI_MODE=prod` (or remove it) before pointing at a real gateway.
+
+Add `DB_MODE=memory` to run without PostgreSQL or Docker: `make dev` starts an in-memory database with the server, applies the migrations and seeds it, and nothing is kept when the server stops.
 
 If Docker is unavailable, run PostgreSQL yourself, point `DB_*` at it, then `make db-migrate`.
 
@@ -52,7 +68,7 @@ Email magic links and self-serve email reset from the sign-in prototype are not 
 
 Paste the Network Integration API key in Settings (`PUT /api/v1/settings/unifi`). The app encrypts it with `FAMILYFI_ENCRYPTION_KEY`. For a local console with a private CA, send `tlsInsecure: true`. Choose `manageAllNetworks: true` or `managedNetworkIds: ["…"]` so discovery/quarantine only watch those VLANs; the default is none until you pick. The spike CLI env key is not used by the running app.
 
-With `UNIFI_MOCK=1` (never in production), Settings Test/Save talk to the in-process mock. A dummy key of at least 8 characters is enough; the seeded household already uses `mock-unifi-key` and `https://127.0.0.1/proxy/network/integration`.
+With `FAMILYFI_MODE=dev` (never in production), Settings Test/Save talk to the in-process mock. A dummy key of at least 8 characters is enough; the seeded household already uses `mock-unifi-key` and `https://127.0.0.1/proxy/network/integration`.
 
 ## Remote access with a sidecar container
 

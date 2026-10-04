@@ -7,12 +7,12 @@ import { ensureDemoRoute, startDemoReset } from "@/server/demo";
 import { ensureDevDummyData } from "@/server/dev-seed";
 import { resetEnvCacheForTests } from "@/server/env";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
-import { startDemoDatabase } from "../../scripts/runtime/demo.mjs";
+import { startMemoryDatabase } from "../../scripts/runtime/memory-database.mjs";
 
 /**
- * Demo mode's boot on the in-memory database `scripts/runtime/demo.mjs` serves: the unchanged
+ * Demo mode's boot on the in-memory database `scripts/runtime/memory-database.mjs` serves: the unchanged
  * migrations apply to PGlite, and the boot seed fills the household. On a free port rather than
- * the demo's own, so runs on one machine never collide; the URL shape is `demo-mode.test.ts`'s.
+ * the demo's own, so runs on one machine never collide; the URL shape is `familyfi-mode.test.ts`'s.
  */
 const root = path.resolve(__dirname, "../..");
 let database: { port: number; stop: () => Promise<void> };
@@ -26,7 +26,7 @@ function migrate(env: NodeJS.ProcessEnv): Promise<number | null> {
 }
 
 beforeAll(async () => {
-  database = await startDemoDatabase({ port: 0 });
+  database = await startMemoryDatabase({ port: 0 });
   Object.assign(process.env, {
     FAMILYFI_DEFAULT_PASSWORD: "recovery-pass",
     FAMILYFI_SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
@@ -37,7 +37,7 @@ beforeAll(async () => {
     POSTGRES_USER: "postgres",
     POSTGRES_PASSWORD: "postgres",
     DB_SSL_MODE: "disable",
-    UNIFI_MOCK: "1",
+    FAMILYFI_MODE: "test",
   });
   delete process.env.DATABASE_URL;
   delete process.env.DB_SSL_ROOT_CERT;

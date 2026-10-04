@@ -1,4 +1,4 @@
-import { demoRequested } from "./print-database-url.mjs";
+import { inMemoryDatabase, modeIssues } from "./mode.mjs";
 
 /** @param {Record<string, string | undefined>} [env] */
 export function envIssues(env = process.env) {
@@ -17,12 +17,13 @@ export function envIssues(env = process.env) {
   if (!hex && !b64) {
     issues.push("FAMILYFI_ENCRYPTION_KEY must be 32 bytes as 64 hex characters (or base64).");
   }
-  // Demo mode's database is in memory, with fixed settings (print-database-url.mjs).
-  if (!env.POSTGRES_PASSWORD && !demoRequested(env)) {
+  issues.push(...modeIssues(env));
+  // The in-memory database brings its own settings (mode.mjs).
+  if (!env.POSTGRES_PASSWORD && !inMemoryDatabase(env)) {
     issues.push("POSTGRES_PASSWORD must be set.");
   }
-  if (env.DB_MODE && !["bundled", "external"].includes(env.DB_MODE)) {
-    issues.push("DB_MODE must be bundled or external.");
+  if (env.DB_MODE && !["bundled", "external", "memory"].includes(env.DB_MODE)) {
+    issues.push("DB_MODE must be bundled, external or memory.");
   }
   return issues;
 }

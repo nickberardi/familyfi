@@ -38,19 +38,19 @@ function probe(auth: SessionAuth | undefined, body: unknown) {
 }
 
 describe("POST /api/v1/settings/unifi/test", () => {
-  const previous = process.env.UNIFI_MOCK;
+  const previous = process.env.FAMILYFI_MODE;
   let auth: SessionAuth;
 
   beforeEach(async () => {
-    process.env.UNIFI_MOCK = "1";
+    process.env.FAMILYFI_MODE = "dev";
     resetDevMockClientForTests();
     await resetDatabase();
     auth = await signedIn();
   });
 
   afterEach(() => {
-    if (previous === undefined) delete process.env.UNIFI_MOCK;
-    else process.env.UNIFI_MOCK = previous;
+    if (previous === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = previous;
     resetDevMockClientForTests();
   });
 
@@ -100,7 +100,7 @@ describe("POST /api/v1/settings/unifi/test", () => {
   });
 
   it("reports a console it cannot reach as a failed probe, not a server error", async () => {
-    delete process.env.UNIFI_MOCK;
+    delete process.env.FAMILYFI_MODE;
     const response = await probe(auth, { apiKey: "not-a-real-key", baseUrl: "https://127.0.0.1:1/proxy/network/integration" });
     expect(response.status).toBe(400);
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe("unifi_invalid");

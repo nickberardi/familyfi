@@ -140,15 +140,16 @@ FamilyFi another way.
 
 - `DB_MODE=bundled` (default): the app expects Compose-managed PostgreSQL (`DB_HOST=db` in that stack).
 - `DB_MODE=external`: the app uses `DB_HOST` and related settings for a server you already run (CI, container smoke, or `make setup` / `make db-dev`).
+- `DB_MODE=memory`: an in-memory database that starts and ends with the server, for `FAMILYFI_MODE=dev` and `test` ([modes](setup.md#modes)). Demo mode always uses it; `prod` refuses it.
 
 Users should not edit Compose YAML to pick a server.
 
 ## Demo mode
 
-`FAMILYFI_DEMO=1` runs the production image as a public demo, such as the one App Review and the familyfi.dev site point at. Nothing in it is real or kept:
+`FAMILYFI_MODE=demo` runs the production image as a public demo, such as the one App Review and the familyfi.dev site point at. Nothing in it is real or kept:
 
-- **Database.** The entrypoint hands over to `scripts/runtime/demo.mjs`, which serves an in-memory [PGlite](https://pglite.dev) database on `127.0.0.1:5433` (through its own small wire-protocol server, `pglite-server.mjs`), applies the migrations and runs FamilyFi against it. The `DB_*` and `POSTGRES_*` settings are ignored and need not be set. No volume is needed; every start begins empty.
-- **Household.** The UniFi mock stands in for the gateway, and the boot seed adds the dummy household, as `UNIFI_MOCK=1` does in development. Visitors use groups, rules, pauses, devices and pairing as at home.
+- **Database.** The entrypoint hands over to `scripts/runtime/memory-database.mjs`, which serves an in-memory [PGlite](https://pglite.dev) database on loopback (port 5433, or `POSTGRES_PORT`; through its own small wire-protocol server, `pglite-server.mjs`), applies the migrations and runs FamilyFi against it. The other `DB_*` and `POSTGRES_*` settings are ignored and need not be set. No volume is needed; every start begins empty.
+- **Household.** The UniFi mock stands in for the gateway, and the boot seed adds the dummy household, as `FAMILYFI_MODE=dev` does in development. Visitors use groups, rules, pauses, devices and pairing as at home.
 - **Locked configuration.** Every visitor shares one household, so configuration writes answer 403 `demo_locked` ([API](api.md#shared-behaviour-and-consumer-adoption)): household and UniFi settings, accounts and passwords, resolvers, connection routes and their certificate pins, and remote access. The demo never opens a Cloudflare tunnel from its host.
 - **Sign-in.** `admin` and `pat`, both with `FAMILYFI_DEFAULT_PASSWORD`. Set it on the host so the password survives restarts, and give it to reviewers out of band. The session secret and encryption key may be left to generate on each start.
 - **Phones.** Set `FAMILYFI_DEMO_URL` to the demo's public HTTPS origin (for example `https://demo.familyfi.dev`). It is published as the household's remote route: the hosted website itself is the connection, like a household's reverse proxy (a `lan` route with the phone's system certificate check, no tunnel and no Cloudflare Access), so Pair Device issues pairing codes for it as it would at home. Android 17 asks for Nearby devices access when a household has such a route; pairing over the public address works either way. The ingress terminates TLS and must pass `X-Forwarded-Proto` and `X-Forwarded-Host`, which sign-in's origin and secure-cookie checks read.
@@ -157,7 +158,7 @@ Users should not edit Compose YAML to pick a server.
 The `Demo image` workflow publishes `ghcr.io/nickberardi/familyfi:demo` from each push to `main`. To try it locally:
 
 ```bash
-docker run --rm -p 7001:7001 -e FAMILYFI_DEMO=1 -e FAMILYFI_DEFAULT_PASSWORD=choose-a-password ghcr.io/nickberardi/familyfi:demo
+docker run --rm -p 7001:7001 -e FAMILYFI_MODE=demo -e FAMILYFI_DEFAULT_PASSWORD=choose-a-password ghcr.io/nickberardi/familyfi:demo
 ```
 
 ## Outages

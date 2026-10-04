@@ -2,7 +2,7 @@ name: Demo image
 
 # The hosted demo (docs/operations.md#demo-mode) runs main, not the latest release, so App
 # Review and the public demo see what is about to ship. Same Dockerfile as a release; only
-# FAMILYFI_DEMO=1 on the host makes it a demo.
+# FAMILYFI_MODE=demo on the host makes it a demo.
 on:
   push:
     branches:

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { Household } from "@prisma/client";
-import { unifiMockEnabled, unifiMockRequested, loadEnv } from "@/server/env";
+import { loadEnv, unifiMockEnabled } from "@/server/env";
 import { MockUnifiClient } from "@/server/unifi/mock";
 import { clientForHousehold, probeClient } from "@/server/unifi/connection";
 import { HttpUnifiClient } from "@/server/unifi/client";
@@ -24,33 +24,32 @@ function stubHousehold(): Household {
   } as unknown as Household;
 }
 
-function setMockFlag(value: string | undefined) {
+function setMode(value: string | undefined) {
   const env = process.env as Record<string, string | undefined>;
-  if (value === undefined) delete env.UNIFI_MOCK;
-  else env.UNIFI_MOCK = value;
+  if (value === undefined) delete env.FAMILYFI_MODE;
+  else env.FAMILYFI_MODE = value;
 }
 
-describe("UNIFI_MOCK", () => {
-  const previousMock = process.env.UNIFI_MOCK;
+describe("UniFi mock", () => {
+  const previousMode = process.env.FAMILYFI_MODE;
 
   afterEach(() => {
-    setMockFlag(previousMock);
+    setMode(previousMode);
     resetDevMockClientForTests();
   });
 
-  it("is opt-in and ignored in production", () => {
+  it("is opt-in, and UNIFI_MOCK is ignored in production", () => {
     expect(unifiMockEnabled({ NODE_ENV: "development" })).toBe(false);
+    expect(unifiMockEnabled({ NODE_ENV: "development", FAMILYFI_MODE: "dev" })).toBe(true);
     expect(unifiMockEnabled({ NODE_ENV: "development", UNIFI_MOCK: "1" })).toBe(true);
-    expect(unifiMockEnabled({ NODE_ENV: "test", UNIFI_MOCK: "true" })).toBe(true);
-    expect(unifiMockRequested({ NODE_ENV: "production", UNIFI_MOCK: "1" })).toBe(true);
     expect(unifiMockEnabled({ NODE_ENV: "production", UNIFI_MOCK: "1" })).toBe(false);
-    expect(unifiMockEnabled({ NODE_ENV: "production", CI: "1", UNIFI_MOCK: "1" })).toBe(true);
+    expect(unifiMockEnabled({ NODE_ENV: "production", CI: "1", FAMILYFI_MODE: "test" })).toBe(true);
     expect(loadEnv({ ...validEnv, NODE_ENV: "production", UNIFI_MOCK: "1" }).UNIFI_MOCK).toBe(false);
-    expect(loadEnv({ ...validEnv, NODE_ENV: "test", UNIFI_MOCK: "1" }).UNIFI_MOCK).toBe(true);
+    expect(loadEnv({ ...validEnv, NODE_ENV: "test", FAMILYFI_MODE: "test" }).UNIFI_MOCK).toBe(true);
   });
 
   it("returns a shared MockUnifiClient for probe and household clients", async () => {
-    setMockFlag("1");
+    setMode("dev");
     const probed = probeClient({
       apiKey: "mock-unifi-key",
       baseUrl: "https://127.0.0.1/proxy/network/integration",
@@ -76,8 +75,8 @@ describe("UNIFI_MOCK", () => {
     expect(getSharedDevMockClient().state.clients.some((client) => client.name === "Kids iPad")).toBe(true);
   });
 
-  it("uses HttpUnifiClient when the flag is off", () => {
-    setMockFlag("0");
+  it("uses HttpUnifiClient in prod", () => {
+    setMode("prod");
     const client = probeClient({
       apiKey: "live-key-value",
       baseUrl: "https://127.0.0.1/proxy/network/integration",

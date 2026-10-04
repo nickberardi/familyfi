@@ -44,7 +44,7 @@ Credentials (CLI-only):
   UNIFI_SPIKE_INSTALL_ID        default local (legacy spike name matching)
   UNIFI_TLS_INSECURE=1          local consoles with a private CA
   UNIFI_SPIKE_CONFIRM=1         required for apply and cleanup
-  UNIFI_MOCK=1                  verify only: run against the local mock (never a record)
+  FAMILYFI_MODE=dev             verify only: run against the local mock (never a record)
 
 Commands:
   discover    list sites, zones, networks, clients (local stdout)
@@ -307,7 +307,7 @@ async function verify(): Promise<number> {
     const fixture = createFixtureUnifiClient({ friendlyNames: true });
     if (macs.length === 0) macs = fixture.state.clients.slice(0, 2).flatMap((item) => (item.macAddress ? [item.macAddress] : []));
     client = fixture;
-    console.error("UNIFI_MOCK: running against the local mock. This proves nothing about a gateway and is never a record.");
+    console.error("FAMILYFI_MODE: running against the local mock. This proves nothing about a gateway and is never a record.");
   } else {
     client = createClient();
   }

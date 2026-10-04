@@ -8,19 +8,24 @@ export type DatabaseSettings = {
   DB_SSL_ROOT_CERT?: string;
 };
 
+/** Where the in-memory database is served unless `POSTGRES_PORT` names another port. */
+export const MEMORY_DATABASE_PORT = "5433";
+
 /**
- * The in-memory PGlite database demo mode runs on, served on loopback by `scripts/runtime/demo.mjs`
- * (which keeps its own copy, `DEMO_DATABASE` in `print-database-url.mjs`). Not configurable: demo
- * mode never reaches another database. Loopback only, so no TLS (`pglite-server.mjs` offers none).
+ * The in-memory PGlite database (demo, or `DB_MODE=memory` in dev and test), served on loopback by
+ * `scripts/runtime/memory-database.mjs`, which keeps its own copy in `print-database-url.mjs`. Only
+ * the port can be chosen. Loopback only, so no TLS (`pglite-server.mjs` offers none).
  */
-export const DEMO_DATABASE = {
-  DB_HOST: "127.0.0.1",
-  POSTGRES_PORT: "5433",
-  POSTGRES_DB: "template1",
-  POSTGRES_USER: "postgres",
-  POSTGRES_PASSWORD: "postgres",
-  DB_SSL_MODE: "disable",
-} as const satisfies DatabaseSettings;
+export function memoryDatabase(port?: string) {
+  return {
+    DB_HOST: "127.0.0.1",
+    POSTGRES_PORT: port || MEMORY_DATABASE_PORT,
+    POSTGRES_DB: "template1",
+    POSTGRES_USER: "postgres",
+    POSTGRES_PASSWORD: "postgres",
+    DB_SSL_MODE: "disable",
+  } satisfies DatabaseSettings;
+}
 
 export function buildDatabaseUrl(settings: DatabaseSettings): string {
   const host = settings.DB_HOST || "127.0.0.1";

@@ -26,7 +26,7 @@ import { resetDatabase } from "../helpers/db";
  */
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const DEMO_URL = "https://demo.familyfi.test";
-const saved = { demo: process.env.FAMILYFI_DEMO, url: process.env.FAMILYFI_DEMO_URL };
+const saved = { mode: process.env.FAMILYFI_MODE, url: process.env.FAMILYFI_DEMO_URL };
 
 async function adminAuth(): Promise<SessionAuth> {
   return authFromLogin(
@@ -43,13 +43,13 @@ const params = <T extends Record<string, string>>(value: T) => ({ params: Promis
 describe("demo mode", () => {
   beforeEach(async () => {
     await resetDatabase();
-    process.env.FAMILYFI_DEMO = "1";
+    process.env.FAMILYFI_MODE = "demo";
     process.env.FAMILYFI_DEMO_URL = DEMO_URL;
     await ensureDemoRoute();
   });
 
   afterEach(() => {
-    for (const [key, value] of [["FAMILYFI_DEMO", saved.demo], ["FAMILYFI_DEMO_URL", saved.url]] as const) {
+    for (const [key, value] of [["FAMILYFI_MODE", saved.mode], ["FAMILYFI_DEMO_URL", saved.url]] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }

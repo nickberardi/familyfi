@@ -6,8 +6,8 @@ import { jsonError } from "./http";
 import { demoModeEnabled } from "./env";
 
 /**
- * Demo mode (`FAMILYFI_DEMO`, `demoModeEnabled` in `env.ts`): the household's side of the hosted
- * public demo. The database is in memory (`scripts/runtime/demo.mjs`), so a restart is the reset.
+ * Demo mode (`FAMILYFI_MODE=demo`, `demoModeEnabled` in `env.ts`): the household's side of the hosted
+ * public demo. The database is in memory (`scripts/runtime/memory-database.mjs`), so a restart is the reset.
  */
 
 /** The household-local time the demo restarts, so each day starts from the seed household. */

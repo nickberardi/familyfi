@@ -33,7 +33,7 @@ export type VerifyRecord = {
   format: typeof RECORD_FORMAT;
   /** YYYY-MM-DD, the day the run started. */
   date: string;
-  /** A run against `UNIFI_MOCK`. Never committed: the mock proves nothing about a gateway. */
+  /** A run against the UniFi mock (`FAMILYFI_MODE=dev`). Never committed: the mock proves nothing about a gateway. */
   mock: boolean;
   console: {
     /** Hardware model, as the operator typed it (for example "UCG Max"). */
@@ -157,7 +157,7 @@ export function renderRecordMarkdown(input: VerifyRecord): string {
     `# Verification ${record.date}: ${record.console.model}, Network ${record.console.network}`,
     "",
     record.mock
-      ? "> **Mock run.** `UNIFI_MOCK` stands in for a gateway, so this proves nothing about enforcement. Never commit it."
+      ? "> **Mock run.** The UniFi mock stands in for a gateway, so this proves nothing about enforcement. Never commit it."
       : "> Written by `pnpm spike verify`. Device checks are the operator's own observations of the test devices.",
     "",
     "| | |",

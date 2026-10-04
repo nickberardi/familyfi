@@ -19,6 +19,7 @@ from .process import run
 from .reporting import atomic_json
 
 POSTGRES_IMAGE = "postgres:18-alpine"
+MEMORY_LAUNCHER = "scripts/runtime/memory-database.mjs"
 TEST_DATABASE = "familyfi_test"
 LABEL = "familyfi.test-run"
 
@@ -174,6 +175,36 @@ class Resources:
             time.sleep(1)
         published = self.command(["docker", "port", name, "5432/tcp"], timeout=30, idle=0).split()[0]
         env["POSTGRES_PORT"] = published.rsplit(":", 1)[1]
+        return env
+
+    def memory_database(self, platform, env, log):
+        """Serve this environment an in-memory PGlite instead of PostgreSQL, and point `env` at it.
+
+        The launcher (`memory-database.mjs --serve`) is this run's process; cleanup stops it.
+        """
+        owner = f"{self.directory.name}/{platform}-database"
+        self.manifest["ports"].append(owner); self.save()
+        port = reserve_port(owner, self.registry_dir)
+        with open(log, "ab") as output:
+            process = subprocess.Popen(["node", MEMORY_LAUNCHER, "--serve"], cwd=self.root, start_new_session=True,
+                                       stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
+                                       env={**env, "FAMILYFI_MODE": "test", "DB_MODE": "memory",
+                                            "POSTGRES_PORT": str(port)})
+        self.track_process(process)
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=1):
+                    break
+            except OSError:
+                if process.poll() is not None:
+                    raise RuntimeError(f"In-memory database for {platform} exited {process.returncode}; see {log}")
+                if time.monotonic() > deadline:
+                    raise RuntimeError(f"In-memory database for {platform} did not start; see {log}")
+                time.sleep(0.25)
+        # Its own settings (scripts/runtime/mode.mjs); the database name is whatever PGlite serves.
+        env.update(POSTGRES_PORT=str(port), POSTGRES_USER="postgres", POSTGRES_PASSWORD="postgres",
+                   DB_SSL_MODE="disable")
         return env
 
     def migrate(self, env, **kwargs):

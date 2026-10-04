@@ -69,4 +69,4 @@ Every write goes through the app's ownership guard with this run's own creations
 
 Commit the record's `.json` and `.md` with the rewritten table in `docs/testing.md`. Read the `.md` first: it should say nothing about your household beyond the console model.
 
-`UNIFI_MOCK=1 pnpm spike verify --confirm` runs the same scenarios against the local mock, for trying the tool. Its record goes to `scripts/spike/.live-verify/`, which git ignores; it is not a verification record.
+`FAMILYFI_MODE=dev pnpm spike verify --confirm` runs the same scenarios against the local mock, for trying the tool. Its record goes to `scripts/spike/.live-verify/`, which git ignores; it is not a verification record.

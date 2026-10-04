@@ -1,5 +1,5 @@
 /**
- * Serves one PGlite database over the PostgreSQL wire protocol, for demo mode (demo.mjs). PGlite is
+ * Serves one PGlite database over the PostgreSQL wire protocol, for the in-memory database (memory-database.mjs). PGlite is
  * a single session, so this does what a server's backends would: it runs one request at a time, and
  * while a connection holds a transaction open, only that connection's requests run.
  *

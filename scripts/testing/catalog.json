@@ -98,7 +98,7 @@
         "runtime"
       ]
     },
-    "tests/unit/demo-mode.test.ts": {
+    "tests/unit/familyfi-mode.test.ts": {
       "categories": [
         "runtime",
         "unifi"
@@ -521,14 +521,16 @@
         "database",
         "rules",
         "groups"
-      ]
+      ],
+      "postgres": "it sets search_path on its own connection, which PGlite's single session shares with every other"
     },
     "tests/integration/household-rules-migration.test.ts": {
       "categories": [
         "database",
         "rules",
         "groups"
-      ]
+      ],
+      "postgres": "it sets search_path on its own connection, which PGlite's single session shares with every other"
     },
     "tests/integration/policy-ownership.test.ts": {
       "categories": [
@@ -562,6 +564,12 @@
       "categories": [
         "trust"
       ]
+    },
+    "tests/integration/remote-access.test.ts > remote access > publishes exactly one route for each choice and turns the rest off": {
+      "categories": [
+        "trust"
+      ],
+      "postgres": "it checks the moment before the fake quick tunnel comes up, and on PGlite the tunnel is already up by its next query"
     },
     "tests/integration/reset-database.test.ts": {
       "categories": [

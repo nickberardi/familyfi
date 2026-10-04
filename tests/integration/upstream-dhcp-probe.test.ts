@@ -6,10 +6,10 @@ import { probeCategory } from "@/server/upstream/probe";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
 import { configureConnectedHousehold, createFamilyGroup, IOT_NETWORK, INTERNAL_NETWORK, resetDatabase, seedDevice } from "../helpers/db";
 
-const previousMock = process.env.UNIFI_MOCK;
+const previousMock = process.env.FAMILYFI_MODE;
 
 async function setupNetworks() {
-  process.env.UNIFI_MOCK = "1";
+  process.env.FAMILYFI_MODE = "dev";
   await configureConnectedHousehold();
   await prisma().household.update({ where: { id: "default" }, data: {
     dohUrl: null,
@@ -27,7 +27,7 @@ async function setupNetworks() {
 
 describe("DHCP-backed category checks", () => {
   beforeEach(async () => { await resetDatabase(); await ensureUpstreamCategories(); });
-  afterEach(() => { if (previousMock === undefined) delete process.env.UNIFI_MOCK; else process.env.UNIFI_MOCK = previousMock; });
+  afterEach(() => { if (previousMock === undefined) delete process.env.FAMILYFI_MODE; else process.env.FAMILYFI_MODE = previousMock; });
 
   it("measures each assigned server and gives groups their own network verdict", async () => {
     await setupNetworks();

@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { inMemoryDatabase, memoryDatabase } from "./mode.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -50,27 +51,11 @@ export function loadDotEnv() {
   }
 }
 
-/**
- * True when FAMILYFI_DEMO is 1/true/yes, as `demoModeEnabled` in src/server/env.ts reads it.
- * @param {Record<string, string | undefined>} [env]
- */
-export function demoRequested(env = process.env) {
-  return ["1", "true", "yes"].includes((env.FAMILYFI_DEMO ?? "").trim().toLowerCase());
-}
-
-/** Demo mode's in-memory database, served by demo.mjs. Mirrors `DEMO_DATABASE` in src/server/database-url.ts. */
-export const DEMO_DATABASE = Object.freeze({
-  DB_HOST: "127.0.0.1",
-  POSTGRES_PORT: "5433",
-  POSTGRES_DB: "template1",
-  POSTGRES_USER: "postgres",
-  POSTGRES_PASSWORD: "postgres",
-  DB_SSL_MODE: "disable",
-});
-
 /** @param {Record<string, string | undefined>} [source] */
 export function buildDatabaseUrl(source = process.env) {
-  const env = demoRequested(source) ? { ...source, DB_SSL_ROOT_CERT: undefined, ...DEMO_DATABASE } : source;
+  const env = inMemoryDatabase(source)
+    ? { ...source, DB_SSL_ROOT_CERT: undefined, ...memoryDatabase(source.POSTGRES_PORT?.trim()) }
+    : source;
   const host = env.DB_HOST || "127.0.0.1";
   const port = env.POSTGRES_PORT || "5432";
   const name = env.POSTGRES_DB || "familyfi";
