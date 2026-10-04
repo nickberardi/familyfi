@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
+import { demoLocked } from "@/server/demo";
 
 const Body = z.object({
   url: z.string().min(1), transport: z.nativeEnum(ConnectionTransport), trustMode: z.nativeEnum(ConnectionTrustMode),
@@ -21,6 +22,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withAdmin(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = Body.safeParse(body.value);

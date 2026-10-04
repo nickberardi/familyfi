@@ -14,17 +14,17 @@ const household = () => prisma().household.findUniqueOrThrow({ where: { id: "def
  * can; when it cannot look it must say so (null), never report quarantine as off.
  */
 describe("observeQuarantineBlocking", () => {
-  const previous = process.env.UNIFI_MOCK;
+  const previous = process.env.FAMILYFI_MODE;
 
   beforeEach(async () => {
-    process.env.UNIFI_MOCK = "1";
+    process.env.FAMILYFI_MODE = "dev";
     resetDevMockClientForTests();
     await resetDatabase();
   });
 
   afterEach(() => {
-    if (previous === undefined) delete process.env.UNIFI_MOCK;
-    else process.env.UNIFI_MOCK = previous;
+    if (previous === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = previous;
     resetDevMockClientForTests();
   });
 
@@ -63,7 +63,7 @@ describe("observeQuarantineBlocking", () => {
     await runReconcileOnce();
     const count = await prisma().appPolicy.count({ where: { ownerScope: PolicyOwnerScope.quarantine } });
     // Outside the mock the saved key is decrypted, and this one cannot be: the read fails.
-    delete process.env.UNIFI_MOCK;
+    delete process.env.FAMILYFI_MODE;
     await prisma().household.update({ where: { id: "default" }, data: { unifiKeyCiphertext: Buffer.from("not a key") } });
 
     await prisma().appPolicy.updateMany({ where: { ownerScope: PolicyOwnerScope.quarantine }, data: { observedEnabled: true } });

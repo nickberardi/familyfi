@@ -172,18 +172,18 @@ describe("policy ownership guard", () => {
 });
 
 describe("clientForHousehold", () => {
-  const previous = process.env.UNIFI_MOCK;
+  const previous = process.env.FAMILYFI_MODE;
 
   beforeEach(async () => {
-    process.env.UNIFI_MOCK = "1";
+    process.env.FAMILYFI_MODE = "dev";
     resetDevMockClientForTests();
     await resetDatabase();
     await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
   });
 
   afterEach(() => {
-    if (previous === undefined) delete process.env.UNIFI_MOCK;
-    else process.env.UNIFI_MOCK = previous;
+    if (previous === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = previous;
     resetDevMockClientForTests();
   });
 

@@ -30,6 +30,7 @@ def plan(tests, coverage=False, **filters):
             keys[test["id"]] = key
             steps.append({"key": key, "test": test["id"], "adapter": test["adapter"], "layer": test["layer"],
                           "source": test["source"], "line": test["line"],
+                          **({"postgres": test["postgres"]} if test.get("postgres") else {}),
                           "role": "selected" if test["id"] in applicable else "prerequisite",
                           "depends_on": [keys[name] for name in prerequisites.get(test["id"], [])]})
         environments.append({"platform": platform,

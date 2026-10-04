@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
+import { demoLocked } from "@/server/demo";
 
 const Body = z.object({ url: z.string().min(1).optional(), transport: z.nativeEnum(ConnectionTransport).optional(), trustMode: z.enum(["system", "pinned"]).optional(), spkiSha256: z.string().nullable().optional(), priority: z.number().int().min(0).max(999).optional(), enabled: z.boolean().optional(),
   edgeAuth: z.nativeEnum(EdgeAuth).optional(), serviceToken: z.object({ clientId: z.string(), clientSecret: z.string() }).strict().optional(),
@@ -15,6 +16,8 @@ const MANAGED = "This route follows FamilyFi's own tunnel. Change it from Remote
 
 export async function PUT(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = Body.safeParse(body.value);
@@ -56,6 +59,8 @@ export async function PUT(request: Request, context: Ctx) {
 
 export async function DELETE(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const { id } = await context.params;
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");

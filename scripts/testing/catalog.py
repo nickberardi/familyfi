@@ -145,6 +145,9 @@ def load(root=ROOT, path=None, discovered=None):
             if matches(identity["id"], selector):
                 used.add(selector)
                 entry["categories"] = sorted(set(entry["categories"]) | set(metadata["categories"]))
+                if metadata.get("postgres"):
+                    # Why the test needs PostgreSQL itself; `run --database memory` reports it as not run.
+                    entry["postgres"] = metadata["postgres"]
         if not entry["categories"]:
             raise ValueError(f"Uncategorized test: {entry['id']}\n"
                              "Give its file a category in scripts/testing/catalog.json.")

@@ -2,6 +2,7 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { demoModeEnabled } from "../env";
 
 /** Minimal environment for every cloudflared child, even `--version`: never the app's own secrets. */
 function childEnv(home: string, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -12,6 +13,8 @@ function childEnv(home: string, extra: Record<string, string> = {}): NodeJS.Proc
 const IMAGE_BINARY = "/usr/local/bin/cloudflared";
 
 export function findCloudflared(): { bin: string; version: string } | null {
+  // The public demo never opens a tunnel from its host: Remote access reads as unavailable there.
+  if (demoModeEnabled()) return null;
   // CLOUDFLARED_BIN is test-only: it points integration tests at a stand-in binary.
   const candidates = [process.env.CLOUDFLARED_BIN, IMAGE_BINARY, "cloudflared"].filter((bin): bin is string => Boolean(bin));
   for (const bin of candidates) {

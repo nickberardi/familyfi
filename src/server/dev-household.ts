@@ -1,5 +1,5 @@
 /**
- * The `UNIFI_MOCK` household: who lives there, their equipment, and the rules on them.
+ * The mock household (`FAMILYFI_MODE` dev, test and demo): who lives there, their equipment, and the rules on them.
  * `dev-seed.ts` writes it to the database and `unifi/dev-mock.ts` reports its online
  * devices as UniFi clients, so the two agree on every MAC without importing each other.
  *

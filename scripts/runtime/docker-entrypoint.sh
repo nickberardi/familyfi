@@ -11,6 +11,12 @@ fi
 
 cd /app
 node scripts/runtime/validate-env.mjs
+
+# Demo mode brings its own in-memory database and applies the migrations itself.
+if node scripts/runtime/memory-database.mjs --requested; then
+  exec node scripts/runtime/memory-database.mjs node scripts/runtime/with-env.mjs node server.js
+fi
+
 DATABASE_URL="$(node scripts/runtime/print-database-url.mjs)"
 export DATABASE_URL
 

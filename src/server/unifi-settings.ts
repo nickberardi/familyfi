@@ -6,7 +6,7 @@ import { clientForHousehold, connectionIdentity, probeClient } from "./unifi/con
 import { enqueueChange } from "./changes";
 import { pruneNetworkScopedRulesForScope } from "./network-rules";
 import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type PublicUnifiNetwork } from "./unifi/scope";
-import { loadNetworkDetails } from "./unifi/spike";
+import { loadNetworkDetails } from "./unifi/networks";
 import type { Household } from "@prisma/client";
 
 async function probeWithClient(client: ReturnType<typeof probeClient>, siteId?: string) {

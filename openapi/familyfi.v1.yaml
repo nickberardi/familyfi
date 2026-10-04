@@ -8,6 +8,12 @@ info:
     enforcement only. Signed-in operators can browse this specification under
     System → API (`/reference`). Groups, devices, accounts, UniFi settings, and
     sync are specified here.
+
+    A server in demo mode (the hosted public demo, where every visitor shares one
+    household) refuses configuration writes with 403 `demo_locked`: household and
+    UniFi settings, accounts and passwords, the household's and groups' resolvers,
+    connection routes and their certificate pins, and remote access. Groups, rules, pauses, devices and pairing
+    work as usual.
   license:
     name: Business Source License 1.1
     identifier: BUSL-1.1

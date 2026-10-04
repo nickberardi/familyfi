@@ -2,7 +2,7 @@ import { isIP } from "node:net";
 import { prisma } from "../db";
 import { clientForHousehold } from "../unifi/connection";
 import { networkInScope } from "../unifi/scope";
-import { loadNetworkDetails } from "../unifi/spike";
+import { loadNetworkDetails } from "../unifi/networks";
 import { withUpstreamLock } from "./transaction";
 
 export type ResolverNetwork = {

@@ -65,7 +65,7 @@ function applyFriendlyNames(state: MockUnifiState): MockUnifiState {
 }
 
 /**
- * The fixture gateway. With `friendlyNames` it is the `UNIFI_MOCK` household's gateway:
+ * The fixture gateway. With `friendlyNames` it is the mock household's gateway:
  * named site and networks, the household's devices as clients, and a few named apps.
  */
 export function createFixtureUnifiState(options?: { friendlyNames?: boolean }): MockUnifiState {

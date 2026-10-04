@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { inMemoryDatabase, memoryDatabase } from "./mode.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -50,7 +51,11 @@ export function loadDotEnv() {
   }
 }
 
-export function buildDatabaseUrl(env = process.env) {
+/** @param {Record<string, string | undefined>} [source] */
+export function buildDatabaseUrl(source = process.env) {
+  const env = inMemoryDatabase(source)
+    ? { ...source, DB_SSL_ROOT_CERT: undefined, ...memoryDatabase(source.POSTGRES_PORT?.trim()) }
+    : source;
   const host = env.DB_HOST || "127.0.0.1";
   const port = env.POSTGRES_PORT || "5432";
   const name = env.POSTGRES_DB || "familyfi";

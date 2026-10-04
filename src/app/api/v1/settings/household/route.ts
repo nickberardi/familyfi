@@ -6,6 +6,7 @@ import { jsonError } from "@/server/http";
 import { observeQuarantineBlocking } from "@/server/quarantine";
 import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 import type { Household } from "@prisma/client";
+import { demoLocked } from "@/server/demo";
 
 const Body = z
   .object({
@@ -38,6 +39,8 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = Body.safeParse(body.value);

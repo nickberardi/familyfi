@@ -98,6 +98,24 @@
         "runtime"
       ]
     },
+    "tests/unit/demo-boot.test.ts": {
+      "categories": [
+        "database",
+        "runtime"
+      ]
+    },
+    "tests/unit/familyfi-mode.test.ts": {
+      "categories": [
+        "runtime",
+        "unifi"
+      ]
+    },
+    "tests/unit/pglite-server.test.ts": {
+      "categories": [
+        "database",
+        "runtime"
+      ]
+    },
     "tests/unit/device-presence.test.ts": {
       "categories": [
         "devices"
@@ -329,11 +347,6 @@
         "sync"
       ]
     },
-    "tests/unit/spike-verify.test.ts": {
-      "categories": [
-        "unifi"
-      ]
-    },
     "tests/unit/spki.test.ts": {
       "categories": [
         "trust"
@@ -472,6 +485,12 @@
         "schedules"
       ]
     },
+    "tests/integration/demo-lock.test.ts": {
+      "categories": [
+        "runtime",
+        "settings"
+      ]
+    },
     "tests/integration/dev-mock.test.ts": {
       "categories": [
         "unifi"
@@ -536,6 +555,12 @@
       "categories": [
         "trust"
       ]
+    },
+    "tests/integration/remote-access.test.ts > remote access > publishes exactly one route for each choice and turns the rest off": {
+      "categories": [
+        "trust"
+      ],
+      "postgres": "it checks the moment before the fake quick tunnel comes up, and on PGlite the tunnel is already up by its next query"
     },
     "tests/integration/reset-database.test.ts": {
       "categories": [
