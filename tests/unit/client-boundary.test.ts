@@ -21,7 +21,7 @@ const srcRoot = path.join(repoRoot, "src");
 const serverRoot = path.join(srcRoot, "server") + path.sep;
 
 /** Packages that only run on the server: the database, the HTTP agent, native hashing. */
-const SERVER_PACKAGES = ["@prisma/client", "@prisma/adapter-pg", "pg", "undici", "@node-rs/argon2", "@electric-sql/pglite", "@electric-sql/pglite-socket"];
+const SERVER_PACKAGES = ["@prisma/client", "@prisma/adapter-pg", "pg", "undici", "@node-rs/argon2", "@electric-sql/pglite"];
 const NODE_BUILTINS = new Set(builtinModules);
 
 function walk(dir: string): string[] {

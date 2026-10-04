@@ -36,13 +36,12 @@ export async function register() {
   }
   if (settings.FAMILYFI_DEMO) {
     const { ensureDemoRoute, startDemoReset } = await import("./server/demo");
-    try {
-      await ensureDemoRoute();
-      const at = await startDemoReset();
-      console.log(`demo mode: the household resets at ${at.toISOString()}`);
-    } catch (error) {
-      console.error("Demo mode setup failed:", error);
-    }
+    // Separately, so a bad FAMILYFI_DEMO_URL never stops the nightly reset.
+    await startDemoReset().then(
+      (at) => console.log(`demo mode: the household resets at ${at.toISOString()}`),
+      (error) => console.error("Demo mode could not schedule its nightly reset:", error),
+    );
+    await ensureDemoRoute().catch((error) => console.error("Demo mode could not publish FAMILYFI_DEMO_URL:", error));
   }
   startUpdateCheck();
   startReconciliation();

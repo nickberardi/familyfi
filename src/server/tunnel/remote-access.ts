@@ -8,8 +8,6 @@ import { ConnectionTransport, ConnectionTrustMode, RouteKind, type ConnectionEnd
 import { isUniqueViolation } from "../connection";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { prisma } from "../db";
-import { DEMO_ROUTE_FIXED } from "../demo";
-import { demoModeEnabled } from "../env";
 import {
   findCloudflared,
   loginUrl,
@@ -450,7 +448,6 @@ async function namedTarget(change: Extract<RemoteAccessChange, { mode: "named" }
 }
 
 export async function setRemoteAccess(change: RemoteAccessChange) {
-  if (demoModeEnabled()) throw new RemoteAccessError(DEMO_ROUTE_FIXED);
   const target = change.mode === "named" ? await namedTarget(change) : null;
   stopAll();
   runtime.error = null;

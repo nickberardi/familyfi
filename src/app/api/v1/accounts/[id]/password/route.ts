@@ -6,6 +6,7 @@ import { publicAccount } from "@/server/accounts";
 import { prisma } from "@/server/db";
 import { readJson, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
+import { demoLocked } from "@/server/demo";
 
 const Body = z.object({
   password: z.string().min(8),
@@ -15,6 +16,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const { id } = await ctx.params;
     const body = await readJson(request);
     if (!body.ok) return body.response;

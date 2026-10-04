@@ -10,21 +10,17 @@
  */
 import { spawn } from "node:child_process";
 import { PGlite } from "@electric-sql/pglite";
-import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { DEMO_DATABASE, applyDatabaseUrl, demoRequested } from "./print-database-url.mjs";
-
-/** Enough for Prisma's pool (10) beside `prisma migrate deploy`; PGlite runs one query at a time either way. */
-const MAX_CONNECTIONS = 20;
+import { servePGlite } from "./pglite-server.mjs";
 
 /** An empty in-memory database, served until `stop`. Port 0 picks a free port (tests); `port` is the one served. */
 export async function startDemoDatabase({ port = Number(DEMO_DATABASE.POSTGRES_PORT) } = {}) {
   const db = await PGlite.create();
-  const server = new PGLiteSocketServer({ db, host: DEMO_DATABASE.DB_HOST, port, maxConnections: MAX_CONNECTIONS });
-  await server.start();
+  const server = await servePGlite(db, { host: DEMO_DATABASE.DB_HOST, port });
   return {
-    port: Number(server.getServerConn().split(":").pop()),
+    port: server.port,
     async stop() {
-      await server.stop();
+      await server.close();
       await db.close();
     },
   };

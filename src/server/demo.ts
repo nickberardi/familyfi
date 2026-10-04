@@ -2,6 +2,7 @@ import { ConnectionTransport, ConnectionTrustMode, RouteKind } from "@prisma/cli
 import { nextClockOnDays } from "@/lib/clock";
 import { assertEndpoint } from "./connection";
 import { prisma } from "./db";
+import { jsonError } from "./http";
 import { demoModeEnabled } from "./env";
 
 /**
@@ -32,24 +33,25 @@ export async function startDemoReset(now = new Date(), exit: () => void = () => 
   return at;
 }
 
-/** Why a visitor cannot change how phones reach the demo: one visitor would cut off the others until the reset. */
-export const DEMO_ROUTE_FIXED = "Remote access is fixed in the demo, so every visitor's phone can pair.";
+export const DEMO_LOCKED = "Settings are locked in the demo. Groups, rules, devices and pairing work as they do at home.";
 
-/** The route `ensureDemoRoute` publishes, while demo mode is on. Remote access and route edits leave it alone. */
-export function isDemoRoute(endpoint: { url: string }, value = process.env.FAMILYFI_DEMO_URL?.trim()): boolean {
-  if (!demoModeEnabled() || !value) return false;
-  return URL.canParse(value) && new URL(value).origin === endpoint.url;
+/**
+ * Refuses a configuration write in demo mode, where every visitor shares one household: the gateway,
+ * household settings, accounts, resolvers and how phones connect stay as the demo set them.
+ */
+export function demoLocked(): Response | null {
+  return demoModeEnabled() ? jsonError(403, "demo_locked", DEMO_LOCKED) : null;
 }
 
 /**
  * Publishes `FAMILYFI_DEMO_URL` (the demo's public HTTPS origin) as the household's remote route, so
- * Pair Device issues phone pairing codes for it as it would at home. It is a route the host runs,
- * in front of the web app like a household's reverse proxy, with the phone's system trust and no
- * Cloudflare Access. Without the setting nothing is published.
+ * Pair Device issues phone pairing codes for it as it would at home. The hosted website itself is
+ * the connection, a route the host runs in front of the web app like a household's reverse proxy,
+ * with the phone's system trust. No tunnel, no Cloudflare Access. Without the setting nothing is published.
  */
 export async function ensureDemoRoute(value = process.env.FAMILYFI_DEMO_URL?.trim()): Promise<void> {
   if (!value) return;
-  const route = { transport: ConnectionTransport.cloudflare, trustMode: ConnectionTrustMode.system };
+  const route = { transport: ConnectionTransport.lan, trustMode: ConnectionTrustMode.system };
   const url = assertEndpoint({ ...route, url: value });
   const endpoint = await prisma().connectionEndpoint.upsert({
     where: { url },

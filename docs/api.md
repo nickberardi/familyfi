@@ -20,6 +20,12 @@ household timezone, per-action outcomes and unknown DNS verdicts must remain con
 clients. The fixtures cover the functions named by their test harness; they are not evidence of
 complete UI parity, all API semantics or live gateway enforcement.
 
+A server in [demo mode](operations.md#demo-mode) refuses configuration writes with 403
+`demo_locked`: `PUT /settings/household`, `PUT /settings/unifi`, account and password writes,
+`PUT`/`DELETE` on `/upstream/resolver` and `/groups/{id}/resolver`, route writes under
+`/connection/endpoints` and `PUT /connection/tunnel`. Clients show the message; the household
+itself (groups, rules, pauses, devices) and pairing are unchanged.
+
 For a change to either shared artifact:
 
 1. Identify the affected consumers and intended behaviour before editing. Follow the [root compatibility rules](../AGENTS.md#openapi-consumer-coordination) and [version policy](#versioning-the-contract) for HTTP changes.

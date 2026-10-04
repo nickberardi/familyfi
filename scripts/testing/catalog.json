@@ -104,6 +104,12 @@
         "unifi"
       ]
     },
+    "tests/unit/pglite-server.test.ts": {
+      "categories": [
+        "database",
+        "runtime"
+      ]
+    },
     "tests/unit/device-presence.test.ts": {
       "categories": [
         "devices"
@@ -470,6 +476,12 @@
       "categories": [
         "trust",
         "pairing"
+      ]
+    },
+    "tests/integration/demo-lock.test.ts": {
+      "categories": [
+        "runtime",
+        "settings"
       ]
     },
     "tests/integration/dev-mock.test.ts": {

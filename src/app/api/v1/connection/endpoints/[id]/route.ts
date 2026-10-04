@@ -2,10 +2,10 @@ import { ConnectionTransport, EdgeAuth } from "@prisma/client";
 import { z } from "zod";
 import { publicEndpoint, assertEndpoint, hasPendingPairing, isManagedRoute, isUniqueViolation } from "@/server/connection";
 import { prisma } from "@/server/db";
-import { DEMO_ROUTE_FIXED, isDemoRoute } from "@/server/demo";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
+import { demoLocked } from "@/server/demo";
 
 const Body = z.object({ url: z.string().min(1).optional(), transport: z.nativeEnum(ConnectionTransport).optional(), trustMode: z.enum(["system", "pinned"]).optional(), spkiSha256: z.string().nullable().optional(), priority: z.number().int().min(0).max(999).optional(), enabled: z.boolean().optional(),
   edgeAuth: z.nativeEnum(EdgeAuth).optional(), serviceToken: z.object({ clientId: z.string(), clientSecret: z.string() }).strict().optional(),
@@ -16,6 +16,8 @@ const MANAGED = "This route follows FamilyFi's own tunnel. Change it from Remote
 
 export async function PUT(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = Body.safeParse(body.value);
@@ -24,7 +26,6 @@ export async function PUT(request: Request, context: Ctx) {
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");
     if (isManagedRoute(current)) return jsonError(409, "managed_route", MANAGED);
-    if (isDemoRoute(current)) return jsonError(409, "managed_route", DEMO_ROUTE_FIXED);
     const { edgeAuth, serviceToken, ...changes } = parsed.data;
     const trustMode = changes.trustMode ?? current.trustMode;
     const transport = changes.transport ?? current.transport;
@@ -58,11 +59,12 @@ export async function PUT(request: Request, context: Ctx) {
 
 export async function DELETE(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const { id } = await context.params;
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");
     if (isManagedRoute(current)) return jsonError(409, "managed_route", MANAGED);
-    if (isDemoRoute(current)) return jsonError(409, "managed_route", DEMO_ROUTE_FIXED);
     if (await hasPendingPairing(id)) {
       return jsonError(409, "endpoint_in_use", "A pairing code for this route is still active. Cancel it or wait for it to expire.");
     }

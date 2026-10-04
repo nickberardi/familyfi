@@ -72,7 +72,7 @@ describe("demo mode boot on PGlite", () => {
     await ensureDemoRoute("https://demo.familyfi.test");
     await ensureDemoRoute("https://demo.familyfi.test");
     const routes = await prisma().connectionEndpoint.findMany();
-    expect(routes).toEqual([expect.objectContaining({ url: "https://demo.familyfi.test", kind: "own", transport: "cloudflare", trustMode: "system", enabled: true, edgeAuth: "none" })]);
+    expect(routes).toEqual([expect.objectContaining({ url: "https://demo.familyfi.test", kind: "own", transport: "lan", trustMode: "system", enabled: true, edgeAuth: "none" })]);
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     expect(household.remoteEndpointId).toBe(routes[0].id);
     await expect(ensureDemoRoute("http://demo.familyfi.test")).rejects.toThrow(/HTTPS/);

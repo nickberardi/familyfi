@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEMO_DATABASE, buildDatabaseUrl } from "@/server/database-url";
 import { ConfigurationError, demoModeEnabled, loadEnv, unifiMockEnabled } from "@/server/env";
-import { isDemoRoute, nextDemoResetAt } from "@/server/demo";
-import { RemoteAccessError, setRemoteAccess } from "@/server/tunnel/remote-access";
+import { demoLocked, nextDemoResetAt } from "@/server/demo";
 import { findCloudflared } from "@/server/tunnel/cloudflared";
 import { envIssues as runtimeEnvIssues } from "../../scripts/runtime/env-issues.mjs";
 import {
@@ -51,28 +50,19 @@ describe("demo mode switch", () => {
   });
 });
 
-describe("demo mode remote access", () => {
+describe("demo mode lock", () => {
   const previous = process.env.FAMILYFI_DEMO;
   afterEach(() => {
     if (previous === undefined) delete process.env.FAMILYFI_DEMO;
     else process.env.FAMILYFI_DEMO = previous;
   });
 
-  it("refuses every Remote access change, so no visitor can unpublish the demo's route", async () => {
+  it("refuses configuration writes only in demo mode", async () => {
+    expect(demoLocked()).toBeNull();
     process.env.FAMILYFI_DEMO = "1";
-    for (const change of [{ mode: "off" }, { mode: "quick" }, { mode: "named", hostname: "familyfi.example.com" }] as const) {
-      await expect(setRemoteAccess(change)).rejects.toBeInstanceOf(RemoteAccessError);
-    }
-  });
-
-  it("names the demo's own route only while demo mode is on", () => {
-    const route = { url: "https://demo.familyfi.test" };
-    expect(isDemoRoute(route, "https://demo.familyfi.test")).toBe(false);
-    process.env.FAMILYFI_DEMO = "1";
-    expect(isDemoRoute(route, "https://demo.familyfi.test/")).toBe(true);
-    expect(isDemoRoute({ url: "https://home.example.com" }, "https://demo.familyfi.test")).toBe(false);
-    expect(isDemoRoute(route, "not a url")).toBe(false);
-    expect(isDemoRoute(route, undefined)).toBe(false);
+    const locked = demoLocked();
+    expect(locked?.status).toBe(403);
+    expect(await locked?.json()).toMatchObject({ error: { code: "demo_locked" } });
   });
 
   it("never finds cloudflared, so no tunnel opens from the demo host", () => {

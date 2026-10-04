@@ -6,6 +6,7 @@ import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
+import { demoLocked } from "@/server/demo";
 
 const Create = z.object({
   username: z.string().min(2),
@@ -24,6 +25,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = Create.safeParse(body.value);

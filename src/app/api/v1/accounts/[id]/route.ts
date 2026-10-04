@@ -7,6 +7,7 @@ import { removeAccountDevices } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
+import { demoLocked } from "@/server/demo";
 
 const Update = z.object({
   displayName: z.string().min(1).optional(),
@@ -27,6 +28,8 @@ export async function GET(request: Request, ctx: Ctx) {
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const { id } = await ctx.params;
     const body = await readJson(request);
     if (!body.ok) return body.response;
@@ -70,6 +73,8 @@ export async function PUT(request: Request, ctx: Ctx) {
 
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const { id } = await ctx.params;
     const existing = await prisma().account.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Account not found.");

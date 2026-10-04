@@ -11,7 +11,7 @@ export type DatabaseSettings = {
 /**
  * The in-memory PGlite database demo mode runs on, served on loopback by `scripts/runtime/demo.mjs`
  * (which keeps its own copy, `DEMO_DATABASE` in `print-database-url.mjs`). Not configurable: demo
- * mode never reaches another database. PGlite's socket server does not answer TLS negotiation.
+ * mode never reaches another database. Loopback only, so no TLS (`pglite-server.mjs` offers none).
  */
 export const DEMO_DATABASE = {
   DB_HOST: "127.0.0.1",
