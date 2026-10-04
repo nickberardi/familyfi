@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   bedtimeEndDays,
   cardNoteLine,
@@ -6,6 +6,7 @@ import {
   daysLabel,
   deviceKindLabel,
   deviceIcon,
+  formatClock,
   formatHhmm,
   nextClockOnDays,
   windowTimes,
@@ -109,4 +110,23 @@ describe("device marks", () => {
     expect(deviceIcon("Unknown")).toBe("question");
     expect(deviceIcon(null)).toBe("question");
   });
+});
+
+describe("clock times", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // Hermes, and some ICU versions, put a narrow no-break space (U+202F) or a no-break space
+  // (U+00A0) before AM/PM; every client must still produce the plain space the display vectors pin.
+  it.each([["narrow no-break space", "\u202f"], ["no-break space", "\u00a0"]])(
+    "separates the time from AM/PM with a plain space when the runtime gives a %s",
+    (_name, space) => {
+      class RuntimeFormat extends Intl.DateTimeFormat {
+        override format = () => `3:00${space}PM`;
+      }
+      vi.stubGlobal("Intl", Object.assign(Object.create(Intl), { DateTimeFormat: RuntimeFormat }));
+      const clock = formatClock(new Date("2026-09-28T15:00:00-04:00"), TZ);
+      expect(clock).toBe("3:00 PM");
+      expect(clock).toMatch(/^[\x20-\x7e]+$/);
+    },
+  );
 });
