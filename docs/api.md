@@ -208,7 +208,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | `agent:readOnly` | Household reads |
 
 No other pair is valid. A phone always pairs as `full` and a Watch enrolls as `rulesOnly`; an
-adult chooses an agent's scope when connecting it.
+administrator chooses an agent's scope when connecting it.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity
