@@ -3,6 +3,9 @@ name: Container
 # Pull requests, not pushes to main: the image build is slow, and a merged PR
 # already passed it. It also gates every release (see release.yml).
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
   workflow_call:
 
