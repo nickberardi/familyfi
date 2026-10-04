@@ -73,7 +73,7 @@ describe("UNIFI_MOCK", () => {
     const again = clientForHousehold(stubHousehold());
     const policies = await again.listPolicies("11111111-1111-4111-8111-111111111111");
     expect(policies.some((policy) => policy.id === created.id)).toBe(true);
-    expect(getSharedDevMockClient().state.clients.some((client) => client.name === "Kids iPad")).toBe(true);
+    expect(getSharedDevMockClient().state.clients.some((client) => client.name === "Cassie's iPad")).toBe(true);
   });
 
   it("uses HttpUnifiClient when the flag is off", () => {
