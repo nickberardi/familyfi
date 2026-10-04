@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { SessionKind } from "@prisma/client";
+import { AccountKind, SessionKind } from "@prisma/client";
 import { ACCESS_TOKEN_TTL_MS, REFRESH_REUSE_GRACE_MS, REFRESH_TOKEN_TTL_MS } from "@/lib/constants";
-import { createSession, revokeAccountSessions } from "@/server/auth";
+import { createSession, hashPassword, revokeAccountSessions } from "@/server/auth";
 import { sha256 } from "@/server/crypto";
 import { prisma } from "@/server/db";
 import { tunnelHeaders } from "@/server/tunnel/phone-gateway";
@@ -195,5 +195,13 @@ describe("refresh tokens for paired devices", () => {
     const listed = devices.find((device) => device.id === pair.deviceId)!;
     expect(listed.sessions).toHaveLength(1);
     expect(listed.sessions[0].expiresAt).toBe(pair.refreshExpiresAt);
+  });
+
+  it("refuses to renew a device whose adult is no longer an administrator", async () => {
+    const adult = await prisma().account.create({ data: { username: "sam", displayName: "Sam", kind: AccountKind.personal, isAdmin: true, passwordHash: await hashPassword("sam-password-1") } });
+    const claim = await pairPhone(await adminAuth(), { accountId: adult.id });
+    await prisma().account.update({ where: { id: adult.id }, data: { isAdmin: false } });
+    expect(await errorCode(await refreshWith(claim.refreshToken))).toBe("invalid_refresh");
+    expect(await signedIn(claim.token)).toBe(false);
   });
 });

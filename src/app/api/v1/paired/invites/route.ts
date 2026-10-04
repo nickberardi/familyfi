@@ -1,7 +1,8 @@
-import { AccountKind, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { PairedDeviceClient, SessionKind } from "@prisma/client";
 import { z } from "zod";
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { requestOrigin } from "@/server/auth";
+import { isAdministratorAccount } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { readJson, withAdmin, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
     const account = await prisma().account.findUnique({ where: { id: accountId } });
     if (!account) return jsonError(404, "not_found", "The account to sign the phone in as no longer exists.");
     // Only administrators have paired phones: a phone controls the household and its agents.
-    if (account.kind !== AccountKind.recovery && !account.isAdmin) {
+    if (!isAdministratorAccount(account)) {
       return jsonError(400, "administrator_account_required", "A phone signs in only as an administrator.");
     }
     // Only a phone is re-paired as a phone: a Watch or agent is never replaced, and so never removed, this way.

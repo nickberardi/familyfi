@@ -1,5 +1,5 @@
 import { ConnectionTrustMode, DeviceScope, PairedDeviceClient, SessionKind, type Account, type Pairing } from "@prisma/client";
-import { bearerSessionData, toPublicSession } from "./auth";
+import { bearerSessionData, isAdministratorAccount, toPublicSession } from "./auth";
 import { ensureConnectionIdentity, instanceFingerprint, publicEndpoint, removeDevice, signedEndpointManifest } from "./connection";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -157,7 +157,8 @@ export async function claimInvite(input: { id: string; token: string; displayNam
   if (!invite || invite.client === PairedDeviceClient.watch || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
   if (invite.client === PairedDeviceClient.phone && !invite.endpoint) return null;
   const account = invite.account;
-  if (!account) return null;
+  // Only administrators have paired devices: an invite for an adult who has since lost that is void.
+  if (!account || !isAdministratorAccount(account)) return null;
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });

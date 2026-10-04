@@ -165,13 +165,11 @@ describe("companion admin surface", () => {
     expect(write.status).toBe(403);
   });
 
-  it("refuses a personal account that is not an admin", async () => {
+  it("refuses a personal account that is not an admin: it cannot sign in at all", async () => {
     await prisma().account.create({ data: { username: "sam", displayName: "Sam", kind: AccountKind.personal, isAdmin: false, passwordHash: await hashPassword("sam-password-1") } });
     const response = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "sam", password: "sam-password-1", client: "browser" }) }));
-    const sam = authFromLogin(response);
-    const denied = await listEndpoints(request("/api/v1/connection/endpoints", { auth: sam }));
-    expect(denied.status).toBe(403);
-    expect(((await denied.json()) as { error: { code: string } }).error.code).toBe("administrator_required");
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as { error: { code: string } }).error.code).toBe("administrator_account_required");
   });
 
   it("rejects a duplicate address with a clean 409", async () => {

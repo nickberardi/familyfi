@@ -27,7 +27,8 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
 
 /**
  * - `anonymous`: no session, on the home network.
- * - `member`: a personal adult account without administrator access.
+ * - `member`: a personal adult account without administrator access. Only administrators use FamilyFi,
+ *   so its session (made directly; it cannot sign in) is refused wherever one is needed.
  * - `administrator`: a personal adult account with administrator access.
  * - `recovery`: the recovery `admin` account.
  * - `tunnel`: an administrator's browser, signed in, reaching the app through remote
@@ -48,7 +49,7 @@ type Outcome = "allowed" | "401" | "403";
  * - `public`: anyone, including over the tunnel.
  * - `home-network`: anyone on the home network; refused over the tunnel without a
  *   paired phone (sign-in).
- * - `session`: any signed-in account.
+ * - `session`: any signed-in account, which is always an administrator's (only administrators sign in).
  * - `administrator`: a signed-in administrator or the recovery account.
  * - `csrf`: needs the CSRF cookie and header but no session (sign-out).
  * - `pairing-token`: the single-use pairing token is the credential; no session helps
@@ -67,8 +68,8 @@ function isDevice(caller: Caller): caller is Device {
 const EXPECTED: Record<Access, Record<Person, Outcome>> = {
   public: { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "allowed" },
   "home-network": { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
-  session: { anonymous: "401", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "401" },
-  administrator: { anonymous: "401", member: "403", administrator: "allowed", recovery: "allowed", tunnel: "401" },
+  session: { anonymous: "401", member: "401", administrator: "allowed", recovery: "allowed", tunnel: "401" },
+  administrator: { anonymous: "401", member: "401", administrator: "allowed", recovery: "allowed", tunnel: "401" },
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
   "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
@@ -104,11 +105,11 @@ const CONTROLLERS: readonly Device[] = ["agent:full"];
 const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly"];
 
 /**
- * Administrator is a flag, not a tier: it gates paired devices and remote access
- * (`/api/v1/paired/*`, `/api/v1/connection/*`) and nothing else. A phone's `?claim=true` invite
- * for its Watch is checked inside `POST /paired/invites` (paired-invites.test.ts), not here. Every adult with a login is trusted with
- * the household, so accounts, household settings and the UniFi connection are `session`,
- * a member can grant themselves administrator, and that is intended.
+ * Only administrators use FamilyFi: an adult without administrator access has no sign-in, session
+ * or paired device (auth-api.test.ts), so `session` and `administrator` admit the same people. The
+ * split remains for paired devices and the tunnel: `administrator` also refuses every non-phone
+ * device. A phone's `?claim=true` invite for its Watch is checked inside `POST /paired/invites`
+ * (paired-invites.test.ts), not here.
  */
 
 const ACCESS: Record<string, Entry> = {
