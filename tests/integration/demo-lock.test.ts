@@ -5,6 +5,7 @@ import { DELETE as deleteAccount, PUT as updateAccount } from "@/app/api/v1/acco
 import { PUT as setPassword } from "@/app/api/v1/accounts/[id]/password/route";
 import { POST as createEndpoint } from "@/app/api/v1/connection/endpoints/route";
 import { DELETE as deleteEndpoint, PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
+import { POST as computePin } from "@/app/api/v1/connection/pins/route";
 import { PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { POST as createGroup } from "@/app/api/v1/groups/route";
 import { DELETE as clearGroupResolver, PUT as setGroupResolver } from "@/app/api/v1/groups/[id]/resolver/route";
@@ -75,6 +76,7 @@ describe("demo mode", () => {
       await createEndpoint(write(auth, "/api/v1/connection/endpoints", "POST", { url: "https://elsewhere.example.com", transport: "lan", trustMode: "system" })),
       await updateEndpoint(write(auth, `/api/v1/connection/endpoints/${route.id}`, "PUT", { url: "https://elsewhere.example.com" }), params({ id: route.id })),
       await deleteEndpoint(write(auth, `/api/v1/connection/endpoints/${route.id}`, "DELETE"), params({ id: route.id })),
+      await computePin(write(auth, "/api/v1/connection/pins", "POST", { url: "https://192.0.2.10:8443" })),
       await setTunnel(write(auth, "/api/v1/connection/tunnel", "PUT", { mode: "quick" })),
     ];
     for (const response of responses) {

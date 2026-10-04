@@ -7,6 +7,9 @@
  * error inside a transaction (a unique violation, say) PGlite's answers to the rest of that request
  * then reach the client out of step, so every later query on the connection reads the wrong result.
  * Here a request is everything up to its Sync, simple Query or Flush, and PGlite gets it whole.
+ *
+ * Unlike PostgreSQL, a query from another connection waits while a transaction is open, so code that
+ * queried outside its own interactive transaction would wait for Prisma's transaction timeout here.
  */
 import net from "node:net";
 
@@ -49,7 +52,8 @@ export function servePGlite(db, { host, port }) {
         } catch (error) {
           // PGlite answers SQL errors in the protocol; a throw means this connection's session is unusable.
           console.error("demo database:", error);
-          socket.destroy();
+          owner = db.isInTransaction() ? socket : null;
+          socket.destroy(); // its close rolls back any transaction it left open
         }
       }
     } finally {
@@ -85,6 +89,10 @@ export function servePGlite(db, { host, port }) {
           // Startup-phase messages carry no type byte: a length, then a code or protocol version.
           if (buffer.length < 8) return;
           const length = buffer.readUInt32BE(0);
+          if (length < 8) {
+            socket.destroy();
+            return;
+          }
           if (buffer.length < length) return;
           const message = buffer.subarray(0, length);
           buffer = buffer.subarray(length);
@@ -103,6 +111,10 @@ export function servePGlite(db, { host, port }) {
         }
         if (buffer.length < 5) return;
         const length = buffer.readUInt32BE(1) + 1;
+        if (length < 5) {
+          socket.destroy();
+          return;
+        }
         if (buffer.length < length) return;
         const message = buffer.subarray(0, length);
         buffer = buffer.subarray(length);

@@ -23,7 +23,7 @@ complete UI parity, all API semantics or live gateway enforcement.
 A server in [demo mode](operations.md#demo-mode) refuses configuration writes with 403
 `demo_locked`: `PUT /settings/household`, `PUT /settings/unifi`, account and password writes,
 `PUT`/`DELETE` on `/upstream/resolver` and `/groups/{id}/resolver`, route writes under
-`/connection/endpoints` and `PUT /connection/tunnel`. Clients show the message; the household
+`/connection/endpoints`, `POST /connection/pins` and `PUT /connection/tunnel`. Clients show the message; the household
 itself (groups, rules, pauses, devices) and pairing are unchanged.
 
 For a change to either shared artifact:

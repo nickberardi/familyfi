@@ -21,9 +21,10 @@ export function nextDemoResetAt(now: Date, timezone: string): Date {
 
 /**
  * Exits at the next reset time. The container platform restarts the process, and the new one
- * starts on an empty database. `exit` is injectable for tests.
+ * starts on an empty database. Non-zero, so a restart policy of on-failure restarts it too.
+ * `exit` is injectable for tests.
  */
-export async function startDemoReset(now = new Date(), exit: () => void = () => process.exit(0)): Promise<Date> {
+export async function startDemoReset(now = new Date(), exit: () => void = () => process.exit(1)): Promise<Date> {
   const { timezone } = await prisma().household.findUniqueOrThrow({ where: { id: "default" }, select: { timezone: true } });
   const at = nextDemoResetAt(now, timezone);
   setTimeout(() => {

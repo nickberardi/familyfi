@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
+import { demoLocked } from "@/server/demo";
 import { ProbeError, pinFromCertificate, probeCertificate } from "@/server/spki";
 
 const Body = z.union([z.object({ url: z.string().min(1) }).strict(), z.object({ certificate: z.string().min(1).max(20_000) }).strict()]);
@@ -8,6 +9,9 @@ const Body = z.union([z.object({ url: z.string().min(1) }).strict(), z.object({ 
 /** Computes the SPKI pin for a pinned LAN route, from the live address or a pasted certificate. */
 export async function POST(request: Request) {
   return withAdmin(request, async () => {
+    // Routes are locked in the demo, and a probe would reach any address from the demo's host.
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = Body.safeParse(body.value);
