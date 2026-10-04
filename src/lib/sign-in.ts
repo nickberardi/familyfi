@@ -1,7 +1,6 @@
 /**
- * Signing in, as every client words it. The web posts `client: "browser"` and gets a cookie; a
- * paired phone posts `client: "native"` with its device credential and gets a bearer token
- * (`POST /api/v1/auth/login`). The outcomes read the same on both.
+ * Signing in, as the web words it: it posts `client: "browser"` to `POST /api/v1/auth/login` and gets
+ * a cookie. Paired devices never sign in here; they join by invite (`/paired/invites`).
  */
 export const SIGN_IN_UNREACHABLE = "Could not reach FamilyFi.";
 export const SIGN_IN_UNREADABLE = "FamilyFi could not complete sign-in. Check the server log.";

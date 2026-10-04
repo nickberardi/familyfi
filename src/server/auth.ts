@@ -168,7 +168,9 @@ export async function authenticate(usernameRaw: string, password: string, ip: st
     valid = await verifyPassword(account.passwordHash, password);
   }
 
-  await recordAttempt({ username, ip, success: valid, accountId: account?.id });
+  // A non-administrator's right password still counts as a failure, so the refusal below cannot be
+  // used to test passwords past the throttle.
+  await recordAttempt({ username, ip, success: valid && isAdministratorAccount(account), accountId: account?.id });
   if (!valid || !account) {
     return { ok: false as const, status: 401 as const, code: "invalid_credentials", message: "Invalid username or password." };
   }

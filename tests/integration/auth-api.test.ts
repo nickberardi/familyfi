@@ -259,6 +259,8 @@ describe("auth and accounts API", () => {
     expect(refused.response.status).toBe(403);
     expect(((await refused.response.json()) as { error: { code: string } }).error.code).toBe("administrator_account_required");
     expect(refused.auth).toBeNull();
+    // The right password still counts as a failed attempt, so the refusal cannot test passwords past the throttle.
+    expect((await prisma().loginAttempt.findFirstOrThrow({ where: { username: "sam" } })).success).toBe(false);
 
     await prisma().account.update({ where: { id: adult.id }, data: { isAdmin: true } });
     const { auth: sam } = await browserLogin("sam", "sam-password-1");
