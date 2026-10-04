@@ -5,7 +5,7 @@ import { prisma } from "./db";
 import { env } from "./env";
 import { normalizeMac } from "./mac";
 import { macRegistrants } from "./mac-vendor";
-import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/spike";
+import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
 import { withPolicyOwnership } from "./unifi/policy-ownership";
 import { UnifiHttpError } from "./unifi/errors";

@@ -28,7 +28,8 @@ services:
       HOSTNAME: 0.0.0.0
       DB_MODE: bundled
       DB_HOST: db
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      # PostgreSQL's port inside the Compose network; POSTGRES_PORT only picks the host's published port.
+      POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-familyfi}
       POSTGRES_USER: ${POSTGRES_USER:-familyfi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}

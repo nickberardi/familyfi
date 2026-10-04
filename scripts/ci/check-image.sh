@@ -19,8 +19,8 @@ if ! grep -q 'openapi/familyfi.v1.yaml' "$tmp/files"; then
   exit 1
 fi
 
-if grep -E '^/?app/scripts/(ci|spike)/' "$tmp/files"; then
-  echo "image contains CI or spike scripts; only scripts/runtime/ belongs in it" >&2
+if grep -E '^/?app/scripts/ci/' "$tmp/files"; then
+  echo "image contains CI scripts; only scripts/runtime/ belongs in it" >&2
   exit 1
 fi
 

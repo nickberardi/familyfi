@@ -171,7 +171,7 @@ export class MockUnifiClient implements UnifiClient {
 
   async getPolicyOrdering(siteId: string, sourceFirewallZoneId?: string): Promise<PolicyOrdering> {
     this.record("GET", `/v1/sites/${siteId}/firewall/policies/ordering`);
-    // The live console refuses an ordering read without a source zone (see spike.ts).
+    // The live console refuses an ordering read without a source zone.
     if (!sourceFirewallZoneId) {
       throw new UnifiHttpError(400, "GET", `/v1/sites/${siteId}/firewall/policies/ordering`, "sourceFirewallZoneId is required");
     }

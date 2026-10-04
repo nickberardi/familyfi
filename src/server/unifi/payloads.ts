@@ -1,13 +1,7 @@
 import { normalizeMac } from "../mac";
-import { FAMILYFI_POLICY_PREFIX, type FirewallPolicy, type FirewallPolicyWrite, type UnifiFirewallSchedule } from "./types";
+import type { FirewallPolicy, FirewallPolicyWrite, UnifiFirewallSchedule } from "./types";
 
 export const INTERNET_BLOCK_ACTION = "BLOCK" as const;
-
-export function isOwnedPolicyName(name: string): boolean {
-  return name.startsWith(FAMILYFI_POLICY_PREFIX);
-}
-
-export { spikePolicyName } from "./names";
 
 export function toPolicyUpdate(policy: FirewallPolicy, patch: Partial<FirewallPolicyWrite> = {}): FirewallPolicyWrite {
   return {

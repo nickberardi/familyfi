@@ -1,5 +1,5 @@
 {
-  "name": "FamilyFi Spike Internal Devices",
+  "name": "FamilyFi Quarantine Internal Devices",
   "description": "FamilyFi managed internet block.",
   "enabled": true,
   "loggingEnabled": false,

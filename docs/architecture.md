@@ -143,6 +143,8 @@ then read its callers and focused tests. Native feature details belong in its ow
 | Sync | Reconciliation history and per-change outcomes | [reconciliation](../src/server/reconciliation.ts), [changes](../src/server/changes.ts), [reconciliation path tests](../tests/integration/reconcile-paths.test.ts) |
 | Pair Device | Companion pairing and remote connection management | [pairing](../src/server/pairing.ts), [paired devices](../src/server/paired-devices.ts), [connection](../src/server/connection.ts), [remote access](../src/server/tunnel/remote-access.ts), the companion client shared with phones ([pairing code](../src/lib/pairing-code.ts), [trust](../src/lib/companion-trust.ts), [requests](../src/lib/companion-request.ts), [pairing](../src/lib/companion-pairing.ts), [session](../src/lib/companion-session.ts), [connection hops and offline policy](../src/lib/connection-hops.ts), [Watch setup](../src/lib/watch.ts)), [pairing browser tests](../tests/browser/pair.spec.ts), [companion tests](../tests/unit/companion-pairing.test.ts) |
 | AI agents | Connect an agent from the API page: a prompt with an agent pairing code, the `/agents.md` guide, and the scope that bounds every paired device | [device scopes](../src/server/device-scope.ts), [connection](../src/server/connection.ts), [guide](../openapi/agent-guide.md), [agent tests](../tests/integration/agent-pairing.test.ts), [API docs](api.md#agents) |
+| Modes and the in-memory database | `FAMILYFI_MODE` (`prod`, `dev`, `test`, `demo`) picks the gateway, database, data and lock; `DB_MODE=memory` and demo run on in-memory PGlite | [env](../src/server/env.ts) and its [startup copy](../scripts/runtime/mode.mjs), [launcher](../scripts/runtime/memory-database.mjs) and its [database server](../scripts/runtime/pglite-server.mjs), [mode tests](../tests/unit/familyfi-mode.test.ts), [setup](setup.md#modes) |
+| Demo mode | The hosted public demo (`FAMILYFI_MODE=demo`): the seed household in memory, its public route, the locked configuration, the banner and the nightly reset | [demo](../src/server/demo.ts), [lock tests](../tests/integration/demo-lock.test.ts), [operations](operations.md#demo-mode), [boot test](../tests/unit/demo-boot.test.ts) |
 | API reference | Authenticated interactive HTTP documentation | [OpenAPI](../openapi/familyfi.v1.yaml), [contract validation](testing.md) |
 
 ## Desired internet block
@@ -219,7 +221,7 @@ Every curated slot also has a domain list of the same slug behind it in
 `src/lib/upstream-domains.ts`, which is what lets its mark report a DNS verdict when no
 policy is blocking; a unit test holds that pairing.
 
-Mocks and fixtures do not prove enforcement. `UNIFI_MOCK=1` routes Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; it is ignored in production. The spike CLI (`scripts/spike`) is for live gateway experiments; see [spike/OPERATOR.md](spike/OPERATOR.md).
+Mocks and fixtures do not prove enforcement. `FAMILYFI_MODE` `dev`, `test` and `demo` route Settings and reconciliation through `MockUnifiClient` plus a dummy household seed so the UI can be exercised without a console; production starts only `prod` and `demo` ([modes](setup.md#modes)).
 
 ## Upstream DNS categories
 
@@ -249,7 +251,7 @@ would outlive the strike-through it sits beside.
 `src/lib/upstream-domains.ts` is a **seed, not runtime data**. The probe reads the
 database. `ensureUpstreamCategories()` runs at every boot beside
 `ensureRecoveryAccount()` — the only place a real deployment creates app-owned rows,
-since `dev-seed` is `UNIFI_MOCK` only and a migration cannot import the seed module.
+since `dev-seed` runs only with the UniFi mock and a migration cannot import the seed module.
 Running every boot is what carries a release's new canaries into an existing household.
 A category's label and monogram follow the seed; domain membership does not. A seeded
 domain the household removed keeps its `removedAt` and is shown struck through, so the

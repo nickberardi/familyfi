@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buildDatabaseUrl } from "./database-url";
+import { buildDatabaseUrl, memoryDatabase } from "./database-url";
 
 export class ConfigurationError extends Error {
   readonly issues: string[];
@@ -16,7 +16,7 @@ const EnvSchema = z.object({
   FAMILYFI_DEFAULT_PASSWORD: z.string().min(12),
   FAMILYFI_SESSION_SECRET: z.string().min(32),
   FAMILYFI_ENCRYPTION_KEY: z.string().min(1),
-  DB_MODE: z.enum(["bundled", "external"]).default("bundled"),
+  DB_MODE: z.enum(["bundled", "external", "memory"]).default("bundled"),
   DB_HOST: z.string().default("127.0.0.1"),
   POSTGRES_PORT: z.string().default("5432"),
   POSTGRES_DB: z.string().default("familyfi"),
@@ -26,7 +26,22 @@ const EnvSchema = z.object({
   DB_SSL_ROOT_CERT: z.string().optional(),
 });
 
-export type AppEnv = z.infer<typeof EnvSchema> & { DATABASE_URL: string; UNIFI_MOCK: boolean };
+export type AppEnv = z.infer<typeof EnvSchema> & { DATABASE_URL: string; FAMILYFI_MODE: FamilyFiMode };
+
+/**
+ * The kind of work this process does, picked by `FAMILYFI_MODE`. Each mode fixes the gateway (real
+ * or the UniFi mock), the database (PostgreSQL, or in memory), the starting data and whether
+ * configuration is locked:
+ *
+ * - `prod`: a household's real gateway on PostgreSQL. The default.
+ * - `dev`: the UniFi mock and the seed household, for local work. PostgreSQL, or in memory with `DB_MODE=memory`.
+ * - `test`: as `dev`, for automated runs, including a production build under CI.
+ * - `demo`: the hosted public demo. The mock and the seed on an in-memory database, reset nightly, configuration locked.
+ *
+ * Under `NODE_ENV=production` only `prod` and `demo` start (and `test` under CI); `modeIssues` refuses the rest.
+ */
+export const FAMILYFI_MODES = ["dev", "test", "demo", "prod"] as const;
+export type FamilyFiMode = (typeof FAMILYFI_MODES)[number];
 
 function truthyFlag(value: string | undefined): boolean {
   if (!value) return false;
@@ -34,19 +49,61 @@ function truthyFlag(value: string | undefined): boolean {
   return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
-/** True when UNIFI_MOCK is 1/true/yes, ignoring NODE_ENV. */
-export function unifiMockRequested(source: Record<string, string | undefined> = process.env): boolean {
-  return truthyFlag(read(source, "UNIFI_MOCK"));
+function isMode(value: string | undefined): value is FamilyFiMode {
+  return (FAMILYFI_MODES as readonly string[]).includes(value ?? "");
 }
 
-/** Opt-in UniFi stand-in for local UI work. Never enabled in production unless CI opts in. */
-export function unifiMockEnabled(source: Record<string, string | undefined> = process.env): boolean {
-  if (source.NODE_ENV === "production") {
-    // `next start` forces production; browser CI still needs the mock household.
-    if (!(truthyFlag(read(source, "CI")) && unifiMockRequested(source))) return false;
-    return true;
+/** `UNIFI_MOCK` was the switch before `FAMILYFI_MODE`. It is no longer read; startup says so when it is set. */
+export function unifiMockWarning(source: Record<string, string | undefined> = process.env): string | undefined {
+  return read(source, "UNIFI_MOCK") ? "UNIFI_MOCK is no longer read; set FAMILYFI_MODE=dev instead." : undefined;
+}
+
+function modeRefusal(source: Record<string, string | undefined>): string | undefined {
+  const value = read(source, "FAMILYFI_MODE")?.toLowerCase();
+  if (value && !isMode(value)) return "FAMILYFI_MODE must be dev, test, demo or prod.";
+  if (source.NODE_ENV !== "production") return undefined;
+  if (value === "dev") return "FAMILYFI_MODE=dev is not allowed in production; use prod or demo.";
+  // `next start` forces production, and browser CI runs the production build in test mode.
+  if (value === "test" && !truthyFlag(read(source, "CI"))) {
+    return "FAMILYFI_MODE=test runs in production only under CI; use prod or demo.";
   }
-  return unifiMockRequested(source);
+  return undefined;
+}
+
+/**
+ * The mode in effect. A mode that `modeIssues` refuses reads as `prod`, so a misconfigured process
+ * never runs the mock or the seed: startup reports the issue instead.
+ */
+export function familyfiMode(source: Record<string, string | undefined> = process.env): FamilyFiMode {
+  if (modeRefusal(source)) return "prod";
+  const value = read(source, "FAMILYFI_MODE")?.toLowerCase();
+  return isMode(value) ? value : "prod";
+}
+
+export function modeIssues(source: Record<string, string | undefined> = process.env): string[] {
+  const issues: string[] = [];
+  const refusal = modeRefusal(source);
+  if (refusal) issues.push(refusal);
+  if (read(source, "DB_MODE") === "memory" && familyfiMode(source) === "prod") {
+    issues.push("DB_MODE=memory is for dev, test and demo; prod keeps its household in PostgreSQL.");
+  }
+  return issues;
+}
+
+/** The hosted public demo (`FAMILYFI_MODE=demo`). */
+export function demoModeEnabled(source: Record<string, string | undefined> = process.env): boolean {
+  return familyfiMode(source) === "demo";
+}
+
+/** The UniFi mock stands in for the gateway in every mode but `prod`. */
+export function unifiMockEnabled(source: Record<string, string | undefined> = process.env): boolean {
+  return familyfiMode(source) !== "prod";
+}
+
+/** In memory in demo, and in dev or test with `DB_MODE=memory`; never in prod. */
+export function inMemoryDatabase(source: Record<string, string | undefined> = process.env): boolean {
+  const mode = familyfiMode(source);
+  return mode === "demo" || (mode !== "prod" && read(source, "DB_MODE") === "memory");
 }
 
 let cached: AppEnv | undefined;
@@ -56,7 +113,7 @@ const ISSUE_BY_FIELD: Record<string, string> = {
   FAMILYFI_SESSION_SECRET: "FAMILYFI_SESSION_SECRET must be at least 32 characters.",
   FAMILYFI_ENCRYPTION_KEY: "FAMILYFI_ENCRYPTION_KEY must be 32 bytes as 64 hex characters (or base64).",
   POSTGRES_PASSWORD: "POSTGRES_PASSWORD must be set.",
-  DB_MODE: "DB_MODE must be bundled or external.",
+  DB_MODE: "DB_MODE must be bundled, external or memory.",
 };
 
 function read(source: Record<string, string | undefined>, key: string): string | undefined {
@@ -71,8 +128,9 @@ function parseEncryptionKey(value: string): Buffer {
   throw new ConfigurationError([ISSUE_BY_FIELD.FAMILYFI_ENCRYPTION_KEY]);
 }
 
-export function envIssues(source: Record<string, string | undefined> = process.env): string[] {
-  const parsed = EnvSchema.safeParse({
+/** The settings as read, with the in-memory database in place of any configured one when it is in use. */
+function settingsFrom(source: Record<string, string | undefined>) {
+  const settings = {
     NODE_ENV: source.NODE_ENV,
     FAMILYFI_DEFAULT_PASSWORD: read(source, "FAMILYFI_DEFAULT_PASSWORD"),
     FAMILYFI_SESSION_SECRET: read(source, "FAMILYFI_SESSION_SECRET"),
@@ -85,7 +143,13 @@ export function envIssues(source: Record<string, string | undefined> = process.e
     POSTGRES_PASSWORD: read(source, "POSTGRES_PASSWORD"),
     DB_SSL_MODE: read(source, "DB_SSL_MODE"),
     DB_SSL_ROOT_CERT: read(source, "DB_SSL_ROOT_CERT"),
-  });
+  };
+  if (!inMemoryDatabase(source)) return settings;
+  return { ...settings, DB_MODE: "memory", DB_SSL_ROOT_CERT: undefined, ...memoryDatabase(settings.POSTGRES_PORT) };
+}
+
+export function envIssues(source: Record<string, string | undefined> = process.env): string[] {
+  const parsed = EnvSchema.safeParse(settingsFrom(source));
   const issues: string[] = [];
   const seen = new Set<string>();
   const add = (message: string) => {
@@ -94,6 +158,7 @@ export function envIssues(source: Record<string, string | undefined> = process.e
       issues.push(message);
     }
   };
+  modeIssues(source).forEach(add);
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
       const field = String(issue.path[0] ?? "");
@@ -112,24 +177,12 @@ export function envIssues(source: Record<string, string | undefined> = process.e
 export function loadEnv(source: Record<string, string | undefined> = process.env): AppEnv {
   const issues = envIssues(source);
   if (issues.length) throw new ConfigurationError(issues);
-  const parsed = EnvSchema.parse({
-    NODE_ENV: source.NODE_ENV,
-    FAMILYFI_DEFAULT_PASSWORD: read(source, "FAMILYFI_DEFAULT_PASSWORD"),
-    FAMILYFI_SESSION_SECRET: read(source, "FAMILYFI_SESSION_SECRET"),
-    FAMILYFI_ENCRYPTION_KEY: read(source, "FAMILYFI_ENCRYPTION_KEY"),
-    DB_MODE: read(source, "DB_MODE") || "bundled",
-    DB_HOST: read(source, "DB_HOST"),
-    POSTGRES_PORT: read(source, "POSTGRES_PORT"),
-    POSTGRES_DB: read(source, "POSTGRES_DB"),
-    POSTGRES_USER: read(source, "POSTGRES_USER"),
-    POSTGRES_PASSWORD: read(source, "POSTGRES_PASSWORD"),
-    DB_SSL_MODE: read(source, "DB_SSL_MODE"),
-    DB_SSL_ROOT_CERT: read(source, "DB_SSL_ROOT_CERT"),
-  });
+  const parsed = EnvSchema.parse(settingsFrom(source));
   parseEncryptionKey(parsed.FAMILYFI_ENCRYPTION_KEY);
   const DATABASE_URL = buildDatabaseUrl(parsed);
   source.DATABASE_URL = DATABASE_URL;
-  return { ...parsed, DATABASE_URL, UNIFI_MOCK: unifiMockEnabled(source) };
+  const FAMILYFI_MODE = familyfiMode(source);
+  return { ...parsed, DATABASE_URL, FAMILYFI_MODE };
 }
 
 export function env(): AppEnv {

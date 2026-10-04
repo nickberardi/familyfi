@@ -2,6 +2,7 @@ import { z } from "zod";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
 import { RemoteAccessError, remoteAccessState, setRemoteAccess } from "@/server/tunnel/remote-access";
+import { demoLocked } from "@/server/demo";
 
 const Body = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("off"), forget: z.boolean().optional() }).strict(),
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   return withAdmin(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = Body.safeParse(body.value);

@@ -4,6 +4,7 @@ import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { listSiteNetworks, publicUnifiSettings, saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
 import { UnifiConfigError } from "@/server/unifi/errors";
+import { demoLocked } from "@/server/demo";
 
 const UnifiBody = z
   .object({
@@ -42,6 +43,8 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = UnifiBody.safeParse(body.value);

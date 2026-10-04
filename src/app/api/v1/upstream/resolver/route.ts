@@ -8,6 +8,7 @@ import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/res
 import { DEFAULT_PROBE_DAYS, DEFAULT_PROBE_TIME, nextProbeRunAt, rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 import { withUpstreamLock } from "@/server/upstream/transaction";
 import { refreshResolverContexts, type ResolverContext } from "@/server/upstream/discovery";
+import { demoLocked } from "@/server/demo";
 
 const SELECT = {
   dohUrl: true,
@@ -84,6 +85,8 @@ const PutBody = z.object({
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const parsed = PutBody.safeParse(body.value);
@@ -137,6 +140,8 @@ export async function PUT(request: Request) {
 /** Removing a DoH override returns to DHCP discovery without changing the check schedule. */
 export async function DELETE(request: Request) {
   return withMutation(request, async () => {
+    const locked = demoLocked();
+    if (locked) return locked;
     await withUpstreamLock(async (tx) => {
       await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
       await tx.household.update({

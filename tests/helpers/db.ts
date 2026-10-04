@@ -17,9 +17,11 @@ export async function resetDatabase() {
   setReconcileClientForTests(undefined);
   resetDevMockClientForTests();
   const db = prisma();
-  // Refuse anything but the test database: this empties whatever it is pointed at.
-  const [{ name }] = await db.$queryRaw<{ name: string }[]>`SELECT current_database() AS name`;
-  if (name !== TEST_POSTGRES_DB) {
+  // Refuse anything but the test database: this empties whatever it is pointed at. The in-memory
+  // PGlite of `scripts/test.py run --database memory` serves one database of its own name, and exists
+  // only for the run.
+  const [{ name, version }] = await db.$queryRaw<{ name: string; version: string }[]>`SELECT current_database() AS name, version() AS version`;
+  if (name !== TEST_POSTGRES_DB && !version.includes("wasm32")) {
     throw new Error(`resetDatabase only runs against ${TEST_POSTGRES_DB}, not ${name}.`);
   }
   for (const table of await tablesChildrenFirst()) {

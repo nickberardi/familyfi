@@ -140,8 +140,26 @@ FamilyFi another way.
 
 - `DB_MODE=bundled` (default): the app expects Compose-managed PostgreSQL (`DB_HOST=db` in that stack).
 - `DB_MODE=external`: the app uses `DB_HOST` and related settings for a server you already run (CI, container smoke, or `make setup` / `make db-dev`).
+- `DB_MODE=memory`: an in-memory database that starts and ends with the server, for `FAMILYFI_MODE=dev` and `test` ([modes](setup.md#modes)). Demo mode always uses it; `prod` refuses it.
 
 Users should not edit Compose YAML to pick a server.
+
+## Demo mode
+
+`FAMILYFI_MODE=demo` runs the production image as a public demo, such as the one App Review and the familyfi.dev site point at. Nothing in it is real or kept:
+
+- **Database.** The entrypoint hands over to `scripts/runtime/memory-database.mjs`, which serves an in-memory [PGlite](https://pglite.dev) database on loopback (port 5433, or `POSTGRES_PORT`; through its own small wire-protocol server, `pglite-server.mjs`), applies the migrations and runs FamilyFi against it. The other `DB_*` and `POSTGRES_*` settings are ignored and need not be set. No volume is needed; every start begins empty.
+- **Household.** The UniFi mock stands in for the gateway, and the boot seed adds the dummy household, as `FAMILYFI_MODE=dev` does in development. Visitors use groups, rules, pauses, devices and pairing as at home.
+- **Locked configuration.** Every visitor shares one household, so configuration writes answer 403 `demo_locked` ([API](api.md#shared-behaviour-and-consumer-adoption)): household and UniFi settings, accounts and passwords, resolvers, connection routes and their certificate pins, and remote access. The demo never opens a Cloudflare tunnel from its host.
+- **Sign-in.** `admin` and `pat`, both with `FAMILYFI_DEFAULT_PASSWORD`. Set it on the host so the password survives restarts, and give it to reviewers out of band. The session secret and encryption key may be left to generate on each start.
+- **Phones.** Set `FAMILYFI_DEMO_URL` to the demo's public HTTPS origin (for example `https://demo.familyfi.dev`). It is published as the household's remote route: the hosted website itself is the connection, like a household's reverse proxy (a `lan` route with the phone's system certificate check, no tunnel and no Cloudflare Access), so Pair Device issues pairing codes for it as it would at home. Android 17 asks for Nearby devices access when a household has such a route; pairing over the public address works either way. The ingress terminates TLS and must pass `X-Forwarded-Proto` and `X-Forwarded-Host`, which sign-in's origin and secure-cookie checks read.
+- **Reset.** The process exits at 03:00 in the household's time zone each night; it exits with status 1, so any restart policy (`--restart on-failure`, `unless-stopped`, or the platform's own) brings it back with a fresh household. A web banner says the demo resets nightly.
+
+The `Demo image` workflow publishes `ghcr.io/nickberardi/familyfi:demo` from each push to `main`. To try it locally:
+
+```bash
+docker run --rm -p 7001:7001 -e FAMILYFI_MODE=demo -e FAMILYFI_DEFAULT_PASSWORD=choose-a-password ghcr.io/nickberardi/familyfi:demo
+```
 
 ## Outages
 
@@ -155,7 +173,7 @@ The migration history starts from one baseline, `prisma/migrations/0000000000000
 
 From the first release on the baseline (v0.22.3), a household may skip releases: any of them upgrades straight to the newest. CI proves it on every push by filling a database built by each supported release and upgrading it (`pnpm db-upgrade`); until that release is tagged there is nothing to upgrade from. The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/ci/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
 
-Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose interpolates `POSTGRES_*` for the database service and passes `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET`, `FAMILYFI_ENCRYPTION_KEY`, and mapped `DB_*` into the app container. The image does not read a mounted `.env` file.
+Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose interpolates `POSTGRES_*` for the database service and passes `DB_*` and `POSTGRES_*` into the app container, which reaches PostgreSQL on port 5432 inside the Compose network. The app generates `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET` and `FAMILYFI_ENCRYPTION_KEY` on first boot and keeps them in `/var/lib/familyfi/data/.env` on its volume; it does not read the host's `.env`.
 
 ## Releases
 
@@ -165,9 +183,9 @@ For a tag-based release, create and push an annotated tag on the intended commit
 
 Bump `package.json` and `openapi/familyfi.v1.yaml` `info.version` together before a later tag, so Settings, the sign-in screen, and `GET /api/v1/health` show the same number as the image tag. `tests/unit/version.test.ts` fails the build when the two drift apart.
 
-Each release's notes cite the latest verification record for every scenario in [testing.md](testing.md#what-no-test-proves), linking the file under `docs/verification/`, or say "not run" for a scenario that has none. Run `pnpm spike verify` on a console first when the release changes how FamilyFi writes policies.
+Release notes say whether anyone checked a block on a real gateway since the last release. Nothing in CI proves enforcement ([testing.md](testing.md#what-no-test-proves)), so a release that changes how FamilyFi writes policies says so plainly.
 
-Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does not set that flag, so the operator must mark it after creation. The local release script sets it automatically. Verification links in release notes also require review; the current publishers do not collect those records automatically.
+Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does not set that flag, so the operator must mark it after creation. The local release script sets it automatically.
 
 ### Local release
 

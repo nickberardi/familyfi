@@ -17,7 +17,7 @@ export default defineConfig({
       // Logic that runs on the server or in shared lib code. Pages and components are
       // exercised by the browser suite, which this does not measure.
       include: ["src/server/**/*.ts", "src/lib/**/*.ts", "src/app/api/**/*.ts"],
-      exclude: ["src/server/unifi/spike.ts", "src/server/dev-seed.ts"],
+      exclude: ["src/server/dev-seed.ts"],
       reporter: ["text-summary", "json-summary", "lcov"],
       reportsDirectory: "coverage",
       /**

@@ -1,13 +1,19 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.22.3
+  version: 0.22.4
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
     enforcement only. Signed-in operators can browse this specification under
     System → API (`/reference`). Groups, devices, accounts, UniFi settings, and
     sync are specified here.
+
+    A server in demo mode (the hosted public demo, where every visitor shares one
+    household) refuses configuration writes with 403 `demo_locked`: household and
+    UniFi settings, accounts and passwords, the household's and groups' resolvers,
+    connection routes and their certificate pins, and remote access. Groups, rules, pauses, devices and pairing
+    work as usual.
   license:
     name: Business Source License 1.1
     identifier: BUSL-1.1

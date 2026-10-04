@@ -1,6 +1,6 @@
 import { GroupKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { pauseRuleName, quarantinePolicyName, spikePolicyName } from "@/server/unifi/names";
+import { pauseRuleName, quarantinePolicyName } from "@/server/unifi/names";
 import { MAX_POLICY_NAME, rulePolicyNames } from "@/lib/policy-names";
 
 const rule = (patch: Partial<Parameters<typeof rulePolicyNames>[0]> = {}) => ({
@@ -18,7 +18,6 @@ describe("UniFi policy names", () => {
     expect(pauseRuleName({ name: "Betsy", kind: GroupKind.family })).toBe("Betsy's Internet Pause");
     expect(pauseRuleName({ name: "Ross", kind: GroupKind.family })).toBe("Ross' Internet Pause");
     expect(pauseRuleName({ name: "TV", kind: GroupKind.things })).toBe("TV Internet Pause");
-    expect(spikePolicyName("Internal")).toBe("FamilyFi Spike Internal Devices");
   });
 });
 

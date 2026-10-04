@@ -34,13 +34,24 @@ def execute(plan, resources, report, args, lookup):
         cancelled = False
         steps = environment["steps"]
         try:
-            preflight(resources.root, docker=environment["database"], browser=environment["build"])
+            memory = getattr(args, "database", "postgres") == "memory"
+            if memory:
+                # Tests that need PostgreSQL itself are reported, not run, against the in-memory database.
+                for step in [s for s in steps if s.get("postgres")]:
+                    report.result(step["test"], "not-run", platform, step["role"], key=step["key"],
+                                  detail=f"Needs PostgreSQL: {step['postgres']}")
+                    outcomes[step["key"]] = "not-run"
+                steps = [s for s in steps if not s.get("postgres")]
+            preflight(resources.root, docker=environment["database"] and not memory, browser=environment["build"])
             env = resources.test_env(platform, args.timezone)
             if environment["database"]:
-                resources.database(platform, env)
+                if memory:
+                    resources.memory_database(platform, env, directory / "database.log")
+                else:
+                    resources.database(platform, env)
                 resources.migrate(env, log=directory / "migrate.log")
             if environment["build"]:
-                env.update(CI="1", UNIFI_MOCK="1", PLAYWRIGHT_PORT=str(resources.port(platform)),
+                env.update(CI="1", FAMILYFI_MODE="test", PLAYWRIGHT_PORT=str(resources.port(platform)),
                            CLOUDFLARED_BIN=str(resources.root / "tests/fixtures/cloudflared/cloudflared"))
                 if build_error:
                     raise RuntimeError(build_error)

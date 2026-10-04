@@ -21,6 +21,7 @@ EPILOG = """examples:
   scripts/test.py run --platform host --layer unit
   scripts/test.py run --layer ui --platform phone
   scripts/test.py run --platform host --coverage
+  scripts/test.py run --layer integration --database memory
   scripts/test.py list --category trust
   scripts/test.py check lint typecheck api
   scripts/test.py status; scripts/test.py follow <run-id>; scripts/test.py cleanup <run-id>
@@ -45,6 +46,9 @@ def parser():
             command.add_argument("--coverage", action="store_true",
                                  help="Measure unit and integration coverage against its floors (whole host suite only)")
             command.add_argument("--timezone", help="TZ of the test processes, e.g. Pacific/Kiritimati")
+            command.add_argument("--database", choices=("postgres", "memory"), default="postgres",
+                                 help="postgres (default, as CI runs) or memory: an in-memory PGlite, no Docker; "
+                                      "tests that need PostgreSQL itself are reported as not run")
             command.add_argument("--show-browser", action="store_true", help="Run Playwright headed")
             limits(command)
     check = commands.add_parser("check", help="Run repository checks with structured results")
@@ -179,6 +183,8 @@ def main(argv=None):
                     print(f"{test['id']} | {','.join(test['categories'])} | {test['layer']} | "
                           f"{','.join(test['platforms'])} | serial: {test.get('serial') or 'no'}")
                 return 0
+            if args.coverage and args.database == "memory":
+                tool.error("--coverage measures the whole suite, which needs PostgreSQL; drop --database memory")
             resolved = planning.plan(tests, coverage=args.coverage, **filters)
             if args.plan:
                 print(json.dumps(resolved, indent=2)); return 0

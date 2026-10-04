@@ -1,7 +1,7 @@
 # scripts
 
-The top level of this folder holds the scripts you run: `test.py`, `release.sh`, `doh-probe.mjs`
-and the `spike/` CLI. `testing/` is the implementation behind `test.py`, `ci/` holds the helpers
+The top level of this folder holds the scripts you run: `test.py`, `release.sh` and
+`doh-probe.mjs`. `testing/` is the implementation behind `test.py`, `ci/` holds the helpers
 that the harness and the workflows both call, and `runtime/` the environment and database
 bootstrap that the dev server, the tests and the container start through. You normally don't
 call `ci/` or `runtime/` directly. `test.py` and `release.sh` print their full usage with
@@ -17,7 +17,6 @@ scripts/
 ├── release.sh         checks and tests, then build, push and publish a release from this machine
 ├── doh-probe.mjs      ask a DNS-over-HTTPS endpoint which transports it actually serves
 ├── update-mac-vendors.py  rebuild the committed IEEE MAC registrant database; run on request
-├── spike/             UniFi integration spike CLI (make spike; docs/spike/OPERATOR.md)
 └── runtime/           with-env, validate-env, docker-entrypoint and the rest of startup;
                        the only part of scripts/ the container image carries
 ```
@@ -68,6 +67,7 @@ may be left off while the rest names one file; an ambiguous one fails and lists 
 | `--exclude-host` | Leave out host tests another job already runs |
 | `--coverage` | Measure coverage against the floors in `tests/vitest.coverage.config.ts`. Only the whole host Vitest suite, since the floors are for all of it |
 | `--timezone ZONE` | `TZ` of the test processes, e.g. `Pacific/Kiritimati` |
+| `--database postgres,memory` | `postgres` (default, as CI runs): a PostgreSQL container per environment. `memory`: an in-memory PGlite (`scripts/runtime/memory-database.mjs --serve`), with no Docker; a test whose catalog entry says it needs PostgreSQL itself (`"postgres": "<why>"`) is reported `not-run` with that reason. Not with `--coverage` |
 | `--show-browser` | Run Playwright headed |
 | `--plan` | Print the execution plan; start nothing |
 | `--timeout SECONDS` / `--idle SECONDS` | Wall-clock and no-output limits per command (default 2400 and 180) |
@@ -204,4 +204,4 @@ scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag
   and prepares the database before running a command. `package.json`, the Makefile, Prisma's
   config, Playwright and the container's `docker-entrypoint.sh` all start through it. The
   Dockerfile copies this folder and nothing else from `scripts/`, and `ci/check-image.sh` fails
-  an image that carries `ci/` or `spike/`.
+  an image that carries `ci/`.

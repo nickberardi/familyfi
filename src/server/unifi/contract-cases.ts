@@ -1,8 +1,8 @@
 /**
  * The behaviour FamilyFi relies on from the UniFi Integration API, as cases that run
  * against any `UnifiClient`. `tests/unit/unifi-client-contract.test.ts` runs them against
- * `MockUnifiClient` and a faked `HttpUnifiClient` in CI; `pnpm spike verify` runs the same
- * cases against a real console, so the mock cannot drift from firmware unnoticed.
+ * `MockUnifiClient` and a faked `HttpUnifiClient` in CI, so the mock cannot drift from the
+ * documented API unnoticed.
  *
  * Every case works on a scratch policy it creates itself, for a locally administered MAC
  * no real device has, and deletes it again. None reads or writes an administrator's policy.

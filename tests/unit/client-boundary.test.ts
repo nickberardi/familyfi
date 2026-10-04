@@ -7,8 +7,8 @@
  * `src/ui` component, and fails
  * with the full chain when it reaches server code or a Node-only package.
  *
- * Next's `server-only` marker would do this at build time, but it throws in Vitest and
- * the spike CLI, which both import `src/server` outside Next's bundler.
+ * Next's `server-only` marker would do this at build time, but it throws in Vitest, which
+ * imports `src/server` outside Next's bundler.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -21,7 +21,7 @@ const srcRoot = path.join(repoRoot, "src");
 const serverRoot = path.join(srcRoot, "server") + path.sep;
 
 /** Packages that only run on the server: the database, the HTTP agent, native hashing. */
-const SERVER_PACKAGES = ["@prisma/client", "@prisma/adapter-pg", "pg", "undici", "@node-rs/argon2"];
+const SERVER_PACKAGES = ["@prisma/client", "@prisma/adapter-pg", "pg", "undici", "@node-rs/argon2", "@electric-sql/pglite"];
 const NODE_BUILTINS = new Set(builtinModules);
 
 function walk(dir: string): string[] {
