@@ -161,7 +161,8 @@ class Resources:
         self.command(["docker", "run", "--detach", "--name", name, "--label", f"{LABEL}={self.directory.name}",
                       "--publish", "127.0.0.1::5432", "--env", f"POSTGRES_USER={env['POSTGRES_USER']}",
                       "--env", f"POSTGRES_DB={env['POSTGRES_DB']}", "--env", "POSTGRES_PASSWORD",
-                      "--health-cmd", f"pg_isready -U {env['POSTGRES_USER']} -d {env['POSTGRES_DB']}",
+                      # Over TCP: while the image initialises, a temporary server answers on the socket only, then restarts.
+                      "--health-cmd", f"pg_isready -h 127.0.0.1 -U {env['POSTGRES_USER']} -d {env['POSTGRES_DB']}",
                       "--health-interval", "1s", "--health-timeout", "5s", "--health-retries", "60",
                       POSTGRES_IMAGE], env=env, timeout=300, idle=0)
         deadline = time.monotonic() + 90
