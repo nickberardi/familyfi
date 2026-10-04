@@ -148,7 +148,9 @@ class Resources:
             "FAMILYFI_ENCRYPTION_KEY": secrets.token_hex(32),
             "POSTGRES_PASSWORD": secrets.token_urlsafe(18)})
         env = {**self.env, **values, "DB_MODE": "external", "DB_HOST": "127.0.0.1",
-               "POSTGRES_DB": TEST_DATABASE, "POSTGRES_USER": "familyfi"}
+               "POSTGRES_DB": TEST_DATABASE, "POSTGRES_USER": "familyfi",
+               # Not a developer's mode from the shell or .env: the browser run sets test, and tests set their own.
+               "FAMILYFI_MODE": "prod"}
         env.pop("POSTGRES_PORT", None)
         if timezone:
             env["TZ"] = timezone
