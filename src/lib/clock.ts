@@ -13,12 +13,19 @@ export function minutesFromHhmm(value: string | null): number | null {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+/**
+ * "3:00 PM", with a plain space before AM/PM. Hermes and some ICU versions put a narrow
+ * no-break space (U+202F) or a no-break space (U+00A0) there; every platform must give the
+ * same bytes, so the shared display vectors match and labels compare equal across clients.
+ */
 export function formatClock(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+  })
+    .format(date)
+    .replace(/[  ]/g, " ");
 }
 
 export function bedtimeEndDays(days: number[], start: string, end: string): number[] {
