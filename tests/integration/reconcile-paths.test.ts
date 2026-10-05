@@ -273,8 +273,9 @@ describe("reconciler paths", () => {
   });
 
   describe("quarantine policies", () => {
-    /** A discovered household: every unassigned device sits behind a quarantine policy. */
+    /** A discovered household with quarantine on: every unassigned device sits behind an enabled quarantine policy. */
     async function quarantined(client: MockUnifiClient) {
+      await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: true } });
       setReconcileClientForTests(client);
       await runReconcileOnce();
       const policy = await prisma().appPolicy.findFirstOrThrow({ where: { ownerScope: "quarantine" }, orderBy: { id: "asc" } });
