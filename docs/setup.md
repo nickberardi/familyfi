@@ -66,9 +66,9 @@ Never part of a deployment.
 
 1. Install Node.js 26+ and pnpm 10. `.node-version` names the version CI and the Docker image use; `nvm`, `fnm` and similar tools read it.
 2. Install Docker if you want `make setup` to start PostgreSQL for you.
-3. `cp .env.example .env` and set `POSTGRES_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. Watch the server log for `username: admin` and `password:`.
+3. `cp .env.example .env` and set `POSTGRES_PASSWORD`. Recovery password and crypto secrets are written into `.env` on first setup if they are missing. The server log prints them as `username: admin` and `password:`.
 4. `make setup` then `make dev`. `make dev` waits for PostgreSQL, applies pending Prisma migrations, regenerates the database client, then starts Next. The first start can take a few extra seconds. If port 3000 is already taken, `make dev` asks whether to kill that process.
-5. Open http://localhost:3000 and sign in as `admin`.
+5. Open http://localhost:3000. With `FAMILYFI_MODE=dev` the mock gateway is already saved, so sign in as `admin`; a household with no gateway key opens first-time setup instead, which hands over the admin password and signs you in.
 
 `make setup` will not overwrite an existing `.env`.
 

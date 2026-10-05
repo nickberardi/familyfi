@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/constants";
 
-// `/openapi` checks its own session, which may be an agent's bearer rather than a cookie.
-const PUBLIC = [/^\/login$/, /^\/api\/v1\/health$/, /^\/api\/v1\/auth\/login$/, /^\/agents\.md$/, /^\/openapi$/];
+// `/openapi` checks its own session, which may be an agent's bearer rather than a cookie. `/setup`
+// checks its own too: it opens before sign-in only while the household has no gateway.
+const PUBLIC = [/^\/login$/, /^\/setup$/, /^\/api\/v1\/health$/, /^\/api\/v1\/auth\/login$/, /^\/agents\.md$/, /^\/openapi$/];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
