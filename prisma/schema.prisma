@@ -109,7 +109,7 @@ model Household {
   unifiTlsInsecure       Boolean   @default(false)
   unifiManageAllNetworks Boolean   @default(false)
   unifiManagedNetworkIds String[]  @default([])
-  quarantineEnforced     Boolean   @default(true)
+  quarantineEnforced     Boolean   @default(false)
   dohUrl                 String?
   dohProbeEnabled        Boolean   @default(true)
   dohProbeTime           String    @default("00:00")

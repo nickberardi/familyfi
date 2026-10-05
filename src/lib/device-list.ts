@@ -79,7 +79,7 @@ export const DEVICES_COPY = {
   noMatch: "Nothing matches this filter.",
   search: "Search name, IP or MAC",
   quarantineLabel: "Quarantine unassigned devices",
-  quarantineBody: "New arrivals stay off the internet until assigned. Off is an emergency override on FamilyFi policies only.",
+  quarantineBody: "New arrivals stay off the internet until assigned. A new household starts with it off; turn it on once your devices are in groups.",
   quarantineOn: "Enforced",
   quarantineOff: "Off",
   loading: "Loading devices…",
