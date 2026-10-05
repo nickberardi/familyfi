@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.24.0
+  version: 0.25.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2077,6 +2077,39 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+  /api/v1/connection/home:
+    get:
+      operationId: getHomeAddress
+      tags: [Connection]
+      summary: Where FamilyFi is on the home network
+      description: |
+        The home network address is the inside address, kept apart from the route remote access
+        publishes. Agents pair at it; without one they pair at the address their code was made at.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Home network address, content: { application/json: { schema: { $ref: "#/components/schemas/HomeAddressResponse" } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: setHomeAddress
+      tags: [Connection]
+      summary: Set or clear the home network address
+      description: |
+        An http or https origin with no credentials, path, query or fragment (400
+        `invalid_home_url` otherwise); `null` or an empty string clears it. It must answer without
+        a sign-in page, since agents pair there.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false, required: [url], properties: { url: { type: [string, "null"], maxLength: 2048 } } }
+      responses:
+        "200": { description: Home network address, content: { application/json: { schema: { $ref: "#/components/schemas/HomeAddressResponse" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /api/v1/connection/pins:
     post:
       operationId: computeConnectionPin
@@ -2787,6 +2820,17 @@ components:
         client: { type: string, enum: [watch] }
         clientId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 80 }
+    HomeAddressResponse:
+      type: object
+      additionalProperties: false
+      required: [home]
+      properties:
+        home:
+          type: object
+          additionalProperties: false
+          required: [url]
+          properties:
+            url: { type: [string, "null"], format: uri, description: "The home network origin, or null when none is set." }
     PairedInviteIssued:
       type: object
       additionalProperties: false
@@ -2799,6 +2843,10 @@ components:
           properties:
             id: { type: string }
             expiresAt: { type: string, format: date-time }
+            url:
+              type: string
+              format: uri
+              description: Only for an agent, the address its code carries, for the prompt that points it at `/agents.md`.
             code:
               type: string
               pattern: "^[A-Za-z0-9_-]+$"
@@ -2808,7 +2856,8 @@ components:
                 `{"version":1,"url","code","fingerprint"}` plus at most one of `pin` and `access`:
 
                 - `url`: the origin to join over (a phone's published HTTPS route; for an agent, the
-                  address the invite was made at).
+                  household's home network address, or the address the invite was made at when there
+                  is none).
                 - `code`: the single-use claim, `inviteId.token`; the token after the first `.` is
                   what `POST /paired/invites/{id}/claim` takes.
                 - `fingerprint`: the household key fingerprint, which must equal

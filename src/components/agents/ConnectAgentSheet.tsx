@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { AGENT_SCOPES, agentPrompt } from "@/lib/agent-prompt";
 import { countdown } from "@/lib/connection-routes";
@@ -92,7 +93,15 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
         </p>
       ) : (
         <>
-          <CopyRow label="Prompt" value={agentPrompt(window.location.origin, issued.code)} testId="agent-prompt" />
+          <CopyRow label="Prompt" value={agentPrompt(issued.url ?? window.location.origin, issued.code)} testId="agent-prompt" />
+          <p data-testid="agent-address" className="text-[14px] text-[var(--ff-muted)]">
+            The agent connects at <span className="font-mono break-all">{issued.url ?? window.location.origin}</span>. If that address asks
+            for a sign-in, such as Cloudflare Access, set your home network address on{" "}
+            <Link href="/pair" className="font-semibold text-[var(--ff-accent)] underline">
+              Pair Device
+            </Link>{" "}
+            and make a new code.
+          </p>
           <p data-testid="agent-countdown" className="text-[14px] text-[var(--ff-muted)]">
             {expired ? "This code expired. Make a new one." : `The code works once and expires in ${countdown(remaining)}.`}
           </p>

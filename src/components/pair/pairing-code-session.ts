@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { PairingState } from "@/lib/types";
 
-export type IssuedPairing = { id: string; expiresAt: string; code: string };
+/** `url` is where an agent's code says to connect; a phone's code names its route instead. */
+export type IssuedPairing = { id: string; expiresAt: string; code: string; url?: string };
 
 /**
  * A single-use invite code on screen: make it, count it down, and poll until something claims it.

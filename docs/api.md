@@ -58,6 +58,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off |
 | POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone (`client: phone`, its route, the administrator it signs in as; five minutes) or an agent (`client: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired phone invites and claims its Watch in one call |
+| GET/PUT | `/api/v1/connection/home` | Administrator reads or sets the home network address: where FamilyFi is inside the home (an http or https origin, 400 `invalid_home_url` otherwise; `null` clears it), apart from the route remote access publishes. Agents pair there |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/paired/invites/{id}/claim` | Join with the code: every client is signed in at once (bearer and refresh token, never a password or device credential); a phone also gets its route and signed manifest |
@@ -185,8 +186,11 @@ An administrator connects an AI agent from **System → API** (`/reference`): na
 scope (**Full access** or **Read only**), and copy the prompt shown. The prompt points the agent at `/agents.md`, a guide served
 without a session from [`openapi/agent-guide.md`](../openapi/agent-guide.md) with this server's
 address filled in, and carries an agent pairing code. That code is single-use, expires in fifteen
-minutes, and carries the address it was made at: it names no route, certificate pin or Cloudflare
-Access token.
+minutes, and carries the household's home network address (`/connection/home`), or the address it
+was made at when none is set; the invite response repeats it as `url` for the prompt. It names no
+route, certificate pin or Cloudflare Access token. The home network address is what lets a household
+that reaches the web app through a proxy with its own sign-in, such as Cloudflare Access email login,
+still connect an agent: the agent cannot get past that sign-in page, so it pairs at the inside address.
 
 The agent never sends a password. It claims the code at
 `POST /api/v1/paired/invites/{id}/claim`, like a phone: the claim returns a one-hour bearer and a
