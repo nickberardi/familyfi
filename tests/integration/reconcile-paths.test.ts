@@ -287,7 +287,16 @@ describe("reconciler paths", () => {
       expect(onGateway()?.enabled).toBe(true);
 
       await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: false } });
-      vi.spyOn(client, "updatePolicy").mockRejectedValueOnce(gatewayError(500, "PUT"));
+      // The household has a quarantine policy per zone, written in no fixed order: refuse this one's.
+      const update = client.updatePolicy.bind(client);
+      let refused = false;
+      vi.spyOn(client, "updatePolicy").mockImplementation(async (siteId, id, body) => {
+        if (id === policy.unifiPolicyId && !refused) {
+          refused = true;
+          throw gatewayError(500, "PUT");
+        }
+        return update(siteId, id, body);
+      });
       await runReconcileOnce();
 
       expect((await lastRun()).status).toBe(ChangeStatus.partial);
@@ -307,7 +316,15 @@ describe("reconciler paths", () => {
       const { policy } = await quarantined(client);
 
       await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: false } });
-      vi.spyOn(client, "getPolicy").mockRejectedValueOnce(gatewayError(404, "GET"));
+      const get = client.getPolicy.bind(client);
+      let vanished = false;
+      vi.spyOn(client, "getPolicy").mockImplementation(async (siteId, id) => {
+        if (id === policy.unifiPolicyId && !vanished) {
+          vanished = true;
+          throw gatewayError(404, "GET");
+        }
+        return get(siteId, id);
+      });
       await runReconcileOnce();
 
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
