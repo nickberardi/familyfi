@@ -41,6 +41,7 @@ describe("openapi contract", () => {
       "Health.error", // only when degraded by configuration
       "PairedClaim.connection", // never for agents
       "PairedClaim.connection.endpoint", // only when the invite named a route
+      "PairedInviteIssued.invite.url", // only for an agent
     ];
     type Schema = Record<string, unknown> & {
       $ref?: string;
