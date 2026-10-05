@@ -35,6 +35,7 @@ describe("reconciliation against mocked UniFi", () => {
 
   afterEach(() => {
     setReconcileClientForTests(undefined);
+    vi.restoreAllMocks();
   });
 
   it("quarantines newly discovered in-scope MACs and never mutates foreign policies", async () => {
@@ -116,7 +117,10 @@ describe("reconciliation against mocked UniFi", () => {
 
     client.listClients = async () => [...client.state.clients];
     client.listSiteDevices = async () => { throw new Error("UniFi access points unavailable"); };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await runReconcileOnce();
+    expect(warn).toHaveBeenCalledWith("UniFi access point lookup failed:", expect.objectContaining({ message: "UniFi access points unavailable" }));
+    warn.mockRestore();
     const retainedAccessPoint = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
     expect(retainedAccessPoint.presenceOnline).toBe(true);
     expect(retainedAccessPoint.accessPointName).toBe("Upstairs AP");
@@ -143,7 +147,10 @@ describe("reconciliation against mocked UniFi", () => {
       expect((await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:02" } })).manufacturer).toBeNull();
 
       registrantsOverride.open = () => { throw new Error("registry unreadable"); };
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       await runReconcileOnce();
+      expect(warn).toHaveBeenCalledWith("MAC registrant database unavailable:", expect.objectContaining({ message: "registry unreadable" }));
+      warn.mockRestore();
       expect((await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } })).manufacturer).toBe("Example Registrant");
     } finally {
       registrantsOverride.open = null;
