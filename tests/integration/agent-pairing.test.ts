@@ -9,6 +9,7 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as currentSession } from "@/app/api/v1/auth/session/route";
 import { GET as listAccounts } from "@/app/api/v1/accounts/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
+import { GET as getHome, PUT as setHome } from "@/app/api/v1/connection/home/route";
 import { GET as listDevices } from "@/app/api/v1/paired/devices/route";
 import { DELETE as revokeDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
@@ -87,6 +88,35 @@ describe("paired agents", () => {
     const status = await inviteStatus(request(`/api/v1/paired/invites/${issued.id}`, { auth }), { params: Promise.resolve({ id: issued.id }) });
     expect(((await status.json()) as { invite: { status: string } }).invite.status).toBe("claimed");
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(claimed.token) }))).status).toBe(200);
+  });
+
+  it("pairs at the home network address when one is set, not at a proxy that asks for a sign-in", async () => {
+    const auth = await adult();
+    // The browser is on a proxied address, such as one behind Cloudflare Access's email login.
+    const proxied = { "x-forwarded-proto": "https", "x-forwarded-host": "familyfi.example.com", "cf-access-jwt-assertion": "a.b.c" };
+    const before = await agentPairing(auth, "full", proxied);
+    expect(((await before.clone().json()) as { invite: { url: string } }).invite.url).toBe("https://familyfi.example.com");
+    expect((await issuedInvite(before)).payload.url).toBe("https://familyfi.example.com");
+
+    const saved = await setHome(request("/api/v1/connection/home", { method: "PUT", auth, headers: json, body: JSON.stringify({ url: "http://192.168.1.10:7001/" }) }));
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual({ home: { url: "http://192.168.1.10:7001" } });
+    expect(await (await getHome(request("/api/v1/connection/home", { auth }))).json()).toEqual({ home: { url: "http://192.168.1.10:7001" } });
+
+    const response = await agentPairing(auth, "full", proxied);
+    expect(((await response.clone().json()) as { invite: { url: string } }).invite.url).toBe("http://192.168.1.10:7001");
+    const issued = await issuedInvite(response);
+    expect(issued.payload.url).toBe("http://192.168.1.10:7001");
+    expect((await claim(issued)).status).toBe(200);
+
+    for (const url of ["ftp://192.168.1.10", "http://192.168.1.10:7001/familyfi", "https://user:pass@familyfi.home.arpa", "not a url"]) {
+      const refused = await setHome(request("/api/v1/connection/home", { method: "PUT", auth, headers: json, body: JSON.stringify({ url }) }));
+      expect(refused.status).toBe(400);
+      expect(await errorCode(refused)).toBe("invalid_home_url");
+    }
+    const cleared = await setHome(request("/api/v1/connection/home", { method: "PUT", auth, headers: json, body: JSON.stringify({ url: null }) }));
+    expect(await cleared.json()).toEqual({ home: { url: null } });
+    expect((await issuedInvite(await agentPairing(auth, "readOnly"))).payload.url).toBe(TEST_ORIGIN);
   });
 
   it("claims a code once, and an agent never gets a phone's connection or a scope it cannot hold", async () => {

@@ -37,10 +37,14 @@ export async function POST(request: Request) {
     if (!session.accountId) return jsonError(403, "administrator_required", "Sign in with an account to invite a device.");
     const input = parsed.data;
     if (input.client === PairedDeviceClient.agent) {
-      // The code carries the address it was made at, so it must be one an agent at home can reach.
       if (request.headers.get(TUNNEL_HEADER) === "tunnel") return jsonError(403, "agent_remote", "Connect an agent from the FamilyFi web app on the home network.");
-      const { invite, code } = await inviteAgent({ url: requestOrigin(request), displayName: input.displayName, scope: input.scope, createdByAccountId: session.accountId });
-      return Response.json(inviteBody(invite, code), { status: 201 });
+      // The code carries the home network address, or else the one it was made at: the browser's
+      // address can be a proxy with its own sign-in page, which an agent cannot get past.
+      const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+      const url = household.homeUrl ?? requestOrigin(request);
+      const { invite, code } = await inviteAgent({ url, displayName: input.displayName, scope: input.scope, createdByAccountId: session.accountId });
+      const body = inviteBody(invite, code);
+      return Response.json({ invite: { ...body.invite, url } }, { status: 201 });
     }
     const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: input.endpointId, householdId: "default", enabled: true } });
     if (!endpoint) return jsonError(404, "not_found", "Connection endpoint not found.");

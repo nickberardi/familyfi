@@ -130,6 +130,8 @@ const ACCESS: Record<string, Entry> = {
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "DELETE /api/v1/connection/endpoints/{id}": { access: "administrator" },
   "GET /api/v1/connection/identity": { access: "public" },
+  "GET /api/v1/connection/home": { access: "administrator" },
+  "PUT /api/v1/connection/home": { access: "administrator" },
   "POST /api/v1/connection/pins": { access: "administrator" },
   "GET /api/v1/connection/tunnel": { access: "administrator" },
   "PUT /api/v1/connection/tunnel": { access: "administrator" },
