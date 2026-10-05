@@ -43,8 +43,6 @@ export function SetupWizard({ initialStep = 0, password }: { initialStep?: numbe
   const router = useRouter();
   const { unifi, groups, rules, accounts, error: loadError, reload } = useAppData();
   const [step, setStep] = useState(initialStep);
-  // Coming from the signed-out first step, the password was saved there already.
-  const [wrote, setWrote] = useState(initialStep > 0);
   const [host, setHost] = useState<string | null>(null);
   const [siteId, setSiteId] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -169,7 +167,6 @@ export function SetupWizard({ initialStep = 0, password }: { initialStep?: numbe
       return;
     }
     const problem = setupStepError(step, {
-      wrote,
       connected,
       savedKey: usingSaved,
       host: hostValue,
@@ -223,14 +220,7 @@ export function SetupWizard({ initialStep = 0, password }: { initialStep?: numbe
       onNext={next}
     >
       {step === 0 ? (
-        <AdminSignInStep
-          password={password}
-          wrote={wrote}
-          onWrote={() => {
-            setWrote(!wrote);
-            setError("");
-          }}
-        />
+        <AdminSignInStep password={password} />
       ) : null}
 
       {step === 1 ? (

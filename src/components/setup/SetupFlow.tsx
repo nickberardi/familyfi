@@ -6,7 +6,7 @@ import { browserSignIn } from "@/components/SignInForm";
 import { AdminSignInStep, SetupFrame } from "@/components/setup/SetupFrame";
 import { SetupWizard } from "@/components/setup/SetupWizard";
 import { RECOVERY_USERNAME } from "@/lib/constants";
-import { setupCta, setupStepError } from "@/lib/setup";
+import { setupCta } from "@/lib/setup";
 
 /**
  * First-time setup. A new install opens here before anyone has signed in: the first step hands over
@@ -15,7 +15,6 @@ import { setupCta, setupStepError } from "@/lib/setup";
  */
 export function SetupFlow({ signedIn, password }: { signedIn: boolean; password: string | null }) {
   const [entered, setEntered] = useState(signedIn);
-  const [wrote, setWrote] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -28,8 +27,6 @@ export function SetupFlow({ signedIn, password }: { signedIn: boolean; password:
   }
 
   async function next() {
-    const problem = setupStepError(0, { wrote, connected: false, savedKey: false, host: "", apiKey: "", selectedNetworks: [], members: [] });
-    if (problem) return setError(problem);
     if (!password) return;
     setPending(true);
     setError("");
@@ -41,14 +38,7 @@ export function SetupFlow({ signedIn, password }: { signedIn: boolean; password:
 
   return (
     <SetupFrame step={0} error={error} pending={pending} cta={setupCta(0, false)} onNext={() => void next()}>
-      <AdminSignInStep
-        password={password}
-        wrote={wrote}
-        onWrote={() => {
-          setWrote(!wrote);
-          setError("");
-        }}
-      />
+      <AdminSignInStep password={password} />
     </SetupFrame>
   );
 }
