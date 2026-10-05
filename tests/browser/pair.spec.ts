@@ -384,3 +384,36 @@ test("lays out remote access on a phone", { tag: "@phone" }, async ({ page }) =>
   for (const name of ["Off", "Quick tunnel", "My domain"]) await expect(card.getByRole("button", { name })).toBeVisible();
   await shot(page, "remote-access");
 });
+
+test("an agent connects at the home network address once one is saved", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const home = "http://192.168.1.10:7001";
+  try {
+    await page.goto("/pair");
+    const card = page.getByTestId("home-address");
+    const field = card.getByLabel("Address");
+    await expect(field).toBeEnabled();
+    await field.fill("http://192.168.1.10:7001/familyfi");
+    await expect(card.getByText("Use an http or https address with no path.")).toBeVisible();
+    await expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
+    await field.fill(`${home}/`);
+    await card.getByRole("button", { name: "Save" }).click();
+    await expect(field).toHaveValue(home);
+
+    await page.goto("/reference");
+    await page.getByRole("button", { name: "Connect an agent" }).click();
+    const sheet = page.getByRole("dialog", { name: "Connect an agent" });
+    await sheet.getByRole("button", { name: "Show prompt" }).click();
+    await expect(page.getByTestId("agent-prompt")).toContainText(`Read ${home}/agents.md`);
+    await expect(page.getByTestId("agent-address")).toContainText(home);
+    const code = /pairing code is (\S+)/.exec((await page.getByTestId("agent-prompt").textContent()) ?? "")?.[1] ?? "";
+    expect(decodePairingCode(code).payload.url).toBe(home);
+
+    await page.goto("/pair");
+    await card.getByLabel("Address").fill("");
+    await card.getByRole("button", { name: "Clear" }).click();
+    await expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
+  } finally {
+    await page.request.put("/api/v1/connection/home", { headers: await csrf(page), data: { url: null } });
+  }
+});
