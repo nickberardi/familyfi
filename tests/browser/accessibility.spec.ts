@@ -39,7 +39,7 @@ test.describe("accessibility", () => {
     await expectAccessible(page, "/login");
   });
 
-  for (const route of ["/family", "/things", "/devices", "/rules", "/rules/new", "/categories", "/pair", "/sync", "/settings", "/reference"]) {
+  for (const route of ["/family", "/things", "/devices", "/rules", "/rules/new", "/categories", "/pair", "/sync", "/settings", "/setup", "/reference"]) {
     test(route, async ({ page }) => {
       await signIn(page);
       await expectAccessible(page, route);

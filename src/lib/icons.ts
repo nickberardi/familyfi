@@ -34,6 +34,8 @@ export type IconName =
   | "plus"
   | "caret-up"
   | "caret-down"
+  | "x"
+  | "check-circle"
   // About
   | "github-logo"
   // Rule kinds

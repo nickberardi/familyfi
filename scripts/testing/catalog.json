@@ -347,6 +347,12 @@
         "sync"
       ]
     },
+    "tests/unit/setup.test.ts": {
+      "categories": [
+        "settings",
+        "schedules"
+      ]
+    },
     "tests/unit/spki.test.ts": {
       "categories": [
         "trust"
@@ -566,6 +572,18 @@
       "categories": [
         "test-infrastructure",
         "database"
+      ]
+    },
+    "tests/integration/setup-redirect.test.ts": {
+      "categories": [
+        "settings",
+        "sessions"
+      ]
+    },
+    "tests/integration/setup-writes.test.ts": {
+      "categories": [
+        "groups",
+        "schedules"
       ]
     },
     "tests/integration/unifi-key-storage.test.ts": {
