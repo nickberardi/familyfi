@@ -22,7 +22,7 @@ describe("Node version", () => {
   });
 
   it("matches every node base image in the Dockerfile", () => {
-    const majors = [...read("docker/Dockerfile").matchAll(/^FROM\s+node:(\d+)/gm)].map((match) => match[1]);
+    const majors = [...read("docker/Dockerfile").matchAll(/^FROM\s+(?:--platform=\S+\s+)?node:(\d+)/gm)].map((match) => match[1]);
     expect(majors.length).toBeGreaterThan(0);
     expect(new Set(majors)).toEqual(new Set([nodeMajor]));
   });

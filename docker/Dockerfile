@@ -1,14 +1,33 @@
+# Prisma's schema parser is WebAssembly that QEMU computes wrongly, so an image built for
+# another architecture under emulation (scripts/release.sh) gets its client generated on the
+# builder's own. The generated client is JavaScript and WebAssembly, the same on every platform.
+FROM --platform=$BUILDPLATFORM node:26-bookworm-slim AS prisma-client
+WORKDIR /app
+RUN npm install -g pnpm@10.15.1
+COPY package.json pnpm-lock.yaml prisma.config.ts ./
+COPY prisma ./prisma
+COPY scripts/runtime/print-database-url.mjs scripts/runtime/mode.mjs ./scripts/runtime/
+RUN pnpm install --frozen-lockfile \
+  && cp -r "$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" /prisma-client
+
 FROM node:26-bookworm-slim AS deps
 WORKDIR /app
 RUN npm install -g pnpm@10.15.1
 COPY package.json pnpm-lock.yaml prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/runtime/print-database-url.mjs scripts/runtime/mode.mjs ./scripts/runtime/
-RUN pnpm install --frozen-lockfile
+# Dependencies' own install scripts run here, for this architecture; this package's
+# postinstall (prisma generate) does not, and the client comes from the stage above. The
+# build stage copies the full package.json back over this one.
+RUN npm pkg delete scripts.postinstall && pnpm install --frozen-lockfile
+COPY --from=prisma-client /prisma-client /tmp/prisma-client
+RUN client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
+  && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
 
 FROM deps AS build
 COPY . .
-RUN pnpm prisma generate && pnpm build
+# Not `pnpm build`, which generates the client again under emulation.
+RUN pnpm exec next build
 
 FROM node:26-bookworm-slim AS runner
 WORKDIR /app
