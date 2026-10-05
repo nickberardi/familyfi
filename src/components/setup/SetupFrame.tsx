@@ -204,17 +204,12 @@ async function copyText(value: string): Promise<boolean> {
   }
 }
 
-/** The password, masked, with Copy. When this browser cannot copy, the password is shown to select instead. */
+/** The password, masked, with Copy. Where nothing can copy, the password is shown to select instead. */
 function PasswordCopy({ value }: { value: string }) {
   const [state, setState] = useState<"idle" | "copied" | "shown">("idle");
   if (state === "shown") {
     return (
-      <span className="flex flex-1 flex-col gap-0.5">
-        <span className="select-all break-all font-mono text-[14px] text-[var(--ff-ink)]">{value}</span>
-        <span role="status" className="text-[14px] text-[var(--ff-muted)]">
-          This browser can’t copy here. Select the password to copy it.
-        </span>
-      </span>
+      <span className="flex-1 select-all break-all font-mono text-[14px] text-[var(--ff-ink)]">{value}</span>
     );
   }
   return (
