@@ -7,6 +7,7 @@ import {
   saveMembers,
   saveSchedules,
   setupCta,
+  setupRedirect,
   setupStepError,
   suggestionApplies,
   suggestionAppliesTo,
@@ -45,7 +46,7 @@ const fields = {
 
 describe("setup steps", () => {
   it("holds each step until its answer is in", () => {
-    expect(setupStepError(0, { ...fields, wrote: false })).toMatch(/recovery password/);
+    expect(setupStepError(0, { ...fields, wrote: false })).toMatch(/admin password/);
     expect(setupStepError(1, { ...fields, connected: false, host: " " })).toMatch(/IP address or hostname/);
     expect(setupStepError(1, { ...fields, connected: false, apiKey: "" })).toMatch(/API key/);
     // A saved key is tested as it is, with no new one pasted (a cloud console has no host).
@@ -206,5 +207,19 @@ describe("saving schedules", () => {
     const { request, calls } = fakeApi(() => ({}));
     await saveSchedules(request, [bedtime], household, created);
     expect(calls).toEqual([{ path: "/api/v1/rules/r-kids", method: "PATCH", body: { groupIds: ["g-tv", "g-leo", "g-mia"] } }]);
+  });
+});
+
+describe("opening setup", () => {
+  it("is open before sign-in until the household has a gateway, then needs a signed-in admin", () => {
+    expect(setupRedirect({ demo: false, configured: false, signedIn: false })).toBeNull();
+    expect(setupRedirect({ demo: false, configured: false, signedIn: true })).toBeNull();
+    expect(setupRedirect({ demo: false, configured: true, signedIn: false })).toBe("/login");
+    expect(setupRedirect({ demo: false, configured: true, signedIn: true })).toBeNull();
+  });
+
+  it("never opens in the demo, whose gateway is locked", () => {
+    expect(setupRedirect({ demo: true, configured: true, signedIn: false })).toBe("/family");
+    expect(setupRedirect({ demo: true, configured: true, signedIn: true })).toBe("/family");
   });
 });

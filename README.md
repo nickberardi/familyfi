@@ -83,8 +83,8 @@ Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docke
 
 ## First run
 
-1. Sign in as **admin** with the recovery password printed in the server log (`make docker-logs` or the `make dev` terminal).
-2. First-time setup opens while no gateway key is saved: paste a UniFi Network Integration API key, pick the networks to watch, add the household and turn on any suggested schedules. Setup accepts a local console's self-signed certificate. Everything it sets can be changed later in Settings and Rules, including certificate checking and **manage all networks**.
+1. Open FamilyFi. A new install opens first-time setup before anyone has signed in: its first step hands over the **admin** password to copy (it is `FAMILYFI_DEFAULT_PASSWORD`, also printed in the server log by `make docker-logs` or the `make dev` terminal), and continuing signs you in with it. Setup stays open to anyone on your network until a gateway key is saved; after that FamilyFi asks for sign-in as usual.
+2. Paste a UniFi Network Integration API key, pick the networks to watch, add the household and turn on any suggested schedules. Setup accepts a local console's self-signed certificate. Everything it sets can be changed later in Settings and Rules, including certificate checking and **manage all networks**.
 3. Align the household timezone with the UniFi console clock so rule windows match wall time.
 4. Assign devices to Family or Things groups and add rules.
 

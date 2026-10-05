@@ -347,6 +347,11 @@
         "sync"
       ]
     },
+    "tests/unit/proxy.test.ts": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/unit/setup.test.ts": {
       "categories": [
         "settings",

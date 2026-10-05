@@ -1,6 +1,5 @@
 /**
- * First-time setup: the five steps a new household walks through after its first sign-in, and the
- * writes each one sends. Every write is an existing API call (the gateway, groups and rules), so
+ * First-time setup: the five steps a new household walks through, and the writes each one sends. Every write is an existing API call (the gateway, groups and rules), so
  * setup is a guided path over Settings and Rules, not a separate store.
  */
 import type { ApiRequest } from "./api-client";
@@ -188,7 +187,7 @@ export type SetupFields = {
 
 /** Why a step cannot continue yet, or null when it can. */
 export function setupStepError(step: number, fields: SetupFields): string | null {
-  if (step === 0 && !fields.wrote) return "Confirm you’ve written down where the recovery password is.";
+  if (step === 0 && !fields.wrote) return "Confirm you’ve saved the admin password.";
   if (step === 1 && !fields.connected && !fields.savedKey) {
     if (!fields.host.trim()) return "Enter your gateway’s IP address or hostname.";
     if (!fields.apiKey.trim()) return "Paste an API key to continue.";
@@ -285,4 +284,13 @@ export async function saveSchedules(
 export function existingSuggestedRules(rules: readonly { id: string; name: string; groupIds: readonly string[] }[]): CreatedRules {
   const names = new Set(SCHEDULE_SUGGESTIONS.flatMap((suggestion) => suggestion.rules.map((rule) => rule.name)));
   return Object.fromEntries(rules.filter((rule) => names.has(rule.name)).map((rule) => [rule.name, { id: rule.id, groupIds: rule.groupIds }]));
+}
+
+/** Where `/setup` sends a visitor, or null to show setup. */
+export function setupRedirect(entry: { demo: boolean; configured: boolean; signedIn: boolean }): "/family" | "/login" | null {
+  // The demo's gateway and networks are locked, so there is nothing to set up.
+  if (entry.demo) return "/family";
+  // Before the household has a gateway, setup is open: it is how the first admin signs in.
+  if (entry.configured && !entry.signedIn) return "/login";
+  return null;
 }

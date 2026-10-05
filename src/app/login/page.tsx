@@ -1,10 +1,17 @@
+import { redirect } from "next/navigation";
 import { SignInForm } from "@/components/SignInForm";
 import { Logo } from "@/components/ui/Logo";
 import { appVersionLabel } from "@/lib/version";
+import { demoModeEnabled } from "@/server/env";
+import { householdHasGateway } from "@/server/setup-entry";
 
 export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // A new install signs its first admin in through setup, which hands over the admin password.
+  // If the database cannot answer, the form still shows, so sign-in reports the problem.
+  const configured = demoModeEnabled() || (await householdHasGateway().catch(() => true));
+  if (!configured) redirect("/setup");
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <div className="flex w-full max-w-[400px] flex-col gap-5">
