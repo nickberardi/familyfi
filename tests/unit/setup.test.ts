@@ -35,6 +35,7 @@ const networks = [
 ];
 
 const fields = {
+  wrote: true,
   connected: true,
   savedKey: false,
   host: "192.168.1.1",
@@ -45,6 +46,7 @@ const fields = {
 
 describe("setup steps", () => {
   it("holds each step until its answer is in", () => {
+    expect(setupStepError(0, { ...fields, wrote: false })).toMatch(/admin password/);
     expect(setupStepError(1, { ...fields, connected: false, host: " " })).toMatch(/IP address or hostname/);
     expect(setupStepError(1, { ...fields, connected: false, apiKey: "" })).toMatch(/API key/);
     // A saved key is tested as it is, with no new one pasted (a cloud console has no host).

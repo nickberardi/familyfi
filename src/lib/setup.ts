@@ -174,6 +174,7 @@ export function networkSelectionBody(
 }
 
 export type SetupFields = {
+  wrote: boolean;
   /** The gateway answered a test. */
   connected: boolean;
   /** A key is saved already, so testing it needs no new one. */
@@ -186,6 +187,7 @@ export type SetupFields = {
 
 /** Why a step cannot continue yet, or null when it can. */
 export function setupStepError(step: number, fields: SetupFields): string | null {
+  if (step === 0 && !fields.wrote) return "Confirm you’ve saved the admin password.";
   if (step === 1 && !fields.connected && !fields.savedKey) {
     if (!fields.host.trim()) return "Enter your gateway’s IP address or hostname.";
     if (!fields.apiKey.trim()) return "Paste an API key to continue.";

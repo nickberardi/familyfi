@@ -120,7 +120,15 @@ const PASSWORD_WHERE =
  * The first step: the built-in admin sign-in. A new install shows its password masked, to copy;
  * once the household is set up the page no longer carries it, and only says where it is kept.
  */
-export function AdminSignInStep({ password }: { password: string | null }) {
+export function AdminSignInStep({
+  password,
+  wrote,
+  onWrote,
+}: {
+  password: string | null;
+  wrote: boolean;
+  onWrote: () => void;
+}) {
   return (
     <>
       <h2 id="setup-step-title" className={TITLE}>
@@ -153,6 +161,15 @@ export function AdminSignInStep({ password }: { password: string | null }) {
           )}
         </div>
       </div>
+      <label className="flex cursor-pointer items-center gap-2.5 text-[14px] text-[var(--ff-ink)]">
+        <input
+          type="checkbox"
+          className={CHECKBOX}
+          checked={wrote}
+          onChange={onWrote}
+        />
+        I’ve saved this password
+      </label>
     </>
   );
 }
