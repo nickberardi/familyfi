@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { HomeAddressCard } from "@/components/pair/HomeAddressCard";
 import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
 import { RemoteAccessCard } from "@/components/pair/RemoteAccessCard";
 import { request } from "@/lib/api";
@@ -41,6 +42,8 @@ export default function PairDevicePage() {
         ) : null}
 
         <RemoteAccessCard tunnel={tunnel} routes={routes} phones={remote} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
+
+        <HomeAddressCard />
 
         <PairedDevicesCard
           phones={phones}

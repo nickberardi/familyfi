@@ -20,6 +20,21 @@ export function canPin(transport: ConnectionTransport): boolean {
   return transport === "lan";
 }
 
+/**
+ * The home network address as an origin, or null when it is not one: http or https, with no
+ * credentials, path, query or fragment. Unlike a route it may be plain http, as FamilyFi often is at home.
+ */
+export function homeOrigin(value: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return null;
+  }
+  const bare = url.username === "" && url.password === "" && (url.pathname === "" || url.pathname === "/") && url.search === "" && url.hash === "";
+  return (url.protocol === "https:" || url.protocol === "http:") && url.hostname !== "" && bare ? url.origin : null;
+}
+
 const WIKI = "https://github.com/nickberardi/familyfi/wiki";
 /** Setting up a VPN or a reverse proxy in front of FamilyFi. */
 export const HOME_NETWORK_GUIDE = `${WIKI}/Remote-access-home-network`;

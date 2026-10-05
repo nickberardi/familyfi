@@ -128,6 +128,9 @@ model Household {
   instancePrivateKeyAuthTag Bytes?
   /// The one route Remote access publishes to phones; null is Off.
   remoteEndpointId       String?
+  /// Where FamilyFi is on the home network (an http or https origin), apart from the route Remote
+  /// access publishes. Agents pair here; null pairs them at the address the code was made at.
+  homeUrl                String?
   revision               Int       @default(0)
   createdAt              DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
