@@ -14,8 +14,9 @@ import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
  *
  * - A phone's invite is made by an administrator over a published route; its code carries that route,
  *   its pin or Cloudflare Access token. The phone acts as the adult the administrator chose.
- * - An agent's invite is made by an administrator on the home network; its code carries the address
- *   it was made at and nothing for remote access. The agent acts as whoever made it.
+ * - An agent's invite is made by an administrator on the home network; its code carries the household's
+ *   home network address, or the address it was made at when none is set, and nothing for remote
+ *   access. The agent acts as whoever made it.
  * - A Watch is invited and claimed at once by its phone, its parent; it acts as the phone's account.
  */
 
