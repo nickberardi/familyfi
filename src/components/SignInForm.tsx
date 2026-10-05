@@ -28,7 +28,8 @@ export function SignInForm() {
     }
     const error = signInError({ ok: response.ok, body });
     if (error) return error;
-    router.replace("/family");
+    // Home sends a household with no gateway yet to first-time setup, and everyone else to Family.
+    router.replace("/");
     router.refresh();
     return null;
   }

@@ -1,6 +1,6 @@
 # Setup
 
-FamilyFi is one Next.js application (web/PWA plus `/api/v1`) and PostgreSQL. UniFi credentials are stored encrypted in the database, not in environment variables, after you paste a key in Settings.
+FamilyFi is one Next.js application (web/PWA plus `/api/v1`) and PostgreSQL. UniFi credentials are stored encrypted in the database, not in environment variables, after you paste a key in first-time setup or Settings.
 
 ## Environment
 
@@ -109,7 +109,7 @@ Email magic links and self-serve email reset from the sign-in prototype are not 
 
 ## UniFi connection (application)
 
-Paste the Network Integration API key in Settings (`PUT /api/v1/settings/unifi`). The app encrypts it with `FAMILYFI_ENCRYPTION_KEY`. For a local console with a private CA, send `tlsInsecure: true`. Choose `manageAllNetworks: true` or `managedNetworkIds: ["…"]` so discovery/quarantine only watch those VLANs; the default is none until you pick.
+Paste the Network Integration API key in first-time setup, which opens after sign-in while no key is saved, or in Settings (`PUT /api/v1/settings/unifi`). The app encrypts it with `FAMILYFI_ENCRYPTION_KEY`. For a local console with a private CA, send `tlsInsecure: true`. Choose `manageAllNetworks: true` or `managedNetworkIds: ["…"]` so discovery/quarantine only watch those VLANs; the default is none until you pick.
 
 With `FAMILYFI_MODE=dev` (never in production), Settings Test/Save talk to the in-process mock. A dummy key of at least 8 characters is enough; the seeded household already uses `mock-unifi-key` and `https://127.0.0.1/proxy/network/integration`.
 

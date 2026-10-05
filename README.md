@@ -84,7 +84,7 @@ Open http://localhost:3000. `make setup` starts PostgreSQL via Docker when Docke
 ## First run
 
 1. Sign in as **admin** with the recovery password printed in the server log (`make docker-logs` or the `make dev` terminal).
-2. In Settings, paste a UniFi Network Integration API key. For a local console with a private CA, enable insecure TLS. Choose **manage all networks** or a VLAN allowlist; the default is none until you pick.
+2. First-time setup opens while no gateway key is saved: paste a UniFi Network Integration API key, pick the networks to watch, add the household and turn on any suggested schedules. Setup accepts a local console's self-signed certificate. Everything it sets can be changed later in Settings and Rules, including certificate checking and **manage all networks**.
 3. Align the household timezone with the UniFi console clock so rule windows match wall time.
 4. Assign devices to Family or Things groups and add rules.
 
