@@ -32,7 +32,17 @@ describe("observeQuarantineBlocking", () => {
     expect(await observeQuarantineBlocking(await household())).toEqual({ observedEnabled: false, policyCount: 0 });
   });
 
+  it("is off in a new household, so connecting the gateway blocks no unassigned device", async () => {
+    expect((await household()).quarantineEnforced).toBe(false);
+    await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    await runReconcileOnce();
+    expect(await prisma().device.count({ where: { assignment: "quarantined" } })).toBeGreaterThan(0);
+    const rows = await prisma().appPolicy.findMany({ where: { ownerScope: PolicyOwnerScope.quarantine } });
+    expect(await observeQuarantineBlocking(await household())).toEqual({ observedEnabled: false, policyCount: rows.length });
+  });
+
   it("reads the gateway, and follows the household's quarantine switch", async () => {
+    await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: true } });
     await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
     await runReconcileOnce();
     const rows = await prisma().appPolicy.findMany({ where: { ownerScope: PolicyOwnerScope.quarantine } });
@@ -74,6 +84,7 @@ describe("observeQuarantineBlocking", () => {
   });
 
   it("uses what it last saw when no UniFi key is saved", async () => {
+    await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: true } });
     await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
     await runReconcileOnce();
     await prisma().household.update({ where: { id: "default" }, data: { unifiKeyLastFour: null } });

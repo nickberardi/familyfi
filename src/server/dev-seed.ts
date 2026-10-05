@@ -49,6 +49,9 @@ async function ensureMockUnifiConnection() {
       unifiKeyLastFour: DEV_MOCK_API_KEY.slice(-4),
       connectionStatus: "connected",
       connectionError: null,
+      // A new household starts with quarantine off; the mock household's is set up, so its
+      // unassigned devices show quarantine at work.
+      quarantineEnforced: true,
       // Category reports go through this resolver, but the probe never runs: the mock's
       // verdicts are seeded, and a sweep would replace them with real ones.
       dohUrl: DEV_DOH_URL,
