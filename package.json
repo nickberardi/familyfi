@@ -78,7 +78,9 @@
       "@faker-js/faker": "^10.5.0",
       "js-yaml": "4.3.2",
       "mysql2": "3.24.4",
-      "@vitest/mocker": "^4.1.11"
+      "@vitest/mocker": "^4.1.11",
+      "source-map-js": "^1.2.2",
+      "fast-uri": "^3.1.8"
     },
     "onlyBuiltDependencies": [
       "@prisma/client",
