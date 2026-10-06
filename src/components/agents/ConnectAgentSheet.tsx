@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AGENT_SCOPES, agentPrompt } from "@/lib/agent-prompt";
 import { api } from "@/lib/api";
@@ -31,15 +30,11 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
       .catch(() => setHome(null));
   }, []);
   const unsafe = home !== null && homeAddress(home) === null;
-  const homeLink = (
-    <Link href="/pair" className="font-semibold text-[var(--ff-accent)] underline">
-      Home access on Pair Device
-    </Link>
-  );
+  const homeLink = <span className="font-semibold">Home access</span>;
   const warning = unsafe ? (
     <p data-testid="agent-home-warning" role="status" className="rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 text-[14px]">
       <span className="font-semibold">Set your home network address.</span> This page isn&rsquo;t on your home network, so the agent may not get
-      through it, for example behind a sign-in such as Cloudflare Access. Set the address under {homeLink}, then make a new code.
+      through it, for example behind a sign-in such as Cloudflare Access. Close this, set the address under {homeLink}, then connect the agent again.
     </p>
   ) : null;
 

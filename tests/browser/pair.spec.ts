@@ -407,8 +407,7 @@ test("Home access suggests this address, saves a home network address, and agent
     await expect(card.getByTestId("home-url")).toHaveText(home);
     await expect(card.getByText("Saved home network address")).toBeVisible();
 
-    await page.goto("/reference");
-    await page.getByRole("button", { name: "Connect an agent" }).click();
+    await card.getByRole("button", { name: "Connect an agent" }).click();
     const sheet = page.getByRole("dialog", { name: "Connect an agent" });
     await expect(sheet.getByRole("button", { name: "Show prompt" })).toBeEnabled();
     await expect(page.getByTestId("agent-home-warning")).toHaveCount(0);
@@ -436,8 +435,7 @@ test("Home access warns, and agent codes are still issued, when FamilyFi was ope
   await expect(card.getByTestId("home-url")).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Set address" })).toBeVisible();
 
-  await page.goto("/reference");
-  await page.getByRole("button", { name: "Connect an agent" }).click();
+  await card.getByRole("button", { name: "Connect an agent" }).click();
   const sheet = page.getByRole("dialog", { name: "Connect an agent" });
   await expect(page.getByTestId("agent-home-warning")).toBeVisible();
   await sheet.getByRole("button", { name: "Show prompt" }).click();

@@ -47,6 +47,7 @@ export default function PairDevicePage() {
             if (!window.confirm(confirmLine(revokeConfirm(agent)))) return;
             void run(() => revokePhone(request, agent));
           }}
+          onConnected={() => void load()}
         />
 
         <RemoteAccessCard tunnel={tunnel} routes={routes} phones={remote} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
