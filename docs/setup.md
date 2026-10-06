@@ -118,7 +118,7 @@ With `FAMILYFI_MODE=dev` (never in production), Settings Test/Save talk to the i
 The easiest remote access is built in: **System → Pair Device → Remote access** (a quick tunnel, or
 FamilyFi's Cloudflare tunnel on your own domain). Use a sidecar instead when you already run
 Tailscale, or want a VPN or reverse proxy in front of FamilyFi. Set it up with the wiki guide, then
-choose it under **My domain** and enter its HTTPS address:
+choose **Tailscale** or **My domain** and enter its HTTPS address:
 
 - [My domain: VPN or reverse proxy](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network)
   — including an NGINX sidecar next to FamilyFi.
@@ -152,7 +152,7 @@ token the dashboard shows, and add the service:
 
 In the tunnel's **Public Hostname** settings, point your hostname (for example
 `familyfi.example.com`) at service `http://app:7002`. Do **not** add 7002 to the app's `ports`.
-Then on **Pair Device** choose **My domain → Cloudflare Tunnel → Advanced** and enter
+Then on **Pair Device** choose **Cloudflare → Advanced** and enter
 `https://familyfi.example.com`. FamilyFi never sees the tunnel token: it lives only in your `.env`
 and the sidecar. To put Cloudflare Access in front of it, see
 [operations](operations.md#your-own-cloudflare-tunnel-and-cloudflare-access-advanced).
