@@ -75,7 +75,7 @@ guarantee and a 200-request concurrency limit. For a permanent address, use **My
 
 ### Cloudflare Tunnel on your own domain (Automatic)
 
-Choose **My domain → Cloudflare Tunnel → Automatic**, enter a hostname on a domain in your
+Choose **Cloudflare → Automatic**, enter a hostname on a domain in your
 Cloudflare account (for example `familyfi.example.com`), and **Connect with Cloudflare**. FamilyFi
 shows a Cloudflare link; open it, pick the domain, and come back — the page updates by itself.
 FamilyFi then:
@@ -100,7 +100,7 @@ there. Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key
 
 1. Create the tunnel, and point its public hostname at the phone-only gateway, `http://app:7002`
    (with `FAMILYFI_PHONE_GATEWAY_PORT=7002`) — never at the app on 7001.
-2. On **Pair Device**, choose **My domain → Cloudflare Tunnel → Advanced**, enter
+2. On **Pair Device**, choose **Cloudflare → Advanced**, enter
    `https://<your hostname>`, and **Use this address**. Phones use it like any other trusted route.
 
 **Cloudflare Access** adds a second barrier: Cloudflare turns away any request that doesn't carry

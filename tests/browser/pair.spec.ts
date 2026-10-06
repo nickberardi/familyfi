@@ -421,3 +421,26 @@ test("Home access suggests this address, saves a home network address, and agent
     await page.request.put("/api/v1/connection/home", { headers: await csrf(page), data: { url: null } });
   }
 });
+
+test("Home access warns, and agent codes are still issued, when FamilyFi was opened at a public address and none is saved", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  // Stands in for a browser that reached FamilyFi through an authenticating proxy on a public name.
+  await page.route("**/api/v1/connection/home", (route) =>
+    route.request().method() === "GET"
+      ? route.fulfill({ json: { home: { url: null, current: { url: "https://familyfi.example.com", private: false } } } })
+      : route.fallback(),
+  );
+  await page.goto("/pair");
+  const card = page.getByTestId("home-access");
+  await expect(card.getByTestId("home-warning")).toBeVisible();
+  await expect(card.getByTestId("home-url")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Set address" })).toBeVisible();
+
+  await page.goto("/reference");
+  await page.getByRole("button", { name: "Connect an agent" }).click();
+  const sheet = page.getByRole("dialog", { name: "Connect an agent" });
+  await expect(page.getByTestId("agent-home-warning")).toBeVisible();
+  await sheet.getByRole("button", { name: "Show prompt" }).click();
+  await expect(page.getByTestId("agent-prompt")).toContainText("pairing code is");
+  await expect(page.getByTestId("agent-home-warning")).toBeVisible();
+});
