@@ -1,11 +1,13 @@
 import { RuleKind, RuleMode, RuleScope } from "@prisma/client";
+import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import {
   householdNetworkScope,
-  publicRule,
+  presentRule,
+  presentRules,
   RuleCreateBody,
   RuleInputError,
   ruleInclude,
@@ -22,7 +24,9 @@ export async function GET(request: Request) {
       include: ruleInclude,
       orderBy: [{ scope: "asc" }, { createdAt: "asc" }],
     });
-    return Response.json({ rules: rules.map(publicRule) });
+    // The built-in quarantine rule covers no group, so a group's list leaves it out; it leads every other.
+    rules.sort((a, b) => Number(b.id === QUARANTINE_RULE_ID) - Number(a.id === QUARANTINE_RULE_ID));
+    return Response.json({ rules: await presentRules(rules) });
   });
 }
 
@@ -51,7 +55,7 @@ export async function POST(request: Request) {
       );
       const rule = await saveRule(input);
       const change = await enqueueChange("rule");
-      return Response.json({ rule: publicRule(rule), change }, { status: 201 });
+      return Response.json({ rule: await presentRule(rule), change }, { status: 201 });
     } catch (error) {
       if (error instanceof RuleInputError) return jsonError(error.status, error.code, error.message);
       throw error;

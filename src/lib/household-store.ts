@@ -222,11 +222,20 @@ export function createHouseholdStore(deps: {
       let rules = state.rules;
       if (result.rule) rules = upsertBy(rules, result.rule, (rule) => rule.id);
       if (result.removedRuleId) rules = rules.filter((rule) => rule.id !== result.removedRuleId);
+      // The built-in quarantine rule's switch is the household's quarantine setting: keep both in step.
+      let household = result.household ?? state.household;
+      if (result.rule?.builtIn === "quarantine" && household) household = { ...household, quarantineEnforced: result.rule.enabled };
+      if (result.household) {
+        const enforced = result.household.quarantineEnforced;
+        rules = rules.map((rule) =>
+          rule.builtIn !== "quarantine" ? rule : { ...rule, enabled: enforced, pause: enforced ? rule.pause : { active: false, until: null, kind: "pause", by: null } },
+        );
+      }
       set({
         groups: next.groups,
         devices: next.devices,
         rules,
-        ...(result.household ? { household: result.household } : {}),
+        household,
         ...(result.unifi ? { unifi: result.unifi } : {}),
         ...(result.account ? { accounts: upsertBy(state.accounts, result.account, (account) => account.id) } : {}),
         notice: feedback?.notice ?? "Saved.",

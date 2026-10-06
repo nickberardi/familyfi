@@ -1,12 +1,21 @@
 import { RuleLiftKind } from "@prisma/client";
 import { z } from "zod";
+import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
+import { demoLocked } from "./demo";
 import { sessionActor } from "./groups";
 import { readJson } from "./guard";
 import { jsonError } from "./http";
-import { activeWindowsEnd, publicRule, ruleInclude, ruleInternetWindows } from "./rules";
+import {
+  activeWindowsEnd,
+  isQuarantineRule,
+  presentRule,
+  ruleInclude,
+  ruleInternetWindows,
+  setQuarantineEnforced,
+} from "./rules";
 
 export type LiftAction = "pause" | "resume" | "extend" | "allow" | "disallow";
 
@@ -33,6 +42,9 @@ export async function runLift(
 
   const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: ruleInclude });
   if (!rule || rule.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
+  const quarantine = isQuarantineRule(rule);
+  // Quarantine blocks around the clock and covers no group: it is paused, never allowed.
+  if (quarantine && (action === "allow" || action === "disallow")) return builtInRefusal();
   const link = target.groupId ? rule.groups.find((item) => item.groupId === target.groupId) : undefined;
   if (target.groupId && !link) return jsonError(404, "not_found", "That group does not have this rule.");
   const state = link ?? rule;
@@ -43,7 +55,8 @@ export async function runLift(
     const kind = action === "resume" ? RuleLiftKind.pause : RuleLiftKind.allow;
     if (state.pauseActive && state.pauseKind === kind) data = CLEARED;
   } else {
-    if (!rule.enabled) return jsonError(409, "rule_off", "This rule is off.");
+    const enabled = quarantine ? (await household()).quarantineEnforced : rule.enabled;
+    if (!enabled) return jsonError(409, "rule_off", "This rule is off.");
     if (action === "extend") {
       if (!state.pauseActive || state.pauseKind !== RuleLiftKind.pause) return jsonError(409, "not_paused", "Extend requires an active pause.");
       if (!state.pauseUntil) return jsonError(409, "indefinite", "An indefinite pause has no expiry to extend.");
@@ -77,7 +90,25 @@ export async function runLift(
   }
   const fresh = await prisma().rule.findUniqueOrThrow({ where: { id: rule.id }, include: ruleInclude });
   const change = await enqueueChange(action === "disallow" ? "allow" : action);
-  return Response.json({ rule: publicRule(fresh), change });
+  return Response.json({ rule: await presentRule(fresh), change });
+}
+
+/** What editing or deleting the built-in quarantine rule answers. */
+export function builtInRefusal(): Response {
+  return jsonError(409, "rule_built_in", "Quarantine is built in: it can be switched on or off, paused and resumed, not edited.");
+}
+
+/**
+ * Switches the built-in quarantine rule, which is the household's quarantine setting: the same
+ * write as `PUT /settings/household` with `quarantineEnforced`, so demo mode refuses it too.
+ */
+export async function switchQuarantineRule(enabled: boolean): Promise<Response> {
+  const locked = demoLocked();
+  if (locked) return locked;
+  await setQuarantineEnforced(enabled);
+  const change = await enqueueChange("quarantine");
+  const rule = await prisma().rule.findUniqueOrThrow({ where: { id: QUARANTINE_RULE_ID }, include: ruleInclude });
+  return Response.json({ rule: await presentRule(rule), change });
 }
 
 async function household() {

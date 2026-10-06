@@ -51,7 +51,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/accounts` | Personal adult accounts; recovery `admin` is listed and cannot be created here |
 | GET/PUT/DELETE | `/api/v1/accounts/{id}` | Recovery admin cannot be edited or deleted; an adult who stops being an administrator (`isAdmin: false`) is signed out everywhere: their sessions end, every phone, Watch and agent acting as them is removed, and their pending invites are cancelled |
 | PUT | `/api/v1/accounts/{id}/password` | Revokes that account's sessions; recovery uses `.env` |
-| GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false (a new household's default) keeps quarantine policies on UniFi with `enabled: false` |
+| GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false (a new household's default) keeps quarantine policies on UniFi with `enabled: false`. It is the built-in quarantine rule's switch, and turning it off ends a pause on that rule |
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |
 | GET | `/api/v1/connection` | Authenticated endpoint manifest, FamilyFi-to-UniFi status, and the account's last attributed change |
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
@@ -69,7 +69,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |
-| GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list |
+| GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list. The list leads with the built-in quarantine rule (id `quarantine`, `builtIn: "quarantine"`, no `groupIds`): its `enabled` is `quarantineEnforced`, its policies the quarantine policies; it is switched, paused, extended and resumed, never edited, deleted or allowed (409 `rule_built_in`). A Watch or agent may pause it but not switch it |
 | GET/PATCH/DELETE | `/api/v1/rules/{id}` | PATCH changes anything but `kind` and `scope`; `windows` replaces the list, and a window sent with its `id` keeps its UniFi policy. DELETE removes the rule's recorded policies |
 | POST | `/api/v1/rules/{id}/off` | Turns a rule off; its policies stay, disabled. Ends any pause on it |
 | POST | `/api/v1/rules/{id}/on` | Turns a rule on |

@@ -38,13 +38,18 @@ export function rulesScopeHref(groupId: string | null): string {
   return groupId ? `/rules?group=${groupId}` : "/rules";
 }
 
-/** A rule's own page. */
-export function ruleHref(rule: Pick<Rule, "id">): string {
-  return `/rules/${rule.id}`;
+/** A rule's own page. Quarantine cannot be edited, so it opens the devices it holds instead. */
+export function ruleHref(rule: Pick<Rule, "id"> & Partial<Pick<Rule, "builtIn">>): string {
+  return rule.builtIn === "quarantine" ? "/devices" : `/rules/${rule.id}`;
 }
 
 /** Who a rule covers, by name: its groups, or its whole networks. */
-export function ruleAppliesTo(rule: Pick<Rule, "scope" | "groupIds" | "networkIds">, groups: Pick<Group, "id" | "name">[], networks: Network[]): string[] {
+export function ruleAppliesTo(
+  rule: Pick<Rule, "scope" | "groupIds" | "networkIds"> & Partial<Pick<Rule, "builtIn">>,
+  groups: Pick<Group, "id" | "name">[],
+  networks: Network[],
+): string[] {
+  if (rule.builtIn === "quarantine") return [RULES_COPY.unassigned];
   return rule.scope === "network"
     ? rule.networkIds.map((id) => networks.find((network) => network.id === id)?.name ?? "Network")
     : rule.groupIds.map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group");
@@ -97,6 +102,7 @@ export const RULES_COPY = {
   all: "All",
   when: "When",
   appliesTo: "Applies to",
+  unassigned: "Unassigned devices",
   footnote:
     "Each window is its own UniFi policy. Edits are desired configuration, written to UniFi on the next reconcile; Sync shows whether the gateway accepted them.",
 } as const;

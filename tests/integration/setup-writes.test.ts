@@ -75,7 +75,7 @@ describe("setup writes", () => {
 
     const result = await saveSchedules(api, [bedtime, homework], saved.members, {});
     expect(result.error).toBeNull();
-    const rules = await prisma().rule.findMany({ include: { groups: true, windows: true }, orderBy: { name: "asc" } });
+    const rules = await prisma().rule.findMany({ where: { id: { not: "quarantine" } }, include: { groups: true, windows: true }, orderBy: { name: "asc" } });
     const byId = new Map(groups.map((group) => [group.id, group.name]));
     expect(
       rules.map((rule) => ({
@@ -104,7 +104,7 @@ describe("setup writes", () => {
     const retried = await saveSchedules(api, [bedtime], second.members, made.created);
     expect(retried.error).toBeNull();
 
-    const rules = await prisma().rule.findMany({ include: { groups: { include: { group: true } } } });
+    const rules = await prisma().rule.findMany({ where: { id: { not: "quarantine" } }, include: { groups: { include: { group: true } } } });
     expect(rules.map((rule) => [rule.name, rule.groups.map((link) => link.group.name).sort()])).toEqual([["Children’s bedtime", ["Leo", "Mia"]]]);
 
     const leo = second.members.find((member) => member.name === "Leo")!;

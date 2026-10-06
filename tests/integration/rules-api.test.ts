@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AssignmentState, FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
+import { GET as getHousehold, PUT as putHousehold } from "@/app/api/v1/settings/household/route";
 import { DELETE as deleteGroup, GET as getGroup } from "@/app/api/v1/groups/[id]/route";
 import { GET as listRules, POST as createRule } from "@/app/api/v1/rules/route";
 import { POST as allowRule } from "@/app/api/v1/rules/[id]/allow/route";
@@ -45,6 +46,7 @@ type PublicRule = {
   groupPauses: { groupId: string; pause: { active: boolean; until: string | null; kind: string } }[];
   windows: { id: string; name: string; days: number[]; start: string; end: string }[];
   policyNames: string[];
+  builtIn: string | null;
 };
 type PublicGroup = {
   access: string;
@@ -316,7 +318,8 @@ describe("household rules", () => {
       const response = await postRule(auth, body);
       expect([response.status, ((await response.json()) as { error: { code: string } }).error.code], JSON.stringify(body)).toEqual([status, code]);
     }
-    expect(await prisma().rule.count()).toBe(0);
+    // Only the built-in quarantine rule remains.
+    expect(await prisma().rule.count()).toBe(1);
   });
 
   it("pauses all internet with its own unscheduled policy, and removes it on resume", async () => {
@@ -713,7 +716,7 @@ describe("household rules", () => {
       // The rule that carries it is not a household rule: hidden, and not editable or deletable.
       const block = await prisma().rule.findFirstOrThrow({ where: { systemGroupId: emma.id } });
       const listed = (await (await listRules(request("/api/v1/rules", { auth }))).json()) as { rules: { id: string }[] };
-      expect(listed.rules).toEqual([]);
+      expect(listed.rules.map((rule) => rule.id)).toEqual(["quarantine"]);
       for (const handler of [getRule, patchRule, deleteRule]) {
         const method = handler === getRule ? "GET" : handler === patchRule ? "PATCH" : "DELETE";
         const response = await handler(request(`/api/v1/rules/${block.id}`, { method, auth, headers: { "content-type": "application/json" }, body: method === "PATCH" ? "{}" : undefined }), {
@@ -812,6 +815,121 @@ describe("household rules", () => {
       const later = inMinutes(90);
       const again = ((await (await groupAction(allow, auth, emma.id, JSON.stringify({ until: later.toISOString() }))).json()) as { group: PublicGroup }).group;
       expect(again.allowance.until).toBe(later.toISOString());
+    });
+  });
+
+  describe("the built-in quarantine rule", () => {
+    const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+    const quarantinePolicy = () => policiesNamed(client, "FamilyFi Quarantine")[0];
+    const enforced = async (auth: SessionAuth) =>
+      ((await (await getHousehold(request("/api/v1/settings/household", { auth }))).json()) as { household: { quarantineEnforced: boolean } }).household
+        .quarantineEnforced;
+
+    /** Quarantine on, holding the fixture gateway's unassigned client. */
+    async function quarantining(auth: SessionAuth) {
+      const on = await ruleOf(await ruleAction(turnOnRule, auth, "quarantine", null));
+      await runReconcileOnce();
+      return on;
+    }
+
+    it("leads the rule list, covers no group, and switches quarantine itself", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      await postRule(auth, { name: "Grounded", kind: "internet", groupIds: [emma.id], mode: "always" });
+      const listed = (await (await listRules(request("/api/v1/rules", { auth }))).json()) as { rules: PublicRule[] };
+      expect(listed.rules.map((rule) => [rule.name, rule.builtIn])).toEqual([
+        ["Quarantine", "quarantine"],
+        ["Grounded", null],
+      ]);
+      const [quarantine] = listed.rules;
+      expect(quarantine).toMatchObject({ id: "quarantine", kind: "internet", mode: "always", groupIds: [], enabled: false });
+      expect(quarantine!.policyNames).toEqual(["FamilyFi Quarantine Internal Devices"]);
+      // A group's own list leaves it out.
+      const scoped = (await (await listRules(request(`/api/v1/rules?groupId=${emma.id}`, { auth }))).json()) as { rules: PublicRule[] };
+      expect(scoped.rules.map((rule) => rule.name)).toEqual(["Grounded"]);
+
+      const on = await quarantining(auth);
+      expect(on.enabled).toBe(true);
+      expect(await enforced(auth)).toBe(true);
+      expect(quarantinePolicy()?.enabled).toBe(true);
+      expect(policyMacs(quarantinePolicy()!).length).toBeGreaterThan(0);
+      // Nor does it plan a policy of its own beside the quarantine policy.
+      expect(await prisma().rulePolicy.count({ where: { ruleId: "quarantine" } })).toBe(0);
+
+      const off = await ruleOf(await patch(auth, "quarantine", { enabled: false }));
+      expect(off.enabled).toBe(false);
+      expect(await enforced(auth)).toBe(false);
+      await runReconcileOnce();
+      expect(quarantinePolicy()?.enabled).toBe(false);
+    });
+
+    it("cannot be edited, deleted or allowed", async () => {
+      const auth = await signedIn();
+      await quarantining(auth);
+      expect(await errorCode(await patch(auth, "quarantine", { name: "Loose" }))).toEqual([409, "rule_built_in"]);
+      expect(await errorCode(await patch(auth, "quarantine", { enabled: true, name: "Loose" }))).toEqual([409, "rule_built_in"]);
+      const deleted = await deleteRule(request("/api/v1/rules/quarantine", { method: "DELETE", auth }), { params: Promise.resolve({ id: "quarantine" }) });
+      expect(await errorCode(deleted)).toEqual([409, "rule_built_in"]);
+      for (const handler of [allowRule, disallowRule]) {
+        expect(await errorCode(await ruleAction(handler, auth, "quarantine"))).toEqual([409, "rule_built_in"]);
+      }
+      const stored = await prisma().rule.findUniqueOrThrow({ where: { id: "quarantine" } });
+      expect([stored.name, stored.pauseActive]).toEqual(["Quarantine", false]);
+    });
+
+    it("pauses, extends and resumes like any rule, disabling its policies meanwhile", async () => {
+      const auth = await signedIn();
+      await quarantining(auth);
+      const policies = policiesNamed(client, "FamilyFi Quarantine");
+      const state = () =>
+        policies.map((policy) => {
+          const live = client.state.policies.find((item) => item.id === policy.id);
+          return [live?.enabled, live ? policyMacs(live) : null];
+        });
+      expect(state()).toEqual(policies.map((policy) => [true, policyMacs(policy)]));
+
+      const until = inMinutes(30);
+      const paused = await ruleOf(await ruleAction(pauseRule, auth, "quarantine", { until: until.toISOString() }));
+      expect(paused.pause).toMatchObject({ active: true, until: until.toISOString(), kind: "pause", by: { name: "Recovery admin" } });
+      expect(paused.enabled).toBe(true);
+      await runReconcileOnce();
+      // Disabled in place, keeping their devices; quarantine itself stays on.
+      expect(state()).toEqual(policies.map((policy) => [false, policyMacs(policy)]));
+      expect(await enforced(auth)).toBe(true);
+
+      const extended = await ruleOf(await ruleAction(extendRule, auth, "quarantine", { minutes: 15 }));
+      expect(new Date(extended.pause.until!).getTime()).toBe(until.getTime() + 15 * 60_000);
+
+      const resumed = await ruleOf(await ruleAction(resumeRule, auth, "quarantine", null));
+      expect(resumed.pause.active).toBe(false);
+      await runReconcileOnce();
+      expect(state()).toEqual(policies.map((policy) => [true, policyMacs(policy)]));
+      expect(policiesNamed(client, "FamilyFi Quarantine")).toHaveLength(policies.length);
+    });
+
+    it("blocks again when its pause expires", async () => {
+      const auth = await signedIn();
+      await quarantining(auth);
+      await ruleAction(pauseRule, auth, "quarantine", { until: inMinutes(30).toISOString() });
+      await runReconcileOnce();
+      expect(quarantinePolicy()?.enabled).toBe(false);
+      await prisma().rule.update({ where: { id: "quarantine" }, data: { pauseUntil: inMinutes(-1) } });
+      await runReconcileOnce();
+      expect((await prisma().rule.findUniqueOrThrow({ where: { id: "quarantine" } })).pauseActive).toBe(false);
+      expect(quarantinePolicy()?.enabled).toBe(true);
+    });
+
+    it("refuses a pause while quarantine is off, and turning it off in Settings ends a pause", async () => {
+      const auth = await signedIn();
+      expect(await errorCode(await ruleAction(pauseRule, auth, "quarantine"))).toEqual([409, "rule_off"]);
+      await quarantining(auth);
+      await ruleAction(pauseRule, auth, "quarantine");
+      const put = await putHousehold(
+        request("/api/v1/settings/household", { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ quarantineEnforced: false }) }),
+      );
+      expect(put.status).toBe(200);
+      const rule = await ruleOf(await getRule(request("/api/v1/rules/quarantine", { auth }), { params: Promise.resolve({ id: "quarantine" }) }));
+      expect([rule.enabled, rule.pause.active]).toEqual([false, false]);
     });
   });
 });

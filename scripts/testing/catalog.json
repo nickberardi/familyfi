@@ -765,6 +765,12 @@
         "schedules"
       ]
     },
+    "tests/browser/smoke.spec.ts > Rules: quarantine is a built-in rule that pauses from its card and resumes on Devices": {
+      "categories": [
+        "rules",
+        "devices"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Pause all internet names its scope and can be undone": {
       "categories": [
         "groups",

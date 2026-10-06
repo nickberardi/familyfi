@@ -80,6 +80,22 @@ describe("device scopes", () => {
     }
   });
 
+  it("lets a Watch or an agent pause quarantine, never switch, edit or delete it", () => {
+    const lifts: [string, string][] = [["POST", "/api/v1/rules/quarantine/pause"], ["POST", "/api/v1/rules/quarantine/extend"], ["POST", "/api/v1/rules/quarantine/resume"]];
+    const switches: [string, string][] = [
+      ["POST", "/api/v1/rules/quarantine/on"],
+      ["POST", "/api/v1/rules/quarantine/off"],
+      ["PATCH", "/api/v1/rules/quarantine"],
+      ["DELETE", "/api/v1/rules/quarantine"],
+    ];
+    for (const [client, scope] of [[watch, rulesOnly], [agent, full]] as const) {
+      for (const [method, path] of lifts) expect(allowed(client, scope, method, path), `${client} ${method} ${path}`).toBe(true);
+      for (const [method, path] of switches) expect(allowed(client, scope, method, path), `${client} ${method} ${path}`).toBe(false);
+    }
+    expect(allowed(agent, readOnly, "GET", "/api/v1/rules/quarantine")).toBe(true);
+    for (const [method, path] of switches) expect(allowed(phone, full, method, path), `phone ${method} ${path}`).toBe(true);
+  });
+
   it("lets an agent disconnect only itself", () => {
     expect(allowed(agent, readOnly, "DELETE", "/api/v1/paired/devices/device-1")).toBe(true);
     expect(allowed(agent, full, "DELETE", "/api/v1/paired/devices/device-2")).toBe(false);

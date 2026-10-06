@@ -18,6 +18,8 @@ export type RuleActionSpec = {
  */
 export function ruleActionSpecs(rule: Rule, timezone: string, now: Date): RuleActionSpec[] {
   if (!rule.enabled) return [];
+  // Quarantine blocks around the clock: it is paused, never allowed.
+  if (rule.builtIn === "quarantine" && !rulePaused(rule, now)) return [{ label: "Pause rule", run: "pause" }];
   if (rulePaused(rule, now) && rule.pause.kind === "allow") {
     return [{ label: "Resume schedule", strong: true, run: "disallow" }, { label: "Pause rule", run: "pause" }];
   }

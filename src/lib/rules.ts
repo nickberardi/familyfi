@@ -10,6 +10,13 @@ export type RulePause = { active: boolean; until: string | null; kind: "pause" |
 
 export type RuleWindow = { id?: string; name: string; days: number[]; start: string; end: string };
 
+/**
+ * The id of the household's built-in quarantine rule: it blocks unassigned devices, and its
+ * switch is the household's quarantine setting. It cannot be edited or deleted, only switched,
+ * paused, extended and resumed.
+ */
+export const QUARANTINE_RULE_ID = "quarantine";
+
 export type Rule = {
   id: string;
   name: string;
@@ -28,6 +35,8 @@ export type Rule = {
   windows: (RuleWindow & { id: string })[];
   useGeneratedName: boolean;
   policyNames: string[];
+  /** Set on a rule FamilyFi provides, which cannot be edited or deleted; null on the household's own. */
+  builtIn: "quarantine" | null;
 };
 
 export const MAX_RULE_NAME = 60;
@@ -178,7 +187,8 @@ export function alwaysWindow(ruleName: string): InternetWindow {
 }
 
 /** What a rule blocks, in the words its card uses. */
-export function ruleBlocksLabel(rule: Pick<Rule, "kind" | "targetIds" | "domains">, catalogNames: Map<string, string>): string {
+export function ruleBlocksLabel(rule: Pick<Rule, "kind" | "targetIds" | "domains"> & Partial<Pick<Rule, "builtIn">>, catalogNames: Map<string, string>): string {
+  if (rule.builtIn === "quarantine") return "All internet · every unassigned device";
   if (rule.kind === "internet") return "All internet · every device";
   if (rule.kind === "domain") {
     const shown = rule.domains.slice(0, 2).join(", ") + (rule.domains.length > 2 ? "…" : "");

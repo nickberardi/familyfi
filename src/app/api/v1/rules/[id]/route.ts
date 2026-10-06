@@ -3,8 +3,11 @@ import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
+import { builtInRefusal, switchQuarantineRule } from "@/server/rule-lifts";
 import {
   householdNetworkScope,
+  isQuarantineRule,
+  presentRule,
   publicRule,
   RuleInputError,
   ruleInclude,
@@ -20,7 +23,7 @@ export async function GET(request: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const rule = await prisma().rule.findUnique({ where: { id }, include: ruleInclude });
     if (!rule || rule.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
-    return Response.json({ rule: publicRule(rule) });
+    return Response.json({ rule: await presentRule(rule) });
   });
 }
 
@@ -38,8 +41,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid rule update.");
     const existing = await prisma().rule.findUnique({ where: { id }, include: ruleInclude });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
-    const current = publicRule(existing);
     const patch = parsed.data;
+    if (isQuarantineRule(existing)) {
+      // Its switch is all that changes: anything else in the patch is an edit.
+      const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
+      if (keys.length !== 1 || patch.enabled === undefined) return builtInRefusal();
+      return switchQuarantineRule(patch.enabled);
+    }
+    const current = publicRule(existing);
     try {
       const input = await validateRule(
         {
@@ -60,7 +69,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       );
       const rule = await saveRule(input, id);
       const change = await enqueueChange("rule");
-      return Response.json({ rule: publicRule(rule), change });
+      return Response.json({ rule: await presentRule(rule), change });
     } catch (error) {
       if (error instanceof RuleInputError) return jsonError(error.status, error.code, error.message);
       throw error;
@@ -76,6 +85,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
       include: { policies: true },
     });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
+    if (isQuarantineRule(existing)) return builtInRefusal();
     // Delete recorded UniFi policies only (D3). Never touch a group's pause AppPolicy rows.
     const household = await prisma().household.findUnique({ where: { id: "default" } });
     if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {

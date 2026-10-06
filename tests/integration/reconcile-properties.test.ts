@@ -49,6 +49,8 @@ type World = {
   manageAll: boolean;
   managed: string[];
   quarantineEnforced: boolean;
+  /** The built-in quarantine rule is paused. */
+  quarantinePaused: boolean;
   groups: GroupSpec[];
   rules: RuleSpec[];
   places: Place[];
@@ -86,6 +88,7 @@ const world: fc.Arbitrary<World> = fc.record({
   manageAll: fc.boolean(),
   managed: fc.subarray([INTERNAL_NETWORK, IOT_NETWORK]),
   quarantineEnforced: fc.boolean(),
+  quarantinePaused: fc.boolean(),
   groups: fc.array(
     fc.record({ paused: fc.boolean(), allowed: fc.boolean() }),
     { minLength: GROUP_COUNT, maxLength: GROUP_COUNT },
@@ -172,6 +175,7 @@ async function build(spec: World): Promise<{ client: Client; groupIds: string[];
   await resetDatabase();
   await configureConnectedHousehold({ manageAllNetworks: spec.manageAll, managedNetworkIds: spec.managed });
   await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: spec.quarantineEnforced } });
+  if (spec.quarantinePaused) await prisma().rule.update({ where: { id: "quarantine" }, data: { pauseActive: true, pauseUntil: PAUSED_UNTIL() } });
   const client = createFixtureUnifiClient();
   client.state.clients = [];
   spec.places.forEach((where, mac) => placeClient(client, mac, where));
@@ -400,10 +404,13 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
   }
 
   // Enforcement: a pause is an unscheduled block, quarantine follows the household
-  // switch, and a rule's windows are UniFi schedules named after the rule.
+  // switch unless its built-in rule is paused, and a rule's windows are UniFi schedules
+  // named after the rule.
+  const quarantineRule = rules.find((rule) => rule.id === "quarantine");
+  const quarantineBlocks = household.quarantineEnforced && !(quarantineRule && rulePaused(quarantineRule));
   for (const { row, policy } of ours) {
     if (row.ownerScope === "quarantine") {
-      expect(policy.enabled, `quarantine ${policy.name}`).toBe(household.quarantineEnforced);
+      expect(policy.enabled, `quarantine ${policy.name}`).toBe(quarantineBlocks);
       continue;
     }
     expect(policy.enabled, `pause ${policy.name}`).toBe(true);
@@ -467,6 +474,7 @@ describe("reconciliation properties", () => {
                 manageAll: false,
                 managed: [IOT_NETWORK],
                 quarantineEnforced: false,
+                quarantinePaused: false,
                 groups: [
                   { paused: false, allowed: false },
                   { paused: false, allowed: false },
