@@ -230,6 +230,28 @@ describe("household store", () => {
     ]);
   });
 
+  it("keeps the quarantine rule's switch and the household's quarantine setting in step", async () => {
+    const quarantine = { ...bedtime, id: "quarantine", name: "Quarantine", groupIds: [], builtIn: "quarantine" as const, enabled: true };
+    const pausedQuarantine = { ...quarantine, pause: { active: true, until: null, kind: "pause" as const, by: null } };
+    const household = { timezone: "America/New_York", revision: 1, displayName: "A household", quarantineEnforced: true };
+    const { store } = setup({
+      ...reads(() => childGroup()),
+      "GET /api/v1/rules": () => ({ json: { rules: [pausedQuarantine, bedtime] } }),
+      "GET /api/v1/settings/household": () => ({ json: { household } }),
+      "PATCH /api/v1/rules/quarantine": () => ({ json: { rule: { ...quarantine, enabled: false } } }),
+      "PUT /api/v1/settings/household": () => ({ json: { household: { ...household, quarantineEnforced: false } } }),
+    });
+    await store.reload();
+    await store.mutate((send) => send("/api/v1/rules/quarantine", { method: "PATCH", body: { enabled: false } }));
+    expect(store.getState().household?.quarantineEnforced).toBe(false);
+
+    await store.reload();
+    await store.mutate((send) => send("/api/v1/settings/household", { method: "PUT", body: { quarantineEnforced: false } }));
+    const rule = store.getState().rules.find((item) => item.id === "quarantine");
+    expect([rule?.enabled, rule?.pause.active]).toEqual([false, false]);
+    expect(store.getState().rules.find((item) => item.id === bedtime.id)).toEqual(bedtime);
+  });
+
   it("merges a returned account and UniFi settings", async () => {
     const { store } = setup({
       ...reads(() => childGroup()),

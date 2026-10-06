@@ -82,6 +82,7 @@ export const DEVICES_COPY = {
   quarantineBody: "New arrivals stay off the internet until assigned. A new household starts with it off; turn it on once your devices are in groups.",
   quarantineOn: "Enforced",
   quarantineOff: "Off",
+  quarantineResume: "Resume",
   loading: "Loading devices…",
   detailLoading: "Loading device…",
   detailUnavailable: "Device details are unavailable right now.",

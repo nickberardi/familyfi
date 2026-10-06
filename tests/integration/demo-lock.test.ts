@@ -12,6 +12,10 @@ import { POST as createGroup } from "@/app/api/v1/groups/route";
 import { DELETE as clearGroupResolver, PUT as setGroupResolver } from "@/app/api/v1/groups/[id]/resolver/route";
 import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
 import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
+import { PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
+import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
+import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
+import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
 import { PUT as setHousehold } from "@/app/api/v1/settings/household/route";
 import { PUT as setUnifi } from "@/app/api/v1/settings/unifi/route";
 import { DELETE as clearResolver, PUT as setResolver } from "@/app/api/v1/upstream/resolver/route";
@@ -80,6 +84,10 @@ describe("demo mode", () => {
       await computePin(write(auth, "/api/v1/connection/pins", "POST", { url: "https://192.0.2.10:8443" })),
       await setTunnel(write(auth, "/api/v1/connection/tunnel", "PUT", { mode: "quick" })),
       await setHome(write(auth, "/api/v1/connection/home", "PUT", { url: "http://192.168.1.10:7001" })),
+      // The built-in quarantine rule's switch is the household's quarantine setting.
+      await turnOnRule(write(auth, "/api/v1/rules/quarantine/on", "POST"), params({ id: "quarantine" })),
+      await turnOffRule(write(auth, "/api/v1/rules/quarantine/off", "POST"), params({ id: "quarantine" })),
+      await patchRule(write(auth, "/api/v1/rules/quarantine", "PATCH", { enabled: true }), params({ id: "quarantine" })),
     ];
     for (const response of responses) {
       expect(response.status).toBe(403);
@@ -98,6 +106,9 @@ describe("demo mode", () => {
     const { group } = (await created.json()) as { group: { id: string } };
     const paused = await pauseGroupRule(write(auth, `/api/v1/groups/${group.id}/rules/internet/pause`, "POST"), params({ id: group.id, ruleId: "internet" }));
     expect(paused.status).toBe(200);
+    // Quarantine is paused like any rule; only its switch is configuration.
+    await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: true } });
+    expect((await pauseRule(write(auth, "/api/v1/rules/quarantine/pause", "POST"), params({ id: "quarantine" }))).status).toBe(200);
 
     const route = await prisma().connectionEndpoint.findUniqueOrThrow({ where: { url: DEMO_URL } });
     expect(route).toMatchObject({ kind: "own", transport: "lan", trustMode: "system", edgeAuth: "none" });

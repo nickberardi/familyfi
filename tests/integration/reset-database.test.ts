@@ -49,9 +49,9 @@ describe("resetDatabase", () => {
 
     await resetDatabase();
 
-    // Only the household and the recovery account come back, seeded by the reset itself.
+    // Only the household, its built-in quarantine rule and the recovery account come back, seeded by the reset itself.
     const after = await rowCounts();
     const leftovers = Object.fromEntries(Object.entries(after).filter(([, count]) => count > 0));
-    expect(leftovers).toEqual({ Household: 1, Account: 1 });
+    expect(leftovers).toEqual({ Household: 1, Rule: 1, Account: 1 });
   });
 });

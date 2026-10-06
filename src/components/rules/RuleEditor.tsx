@@ -45,6 +45,16 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
     if (loading) return null;
     return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{COPY.notFound}</p>;
   }
+  if (rule?.builtIn) {
+    return (
+      <p className="p-6 text-[14px] text-[var(--ff-muted)]">
+        {COPY.builtIn}{" "}
+        <Link href={ruleEditorBack(null, []).href} className="text-[var(--ff-accent)]">
+          {ruleEditorBack(null, []).label}
+        </Link>
+      </p>
+    );
+  }
   return (
     <RuleEditor
       key={rule?.id ?? "new"}

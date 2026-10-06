@@ -99,8 +99,9 @@ export function rulePauseSheetTitle(rule: Pick<Rule, "name">, mode: PauseSheetMo
   return mode === "extend" ? `Keep ${rule.name} paused longer?` : `Pause ${rule.name}?`;
 }
 
-export function rulePauseSheetBody(rule: Pick<Rule, "groupIds" | "scope">, mode: PauseSheetMode): string {
+export function rulePauseSheetBody(rule: Pick<Rule, "groupIds" | "scope"> & Partial<Pick<Rule, "builtIn">>, mode: PauseSheetMode): string {
   if (mode === "extend") return "The rule stays lifted for longer. Resume brings it back sooner.";
+  if (rule.builtIn === "quarantine") return "Unassigned devices can reach the internet until it ends. Rules and pauses on groups stay as they are.";
   const covered =
     rule.scope === "network"
       ? "everything on its networks"

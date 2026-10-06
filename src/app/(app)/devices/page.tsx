@@ -15,6 +15,9 @@ import {
   type DeviceFilterId,
 } from "@/lib/device-list";
 import { deleteDevice, setQuarantineEnforced } from "@/lib/device-writes";
+import { runRuleAction } from "@/lib/group-writes";
+import { ruleStateLine } from "@/lib/rule-actions";
+import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { deviceKindLabel } from "@/lib/display";
@@ -32,7 +35,7 @@ export default function DevicesPage() {
 }
 
 function DevicesBody() {
-  const { devices, groups, unifi, household, store, busy } = useAppData();
+  const { devices, groups, rules, unifi, household, store, busy } = useAppData();
   const searchParams = useSearchParams();
   const assignGroupId = searchParams.get("assign");
   const assignGroup = groups.find((group) => group.id === assignGroupId) ?? null;
@@ -49,6 +52,8 @@ function DevicesBody() {
   }, []);
   const networks = unifi?.networks ?? [];
   const enforced = household?.quarantineEnforced === true;
+  const quarantineRule = rules.find((rule) => rule.id === QUARANTINE_RULE_ID);
+  const pausedLine = quarantineRule && enforced ? ruleStateLine(quarantineRule, household?.timezone ?? "UTC", now) : null;
 
   const rows = useMemo(() => filterDevices(devices, groups, filter, query), [devices, filter, groups, query]);
 
@@ -57,7 +62,14 @@ function DevicesBody() {
       <PageHeader title={COPY.title} sub={COPY.subtitle} />
       <div className="flex flex-col gap-4 p-4 md:p-6">
         {assignGroup ? <AssignNeededBanner group={assignGroup} /> : null}
-        {household ? <QuarantineCard enforced={enforced} onToggle={() => void setQuarantineEnforced(store.mutate, !enforced)} /> : null}
+        {household ? (
+          <QuarantineCard
+            enforced={enforced}
+            onToggle={() => void setQuarantineEnforced(store.mutate, !enforced)}
+            pausedLine={pausedLine}
+            onResume={quarantineRule ? () => void runRuleAction(store.mutate, quarantineRule, "resume") : undefined}
+          />
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">

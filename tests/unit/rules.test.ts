@@ -24,6 +24,7 @@ function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">):
     windows: [],
     useGeneratedName: false,
     policyNames: [],
+    builtIn: null,
     ...partial,
   };
 }

@@ -100,6 +100,7 @@ describe("client rule helpers", () => {
     windows: [{ id: "w", name: "", days: EVERY_DAY, start: "22:00", end: "06:00" }],
     useGeneratedName: false,
     policyNames: [],
+    builtIn: null,
     ...patch,
   });
 
@@ -153,6 +154,7 @@ describe("client rule helpers", () => {
   it("says what a rule blocks", () => {
     const names = new Map([["app:7", "TikTok"]]);
     expect(ruleBlocksLabel(rule({}), names)).toBe("All internet · every device");
+    expect(ruleBlocksLabel(rule({ builtIn: "quarantine" }), names)).toBe("All internet · every unassigned device");
     expect(ruleBlocksLabel(rule({ kind: "category", targetIds: [4] }), names)).toBe("Video only · everything else stays on");
     expect(ruleBlocksLabel(rule({ kind: "app", targetIds: [7, 8] }), names)).toBe("TikTok, App only · everything else stays on");
     expect(ruleBlocksLabel(rule({ kind: "domain", domains: ["a.com", "b.com", "c.com"] }), names)).toBe("3 websites · a.com, b.com…");

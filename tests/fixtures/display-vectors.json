@@ -6051,6 +6051,92 @@
       "expected": []
     },
     {
+      "fn": "ruleActionSpecs",
+      "name": "built-in quarantine rule is paused, never allowed",
+      "input": {
+        "rule": {
+          "id": "quarantine",
+          "name": "Quarantine",
+          "kind": "internet",
+          "scope": "group",
+          "groupIds": [],
+          "networkIds": [],
+          "targetIds": [],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": [
+            "FamilyFi Quarantine Internal Devices"
+          ],
+          "builtIn": "quarantine"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Pause rule",
+          "run": "pause"
+        }
+      ]
+    },
+    {
+      "fn": "ruleActionSpecs",
+      "name": "paused built-in quarantine rule resumes or takes more time",
+      "input": {
+        "rule": {
+          "id": "quarantine",
+          "name": "Quarantine",
+          "kind": "internet",
+          "scope": "group",
+          "groupIds": [],
+          "networkIds": [],
+          "targetIds": [],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": true,
+            "until": "2026-09-15T17:00:00Z",
+            "kind": "pause",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": [
+            "FamilyFi Quarantine Internal Devices"
+          ],
+          "builtIn": "quarantine"
+        },
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z"
+      },
+      "expected": [
+        {
+          "label": "Resume rule",
+          "strong": true,
+          "run": "resume"
+        },
+        {
+          "label": "More time",
+          "run": "extend"
+        }
+      ]
+    },
+    {
       "fn": "ruleStateLine",
       "name": "not paused",
       "input": {
@@ -6664,6 +6750,19 @@
         "mode": "extend"
       },
       "expected": "The rule stays lifted for longer. Resume brings it back sooner."
+    },
+    {
+      "fn": "rulePauseSheetBody",
+      "name": "pause, built-in quarantine rule",
+      "input": {
+        "rule": {
+          "scope": "group",
+          "groupIds": [],
+          "builtIn": "quarantine"
+        },
+        "mode": "pause"
+      },
+      "expected": "Unassigned devices can reach the internet until it ends. Rules and pauses on groups stay as they are."
     },
     {
       "fn": "rulePauseSheetOptions",

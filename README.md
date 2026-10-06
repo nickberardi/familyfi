@@ -28,7 +28,7 @@ A rule blocks all internet, a category (Video, Social, Gaming…), apps or websi
 
 ### Unassigned devices
 
-New clients on the VLANs you opted in to manage show up as unassigned (quarantined in the API). FamilyFi discovers them on a short poll and, once you turn quarantine on in Devices, blocks them until you assign them. A new household starts with quarantine off, so your own devices stay online while you set up groups. Devices on other VLANs are ignored. Immediate admission control is not promised: a brand-new MAC can have internet until the next successful sync.
+New clients on the VLANs you opted in to manage show up as unassigned (quarantined in the API). FamilyFi discovers them on a short poll and, once you turn quarantine on in Devices, blocks them until you assign them. Quarantine is also the built-in rule on Rules, where it can be paused, extended and resumed like any rule, but not edited. A new household starts with quarantine off, so your own devices stay online while you set up groups. Devices on other VLANs are ignored. Immediate admission control is not promised: a brand-new MAC can have internet until the next successful sync.
 
 ### One site, your key
 

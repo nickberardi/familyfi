@@ -1,10 +1,11 @@
 import { Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { z } from "zod";
 import { rulePolicyNames } from "@/lib/policy-names";
-import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain } from "@/lib/rules";
+import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isWindowActive, windowEndsAt, type InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
 import { prisma } from "./db";
+import { quarantinePolicyName } from "./unifi/names";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
 
 export const ruleInclude = {
@@ -33,8 +34,13 @@ function publicPause(state: LiftColumns) {
   };
 }
 
-export function publicRule(rule: RuleWithWindows) {
+/**
+ * The rule as the API shows it. The built-in quarantine rule is on while the household enforces
+ * quarantine (`quarantineEnforced`), which callers pass; `presentRules` reads it for them.
+ */
+export function publicRule(rule: RuleWithWindows, quarantineEnforced = false) {
   const windows = [...rule.windows].sort((a, b) => a.position - b.position);
+  const builtIn = isQuarantineRule(rule);
   return {
     id: rule.id,
     name: rule.name,
@@ -44,7 +50,7 @@ export function publicRule(rule: RuleWithWindows) {
     networkIds: [...rule.networkIds],
     targetIds: [...rule.targetIds],
     domains: [...rule.domains],
-    enabled: rule.enabled,
+    enabled: builtIn ? quarantineEnforced : rule.enabled,
     pause: publicPause(rule),
     groupPauses: rule.groups
       .filter((link) => link.pauseActive)
@@ -60,8 +66,54 @@ export function publicRule(rule: RuleWithWindows) {
     })),
     useGeneratedName: rule.useGeneratedName,
     /** What UniFi's policy table shows for this rule, one per policy in the Internal zone. */
-    policyNames: rulePolicyNames({ ...rule, windows }),
+    policyNames: builtIn ? [quarantinePolicyName("Internal")] : rulePolicyNames({ ...rule, windows }),
+    builtIn: builtIn ? ("quarantine" as const) : null,
   };
+}
+
+/** The rules as the API shows them, reading the household's quarantine switch when one is built in. */
+export async function presentRules(rules: RuleWithWindows[]) {
+  const enforced = rules.some(isQuarantineRule)
+    ? (await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).quarantineEnforced
+    : false;
+  return rules.map((rule) => publicRule(rule, enforced));
+}
+
+export async function presentRule(rule: RuleWithWindows) {
+  return (await presentRules([rule]))[0]!;
+}
+
+export function isQuarantineRule(rule: Pick<RuleWithWindows, "id">): boolean {
+  return rule.id === QUARANTINE_RULE_ID;
+}
+
+/**
+ * The household's built-in quarantine rule, created beside the household. It holds only the
+ * quarantine pause: whether quarantine is on is `Household.quarantineEnforced`, so the row's own
+ * `enabled` stays true, and its policies are the quarantine `AppPolicy` rows, never `RulePolicy`.
+ */
+export async function ensureQuarantineRule(): Promise<void> {
+  await prisma().rule.upsert({
+    where: { id: QUARANTINE_RULE_ID },
+    update: {},
+    create: { id: QUARANTINE_RULE_ID, name: "Quarantine", kind: RuleKind.internet, mode: RuleMode.always },
+  });
+}
+
+/**
+ * Turns quarantine on or off for the household. Turning it off ends a pause on it, as turning
+ * any rule off does. The caller enqueues the change.
+ */
+export async function setQuarantineEnforced(enforced: boolean) {
+  return prisma().$transaction(async (tx) => {
+    if (!enforced) {
+      await tx.rule.updateMany({
+        where: { id: QUARANTINE_RULE_ID },
+        data: { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
+      });
+    }
+    return tx.household.update({ where: { id: "default" }, data: { quarantineEnforced: enforced } });
+  });
 }
 
 /** The rule's windows as the schedule sees them: an always-on rule is one window with no end. */

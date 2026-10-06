@@ -56,6 +56,16 @@ describe("the Rules list", () => {
     expect(rulesScopeHref("g1")).toBe("/rules?group=g1");
     expect(rulesScopeHref(null)).toBe("/rules");
     expect(ruleHref({ id: "r9" })).toBe("/rules/r9");
+    // Quarantine cannot be edited: its card opens the devices it holds.
+    expect(ruleHref({ id: "quarantine", builtIn: "quarantine" })).toBe("/devices");
+  });
+
+  it("shows the built-in quarantine rule only in the full list, covering unassigned devices", () => {
+    const quarantine = rule({ id: "quarantine", groupIds: [], mode: "always", windows: [], builtIn: "quarantine" });
+    const rules = [quarantine, rule({ id: "r1" })];
+    expect(rulesListView(rules, groups, null).list.map((item) => item.id)).toEqual(["quarantine", "r1"]);
+    expect(rulesListView(rules, groups, "g1").list.map((item) => item.id)).toEqual(["r1"]);
+    expect(ruleAppliesTo(quarantine, groups, [])).toEqual(["Unassigned devices"]);
   });
 
   it("names who a rule covers, groups or networks, even when one is gone", () => {

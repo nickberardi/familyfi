@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.25.0
+  version: 0.26.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -758,7 +758,9 @@ paths:
       operationId: listRules
       tags: [Rules]
       summary: List rules
-      description: Every rule, household-wide. `groupId` narrows to the rules covering that group.
+      description: |
+        Every rule, household-wide, led by the built-in quarantine rule (`builtIn: quarantine`).
+        `groupId` narrows to the rules covering that group, which leaves quarantine out.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: groupId
@@ -864,7 +866,8 @@ paths:
         Changes any field except `kind` and `scope`. `windows` replaces the whole list:
         a window sent with its `id` keeps its UniFi policy (renamed or rescheduled in
         place), one without an id is new, and a stored window left out is removed with
-        its policy.
+        its policy. The built-in quarantine rule takes `enabled` alone, as `/on` and `/off`;
+        any other field answers 409 `rule_built_in`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -901,7 +904,7 @@ paths:
       summary: Delete a rule
       description: |
         Deletes the rule and the UniFi policies recorded for it, by id only. A group's
-        pause policy is never touched.
+        pause policy is never touched. The built-in quarantine rule answers 409 `rule_built_in`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -922,6 +925,8 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/rules/{id}/pause:
     post:
       operationId: pauseRule
@@ -932,7 +937,8 @@ paths:
         omit `until` for an indefinite pause. The rule's policies stay on the gateway, disabled.
         Records who paused it and replaces an earlier pause or allowance. A rule that is off
         answers 409 `rule_off`; an `until` in the past answers 400. A group's own pause is
-        separate and unchanged. To suspend the rule for one group only, use
+        separate and unchanged. Pausing the built-in quarantine rule lets unassigned devices online
+        until it ends: its policies stay on the gateway, disabled. To suspend the rule for one group only, use
         `/groups/{id}/rules/{ruleId}/pause`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -1063,7 +1069,8 @@ paths:
         Overrides the rule until `until`: its policies are disabled, like a pause, but the state is
         an allowance. Omit `until` to allow until the windows active now end, or until disallowed for
         an always-on rule (409 `not_in_window` when none is active); `null` allows until disallowed.
-        409 `rule_off` when the rule is off. Ends with `disallow`.
+        409 `rule_off` when the rule is off. Ends with `disallow`. The built-in quarantine rule is
+        paused, never allowed: 409 `rule_built_in`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1111,7 +1118,8 @@ paths:
       summary: End a rule allowance
       description: |
         Ends an allowance: the rule blocks again. A pause is ended by `resume`; disallowing while
-        there is no allowance, or a pause, changes nothing and still returns 200.
+        there is no allowance, or a pause, changes nothing and still returns 200. The built-in
+        quarantine rule answers 409 `rule_built_in`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1137,13 +1145,17 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/rules/{id}/on:
     post:
       operationId: turnOnRule
       tags: [Rules]
       summary: Turn on a rule
       description: |
-        Sets desired enabled true, the counterpart to `/off`.
+        Sets desired enabled true, the counterpart to `/off`. For the built-in quarantine rule
+        this is the household's quarantine switch (`quarantineEnforced` in
+        `/settings/household`), which demo mode refuses with 403 `demo_locked`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1174,7 +1186,9 @@ paths:
       operationId: turnOffRule
       tags: [Rules]
       summary: Turn off a rule
-      description: Sets desired enabled false; the rule's policies stay on the gateway, disabled, and any pause on the rule ends. A group's pause is unchanged.
+      description: |
+        Sets desired enabled false; the rule's policies stay on the gateway, disabled, and any pause on the rule ends. A group's pause is unchanged.
+        For the built-in quarantine rule this turns quarantine off (`quarantineEnforced` false).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -3174,7 +3188,7 @@ components:
     Rule:
       type: object
       additionalProperties: false
-      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames]
+      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 60 }
@@ -3222,6 +3236,15 @@ components:
           items: { $ref: "#/components/schemas/RuleWindow" }
           description: Empty when mode=always
         useGeneratedName: { type: boolean, description: "Name its UniFi policies \"FamilyFi Rule <id>\" instead of after the rule." }
+        builtIn:
+          type: [string, "null"]
+          enum: [quarantine, null]
+          description: |
+            Set on a rule FamilyFi provides; null on the household's own. `quarantine` (id
+            `quarantine`) blocks all internet for unassigned devices on managed networks. It covers
+            no group (`groupIds` empty), cannot be edited or deleted (409 `rule_built_in`), and is
+            paused, extended and resumed like any rule, never allowed. Its `enabled` is the
+            household's `quarantineEnforced`; its policies are the quarantine policies.
         policyNames:
           type: array
           items: { type: string, maxLength: 100 }

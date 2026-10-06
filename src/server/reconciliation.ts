@@ -1,4 +1,5 @@
 import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope } from "@prisma/client";
+import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
 import { prisma } from "./db";
@@ -239,11 +240,14 @@ async function tick(owner: string): Promise<boolean> {
       },
     });
 
-    const [groups, devices, appPolicies] = await Promise.all([
+    const [groups, devices, appPolicies, quarantineRule] = await Promise.all([
       prisma().group.findMany(),
       prisma().device.findMany(),
       prisma().appPolicy.findMany({ where: { connectionIdentity: identity, siteId } }),
+      prisma().rule.findUnique({ where: { id: QUARANTINE_RULE_ID } }),
     ]);
+    // A pause on the built-in quarantine rule disables its policies, which keep their devices.
+    const quarantinePaused = quarantineRule ? isSuspended({ active: quarantineRule.pauseActive, until: quarantineRule.pauseUntil }, now) : false;
     const { policies: desired, retainOwners } = planPolicies({
       installId: household.id,
       destinationZoneId: external.id,
@@ -253,7 +257,7 @@ async function tick(owner: string): Promise<boolean> {
         ...device,
         inScope: networkInScope(scope, device.networkId),
       })),
-      quarantineEnforced: household.quarantineEnforced,
+      quarantineEnforced: household.quarantineEnforced && !quarantinePaused,
     });
     const desiredKeys = new Set(desired.map((item) => item.key));
 
@@ -324,7 +328,8 @@ async function tick(owner: string): Promise<boolean> {
       }
     }
 
-    const rules = await prisma().rule.findMany({ include: { groups: true, windows: true } });
+    // The built-in quarantine rule is enforced by the quarantine policies above, never its own.
+    const rules = await prisma().rule.findMany({ where: { id: { not: QUARANTINE_RULE_ID } }, include: { groups: true, windows: true } });
     const rulePolicies = await prisma().rulePolicy.findMany({
       where: { connectionIdentity: identity, siteId },
     });

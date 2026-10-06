@@ -12,6 +12,9 @@ import { DeviceScope, PairedDeviceClient } from "@prisma/client";
  *   settings changes or connection management, including `GET /connection`, whose manifest carries
  *   Cloudflare Access tokens.
  * - `agent:readOnly`: household reads.
+ *
+ * The built-in quarantine rule's switch is the household's quarantine setting, so a Watch or an
+ * agent may pause, extend and resume it, never switch, edit or delete it.
  */
 
 /** Pause, resume, extend, allow, disallow, on and off on one rule, for every group it covers. */
@@ -19,7 +22,14 @@ const RULE_VERBS = /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallo
 /** The same verbs for one group alone, including its built-in `internet` rule. */
 const GROUP_RULE_VERBS = /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/;
 
+/** The built-in quarantine rule's switch: PATCH, DELETE, on and off. Its other verbs are rule verbs. */
+const QUARANTINE_SWITCH = /^\/api\/v1\/rules\/quarantine(\/(on|off))?$/;
+
 type ScopedCall = { method: string; path: string; deviceId: string };
+
+function changesQuarantineSetting({ method, path }: ScopedCall): boolean {
+  return method !== "GET" && method !== "HEAD" && QUARANTINE_SWITCH.test(path);
+}
 
 function watchRulesOnly({ method, path }: ScopedCall): boolean {
   if (method === "GET") {
@@ -31,6 +41,7 @@ function watchRulesOnly({ method, path }: ScopedCall): boolean {
   }
   // The route itself lets a Watch revoke only itself.
   if (method === "DELETE" && /^\/api\/v1\/paired\/devices\/[^/]+$/.test(path)) return true;
+  if (changesQuarantineSetting({ method, path, deviceId: "" })) return false;
   return method === "POST" && (RULE_VERBS.test(path) || GROUP_RULE_VERBS.test(path));
 }
 
@@ -71,6 +82,7 @@ function agentReadOnly({ method, path, deviceId }: ScopedCall): boolean {
 }
 
 function agentFull(request: ScopedCall): boolean {
+  if (changesQuarantineSetting(request)) return false;
   return agentReadOnly(request) || (AGENT_WRITES[request.method] ?? []).some((pattern) => pattern.test(request.path));
 }
 
