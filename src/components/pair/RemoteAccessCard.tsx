@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import {
-  HOME_NETWORK_GUIDE,
+  MY_DOMAIN_GUIDE,
   OWN_TRANSPORT,
   REMOTE_STATUS,
   TAILSCALE_GUIDE,
@@ -22,18 +22,13 @@ import { PinCheck } from "./PinCheck";
 import { RouteForm } from "./RouteForm";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
-type Top = "off" | "quick" | "named";
-type Via = "home" | "tailscale" | "cloudflare";
+type Top = "off" | "quick" | "tailscale" | "cloudflare" | "myDomain";
 type Cloudflare = "automatic" | "advanced";
 
 const LINK = "inline-flex items-center gap-1 font-semibold text-[var(--ff-accent)] underline";
 
 function top(choice: RemoteChoice): Top {
-  return choice === "off" || choice === "quick" ? choice : "named";
-}
-
-function via(choice: RemoteChoice): Via {
-  return choice === "home" || choice === "tailscale" ? choice : "cloudflare";
+  return choice === "cloudflareAutomatic" || choice === "cloudflareAdvanced" ? "cloudflare" : choice;
 }
 
 function Guide({ href, children }: { href: string; children: string }) {
@@ -46,10 +41,10 @@ function Guide({ href, children }: { href: string; children: string }) {
 }
 
 /**
- * Remote access: the one route phones use to reach home. Off publishes nothing; a quick
- * tunnel needs nothing at all; "My domain" is a permanent address — one you run (home
- * network, Tailscale) or FamilyFi's own Cloudflare tunnel on your domain. Switching
- * publishes that route and turns every other route off, on the server, in one step.
+ * Remote access: the one route phones use to reach home from outside. Off publishes nothing; a
+ * quick tunnel needs nothing at all; Tailscale and Cloudflare are permanent addresses; My domain
+ * is any HTTPS address the household publishes itself. Switching publishes that route and turns
+ * every other route off, on the server, in one step. Home access, the inside address, is apart.
  */
 export function RemoteAccessCard({
   tunnel,
@@ -125,10 +120,10 @@ export function RemoteAccessCard({
       if (leaving(routes?.find((route) => route.kind === "quick")?.id ?? null)) void put({ mode: "quick" });
       return;
     }
-    // "My domain" only opens the choices: nothing is published until one is used.
-    if (top(choice) === "named") return;
-    const firstSaved = (["home", "tailscale", "cloudflareAutomatic"] as const).find((item) => savedRoute(item, routes ?? []));
-    setChoice(firstSaved ?? "home");
+    // The other choices only open their setup: nothing is published until one is used.
+    if (top(choice) === next) return;
+    const advancedOnly = !savedRoute("cloudflareAutomatic", routes ?? []) && savedRoute("cloudflareAdvanced", routes ?? []);
+    setChoice(next === "cloudflare" ? (advancedOnly ? "cloudflareAdvanced" : "cloudflareAutomatic") : next);
     setEditing(false);
   }
 
@@ -206,7 +201,9 @@ export function RemoteAccessCard({
           segments={[
             { value: "off", label: "Off", disabled: busy || loading },
             { value: "quick", label: "Quick tunnel", disabled: busy || loading || noBinary },
-            { value: "named", label: "My domain", disabled: busy || loading },
+            { value: "tailscale", label: "Tailscale", disabled: busy || loading || settingUp },
+            { value: "cloudflare", label: "Cloudflare", disabled: busy || loading },
+            { value: "myDomain", label: "My domain", disabled: busy || loading || settingUp },
           ]}
         />
 
@@ -219,31 +216,12 @@ export function RemoteAccessCard({
           </p>
         ) : null}
 
-        {top(choice) === "named" ? (
+        {choice !== "off" && choice !== "quick" ? (
           <>
-            <div className="flex flex-col gap-2">
-              <div className="font-semibold text-[var(--ff-muted)]">How phones reach home</div>
-              <Segmented
-                name="How phones reach home"
-                value={via(choice)}
-                grow
-                onChange={(next) => {
-                  setError("");
-                  setEditing(false);
-                  setChoice(next === "cloudflare" ? "cloudflareAutomatic" : next);
-                }}
-                segments={[
-                  { value: "home", label: "Home network", disabled: busy || settingUp },
-                  { value: "tailscale", label: "Tailscale", disabled: busy || settingUp },
-                  { value: "cloudflare", label: "Cloudflare Tunnel", disabled: busy || settingUp },
-                ]}
-              />
-            </div>
-
-            {choice === "home" ? (
+            {choice === "myDomain" ? (
               <p className="text-[var(--ff-muted)]">
-                An address on your home network — reached directly on Wi-Fi, over your VPN, or through your reverse proxy.{" "}
-                <Guide href={HOME_NETWORK_GUIDE}>Set up a VPN or reverse proxy</Guide>
+                An address you publish yourself, through your own reverse proxy or tunnel. You provide its HTTPS certificate.{" "}
+                <Guide href={MY_DOMAIN_GUIDE}>Set up a reverse proxy</Guide>
               </p>
             ) : null}
             {choice === "tailscale" ? (
@@ -278,7 +256,7 @@ export function RemoteAccessCard({
               )
             ) : null}
 
-            {via(choice) === "cloudflare" ? (
+            {top(choice) === "cloudflare" ? (
               <Segmented
                 name="Cloudflare setup"
                 value={choice === "cloudflareAdvanced" ? "advanced" : ("automatic" as Cloudflare)}

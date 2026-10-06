@@ -57,10 +57,9 @@ async function cleanUp(page: Page, urls: string[]) {
   }
 }
 
-async function publishHomeNetwork(page: Page, url: string) {
+async function publishMyDomain(page: Page, url: string) {
   const card = page.getByTestId("remote-access");
   await card.getByRole("button", { name: "My domain" }).click();
-  await card.getByRole("group", { name: "How phones reach home" }).getByRole("button", { name: "Home network" }).click();
   await card.getByLabel("Address").fill(url);
   return card;
 }
@@ -85,7 +84,7 @@ test("going back to Off from an unsaved My domain choice switches the picker to 
   }
 });
 
-test("publishes a home-network route, pairs a phone through it, and revokes it", { tag: "@desktop" }, async ({ page }) => {
+test("publishes a My domain route, pairs a phone through it, and revokes it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const url = `https://pair-e2e-${Date.now()}.home`;
   page.on("dialog", (dialog) => void dialog.accept());
@@ -98,8 +97,8 @@ test("publishes a home-network route, pairs a phone through it, and revokes it",
     await expect(page.getByRole("button", { name: "Pair a phone" })).toHaveCount(0);
     await expect(page.getByText("Turn on remote access, then pair a phone.")).toBeVisible();
 
-    const card = await publishHomeNetwork(page, url);
-    await expect(card.getByRole("link", { name: /Set up a VPN or reverse proxy/ })).toHaveAttribute("href", /\/wiki\/Remote-access-home-network$/);
+    const card = await publishMyDomain(page, url);
+    await expect(card.getByRole("link", { name: /Set up a reverse proxy/ })).toHaveAttribute("href", /\/wiki\/Remote-access-home-network$/);
     await shot(page, "home-network-form");
     await card.getByRole("button", { name: "Use this address" }).click();
     await expect(card.getByTestId("remote-url")).toHaveText(url);
@@ -148,7 +147,7 @@ test("publishes a home-network route, pairs a phone through it, and revokes it",
   }
 });
 
-test("pins a home-network certificate from a pasted PEM and puts the pin in the pairing code", { tag: "@desktop" }, async ({ page }) => {
+test("pins a My domain certificate from a pasted PEM and puts the pin in the pairing code", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const url = `https://pinned-e2e-${Date.now()}.home`;
   const dir = mkdtempSync(path.join(tmpdir(), "familyfi-pin-e2e-"));
@@ -158,7 +157,7 @@ test("pins a home-network certificate from a pasted PEM and puts the pin in the 
     const certificate = readFileSync(path.join(dir, "c.pem"), "utf8");
 
     await page.goto("/pair");
-    const card = await publishHomeNetwork(page, url);
+    const card = await publishMyDomain(page, url);
     await card.getByRole("button", { name: "Pin this certificate" }).click();
     await card.getByRole("button", { name: "Paste certificate instead" }).click();
     await card.getByLabel("Certificate (PEM)").fill(certificate);
@@ -197,11 +196,11 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
   page.on("dialog", (dialog) => void dialog.accept());
   try {
     await page.goto("/pair");
-    const card = await publishHomeNetwork(page, home);
+    const card = await publishMyDomain(page, home);
     await card.getByRole("button", { name: "Use this address" }).click();
     await expect(card.getByTestId("remote-url")).toHaveText(home);
 
-    const via = card.getByRole("group", { name: "How phones reach home" });
+    const via = card.getByRole("group", { name: "Remote access" });
     await via.getByRole("button", { name: "Tailscale" }).click();
     await expect(card.getByRole("link", { name: /Set up the Tailscale sidecar/ })).toHaveAttribute("href", /\/wiki\/Remote-access-Tailscale$/);
     await card.getByLabel("Address").fill(tailnet);
@@ -209,8 +208,8 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
     await expect(card.getByTestId("remote-url")).toHaveText(tailnet);
     expect(await enabledUrls(page)).toEqual([tailnet]);
 
-    // The home-network route is still saved: switching back publishes it without retyping.
-    await via.getByRole("button", { name: "Home network" }).click();
+    // The My domain route is still saved: switching back publishes it without retyping.
+    await via.getByRole("button", { name: "My domain" }).click();
     await card.getByTestId("saved-route").getByRole("button", { name: "Use this route" }).click();
     await expect(card.getByTestId("remote-url")).toHaveText(home);
     expect(await enabledUrls(page)).toEqual([home]);
@@ -236,8 +235,7 @@ test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a 
   try {
     await page.goto("/pair");
     const card = page.getByTestId("remote-access");
-    await card.getByRole("button", { name: "My domain" }).click();
-    await card.getByRole("group", { name: "How phones reach home" }).getByRole("button", { name: "Cloudflare Tunnel" }).click();
+    await card.getByRole("button", { name: "Cloudflare", exact: true }).click();
     await card.getByRole("group", { name: "Cloudflare setup" }).getByRole("button", { name: "Advanced" }).click();
     const advanced = card.getByTestId("cloudflare-advanced");
     await expect(advanced).toContainText("http://app:7002");
@@ -358,8 +356,7 @@ test("sets up remote access on a domain through the Cloudflare sign-in link", { 
   test.skip(await card.getByRole("button", { name: "Quick tunnel" }).isDisabled(), "needs cloudflared (or CLOUDFLARED_BIN pointing at tests/fixtures/cloudflared) on the server");
   const hostname = `familyfi-${test.info().project.name}.example.com`;
   try {
-    await card.getByRole("button", { name: "My domain" }).click();
-    await card.getByRole("group", { name: "How phones reach home" }).getByRole("button", { name: "Cloudflare Tunnel" }).click();
+    await card.getByRole("button", { name: "Cloudflare", exact: true }).click();
     await card.getByLabel("Hostname").fill(hostname);
     await card.getByRole("button", { name: "Connect with Cloudflare" }).click();
     const link = card.getByRole("link", { name: "Open Cloudflare to authorize FamilyFi" });
@@ -381,38 +378,45 @@ test("lays out remote access on a phone", { tag: "@phone" }, async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Pair Device" })).toBeVisible();
   const card = page.getByTestId("remote-access");
   await expect(card.getByRole("group", { name: "Remote access" })).toBeVisible();
-  for (const name of ["Off", "Quick tunnel", "My domain"]) await expect(card.getByRole("button", { name })).toBeVisible();
+  for (const name of ["Off", "Quick tunnel", "Tailscale", "Cloudflare", "My domain"]) await expect(card.getByRole("button", { name, exact: true })).toBeVisible();
   await shot(page, "remote-access");
 });
 
-test("an agent connects at the home network address once one is saved", { tag: "@desktop" }, async ({ page }) => {
+test("Home access suggests this address, saves a home network address, and agents connect there", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const home = "http://192.168.1.10:7001";
   try {
+    await page.request.put("/api/v1/connection/home", { headers: await csrf(page), data: { url: null } });
     await page.goto("/pair");
-    const card = page.getByTestId("home-address");
-    const field = card.getByLabel("Address");
-    await expect(field).toBeEnabled();
+    const card = page.getByTestId("home-access");
+    await expect(card.getByText("Always on")).toBeVisible();
+    // The test server is on 127.0.0.1, a private address, so it stands in until one is saved.
+    const current = new URL(page.url()).origin;
+    await expect(card.getByTestId("home-url")).toHaveText(current);
+    await expect(card.getByText("The address you opened FamilyFi at")).toBeVisible();
+    await expect(card.getByTestId("home-warning")).toHaveCount(0);
+
+    await card.getByRole("button", { name: "Edit" }).click();
+    const field = card.getByLabel("Home network address");
+    await expect(field).toHaveValue(current);
     await field.fill("http://192.168.1.10:7001/familyfi");
     await expect(card.getByText("Use an http or https address with no path.")).toBeVisible();
     await expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
     await field.fill(`${home}/`);
     await card.getByRole("button", { name: "Save" }).click();
-    await expect(field).toHaveValue(home);
+    await expect(card.getByTestId("home-url")).toHaveText(home);
+    await expect(card.getByText("Saved home network address")).toBeVisible();
 
     await page.goto("/reference");
     await page.getByRole("button", { name: "Connect an agent" }).click();
     const sheet = page.getByRole("dialog", { name: "Connect an agent" });
+    await expect(sheet.getByRole("button", { name: "Show prompt" })).toBeEnabled();
+    await expect(page.getByTestId("agent-home-warning")).toHaveCount(0);
     await sheet.getByRole("button", { name: "Show prompt" }).click();
     await expect(page.getByTestId("agent-prompt")).toContainText(`Read ${home}/agents.md`);
     await expect(page.getByTestId("agent-address")).toContainText(home);
     const code = /pairing code is (\S+)/.exec((await page.getByTestId("agent-prompt").textContent()) ?? "")?.[1] ?? "";
     expect(decodePairingCode(code).payload.url).toBe(home);
-
-    await page.goto("/pair");
-    await card.getByLabel("Address").fill("");
-    await card.getByRole("button", { name: "Clear" }).click();
-    await expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   } finally {
     await page.request.put("/api/v1/connection/home", { headers: await csrf(page), data: { url: null } });
   }

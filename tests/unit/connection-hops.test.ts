@@ -23,7 +23,7 @@ describe("connection hops", () => {
   });
 
   it("reports this phone's hop as measured", () => {
-    expect(phoneHop("connected", route)).toMatchObject({ tone: "var(--ff-on)", status: "Connected", footnote: "Home network · https://home.example" });
+    expect(phoneHop("connected", route)).toMatchObject({ tone: "var(--ff-on)", status: "Connected", footnote: "My domain · https://home.example" });
     expect(phoneHop("connected", route).detail).toMatch(/^Pinned certificate .+\. Measured from this phone/);
     expect(phoneHop("offline", null)).toMatchObject({ tone: "var(--ff-danger)", status: "Not connected", footnote: null });
     expect(phoneHop("checking", null).status).toBe("Checking…");

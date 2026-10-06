@@ -23,6 +23,11 @@ export const PAIR_COPY = {
   pairedSub: "Phones, Watches and agents; revoke any of them on its own",
   noPhones: "No paired devices yet. Use Pair a phone to add one, or connect an agent from the API page.",
   remoteFirst: "Turn on remote access, then pair a phone. Agents connect from the API page.",
+  /** The web lists agents under Home access, so its device list holds only what reaches home remotely. */
+  pairedRemote: "Paired phones",
+  pairedRemoteSub: "Phones and Watches, which reach home through remote access",
+  noRemotePhones: "No paired phones yet. Use Pair a phone to add one.",
+  remoteFirstPhones: "Turn on remote access, then pair a phone.",
   showRecent: "Show recent only",
   removeAllRevoked: "Remove all revoked",
   revoke: "Revoke",

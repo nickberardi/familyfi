@@ -2083,8 +2083,9 @@ paths:
       tags: [Connection]
       summary: Where FamilyFi is on the home network
       description: |
-        The home network address is the inside address, kept apart from the route remote access
-        publishes. Agents pair at it; without one they pair at the address their code was made at.
+        Home access: the inside address, kept apart from the route remote access publishes. It is
+        always on. Agents pair at the saved address; without one they pair at the address their
+        code was made at, which the web app suggests only when `current.private` is true.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: Home network address, content: { application/json: { schema: { $ref: "#/components/schemas/HomeAddressResponse" } } } }
@@ -2828,9 +2829,21 @@ components:
         home:
           type: object
           additionalProperties: false
-          required: [url]
+          required: [url, current]
           properties:
-            url: { type: [string, "null"], format: uri, description: "The home network origin, or null when none is set." }
+            url: { type: [string, "null"], format: uri, description: "The saved home network origin, or null when none is set." }
+            current:
+              type: object
+              additionalProperties: false
+              required: [url, private]
+              description: The address this request reached FamilyFi at, which Home access suggests when nothing is saved and it is private.
+              properties:
+                url: { type: string, format: uri }
+                private:
+                  type: boolean
+                  description: |
+                    True for a private, loopback, link-local or carrier-grade NAT IP, `localhost`, or a `.local` or
+                    `.home.arpa` name. A public name may sit behind a proxy's sign-in page, which an agent cannot get past.
     PairedInviteIssued:
       type: object
       additionalProperties: false
