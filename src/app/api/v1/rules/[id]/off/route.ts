@@ -10,11 +10,11 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** Turns a rule off: its policies stay, disabled, and any pause on it ends. A group's pause is untouched. */
 export async function POST(request: Request, ctx: Ctx) {
-  return withMutation(request, async () => {
+  return withMutation(request, async (session) => {
     const { id } = await ctx.params;
     const existing = await prisma().rule.findUnique({ where: { id } });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
-    if (isQuarantineRule(existing)) return switchQuarantineRule(false);
+    if (isQuarantineRule(existing)) return switchQuarantineRule(request, session, false);
     const rule = await prisma().rule.update({
       where: { id },
       data: { enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },

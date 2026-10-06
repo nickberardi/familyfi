@@ -112,6 +112,11 @@ const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly
  * (paired-invites.test.ts), not here.
  */
 
+/**
+ * One rule narrows these per-route cells by id: the built-in quarantine rule's switch (`PATCH` and
+ * `DELETE /rules/quarantine`, `POST /rules/quarantine/on|off`) is the household's quarantine setting,
+ * so no Watch or agent may call it (device-scope.test.ts, agent-pairing.test.ts). Its other verbs are as listed.
+ */
 const ACCESS: Record<string, Entry> = {
   "GET /api/v1/accounts": { access: "session" },
   "POST /api/v1/accounts": { access: "session" },

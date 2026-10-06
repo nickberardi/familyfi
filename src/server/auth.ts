@@ -1,6 +1,6 @@
 import { hash, verify } from "@node-rs/argon2";
 import { cookies } from "next/headers";
-import { type Account, AccountKind, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { type Account, AccountKind, type DeviceScope, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { cookieValue } from "@/lib/cookie";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -331,15 +331,24 @@ export async function requireSession(request: Request) {
     if (device.client === PairedDeviceClient.agent && request.headers.get(TUNNEL_HEADER) === "tunnel") {
       return { session: null, error: jsonError(403, "agent_remote", "Agents connect from the home network only.") };
     }
-    if (!deviceRouteAllowed({ client: device.client, scope: device.scope, deviceId: device.id, method: request.method, path: new URL(request.url).pathname })) {
-      // Signed in but not allowed: 403, never 401, which clients read as "renew or sign in again".
-      if (device.client === PairedDeviceClient.agent) {
-        return { session: null, error: jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.") };
-      }
-      return { session: null, error: jsonError(403, "watch_scope", "This Watch session cannot use that endpoint.") };
-    }
+    const refused = deviceScopeRefusal(device, request.method, new URL(request.url).pathname);
+    if (refused) return { session: null, error: refused };
   }
   return { session, error: null };
+}
+
+/** The 403 a paired device gets for a call its scope does not cover, or null when it may make it. */
+export function deviceScopeRefusal(
+  device: { id: string; client: PairedDeviceClient; scope: DeviceScope },
+  method: string,
+  path: string,
+): Response | null {
+  if (deviceRouteAllowed({ client: device.client, scope: device.scope, deviceId: device.id, method, path })) return null;
+  // Signed in but not allowed: 403, never 401, which clients read as "renew or sign in again".
+  if (device.client === PairedDeviceClient.agent) {
+    return jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.");
+  }
+  return jsonError(403, "watch_scope", "This Watch session cannot use that endpoint.");
 }
 
 export { originAllowed };

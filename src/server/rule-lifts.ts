@@ -1,8 +1,9 @@
-import { RuleLiftKind } from "@prisma/client";
+import { type DeviceScope, type PairedDeviceClient, RuleLiftKind } from "@prisma/client";
 import { z } from "zod";
 import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
 import { enqueueChange } from "./changes";
+import { deviceScopeRefusal } from "./auth";
 import { prisma } from "./db";
 import { demoLocked } from "./demo";
 import { sessionActor } from "./groups";
@@ -101,8 +102,19 @@ export function builtInRefusal(): Response {
 /**
  * Switches the built-in quarantine rule, which is the household's quarantine setting: the same
  * write as `PUT /settings/household` with `quarantineEnforced`, so demo mode refuses it too.
+ * The guard checked the device's scope against the path as sent, where the id may be
+ * percent-encoded; the scope is checked again here against the rule it names.
  */
-export async function switchQuarantineRule(enabled: boolean): Promise<Response> {
+export async function switchQuarantineRule(
+  request: Request,
+  session: Parameters<typeof sessionActor>[0] & { device: { id: string; client: PairedDeviceClient; scope: DeviceScope } | null },
+  enabled: boolean,
+): Promise<Response> {
+  if (session.device) {
+    const verb = request.method === "POST" ? `/${enabled ? "on" : "off"}` : "";
+    const refused = deviceScopeRefusal(session.device, request.method, `/api/v1/rules/${QUARANTINE_RULE_ID}${verb}`);
+    if (refused) return refused;
+  }
   const locked = demoLocked();
   if (locked) return locked;
   await setQuarantineEnforced(enabled);

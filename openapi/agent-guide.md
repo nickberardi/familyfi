@@ -71,6 +71,9 @@ Connect from the home network.
 - A **rule** blocks all internet (`kind: internet`), a category, apps or websites for one or more
   groups, always or in named **windows**. `GET /api/v1/rules?groupId=…`.
 - Every group has a built-in rule whose id is `internet`.
+- The household has a built-in rule whose id is `quarantine` (`builtIn: "quarantine"`, no groups):
+  it blocks every quarantined device. You may pause, extend and resume it, which lets every
+  unassigned device online meanwhile, so say so first. You cannot switch, edit or delete it.
 
 ## 4. Changing things
 

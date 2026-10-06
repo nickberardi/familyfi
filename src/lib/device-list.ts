@@ -66,8 +66,9 @@ export function deviceGroupOptions(groups: Pick<Group, "id" | "name" | "kind">[]
   ];
 }
 
-/** The quarantine switch's title: the state quarantine is in, warning when it is off. */
-export function quarantineTitle(enforced: boolean): string {
+/** The quarantine switch's title: the state quarantine is in, warning when it is off or paused. */
+export function quarantineTitle(enforced: boolean, paused = false): string {
+  if (enforced && paused) return "Quarantine is paused — unassigned devices may have internet";
   return enforced ? "Quarantine unassigned devices" : "Quarantine is off — unassigned devices may have internet";
 }
 

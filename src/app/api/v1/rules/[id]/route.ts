@@ -8,7 +8,6 @@ import {
   householdNetworkScope,
   isQuarantineRule,
   presentRule,
-  publicRule,
   RuleInputError,
   ruleInclude,
   RuleUpdateBody,
@@ -33,7 +32,7 @@ export async function GET(request: Request, ctx: Ctx) {
  * left out is removed with its policy.
  */
 export async function PATCH(request: Request, ctx: Ctx) {
-  return withMutation(request, async () => {
+  return withMutation(request, async (session) => {
     const { id } = await ctx.params;
     const body = await readJson(request);
     if (!body.ok) return body.response;
@@ -46,9 +45,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
       // Its switch is all that changes: anything else in the patch is an edit.
       const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
       if (keys.length !== 1 || patch.enabled === undefined) return builtInRefusal();
-      return switchQuarantineRule(patch.enabled);
+      return switchQuarantineRule(request, session, patch.enabled);
     }
-    const current = publicRule(existing);
+    const current = await presentRule(existing);
     try {
       const input = await validateRule(
         {
