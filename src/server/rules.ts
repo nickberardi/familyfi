@@ -101,10 +101,11 @@ export async function ensureQuarantineRule(): Promise<void> {
 }
 
 /**
- * Turns quarantine on or off for the household. Turning it off ends a pause on it, as turning
- * any rule off does. The caller enqueues the change.
+ * Turns quarantine on or off for the household, with any other household fields in `data` in the
+ * same transaction. Turning it off ends a pause on it, as turning any rule off does. The caller
+ * enqueues the change.
  */
-export async function setQuarantineEnforced(enforced: boolean) {
+export async function setQuarantineEnforced(enforced: boolean, data: Prisma.HouseholdUpdateInput = {}) {
   return prisma().$transaction(async (tx) => {
     if (!enforced) {
       await tx.rule.updateMany({
@@ -112,7 +113,7 @@ export async function setQuarantineEnforced(enforced: boolean) {
         data: { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
       });
     }
-    return tx.household.update({ where: { id: "default" }, data: { quarantineEnforced: enforced } });
+    return tx.household.update({ where: { id: "default" }, data: { ...data, quarantineEnforced: enforced } });
   });
 }
 

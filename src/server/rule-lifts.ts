@@ -96,7 +96,7 @@ export async function runLift(
 
 /** What editing or deleting the built-in quarantine rule answers. */
 export function builtInRefusal(): Response {
-  return jsonError(409, "rule_built_in", "Quarantine is built in: it can be switched on or off, paused and resumed, not edited.");
+  return jsonError(409, "rule_built_in", "Quarantine is built in: it can be paused, extended and resumed, but not edited, deleted or allowed.");
 }
 
 /**
