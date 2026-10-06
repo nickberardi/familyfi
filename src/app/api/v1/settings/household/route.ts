@@ -53,15 +53,15 @@ export async function PUT(request: Request) {
         return jsonError(400, "invalid_timezone", "Use an IANA timezone name.");
       }
     }
-    let household = await prisma().household.update({
-      where: { id: "default" },
-      data: {
-        ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
-        ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
-      },
-    });
+    const data = {
+      ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
+      ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
+    };
     // The same switch as the built-in quarantine rule's: turning it off ends a pause on it.
-    if (parsed.data.quarantineEnforced !== undefined) household = await setQuarantineEnforced(parsed.data.quarantineEnforced);
+    const household =
+      parsed.data.quarantineEnforced !== undefined
+        ? await setQuarantineEnforced(parsed.data.quarantineEnforced, data)
+        : await prisma().household.update({ where: { id: "default" }, data });
     const change = await enqueueChange(parsed.data.quarantineEnforced !== undefined ? "quarantine" : "household");
     if (parsed.data.timezone) rescheduleUpstreamProbe();
     return Response.json({
