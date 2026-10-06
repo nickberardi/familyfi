@@ -15,8 +15,8 @@ export const WATCH_MAX_GROUPS = 8;
 
 /**
  * The phone's choice of groups for each of its Watches, by the Watch's lowercased id, with the paired
- * device it was enrolled as: only ids and order cross to the Watches, with the household's time zone,
- * which a Watch session cannot read but its labels are written in. Each Watch takes its own entry.
+ * device it was enrolled as: only ids and order cross to the Watches, with the household's time zone
+ * its labels are written in, which a Watch also reads from its session. Each Watch takes its own entry.
  */
 export type WatchSelection = { watches: Record<string, WatchEntry>; timeZone: string };
 export type WatchEntry = { deviceId: string; groupIds: string[] };
