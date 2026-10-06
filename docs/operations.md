@@ -10,22 +10,27 @@ Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` af
 
 ## Remote access and pairing
 
-**System → Pair Device** is where phones are paired and where you choose how the FamilyFi app
-reaches home. **Remote access** publishes exactly one route at a time, and turns every other
-route off:
+**System → Pair Device** has two sections. **Home access** is always on: it is the address
+FamilyFi has inside the home, where AI agents pair and connect. It shows the address you saved,
+else the address you opened FamilyFi at when that is a private IP or `.local` name, else a warning
+asking you to set one (for example when FamilyFi is opened through an authenticating proxy such as
+Cloudflare Access, which an agent can't sign in to). Agent codes are still issued with the warning.
+
+**Remote access** is how the FamilyFi app on phones and Watches reaches home. It publishes exactly
+one route at a time, and turns every other route off:
 
 | Choice | Who runs it | The route phones get |
 | --- | --- | --- |
 | **Off** | — | none: phones can't reach home, and none can pair |
 | **Quick tunnel** | FamilyFi (`cloudflared`) | a `…trycloudflare.com` address that changes on restart |
-| **My domain → Home network** | you (LAN, VPN or reverse proxy) | your HTTPS address, trusted or pinned |
-| **My domain → Tailscale** | you (a Tailscale Serve sidecar) | `https://…ts.net`, trusted |
-| **My domain → Cloudflare Tunnel → Automatic** | FamilyFi (`cloudflared`) | `https://<your hostname>` on your Cloudflare domain |
-| **My domain → Cloudflare Tunnel → Advanced** | you (a `cloudflared` sidecar) | `https://<your hostname>`, trusted, optionally behind Cloudflare Access |
+| **Tailscale** | you (a Tailscale Serve sidecar) | `https://…ts.net`, trusted |
+| **Cloudflare → Automatic** | FamilyFi (`cloudflared`) | `https://<your hostname>` on your Cloudflare domain |
+| **Cloudflare → Advanced** | you (a `cloudflared` sidecar) | `https://<your hostname>`, trusted, optionally behind Cloudflare Access |
+| **My domain** | you (VPN or reverse proxy) | your HTTPS address, trusted or pinned |
 
 Switching is one step and can be done any time. Routes you have saved stay saved, so switching back
 to one of them needs no retyping, and switching back to Automatic needs no new Cloudflare sign-in.
-Setup guides: [home network (VPN or reverse proxy)](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network),
+Setup guides: [My domain (VPN or reverse proxy)](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network),
 [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) and
 [your own Cloudflare Tunnel](https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Tunnel).
 
@@ -37,7 +42,7 @@ the same page; it is signed out at once and must pair again. A revoked phone sta
 and once the phone uses it the old entry disappears. A paired phone learns a newly published route
 from the signed manifest the next time it reaches FamilyFi.
 
-HTTPS is required for every route. For a self-signed home-network certificate, choose **Pin this
+HTTPS is required for every route. For a self-signed My domain certificate, choose **Pin this
 certificate** and **Read certificate from this address**: FamilyFi completes a TLS handshake with
 that address and stores the SHA-256 of its public key, or hashes a certificate you paste when
 FamilyFi cannot reach it. The value equals

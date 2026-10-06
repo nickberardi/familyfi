@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessRollout, canPin, countdown, homeOrigin, remoteChoice, routeTrust, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
+import { accessRollout, canPin, countdown, homeAddress, homeOrigin, isPrivateOrigin, remoteChoice, routeTrust, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
 function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
@@ -8,7 +8,7 @@ function route(id: string, priority = 0, kind: RouteKind = "own", transport: Con
 
 describe("connection routes", () => {
   it("labels the three transports for parents and only lets a home-network route pin", () => {
-    expect(transportLabel("lan")).toBe("Home network");
+    expect(transportLabel("lan")).toBe("My domain");
     expect(transportLabel("tailscale")).toBe("Tailscale");
     expect(transportLabel("cloudflare")).toBe("Cloudflare Tunnel");
     expect(canPin("lan")).toBe(true);
@@ -21,6 +21,15 @@ describe("connection routes", () => {
     expect(homeOrigin(" https://familyfi.home.arpa ")).toBe("https://familyfi.home.arpa");
     for (const value of ["", "familyfi.local", "ftp://192.168.1.10", "http://192.168.1.10/familyfi", "http://192.168.1.10/?a=1", "http://192.168.1.10/#x", "https://user:pass@familyfi.home.arpa"]) {
       expect(homeOrigin(value)).toBeNull();
+    }
+  });
+
+  it("calls only addresses that can't be reached from outside a home private", () => {
+    for (const origin of ["http://10.0.0.5:7001", "http://172.16.0.1", "http://172.31.255.255", "http://192.168.1.10:7001", "http://127.0.0.1:7001", "http://169.254.1.1", "http://100.64.0.1", "http://localhost:7001", "http://familyfi.local:7001", "https://familyfi.home.arpa", "http://[::1]:7001", "http://[fd12:3456::1]", "http://[fe80::1]"]) {
+      expect(isPrivateOrigin(origin), origin).toBe(true);
+    }
+    for (const origin of ["https://familyfi.example.com", "http://172.32.0.1", "http://100.128.0.1", "http://8.8.8.8", "http://192.169.1.1", "https://local.example.com", "http://[2001:db8::1]", "not a url"]) {
+      expect(isPrivateOrigin(origin), origin).toBe(false);
     }
   });
 
@@ -48,7 +57,7 @@ describe("connection routes", () => {
     it("reads the choice from the published route's kind, then its transport", () => {
       expect(remoteChoice({ mode: "quick", endpointId: "quick" }, routes)).toBe("quick");
       expect(remoteChoice({ mode: "named", endpointId: "domain" }, routes)).toBe("cloudflareAutomatic");
-      expect(remoteChoice({ mode: "named", endpointId: "home" }, routes)).toBe("home");
+      expect(remoteChoice({ mode: "named", endpointId: "home" }, routes)).toBe("myDomain");
       expect(remoteChoice({ mode: "named", endpointId: "tailnet" }, routes)).toBe("tailscale");
       expect(remoteChoice({ mode: "named", endpointId: "advanced" }, routes)).toBe("cloudflareAdvanced");
     });
@@ -62,7 +71,7 @@ describe("connection routes", () => {
 
   it("finds the saved route a choice would publish again", () => {
     const routes = [route("domain", 0, "domain", "cloudflare"), route("home-b", 5), route("home-a", 1), route("tailnet", 0, "own", "tailscale"), route("quick", 0, "quick", "cloudflare")];
-    expect(savedRoute("home", routes)?.id).toBe("home-a");
+    expect(savedRoute("myDomain", routes)?.id).toBe("home-a");
     expect(savedRoute("tailscale", routes)?.id).toBe("tailnet");
     expect(savedRoute("cloudflareAutomatic", routes)?.id).toBe("domain");
     expect(savedRoute("cloudflareAdvanced", routes)).toBeUndefined();
@@ -107,5 +116,13 @@ describe("connection routes", () => {
     expect(countdown(61_000)).toBe("1:01");
     expect(countdown(-5)).toBe("0:00");
     expect(shortPin("abcdefghijklmnopqrstuvwxyz")).toBe("abcdef…uvwxyz");
+  });
+});
+
+describe("homeAddress", () => {
+  it("prefers the saved address, then a private current address, else none", () => {
+    expect(homeAddress({ url: "http://familyfi.local:7001", current: { url: "http://192.168.1.10:7001", private: true } })).toBe("http://familyfi.local:7001");
+    expect(homeAddress({ url: null, current: { url: "http://192.168.1.10:7001", private: true } })).toBe("http://192.168.1.10:7001");
+    expect(homeAddress({ url: null, current: { url: "https://familyfi.example.com", private: false } })).toBeNull();
   });
 });

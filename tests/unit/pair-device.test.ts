@@ -64,7 +64,7 @@ describe("pair device", () => {
     const now = new Date("2026-09-14T20:00:00Z");
     const lines = phoneLines(phone({ sessions: [{ id: "s1", username: "admin", client: "phone", expiresAt: "2026-10-14T12:00:00Z", createdAt: "2026-09-14T12:00:00Z" }] }), now);
     expect(lines.status).toMatch(/^Paired .+ · last seen 2m ago$/);
-    expect(lines.via).toEqual({ url: "https://home.example", transport: "Home network" });
+    expect(lines.via).toEqual({ url: "https://home.example", transport: "My domain" });
     expect(lines.sessions[0]!.line).toMatch(/^admin · expires /);
     expect(phoneLines(phone({ lastSeenAt: null }), now).status).toMatch(/last seen never$/);
     expect(phoneLines(phone({ revokedAt: "2026-09-10T00:00:00Z" }), now).status).toMatch(/ · revoked /);

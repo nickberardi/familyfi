@@ -100,8 +100,14 @@ describe("paired agents", () => {
 
     const saved = await setHome(request("/api/v1/connection/home", { method: "PUT", auth, headers: json, body: JSON.stringify({ url: "http://192.168.1.10:7001/" }) }));
     expect(saved.status).toBe(200);
-    expect(await saved.json()).toEqual({ home: { url: "http://192.168.1.10:7001" } });
-    expect(await (await getHome(request("/api/v1/connection/home", { auth }))).json()).toEqual({ home: { url: "http://192.168.1.10:7001" } });
+    expect(await saved.json()).toEqual({ home: { url: "http://192.168.1.10:7001", current: { url: TEST_ORIGIN, private: false } } });
+    // The address the browser is on is reported, and a proxied public one is never called private.
+    expect(await (await getHome(request("/api/v1/connection/home", { auth, headers: proxied }))).json()).toEqual({
+      home: { url: "http://192.168.1.10:7001", current: { url: "https://familyfi.example.com", private: false } },
+    });
+    expect(await (await getHome(request("/api/v1/connection/home", { auth, headers: { "x-forwarded-host": "192.168.1.10:7001" } }))).json()).toMatchObject({
+      home: { current: { url: "http://192.168.1.10:7001", private: true } },
+    });
 
     const response = await agentPairing(auth, "full", proxied);
     expect(((await response.clone().json()) as { invite: { url: string } }).invite.url).toBe("http://192.168.1.10:7001");
@@ -115,7 +121,7 @@ describe("paired agents", () => {
       expect(await errorCode(refused)).toBe("invalid_home_url");
     }
     const cleared = await setHome(request("/api/v1/connection/home", { method: "PUT", auth, headers: json, body: JSON.stringify({ url: null }) }));
-    expect(await cleared.json()).toEqual({ home: { url: null } });
+    expect(await cleared.json()).toMatchObject({ home: { url: null } });
     expect((await issuedInvite(await agentPairing(auth, "readOnly"))).payload.url).toBe(TEST_ORIGIN);
   });
 
@@ -230,7 +236,7 @@ describe("paired agents", () => {
   });
 
   it("serves the guide without a session, with this address, and the spec to an agent's bearer", async () => {
-    const guide = await agentGuide(new Request("http://192.168.1.10:7001/agents.md", { headers: { host: "192.168.1.10:7001" } }));
+    const guide = await agentGuide(new Request("http://192.168.1.10:7001/agents.md", { headers: { "x-forwarded-host": "192.168.1.10:7001" } }));
     expect(guide.status).toBe(200);
     expect(guide.headers.get("content-type")).toContain("text/markdown");
     const text = await guide.text();

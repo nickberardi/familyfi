@@ -97,8 +97,11 @@ export function PairedDevicesCard({
   onRemove,
   onRemoveAllRevoked,
   disabled,
+  phonesOnly = false,
 }: {
   phones: PairedPhone[];
+  /** Only active phones and Watches, the devices remote access serves; active agents are listed elsewhere. */
+  phonesOnly?: boolean;
   /** No changes while the phone's view of the household is stale. */
   disabled?: boolean;
   /** Whether a route is published, so a phone can pair (or re-pair) now. */
@@ -112,16 +115,21 @@ export function PairedDevicesCard({
   const text = useText();
   const [showAll, setShowAll] = useState(false);
   const [showRevoked, setShowRevoked] = useState(false);
-  const { active, revoked } = splitPhones(phones);
+  const split = splitPhones(phones);
+  // Revoked agents stay in the revoked list, the one place they can be removed from.
+  const active = phonesOnly ? split.active.filter((phone) => phone.client !== "agent") : split.active;
+  const revoked = split.revoked;
   const rule = { borderTopWidth: 1, borderTopColor: ui.color("hairline") };
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="paired-devices">
       <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
-        <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
-        <Text style={text(14, 21, "muted")}>{COPY.pairedSub}</Text>
+        <Text style={[text(14, 21, "ink"), styles.bold]}>{phonesOnly ? COPY.pairedRemote : COPY.paired}</Text>
+        <Text style={text(14, 21, "muted")}>{phonesOnly ? COPY.pairedRemoteSub : COPY.pairedSub}</Text>
       </View>
       {active.length === 0 ? (
-        <Text style={[text(14, 21, "muted"), styles.empty]}>{canPair ? COPY.noPhones : COPY.remoteFirst}</Text>
+        <Text style={[text(14, 21, "muted"), styles.empty]}>
+          {phonesOnly ? (canPair ? COPY.noRemotePhones : COPY.remoteFirstPhones) : canPair ? COPY.noPhones : COPY.remoteFirst}
+        </Text>
       ) : (
         (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (
           <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />

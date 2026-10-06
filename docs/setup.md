@@ -120,7 +120,7 @@ FamilyFi's Cloudflare tunnel on your own domain). Use a sidecar instead when you
 Tailscale, or want a VPN or reverse proxy in front of FamilyFi. Set it up with the wiki guide, then
 choose it under **My domain** and enter its HTTPS address:
 
-- [Home network: VPN or reverse proxy](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network)
+- [My domain: VPN or reverse proxy](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network)
   — including an NGINX sidecar next to FamilyFi.
 - [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) — a Tailscale
   Serve sidecar; phones in your tailnet reach `https://familyfi.<your-tailnet>.ts.net`.

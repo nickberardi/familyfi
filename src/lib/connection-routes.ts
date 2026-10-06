@@ -6,7 +6,7 @@
 import type { ConnectionRoute, ConnectionTransport, PairedPhone, RemoteAccess } from "./types";
 
 export const TRANSPORTS: readonly { value: ConnectionTransport; label: string }[] = [
-  { value: "lan", label: "Home network" },
+  { value: "lan", label: "My domain" },
   { value: "tailscale", label: "Tailscale" },
   { value: "cloudflare", label: "Cloudflare Tunnel" },
 ];
@@ -15,7 +15,7 @@ export function transportLabel(transport: string): string {
   return TRANSPORTS.find((item) => item.value === transport)?.label ?? transport;
 }
 
-/** Only a home-network route may pin a certificate; everything else uses ordinary trust. */
+/** Only a My domain route may pin a certificate; everything else uses ordinary trust. */
 export function canPin(transport: ConnectionTransport): boolean {
   return transport === "lan";
 }
@@ -35,9 +35,41 @@ export function homeOrigin(value: string): string | null {
   return (url.protocol === "https:" || url.protocol === "http:") && url.hostname !== "" && bare ? url.origin : null;
 }
 
+/** `GET /api/v1/connection/home`: the saved home network address, and the address this request came in at. */
+export type HomeAccess = { url: string | null; current: { url: string; private: boolean } };
+
+/** The address agents pair at: the saved one, or the current one when it is private; null asks for one. */
+export function homeAddress(home: HomeAccess): string | null {
+  return home.url ?? (home.current.private ? home.current.url : null);
+}
+
+/**
+ * Whether an origin can only be reached inside a home: a private, loopback, link-local or
+ * carrier-grade NAT address, `localhost`, or a `.local` or `.home.arpa` name. Home access
+ * suggests the address the web app was opened at only when it is one of these; a public name
+ * may sit behind a proxy's sign-in page, which an agent cannot get past.
+ */
+export function isPrivateOrigin(origin: string): boolean {
+  let host: string;
+  try {
+    host = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "home.arpa" || host.endsWith(".home.arpa")) return true;
+  if (host.startsWith("[")) {
+    const v6 = host.slice(1, -1);
+    return v6 === "::1" || /^f[cd][0-9a-f]{0,2}:/.test(v6) || /^fe[89ab][0-9a-f]?:/.test(v6);
+  }
+  const octets = host.split(".");
+  if (octets.length !== 4 || !octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)) return false;
+  const [a, b] = octets.map(Number);
+  return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+}
+
 const WIKI = "https://github.com/nickberardi/familyfi/wiki";
-/** Setting up a VPN or a reverse proxy in front of FamilyFi. */
-export const HOME_NETWORK_GUIDE = `${WIKI}/Remote-access-home-network`;
+/** My domain: publishing FamilyFi yourself, through a reverse proxy or a tunnel you run. */
+export const MY_DOMAIN_GUIDE = `${WIKI}/Remote-access-home-network`;
 /** Running Tailscale Serve as a sidecar container. */
 export const TAILSCALE_GUIDE = `${WIKI}/Remote-access-Tailscale`;
 /** Running your own Cloudflare Tunnel, optionally behind Cloudflare Access. */
@@ -73,13 +105,14 @@ export function accessRollout(
 }
 
 /**
- * Everything Remote access can publish. `home`, `tailscale` and `cloudflareAdvanced` are
+ * Everything Remote access can publish. `myDomain`, `tailscale` and `cloudflareAdvanced` are
  * routes the household runs; `quick` and `cloudflareAutomatic` are FamilyFi's own tunnel.
+ * `myDomain` is the do-it-yourself one: any HTTPS address the household publishes itself.
  */
-export type RemoteChoice = "off" | "quick" | "home" | "tailscale" | "cloudflareAutomatic" | "cloudflareAdvanced";
+export type RemoteChoice = "off" | "quick" | "myDomain" | "tailscale" | "cloudflareAutomatic" | "cloudflareAdvanced";
 
 /** The transport a household-run choice saves its route with. */
-export const OWN_TRANSPORT: Partial<Record<RemoteChoice, ConnectionTransport>> = { home: "lan", tailscale: "tailscale", cloudflareAdvanced: "cloudflare" };
+export const OWN_TRANSPORT: Partial<Record<RemoteChoice, ConnectionTransport>> = { myDomain: "lan", tailscale: "tailscale", cloudflareAdvanced: "cloudflare" };
 
 /** Which choice the published route stands for. */
 export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, routes: readonly ConnectionRoute[]): RemoteChoice {
@@ -92,7 +125,7 @@ export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, 
   if (route.kind === "quick") return "quick";
   if (route.kind === "domain") return "cloudflareAutomatic";
   if (route.transport === "tailscale") return "tailscale";
-  return route.transport === "cloudflare" ? "cloudflareAdvanced" : "home";
+  return route.transport === "cloudflare" ? "cloudflareAdvanced" : "myDomain";
 }
 
 /** The saved route a choice would publish again, if it has one. */

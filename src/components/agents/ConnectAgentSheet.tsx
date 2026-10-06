@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AGENT_SCOPES, agentPrompt } from "@/lib/agent-prompt";
+import { api } from "@/lib/api";
+import { homeAddress, type HomeAccess } from "@/lib/connection-routes";
 import { countdown } from "@/lib/connection-routes";
 import { CopyRow } from "@/components/ui/CopyRow";
 import { Segmented } from "@/components/ui/Segmented";
@@ -20,6 +22,26 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
     body: () => ({ client: "agent", displayName: name.trim(), scope }),
     onClaimed: onConnected,
   });
+
+  // Home access says whether there is an address an agent can reach without a sign-in page.
+  const [home, setHome] = useState<HomeAccess | null>(null);
+  useEffect(() => {
+    api<{ home: HomeAccess }>("/api/v1/connection/home")
+      .then((result) => setHome(result.home))
+      .catch(() => setHome(null));
+  }, []);
+  const unsafe = home !== null && homeAddress(home) === null;
+  const homeLink = (
+    <Link href="/pair" className="font-semibold text-[var(--ff-accent)] underline">
+      Home access on Pair Device
+    </Link>
+  );
+  const warning = unsafe ? (
+    <p data-testid="agent-home-warning" role="status" className="rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 text-[14px]">
+      <span className="font-semibold">Set your home network address.</span> This page isn&rsquo;t on your home network, so the agent may not get
+      through it, for example behind a sign-in such as Cloudflare Access. Set the address under {homeLink}, then make a new code.
+    </p>
+  ) : null;
 
   const errorLine = error ? (
     <p role="alert" className="text-[14px] font-semibold text-[var(--ff-danger)]">
@@ -56,6 +78,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
           <p className="mt-1.5 font-normal">{AGENT_SCOPES.find((option) => option.value === scope)?.detail}</p>
           <p className="mt-1.5 font-normal">No agent can change accounts, gateway settings, remote access or paired devices.</p>
         </div>
+        {warning}
         {errorLine}
       </SheetFrame>
     );
@@ -95,13 +118,9 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
         <>
           <CopyRow label="Prompt" value={agentPrompt(issued.url ?? window.location.origin, issued.code)} testId="agent-prompt" />
           <p data-testid="agent-address" className="text-[14px] text-[var(--ff-muted)]">
-            The agent connects at <span className="font-mono break-all">{issued.url ?? window.location.origin}</span>. If that address asks
-            for a sign-in, such as Cloudflare Access, set your home network address on{" "}
-            <Link href="/pair" className="font-semibold text-[var(--ff-accent)] underline">
-              Pair Device
-            </Link>{" "}
-            and make a new code.
+            The agent connects at <span className="font-mono break-all">{issued.url ?? window.location.origin}</span>. Change it under {homeLink}.
           </p>
+          {warning}
           <p data-testid="agent-countdown" className="text-[14px] text-[var(--ff-muted)]">
             {expired ? "This code expired. Make a new one." : `The code works once and expires in ${countdown(remaining)}.`}
           </p>
