@@ -1,25 +1,35 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { homeAddress, homeOrigin, type HomeAccess } from "@/lib/connection-routes";
 import type { PairedPhone } from "@/lib/types";
 import { AgentRow } from "@/components/agents/AgentRow";
+import { ConnectAgentSheet } from "@/components/agents/ConnectAgentSheet";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
 /**
  * Home access: where FamilyFi is on the home network, kept apart from Remote access, the route
  * phones use from outside. It is always on. AI agents pair here, so it must answer without a
  * proxy's sign-in page: with nothing saved, the address this page is open at stands in only when
- * it is a private one, and otherwise the card asks for an address.
+ * it is a private one, and otherwise the card asks for an address. Agents are connected from here.
  */
-export function HomeAccessCard({ agents, onRevoke }: { agents: PairedPhone[]; onRevoke: (agent: PairedPhone) => void }) {
+export function HomeAccessCard({
+  agents,
+  onRevoke,
+  onConnected,
+}: {
+  agents: PairedPhone[];
+  onRevoke: (agent: PairedPhone) => void;
+  /** After an agent claims its code, so the list shows it. */
+  onConnected: () => void;
+}) {
   const [home, setHome] = useState<HomeAccess | null>(null);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     api<{ home: HomeAccess }>("/api/v1/connection/home")
@@ -128,19 +138,21 @@ export function HomeAccessCard({ agents, onRevoke }: { agents: PairedPhone[]; on
         ) : null}
       </div>
       <div className="border-t border-[var(--ff-hairline-card)]">
-        <div className="px-[18px] pt-3 text-[14px] font-semibold">AI agents</div>
+        <div className="flex items-center justify-between gap-3 px-[18px] pt-3">
+          <span className="text-[14px] font-semibold">AI agents</span>
+          <button type="button" className={SECONDARY_BUTTON} onClick={() => setConnecting(true)}>
+            Connect an agent
+          </button>
+        </div>
         {active.length ? (
           active.map((agent) => <AgentRow key={agent.id} agent={agent} onRevoke={() => onRevoke(agent)} />)
         ) : (
           <p className="px-[18px] py-3 text-[14px] text-[var(--ff-muted)]">
-            No agents yet.{" "}
-            <Link href="/reference" className="font-semibold text-[var(--ff-accent)] underline">
-              Connect one from the API page
-            </Link>
-            .
+            No agents yet. Use Connect an agent to get a prompt for Claude Code, Codex or another agent.
           </p>
         )}
       </div>
+      {connecting ? <ConnectAgentSheet onClose={() => setConnecting(false)} onConnected={onConnected} /> : null}
     </section>
   );
 }

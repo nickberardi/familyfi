@@ -182,7 +182,7 @@ refresh token.
 
 ### Agents
 
-An administrator connects an AI agent from **System → API** (`/reference`): name it, choose a
+An administrator connects an AI agent from **Home access** on **System → Pair Device** (`/pair`): name it, choose a
 scope (**Full access** or **Read only**), and copy the prompt shown. The prompt points the agent at `/agents.md`, a guide served
 without a session from [`openapi/agent-guide.md`](../openapi/agent-guide.md) with this server's
 address filled in, and carries an agent pairing code. That code is single-use, expires in fifteen
