@@ -28,7 +28,8 @@ export function Segmented<T extends string>({
   /** Stretch segments to fill the row (sheet controls) instead of hugging (table rows). */
   grow?: boolean;
 }) {
-  const pad = size === "sm" ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-1.5 text-[13px]";
+  // A stretched row of five shares a phone's width, so its segments pad less there.
+  const pad = size === "sm" ? "px-2.5 py-1.5 text-[11px]" : grow ? "px-1.5 py-1.5 text-[13px] sm:px-3" : "px-3 py-1.5 text-[13px]";
 
   return (
     <div

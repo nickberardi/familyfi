@@ -8,7 +8,7 @@ steps in order, then help the person who gave you this guide.
 ## 1. Connect
 
 The person gave you a **pairing code** with this guide. It is single-use and expires 15 minutes after it was
-made. If it has expired or does not work, ask them for a new one: they make it on the **API** page
+made. If it has expired or does not work, ask them for a new one: they make it on the **Pair Device** page
 of the FamilyFi web app, under **Connect an agent**.
 
 The code is base64url JSON. Decode it to get `url` (where FamilyFi is) and `code`:

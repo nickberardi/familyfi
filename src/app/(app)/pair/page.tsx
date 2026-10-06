@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { ConnectAgentSheet } from "@/components/agents/ConnectAgentSheet";
 import { PageHeader } from "@/components/PageHeader";
 import { HomeAccessCard } from "@/components/pair/HomeAccessCard";
 import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
 import { RemoteAccessCard } from "@/components/pair/RemoteAccessCard";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/pair/SheetFrame";
 import { request } from "@/lib/api";
 import { PAIR_COPY, confirmLine, removeAllConfirm, removeConfirm, removePhone, removeRevokedPhones, revokeConfirm, revokePhone } from "@/lib/pair-device";
 import type { PairedPhone } from "@/lib/types";
@@ -19,6 +21,7 @@ export default function PairDevicePage() {
   const { tunnel, setTunnel, routes, phones, remote, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
   const [pairing, setPairing] = useState(false);
   const [replacing, setReplacing] = useState<PairedPhone | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   if (forbidden) {
     return (
@@ -33,7 +36,21 @@ export default function PairDevicePage() {
 
   return (
     <>
-      <PageHeader title={TITLE} sub={SUB} actionLabel={canPair ? PAIR_COPY.pairPhone : undefined} onAction={canPair ? () => setPairing(true) : undefined} />
+      <PageHeader
+        title={TITLE}
+        sub={SUB}
+        secondary={
+          <div className="flex basis-full justify-end gap-2 md:basis-auto">
+            <button type="button" className={SECONDARY_BUTTON} onClick={() => setConnecting(true)}>
+              {PAIR_COPY.connectAgent}
+            </button>
+            {/* Phones pair through the published route, so there is nothing to pair through while remote access is Off. */}
+            <button type="button" className={PRIMARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing(true)}>
+              {PAIR_COPY.pairPhone}
+            </button>
+          </div>
+        }
+      />
       <div className="flex flex-col gap-4 p-4 md:p-6">
         {error ? (
           <p role="alert" className="rounded-[9px] bg-[var(--ff-danger-fill)] px-3 py-2.5 text-[14px] font-semibold text-[var(--ff-danger)]">
@@ -47,7 +64,6 @@ export default function PairDevicePage() {
             if (!window.confirm(confirmLine(revokeConfirm(agent)))) return;
             void run(() => revokePhone(request, agent));
           }}
-          onConnected={() => void load()}
         />
 
         <RemoteAccessCard tunnel={tunnel} routes={routes} phones={remote} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
@@ -74,6 +90,8 @@ export default function PairDevicePage() {
           }}
         />
       </div>
+
+      {connecting ? <ConnectAgentSheet onClose={() => setConnecting(false)} onConnected={() => void load()} /> : null}
 
       {pairing && published ? (
         <PairPhoneSheet
