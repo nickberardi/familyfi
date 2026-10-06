@@ -63,7 +63,7 @@ export function isPrivateOrigin(origin: string): boolean {
   }
   const octets = host.split(".");
   if (octets.length !== 4 || !octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)) return false;
-  const [a, b] = octets.map(Number);
+  const [a = 0, b = 0] = octets.map(Number);
   return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
 }
 
