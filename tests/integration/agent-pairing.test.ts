@@ -21,6 +21,9 @@ import { GET as listGroups, POST as createGroup } from "@/app/api/v1/groups/rout
 import { GET as settingsUnifi } from "@/app/api/v1/settings/unifi/route";
 import { GET as household } from "@/app/api/v1/settings/household/route";
 import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
+import { PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
+import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
+import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 import { claimInvite, issuedInvite } from "../helpers/pairing";
@@ -194,6 +197,25 @@ describe("paired agents", () => {
       expect((await listDevices(request("/api/v1/paired/devices", { auth: bearer(token) }))).status).toBe(403);
       expect((await agentPairing(bearer(token), "full")).status).toBe(403);
     }
+  });
+
+  it("pauses quarantine but never switches it, however the rule's id is spelled", async () => {
+    const auth = await adult();
+    const manager = (await connectedAgent(auth, "full")).claimed;
+    await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: true } });
+    const quarantine = { params: Promise.resolve({ id: "quarantine" }) };
+    const call = (path: string, method: string, body = "{}") => request(path, { method, auth: bearer(manager.token), headers: json, body });
+
+    // The guard reads the path as sent; the route reads the decoded id, so both spellings must be refused.
+    for (const id of ["quarantine", "%71uarantine"]) {
+      const off = await turnOffRule(call(`/api/v1/rules/${id}/off`, "POST"), quarantine);
+      expect([off.status, await errorCode(off)], id).toEqual([403, "agent_scope"]);
+      const patched = await patchRule(call(`/api/v1/rules/${id}`, "PATCH", JSON.stringify({ enabled: false })), quarantine);
+      expect([patched.status, await errorCode(patched)], id).toEqual([403, "agent_scope"]);
+    }
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).quarantineEnforced).toBe(true);
+
+    expect((await pauseRule(call("/api/v1/rules/quarantine/pause", "POST"), quarantine)).status).toBe(200);
   });
 
   it("works from the home network only", async () => {

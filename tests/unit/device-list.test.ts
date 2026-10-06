@@ -71,6 +71,7 @@ describe("the Devices list", () => {
   it("names quarantine's state, warning when it is off", () => {
     expect(quarantineTitle(true)).toBe("Quarantine unassigned devices");
     expect(quarantineTitle(false)).toMatch(/^Quarantine is off/);
+    expect(quarantineTitle(true, true)).toMatch(/^Quarantine is paused/);
   });
 
   it("names a device's removal by its name and MAC", () => {

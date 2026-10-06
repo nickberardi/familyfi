@@ -38,7 +38,7 @@ function publicPause(state: LiftColumns) {
  * The rule as the API shows it. The built-in quarantine rule is on while the household enforces
  * quarantine (`quarantineEnforced`), which callers pass; `presentRules` reads it for them.
  */
-export function publicRule(rule: RuleWithWindows, quarantineEnforced = false) {
+export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
   const windows = [...rule.windows].sort((a, b) => a.position - b.position);
   const builtIn = isQuarantineRule(rule);
   return {

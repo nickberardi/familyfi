@@ -31,7 +31,7 @@ export function QuarantineCard({
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="quarantine-card">
       <View style={styles.words}>
-        <Text style={[text, styles.title, { color: ui.color(enforced && !pausedLine ? "ink" : "paused") }]}>{quarantineTitle(enforced)}</Text>
+        <Text style={[text, styles.title, { color: ui.color(enforced && !pausedLine ? "ink" : "paused") }]}>{quarantineTitle(enforced, Boolean(pausedLine))}</Text>
         <Text style={[text, styles.body, { color: ui.color("muted") }]}>{COPY.quarantineBody}</Text>
         {pausedLine ? (
           <Text style={[text, styles.body, { color: ui.color("ink-2") }]} testID="quarantine-paused">

@@ -505,8 +505,15 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
     await expect(card.getByText("All internet · every unassigned device")).toBeVisible();
     await expect(card.getByText("Unassigned devices")).toBeVisible();
     // The mock household enforces quarantine; it is paused, never allowed.
-    await expect(card.getByRole("switch", { name: "Quarantine" })).toBeChecked();
+    const toggle = card.getByRole("switch", { name: "Quarantine" });
+    await expect(toggle).toBeChecked();
     await expect(card.getByRole("button", { name: "Allow now" })).toHaveCount(0);
+    // Its switch is the household's quarantine setting, the one Devices shows.
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await expect(card.getByRole("button", { name: "Pause rule" })).toHaveCount(0);
+    await toggle.click();
+    await expect(toggle).toBeChecked();
     await card.getByRole("button", { name: "Pause rule" }).click();
     await page.getByRole("button", { name: /For 30 minutes/ }).click();
     await expect(card.getByText(/^Paused until .* by /)).toBeVisible();
@@ -518,6 +525,7 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
     await expect(quarantine.getByTestId("quarantine-paused")).toHaveCount(0);
   } finally {
     await page.request.post("/api/v1/rules/quarantine/resume", { headers: await csrfHeaders(page) });
+    await page.request.post("/api/v1/rules/quarantine/on", { headers: await csrfHeaders(page) });
   }
 });
 

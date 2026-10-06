@@ -9,11 +9,11 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** Turns a rule on, the counterpart to `/off`. */
 export async function POST(request: Request, ctx: Ctx) {
-  return withMutation(request, async () => {
+  return withMutation(request, async (session) => {
     const { id } = await ctx.params;
     const existing = await prisma().rule.findUnique({ where: { id } });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
-    if (isQuarantineRule(existing)) return switchQuarantineRule(true);
+    if (isQuarantineRule(existing)) return switchQuarantineRule(request, session, true);
     const rule = await prisma().rule.update({
       where: { id },
       data: { enabled: true },
