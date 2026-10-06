@@ -209,18 +209,19 @@ function PasswordCopy({ value }: { value: string }) {
   const [state, setState] = useState<"idle" | "copied" | "shown">("idle");
   if (state === "shown") {
     return (
-      <span className="flex-1 select-all break-all font-mono text-[14px] text-[var(--ff-ink)]">{value}</span>
+      <span className="min-w-0 flex-1 select-all break-all font-mono text-[14px] text-[var(--ff-ink)]">{value}</span>
     );
   }
   return (
     <>
-      <span className="flex-1 font-mono text-[14px] tracking-[0.12em] text-[var(--ff-ink)]">
-        <span aria-hidden>••••••••••••</span>
+      {/* The mask gives way on a narrow screen, so Copy stays inside the row at its right edge. */}
+      <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-mono text-[14px] tracking-[0.08em] text-[var(--ff-ink)]">
+        <span aria-hidden>••••••••••</span>
         <span className="sr-only">Hidden</span>
       </span>
       <button
         type="button"
-        className="flex flex-none items-center gap-1.5 rounded-lg px-1.5 py-1 text-[14px] font-semibold text-[var(--ff-accent)]"
+        className="ml-auto flex flex-none items-center gap-1.5 rounded-lg px-1.5 py-1 text-[14px] font-semibold text-[var(--ff-accent)]"
         onClick={() => {
           void copyText(value).then((copied) => {
             setState(copied ? "copied" : "shown");
