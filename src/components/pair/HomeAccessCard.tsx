@@ -5,31 +5,20 @@ import { api, ApiError } from "@/lib/api";
 import { homeAddress, homeOrigin, type HomeAccess } from "@/lib/connection-routes";
 import type { PairedPhone } from "@/lib/types";
 import { AgentRow } from "@/components/agents/AgentRow";
-import { ConnectAgentSheet } from "@/components/agents/ConnectAgentSheet";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
 /**
  * Home access: where FamilyFi is on the home network, kept apart from Remote access, the route
  * phones use from outside. It is always on. AI agents pair here, so it must answer without a
  * proxy's sign-in page: with nothing saved, the address this page is open at stands in only when
- * it is a private one, and otherwise the card asks for an address. Agents are connected from here.
+ * it is a private one, and otherwise the card asks for an address. Connect an agent is the page's header action.
  */
-export function HomeAccessCard({
-  agents,
-  onRevoke,
-  onConnected,
-}: {
-  agents: PairedPhone[];
-  onRevoke: (agent: PairedPhone) => void;
-  /** After an agent claims its code, so the list shows it. */
-  onConnected: () => void;
-}) {
+export function HomeAccessCard({ agents, onRevoke }: { agents: PairedPhone[]; onRevoke: (agent: PairedPhone) => void }) {
   const [home, setHome] = useState<HomeAccess | null>(null);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     api<{ home: HomeAccess }>("/api/v1/connection/home")
@@ -138,12 +127,7 @@ export function HomeAccessCard({
         ) : null}
       </div>
       <div className="border-t border-[var(--ff-hairline-card)]">
-        <div className="flex items-center justify-between gap-3 px-[18px] pt-3">
-          <span className="text-[14px] font-semibold">AI agents</span>
-          <button type="button" className={SECONDARY_BUTTON} onClick={() => setConnecting(true)}>
-            Connect an agent
-          </button>
-        </div>
+        <div className="px-[18px] pt-3 text-[14px] font-semibold">AI agents</div>
         {active.length ? (
           active.map((agent) => <AgentRow key={agent.id} agent={agent} onRevoke={() => onRevoke(agent)} />)
         ) : (
@@ -152,7 +136,6 @@ export function HomeAccessCard({
           </p>
         )}
       </div>
-      {connecting ? <ConnectAgentSheet onClose={() => setConnecting(false)} onConnected={onConnected} /> : null}
     </section>
   );
 }

@@ -41,7 +41,7 @@ export function PageHeader({
   return (
     /* The header wash is the only blur in the product — hence a token, not a utility. */
     <header
-      className="sticky top-0 z-20 flex items-center gap-3.5 border-b border-[var(--ff-line)] bg-[var(--ff-header-wash)] px-4 py-4 md:px-6"
+      className="sticky top-0 z-20 flex flex-wrap items-center gap-3.5 border-b border-[var(--ff-line)] bg-[var(--ff-header-wash)] px-4 py-4 md:px-6"
       style={{ backdropFilter: "var(--ff-blur-header)" }}
     >
       <button

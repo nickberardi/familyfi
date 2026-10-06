@@ -93,8 +93,8 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     await page.goto("/pair");
     await expect(page.getByRole("heading", { name: "Pair Device" })).toBeVisible();
     await page.getByTestId("remote-access").getByRole("button", { name: "Off" }).click();
-    // Nothing is published while Off, so there is nothing to pair through.
-    await expect(page.getByRole("button", { name: "Pair a phone" })).toHaveCount(0);
+    // Nothing is published while Off, so there is nothing to pair through yet.
+    await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
     await expect(page.getByText("Turn on remote access, then pair a phone.")).toBeVisible();
 
     const card = await publishMyDomain(page, url);
@@ -217,7 +217,7 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
     await card.getByRole("button", { name: "Off" }).click();
     await expect(card.getByTestId("remote-url")).toHaveCount(0);
     expect(await enabledUrls(page)).toEqual([]);
-    await expect(page.getByRole("button", { name: "Pair a phone" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
 
   } finally {
     await cleanUp(page, [home, tailnet]);
@@ -407,7 +407,7 @@ test("Home access suggests this address, saves a home network address, and agent
     await expect(card.getByTestId("home-url")).toHaveText(home);
     await expect(card.getByText("Saved home network address")).toBeVisible();
 
-    await card.getByRole("button", { name: "Connect an agent" }).click();
+    await page.getByRole("button", { name: "Connect an agent" }).click();
     const sheet = page.getByRole("dialog", { name: "Connect an agent" });
     await expect(sheet.getByRole("button", { name: "Show prompt" })).toBeEnabled();
     await expect(page.getByTestId("agent-home-warning")).toHaveCount(0);
@@ -435,7 +435,7 @@ test("Home access warns, and agent codes are still issued, when FamilyFi was ope
   await expect(card.getByTestId("home-url")).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Set address" })).toBeVisible();
 
-  await card.getByRole("button", { name: "Connect an agent" }).click();
+  await page.getByRole("button", { name: "Connect an agent" }).click();
   const sheet = page.getByRole("dialog", { name: "Connect an agent" });
   await expect(page.getByTestId("agent-home-warning")).toBeVisible();
   await sheet.getByRole("button", { name: "Show prompt" }).click();
