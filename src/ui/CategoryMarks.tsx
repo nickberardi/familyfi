@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { CategorySlotState } from "@/lib/category-marks";
-import { moreMarkLabels } from "@/lib/category-marks";
+import { MARK_WIDTH, moreMarkLabels } from "@/lib/category-marks";
 import { categoryMarkLabel, categoryMarkStyle, categoryMarkWord, type CategoryMarkState } from "@/lib/upstream";
 
 import { CategoryGlyph } from "./CategoryGlyph";
@@ -121,7 +121,7 @@ export function AddAppMark({ onPress, disabled = false }: { onPress: () => void;
 }
 
 const styles = StyleSheet.create({
-  mark: { width: 52, alignItems: "center", gap: 4 },
+  mark: { width: MARK_WIDTH, alignItems: "center", gap: 4 },
   circle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   dashed: { borderWidth: 1, borderStyle: "dashed" },
   addDashed: { borderWidth: 1.5, borderStyle: "dashed" },

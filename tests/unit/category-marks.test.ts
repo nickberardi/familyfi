@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardMarks, categoryRuleWhen, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
+import { cardMarks, categoryRuleWhen, fitCardMarks, marksRoom, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
@@ -29,6 +29,32 @@ describe("category marks", () => {
     expect(open.focused?.key).toBe("b");
     expect(open.shown.map((item) => item.key)).toEqual(["a", "c"]);
     expect(open.hidden).toBe(0);
+  });
+
+  it("keeps More on the row's last place when the marks do not all fit", () => {
+    const slots = [slot("a"), slot("b"), slot("c"), slot("d"), slot("e"), slot("f")];
+    const closed = cardMarks(slots, { open: false, focus: null, more: false });
+    // Room for four: three categories and More, not four with More wrapping alone.
+    expect(fitCardMarks(closed, 4).shown.map((item) => item.key)).toEqual(["a", "b", "c"]);
+    expect(fitCardMarks(closed, 4).hidden).toBe(3);
+    // Room to spare changes nothing.
+    expect(fitCardMarks(closed, 9)).toEqual(closed);
+    // Four categories alone fit in four places; in three, two show and More holds the last.
+    const four = cardMarks(slots.slice(0, 4), { open: false, focus: null, more: false });
+    expect(fitCardMarks(four, 4)).toEqual(four);
+    expect(fitCardMarks(four, 3).shown.map((item) => item.key)).toEqual(["a", "b"]);
+    expect(fitCardMarks(four, 3).hidden).toBe(2);
+    // Expanded, every mark shows and the row wraps, and Fewer stays even when only the narrow row hid any.
+    expect(fitCardMarks(cardMarks(slots, { open: false, focus: null, more: true }), 2).shown).toHaveLength(6);
+    expect(fitCardMarks(cardMarks(slots.slice(0, 4), { open: false, focus: null, more: true }), 3).hidden).toBe(2);
+  });
+
+  it("counts the marks a row fits, after the Internet mark when closed", () => {
+    // A 402px phone's card: Internet, three categories and More closed; five open.
+    expect(marksRoom(370, false)).toBe(4);
+    expect(marksRoom(370, true)).toBe(5);
+    // A 320px phone's card.
+    expect(marksRoom(288, false)).toBe(2);
   });
 
   it("says what More does, and when a rule blocks", () => {

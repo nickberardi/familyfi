@@ -2,6 +2,7 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { MARK_WIDTH } from "@/lib/category-marks";
 import { internetMarkLook } from "@/lib/internet-zone";
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
@@ -44,6 +45,6 @@ export function InternetMark({
 }
 
 const styles = StyleSheet.create({
-  mark: { width: 52, alignItems: "center", gap: 4 },
+  mark: { width: MARK_WIDTH, alignItems: "center", gap: 4 },
   tile: { width: 34, height: 34, borderRadius: 9, alignItems: "center", justifyContent: "center" },
 });
