@@ -28,7 +28,10 @@ export async function GET(request: Request) {
       run?.status === ChangeStatus.partial &&
       issues.some((issue) => issue.kind === "no_members") &&
       Boolean(run.error);
-    const runError = staleNoMembers ? null : (run?.error ?? writeIssues[0]?.message ?? null);
+    // While the sweep after a lost connection is still running, the error that lost it still holds.
+    const connectionError =
+      run?.status === ChangeStatus.pending && household.connectionStatus === "error" ? household.connectionError : null;
+    const runError = staleNoMembers ? null : (run?.error ?? connectionError ?? writeIssues[0]?.message ?? null);
     const runStatus = run
       ? staleNoMembers
         ? "applied"

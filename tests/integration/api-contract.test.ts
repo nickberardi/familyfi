@@ -256,6 +256,17 @@ describe("v1 API contracts", () => {
     expect(body.failingCount).toBe(1);
   });
 
+  it("keeps the lost connection's error on the sync page while the next sweep runs", async () => {
+    const auth = await signedIn();
+    const timeout = "UniFi GET /v1/sites/site/firewall/zones?offset=0&limit=200 timed out";
+    await prisma().household.update({ where: { id: "default" }, data: { connectionStatus: "error", connectionError: timeout } });
+    await prisma().syncRun.create({ data: { requestedRevision: 1, status: "pending" } });
+
+    const sync = await getSync(request("/api/v1/sync", { auth }));
+    expect(sync.status).toBe(200);
+    expect(await sync.json()).toMatchObject({ connectionStatus: "error", lastRun: { status: "pending", error: timeout } });
+  });
+
   it("starts a group with no internet rule, and pauses and resumes all its internet", async () => {
     const auth = await signedIn();
     const created = await createGroup(

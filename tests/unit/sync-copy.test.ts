@@ -9,6 +9,7 @@ import {
   noMembersAttention,
   syncFailed,
   syncLogRows,
+  syncProblem,
   syncStats,
   syncStatusCard,
 } from "@/lib/sync-copy";
@@ -112,6 +113,66 @@ describe("sync copy", () => {
     expect(rows[2]!.detailInk).toBe("var(--ff-danger)");
     expect(syncLogRows(sync({ lastRun: null, issues: [{ kind: "missing_policy", groupId: "g2", groupName: "A teen", message: "m" }] }), "UTC")[0]!.when).toBe("Now");
     expect(syncLogRows(null, "UTC")).toEqual([]);
+  });
+
+  it("lists a failed sweep first, since no change row may carry its error", () => {
+    const timeout = "UniFi GET /v1/sites/s1/firewall/zones?offset=0&limit=200 timed out";
+    const rows = syncLogRows(sync({ lastRun: { ...sync().lastRun!, status: "failed", error: timeout } }), "UTC");
+    expect(rows.map((row) => [row.key, row.action, row.detail, row.result, row.resultInk])).toEqual([
+      ["run-r1", "Reconcile sweep", timeout, "Failed", "var(--ff-danger)"],
+    ]);
+    expect(rows[0]!.when).toBe("Sep 14, 7:58 PM");
+    const now = new Date("2026-09-14T20:00:00Z");
+    expect(syncStats(sync({ lastRun: { ...sync().lastRun!, status: "failed", error: timeout } }), now)[3]).toMatchObject({ ink: "var(--ff-danger)" });
+  });
+
+  it("never flags sync without a log row saying why", () => {
+    const run = sync().lastRun!;
+    const flaggedStates: SyncStatus[] = [
+      sync({ lastRun: { ...run, status: "failed", error: "UniFi GET /v1/sites timed out" } }),
+      sync({ connectionStatus: "error" }),
+      sync({ connectionStatus: "error", lastRun: { ...run, status: "pending", finishedAt: null } }),
+      sync({ connectionStatus: "error", lastRun: null }),
+      sync({ failingCount: 1, lastRun: { ...run, status: "partial", error: "UniFi refused the policy" } }),
+      sync({ failingCount: 2, lastRun: { ...run, status: "partial", error: null } }),
+      sync({ failingCount: 1, lastRun: { ...run, status: "pending", finishedAt: null } }),
+      sync({ failingCount: 1, lastRun: null }),
+    ];
+    for (const state of flaggedStates) {
+      expect(syncFailed(state)).toBe(true);
+      const first = syncLogRows(state, "UTC")[0];
+      expect(first, JSON.stringify(state)).toBeDefined();
+      expect(first!.resultInk).toBe("var(--ff-danger)");
+      expect(first!.detail).toBeTruthy();
+    }
+    expect(syncLogRows(sync({ failingCount: 2, lastRun: { ...run, status: "partial", error: null } }), "UTC")[0]).toMatchObject({
+      action: "Reconcile sweep",
+      detail: "2 policies couldn't be written to UniFi.",
+      result: "Partial",
+    });
+    expect(syncLogRows(sync({ connectionStatus: "error", lastRun: null }), "UTC")[0]).toMatchObject({ key: "connection", action: "Reach UniFi", result: "Failed" });
+    expect(syncLogRows(sync(), "UTC")).toEqual([]);
+  });
+
+  it("explains why sync stopped and what to do about it", () => {
+    const failed = (error: string | null) => sync({ connectionStatus: "error", lastRun: { ...sync().lastRun!, status: "failed", error } });
+    expect(syncProblem(sync())).toBeNull();
+    expect(syncProblem(sync({ failingCount: 2 }))).toBeNull();
+    expect(syncProblem(null)).toBeNull();
+    const timeout = "UniFi GET /v1/sites/s1/firewall/zones?offset=0&limit=200 timed out";
+    expect(syncProblem(failed(timeout))).toMatchObject({ title: "UniFi isn't answering", detail: timeout });
+    expect(syncProblem(failed(timeout))!.fix).toMatch(/every 30 seconds/);
+    expect(syncProblem(failed("UniFi GET /v1/sites failed with HTTP 401: Unauthorized"))).toMatchObject({ title: "UniFi refused the API key" });
+    expect(syncProblem(failed("No External/WAN firewall zone was found."))).toMatchObject({
+      title: "Sync couldn't reach UniFi",
+      detail: "No External/WAN firewall zone was found.",
+    });
+    // The connection is in error while the next sweep runs: the lost connection's error still explains it.
+    expect(syncProblem(sync({ connectionStatus: "error", lastRun: { ...sync().lastRun!, status: "pending", error: timeout } }))).toMatchObject({
+      title: "UniFi isn't answering",
+      detail: timeout,
+    });
+    expect(syncProblem(sync({ connectionStatus: "error", lastRun: null }))).toMatchObject({ title: "Sync couldn't reach UniFi", detail: null });
   });
 
   it("says when sync needs attention, and counts groups waiting for a device", () => {

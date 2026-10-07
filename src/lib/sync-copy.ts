@@ -133,7 +133,7 @@ export function syncStats(sync: SyncStatus | null | undefined, now = new Date())
     {
       label: "Last sweep",
       value: relativeSweep(lastSweepAt(sync), now),
-      ink: "var(--ff-ink)",
+      ink: run?.status === "failed" ? "var(--ff-danger)" : "var(--ff-ink)",
       note: run ? `${run.status} · revision ${run.appliedRevision ?? run.requestedRevision}` : "no sweep yet",
     },
   ];
@@ -151,9 +151,39 @@ export type SyncLogRow = {
   resultInk: string;
 };
 
-/** The log, as the Sync page lists it: the current issues at the last sweep, then every change, newest first. */
+/**
+ * Whenever sync is flagged as needing attention, the log's first row says why, so the flag never
+ * points at a log with nothing in it: a sweep that stopped or only partly applied (often with no
+ * pending change to carry its error), a gateway connection in error, or policies failing to write.
+ */
+function flaggedRow(sync: SyncStatus | null | undefined, sweepAt: string | null, timezone: string): SyncLogRow | null {
+  if (!sync || !syncFailed(sync)) return null;
+  const run = sync.lastRun;
+  const when = sweepAt ? formatLogWhen(sweepAt, timezone) : SYNC_COPY.now;
+  const row = (key: string, action: string, detail: string, status: "failed" | "partial"): SyncLogRow => ({
+    key,
+    when,
+    action,
+    detail,
+    detailInk: "var(--ff-danger)",
+    detailMono: false,
+    result: changeResultLabel(status),
+    resultInk: changeResultColor(status),
+  });
+  const failing = sync.failingCount === 1 ? "1 policy couldn't be written to UniFi." : `${sync.failingCount} policies couldn't be written to UniFi.`;
+  if (run && (run.status === "failed" || run.status === "partial")) {
+    return row(`run-${run.id}`, changeActionLabel("retry"), run.error ?? failing, run.status);
+  }
+  if (sync.connectionStatus === "error") {
+    return row("connection", "Reach UniFi", run?.error ?? "The last sync couldn't reach the gateway. FamilyFi is trying again.", "failed");
+  }
+  return row("failing", changeActionLabel("retry"), failing, "failed");
+}
+
+/** The log, as the Sync page lists it: why sync is flagged, the current issues at the last sweep, then every change, newest first. */
 export function syncLogRows(sync: SyncStatus | null | undefined, timezone: string): SyncLogRow[] {
   const sweepAt = lastSweepAt(sync);
+  const flagged = flaggedRow(sync, sweepAt, timezone);
   const issues = (sync?.issues ?? []).map((issue): SyncLogRow => ({
     key: `issue-${issue.groupId}`,
     when: sweepAt ? formatLogWhen(sweepAt, timezone) : SYNC_COPY.now,
@@ -174,12 +204,51 @@ export function syncLogRows(sync: SyncStatus | null | undefined, timezone: strin
     result: changeResultLabel(change.status),
     resultInk: changeResultColor(change.status),
   }));
-  return [...issues, ...changes];
+  return [...(flagged ? [flagged] : []), ...issues, ...changes];
 }
 
 /** Whether sync needs attention: the last sweep failed, UniFi is unreachable, or a policy is failing. */
 export function syncFailed(sync: Pick<SyncStatus, "lastRun" | "connectionStatus" | "failingCount"> | null | undefined): boolean {
   return sync?.lastRun?.status === "failed" || sync?.connectionStatus === "error" || (sync?.failingCount ?? 0) > 0;
+}
+
+export type SyncProblem = { title: string; message: string; detail: string | null; fix: string };
+
+/**
+ * Why sync stopped, in words a parent can act on, when FamilyFi could not finish talking to the
+ * gateway: the last sweep failed, or the gateway connection is in error. Write failures on single
+ * policies are the Failing tile's and the log's, not this. `detail` is UniFi's own error, if any.
+ */
+export function syncProblem(sync: Pick<SyncStatus, "lastRun" | "connectionStatus"> | null | undefined): SyncProblem | null {
+  const run = sync?.lastRun;
+  const sweepFailed = run?.status === "failed";
+  if (!sweepFailed && sync?.connectionStatus !== "error") return null;
+  const detail = run?.error ?? null;
+  const retry = "FamilyFi tries again every 30 seconds, so a short outage clears by itself.";
+  if (detail && /\btimed out$/.test(detail)) {
+    return {
+      title: "UniFi isn't answering",
+      message: "The gateway didn't answer FamilyFi in time, so this sync stopped. Your rules already on the gateway keep working.",
+      detail,
+      fix: `${retry} If it keeps happening, check that the gateway is online and not overloaded, and that the FamilyFi server can reach the gateway address in FamilyFi's web Settings.`,
+    };
+  }
+  if (detail && /HTTP 40[13]\b/.test(detail)) {
+    return {
+      title: "UniFi refused the API key",
+      message: "The gateway turned down FamilyFi's key, so this sync stopped. Your rules already on the gateway keep working.",
+      detail,
+      fix: "Create a new Integration API key on the UniFi console and replace it in FamilyFi's web Settings.",
+    };
+  }
+  return {
+    title: "Sync couldn't reach UniFi",
+    message: detail
+      ? "FamilyFi couldn't finish talking to the gateway, so this sync stopped. Your rules already on the gateway keep working."
+      : "The last sync couldn't reach the gateway. FamilyFi is trying again.",
+    detail,
+    fix: `${retry} If it keeps happening, check that the gateway is online and that its address and key in FamilyFi's web Settings are right.`,
+  };
 }
 
 /** How many family groups have rules that cannot be created until they have a device: the Family badge. */
