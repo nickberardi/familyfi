@@ -445,6 +445,11 @@ async function tick(owner: string): Promise<boolean> {
         error: errors[0],
       },
     });
+    // The pass reached the gateway, so an error left by an earlier failed pass no longer holds.
+    await prisma().household.updateMany({
+      where: { id: "default", connectionStatus: "error" },
+      data: { connectionStatus: "connected", connectionError: null },
+    });
     await prisma().changeResult.updateMany({
       where: { status: ChangeStatus.pending, requestedRevision: { lte: revision } },
       data: {
