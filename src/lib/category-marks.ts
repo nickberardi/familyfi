@@ -107,9 +107,9 @@ export function categorySheet(item: CategorySlotState): CategorySheetState {
   };
 }
 
-/** Category marks on a closed card, before "More". */
+/** Most category marks a closed card shows before "More"; a narrow row shows fewer. */
 export const CLOSED_MARKS = 4;
-/** Other-category marks on an open card, before "More". */
+/** Most other-category marks an open card shows before "More"; a narrow row shows fewer. */
 export const OPEN_MARKS = 5;
 
 /**
@@ -122,12 +122,36 @@ export function cardMarks(slots: CategorySlotState[], { open, focus, more }: { o
   const focused = ordered.find((item) => item.key === focus) ?? ordered[0];
   const pool = open ? ordered.filter((item) => item !== focused) : ordered;
   const cap = open ? OPEN_MARKS : CLOSED_MARKS;
-  return {
-    ordered,
-    focused: open ? focused : undefined,
-    shown: more ? pool : pool.slice(0, cap),
-    hidden: pool.length > cap ? pool.length - cap : 0,
-  };
+  return { ordered, focused: open ? focused : undefined, pool, more, cap, ...rowOfMarks(pool, more, cap) };
+}
+
+/** `hidden` is what the row hides collapsed, so expanded it still shows Fewer. */
+function rowOfMarks(pool: CategorySlotState[], more: boolean, cap: number) {
+  return { shown: more ? pool : pool.slice(0, cap), hidden: Math.max(0, pool.length - cap) };
+}
+
+/** A mark's column, and the gap and side padding of a card's row of marks. */
+export const MARK_WIDTH = 52;
+export const MARK_ROW_GAP = 12;
+export const MARK_ROW_PADDING = 18;
+/** The Internet mark, its 1px divider and the gaps either side, before a closed card's categories. */
+const INTERNET_MARK_SPAN = MARK_WIDTH + MARK_ROW_GAP + 1 + MARK_ROW_GAP;
+
+/** How many marks fit on one line of a card's row `width` wide, after the Internet mark when closed. */
+export function marksRoom(width: number, open: boolean) {
+  const inner = width - 2 * MARK_ROW_PADDING - (open ? 0 : INTERNET_MARK_SPAN);
+  return Math.floor((inner + MARK_ROW_GAP) / (MARK_WIDTH + MARK_ROW_GAP));
+}
+
+/**
+ * The marks a row with room for `room` marks shows, More included. When they do not all fit, More
+ * takes the row's last place, so it never wraps onto a line of its own. Expanded, every mark shows
+ * and the row wraps.
+ */
+export function fitCardMarks(marks: CardMarks, room: number): CardMarks {
+  const { pool, cap } = marks;
+  const fit = pool.length <= Math.min(cap, room) ? pool.length : Math.max(0, Math.min(cap, room - 1));
+  return { ...marks, ...rowOfMarks(pool, marks.more, fit) };
 }
 
 export type CardMarks = ReturnType<typeof cardMarks>;

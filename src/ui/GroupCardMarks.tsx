@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import type { CardMarks } from "@/lib/category-marks";
+import { MARK_ROW_GAP, MARK_ROW_PADDING, fitCardMarks, marksRoom, type CardMarks } from "@/lib/category-marks";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { appRulesForGroup, glyphForAppName, parentFacingRuleLabel, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -52,6 +53,9 @@ export function GroupCardMarks({
 }) {
   const ui = useUI();
   const apps = open ? appRulesForGroup(rules, group.id) : [];
+  // Until the row has been measured it shows the usual few; then only what fits on one line.
+  const [width, setWidth] = useState<number | null>(null);
+  const fitted = width === null ? marks : fitCardMarks(marks, marksRoom(width, open));
   return (
     <View testID={`filter-marks-${group.id}`}>
       {open ? (
@@ -59,17 +63,17 @@ export function GroupCardMarks({
           <SectionLabel>Other categories</SectionLabel>
         </View>
       ) : null}
-      <View style={styles.row}>
+      <View style={styles.row} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
         {open ? null : (
           <>
             <InternetMark group={group} windows={windows} timezone={timezone} now={now} onPress={() => onOpen()} />
             <View aria-hidden style={[styles.divider, { backgroundColor: ui.color("hairline-strong") }]} />
           </>
         )}
-        {marks.shown.map((item) => (
+        {fitted.shown.map((item) => (
           <CategoryMark key={item.key} item={item} onPress={() => onOpen(item.key)} testID={`mark-${item.key}-${group.id}`} />
         ))}
-        {marks.hidden ? <MoreMark more={more} total={marks.ordered.length} hidden={marks.hidden} onPress={onToggleMore} /> : null}
+        {fitted.hidden ? <MoreMark more={more} total={marks.ordered.length} hidden={fitted.hidden} onPress={onToggleMore} /> : null}
       </View>
       {apps.length || (open && onAddApp) ? (
         <View style={[styles.apps, { borderTopColor: ui.color("hairline") }]}>
@@ -97,7 +101,7 @@ export function GroupCardMarks({
 
 const styles = StyleSheet.create({
   heading: { paddingHorizontal: 18, paddingTop: 4 },
-  row: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: 12, paddingHorizontal: 18, paddingTop: 4, paddingBottom: 14 },
+  row: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: MARK_ROW_GAP, paddingHorizontal: MARK_ROW_PADDING, paddingTop: 4, paddingBottom: 14 },
   divider: { width: 1, alignSelf: "stretch", marginTop: 2, marginBottom: 14 },
   apps: { borderTopWidth: 1, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 14 },
   appMarks: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingTop: 8 },
