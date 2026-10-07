@@ -1,27 +1,66 @@
 "use client";
 
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { SYNC_COPY as COPY, syncLogRows, syncStats } from "@/lib/sync-copy";
+import { SYNC_COPY as COPY, syncLogRows, syncProblem, syncStats } from "@/lib/sync-copy";
 import type { SyncStatus } from "@/lib/types";
 
 import { SyncTiles } from "./SyncTiles";
-import { tokenOf, useUI } from "./UIContext";
+import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
 /**
- * The Sync page below its header: the four tiles (policies FamilyFi owns, admin policies touched,
- * failing, last sweep), the log of current issues and changes, and what FamilyFi never touches.
+ * The Sync page below its header: why sync stopped and what to do when it could not reach the
+ * gateway, the four tiles (policies FamilyFi owns, admin policies touched, failing, last sweep),
+ * the log of current issues and changes, and what FamilyFi never touches. `onReconcile`, when
+ * given, offers Try again now on that problem.
  */
-export function SyncContent({ sync, timezone, now }: { sync: SyncStatus | null; timezone: string; now?: Date }) {
+export function SyncContent({
+  sync,
+  timezone,
+  now,
+  onReconcile,
+  busy = false,
+}: {
+  sync: SyncStatus | null;
+  timezone: string;
+  now?: Date;
+  onReconcile?: () => void;
+  busy?: boolean;
+}) {
   const ui = useUI();
   const text = (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const rows = syncLogRows(sync, timezone);
+  const problem = syncProblem(sync);
 
   return (
     <View style={styles.stack} testID="sync-content">
+      {problem ? (
+        <View
+          role="alert"
+          style={[styles.card, styles.problem, { backgroundColor: ui.color("danger-tint"), borderColor: ui.color("hairline-card") }]}
+          testID="sync-problem"
+        >
+          <Text style={[text(16, 22, "danger"), styles.bold]}>{problem.title}</Text>
+          <Text style={text(14, 20, "ink")}>{problem.message}</Text>
+          {problem.detail ? <Text style={[text(14, 20, "muted"), { fontFamily: MONO }]}>{problem.detail}</Text> : null}
+          <Text style={text(14, 20, "ink")}>{problem.fix}</Text>
+          {onReconcile ? (
+            <Pressable
+              role="button"
+              aria-disabled={busy}
+              disabled={busy}
+              onPress={onReconcile}
+              testID="sync-problem-retry"
+              style={({ pressed }) => [styles.retry, { backgroundColor: ui.color("accent-fill") }, busy && { opacity: 0.5 }, pressed && !busy && { opacity: PRESS_OPACITY }]}
+            >
+              <Text style={[text(14, 21, "accent"), styles.bold]}>{busy ? "Trying again…" : "Try again now"}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       <SyncTiles>
         {syncStats(sync, now).map((stat) => (
           <View key={stat.label} style={[styles.card, styles.tile, card]} testID={`sync-stat-${stat.label}`}>
@@ -66,6 +105,8 @@ export function SyncContent({ sync, timezone, now }: { sync: SyncStatus | null; 
 const styles = StyleSheet.create({
   stack: { gap: 16 },
   card: { borderRadius: 12, borderWidth: 1 },
+  problem: { gap: 8, paddingHorizontal: 18, paddingVertical: 16 },
+  retry: { alignSelf: "flex-start", marginTop: 4, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   tile: { flexGrow: 1, flexBasis: 200, minWidth: 0, paddingHorizontal: 18, paddingVertical: 16 },
   statLabel: { fontWeight: "600", letterSpacing: 0.35, textTransform: "uppercase" },
   statValue: { marginTop: 6, fontWeight: "700", letterSpacing: -0.65 },
