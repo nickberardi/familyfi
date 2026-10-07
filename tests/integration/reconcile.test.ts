@@ -370,6 +370,23 @@ describe("reconciliation against mocked UniFi", () => {
     expect(client.state.policies.some((policy) => policy.name.includes("Internal"))).toBe(true);
   });
 
+  it("clears the connection error once a later sweep reaches the gateway", async () => {
+    const client = fixtureUnifiClient();
+    vi.spyOn(client, "listZones").mockRejectedValueOnce(new Error("gateway unreachable"));
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({
+      connectionStatus: "error",
+      connectionError: "gateway unreachable",
+    });
+
+    await runReconcileOnce();
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({
+      connectionStatus: "connected",
+      connectionError: null,
+    });
+  });
+
   it("does not run while another owner holds the lock", async () => {
     await prisma().reconciliationLock.create({
       data: { id: "global", owner: "other", expiresAt: new Date(Date.now() + 60_000) },
