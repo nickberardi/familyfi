@@ -16,7 +16,7 @@ concurrency:
 jobs:
   # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
   verify:
-    runs-on: self-hosted
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
@@ -63,7 +63,7 @@ jobs:
           retention-days: 7
 
   browser:
-    runs-on: self-hosted
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup

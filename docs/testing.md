@@ -108,7 +108,9 @@ CodeQL runs through the repository's GitHub default setup (Settings → Code sec
 
 ### Self-hosted runners
 
-Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup. The script removes unused Docker data, test databases a killed job left running (containers labelled `familyfi.test-run`), the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. Two agents share a machine, so while another job is running the script leaves the shared Docker daemon and any shared Go or pnpm cache alone. Each runner service keeps its own Go and pnpm caches. Some jobs use GitHub-hosted runners; the workflow files define placement.
+Jobs run on GitHub-hosted runners unless the repository variable `USE_SELF_HOSTED` is `true` (Settings → Secrets and variables → Actions → Variables), which moves every job that can run self-hosted onto the self-hosted runners, as in familyfi-mobile. The arm64 image, the version bump PR and the mutation run always use GitHub-hosted runners.
+
+Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup; on a GitHub-hosted runner the action does nothing. The script removes unused Docker data, test databases a killed job left running (containers labelled `familyfi.test-run`), the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. Two agents share a machine, so while another job is running the script leaves the shared Docker daemon and any shared Go or pnpm cache alone. Each runner service keeps its own Go and pnpm caches.
 
 **Never run this cleanup script on a development machine.** Local work must clean only resources created by that task; `scripts/test.py` removes only what its own run recorded and never runs runner cleanup.
 

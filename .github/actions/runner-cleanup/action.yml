@@ -1,11 +1,13 @@
 name: Runner cleanup
 description: >
   Run scripts/ci/runner-cleanup.sh so a self-hosted job starts on a clean disk. Use it
-  right after checkout, before any setup step, in every job that runs on self-hosted.
+  right after checkout, before any setup step, in every job that can run on self-hosted.
+  On a GitHub-hosted runner it does nothing.
 
 runs:
   using: composite
   steps:
     - name: Clean runner disk
+      if: runner.environment == 'self-hosted'
       shell: bash
       run: sh scripts/ci/runner-cleanup.sh

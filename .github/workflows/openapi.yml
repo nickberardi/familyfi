@@ -20,7 +20,7 @@ concurrency:
 jobs:
   # info.version must rise with every change, so the iOS client can tell its vendored copy is stale.
   version:
-    runs-on: self-hosted
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
@@ -39,7 +39,7 @@ jobs:
         run: node scripts/ci/check-openapi-version.mjs
 
   breaking:
-    runs-on: self-hosted
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
