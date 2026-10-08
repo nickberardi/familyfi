@@ -47,7 +47,8 @@ export function SidebarStatus({
   const alert = updateAlert(update);
   const status = syncStatusCard(sync, { busy, error, notice });
   const attention = noMembersAttention(sync?.issues ?? []);
-  const syncNotice = status.dot !== "var(--ff-on)";
+  // Whether sync needs a hand (failed, partial, not configured), whatever a write in flight says.
+  const syncNotice = syncStatusCard(sync).showReconcile;
   // Most urgent first: the row takes the first one's dot.
   const notices = [
     syncNotice && status.dot === "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,
@@ -67,16 +68,19 @@ export function SidebarStatus({
   );
 
   // Collapse while the cards would push the navigation into a scroll, and expand again once the
-  // rail has room for them at the height they last had. A different set of cards is measured again.
+  // rail has room for them at the height they last had. Cards that say something different (a new
+  // notice, a write in flight, a longer message) are measured again, but not under an open popover.
   const root = useRef<HTMLDivElement>(null);
   const fullHeight = useRef(0);
   const [collapsed, setCollapsed] = useState(false);
-  const shape = [alert?.title, status.title, attention?.title].join("|");
+  const shape = JSON.stringify([alert, status, attention]);
   const [measuredShape, setMeasuredShape] = useState(shape);
-  if (shape !== measuredShape) {
+  if (shape !== measuredShape && !open) {
     setMeasuredShape(shape);
     setCollapsed(false);
   }
+  // The popover belongs to the collapsed row; it never waits to reopen on its own.
+  if (!collapsed && open) setOpen(false);
   useLayoutEffect(() => {
     const rail = root.current?.closest("aside");
     if (!rail || !nav.current || !navContent.current) return;
@@ -86,20 +90,21 @@ export function SidebarStatus({
       const own = root.current;
       const end = own?.parentElement;
       if (!scroller || !content || !own || !end) return;
-      const slack = scroller.clientHeight - content.offsetHeight;
+      const slack = scroller.getBoundingClientRect().height - content.getBoundingClientRect().height;
+      const height = own.getBoundingClientRect().height;
       if (!collapsed) {
-        if (slack < 0 || end.scrollHeight > end.clientHeight + 1) {
-          fullHeight.current = own.offsetHeight;
+        if (slack < -0.5 || end.scrollHeight > end.clientHeight + 1) {
+          fullHeight.current = height;
           setCollapsed(true);
         }
-      } else if (slack + own.offsetHeight >= fullHeight.current) {
+        // A few pixels' margin, so a height on the edge settles rather than flipping back and forth.
+      } else if (slack + height >= fullHeight.current + 4) {
         setCollapsed(false);
       }
     }
     check();
     const observer = new ResizeObserver(check);
-    observer.observe(rail);
-    observer.observe(navContent.current);
+    for (const element of [rail, nav.current, navContent.current, root.current]) if (element) observer.observe(element);
     return () => observer.disconnect();
   }, [collapsed, measuredShape, nav, navContent]);
 

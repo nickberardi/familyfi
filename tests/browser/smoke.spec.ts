@@ -61,7 +61,7 @@ test("sign-in and household pages", async ({ page }) => {
     await expect(page.locator("body")).not.toContainText("Something went wrong");
   }
   await expect(page).toHaveURL(/\/reference/);
-  await expect(page.getByRole("heading", { name: "API" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "API", exact: true })).toBeVisible();
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
@@ -83,7 +83,7 @@ test("sign-in and household pages", async ({ page }) => {
 
 test("the sidebar's notices collapse into one row when the rail is short", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 1200 });
   await page.goto("/family");
   const rail = page.locator("aside");
   const row = rail.locator("button[aria-haspopup=dialog]");
@@ -107,7 +107,7 @@ test("the sidebar's notices collapse into one row when the rail is short", { tag
   await page.getByRole("heading", { level: 1 }).click();
   await expect(popover).toHaveCount(0);
 
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 1200 });
   await expect(rail.getByTestId("sync-status")).toBeVisible();
   await expect(row).toHaveCount(0);
 });
