@@ -68,22 +68,16 @@ export function SidebarStatus({
   );
 
   // Collapse while the cards would push the navigation into a scroll, and expand again once the
-  // rail has room for them at the height they last had. Cards that say something different (a new
-  // notice, a write in flight, a longer message) are measured again, but not under an open popover.
+  // rail has room for them. While collapsed, a hidden copy of the cards keeps their full height
+  // measured as what they say changes, so the row never has to unmount (and drop focus) to look.
   const root = useRef<HTMLDivElement>(null);
-  const fullHeight = useRef(0);
+  const ghost = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const shape = JSON.stringify([alert, status, attention]);
-  const [measuredShape, setMeasuredShape] = useState(shape);
-  if (shape !== measuredShape && !open) {
-    setMeasuredShape(shape);
-    setCollapsed(false);
-  }
   // The popover belongs to the collapsed row; it never waits to reopen on its own.
   if (!collapsed && open) setOpen(false);
   useLayoutEffect(() => {
     const rail = root.current?.closest("aside");
-    if (!rail || !nav.current || !navContent.current) return;
+    if (!rail) return;
     function check() {
       const scroller = nav.current;
       const content = navContent.current;
@@ -91,22 +85,21 @@ export function SidebarStatus({
       const end = own?.parentElement;
       if (!scroller || !content || !own || !end) return;
       const slack = scroller.getBoundingClientRect().height - content.getBoundingClientRect().height;
-      const height = own.getBoundingClientRect().height;
       if (!collapsed) {
-        if (slack < -0.5 || end.scrollHeight > end.clientHeight + 1) {
-          fullHeight.current = height;
-          setCollapsed(true);
-        }
-        // A few pixels' margin, so a height on the edge settles rather than flipping back and forth.
-      } else if (slack + height >= fullHeight.current + 4) {
-        setCollapsed(false);
+        if (slack < -0.5 || end.scrollHeight > end.clientHeight + 1) setCollapsed(true);
+        return;
       }
+      const copy = ghost.current;
+      if (!copy) return;
+      copy.style.width = `${own.getBoundingClientRect().width}px`;
+      // A few pixels' margin, so a height on the edge settles rather than flipping back and forth.
+      if (slack + own.getBoundingClientRect().height >= copy.getBoundingClientRect().height + 4) setCollapsed(false);
     }
     check();
     const observer = new ResizeObserver(check);
-    for (const element of [rail, nav.current, navContent.current, root.current]) if (element) observer.observe(element);
+    for (const element of [rail, nav.current, navContent.current, root.current, ghost.current]) if (element) observer.observe(element);
     return () => observer.disconnect();
-  }, [collapsed, measuredShape, nav, navContent]);
+  }, [collapsed, nav, navContent]);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -118,6 +111,12 @@ export function SidebarStatus({
             {cards}
           </div>
         </StatusRow>
+      ) : null}
+      {collapsed ? (
+        // Fixed and off screen, so it adds nothing to the rail's scroll height.
+        <div ref={ghost} aria-hidden inert className="pointer-events-none invisible fixed top-0 left-[-10000px] flex flex-col gap-2.5">
+          {cards}
+        </div>
       ) : (
         cards
       )}

@@ -93,7 +93,7 @@ test("the sidebar's notices collapse into one row when the rail is short", { tag
 
   await page.setViewportSize({ width: 1280, height: 480 });
   await expect(row).toHaveAttribute("aria-expanded", "false");
-  await expect(rail.getByTestId("sync-status")).toHaveCount(0);
+  await expect(rail.getByTestId("sync-status")).toBeHidden();
   await row.click();
   const popover = rail.getByRole("dialog");
   await expect(popover.getByTestId("sync-status")).toBeVisible();
@@ -110,6 +110,32 @@ test("the sidebar's notices collapse into one row when the rail is short", { tag
   await page.setViewportSize({ width: 1280, height: 1200 });
   await expect(rail.getByTestId("sync-status")).toBeVisible();
   await expect(row).toHaveCount(0);
+});
+
+test("reconciling from the collapsed notices keeps the row and its focus", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  // A failed sync, so its card offers Reconcile now; the write that follows changes what it says.
+  await page.route("**/api/v1/sync", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    const body = await response.json();
+    body.connectionStatus = "error";
+    body.lastRun = { ...(body.lastRun ?? {}), status: "failed", error: "The gateway refused the policy." };
+    await route.fulfill({ response, json: body });
+  });
+  await page.setViewportSize({ width: 1280, height: 480 });
+  await page.goto("/family");
+  const rail = page.locator("aside");
+  const row = rail.locator("button[aria-haspopup=dialog]");
+  await row.click();
+  const popover = rail.getByRole("dialog");
+  await popover.getByTestId("sync-reconcile").click();
+  await expect(popover.getByTestId("sync-reconcile")).toBeEnabled();
+  await expect(popover).toBeVisible();
+  await popover.getByTestId("sync-reconcile").focus();
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await expect(row).toBeFocused();
 });
 
 test("the sidebar alerts an available update and stays quiet otherwise", { tag: "@desktop" }, async ({ page }) => {

@@ -718,6 +718,11 @@
         "sync"
       ]
     },
+    "tests/browser/smoke.spec.ts > reconciling from the collapsed notices keeps the row and its focus": {
+      "categories": [
+        "sync"
+      ]
+    },
     "tests/browser/smoke.spec.ts > the sidebar alerts an available update and stays quiet otherwise": {
       "categories": [
         "settings"
