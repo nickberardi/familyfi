@@ -718,7 +718,7 @@
         "sync"
       ]
     },
-    "tests/browser/smoke.spec.ts > reconciling from the collapsed notices keeps the row and its focus": {
+    "tests/browser/smoke.spec.ts > reconciling from the collapsed notices keeps the row, and Escape returns focus to it": {
       "categories": [
         "sync"
       ]

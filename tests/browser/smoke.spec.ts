@@ -112,7 +112,7 @@ test("the sidebar's notices collapse into one row when the rail is short", { tag
   await expect(row).toHaveCount(0);
 });
 
-test("reconciling from the collapsed notices keeps the row and its focus", { tag: "@desktop" }, async ({ page }) => {
+test("reconciling from the collapsed notices keeps the row, and Escape returns focus to it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   // A failed sync, so its card offers Reconcile now; the write that follows changes what it says.
   await page.route("**/api/v1/sync", async (route) => {
@@ -132,6 +132,7 @@ test("reconciling from the collapsed notices keeps the row and its focus", { tag
   await popover.getByTestId("sync-reconcile").click();
   await expect(popover.getByTestId("sync-reconcile")).toBeEnabled();
   await expect(popover).toBeVisible();
+  // The button is disabled while the write runs, which drops focus; from the card, Escape returns it to the row.
   await popover.getByTestId("sync-reconcile").focus();
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
