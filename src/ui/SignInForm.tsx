@@ -16,12 +16,15 @@ import { useUI } from "./UIContext";
 export function SignInForm({
   onSubmit,
   initialUsername = "",
+  initialPassword = "",
   surface = "card",
   buttonStyle,
   buttonLabelStyle,
 }: {
   onSubmit: (username: string, password: string) => Promise<string | null>;
   initialUsername?: string;
+  /** Only the public demo fills this in, with the login it shows every visitor. */
+  initialPassword?: string;
   /** `card` on a page (the web); `plain` sits the fields straight on a ground, filled with `field` (a phone's setup). */
   surface?: "card" | "plain";
   /** The submit button's platform shape and type, on top of the web's (`Button`'s `style` and `labelStyle`). */
@@ -30,7 +33,7 @@ export function SignInForm({
 }) {
   const ui = useUI();
   const [username, setUsername] = useState(initialUsername);
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(initialPassword);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [focused, setFocused] = useState<"username" | "password" | null>(null);

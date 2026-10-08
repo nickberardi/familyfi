@@ -26,8 +26,11 @@ export async function browserSignIn(username: string, password: string): Promise
   return signInError({ ok: response.ok, body });
 }
 
-/** The shared sign-in form (`src/ui/SignInForm.tsx`), signing in with the browser's cookie session. */
-export function SignInForm() {
+/**
+ * The shared sign-in form (`src/ui/SignInForm.tsx`), signing in with the browser's cookie session.
+ * `demoLogin` fills it in on the public demo, where every visitor uses the same login.
+ */
+export function SignInForm({ demoLogin }: { demoLogin?: { username: string; password: string } }) {
   const router = useRouter();
 
   async function signIn(username: string, password: string): Promise<string | null> {
@@ -39,5 +42,5 @@ export function SignInForm() {
     return null;
   }
 
-  return <SharedSignInForm onSubmit={signIn} />;
+  return <SharedSignInForm onSubmit={signIn} initialUsername={demoLogin?.username} initialPassword={demoLogin?.password} />;
 }
