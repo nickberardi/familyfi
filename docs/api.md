@@ -33,7 +33,7 @@ For a change to either shared artifact:
 1. Identify the affected consumers and intended behaviour before editing. Follow the [root compatibility rules](../AGENTS.md#openapi-consumer-coordination) and [version policy](#versioning-the-contract) for HTTP changes.
 2. Change the owning implementation and applicable artifact in the same PR. Add meaningful cases for changed shared display behaviour; do not change expected results merely to accept a regression.
 3. Run the applicable [validation](testing.md). Describe changed endpoints/schemas or vector cases, the server commit/version to adopt, and any rollout dependency in the PR.
-4. For an OpenAPI change, open the required native adoption issue as specified in `AGENTS.md`. For display changes, make the behaviour and vector diff explicit in the PR so the native port can adopt them together.
+4. For an OpenAPI change, open the required `familyfi-mobile` adoption issue as specified in `AGENTS.md`. For display changes, make the behaviour and vector diff explicit in the PR so familyfi-mobile's Watch port can adopt them together.
 5. Use the [native repository's current adoption instructions](https://github.com/nickberardi/familyfi-mobile/blob/main/docs/development.md#paired-familyfi-changes) for its refresh, generation and validation procedure. Keep those commands there. A passing server check does not establish that a consumer has adopted the change.
 
 Platform-specific navigation, typography and layout are owned by each implementation; use the

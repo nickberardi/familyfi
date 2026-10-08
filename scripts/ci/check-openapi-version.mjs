@@ -177,7 +177,8 @@ function main() {
         "### OpenAPI version",
         "",
         `The companion app generates its API types from \`${SPEC}\`. ` +
-          `After this merges, re-pin \`${MOBILE_SUBMODULE}\` to it and run \`pnpm run schema\` there.`,
+          `After this merges, re-pin \`${MOBILE_SUBMODULE}\` to the merged commit and follow ` +
+          `familyfi-mobile's paired-changes steps (\`docs/development.md\`).`,
         "",
         "| | info.version |",
         "| --- | --- |",
