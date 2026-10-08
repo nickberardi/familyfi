@@ -1,7 +1,7 @@
 "use client";
 
 import { Toast } from "@/ui/Toast";
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AboutSheet } from "@/components/AboutSheet";
@@ -66,9 +66,79 @@ function NavBrand({ statusLine, compact, onAbout }: { statusLine: string; compac
 }
 
 /**
+ * Which nav sections are collapsed, kept in this browser so the room a person frees stays freed.
+ * The rail and the drawer read the same set. Before hydration, and where storage is unavailable,
+ * every section is open.
+ */
+const COLLAPSED_KEY = "familyfi.nav.collapsed";
+const collapsedListeners = new Set<() => void>();
+
+function readCollapsed(): string {
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+function parseCollapsed(raw: string): string[] {
+  try {
+    const titles: unknown = JSON.parse(raw);
+    return Array.isArray(titles) ? titles.filter((title): title is string => typeof title === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCollapsed(titles: readonly string[]) {
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(titles));
+  } catch {
+    // Storage refused (a private window): the toggle simply does not persist.
+  }
+  for (const listener of collapsedListeners) listener();
+}
+
+function subscribeCollapsed(listener: () => void) {
+  collapsedListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    collapsedListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
+function useCollapsedSections(): [ReadonlySet<string>, (titles: readonly string[]) => void] {
+  const raw = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => "[]");
+  const collapsed = useMemo(() => new Set(parseCollapsed(raw)), [raw]);
+  return [collapsed, writeCollapsed];
+}
+
+/** The count beside a destination: devices waiting, family members without a device, a failed sync. */
+function navBadge(href: string, counts: { unassignedCount: number; familyNeedsDevices: number; syncFailed: boolean }) {
+  if (href === "/devices") return counts.unassignedCount;
+  if (href === "/family") return counts.familyNeedsDevices;
+  return href === "/sync" && counts.syncFailed ? 1 : 0;
+}
+
+function NavBadge({ count, tone }: { count: number; tone: "paused" | "danger" }) {
+  return (
+    <span
+      className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
+      style={{ background: `var(--ff-${tone})` }}
+    >
+      {count}
+    </span>
+  );
+}
+
+/**
  * The nav groups themselves — identical content on the rail and in the drawer, so a
  * destination reachable on desktop is never missing on phone. `onNavigate` closes the
  * drawer after a tap; the rail passes nothing since it is never hidden.
+ *
+ * Each group's title collapses it. A collapsed group keeps its badges as one total on the title,
+ * and arriving on one of its pages opens it again, so the current page is always in view.
  */
 function NavGroups({
   pathname,
@@ -76,61 +146,76 @@ function NavGroups({
   familyNeedsDevices,
   syncFailed,
   onNavigate,
+  idPrefix,
 }: {
   pathname: string;
   unassignedCount: number;
   familyNeedsDevices: number;
   syncFailed: boolean;
   onNavigate?: () => void;
+  /** Keeps the rail's and the drawer's section ids apart. */
+  idPrefix: string;
 }) {
+  const counts = { unassignedCount, familyNeedsDevices, syncFailed };
+  const [collapsed, setCollapsed] = useCollapsedSections();
+  // Arriving on a page opens its section. An effect rather than render, since it writes storage the
+  // other list (rail or drawer) also reads.
+  useEffect(() => {
+    const current = NAV.find((group) => group.items.some((item) => isActive(pathname, item.href)));
+    const titles = parseCollapsed(readCollapsed());
+    if (current && titles.includes(current.title)) {
+      writeCollapsed(titles.filter((title) => title !== current.title));
+    }
+  }, [pathname]);
+
   return (
     <>
-      {NAV.map((group) => (
-        <div key={group.title} className="mb-5 last:mb-0">
-          <div className="px-2.5 pb-1.5 text-[14px] font-semibold tracking-wide text-[var(--ff-muted)] uppercase">
-            {group.title}
+      {NAV.map((group) => {
+        const closed = collapsed.has(group.title);
+        const id = `${idPrefix}-${group.title.toLowerCase()}`;
+        const total = group.items.reduce((sum, item) => sum + navBadge(item.href, counts), 0);
+        const urgent = group.items.some((item) => item.href !== "/family" && navBadge(item.href, counts) > 0);
+        return (
+          <div key={group.title} className={closed ? "mb-2 last:mb-0" : "mb-5 last:mb-0"}>
+            <button
+              type="button"
+              aria-expanded={!closed}
+              aria-controls={id}
+              onClick={() =>
+                setCollapsed(closed ? [...collapsed].filter((title) => title !== group.title) : [...collapsed, group.title])
+              }
+              className="flex w-full items-center gap-1.5 rounded-[7px] border-0 bg-transparent px-2.5 pb-1.5 text-left text-[14px] font-semibold tracking-wide text-[var(--ff-muted)] uppercase"
+            >
+              <span className="min-w-0 flex-1">{group.title}</span>
+              {closed && total ? <NavBadge count={total} tone={urgent ? "danger" : "paused"} /> : null}
+              <Icon name={closed ? "caret-right" : "caret-down"} size={14} />
+            </button>
+            <div id={id} hidden={closed} className="flex flex-col gap-px">
+              {group.items.map((item) => {
+                const active = isActive(pathname, item.href);
+                const badge = navBadge(item.href, counts);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    className="flex items-center gap-2.5 rounded-[7px] px-2.5 py-1.5 text-[14px]"
+                    style={{
+                      background: active ? "var(--ff-accent-tint)" : undefined,
+                      color: active ? "var(--ff-accent)" : "var(--ff-ink)",
+                      fontWeight: active ? 600 : 500,
+                    }}
+                  >
+                    <Icon name={item.icon} size={16} />
+                    <span className="min-w-0 flex-1">{item.label}</span>
+                    {badge ? <NavBadge count={badge} tone={item.href === "/family" ? "paused" : "danger"} /> : null}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex flex-col gap-px">
-            {group.items.map((item) => {
-              const active = isActive(pathname, item.href);
-              const badge =
-                item.href === "/devices"
-                  ? unassignedCount
-                  : item.href === "/family"
-                    ? familyNeedsDevices
-                    : item.href === "/sync" && syncFailed
-                      ? 1
-                      : 0;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className="flex items-center gap-2.5 rounded-[7px] px-2.5 py-1.5 text-[14px]"
-                  style={{
-                    background: active ? "var(--ff-accent-tint)" : undefined,
-                    color: active ? "var(--ff-accent)" : "var(--ff-ink)",
-                    fontWeight: active ? 600 : 500,
-                  }}
-                >
-                  <Icon name={item.icon} size={16} />
-                  <span className="min-w-0 flex-1">{item.label}</span>
-                  {badge ? (
-                    <span
-                      className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
-                      style={{
-                        background: item.href === "/family" ? "var(--ff-paused)" : "var(--ff-danger)",
-                      }}
-                    >
-                      {badge}
-                    </span>
-                  ) : null}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -197,6 +282,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
           <nav ref={railNav} className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
             <div ref={railNavContent}>
               <NavGroups
+                idPrefix="rail-nav"
                 pathname={pathname}
                 unassignedCount={unassignedCount}
                 familyNeedsDevices={familyNeedsDevices}
@@ -264,6 +350,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               <NavBrand statusLine={statusLine} compact onAbout={openAbout} />
               <nav className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
                 <NavGroups
+                  idPrefix="drawer-nav"
                   pathname={pathname}
                   unassignedCount={unassignedCount}
                   familyNeedsDevices={familyNeedsDevices}

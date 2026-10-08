@@ -723,6 +723,11 @@
         "sync"
       ]
     },
+    "tests/browser/smoke.spec.ts > a sidebar section collapses, stays collapsed, and opens when one of its pages is visited": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/browser/smoke.spec.ts > the sidebar alerts an available update and stays quiet otherwise": {
       "categories": [
         "settings"
