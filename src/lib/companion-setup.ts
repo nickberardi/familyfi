@@ -1,7 +1,6 @@
 /**
- * What a phone's setup says, step by step, as familyfi-mobile's setup screens show it,
- * in the web's own names for where a code comes from (Pair Device → Pair a phone), and the
- * household details a person checks before trusting it. Each client lays the steps out natively.
+ * What a phone's setup says, step by step, in the web's own names for where a code comes from
+ * (Pair Device → Pair a phone), and the household details a person checks before trusting it. Each client lays the steps out natively.
  */
 import type { PendingEnrollment } from "./companion-pairing";
 import { shortPin } from "./connection-routes";
