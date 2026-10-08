@@ -139,6 +139,26 @@ test("reconciling from the collapsed notices keeps the row, and Escape returns f
   await expect(row).toBeFocused();
 });
 
+test("a sidebar section collapses, stays collapsed, and opens when one of its pages is visited", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/family");
+  const rail = page.locator("aside");
+  const network = rail.getByRole("button", { name: /^Network/ });
+  const devices = rail.getByRole("link", { name: /^Devices/ });
+  await expect(network).toHaveAttribute("aria-expanded", "true");
+  await network.click();
+  await expect(network).toHaveAttribute("aria-expanded", "false");
+  await expect(devices).toBeHidden();
+
+  await page.reload();
+  await expect(network).toHaveAttribute("aria-expanded", "false");
+  await expect(devices).toBeHidden();
+
+  await page.goto("/devices");
+  await expect(network).toHaveAttribute("aria-expanded", "true");
+  await expect(devices).toBeVisible();
+});
+
 test("the sidebar alerts an available update and stays quiet otherwise", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   // Tall enough that the rail shows its cards in full rather than collapsed into one row.
