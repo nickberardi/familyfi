@@ -7,12 +7,12 @@ import { GET as listAccounts, POST as createAccount } from "@/app/api/v1/account
 import { DELETE as deleteAccount, PUT as updateAccount } from "@/app/api/v1/accounts/[id]/route";
 import { PUT as setPassword } from "@/app/api/v1/accounts/[id]/password/route";
 import { GET as getHealth } from "@/app/api/v1/health/route";
-import { hashPassword } from "@/server/auth";
+import { authenticate, hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { publicAccount } from "@/server/accounts";
 import { refreshUpdateCheck } from "@/server/update-check";
 import { APP_VERSION } from "@/lib/version";
-import { CSRF_HEADER } from "@/lib/constants";
+import { CSRF_HEADER, LOGIN_MAX_FAILURES } from "@/lib/constants";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 import { bearer, pairPhone } from "../helpers/pairing";
@@ -279,5 +279,34 @@ describe("auth and accounts API", () => {
     // Demoted behind the API's back: its session is still on record, but no longer honoured.
     await prisma().account.update({ where: { username: "sam" }, data: { isAdmin: false } });
     expect((await session(request("/api/v1/auth/session", { auth: sam! }))).status).toBe(401);
+  });
+});
+
+describe("sign-in throttling on the public demo", () => {
+  const mode = process.env.FAMILYFI_MODE;
+
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  afterEach(() => {
+    if (mode === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = mode;
+  });
+
+  async function failFrom(ip: string) {
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) await authenticate("admin", "wrong-password", ip);
+  }
+
+  it("lets other visitors in after one address fails the shared login repeatedly", async () => {
+    process.env.FAMILYFI_MODE = "demo";
+    await failFrom("203.0.113.1");
+    expect(await authenticate("admin", "wrong-password", "203.0.113.1")).toMatchObject({ status: 429 });
+    expect(await authenticate("admin", PASSWORD, "203.0.113.2")).toMatchObject({ ok: true });
+  });
+
+  it("still limits a username across addresses outside the demo", async () => {
+    await failFrom("203.0.113.1");
+    expect(await authenticate("admin", PASSWORD, "203.0.113.2")).toMatchObject({ status: 429 });
   });
 });

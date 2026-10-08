@@ -17,6 +17,7 @@ export function SignInForm({
   onSubmit,
   initialUsername = "",
   initialPassword = "",
+  note = SIGN_IN_NOTE,
   surface = "card",
   buttonStyle,
   buttonLabelStyle,
@@ -25,6 +26,8 @@ export function SignInForm({
   initialUsername?: string;
   /** Only the public demo fills this in, with the login it shows every visitor. */
   initialPassword?: string;
+  /** The line under the button; the demo, where passwords are locked, passes null. */
+  note?: string | null;
   /** `card` on a page (the web); `plain` sits the fields straight on a ground, filled with `field` (a phone's setup). */
   surface?: "card" | "plain";
   /** The submit button's platform shape and type, on top of the web's (`Button`'s `style` and `labelStyle`). */
@@ -112,7 +115,7 @@ export function SignInForm({
         </Text>
       ) : null}
       <Button label={pending ? "Signing in…" : "Sign in"} disabled={pending} onPress={() => void submit()} testID="sign-in-submit" style={buttonStyle} labelStyle={buttonLabelStyle} />
-      <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, color: ui.color("muted") }}>{SIGN_IN_NOTE}</Text>
+      {note ? <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, color: ui.color("muted") }}>{note}</Text> : null}
     </View>
   );
 }

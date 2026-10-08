@@ -4,7 +4,7 @@ import { type Account, AccountKind, PairedDeviceClient, SessionKind } from "@pri
 import { cookieValue } from "@/lib/cookie";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
-import { recoveryPassword } from "./env";
+import { demoModeEnabled, recoveryPassword } from "./env";
 import { originAllowed } from "./origin";
 import {
   CSRF_COOKIE,
@@ -116,7 +116,9 @@ export async function isThrottled(username: string, ip: string): Promise<boolean
       where: { ip, success: false, createdAt: { gt: since } },
     }),
   ]);
-  return byUser >= LOGIN_MAX_FAILURES || byIp >= LOGIN_MAX_FAILURES;
+  // The demo shows its one login to every visitor, so a per-username limit would only let one visitor
+  // lock everyone else out; there the limit is per address alone.
+  return (!demoModeEnabled() && byUser >= LOGIN_MAX_FAILURES) || byIp >= LOGIN_MAX_FAILURES;
 }
 
 async function recordAttempt(input: {
