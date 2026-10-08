@@ -31,6 +31,6 @@ _No plan — direct change._
 
 ### Issues and remaining risks
 
-<!-- List every issue closed as Closes #number; identify Dependabot alerts by number and advisory. Include any iOS coordination issue. State relevant limitations or "None". Mark non-applicable checklist items explicitly. -->
+<!-- List every issue closed as Closes #number; identify Dependabot alerts by number and advisory. Include any `familyfi-mobile` coordination issue. State relevant limitations or "None". Mark non-applicable checklist items explicitly. -->
 
 None.

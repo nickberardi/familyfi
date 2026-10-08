@@ -232,7 +232,7 @@ CI holds the implementation to this document: `pnpm test-api` fails when a route
 
 ## Versioning the contract
 
-The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile)) vendors this repository as its `vendor/familyfi` submodule and generates its API types from `openapi/familyfi.v1.yaml` (`pnpm run schema`), so `info.version` is how it tells that its pin is stale. Every pull request that changes the document raises `info.version`, and `package.json`'s version with it (`tests/unit/version.test.ts` keeps the two equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
+The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile)) vendors this repository as its `vendor/familyfi` submodule and generates its API types from `openapi/familyfi.v1.yaml` (`pnpm run schema`), so `info.version` names which contract revision a pin carries. Every pull request that changes the document raises `info.version`, and `package.json`'s version with it (`tests/unit/version.test.ts` keeps the two equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
 
 | The pull request changes | `info.version` must |
 | --- | --- |
@@ -241,6 +241,6 @@ The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-m
 | Anything else: a path, parameter, schema, enum value or status | Increase by at least a minor version |
 | Anything, with the `breaking_api` label | From 1.0.0 on, increase by a major version. Before 1.0.0 a minor increase carries the break, as semver allows for `0.y.z` |
 
-A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions and the app's pin can tell which one it has. The `OpenAPI` workflow's job summary names the old and new version as a reminder to move `familyfi-mobile`'s `vendor/familyfi` submodule and regenerate its types; it posts nothing outside this repository.
+A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions, and each pin carries the one it was taken at. The `OpenAPI` workflow's job summary names the old and new version as a reminder to re-pin `familyfi-mobile`'s `vendor/familyfi` submodule and regenerate its types; it posts nothing outside this repository.
 
 Run the check locally with `make test-api-version`, or against any ref with `node scripts/ci/check-openapi-version.mjs <ref>`.
