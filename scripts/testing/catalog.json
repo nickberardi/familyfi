@@ -713,6 +713,11 @@
         "sessions"
       ]
     },
+    "tests/browser/smoke.spec.ts > a sidebar status row opens its card beside the rail and Escape closes it": {
+      "categories": [
+        "sync"
+      ]
+    },
     "tests/browser/smoke.spec.ts > the sidebar alerts an available update and stays quiet otherwise": {
       "categories": [
         "settings"
