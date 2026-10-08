@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # info.version must rise with every change, so familyfi-mobile can tell its vendored pin is stale.
+  # info.version must rise with every change, so each familyfi-mobile pin names its contract revision.
   version:
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     steps:

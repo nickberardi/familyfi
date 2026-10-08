@@ -2,7 +2,7 @@
  * `tests/fixtures/display-vectors.json` is the display behaviour the web app and the
  * companion app (nickberardi/familyfi-mobile, and its Apple Watch's Swift port) must show: labels,
  * states, card actions, the pause sheet, and rule windows with the internet state and
- * day timeline built from them. familyfi-mobile replays the same file, its Watch against its port,
+ * day timeline built from them. familyfi-mobile replays the same file, and its Watch the vectors it ports,
  * so this test runs every vector against the TypeScript and fails when either drifts.
  * Change display behaviour and the vectors change in the same pull request.
  */

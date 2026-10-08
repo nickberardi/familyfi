@@ -2,8 +2,8 @@
 // Fails when openapi/familyfi.v1.yaml changes without a matching info.version increase.
 //
 // The companion app (familyfi-mobile) vendors this repository as its `vendor/familyfi`
-// submodule and generates its API types from this file, so the version is how it tells that
-// its pin is stale. The rule, against the base
+// submodule and generates its API types from this file, so the version names which contract
+// revision a pin carries. The rule, against the base
 // branch (docs/api.md, "Versioning the contract"):
 //
 //   - Unchanged spec: nothing to check.
@@ -20,7 +20,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import YAML from "yaml";
 
 const SPEC = "openapi/familyfi.v1.yaml";
-const MOBILE_SPEC = "familyfi-mobile/vendor/familyfi/openapi/familyfi.v1.yaml";
+const MOBILE_SUBMODULE = "familyfi-mobile/vendor/familyfi";
 const PROSE_KEYS = new Set(["description", "summary"]);
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
@@ -177,7 +177,7 @@ function main() {
         "### OpenAPI version",
         "",
         `The companion app generates its API types from \`${SPEC}\`. ` +
-          `After this merges, move \`${MOBILE_SPEC}\` to it and run \`pnpm run schema\` there.`,
+          `After this merges, re-pin \`${MOBILE_SUBMODULE}\` to it and run \`pnpm run schema\` there.`,
         "",
         "| | info.version |",
         "| --- | --- |",
@@ -195,7 +195,7 @@ function main() {
   }
   console.log(outcome.message);
   if (outcome.change !== "none") {
-    console.log(`The companion app generates its types from ${SPEC}: move ${MOBILE_SPEC} (${outcome.from} -> ${outcome.to}).`);
+    console.log(`The companion app generates its types from ${SPEC}: re-pin ${MOBILE_SUBMODULE} (${outcome.from} -> ${outcome.to}).`);
   }
   return 0;
 }
