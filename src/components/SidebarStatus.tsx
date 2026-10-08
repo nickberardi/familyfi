@@ -90,7 +90,8 @@ export function SidebarStatus({
         return;
       }
       const copy = ghost.current;
-      if (!copy) return;
+      // Not under an open popover, which would close with focus inside it; it re-checks on close.
+      if (!copy || open) return;
       copy.style.width = `${own.getBoundingClientRect().width}px`;
       // A few pixels' margin, so a height on the edge settles rather than flipping back and forth.
       if (slack + own.getBoundingClientRect().height >= copy.getBoundingClientRect().height + 4) setCollapsed(false);
@@ -99,7 +100,7 @@ export function SidebarStatus({
     const observer = new ResizeObserver(check);
     for (const element of [rail, nav.current, navContent.current, root.current, ghost.current]) if (element) observer.observe(element);
     return () => observer.disconnect();
-  }, [collapsed, nav, navContent]);
+  }, [collapsed, open, nav, navContent]);
 
   const close = useCallback(() => setOpen(false), []);
 
