@@ -26,6 +26,11 @@ RUN client="$(node -p "require('path').join(require.resolve('@prisma/client/pack
 
 FROM deps AS build
 COPY . .
+# A release passes its tag's version (release.yml, scripts/release.sh), which the image then
+# reports wherever it shows package.json's (src/lib/version.ts), even when main's package.json
+# has not caught up yet. Other builds keep package.json's.
+ARG APP_VERSION
+RUN if [ -n "$APP_VERSION" ]; then npm pkg set "version=$APP_VERSION"; fi
 # Not `pnpm build`, which generates the client again under emulation.
 RUN pnpm exec next build
 
