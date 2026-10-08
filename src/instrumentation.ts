@@ -30,8 +30,11 @@ export async function register() {
       const { ensureDevDummyData } = await import("./server/dev-seed");
       await ensureDevDummyData();
     }
-  } catch {
-    // Database may not be up yet during `next build` or a local start.
+  } catch (error) {
+    // Database may not be up yet during `next build` or a local start. The demo's database is
+    // in memory and already migrated, so a failure there is real: exit, and the platform restarts it.
+    console.error("FamilyFi could not prepare the household:", error);
+    if (settings.FAMILYFI_MODE === "demo") process.exit(1);
   }
   if (settings.FAMILYFI_MODE === "demo") {
     const { ensureDemoRoute, startDemoReset } = await import("./server/demo");

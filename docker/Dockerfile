@@ -12,6 +12,12 @@ RUN pnpm install --frozen-lockfile \
 
 FROM node:26-bookworm-slim AS deps
 WORKDIR /app
+# Prisma's install script picks the schema engine (`prisma migrate deploy` at start) by the
+# OpenSSL it finds. Without the runner's OpenSSL here it fetches the 1.1 engine, and every start
+# then downloads the 3.0 one from binaries.prisma.sh, so a start with no internet fails.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10.15.1
 COPY package.json pnpm-lock.yaml prisma.config.ts ./
 COPY prisma ./prisma
@@ -76,3 +82,12 @@ RUN chmod +x /app/docker-entrypoint.sh \
   && chown -R familyfi:familyfi /app /var/lib/familyfi
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
+# The hosted demo's image (.github/workflows/demo.yml builds this target). FAMILYFI_MODE=demo runs
+# the UniFi mock, which reads the gateway fixtures from disk (src/server/unifi/dev-mock.ts); no
+# other mode does, so only this image carries them.
+FROM runner AS demo
+COPY --from=build /app/tests/fixtures/unifi/*.json ./tests/fixtures/unifi/
+
+# The default target, for releases and container.yml: no demo fixtures.
+FROM runner

@@ -1,6 +1,6 @@
 import { APP_VERSION } from "@/lib/version";
 import { prisma } from "@/server/db";
-import { ConfigurationError, loadEnv } from "@/server/env";
+import { ConfigurationError, demoModeEnabled, loadEnv } from "@/server/env";
 import { getUpdateCheckSnapshot } from "@/server/update-check";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,10 @@ export async function GET() {
   try {
     await prisma().$queryRaw`SELECT 1`;
     const household = await prisma().household.findUnique({ where: { id: "default" } });
+    // The demo seeds its household at every start, so without one it has nothing to show.
+    if (!household && demoModeEnabled()) {
+      return healthResponse({ status: "degraded", db: "ok", version: APP_VERSION, error: "No household yet." }, 503);
+    }
     return healthResponse(
       {
         status: "ok",

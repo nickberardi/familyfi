@@ -19,6 +19,8 @@ backups
 logs
 docs
 tests
+# The demo image's UniFi mock reads these (docker/Dockerfile, target demo).
+!tests/fixtures/unifi
 *.md
 !README.md
 .DS_Store

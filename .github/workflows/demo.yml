@@ -1,8 +1,8 @@
 name: Demo image
 
 # The hosted demo (docs/operations.md#demo-mode) runs main, not the latest release, so App
-# Review and the public demo see what is about to ship. Same Dockerfile as a release; only
-# FAMILYFI_MODE=demo on the host makes it a demo.
+# Review and the public demo see what is about to ship. Same Dockerfile as a release, built to its
+# demo target, which adds the UniFi mock's fixtures; FAMILYFI_MODE=demo on the host makes it a demo.
 on:
   push:
     branches:
@@ -34,6 +34,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          target: demo
           platforms: linux/amd64
           push: true
           tags: ghcr.io/${{ github.repository }}:demo
