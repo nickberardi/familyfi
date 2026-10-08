@@ -182,11 +182,11 @@ Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actio
 
 ## Releases
 
-Publishing requires the operator's request. Use the version in `package.json` and `openapi/familyfi.v1.yaml`; the release tag must be `v` followed by that full `MAJOR.MINOR.PATCH` version. Confirm all three match before publishing. Never copy an old version from a documentation example.
+Publishing requires the operator's request. The release tag is `v` followed by the full `MAJOR.MINOR.PATCH` version, normally the one already in `package.json` and `openapi/familyfi.v1.yaml`. Never copy an old version from a documentation example.
 
 For a tag-based release, create and push an annotated tag on the intended commit on `main`. Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml). For an unpublished image tag, it requires CI and container smoke, builds `linux/amd64` and `linux/arm64` images at `ghcr.io/nickberardi/familyfi`, and creates a GitHub Release with generated notes. Stable tags publish the full version, its major/minor tag and `latest`. If the image tag already exists, the workflow assumes local publication and skips these jobs; image existence alone does not prove checks passed.
 
-Bump `package.json` and `openapi/familyfi.v1.yaml` `info.version` together before a later tag, so Settings, the sign-in screen, and `GET /api/v1/health` show the same number as the image tag. `tests/unit/version.test.ts` fails the build when the two drift apart.
+Both release paths pass the tag's version into the image build (`APP_VERSION` in `docker/Dockerfile`), so Settings, the sign-in screen, `GET /api/v1/health` and the update check report the image's own tag even when `package.json` lags behind it. When a stable tag is newer than `main`'s `package.json`, `release.yml`'s `version-pr` job opens a PR that bumps `package.json` and `openapi/familyfi.v1.yaml` `info.version` to it; merge it after the release. A PR opened with the workflow's own token starts no checks, so the job uses the `RELEASE_PR_TOKEN` secret (contents and pull requests: write) when it exists. Bumping both before tagging still works and opens no PR. `tests/unit/version.test.ts` fails the build when the two drift apart.
 
 Release notes say whether anyone checked a block on a real gateway since the last release. Nothing in CI proves enforcement ([testing.md](testing.md#what-no-test-proves)), so a release that changes how FamilyFi writes policies says so plainly.
 

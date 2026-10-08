@@ -23,7 +23,9 @@
 # notes, which creates the tag on GitHub at HEAD, marked a pre-release below 1.0. The
 # architecture this machine isn't is built under emulation, which takes a while.
 #
-# Creating the tag starts release.yml, which finds this version's images on GHCR and skips.
+# The image reports the tag's version, whatever package.json says (docker/Dockerfile).
+# Creating the tag starts release.yml, which finds this version's images on GHCR and skips
+# the build; when main's package.json is behind the tag, it opens a PR bringing it up.
 #
 # GHCR credentials: GHCR_TOKEN from the environment or a gitignored .release.env, otherwise
 # `gh auth token`, which needs the write:packages scope (gh auth refresh -s write:packages).
@@ -145,6 +147,7 @@ docker buildx build --builder "$builder" --file docker/Dockerfile \
   --platform linux/amd64,linux/arm64 \
   --label "org.opencontainers.image.source=https://github.com/$repo" \
   --label "org.opencontainers.image.version=$version" \
+  --build-arg "APP_VERSION=$version" \
   --label "org.opencontainers.image.revision=$sha" \
   "${tags[@]}" "${output[@]}" .
 

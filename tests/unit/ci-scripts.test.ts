@@ -58,6 +58,33 @@ describe("scripts/release.sh", () => {
   });
 });
 
+describe("the release version", () => {
+  // v0.25.1 was tagged on a commit whose package.json said 0.25.0, so its image reported
+  // 0.25.0 and the update check offered every household the release it already ran.
+  it("is stamped into the image before next build bundles package.json", () => {
+    const build = read("docker/Dockerfile").split(/^FROM deps AS build$/m)[1].split(/^FROM /m)[0];
+    const stamp = build.indexOf('npm pkg set "version=$APP_VERSION"');
+    expect(build).toMatch(/^ARG APP_VERSION$/m);
+    expect(stamp).toBeGreaterThan(build.indexOf("COPY . ."));
+    expect(stamp).toBeLessThan(build.indexOf("next build"));
+  });
+
+  it("is the tag's on both release paths", () => {
+    expect(read("scripts/release.sh")).toContain('--build-arg "APP_VERSION=$version"');
+    const workflow = read(".github/workflows/release.yml");
+    expect(workflow).toContain('echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"');
+    expect(workflow).toContain("build-args: APP_VERSION=${{ env.APP_VERSION }}");
+  });
+
+  it("opens a PR bringing main's package.json up to a newer stable tag", () => {
+    const job = read(".github/workflows/release.yml").split(/^  version-pr:$/m)[1];
+    expect(job).toBeDefined();
+    expect(job).toContain('npm pkg set "version=$tag_version"');
+    expect(job).toContain("openapi/familyfi.v1.yaml");
+    expect(job).toContain("gh pr create --base main");
+  });
+});
+
 describe("scripts/ paths", () => {
   const sources = [
     ...workflows,

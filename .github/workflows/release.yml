@@ -11,6 +11,7 @@ env:
 permissions:
   contents: write
   packages: write
+  pull-requests: write
 
 jobs:
   on-main:
@@ -78,6 +79,7 @@ jobs:
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+          echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -96,6 +98,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           platforms: ${{ matrix.platform }}
+          build-args: APP_VERSION=${{ env.APP_VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
@@ -149,3 +152,52 @@ jobs:
             Image: `ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}` (linux/amd64 and linux/arm64).
 
             Licensed under the Business Source License 1.1. See LICENSE and docs/licensing.md.
+
+  # The image reports the tag's version whatever package.json says. When main's package.json
+  # and OpenAPI info.version are behind a stable tag, open a PR that brings them up to it.
+  version-pr:
+    needs: [on-main, manifest]
+    if: >-
+      always() && !contains(github.ref_name, '-') && needs.on-main.result == 'success' &&
+      (needs.on-main.outputs.published == 'true' || needs.manifest.result == 'success')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          # A PR opened with GITHUB_TOKEN starts no workflows, so its checks would never run.
+          # RELEASE_PR_TOKEN (contents and pull requests: write) lets them; without it, the PR
+          # needs a push or a close and reopen by a person before CI runs.
+          token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+      - name: Open a PR when main is behind the tag
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          main_version="$(jq -r .version package.json)"
+          newest="$(printf '%s\n%s\n' "$main_version" "$tag_version" | sort -V | tail -n 1)"
+          if [ "$main_version" = "$tag_version" ] || [ "$newest" = "$main_version" ]; then
+            echo "main's package.json is $main_version, not behind $GITHUB_REF_NAME"
+            exit 0
+          fi
+          branch="release/version-$tag_version"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "A PR from $branch is already open"
+            exit 0
+          fi
+          npm pkg set "version=$tag_version"
+          node -e '
+            const fs = require("fs");
+            const file = "openapi/familyfi.v1.yaml";
+            const text = fs.readFileSync(file, "utf8");
+            const next = text.replace(/^(info:\n(?:[ \t]+.*\n)*?[ \t]+version:[ \t]*)\S+/m, `$1${process.argv[1]}`);
+            if (next === text) throw new Error(`no info.version to change in ${file}`);
+            fs.writeFileSync(file, next);
+          ' "$tag_version"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Bump the version to $tag_version" -m "$GITHUB_REF_NAME was released from a commit whose package.json said $main_version."
+          git push --force origin "$branch"
+          gh pr create --base main --head "$branch" --title "Bump the version to $tag_version" \
+            --body "$GITHUB_REF_NAME was released with version $tag_version stamped into its image, but main's \`package.json\` and OpenAPI \`info.version\` say $main_version. This brings them up to the release, so the repository shows the version households run."
