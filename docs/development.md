@@ -96,6 +96,8 @@ Record deliberate web choices here and native choices there, with links rather t
 - Distinguish initial loading, an empty household, a failed request and an unknown measurement. A retained result after a failed refresh is not evidence of a fresh observation.
 - Preserve keyboard access, accessible names and visible focus when composing controls. Verify desktop and phone layouts, including relevant loading, empty, pending and failure states.
 
+The sidebar keeps its height for navigation: its status (an update, sync, groups needing a device) is one line per item, and each row opens the shared status card in a popover beside the rail (`src/components/SidebarStatus.tsx`). The phone drawer and the native app show the cards themselves.
+
 The Devices list leads with the observed connection status and links each identity to a read-only detail page. The detail page leads with a named presence state and connection summary, then groups identity and connection fields into two cards that stack on narrow screens. Assignment remains a separate control on the list. Last-known status names the checked time; it never looks like a fresh online result.
 
 ### Styling

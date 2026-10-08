@@ -12,7 +12,8 @@ import { unassignedBadgeCount } from "@/lib/device-list";
 import { NAV } from "@/lib/nav";
 import { familyNeedsDevices as familyNeedsDevicesCount, syncFailed as syncNeedsAttention } from "@/lib/sync-copy";
 import { reconcileNow } from "@/lib/sync-writes";
-import { AccountCard, DeviceAttentionCard, SyncStatusCard, UpdateAlertCard } from "@/ui/StatusCards";
+import { AccountCard, UpdateAlertCard } from "@/ui/StatusCards";
+import { SidebarStatus } from "@/components/SidebarStatus";
 import { appVersionLabel } from "@/lib/version";
 import { useAppData } from "./AppDataProvider";
 import { useUpdateCheck } from "@/ui/use-update-check";
@@ -203,15 +204,14 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
             </div>
           </nav>
           <div className="ff-sidebar-end flex flex-col gap-2.5">
-            <UpdateAlertCard update={update} />
-            <SyncStatusCard
+            <SidebarStatus
+              update={update}
               sync={sync}
               busy={busy}
               error={error}
               notice={notice}
               onReconcile={() => void reconcileNow(store.mutate)}
             />
-            <DeviceAttentionCard sync={sync} />
             <AccountCard session={session} onSignOut={() => void signOut()} />
           </div>
         </aside>

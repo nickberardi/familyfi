@@ -107,7 +107,10 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
     });
   });
   await page.goto("/family");
+  // The rail shows a one-line row; the card opens beside it.
+  const row = page.getByRole("button", { name: "Update available" });
   const alert = page.getByRole("region", { name: "Update available" });
+  await row.click();
   await expect(alert).toContainText("v0.6.0 is ready. You’re on v0.5.1.");
   await alert.getByRole("link", { name: "Update" }).click();
   await expect(page).toHaveURL(/\/update$/);
@@ -122,7 +125,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   // Settings no longer carries the update check; the alert is the one place it appears.
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(alert).toBeVisible();
+  await expect(row).toBeVisible();
 
   update = {
     ...update,
@@ -132,7 +135,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   };
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(alert).toHaveCount(0);
+  await expect(row).toHaveCount(0);
 
   update = {
     ...update,
@@ -145,7 +148,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   };
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(alert).toHaveCount(0);
+  await expect(row).toHaveCount(0);
 });
 
 /** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */

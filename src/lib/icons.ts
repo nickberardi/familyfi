@@ -34,6 +34,7 @@ export type IconName =
   | "plus"
   | "caret-up"
   | "caret-down"
+  | "caret-right"
   | "x"
   | "check-circle"
   // About
