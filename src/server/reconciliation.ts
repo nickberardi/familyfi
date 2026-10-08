@@ -240,14 +240,16 @@ async function tick(owner: string): Promise<boolean> {
       },
     });
 
-    const [groups, devices, appPolicies, quarantineRule] = await Promise.all([
+    const [groups, devices, appPolicies, quarantinePauses] = await Promise.all([
       prisma().group.findMany(),
       prisma().device.findMany(),
       prisma().appPolicy.findMany({ where: { connectionIdentity: identity, siteId } }),
-      prisma().rule.findUnique({ where: { id: QUARANTINE_RULE_ID } }),
+      // A pause on the built-in quarantine rule disables its policies, which keep their devices.
+      prisma().rule.count({
+        where: { id: QUARANTINE_RULE_ID, pauseActive: true, OR: [{ pauseUntil: null }, { pauseUntil: { gt: now } }] },
+      }),
     ]);
-    // A pause on the built-in quarantine rule disables its policies, which keep their devices.
-    const quarantinePaused = quarantineRule ? isSuspended({ active: quarantineRule.pauseActive, until: quarantineRule.pauseUntil }, now) : false;
+    const quarantinePaused = quarantinePauses > 0;
     const { policies: desired, retainOwners } = planPolicies({
       installId: household.id,
       destinationZoneId: external.id,

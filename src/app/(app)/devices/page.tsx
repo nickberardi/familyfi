@@ -65,6 +65,7 @@ function DevicesBody() {
         {household ? (
           <QuarantineCard
             enforced={enforced}
+            disabled={busy}
             onToggle={() => void setQuarantineEnforced(store.mutate, !enforced)}
             pausedLine={pausedLine}
             onResume={quarantineRule ? () => void runRuleAction(store.mutate, quarantineRule, "resume") : undefined}
