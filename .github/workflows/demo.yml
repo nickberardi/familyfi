@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   demo:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
