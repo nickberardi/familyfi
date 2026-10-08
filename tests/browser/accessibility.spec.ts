@@ -70,9 +70,11 @@ test.describe("accessibility", () => {
 
   test("sidebar status popover", { tag: "@desktop" }, async ({ page }) => {
     await signIn(page);
+    // Short enough that the rail's notices collapse into their row.
+    await page.setViewportSize({ width: 1280, height: 480 });
     await page.goto("/family");
     await page.waitForLoadState("networkidle");
-    await page.locator("aside button[aria-haspopup=dialog]").first().click();
+    await page.locator("aside button[aria-haspopup=dialog]").click();
     await expect(page.locator("aside").getByRole("dialog")).toBeVisible();
     await expectAccessible(page, "/family sidebar status popover", { navigate: false });
   });

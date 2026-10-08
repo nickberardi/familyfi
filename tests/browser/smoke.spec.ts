@@ -81,14 +81,21 @@ test("sign-in and household pages", async ({ page }) => {
   await expect(page.getByText("About", { exact: true })).toHaveCount(0);
 });
 
-test("a sidebar status row opens its card beside the rail and Escape closes it", { tag: "@desktop" }, async ({ page }) => {
+test("the sidebar's notices collapse into one row when the rail is short", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/family");
-  const title = /Gateway in sync|Sync needs attention|Partial apply|UniFi not configured/;
-  const row = page.getByRole("button", { name: title });
+  const rail = page.locator("aside");
+  const row = rail.locator("button[aria-haspopup=dialog]");
+  // With room, the cards show in full.
+  await expect(rail.getByTestId("sync-status")).toBeVisible();
+  await expect(row).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1280, height: 480 });
   await expect(row).toHaveAttribute("aria-expanded", "false");
+  await expect(rail.getByTestId("sync-status")).toHaveCount(0);
   await row.click();
-  const popover = page.getByRole("dialog", { name: title });
+  const popover = rail.getByRole("dialog");
   await expect(popover.getByTestId("sync-status")).toBeVisible();
   await expect(popover).toBeFocused();
   await page.keyboard.press("Escape");
@@ -99,10 +106,16 @@ test("a sidebar status row opens its card beside the rail and Escape closes it",
   await expect(popover).toBeVisible();
   await page.getByRole("heading", { level: 1 }).click();
   await expect(popover).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(rail.getByTestId("sync-status")).toBeVisible();
+  await expect(row).toHaveCount(0);
 });
 
 test("the sidebar alerts an available update and stays quiet otherwise", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
+  // Tall enough that the rail shows its cards in full rather than collapsed into one row.
+  await page.setViewportSize({ width: 1280, height: 1000 });
   let update: UpdateCheck = {
     status: "ok",
     available: true,
@@ -127,10 +140,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
     });
   });
   await page.goto("/family");
-  // The rail shows a one-line row; the card opens beside it.
-  const row = page.getByRole("button", { name: "Update available" });
   const alert = page.getByRole("region", { name: "Update available" });
-  await row.click();
   await expect(alert).toContainText("v0.6.0 is ready. You’re on v0.5.1.");
   await alert.getByRole("link", { name: "Update" }).click();
   await expect(page).toHaveURL(/\/update$/);
@@ -145,7 +155,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   // Settings no longer carries the update check; the alert is the one place it appears.
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(row).toBeVisible();
+  await expect(alert).toBeVisible();
 
   update = {
     ...update,
@@ -155,7 +165,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   };
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(row).toHaveCount(0);
+  await expect(alert).toHaveCount(0);
 
   update = {
     ...update,
@@ -168,7 +178,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   };
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(row).toHaveCount(0);
+  await expect(alert).toHaveCount(0);
 });
 
 /** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
