@@ -34,7 +34,7 @@ For a change to either shared artifact:
 2. Change the owning implementation and applicable artifact in the same PR. Add meaningful cases for changed shared display behaviour; do not change expected results merely to accept a regression.
 3. Run the applicable [validation](testing.md). Describe changed endpoints/schemas or vector cases, the server commit/version to adopt, and any rollout dependency in the PR.
 4. For an OpenAPI change, open the required native adoption issue as specified in `AGENTS.md`. For display changes, make the behaviour and vector diff explicit in the PR so the native port can adopt them together.
-5. Use the [native repository's current adoption instructions](https://github.com/nickberardi/familyfi-ios/blob/main/AGENTS.md) for its refresh, generation and validation procedure. Keep those commands there. A passing server check does not establish that a consumer has adopted the change.
+5. Use the [native repository's current adoption instructions](https://github.com/nickberardi/familyfi-mobile/blob/main/docs/development.md#paired-familyfi-changes) for its refresh, generation and validation procedure. Keep those commands there. A passing server check does not establish that a consumer has adopted the change.
 
 Platform-specific navigation, typography and layout are owned by each implementation; use the
 [design ownership map](development.md#design-ownership) when comparing them.
@@ -232,7 +232,7 @@ CI holds the implementation to this document: `pnpm test-api` fails when a route
 
 ## Versioning the contract
 
-The iOS client ([`familyfi-ios`](https://github.com/nickberardi/familyfi-ios)) vendors a copy of `openapi/familyfi.v1.yaml` and generates its client from it, so `info.version` is how it tells that its copy is stale. Every pull request that changes the document raises `info.version`, and `package.json`'s version with it (`tests/unit/version.test.ts` keeps the two equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
+The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile)) vendors this repository as its `vendor/familyfi` submodule and generates its API types from `openapi/familyfi.v1.yaml` (`pnpm run schema`), so `info.version` is how it tells that its pin is stale. Every pull request that changes the document raises `info.version`, and `package.json`'s version with it (`tests/unit/version.test.ts` keeps the two equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
 
 | The pull request changes | `info.version` must |
 | --- | --- |
@@ -241,6 +241,6 @@ The iOS client ([`familyfi-ios`](https://github.com/nickberardi/familyfi-ios)) v
 | Anything else: a path, parameter, schema, enum value or status | Increase by at least a minor version |
 | Anything, with the `breaking_api` label | From 1.0.0 on, increase by a major version. Before 1.0.0 a minor increase carries the break, as semver allows for `0.y.z` |
 
-A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions and the iOS copy can tell which one it has. The `OpenAPI` workflow's job summary names the old and new version as a reminder to refresh `familyfi-ios/openapi/familyfi.v1.yaml`; it posts nothing outside this repository.
+A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions and the app's pin can tell which one it has. The `OpenAPI` workflow's job summary names the old and new version as a reminder to move `familyfi-mobile`'s `vendor/familyfi` submodule and regenerate its types; it posts nothing outside this repository.
 
 Run the check locally with `make test-api-version`, or against any ref with `node scripts/ci/check-openapi-version.mjs <ref>`.

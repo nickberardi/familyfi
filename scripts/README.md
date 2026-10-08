@@ -29,8 +29,7 @@ Agents can use the [validation](../.agents/skills/validate-change/SKILL.md) and 
 
 ## `test.py`
 
-The one test and validation interface, the same one [familyfi-ios](https://github.com/nickberardi/familyfi-ios)
-uses. It needs Python 3.11 or newer on `PATH` (`python3 --version`) and installed dependencies
+The one test and validation interface. It needs Python 3.11 or newer on `PATH` (`python3 --version`) and installed dependencies
 (`make setup`); integration, browser and database checks also need Docker, and browser tests
 Chromium (`pnpm exec playwright install chromium`).
 

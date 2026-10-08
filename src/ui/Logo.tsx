@@ -3,7 +3,7 @@
  * `Logo.web.tsx` draws it through `next/image`. The shield and the check shield are the supplied
  * artwork, placed; only the wordmark is live text. The shield carries the product's name, so the
  * wordmark and tagline beside it are hidden from screen readers. The lockup is artwork, drawn at
- * its sizes whatever the system text size, as familyfi-ios draws it. Pick `onDeep` by the ground
+ * its sizes whatever the system text size, as a native lockup is. Pick `onDeep` by the ground
  * it sits on, not by a theme.
  */
 import { Image, StyleSheet, Text, View, type ImageSourcePropType } from "react-native";

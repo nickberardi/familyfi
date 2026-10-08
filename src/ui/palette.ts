@@ -3,9 +3,8 @@
  * uses these: it renders every colour as its own CSS variable (`DefaultUI.web.tsx`).
  *
  * LIGHT is `src/app/globals.css`'s `:root`, value for value (`tests/unit/ui-palette.test.ts`
- * holds them equal). The web has no dark theme; DARK is familyfi-ios's appearance-aware tokens
- * (`App/Design/Color+FamilyFi.swift`, the iOS system colours they resolve to), and a token with
- * no dark value falls back to light.
+ * holds them equal). The web has no dark theme; DARK is familyfi-mobile's dark appearance, the
+ * iOS system colours its tokens resolve to, and a token with no dark value falls back to light.
  */
 export const LIGHT = {
   "accent": "#0066cc",

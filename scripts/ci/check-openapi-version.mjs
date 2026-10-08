@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Fails when openapi/familyfi.v1.yaml changes without a matching info.version increase.
 //
-// The iOS client (familyfi-ios) vendors a copy of this file and generates its client from
-// it, so the version is how it tells that its copy is stale. The rule, against the base
+// The companion app (familyfi-mobile) vendors this repository as its `vendor/familyfi`
+// submodule and generates its API types from this file, so the version is how it tells that
+// its pin is stale. The rule, against the base
 // branch (docs/api.md, "Versioning the contract"):
 //
 //   - Unchanged spec: nothing to check.
@@ -19,7 +20,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import YAML from "yaml";
 
 const SPEC = "openapi/familyfi.v1.yaml";
-const IOS_SPEC = "familyfi-ios/openapi/familyfi.v1.yaml";
+const MOBILE_SPEC = "familyfi-mobile/vendor/familyfi/openapi/familyfi.v1.yaml";
 const PROSE_KEYS = new Set(["description", "summary"]);
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
@@ -175,8 +176,8 @@ function main() {
       [
         "### OpenAPI version",
         "",
-        `The iOS client vendors \`${SPEC}\` and generates its client from it. ` +
-          `After this merges, refresh \`${IOS_SPEC}\` from it.`,
+        `The companion app generates its API types from \`${SPEC}\`. ` +
+          `After this merges, move \`${MOBILE_SPEC}\` to it and run \`pnpm run schema\` there.`,
         "",
         "| | info.version |",
         "| --- | --- |",
@@ -194,7 +195,7 @@ function main() {
   }
   console.log(outcome.message);
   if (outcome.change !== "none") {
-    console.log(`The iOS client vendors ${SPEC}: refresh ${IOS_SPEC} (${outcome.from} -> ${outcome.to}).`);
+    console.log(`The companion app generates its types from ${SPEC}: move ${MOBILE_SPEC} (${outcome.from} -> ${outcome.to}).`);
   }
   return 0;
 }

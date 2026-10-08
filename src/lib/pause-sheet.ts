@@ -17,8 +17,8 @@ export type PauseSheetRequest =
 export type PauseSheetOption = { label: string; note: string; request: PauseSheetRequest };
 
 /*
- * The pause sheet's copy and options as plain data, so the native iOS app can port them
- * and `tests/fixtures/display-vectors.json` can pin them. A pause blocks all internet on
+ * The pause sheet's copy and options as plain data, so familyfi-mobile's Apple Watch can port
+ * them and `tests/fixtures/display-vectors.json` can pin them. A pause blocks all internet on
  * every device in the group, so the copy names that scope and the devices.
  */
 

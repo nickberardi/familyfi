@@ -3,7 +3,7 @@ import { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays } from ".
 /*
  * Recurring rule windows, and a group's internet state and day timeline built from them.
  * Shared by the server, the web app and (through `tests/fixtures/display-vectors.json`)
- * the iOS port, so like `display.ts` nothing here reads the wall clock: callers pass `now`
+ * familyfi-mobile's Apple Watch port, so like `display.ts` nothing here reads the wall clock: callers pass `now`
  * and the household time zone.
  *
  * A window may cross midnight: 22:00–06:00 on Friday blocks Friday 22:00 to Saturday 06:00.

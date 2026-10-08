@@ -26,7 +26,8 @@ and configure the gateway, accounts and companion connections; only administrato
 reports describe filtering observed through a resolver; they do not enforce it.
 
 This repository owns the web UI, server, database, HTTP contract and shared display fixtures.
-The native companion lives in [familyfi-ios](https://github.com/nickberardi/familyfi-ios).
+The native companion lives in [familyfi-mobile](https://github.com/nickberardi/familyfi-mobile): an Expo app for iPhone, iPad, Apple Watch
+and Android that imports this repository through its `vendor/familyfi` submodule.
 Read that repository's instructions and implementation for its current screens and platform
 choices; do not maintain a copy of its implementation status here. Clients share household
 semantics and the API, while each platform owns its presentation.
@@ -112,7 +113,7 @@ PRs include validation appropriate to the change. Behaviour changes include test
 
 ## OpenAPI consumer coordination
 
-- Whenever a change modifies the OpenAPI specification, open an issue in `familyfi-ios` for the iOS client to adopt that contract change. Describe the affected endpoints and schemas, the expected client work, and any rollout or compatibility considerations.
+- Whenever a change modifies the OpenAPI specification, open an issue in `familyfi-mobile` for the companion app to adopt that contract change. Describe the affected endpoints and schemas, the expected client work, and any rollout or compatibility considerations.
 - Assess every requested contract change for compatibility. If the requested change would be breaking, call that out clearly before making the change. The human operator—not the agent—decides whether the breaking change is warranted or whether a compatible approach is needed; do not make that product decision on the operator's behalf.
 - Do not raise a breaking-change warning for additive or otherwise compatible contract changes. The agent's role is to identify a breaking impact when the requested work would cause one, not to speculate about or independently choose breaking changes.
 - The `OpenAPI` workflow enforces this on every pull request that changes `openapi/`: a breaking change against `main` fails it until the operator adds the `breaking_api` label. Never add that label yourself; it records the operator's decision.
