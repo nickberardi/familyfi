@@ -919,6 +919,25 @@ describe("household rules", () => {
       expect(quarantinePolicy()?.enabled).toBe(true);
     });
 
+    it("never brings back a pause that raced turning it off, and keeps one when saved on again", async () => {
+      const auth = await signedIn();
+      await quarantining(auth);
+      await ruleOf(await ruleAction(turnOffRule, auth, "quarantine", null));
+      // A pause that read quarantine as on just before it went off lands afterwards.
+      await prisma().rule.update({ where: { id: "quarantine" }, data: { pauseActive: true, pauseUntil: null } });
+      const on = await ruleOf(await ruleAction(turnOnRule, auth, "quarantine", null));
+      expect([on.enabled, on.pause.active]).toEqual([true, false]);
+      await runReconcileOnce();
+      expect(quarantinePolicy()?.enabled).toBe(true);
+
+      await ruleAction(pauseRule, auth, "quarantine");
+      const saved = await putHousehold(
+        request("/api/v1/settings/household", { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ quarantineEnforced: true, displayName: "Home" }) }),
+      );
+      expect(saved.status).toBe(200);
+      expect((await prisma().rule.findUniqueOrThrow({ where: { id: "quarantine" } })).pauseActive).toBe(true);
+    });
+
     it("refuses a pause while quarantine is off, and turning it off in Settings ends a pause", async () => {
       const auth = await signedIn();
       expect(await errorCode(await ruleAction(pauseRule, auth, "quarantine"))).toEqual([409, "rule_off"]);
