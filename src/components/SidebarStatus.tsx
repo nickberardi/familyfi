@@ -172,6 +172,15 @@ function StatusRow({
           tabIndex={-1}
           className="fixed z-[60] w-[280px] overflow-y-auto rounded-[10px] outline-none"
           style={{ boxShadow: "var(--ff-shadow-toast)" }}
+          // A link in the card may stay on this page (`/devices?assign=…` from Devices), so following one closes it.
+          onClickCapture={(event) => {
+            if ((event.target as Element).closest("a")) onClose();
+          }}
+          // Tabbing past the card closes it, as a click outside does.
+          onBlur={(event) => {
+            const next = event.relatedTarget as Node | null;
+            if (next && !panel.current?.contains(next) && next !== button.current) onClose();
+          }}
         >
           {children}
         </div>

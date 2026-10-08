@@ -84,10 +84,11 @@ test("sign-in and household pages", async ({ page }) => {
 test("a sidebar status row opens its card beside the rail and Escape closes it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/family");
-  const row = page.getByRole("button", { name: /Gateway in sync|Sync needs attention|Partial apply|UniFi not configured/ });
+  const title = /Gateway in sync|Sync needs attention|Partial apply|UniFi not configured/;
+  const row = page.getByRole("button", { name: title });
   await expect(row).toHaveAttribute("aria-expanded", "false");
   await row.click();
-  const popover = page.getByRole("dialog", { name: await row.innerText() });
+  const popover = page.getByRole("dialog", { name: title });
   await expect(popover.getByTestId("sync-status")).toBeVisible();
   await expect(popover).toBeFocused();
   await page.keyboard.press("Escape");
