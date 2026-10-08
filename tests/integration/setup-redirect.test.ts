@@ -126,7 +126,8 @@ describe("sign-in on the public demo", () => {
     expect(signInFormProps(await visit(LoginPage))).toEqual({ demoLogin: { username: "admin", password: recoveryPassword() } });
   });
 
-  it("never carries the password outside the demo", async () => {
+  it.each(["prod", "dev", "test"])("never carries the password in %s mode", async (value) => {
+    process.env.FAMILYFI_MODE = value;
     await saveGateway();
     const page = await visit(LoginPage);
     expect(signInFormProps(page)).toEqual({ demoLogin: undefined });

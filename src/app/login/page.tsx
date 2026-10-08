@@ -15,7 +15,9 @@ export default async function LoginPage() {
   const configured = demo || (await householdHasGateway().catch(() => true));
   if (!configured) redirect("/setup");
   // The public demo shows its one shared login to every visitor; settings and passwords are locked there.
-  const demoLogin = demo ? { username: DEMO_USERNAME, password: recoveryPassword() } : undefined;
+  // Without a password the form stays empty, so sign-in reports the problem as it does elsewhere.
+  const demoPassword = demo ? demoSignInPassword() : "";
+  const demoLogin = demoPassword ? { username: DEMO_USERNAME, password: demoPassword } : undefined;
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <div className="flex w-full max-w-[400px] flex-col gap-5">
@@ -33,7 +35,7 @@ export default async function LoginPage() {
         {demoLogin ? (
           <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
             Username <span className="font-semibold text-[var(--ff-ink)]">{demoLogin.username}</span>, password{" "}
-            <span className="whitespace-nowrap font-mono font-semibold text-[var(--ff-ink)]">{demoLogin.password}</span>. {DEMO_SIGN_IN_NOTE}
+            <span className="font-mono [overflow-wrap:anywhere] font-semibold text-[var(--ff-ink)]">{demoLogin.password}</span>. {DEMO_SIGN_IN_NOTE}
           </p>
         ) : (
           <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
@@ -48,4 +50,12 @@ export default async function LoginPage() {
       </div>
     </main>
   );
+}
+
+function demoSignInPassword(): string {
+  try {
+    return recoveryPassword();
+  } catch {
+    return "";
+  }
 }

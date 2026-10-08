@@ -42,5 +42,12 @@ export function SignInForm({ demoLogin }: { demoLogin?: { username: string; pass
     return null;
   }
 
-  return <SharedSignInForm onSubmit={signIn} initialUsername={demoLogin?.username} initialPassword={demoLogin?.password} />;
+  return (
+    <SharedSignInForm
+      onSubmit={signIn}
+      initialUsername={demoLogin?.username}
+      initialPassword={demoLogin?.password}
+      note={demoLogin ? null : undefined}
+    />
+  );
 }
