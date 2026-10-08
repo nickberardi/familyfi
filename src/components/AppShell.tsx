@@ -67,13 +67,15 @@ function NavBrand({ statusLine, compact, onAbout }: { statusLine: string; compac
 
 /**
  * Which nav sections are collapsed, kept in this browser so the room a person frees stays freed.
- * The rail and the drawer read the same set. Before hydration, and where storage is unavailable,
- * every section is open.
+ * The rail and the drawer read the same set. Before hydration every section is open; where storage
+ * is unavailable the toggles still work, for this page load.
  */
 const COLLAPSED_KEY = "familyfi.nav.collapsed";
 const collapsedListeners = new Set<() => void>();
+let collapsedInMemory: string | null = null;
 
 function readCollapsed(): string {
+  if (collapsedInMemory !== null) return collapsedInMemory;
   try {
     return window.localStorage.getItem(COLLAPSED_KEY) ?? "[]";
   } catch {
@@ -91,10 +93,13 @@ function parseCollapsed(raw: string): string[] {
 }
 
 function writeCollapsed(titles: readonly string[]) {
+  const raw = JSON.stringify(titles);
   try {
-    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(titles));
+    window.localStorage.setItem(COLLAPSED_KEY, raw);
+    collapsedInMemory = null;
   } catch {
-    // Storage refused (a private window): the toggle simply does not persist.
+    // Storage refused (site data blocked): keep the choice for this page load instead.
+    collapsedInMemory = raw;
   }
   for (const listener of collapsedListeners) listener();
 }
@@ -121,9 +126,11 @@ function navBadge(href: string, counts: { unassignedCount: number; familyNeedsDe
   return href === "/sync" && counts.syncFailed ? 1 : 0;
 }
 
-function NavBadge({ count, tone }: { count: number; tone: "paused" | "danger" }) {
+function NavBadge({ count, tone, label }: { count: number; tone: "paused" | "danger"; label?: string }) {
   return (
     <span
+      aria-label={label}
+      role={label ? "img" : undefined}
       className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
       style={{ background: `var(--ff-${tone})` }}
     >
@@ -138,7 +145,7 @@ function NavBadge({ count, tone }: { count: number; tone: "paused" | "danger" })
  * drawer after a tap; the rail passes nothing since it is never hidden.
  *
  * Each group's title collapses it. A collapsed group keeps its badges as one total on the title,
- * and arriving on one of its pages opens it again, so the current page is always in view.
+ * and arriving on one of its pages opens it again.
  */
 function NavGroups({
   pathname,
@@ -187,7 +194,7 @@ function NavGroups({
               className="flex w-full items-center gap-1.5 rounded-[7px] border-0 bg-transparent px-2.5 pb-1.5 text-left text-[14px] font-semibold tracking-wide text-[var(--ff-muted)] uppercase"
             >
               <span className="min-w-0 flex-1">{group.title}</span>
-              {closed && total ? <NavBadge count={total} tone={urgent ? "danger" : "paused"} /> : null}
+              {closed && total ? <NavBadge count={total} tone={urgent ? "danger" : "paused"} label={`${total} need attention`} /> : null}
               <Icon name={closed ? "caret-right" : "caret-down"} size={14} />
             </button>
             <div id={id} hidden={closed} className="flex flex-col gap-px">
