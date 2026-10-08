@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/server/db";
 import { resetDatabase } from "../helpers/db";
 
@@ -27,6 +27,7 @@ const { default: Home } = await import("@/app/page");
 const { default: SetupPage } = await import("@/app/setup/page");
 const { default: LoginPage } = await import("@/app/login/page");
 const { recoveryPassword } = await import("@/server/env");
+const { SignInForm } = await import("@/components/SignInForm");
 
 /** Where a page redirects, or what it rendered when it did not. */
 async function visit(page: () => Promise<unknown>): Promise<string | { props: Record<string, unknown> }> {
@@ -91,5 +92,44 @@ describe("setup before sign-in", () => {
     sessionCookie = "not-a-session";
     expect(await visit(SetupPage)).toBe("/login");
     expect(typeof (await visit(LoginPage))).toBe("object");
+  });
+});
+
+/** The props the sign-in page hands its form. */
+function signInFormProps(node: unknown): Record<string, unknown> | undefined {
+  if (!node || typeof node !== "object") return undefined;
+  const element = node as { type?: unknown; props?: { children?: unknown } & Record<string, unknown> };
+  if (element.type === SignInForm) return element.props;
+  const children = element.props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = signInFormProps(child);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+describe("sign-in on the public demo", () => {
+  const mode = process.env.FAMILYFI_MODE;
+
+  beforeEach(async () => {
+    await resetDatabase();
+    sessionCookie = undefined;
+  });
+
+  afterEach(() => {
+    if (mode === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = mode;
+  });
+
+  it("fills in the shared demo login for every visitor", async () => {
+    process.env.FAMILYFI_MODE = "demo";
+    expect(signInFormProps(await visit(LoginPage))).toEqual({ demoLogin: { username: "admin", password: recoveryPassword() } });
+  });
+
+  it("never carries the password outside the demo", async () => {
+    await saveGateway();
+    const page = await visit(LoginPage);
+    expect(signInFormProps(page)).toEqual({ demoLogin: undefined });
+    expect(JSON.stringify(page)).not.toContain(recoveryPassword());
   });
 });
