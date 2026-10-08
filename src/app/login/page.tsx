@@ -33,7 +33,7 @@ export default async function LoginPage() {
         {demoLogin ? (
           <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
             Username <span className="font-semibold text-[var(--ff-ink)]">{demoLogin.username}</span>, password{" "}
-            <span className="font-mono font-semibold text-[var(--ff-ink)]">{demoLogin.password}</span>. {DEMO_SIGN_IN_NOTE}
+            <span className="whitespace-nowrap font-mono font-semibold text-[var(--ff-ink)]">{demoLogin.password}</span>. {DEMO_SIGN_IN_NOTE}
           </p>
         ) : (
           <p className="text-[14px] leading-5 text-[var(--ff-muted)]">
