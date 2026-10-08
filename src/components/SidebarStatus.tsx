@@ -9,10 +9,11 @@ import { updateAlert } from "@/lib/update-copy";
 import { DeviceAttentionCard, SyncStatusCard, UpdateAlertCard } from "@/ui/StatusCards";
 
 /**
- * The rail's status as one line each — an update on offer, whether the gateway is in sync, groups
- * that need a device — so the navigation keeps the rail's height. A row opens its shared card
- * (`src/ui/StatusCards.tsx`) in a popover beside the rail; the drawer and the native app show the
- * cards themselves.
+ * The rail's status: an update on offer, whether the gateway is in sync, groups that need a
+ * device. They show as their shared cards (`src/ui/StatusCards.tsx`) while the rail has room. When
+ * the cards would squeeze the navigation into a scroll, they collapse into one row, which names
+ * the one notice or counts several and opens every card in a popover beside the rail. The drawer
+ * and the native app show the cards themselves.
  */
 export function SidebarStatus({
   update,
@@ -21,6 +22,8 @@ export function SidebarStatus({
   error,
   notice,
   onReconcile,
+  nav,
+  navContent,
 }: {
   update: UpdateCheck | null;
   sync: SyncStatus | null;
@@ -28,53 +31,91 @@ export function SidebarStatus({
   error?: string | null;
   notice?: string | null;
   onReconcile: () => void;
+  /** The rail's scrolling navigation, and the content inside it, measured to decide when to collapse. */
+  nav: React.RefObject<HTMLElement | null>;
+  navContent: React.RefObject<HTMLElement | null>;
 }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [openedAt, setOpenedAt] = useState(pathname);
   // A link in a card navigates; the popover closes with the page it was opened on.
   if (pathname !== openedAt) {
     setOpenedAt(pathname);
-    if (open) setOpen(null);
+    if (open) setOpen(false);
   }
 
   const alert = updateAlert(update);
   const status = syncStatusCard(sync, { busy, error, notice });
   const attention = noMembersAttention(sync?.issues ?? []);
-  const rows = [
-    alert
-      ? { key: "update", title: alert.title, dot: "var(--ff-accent)", card: <UpdateAlertCard update={update} /> }
-      : null,
-    {
-      key: "sync",
-      title: status.title,
-      dot: status.dot,
-      card: <SyncStatusCard sync={sync} busy={busy} error={error} notice={notice} onReconcile={onReconcile} />,
-    },
-    attention
-      ? { key: "devices", title: attention.title, dot: "var(--ff-paused)", card: <DeviceAttentionCard sync={sync} /> }
-      : null,
-  ].filter((row) => row !== null);
+  const syncNotice = status.dot !== "var(--ff-on)";
+  // Most urgent first: the row takes the first one's dot.
+  const notices = [
+    syncNotice && status.dot === "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,
+    attention ? { title: attention.title, dot: "var(--ff-paused)" } : null,
+    alert ? { title: alert.title, dot: "var(--ff-accent)" } : null,
+    syncNotice && status.dot !== "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,
+  ].filter((item) => item !== null);
+  const title = notices.length > 1 ? `${notices.length} notices` : (notices[0]?.title ?? status.title);
+  const dot = notices[0]?.dot ?? status.dot;
 
-  // A row that goes away (the update installed, the groups got devices) takes its popover with it.
-  if (open && !rows.some((row) => row.key === open)) setOpen(null);
-  const close = useCallback(() => setOpen(null), []);
+  const cards = (
+    <>
+      <UpdateAlertCard update={update} />
+      <SyncStatusCard sync={sync} busy={busy} error={error} notice={notice} onReconcile={onReconcile} />
+      <DeviceAttentionCard sync={sync} />
+    </>
+  );
+
+  // Collapse while the cards would push the navigation into a scroll, and expand again once the
+  // rail has room for them at the height they last had. A different set of cards is measured again.
+  const root = useRef<HTMLDivElement>(null);
+  const fullHeight = useRef(0);
+  const [collapsed, setCollapsed] = useState(false);
+  const shape = [alert?.title, status.title, attention?.title].join("|");
+  const [measuredShape, setMeasuredShape] = useState(shape);
+  if (shape !== measuredShape) {
+    setMeasuredShape(shape);
+    setCollapsed(false);
+  }
+  useLayoutEffect(() => {
+    const rail = root.current?.closest("aside");
+    if (!rail || !nav.current || !navContent.current) return;
+    function check() {
+      const scroller = nav.current;
+      const content = navContent.current;
+      const own = root.current;
+      const end = own?.parentElement;
+      if (!scroller || !content || !own || !end) return;
+      const slack = scroller.clientHeight - content.offsetHeight;
+      if (!collapsed) {
+        if (slack < 0 || end.scrollHeight > end.clientHeight + 1) {
+          fullHeight.current = own.offsetHeight;
+          setCollapsed(true);
+        }
+      } else if (slack + own.offsetHeight >= fullHeight.current) {
+        setCollapsed(false);
+      }
+    }
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(rail);
+    observer.observe(navContent.current);
+    return () => observer.disconnect();
+  }, [collapsed, measuredShape, nav, navContent]);
+
+  const close = useCallback(() => setOpen(false), []);
 
   return (
-    <div className="flex flex-col gap-px">
-      {rows.map((row) => (
-        <StatusRow
-          key={row.key}
-          id={row.key}
-          title={row.title}
-          dot={row.dot}
-          expanded={open === row.key}
-          onToggle={() => setOpen((current) => (current === row.key ? null : row.key))}
-          onClose={close}
-        >
-          {row.card}
+    <div ref={root} className="flex flex-col gap-2.5">
+      {collapsed ? (
+        <StatusRow id="notices" title={title} dot={dot} expanded={open} onToggle={() => setOpen((current) => !current)} onClose={close}>
+          <div className="flex flex-col gap-2.5 rounded-[10px] p-2.5" style={{ background: "var(--ff-rail)" }}>
+            {cards}
+          </div>
         </StatusRow>
-      ))}
+      ) : (
+        cards
+      )}
     </div>
   );
 }

@@ -713,7 +713,7 @@
         "sessions"
       ]
     },
-    "tests/browser/smoke.spec.ts > a sidebar status row opens its card beside the rail and Escape closes it": {
+    "tests/browser/smoke.spec.ts > the sidebar's notices collapse into one row when the rail is short": {
       "categories": [
         "sync"
       ]

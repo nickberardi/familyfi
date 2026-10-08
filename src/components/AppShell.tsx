@@ -1,7 +1,7 @@
 "use client";
 
 import { Toast } from "@/ui/Toast";
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AboutSheet } from "@/components/AboutSheet";
@@ -155,6 +155,8 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
   const { session, devices, sync, unifi, store, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const railNav = useRef<HTMLElement>(null);
+  const railNavContent = useRef<HTMLDivElement>(null);
   const update = useUpdateCheck(request);
   // Closing on a route change is the drawer's own signal, same as the design's
   // `pickAndClose` on each item — but this also catches the back button, a redirect,
@@ -192,15 +194,17 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
       <div className="ff-shell">
         <aside className="ff-sidebar flex-col gap-5 overflow-hidden border-r border-[var(--ff-line)] bg-[var(--ff-rail)] px-3 py-5">
           <NavBrand statusLine={statusLine} onAbout={openAbout} />
-          <nav className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
-            <NavGroups
-              pathname={pathname}
-              unassignedCount={unassignedCount}
-              familyNeedsDevices={familyNeedsDevices}
-              syncFailed={syncFailed}
-            />
-            <div className="mt-5">
-              <AboutRow onAbout={openAbout} />
+          <nav ref={railNav} className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            <div ref={railNavContent}>
+              <NavGroups
+                pathname={pathname}
+                unassignedCount={unassignedCount}
+                familyNeedsDevices={familyNeedsDevices}
+                syncFailed={syncFailed}
+              />
+              <div className="mt-5">
+                <AboutRow onAbout={openAbout} />
+              </div>
             </div>
           </nav>
           <div className="ff-sidebar-end flex flex-col gap-2.5">
@@ -211,6 +215,8 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               error={error}
               notice={notice}
               onReconcile={() => void reconcileNow(store.mutate)}
+              nav={railNav}
+              navContent={railNavContent}
             />
             <AccountCard session={session} onSignOut={() => void signOut()} />
           </div>
