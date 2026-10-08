@@ -56,6 +56,8 @@ export function SidebarStatus({
       : null,
   ].filter((row) => row !== null);
 
+  // A row that goes away (the update installed, the groups got devices) takes its popover with it.
+  if (open && !rows.some((row) => row.key === open)) setOpen(null);
   const close = useCallback(() => setOpen(null), []);
 
   return (
@@ -96,7 +98,6 @@ function StatusRow({
 }) {
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<{ left: number; bottom: number; maxHeight: number } | null>(null);
   const panelId = `sidebar-status-${id}`;
 
   // The panel sits just right of the rail, its foot level with the row's, growing upward since
@@ -106,12 +107,20 @@ function StatusRow({
     function measure() {
       const row = button.current?.getBoundingClientRect();
       const rail = button.current?.closest("aside")?.getBoundingClientRect();
-      if (!row || !rail) return;
-      setPlace({ left: rail.right + 8, bottom: Math.max(12, window.innerHeight - row.bottom), maxHeight: row.bottom - 12 });
+      const style = panel.current?.style;
+      if (!row || !rail || !style) return;
+      style.left = `${rail.right + 8}px`;
+      style.bottom = `${Math.max(12, window.innerHeight - row.bottom)}px`;
+      style.maxHeight = `${row.bottom - 12}px`;
     }
     measure();
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    // Capture, so a scroll inside the rail keeps the panel level with its row too.
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
   }, [expanded]);
 
   useEffect(() => {
@@ -119,6 +128,9 @@ function StatusRow({
     panel.current?.focus();
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      // Only while the popover has focus, so Escape meant for a sheet opened over it stays with that sheet.
+      const focused = document.activeElement;
+      if (!panel.current?.contains(focused) && focused !== button.current) return;
       onClose();
       button.current?.focus();
     }
@@ -159,13 +171,7 @@ function StatusRow({
           aria-label={title}
           tabIndex={-1}
           className="fixed z-[60] w-[280px] overflow-y-auto rounded-[10px] outline-none"
-          style={{
-            left: place?.left ?? 0,
-            bottom: place?.bottom ?? 0,
-            maxHeight: place?.maxHeight,
-            visibility: place ? "visible" : "hidden",
-            boxShadow: "var(--ff-shadow-toast)",
-          }}
+          style={{ boxShadow: "var(--ff-shadow-toast)" }}
         >
           {children}
         </div>

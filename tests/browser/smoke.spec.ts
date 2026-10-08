@@ -81,6 +81,25 @@ test("sign-in and household pages", async ({ page }) => {
   await expect(page.getByText("About", { exact: true })).toHaveCount(0);
 });
 
+test("a sidebar status row opens its card beside the rail and Escape closes it", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/family");
+  const row = page.getByRole("button", { name: /Gateway in sync|Sync needs attention|Partial apply|UniFi not configured/ });
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await row.click();
+  const popover = page.getByRole("dialog", { name: await row.innerText() });
+  await expect(popover.getByTestId("sync-status")).toBeVisible();
+  await expect(popover).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await expect(row).toBeFocused();
+
+  await row.click();
+  await expect(popover).toBeVisible();
+  await page.getByRole("heading", { level: 1 }).click();
+  await expect(popover).toHaveCount(0);
+});
+
 test("the sidebar alerts an available update and stays quiet otherwise", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   let update: UpdateCheck = {
