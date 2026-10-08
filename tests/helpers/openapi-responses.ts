@@ -3,7 +3,8 @@
  * be documented for that path and method, and a JSON body must match its schema. The
  * integration config's `openapi-responses` plugin wraps every handler in `src/app/api`
  * with `checkedHandler`, so every response any integration test receives is checked —
- * the iOS client is built from this document, and a drifted field breaks it silently.
+ * familyfi-mobile generates its API types from this document, and a drifted field breaks it
+ * silently.
  */
 
 import { readFileSync } from "node:fs";

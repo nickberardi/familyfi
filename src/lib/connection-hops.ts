@@ -4,7 +4,7 @@ import { routeTrust, transportLabel } from "./connection-routes";
 import type { ConnectionRoute, SyncStatus, UnifiSettings } from "./types";
 
 /**
- * A paired phone's view of its connection, as familyfi-ios's Connection screen reports it: "connected"
+ * A paired phone's view of its connection, as familyfi-mobile's Connection screen reports it: "connected"
  * is three questions, so it answers each apart. This phone reaching FamilyFi is measured on the phone;
  * FamilyFi reaching the UniFi console is only relayed from the server; and the last change has its
  * own outcome. The phone never talks to UniFi.

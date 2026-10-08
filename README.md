@@ -8,7 +8,7 @@ Family internet controls for a UniFi gateway. One deployment, one household.
 
 UniFi gives you firewall policies and client lists, but bedtime, no-internet-during-homework, and “who owns this new iPad?” are still a pile of rules you have to remember. FamilyFi is the household layer: groups of people and things, rules and their schedules, and quarantined unknowns. It stores what you want, then enforces it with **app-owned** UniFi firewall policies. Your own policies are never modified, disabled, deleted, or reordered.
 
-The responsive web app / PWA and the companion [iOS project](https://github.com/nickberardi/familyfi-ios) share the `/api/v1` contract.
+The responsive web app / PWA and the companion [mobile app](https://github.com/nickberardi/familyfi-mobile) share the `/api/v1` contract.
 
 **[Setup](docs/setup.md)** • **[Operations](docs/operations.md)** • **[API](docs/api.md)** • **[Licensing](docs/licensing.md)**
 

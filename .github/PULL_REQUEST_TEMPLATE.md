@@ -23,7 +23,7 @@ _No plan — direct change._
 
 - [ ] Behaviour changes have tests; a bug regression test failed before the fix
 - [ ] Applicable checks in `docs/testing.md` ran; any missing evidence is stated above
-- [ ] API contract changes include the spec, version checks and a linked `familyfi-ios` issue; breaking changes have the operator's decision
+- [ ] API contract changes include the spec, version checks and a linked `familyfi-mobile` issue; breaking changes have the operator's decision
 - [ ] Migration changes pass migration, drift and upgrade checks
 - [ ] Final diff reviewed for duplicated behaviour, unnecessary abstractions, hidden errors and stale docs
 - [ ] Any changed test expectations, exclusions or suppressions are justified below

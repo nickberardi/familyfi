@@ -74,7 +74,7 @@ needed for future work belongs here when implemented, not only in a canvas or se
 | Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/lib/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts), [rule-actions.ts](../src/lib/rule-actions.ts), [day-timeline.ts](../src/lib/day-timeline.ts), [internet-zone.ts](../src/lib/internet-zone.ts) and [shared vectors](testing.md#display-vectors) |
 | Components shared with the native app | [src/ui](../src/ui): React Native components the web renders through react-native-web; see [shared components](#shared-components) |
 | Rule and resolver verdicts | [rules.ts](../src/lib/rules.ts), [upstream.ts](../src/lib/upstream.ts) and [architecture](architecture.md#upstream-dns-categories) |
-| Native typography, navigation and adaptive layout | [Native design guide](https://github.com/nickberardi/familyfi-ios/blob/main/docs/design-system.md); read its current sources for platform details |
+| Native typography, navigation and adaptive layout | [familyfi-mobile's components and design](https://github.com/nickberardi/familyfi-mobile/blob/main/docs/architecture.md#components-and-design-srccomponents-srcdesign); read its current sources for platform details |
 
 Shared meaning must survive platform adaptation: Pause blocks all internet for a group and names that scope, an internet rule is optional, time follows the household timezone, and unknown observations remain unknown. Native
 controls, fonts and navigation can differ; web CSS dimensions are not a native layout specification.

@@ -1,5 +1,5 @@
 /**
- * What a phone's setup says, step by step, as familyfi-ios's setup views say it (`App/Features/Setup`),
+ * What a phone's setup says, step by step, as familyfi-mobile's setup screens show it,
  * in the web's own names for where a code comes from (Pair Device → Pair a phone), and the
  * household details a person checks before trusting it. Each client lays the steps out natively.
  */
@@ -55,7 +55,7 @@ export const SCAN_UNAVAILABLE = "Camera scanning isn't available on this device"
 export type PendingRow = { label: string; value: string; mono: boolean; secret?: boolean };
 
 /**
- * The details of a verified household, to check before trusting it, in familyfi-ios's two groups:
+ * The details of a verified household, to check before trusting it, in two groups:
  * what the pairing code said (the one-time key hidden until revealed) and what the household proved.
  */
 export function pendingHouseholdSections({ code, identity }: PendingEnrollment): { title: string; rows: PendingRow[] }[] {

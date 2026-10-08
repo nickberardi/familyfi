@@ -7,8 +7,9 @@ import type { Group } from "./types";
 export { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays };
 
 /*
- * Display copy and state shared by every surface. The native iOS app ports this module,
- * and `tests/fixtures/display-vectors.json` holds the cases both must pass. So nothing
+ * Display copy and state shared by every surface. familyfi-mobile imports this module, its
+ * Apple Watch (native Swift) ports it, and `tests/fixtures/display-vectors.json` holds the cases
+ * all must pass. So nothing
  * here reads the wall clock or the server's time zone: a function that needs the time
  * takes `now` and the household `timezone` from its caller.
  */

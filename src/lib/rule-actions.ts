@@ -3,8 +3,8 @@ import { isWindowActive } from "./rule-windows";
 import { rulePaused, ruleInternetWindows, type Rule } from "./rules";
 
 /**
- * A rule card action as plain data, like a group's: `run` names what a tap does. The
- * native iOS app ports this, and `tests/fixtures/display-vectors.json` pins it.
+ * A rule card action as plain data, like a group's: `run` names what a tap does.
+ * familyfi-mobile shows it through the shared rule card, and `tests/fixtures/display-vectors.json` pins it.
  */
 export type RuleActionSpec = {
   label: string;

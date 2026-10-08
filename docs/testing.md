@@ -11,7 +11,7 @@ The pre-push hook runs lint, typecheck and the unit tests on every push; `make s
 | Documentation only | Check changed links, paths and commands against the repo; `git diff --check`. For agent instructions, also run `scripts/test.py run tests/unit/invariants.test.ts`. No application build or database is needed. |
 | Code, dependencies, configuration or tooling | `make lint typecheck test-coverage` |
 | Pages, components or `globals.css` | `make test-browser` |
-| An `/api/v1` route or payload | `make test-api` and relevant integration tests. Update `openapi/familyfi.v1.yaml` when HTTP behaviour changes; an internal refactor alone needs no spec edit. For spec changes also run `make test-api-version test-api-breaking` (breaking check needs Go) and coordinate iOS as required in `AGENTS.md`. |
+| An `/api/v1` route or payload | `make test-api` and relevant integration tests. Update `openapi/familyfi.v1.yaml` when HTTP behaviour changes; an internal refactor alone needs no spec edit. For spec changes also run `make test-api-version test-api-breaking` (breaking check needs Go) and coordinate familyfi-mobile as required in `AGENTS.md`. |
 | `prisma/schema.prisma` or a migration | `make db-drift db-upgrade`. `db-drift` migrates a fresh database and compares it with the schema; `db-upgrade` upgrades a filled database from every supported release, so a household that skipped releases is covered. `pnpm db-upgrade --from v0.22.3` or `--latest` runs one start point against the development database while you iterate |
 
 Start with focused tests while iterating (`scripts/test.py list` finds them; `run <file>` or `run --category <name>` runs them); the table is the handoff requirement. The pre-push hook still runs its checks on every push, including documentation changes. If a required check cannot run, report the command, blocker and unverified behaviour. Do not bypass it or claim the change is fully verified. CI remains the merge check.
@@ -56,19 +56,19 @@ The authorization matrix runs with the integration suite. When you add a route, 
   - fixture IPv4 addresses come from the documentation ranges `192.0.2.0/24`, `198.51.100.0/24` and `203.0.113.0/24`;
   - never commit a live UniFi response.
 - **The UniFi mock answers like the real API.** `tests/unit/unifi-client-contract.test.ts` runs the cases in `src/server/unifi/contract-cases.ts` against `MockUnifiClient` and `HttpUnifiClient`. Change the mock and those cases together.
-- **Display behaviour is shared with iOS through `tests/fixtures/display-vectors.json`.** See [Display vectors](#display-vectors).
+- **Display behaviour is shared with familyfi-mobile through `tests/fixtures/display-vectors.json`.** See [Display vectors](#display-vectors).
 - **Every test has a category.** A new test file needs an entry in `scripts/testing/catalog.json`, keyed by its path, so `--category` finds it; every run and `check catalog` fail on an uncategorized test or an entry that names none. Pick existing categories where they fit.
 - **Every invariant in AGENTS.md names its tests.** A new invariant comes with them; `tests/unit/invariants.test.ts` fails when one names none or a missing file.
 - **Household time never depends on the server's time zone.** CI runs the unit suite a second time at UTC+14 to catch this.
 
 ## Display vectors
 
-The native iOS app, [`nickberardi/familyfi-ios`](https://github.com/nickberardi/familyfi-ios), ports the display logic by hand: `src/lib/display.ts`, `groupActionSpecs` in `src/lib/group-actions.ts`, the pause sheet in `src/lib/pause-sheet.ts`, rule actions and state line in `src/lib/rule-actions.ts`, rule windows with the internet state and day bands in `src/lib/rule-windows.ts`. The day timeline and internet zone (`src/lib/day-timeline.ts`, `src/lib/internet-zone.ts`) are covered by unit tests rather than vectors: the Expo app imports them directly instead of porting them. `tests/fixtures/display-vectors.json` is the set of cases both must pass, and iOS replays the same file against its port.
+The companion app, [`nickberardi/familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile), imports the display logic from this repository through its `vendor/familyfi` submodule: `src/lib/display.ts`, `groupActionSpecs` in `src/lib/group-actions.ts`, the pause sheet in `src/lib/pause-sheet.ts`, rule actions and state line in `src/lib/rule-actions.ts`, rule windows with the internet state and day bands in `src/lib/rule-windows.ts`. It replays `tests/fixtures/display-vectors.json` with this repository's runners (`src/lib/display-vectors.ts`) in Node and on device, whose JavaScript engine's `Intl` differs. Its Apple Watch app is native Swift, so it ports that logic by hand and replays the same file against its port. The day timeline and internet zone (`src/lib/day-timeline.ts`, `src/lib/internet-zone.ts`) are covered by unit tests rather than vectors, since the Watch does not port them.
 
 - Each vector is `{ "fn", "name", "input", "expected" }`: call `fn` with the named arguments in `input` and compare to `expected`. Instants are ISO 8601 strings, and a returned instant is compared as its ISO string. The file carries a `version`; bump it when the format changes, not when cases do.
 - Inputs are plain JSON and pin everything the output depends on: a vector that needs the time names `now` and `timeZone`, never the wall clock. So a display function takes `now` from its caller rather than defaulting to `new Date()`.
 - `tests/unit/display-vectors.test.ts` runs every vector against the TypeScript, and fails when an exported function of those modules has no vector and is not on its commented exclusion list.
-- **Changing display behaviour means changing the vectors in the same pull request.** That diff is the iOS team’s signal to update the port, so an `expected` value changes only because the behaviour did, and the pull request says which.
+- **Changing display behaviour means changing the vectors in the same pull request.** That diff is familyfi-mobile’s signal to update its Watch port, so an `expected` value changes only because the behaviour did, and the pull request says which.
 
 ## Mutation testing
 
