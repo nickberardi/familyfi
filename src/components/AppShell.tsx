@@ -4,7 +4,7 @@ import { Toast } from "@/ui/Toast";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AboutSheet } from "@/components/AboutSheet";
+import { AboutSheet, SOURCE_URL } from "@/components/AboutSheet";
 import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api, request } from "@/lib/api";
@@ -226,20 +226,27 @@ function NavGroups({
 }
 
 /**
- * The small "FamilyFi v…" line at the foot of the rail and the drawer. It keeps the version in
- * sight without taking a row of the nav, and opens About.
+ * The small line at the foot of the rail and the drawer: the version, which opens About, and
+ * links to star the project and report an issue on GitHub. It keeps the version in sight
+ * without taking a row of the nav.
  */
-function VersionLink({ onAbout }: { onAbout: () => void }) {
+function SidebarFooter({ onAbout }: { onAbout: () => void }) {
+  const link = "rounded-[4px] border-0 bg-transparent p-0 text-[var(--ff-muted)] hover:text-[var(--ff-ink)] hover:underline";
   return (
-    <button
-      type="button"
-      onClick={onAbout}
-      aria-label="About FamilyFi"
-      title="About FamilyFi"
-      className="flex-none self-center rounded-[5px] border-0 bg-transparent px-1.5 text-[11px] leading-4 text-[var(--ff-muted)] hover:underline"
-    >
-      FamilyFi {appVersionLabel()}
-    </button>
+    <div className="flex flex-none items-center justify-center gap-1.5 text-[11px] leading-4 whitespace-nowrap text-[var(--ff-muted)]">
+      <button type="button" onClick={onAbout} aria-label="About FamilyFi" title="About FamilyFi" className={link}>
+        {appVersionLabel()}
+      </button>
+      <span aria-hidden="true">·</span>
+      <a href={SOURCE_URL} target="_blank" rel="noreferrer" className={`flex items-center gap-1 ${link}`}>
+        <Icon name="github-logo" size={12} />
+        Star us
+      </a>
+      <span aria-hidden="true">·</span>
+      <a href={`${SOURCE_URL}/issues/new`} target="_blank" rel="noreferrer" className={link}>
+        Report issue
+      </a>
+    </div>
   );
 }
 
@@ -284,7 +291,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
   return (
     <NavDrawerCtx.Provider value={navDrawer}>
       <div className="ff-shell">
-        <aside className="ff-sidebar flex-col gap-5 overflow-hidden border-r border-[var(--ff-line)] bg-[var(--ff-rail)] px-3 py-5">
+        <aside className="ff-sidebar flex-col gap-5 overflow-hidden border-r border-[var(--ff-line)] bg-[var(--ff-rail)] px-3 pt-5 pb-2.5">
           <NavBrand onAbout={openAbout} />
           <nav ref={railNav} className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
             <div ref={railNavContent}>
@@ -297,7 +304,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               />
             </div>
           </nav>
-          <div className="ff-sidebar-end flex flex-col gap-2.5">
+          <div className="ff-sidebar-end flex flex-col gap-2">
             <SidebarStatus
               update={update}
               sync={sync}
@@ -309,7 +316,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               navContent={railNavContent}
             />
             <AccountCard session={session} onSignOut={() => void signOut()} />
-            <VersionLink onAbout={openAbout} />
+            <SidebarFooter onAbout={openAbout} />
           </div>
         </aside>
         {/* The page scrolls here, so it takes focus: a keyboard user can scroll content with no controls in it. */}
@@ -364,7 +371,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
                 />
               </nav>
               <UpdateAlertCard update={update} />
-              <VersionLink onAbout={openAbout} />
+              <SidebarFooter onAbout={openAbout} />
             </div>
           </>
         ) : null}

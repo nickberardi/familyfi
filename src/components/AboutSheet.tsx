@@ -6,7 +6,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { PRIMARY_BUTTON } from "@/components/pair/SheetFrame";
 import { appVersionLabel } from "@/lib/version";
 
-const SOURCE_URL = "https://github.com/nickberardi/familyfi";
+export const SOURCE_URL = "https://github.com/nickberardi/familyfi";
 
 type AboutTab = "about" | "start";
 
