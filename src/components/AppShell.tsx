@@ -234,7 +234,8 @@ function SidebarFooter({ onAbout }: { onAbout: () => void }) {
   const link = "rounded-[4px] border-0 bg-transparent p-0 text-[var(--ff-muted)] hover:text-[var(--ff-ink)] hover:underline";
   return (
     <div className="flex flex-none items-center justify-center gap-1.5 text-[11px] leading-4 whitespace-nowrap text-[var(--ff-muted)]">
-      <button type="button" onClick={onAbout} aria-label="About FamilyFi" title="About FamilyFi" className={link}>
+      {/* The spoken name starts with the visible version, so voice control can say what it sees. */}
+      <button type="button" onClick={onAbout} aria-label={`${appVersionLabel()}, About FamilyFi`} title="About" className={link}>
         {appVersionLabel()}
       </button>
       <span aria-hidden="true">·</span>
