@@ -23,6 +23,10 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
+// A request the proxy sees has its body buffered, and past Next's 10 MB limit only the first part
+// reaches the route, with no error. A household import is up to 50 MB and the proxy does nothing for
+// `/api/` anyway, so that one route skips it; raising the limit would let anyone make every route
+// buffer 50 MB before any check.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  matcher: ["/((?!_next/static|_next/image|api/v1/settings/import$).*)"],
 };

@@ -154,7 +154,7 @@ describe("installing", () => {
     expect(response.status).toBe(202);
     const { run } = (await response.json()) as { run: UpdateRun };
     expect(run).toMatchObject({ trigger: "manual", fromVersion: APP_VERSION, targetVersion: NEWER, status: "requested" });
-    expect(watchtower.seen).toEqual([{ method: "POST", url: "/v1/update?async=true", authorization: `Bearer ${TOKEN}` }]);
+    expect(watchtower.seen.filter((call) => call.method === "POST")).toEqual([{ method: "POST", url: "/v1/update?async=true", authorization: `Bearer ${TOKEN}` }]);
 
     const again = await install(write(auth, "/api/v1/update/install", "POST"));
     expect(again.status).toBe(409);
@@ -185,23 +185,39 @@ describe("installing", () => {
     expect(settled).toMatchObject({ status: "succeeded", error: null });
   });
 
-  it("records Watchtower refusing the token or being away", async () => {
+  it("treats Watchtower refusing the token, or not answering, as no updater, and a busy one as in progress", async () => {
     const auth = await adminAuth();
     writeToken("not-the-token");
     const refused = await install(write(auth, "/api/v1/update/install", "POST"));
-    expect(refused.status).toBe(502);
-    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("updater_unreachable");
-    expect((await settings(auth)).lastRun).toMatchObject({ status: "failed", error: "Watchtower refused FamilyFi's updater token." });
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
 
     writeToken(TOKEN);
     watchtower.updateStatus = 429;
     const busy = await install(write(auth, "/api/v1/update/install", "POST"));
     expect(busy.status).toBe(409);
+    expect(((await busy.json()) as { error: { code: string } }).error.code).toBe("update_in_progress");
+    expect((await settings(auth)).lastRun).toMatchObject({ status: "failed", error: "Watchtower was already updating containers." });
 
-    process.env.FAMILYFI_UPDATER_URL = "http://127.0.0.1:1";
-    const away = await install(write(auth, "/api/v1/update/install", "POST"));
-    expect(away.status).toBe(502);
+    watchtower.updateStatus = 500;
+    const broken = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(broken.status).toBe(502);
+    expect(((await broken.json()) as { error: { code: string } }).error.code).toBe("updater_unreachable");
     expect(await prisma().updateRun.count({ where: { status: "requested" } })).toBe(0);
+  });
+
+  it("installs nothing when only the token is there and Watchtower is not, now or on schedule", async () => {
+    const auth = await adminAuth();
+    process.env.FAMILYFI_UPDATER_URL = "http://127.0.0.1:1";
+    setUpdaterTokenFileForTests(tokenFile);
+    const response = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(response.status).toBe(409);
+    expect(((await response.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
+    const fetchImpl: typeof fetch = async (input, init) =>
+      String(input).startsWith("https://api.github.com/") ? releases(NEWER)() : fetch(input, init);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: () => new Date("2026-10-14T07:10:00.000Z") })).toBe("nothing");
+    expect(await prisma().updateRun.count()).toBe(0);
   });
 
   it("refuses without the updater or anything newer", async () => {

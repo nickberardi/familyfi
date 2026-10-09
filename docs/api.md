@@ -71,7 +71,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/settings/import` | Administrator, in a browser, previews (`?mode=preview`) or applies (`?mode=apply`) an export, sent as the raw body. Apply replaces groups, rules, devices, accounts, DNS categories and settings and returns a `change`; keys saved here are kept. 400 `invalid_export`, 409 `export_too_new`, 413 `export_too_large` |
 | GET | `/api/v1/update` | Administrator reads whether the Watchtower updater is set up, the automatic schedule, its next run and the last install (`requested`, `succeeded`, `failed`, `skipped`, `unchanged`) |
 | PUT | `/api/v1/update/schedule` | Administrator sets automatic installs: `enabled`, `days` and a household-local `time`; Sunday at midnight by default |
-| POST | `/api/v1/update/install` | Administrator installs the newer release now through Watchtower; 202 with the run. 409 `updater_not_configured`, `no_update_available` or `update_in_progress`; 502 `updater_unreachable` |
+| POST | `/api/v1/update/install` | Administrator installs the newer release now through Watchtower; 202 with the run. 409 `updater_not_configured` (Watchtower does not answer to FamilyFi's token), `no_update_available` or `update_in_progress`; 502 `updater_unreachable` when Watchtower answered but failed the request |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |

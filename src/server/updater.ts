@@ -239,6 +239,10 @@ export async function requestUpdate(
   if (input.update.available !== true || !input.update.latestVersion) {
     throw new UpdaterError("no_update_available", "There is no newer release to install.");
   }
+  // Every image has a token; the updater is there only when Watchtower answers to it.
+  if (!(await watchtowerAnswers(settings, options))) {
+    throw new UpdaterError("updater_not_configured", `Installing needs the Watchtower updater beside FamilyFi, and nothing answers at ${settings.url}.`);
+  }
   const targetVersion = input.update.latestVersion;
   const now = (options.now ?? (() => new Date()))();
   await settleUpdateRun({ ...options, settings });
@@ -331,6 +335,8 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim
   if (household.autoUpdateLastRunAt && household.autoUpdateLastRunAt.getTime() >= due.getTime()) return "nothing";
   const update = await refreshUpdateCheck({ fetchImpl: options.fetchImpl });
   if (update.status !== "ok") return "retry";
+  // Without Watchtower (`docker compose up -d db app`) the schedule installs nothing, and records nothing.
+  if (!(await watchtowerAnswers(settings, options))) return "nothing";
   const claimed = await prisma().household.updateMany({
     where: { id: "default", OR: [{ autoUpdateLastRunAt: null }, { autoUpdateLastRunAt: { lt: due } }] },
     data: { autoUpdateLastRunAt: due },

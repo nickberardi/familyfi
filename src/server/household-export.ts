@@ -20,7 +20,7 @@ import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import type { ImportSummary } from "@/lib/types";
 import { APP_VERSION } from "@/lib/version";
 import { ArchiveError, readArchive, writeArchive } from "./archive";
-import { ensureConnectionIdentity, removeAccountDevices } from "./connection";
+import { assertEndpoint, ensureConnectionIdentity, removeAccountDevices } from "./connection";
 import { dumpDatabase } from "./database-dump";
 import { assertManagedNetworkIds, RuleInputError, validateRuleShape } from "./rules";
 import { normalizeResolverUrl, ResolverConfigError } from "./upstream/resolver-settings";
@@ -63,7 +63,7 @@ const Config = z
   .object({
     household: z.object({
       timezone: z.string().min(1),
-      displayName: z.string().min(1).max(200),
+      displayName: z.string().trim().min(1).max(80),
       quarantineEnforced: z.boolean(),
       unifi: z.object({
         mode: z.string().nullable(),
@@ -166,6 +166,10 @@ const Config = z
     const groups = new Set(config.groups.map((group) => group.id));
     const known = (id: string | null) => id === null || groups.has(id);
     if (!config.accounts.every((account) => known(account.groupId))) issue("An account names a group the export does not have.");
+    const adults = new Set(config.groups.filter((group) => group.kind === GroupKind.family && group.familyRole === FamilyRole.adult).map((group) => group.id));
+    if (config.accounts.some((account) => account.groupId !== null && !adults.has(account.groupId))) {
+      issue("An account belongs to a group that is not an adult in the family.");
+    }
     if (!config.devices.every((device) => known(device.groupId))) issue("A device names a group the export does not have.");
     if (!config.rules.every((rule) => rule.groupIds.every((id) => groups.has(id)))) issue("A rule names a group the export does not have.");
     if (config.rules.some((rule) => rule.id === QUARANTINE_RULE_ID)) issue("The quarantine rule is built in and never exported.");
@@ -305,7 +309,8 @@ export async function exportHousehold(now = new Date()): Promise<{ archive: Buff
   // Import reads at most IMPORT_MAX_BYTES of contents, so a dump that would push the export past it
   // is left out (named in the manifest) rather than making the file unimportable.
   const dumped = await dumpDatabase();
-  const room = IMPORT_MAX_BYTES - configJson.length - 4096;
+  // pg_dump's custom format is compressed already, so gzip barely shrinks it: leave the tar and gzip room.
+  const room = IMPORT_MAX_BYTES - configJson.length - ARCHIVE_OVERHEAD_BYTES;
   const dump = dumped.data && dumped.data.length > room
     ? { data: null, reason: "The database dump would make the export too large to import; back up the database itself instead." }
     : dumped;
@@ -367,15 +372,14 @@ export function readExport(upload: Buffer): { manifest: Manifest; config: Househ
 /**
  * The same checks the API makes on the way in, so an edited or damaged export cannot store a rule or
  * resolver the routes would refuse: rules through `validateRuleShape` (their groups are checked
- * against the export itself), network rules against the export's networks, resolvers through
- * `normalizeResolverUrl`. Returns the configuration as those checks normalise it.
+ * against the export itself; network rules against the networks the import will keep, in
+ * `assertNetworkRules`), routes through `assertEndpoint`, resolvers through `normalizeResolverUrl`.
+ * Returns the configuration as those checks normalise it.
  */
 function checkWrites(config: HouseholdConfig): HouseholdConfig {
-  const scope = { manageAllNetworks: config.household.unifi.manageAllNetworks, managedNetworkIds: config.household.unifi.managedNetworkIds };
   const rules = config.rules.map((rule) => {
     try {
       const shaped = validateRuleShape({ ...rule, windows: rule.windows.map(({ id, name, days, start, end }) => ({ id, name, days, start, end })) });
-      if (shaped.scope === RuleScope.network) assertManagedNetworkIds(shaped.networkIds, scope);
       const positions = new Map(rule.windows.map((window) => [window.id, window.position]));
       return {
         ...rule,
@@ -407,8 +411,19 @@ function checkWrites(config: HouseholdConfig): HouseholdConfig {
       throw error;
     }
   };
+  const endpoints = config.endpoints.map((endpoint) => {
+    try {
+      return { ...endpoint, url: assertEndpoint(endpoint) };
+    } catch (error) {
+      throw new HouseholdImportError("invalid_export", `The route ${endpoint.url} cannot be imported: ${error instanceof Error ? error.message : "it is not valid."}`);
+    }
+  });
+  if (new Set(endpoints.map((endpoint) => endpoint.url)).size !== endpoints.length) {
+    throw new HouseholdImportError("invalid_export", "Two routes in the export are the same address.");
+  }
   return {
     ...config,
+    endpoints,
     household: { ...config.household, resolver: { ...config.household.resolver, dohUrl: resolver(config.household.resolver.dohUrl, "The household") } },
     groups: config.groups.map((group) => ({ ...group, dohOverrideUrl: resolver(group.dohOverrideUrl, group.name) })),
     rules,
@@ -483,10 +498,29 @@ async function currentState() {
   return { household, endpoints };
 }
 
+/** Network rules name networks of the gateway the import keeps: the export's, or this install's when it keeps its own. */
+function assertNetworkRules(config: HouseholdConfig, current: Current, gateway: ImportSummary["gateway"]) {
+  const scope =
+    gateway === "imported"
+      ? { manageAllNetworks: config.household.unifi.manageAllNetworks, managedNetworkIds: config.household.unifi.managedNetworkIds }
+      : { manageAllNetworks: current.unifiManageAllNetworks, managedNetworkIds: current.unifiManagedNetworkIds };
+  for (const rule of config.rules) {
+    if (rule.scope !== RuleScope.network) continue;
+    try {
+      assertManagedNetworkIds(rule.networkIds, scope);
+    } catch (error) {
+      if (error instanceof RuleInputError) throw new HouseholdImportError("invalid_export", `The rule “${rule.name}” cannot be imported: ${error.message}`);
+      throw error;
+    }
+  }
+}
+
 export async function previewImport(upload: Buffer): Promise<ImportSummary> {
   const { manifest, config, hasDump } = readExport(upload);
   const { household, endpoints } = await currentState();
-  return summarize(household, endpoints, manifest, config, hasDump);
+  const summary = summarize(household, endpoints, manifest, config, hasDump);
+  assertNetworkRules(config, household, summary.gateway);
+  return summary;
 }
 
 /**
@@ -507,6 +541,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
         select: { url: true, kind: true, edgeAuth: true, tunnelCredentialCiphertext: true, edgeTokenCiphertext: true },
       });
       const summary = summarize(household, endpoints, manifest, config, hasDump);
+      assertNetworkRules(config, household, summary.gateway);
       const { unifi, resolver, autoUpdate } = config.household;
 
       await tx.household.update({
@@ -547,11 +582,6 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       await tx.group.deleteMany({});
       for (const group of config.groups) await tx.group.create({ data: group });
 
-      const groupKinds = new Map(config.groups.map((group) => [group.id, group]));
-      const adultGroup = (id: string | null) => {
-        const group = id ? groupKinds.get(id) : undefined;
-        return group?.kind === GroupKind.family && group.familyRole === FamilyRole.adult ? group.id : null;
-      };
       const existingAccounts = await tx.account.findMany({ where: { kind: AccountKind.personal } });
       const byUsername = new Map(existingAccounts.map((account) => [account.username, account]));
       for (const account of config.accounts) {
@@ -562,7 +592,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           displayName: account.displayName,
           passwordHash: isImporter ? existing.passwordHash : account.passwordHash,
           isAdmin: isImporter ? true : account.isAdmin,
-          groupId: adultGroup(account.groupId),
+          groupId: account.groupId,
         };
         if (!existing) {
           await tx.account.create({ data: { ...data, username: account.username, kind: AccountKind.personal } });
@@ -611,8 +641,16 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
 
       const byUrl = new Map(endpoints.map((endpoint) => [endpoint.url, endpoint]));
       for (const endpoint of config.endpoints.filter(imports)) {
-        const missingToken = needsToken(endpoint, byUrl.get(endpoint.url));
-        const data = { ...endpoint, enabled: endpoint.enabled && !missingToken };
+        const existing = byUrl.get(endpoint.url);
+        // An address FamilyFi's own tunnel uses here stays that tunnel's; the export's route is left out.
+        if (existing && existing.kind !== RouteKind.own) continue;
+        const missingToken = needsToken(endpoint, existing);
+        const data = {
+          ...endpoint,
+          enabled: endpoint.enabled && !missingToken,
+          // A route the export no longer puts behind Access drops the token this install held for it.
+          ...(endpoint.edgeAuth === EdgeAuth.none ? { edgeTokenCiphertext: null, edgeTokenIv: null, edgeTokenAuthTag: null } : {}),
+        };
         await tx.connectionEndpoint.upsert({ where: { url: endpoint.url }, update: data, create: data });
       }
       return summary;
@@ -627,8 +665,9 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
  * own domains in seeded ones, are replaced.
  */
 async function importCategories(tx: Prisma.TransactionClient, categories: HouseholdConfig["categories"], now: Date) {
-  const existing = await tx.upstreamCategory.findMany({ select: { slug: true, source: true } });
-  const seeds = new Set(existing.filter((category) => category.source === UpstreamSource.seed).map((category) => category.slug));
+  // The household's own categories are replaced: remove them first, so a slug they held is free.
+  await tx.upstreamCategory.deleteMany({ where: { source: UpstreamSource.user } });
+  const seeds = new Set((await tx.upstreamCategory.findMany({ select: { slug: true } })).map((category) => category.slug));
   // A household category whose slug is a seed of this release stays its own category, under the
   // slug the boot seed would give it (`customSlugFor`), never merged into the seed's.
   const placed: { category: HouseholdConfig["categories"][number]; slug: string }[] = [];
@@ -647,8 +686,6 @@ async function importCategories(tx: Prisma.TransactionClient, categories: Househ
     taken.add(slug);
     placed.push({ category, slug });
   }
-  const kept = placed.filter((entry) => entry.category.source === UpstreamSource.user).map((entry) => entry.slug);
-  await tx.upstreamCategory.deleteMany({ where: { source: UpstreamSource.user, slug: { notIn: kept } } });
   for (const { category, slug } of placed) {
     const row =
       category.source === UpstreamSource.seed
