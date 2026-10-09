@@ -1,11 +1,13 @@
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, request as httpRequest } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
-import { householdRoutePublished, resetRouteCheckForTests, resumeRemoteAccess } from "@/server/tunnel/remote-access";
+import { householdRoutePublished, resetRouteCheckForTests, resumeRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -229,6 +231,36 @@ describe("remote access", () => {
     expect(await open()).toBe(true);
     expect((await put({ mode: "off" })).status).toBe(200);
     expect(await open()).toBe(false);
+  });
+
+  it("serves the phone gateway on the remote access port once a household route is published", async () => {
+    const app = createServer((_req, res) => res.end("ok"));
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    const savedPort = process.env.PORT;
+    process.env.PORT = String((app.address() as AddressInfo).port);
+    const gateway = await startRemoteAccessPort(0);
+    const get = () =>
+      new Promise<number | "closed">((resolve) => {
+        const req = httpRequest({ host: "127.0.0.1", port: gateway.port, path: "/api/v1/connection/identity" }, (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode ?? 0));
+        });
+        req.on("error", () => resolve("closed"));
+        req.end();
+      });
+    try {
+      resetRouteCheckForTests();
+      expect(await get()).toBe("closed");
+      const home = await ownRoute("https://203.0.113.10:8443", "lan", false);
+      expect((await put({ mode: "named", endpointId: home.id })).status).toBe(200);
+      resetRouteCheckForTests();
+      expect(await get()).toBe(200);
+    } finally {
+      if (savedPort === undefined) delete process.env.PORT;
+      else process.env.PORT = savedPort;
+      await new Promise((resolve) => gateway.server.close(resolve));
+      await new Promise((resolve) => app.close(resolve));
+    }
   });
 
   it("switches from a route the household runs back to its domain without signing in again", async () => {
