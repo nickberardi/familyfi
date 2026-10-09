@@ -963,6 +963,12 @@
       "categories": [
         "settings"
       ]
+    },
+    "tests/unit/import-body-limit.test.ts": {
+      "categories": [
+        "settings",
+        "runtime"
+      ]
     }
   }
 }

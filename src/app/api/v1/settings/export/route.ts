@@ -1,11 +1,13 @@
 import { demoLocked } from "@/server/demo";
 import { withAdmin } from "@/server/guard";
-import { exportHousehold } from "@/server/household-export";
+import { browserOnly, exportHousehold } from "@/server/household-export";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  return withAdmin(request, async () => {
+  return withAdmin(request, async (session) => {
+    const refused = browserOnly(session);
+    if (refused) return refused;
     // Every demo visitor shares one household; its export would hand out the others' work.
     const locked = demoLocked();
     if (locked) return locked;

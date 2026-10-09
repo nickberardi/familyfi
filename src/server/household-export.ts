@@ -22,6 +22,7 @@ import { ArchiveError, readArchive, writeArchive } from "./archive";
 import { ensureConnectionIdentity, removeAccountDevices } from "./connection";
 import { dumpDatabase } from "./database-dump";
 import { prisma } from "./db";
+import { jsonError } from "./http";
 import { compareSemver, parseSemver } from "./update-check";
 
 /**
@@ -163,6 +164,9 @@ const Config = z
     if (!config.rules.every((rule) => rule.groupIds.every((id) => groups.has(id)))) issue("A rule names a group the export does not have.");
     if (config.rules.some((rule) => rule.id === QUARANTINE_RULE_ID)) issue("The quarantine rule is built in and never exported.");
     if (config.accounts.some((account) => account.username === RECOVERY_USERNAME)) issue("The recovery account is never exported.");
+    if (config.endpoints.some((endpoint) => endpoint.edgeAuth === EdgeAuth.serviceToken && (endpoint.kind !== RouteKind.own || endpoint.transport !== ConnectionTransport.cloudflare))) {
+      issue("Only a Cloudflare route the household runs can sit behind Cloudflare Access.");
+    }
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: config.household.timezone });
     } catch {
@@ -179,6 +183,15 @@ export class HouseholdImportError extends Error {
     super(message);
     this.name = "HouseholdImportError";
   }
+}
+
+/**
+ * Export and import are for an administrator's browser on Settings, never a paired device: an export
+ * carries every administrator's password hash, and an import replaces the household, so neither goes
+ * to a phone or through the remote access tunnel.
+ */
+export function browserOnly(session: { deviceId?: string | null }): Response | null {
+  return session.deviceId ? jsonError(403, "browser_session_required", "Export and import a household from FamilyFi in a browser.") : null;
 }
 
 /** The household's configuration as export writes it. */
@@ -320,7 +333,8 @@ function parseJson<T>(schema: z.ZodType<T>, data: Buffer | undefined, name: stri
 export function readExport(upload: Buffer): { manifest: Manifest; config: HouseholdConfig; hasDump: boolean } {
   let files: Map<string, Buffer>;
   try {
-    files = readArchive(upload, { allowed: FILES, maxFileBytes: IMPORT_MAX_BYTES, maxTotalBytes: IMPORT_MAX_BYTES });
+    // The dump alone may reach the per-file cap; the manifest and configuration come on top of it.
+    files = readArchive(upload, { allowed: FILES, maxFileBytes: IMPORT_MAX_BYTES, maxTotalBytes: IMPORT_MAX_BYTES * 2 });
   } catch (error) {
     if (error instanceof ArchiveError) throw new HouseholdImportError("invalid_export", error.message);
     throw error;
@@ -349,10 +363,20 @@ function needsToken(endpoint: HouseholdConfig["endpoints"][number], existing: En
   return endpoint.edgeAuth === EdgeAuth.serviceToken && !existing?.edgeTokenCiphertext;
 }
 
-/** The gateway connection comes from the export unless this install already talks to another console or site. */
+/**
+ * The gateway connection comes from the export unless this install already holds a key for another
+ * gateway. Changing the connection under a saved key would move this install's policies to a new
+ * identity without the cleanup Settings does (`saveUnifiConnection`), so then the connection stays.
+ */
 function importsGateway(current: Current, config: HouseholdConfig): boolean {
   if (!current.unifiKeyLastFour) return true;
-  return current.unifiConsoleId === config.household.unifi.consoleId && current.unifiSiteId === config.household.unifi.siteId;
+  const { unifi } = config.household;
+  return (
+    current.unifiMode === unifi.mode &&
+    current.unifiBaseUrl === unifi.baseUrl &&
+    current.unifiConsoleId === unifi.consoleId &&
+    current.unifiSiteId === unifi.siteId
+  );
 }
 
 function summarize(current: Current, endpoints: EndpointRow[], manifest: Manifest, config: HouseholdConfig, hasDump: boolean): ImportSummary {
@@ -403,7 +427,8 @@ export async function previewImport(upload: Buffer): Promise<ImportSummary> {
  * Replaces the household with the export's, in one transaction under the household row lock that
  * every upstream write takes. Rule and group rows go, and their policy ownership rows with them; the
  * applied creation records stay, so the next reconciliation removes this install's own old policies
- * and nothing else (`removeOrphanedPolicies`). The importing account is never removed or demoted.
+ * and nothing else (`removeOrphanedPolicies`). The importing account is never removed or demoted, and
+ * keeps its password and sessions.
  */
 export async function applyImport(upload: Buffer, importer: { accountId: string | null }, now = new Date()): Promise<ImportSummary> {
   const { manifest, config, hasDump } = readExport(upload);
@@ -465,10 +490,11 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       const byUsername = new Map(existingAccounts.map((account) => [account.username, account]));
       for (const account of config.accounts) {
         const existing = byUsername.get(account.username);
-        const isImporter = existing?.id === importer.accountId;
+        // The administrator importing keeps their password, their sign-in and their access.
+        const isImporter = existing !== undefined && existing.id === importer.accountId;
         const data = {
           displayName: account.displayName,
-          passwordHash: account.passwordHash,
+          passwordHash: isImporter ? existing.passwordHash : account.passwordHash,
           isAdmin: isImporter ? true : account.isAdmin,
           groupId: adultGroup(account.groupId),
         };
