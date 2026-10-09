@@ -2,10 +2,14 @@
 set -eu
 
 DATA_DIR="/var/lib/familyfi/data"
+UPDATER_DIR="/var/lib/familyfi/updater"
 
 if [ "$(id -u)" = "0" ]; then
-  mkdir -p "$DATA_DIR"
+  mkdir -p "$DATA_DIR" "$UPDATER_DIR"
   chown -R familyfi:familyfi "$DATA_DIR"
+  # The token Watchtower and FamilyFi share, before either reads it (scripts/runtime/ensure-updater-token.mjs).
+  node /app/scripts/runtime/ensure-updater-token.mjs "$UPDATER_DIR"
+  chown -R familyfi:familyfi "$UPDATER_DIR"
   exec gosu familyfi "$0" "$@"
 fi
 

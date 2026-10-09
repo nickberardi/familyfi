@@ -33,11 +33,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-familyfi}
       POSTGRES_USER: ${POSTGRES_USER:-familyfi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      # Set to expose the phone-only gateway to a tunnel sidecar on this Compose network
-      # (see docs/setup.md). Never add it to `ports`.
-      FAMILYFI_PHONE_GATEWAY_PORT: ${FAMILYFI_PHONE_GATEWAY_PORT:-}
-      # Set to let FamilyFi install releases through the watchtower service below (docs/setup.md).
-      FAMILYFI_UPDATER_TOKEN: ${FAMILYFI_UPDATER_TOKEN:-}
+      # The remote access port: the phone-only gateway, for a route the household runs (a router port
+      # forward, reverse proxy, Tailscale or its own tunnel) to point at. It answers nothing until
+      # Pair Device → Remote access publishes such a route (docs/setup.md).
+      FAMILYFI_REMOTE_ACCESS_PORT: ${FAMILYFI_REMOTE_ACCESS_PORT:-7002}
     labels:
       # Watchtower updates this container and no other, after backing up the database. A failed
       # backup exits 75, which makes Watchtower skip the update.
@@ -46,24 +45,32 @@ services:
       com.centurylinklabs.watchtower.lifecycle.pre-update-timeout: "10"
     ports:
       - "${FAMILYFI_PORT:-7001}:7001"
+      - "${FAMILYFI_REMOTE_ACCESS_PORT:-7002}:${FAMILYFI_REMOTE_ACCESS_PORT:-7002}"
     volumes:
       - familyfi-app:/var/lib/familyfi/data
+      - familyfi-updater:/var/lib/familyfi/updater
+    # Healthy once the entrypoint has written the token Watchtower waits for.
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /var/lib/familyfi/updater/token"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     depends_on:
       db:
         condition: service_healthy
 
-  # Installs newer FamilyFi releases when FamilyFi asks (Update page, or its schedule). Opt in with
-  # `docker compose --profile updater up -d` and FAMILYFI_UPDATER_TOKEN in .env. It alone holds the
-  # Docker socket, publishes no port and polls nothing on its own. The original containrrr/watchtower
-  # was archived in December 2025; this is the maintained fork, pinned by digest.
+  # Installs newer FamilyFi releases when FamilyFi asks: Install on the Update page, or its schedule.
+  # It alone holds the Docker socket, publishes no port and polls nothing on its own. Its token is
+  # the one FamilyFi generated into the updater volume, read here read-only. The original
+  # containrrr/watchtower was archived in December 2025; this is the maintained fork. Run without it
+  # with `docker compose up -d db app`.
   watchtower:
-    image: nickfedor/watchtower:1.23.0@sha256:45b54f6dc15227cfb38dbb826f2881aa0f56aaf0c255cdbb38bd80e598bdca9a
+    image: nickfedor/watchtower:latest
     container_name: ${WATCHTOWER_CONTAINER_NAME:-familyfi-watchtower}
-    profiles: [updater]
     restart: unless-stopped
     environment:
-      # Watchtower refuses to start the update endpoint without a token.
-      WATCHTOWER_HTTP_API_TOKEN: ${FAMILYFI_UPDATER_TOKEN:-}
+      # A path: Watchtower reads the token from the file.
+      WATCHTOWER_HTTP_API_TOKEN: /run/familyfi-updater/token
       WATCHTOWER_HTTP_API_ENDPOINTS: update,history
       WATCHTOWER_HTTP_API_PERIODIC_POLLS: "false"
       WATCHTOWER_LABEL_ENABLE: "true"
@@ -73,6 +80,10 @@ services:
       com.centurylinklabs.watchtower.enable: "false"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - familyfi-updater:/run/familyfi-updater:ro
+    depends_on:
+      app:
+        condition: service_healthy
 
 volumes:
   familyfi-postgres:
@@ -81,3 +92,6 @@ volumes:
   familyfi-app:
     driver: local
     name: ${APP_DATA_VOLUME_NAME:-familyfi-app_data}
+  familyfi-updater:
+    driver: local
+    name: ${UPDATER_VOLUME_NAME:-familyfi-updater_data}

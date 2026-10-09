@@ -89,7 +89,7 @@ COPY scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh /app/scripts/runtime/pre-update-backup.sh \
   && groupadd --system familyfi \
   && useradd --system --gid familyfi --home-dir /app familyfi \
-  && mkdir -p /var/lib/familyfi/data \
+  && mkdir -p /var/lib/familyfi/data /var/lib/familyfi/updater \
   && chown -R familyfi:familyfi /app /var/lib/familyfi
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

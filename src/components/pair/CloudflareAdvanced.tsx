@@ -42,8 +42,8 @@ export function CloudflareAdvanced({
   return (
     <div data-testid="cloudflare-advanced" className="flex flex-col gap-3">
       <p className="text-[var(--ff-muted)]">
-        A tunnel you run in your own Cloudflare account. Point its public hostname at FamilyFi&rsquo;s phone-only gateway,{" "}
-        <span className="font-mono">http://app:7002</span> with <span className="font-mono">FAMILYFI_PHONE_GATEWAY_PORT=7002</span> — never at
+        A tunnel you run in your own Cloudflare account. Point its public hostname at FamilyFi&rsquo;s remote access port,{" "}
+        <span className="font-mono">http://app:7002</span> (<span className="font-mono">FAMILYFI_REMOTE_ACCESS_PORT</span>) — never at
         the app itself. <Guide />
       </p>
       <RouteForm

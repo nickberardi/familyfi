@@ -60,14 +60,20 @@ function refuse(res: ServerResponse) {
 
 /**
  * By default the gateway listens on a free loopback port for FamilyFi's own cloudflared.
- * `listen` is for a sidecar tunnel container (FAMILYFI_PHONE_GATEWAY_PORT): same rules,
- * reachable on the Compose network instead.
+ * `listen` is the remote-access port (FAMILYFI_REMOTE_ACCESS_PORT) for a route the household
+ * runs: same rules, reachable from outside the container. `open` gates it: while it answers
+ * false the gateway closes every connection without a word, so nothing is learned from it.
  */
 export function startPhoneGateway(
   upstreamPort: number,
   listen: { host: string; port: number } = { host: "127.0.0.1", port: 0 },
+  open?: () => Promise<boolean>,
 ): Promise<{ server: Server; port: number }> {
-  const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+  const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    if (open && !(await open().catch(() => false))) {
+      req.socket.destroy();
+      return;
+    }
     if (req.url === "/" && (req.method === "GET" || req.method === "HEAD")) {
       res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" });
       return res.end(req.method === "HEAD" ? undefined : ROOT_NOTE);

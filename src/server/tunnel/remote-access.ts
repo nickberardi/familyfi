@@ -509,14 +509,33 @@ export async function setRemoteAccess(change: RemoteAccessChange) {
     });
 }
 
+const ROUTE_CHECK_MS = 5_000;
+let routeCheck: { at: number; open: Promise<boolean> } | undefined;
+
 /**
- * For a tunnel run in its own container (Compose sidecar): exposes the phone-only
- * gateway on the container network at FAMILYFI_PHONE_GATEWAY_PORT. Never publish this
- * port on the host; point the sidecar at `http://app:<port>`.
+ * Whether the remote-access port should answer: only while Remote access publishes a route the
+ * household runs (a port forward, reverse proxy, Tailscale or its own tunnel). FamilyFi's own quick
+ * and domain tunnels reach the gateway on loopback instead. Read at most every five seconds.
  */
-export async function startSidecarGateway(port: number) {
-  const { port: bound } = await startPhoneGateway(appPort(), { host: "0.0.0.0", port });
-  console.log(`Phone-only gateway for a tunnel sidecar listening on port ${bound}.`);
+export function householdRoutePublished(now = Date.now()): Promise<boolean> {
+  if (routeCheck && now - routeCheck.at < ROUTE_CHECK_MS) return routeCheck.open;
+  const open = publishedRoute().then((route) => route?.kind === RouteKind.own && route.enabled);
+  routeCheck = { at: now, open };
+  return open;
+}
+
+export function resetRouteCheckForTests() {
+  routeCheck = undefined;
+}
+
+/**
+ * The remote-access port (FAMILYFI_REMOTE_ACCESS_PORT, 7002 by default): the phone-only gateway
+ * on every interface, published by the Compose file, for a route the household runs to point at.
+ * Until Remote access publishes such a route it closes every connection without answering.
+ */
+export async function startRemoteAccessPort(port: number) {
+  const { port: bound } = await startPhoneGateway(appPort(), { host: "0.0.0.0", port }, () => householdRoutePublished());
+  console.log(`Remote access port ${bound} answers while a route the household runs is published.`);
 }
 
 /** Called once at boot: resumes the tunnel behind the route the household left published. */

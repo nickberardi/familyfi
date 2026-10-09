@@ -157,3 +157,30 @@ describe("named tunnel helpers", () => {
     expect(() => parseTunnelCredential('{"AccountTag":"a"}')).toThrow();
   });
 });
+
+describe("the remote access port", () => {
+  it("closes every connection without a word until a household route is published, then forwards", async () => {
+    const app = createServer((_req, res) => res.end("ok"));
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    let open = false;
+    const started = await startPhoneGateway((app.address() as AddressInfo).port, { host: "127.0.0.1", port: 0 }, async () => open);
+    const get = () =>
+      new Promise<{ status: number; body: string } | "closed">((resolve) => {
+        const req = request({ host: "127.0.0.1", port: started.port, path: "/api/v1/connection/identity" }, (res) => {
+          let body = "";
+          res.on("data", (chunk) => (body += chunk));
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+        });
+        req.on("error", () => resolve("closed"));
+        req.end();
+      });
+    try {
+      expect(await get()).toBe("closed");
+      open = true;
+      expect(await get()).toEqual({ status: 200, body: "ok" });
+    } finally {
+      await new Promise((resolve) => started.server.close(resolve));
+      await new Promise((resolve) => app.close(resolve));
+    }
+  });
+});

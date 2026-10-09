@@ -15,9 +15,8 @@ Copy `.env.example` to `.env` and set what you need. This is every setting Famil
 | `FAMILYFI_SESSION_SECRET` | generated | Binds cookie sessions. Generated on first setup if missing or invalid; never rotated automatically afterward. |
 | `FAMILYFI_ENCRYPTION_KEY` | generated | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
 | `FAMILYFI_DEMO_URL` | none | `demo` only. The demo's public HTTPS origin, published as the phones' route ([demo mode](operations.md#demo-mode)). |
-| `FAMILYFI_PHONE_GATEWAY_PORT` | off | Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
-| `FAMILYFI_UPDATER_TOKEN` | off | Lets FamilyFi install releases through the Watchtower sidecar, which is given the same token (see [Automatic updates](#automatic-updates)). Unset, the Update page tells the operator to update by hand. |
-| `FAMILYFI_UPDATER_URL` | `http://watchtower:8080` | Where Watchtower's HTTP API answers, when it is not the Compose service. |
+| `FAMILYFI_REMOTE_ACCESS_PORT` | `7002` | The remote access port: the phone-only gateway, published by the Compose file, for a route the household runs (a port forward, reverse proxy, Tailscale or its own tunnel) to point at. It closes every connection unanswered until Remote access publishes such a route (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). |
+| `FAMILYFI_UPDATER_URL` | `http://watchtower:8080` | Where Watchtower's HTTP API answers, when it is not the Compose service (see [Automatic updates](#automatic-updates)). |
 | `PORT` | `3000` (`7001` in the image) | The port the server listens on. |
 | `NODE_ENV` | set by Next.js | `production` under `next start` and in the image. Only `prod` and `demo` start in production, and `test` when `CI` is set. |
 
@@ -47,7 +46,7 @@ Read by `docker/docker-compose.yml` (and `docker-compose.dev-db.yml`), not by th
 | `FAMILYFI_PORT` | `7001` | The host port `make docker-up` publishes. |
 | `FAMILYFI_IMAGE` | `ghcr.io/nickberardi/familyfi:latest` | The image `make docker-up` runs. |
 | `APP_CONTAINER_NAME`, `POSTGRES_CONTAINER_NAME`, `WATCHTOWER_CONTAINER_NAME` | `familyfi-app`, `familyfi-postgres`, `familyfi-watchtower` | Container names. |
-| `APP_DATA_VOLUME_NAME`, `POSTGRES_VOLUME_NAME` | `familyfi-app_data`, `familyfi-postgres_data` (`familyfi-dev-postgres_data` for the dev database) | Volume names. |
+| `APP_DATA_VOLUME_NAME`, `POSTGRES_VOLUME_NAME`, `UPDATER_VOLUME_NAME` | `familyfi-app_data`, `familyfi-postgres_data` (`familyfi-dev-postgres_data` for the dev database), `familyfi-updater_data` | Volume names. The updater volume holds only the token FamilyFi and Watchtower share. |
 | `POSTGRES_DATA_PATH` | `/var/lib/postgresql` | Where the PostgreSQL volume mounts. |
 
 ### Development and tests only
@@ -130,16 +129,18 @@ choose **Tailscale** or **My domain** and enter its HTTPS address:
 - [Your own Cloudflare Tunnel](https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Tunnel)
   — a `cloudflared` sidecar on your domain, optionally behind Cloudflare Access (below).
 
-Anything reachable from the internet must point at FamilyFi's **phone-only gateway**
-(`FAMILYFI_PHONE_GATEWAY_PORT`, for example `http://app:7002`), never the app itself on 7001, which
-would put the web admin and its sign-in page on the internet. Never publish the gateway port on the
-host.
+Anything reachable from the internet must point at FamilyFi's **remote access port**, the
+phone-only gateway (`FAMILYFI_REMOTE_ACCESS_PORT`, 7002 by default: `http://app:7002` from a sidecar,
+or the host's port 7002 for a router port forward or a reverse proxy elsewhere), never the app itself
+on 7001, which would put the web admin and its sign-in page on the internet. The Compose file
+publishes it on the host, but it closes every connection without answering until **Pair Device →
+Remote access** publishes a route you run.
 
 ### Cloudflare Tunnel you run
 
 A tunnel you manage in the Cloudflare dashboard (Zero Trust → Networks → Tunnels → Create →
-Cloudflared). In `.env`, set `FAMILYFI_PHONE_GATEWAY_PORT=7002` and `CLOUDFLARE_TUNNEL_TOKEN` to the
-token the dashboard shows, and add the service:
+Cloudflared). In `.env`, set `CLOUDFLARE_TUNNEL_TOKEN` to the token the dashboard shows, and add the
+service:
 
 ```yaml
   cloudflared:
@@ -153,8 +154,7 @@ token the dashboard shows, and add the service:
 ```
 
 In the tunnel's **Public Hostname** settings, point your hostname (for example
-`familyfi.example.com`) at service `http://app:7002`. Do **not** add 7002 to the app's `ports`.
-Then on **Pair Device** choose **Cloudflare → Advanced** and enter
+`familyfi.example.com`) at service `http://app:7002`. Then on **Pair Device** choose **Cloudflare → Advanced** and enter
 `https://familyfi.example.com`. FamilyFi never sees the tunnel token: it lives only in your `.env`
 and the sidecar. To put Cloudflare Access in front of it, see
 [operations](operations.md#your-own-cloudflare-tunnel-and-cloudflare-access-advanced).
@@ -166,23 +166,34 @@ choose it.
 
 The Update page installs a newer release, now or on a schedule (Sunday at midnight by default, in
 the household's time zone), through [Watchtower](https://github.com/nicholas-fedor/watchtower), a
-sidecar that holds the Docker socket so FamilyFi never does. It is opt-in:
-
-1. Add a token to the host's `.env`, which Compose hands to both containers:
-   `FAMILYFI_UPDATER_TOKEN=$(openssl rand -hex 32)`.
-2. Start the `updater` profile: `docker compose -f docker/docker-compose.yml --profile updater up -d`.
+sidecar that holds the Docker socket so FamilyFi never does. `docker compose up -d` starts it with
+FamilyFi; there is nothing to set up. To run without it, start only `db` and `app`
+(`docker compose -f docker/docker-compose.yml up -d db app`); the Update page then says to update by
+hand.
 
 The `watchtower` service in [docker-compose.yml](../docker/docker-compose.yml) is the maintained fork
-(the original `containrrr/watchtower` was archived in December 2025), pinned by digest. It updates
+(the original `containrrr/watchtower` was archived in December 2025), at its `latest` tag. It updates
 only containers labelled `com.centurylinklabs.watchtower.enable=true`, which is the app alone, polls
 nothing on its own and publishes no port: FamilyFi calls its `POST /v1/update` and reads its
-`/v1/history` over the Compose network. Before it replaces the app it runs the app's pre-update hook,
-[`pre-update-backup.sh`](../scripts/runtime/pre-update-backup.sh), which dumps the database to
-`/var/lib/familyfi/data/backups` and keeps the newest three; when the dump fails the hook exits 75
-and Watchtower skips the update, so FamilyFi keeps running the release it has.
+`/v1/history` over the Compose network.
+
+They share a token that FamilyFi generates. The app's entrypoint writes 32 random bytes to `token` in
+the updater volume (`familyfi-updater_data`) before anything starts, and never rewrites it
+([`ensure-updater-token.mjs`](../scripts/runtime/ensure-updater-token.mjs)). The app mounts the
+volume read-write; Watchtower mounts it read-only and reads the token from the file
+(`WATCHTOWER_HTTP_API_TOKEN=/run/familyfi-updater/token`). Watchtower starts only once the app's
+healthcheck sees the file, because it would take a path it cannot open as the token itself. The
+Update page counts the updater as set up only once Watchtower answers with that token.
+
+Before it replaces the app, Watchtower runs the app's pre-update hook,
+[`pre-update-backup.sh`](../scripts/runtime/pre-update-backup.sh). The hook dumps the database to
+`/var/lib/familyfi/data/backups` and keeps the newest three. When the dump fails it exits 75 and
+Watchtower skips the update, so FamilyFi keeps running the release it has; Watchtower's history counts
+that as a failure, which the Update page reports.
 
 Watchtower pulls the tag the app runs, so `FAMILYFI_IMAGE` must name a moving tag (`latest`, the
 default) for an install to change anything; a pinned version reports **not installed** on the Update
-page. A container created outside this Compose file can use the same sidecar: give it the labels on
-the `app` service and the token, and set `FAMILYFI_UPDATER_URL` to where Watchtower answers.
+page. A container created outside this Compose file can use the same sidecar: give it the labels and
+the updater volume of the `app` service, give Watchtower the volume read-only, and set
+`FAMILYFI_UPDATER_URL` to where Watchtower answers.
 

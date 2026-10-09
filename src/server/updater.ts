@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { UpdateRun as UpdateRunRow, UpdateRunStatus, UpdateTrigger } from "@prisma/client";
 import { z } from "zod";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
@@ -8,8 +9,8 @@ import { compareSemver, parseSemver, refreshUpdateCheck, type UpdateCheckSnapsho
 import { DEFAULT_WEEKLY_DAYS, DEFAULT_WEEKLY_TIME, dueWeeklyRunAt, nextWeeklyRunAt } from "./weekly-schedule";
 
 /**
- * Installing a newer release through the Watchtower sidecar (docker/docker-compose.yml, profile
- * `updater`). FamilyFi never holds the Docker socket: it asks Watchtower to update the containers it
+ * Installing a newer release through the Watchtower sidecar (docker/docker-compose.yml). FamilyFi
+ * never holds the Docker socket: it asks Watchtower to update the containers it
  * watches, which is the app alone, and reads Watchtower's history to learn what came of it. The
  * process that asked is usually the one being replaced, so every request is written down first and
  * settled by whichever process reads it next: the new release on its first start, or the old one
@@ -21,17 +22,54 @@ const REQUEST_TIMEOUT_MS = 10_000;
 export const UPDATE_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 /** A scheduled install missed by more than this (FamilyFi was down) waits for the next one. */
 const SCHEDULE_CATCH_UP_MS = 60 * 60 * 1000;
-/** Watchtower and FamilyFi share the host's clock, but a history entry is stamped after its scan began. */
-const HISTORY_SKEW_MS = 5_000;
+/** How long an answer, or silence, from Watchtower stands for the Update page. */
+const REACHABLE_CACHE_MS = 30_000;
+const REACHABLE_TIMEOUT_MS = 3_000;
+
+/** Where the entrypoint writes the token FamilyFi and Watchtower share (scripts/runtime/ensure-updater-token.mjs). */
+const UPDATER_TOKEN_FILE = "/var/lib/familyfi/updater/token";
+let tokenFile = UPDATER_TOKEN_FILE;
+
+export function setUpdaterTokenFileForTests(path?: string) {
+  tokenFile = path ?? UPDATER_TOKEN_FILE;
+  reachable = undefined;
+}
 
 export type UpdaterSettings = { url: string; token: string };
 
-/** The sidecar is set up when its token is: the same `FAMILYFI_UPDATER_TOKEN` is given to both containers. */
-export function updaterSettings(source: Record<string, string | undefined> = process.env): UpdaterSettings | null {
-  const token = source["FAMILYFI_UPDATER_TOKEN"]?.trim();
+/**
+ * The token and where Watchtower answers, or null without a token: outside the release image, or
+ * when the updater volume is not mounted. `FAMILYFI_UPDATER_URL` points at a Watchtower that is
+ * not the Compose service.
+ */
+export function updaterSettings(source: Record<string, string | undefined> = process.env, file = tokenFile): UpdaterSettings | null {
+  let token: string;
+  try {
+    token = readFileSync(file, "utf8").trim();
+  } catch {
+    return null;
+  }
   if (!token) return null;
   const url = (source["FAMILYFI_UPDATER_URL"]?.trim() || DEFAULT_UPDATER_URL).replace(/\/+$/, "");
   return { url, token };
+}
+
+let reachable: { key: string; at: number; answer: Promise<boolean> } | undefined;
+
+/** Watchtower is set up when it answers with this token; a token alone is in every image. */
+export function watchtowerAnswers(settings: UpdaterSettings, options: UpdaterOptions = {}): Promise<boolean> {
+  const now = (options.now ?? (() => new Date()))().getTime();
+  const key = `${settings.url} ${settings.token}`;
+  if (reachable && reachable.key === key && now - reachable.at < REACHABLE_CACHE_MS) return reachable.answer;
+  const answer = (options.fetchImpl ?? fetch)(`${settings.url}/v1/history?limit=1`, {
+    headers: { Authorization: `Bearer ${settings.token}` },
+    signal: AbortSignal.timeout(REACHABLE_TIMEOUT_MS),
+  }).then(
+    (response) => response.ok,
+    () => false,
+  );
+  reachable = { key, at: now, answer };
+  return answer;
 }
 
 export type UpdaterErrorCode = "updater_not_configured" | "no_update_available" | "update_in_progress" | "updater_unreachable";
@@ -71,6 +109,7 @@ const HistorySchema = z.object({
   entries: z
     .array(
       z.object({
+        timestamp: z.iso.datetime({ offset: true }),
         updated: z.number().int().nonnegative(),
         failed: z.number().int().nonnegative(),
         skipped: z.number().int().nonnegative(),
@@ -142,12 +181,13 @@ async function readHistory(since: Date, options: UpdaterOptions): Promise<Watcht
   const settings = options.settings === undefined ? updaterSettings() : options.settings;
   if (!settings) return null;
   try {
-    const query = new URLSearchParams({ since: new Date(since.getTime() - HISTORY_SKEW_MS).toISOString() });
+    const query = new URLSearchParams({ since: since.toISOString() });
     const response = await watchtowerRequest(settings, `/v1/history?${query}`, { method: "GET" }, options.fetchImpl ?? fetch);
     if (!response.ok) return null;
     const parsed = HistorySchema.safeParse(await response.json());
     if (!parsed.success) return null;
-    const entries = parsed.data.entries ?? [];
+    // Only scans that ended after this request; one an earlier request ran must not settle it.
+    const entries = (parsed.data.entries ?? []).filter((entry) => new Date(entry.timestamp).getTime() >= since.getTime());
     return entries.reduce<WatchtowerHistory>(
       (sum, entry) => ({
         scans: sum.scans + 1,
@@ -194,7 +234,7 @@ export async function requestUpdate(
 ): Promise<UpdateRunRow> {
   const settings = options.settings === undefined ? updaterSettings() : options.settings;
   if (!settings) {
-    throw new UpdaterError("updater_not_configured", "Automatic installs need the Watchtower sidecar and FAMILYFI_UPDATER_TOKEN.");
+    throw new UpdaterError("updater_not_configured", "Installing needs the Watchtower updater beside FamilyFi, and this install has no updater token.");
   }
   if (input.update.available !== true || !input.update.latestVersion) {
     throw new UpdaterError("no_update_available", "There is no newer release to install.");
@@ -230,7 +270,7 @@ export async function requestUpdate(
   }
   if (!response.ok) {
     const message =
-      response.status === 401 ? "Watchtower refused FAMILYFI_UPDATER_TOKEN." : `Watchtower answered HTTP ${response.status}.`;
+      response.status === 401 ? "Watchtower refused FamilyFi's updater token." : `Watchtower answered HTTP ${response.status}.`;
     await finishRun(run.id, "failed", message, now);
     throw new UpdaterError("updater_unreachable", message);
   }
@@ -251,11 +291,12 @@ export async function updateSettings(options: UpdaterOptions = {}): Promise<Upda
   await settleUpdateRun({ ...options, settings });
   const lastRun = await prisma().updateRun.findFirst({ orderBy: { requestedAt: "desc" } });
   const now = (options.now ?? (() => new Date()))();
+  const configured = settings !== null && (await watchtowerAnswers(settings, options));
   return {
-    updater: { configured: settings !== null },
+    updater: { configured },
     schedule,
     nextRunAt:
-      settings && schedule.enabled && schedule.days.length > 0
+      configured && schedule.enabled && schedule.days.length > 0
         ? nextWeeklyRunAt(now, household?.timezone ?? "America/New_York", schedule.time, schedule.days).toISOString()
         : null,
     lastRun: lastRun ? publicUpdateRun(lastRun) : null,
@@ -263,30 +304,38 @@ export async function updateSettings(options: UpdaterOptions = {}): Promise<Upda
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
+/** Bumped by every re-arm, so an `arm` still reading the schedule when another starts never sets a timer. */
+let generation = 0;
+/** A failed release check is tried again this often while its slot is still due. */
+const RETRY_MS = 15 * 60 * 1000;
+
+type Claim = "installed" | "nothing" | "retry";
 
 /**
  * Claims the currently due scheduled install and, if a newer release is out, requests it. The claim
  * (`autoUpdateLastRunAt`) is a conditional update, as for the DNS check, so a restart (including the
- * one the install itself causes) never installs twice for the same instant.
+ * one the install itself causes) never installs twice for the same instant. The release check runs
+ * first: when GitHub cannot be asked the slot is left unclaimed, to be tried again within the hour.
  */
-async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<boolean> {
+async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim> {
   const settings = options.settings === undefined ? updaterSettings() : options.settings;
-  if (!settings) return false;
+  if (!settings) return "nothing";
   const household = await prisma().household.findUnique({
     where: { id: "default" },
-    select: { timezone: true, autoUpdateEnabled: true, autoUpdateDays: true, autoUpdateTime: true },
+    select: { timezone: true, autoUpdateEnabled: true, autoUpdateDays: true, autoUpdateTime: true, autoUpdateLastRunAt: true },
   });
-  if (!household?.autoUpdateEnabled || household.autoUpdateDays.length === 0) return false;
+  if (!household?.autoUpdateEnabled || household.autoUpdateDays.length === 0) return "nothing";
   const now = (options.now ?? (() => new Date()))();
   const due = dueWeeklyRunAt(now, household.timezone, household.autoUpdateTime, household.autoUpdateDays);
-  if (now.getTime() - due.getTime() > SCHEDULE_CATCH_UP_MS) return false;
+  if (now.getTime() - due.getTime() > SCHEDULE_CATCH_UP_MS) return "nothing";
+  if (household.autoUpdateLastRunAt && household.autoUpdateLastRunAt.getTime() >= due.getTime()) return "nothing";
+  const update = await refreshUpdateCheck({ fetchImpl: options.fetchImpl });
+  if (update.status !== "ok") return "retry";
   const claimed = await prisma().household.updateMany({
     where: { id: "default", OR: [{ autoUpdateLastRunAt: null }, { autoUpdateLastRunAt: { lt: due } }] },
     data: { autoUpdateLastRunAt: due },
   });
-  if (claimed.count === 0) return false;
-  const update = await refreshUpdateCheck({ fetchImpl: options.fetchImpl });
-  if (update.available !== true) return true;
+  if (claimed.count === 0 || update.available !== true) return "nothing";
   try {
     await requestUpdate({ trigger: "scheduled", accountId: null, update }, { ...options, settings });
   } catch (error) {
@@ -295,42 +344,46 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<boole
       console.error("Scheduled update did not start:", error instanceof Error ? error.message : error);
     }
   }
-  return true;
+  return "installed";
 }
 
-async function arm(): Promise<void> {
+function setTimer(run: () => void, delay: number, armed: number) {
+  if (armed !== generation) return;
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(run, Math.max(0, delay));
+  unrefTimer(timer);
+}
+
+/** Arms the next scheduled instant, or a retry when the last check could not be made. */
+async function arm(armed: number, retry = false): Promise<void> {
   if (!updaterSettings()) return;
   const household = await prisma().household.findUnique({
     where: { id: "default" },
     select: { timezone: true, autoUpdateEnabled: true, autoUpdateDays: true, autoUpdateTime: true },
   });
   if (!household?.autoUpdateEnabled || household.autoUpdateDays.length === 0) return;
-  const next = nextWeeklyRunAt(new Date(), household.timezone, household.autoUpdateTime, household.autoUpdateDays);
-  timer = setTimeout(() => {
-    void claimAndInstallIfDue()
-      .catch((error) => console.error("Scheduled update failed:", error))
-      .finally(() => void arm().catch(() => undefined));
-  }, Math.max(0, next.getTime() - Date.now()));
-  unrefTimer(timer);
+  const next = retry
+    ? new Date(Date.now() + RETRY_MS)
+    : nextWeeklyRunAt(new Date(), household.timezone, household.autoUpdateTime, household.autoUpdateDays);
+  setTimer(() => fire(armed), next.getTime() - Date.now(), armed);
 }
 
-function catchUpThenArm(): void {
+function fire(armed: number) {
   void claimAndInstallIfDue()
-    .catch(() => {
-      // The database may not be up yet; the next timer fire tries again.
+    .catch((error): Claim => {
+      // The database may not be up yet; the next instant, or the retry, tries again.
+      console.error("Scheduled update failed:", error);
+      return "nothing";
     })
-    .finally(() => {
-      void arm().catch(() => {
-        // As above: arming waits for the next start or schedule change.
-      });
-    });
+    .then((claim) => arm(armed, claim === "retry"))
+    .catch(() => undefined);
 }
 
 /** Boot: settle a request the previous process made, catch up an install due within the hour, then arm the timer. */
 export function startAutoUpdate(): void {
   if (timer) return;
   void settleUpdateRun().catch((error) => console.error("Could not settle the last update:", error));
-  catchUpThenArm();
+  fire(++generation);
 }
 
 /**
@@ -338,16 +391,23 @@ export function startAutoUpdate(): void {
  * just passed should not replace FamilyFi as the administrator saves it.
  */
 export function rescheduleAutoUpdate(): void {
+  const armed = ++generation;
   if (timer) clearTimeout(timer);
   timer = undefined;
-  void arm().catch((error) => console.error("Could not arm the update schedule:", error));
+  void arm(armed).catch((error) => console.error("Could not arm the update schedule:", error));
 }
 
 export function stopAutoUpdateForTests(): void {
+  generation += 1;
   if (timer) clearTimeout(timer);
   timer = undefined;
 }
 
-export function runAutoUpdateCatchUpForTests(options: UpdaterOptions = {}): Promise<boolean> {
+/** Whether a scheduled install is armed, for tests. */
+export function autoUpdateArmedForTests(): boolean {
+  return timer !== undefined;
+}
+
+export function runAutoUpdateCatchUpForTests(options: UpdaterOptions = {}): Promise<Claim> {
   return claimAndInstallIfDue(options);
 }
