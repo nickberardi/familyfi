@@ -52,7 +52,10 @@ export async function register() {
   startAutoUpdate();
   const { resumeRemoteAccess, startRemoteAccessPort } = await import("./server/tunnel/remote-access");
   const remotePort = Number(process.env.FAMILYFI_REMOTE_ACCESS_PORT?.trim() || "7002");
-  if (Number.isInteger(remotePort) && remotePort > 0 && remotePort < 65536) {
+  // The demo publishes its own public route and is reached through it, never this port.
+  if (settings.FAMILYFI_MODE === "demo") {
+    // Nothing to open.
+  } else if (Number.isInteger(remotePort) && remotePort > 0 && remotePort < 65536) {
     void startRemoteAccessPort(remotePort).catch((error) => console.error("Remote access port did not start:", error));
   } else {
     console.error("FAMILYFI_REMOTE_ACCESS_PORT must be a port number; the remote access port is off.");

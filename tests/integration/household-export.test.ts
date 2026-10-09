@@ -350,6 +350,39 @@ describe("household export", () => {
     expect(await householdConfig()).toEqual(before);
   });
 
+  it("refuses a route, an account or a network rule the API would refuse, against what the import keeps", async () => {
+    await buildHousehold();
+    const auth = await recoveryAuth();
+    const files = readArchive(await exportArchive(auth), FILES);
+    const edited = (change: (config: HouseholdConfig) => void) => {
+      const config = JSON.parse(files.get("config.json")!.toString()) as HouseholdConfig;
+      change(config);
+      return writeArchive([{ name: "manifest.json", data: files.get("manifest.json")! }, { name: "config.json", data: Buffer.from(JSON.stringify(config)) }]);
+    };
+    const refusals: [Buffer, RegExp][] = [
+      [edited((config) => config.endpoints.push({ url: "http://198.51.100.7:7001/path", kind: "own", transport: "lan", trustMode: "system", spkiSha256: null, priority: 9, enabled: true, edgeAuth: "none" })), /route http:\/\/198\.51\.100\.7:7001\/path cannot be imported/],
+      [edited((config) => config.endpoints.push({ url: "https://pinned.example.com", kind: "own", transport: "lan", trustMode: "pinned", spkiSha256: null, priority: 9, enabled: true, edgeAuth: "none" })), /SPKI/],
+      [edited((config) => (config.accounts[0].groupId = config.groups.find((group) => group.familyRole === "child")!.id)), /not an adult/],
+    ];
+    for (const [archive, message] of refusals) {
+      const response = await importRequest(auth, "preview", archive);
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: { message: string } }).error.message).toMatch(message);
+    }
+
+    // This install keeps its own gateway (its key is for another console), so a network rule is
+    // checked against the networks it manages, not the export's.
+    await prisma().household.update({ where: { id: "default" }, data: { unifiConsoleId: "another-console", unifiManageAllNetworks: false, unifiManagedNetworkIds: ["here"] } });
+    const network = edited((config) => {
+      config.household.unifi.manageAllNetworks = false;
+      config.household.unifi.managedNetworkIds = ["there"];
+      config.rules.push({ ...config.rules[0], id: "network-rule", name: "Guest Wi-Fi", kind: "domain", scope: "network", networkIds: ["there"], groupIds: [], mode: "always", windows: [], domains: ["games.example.com"] });
+    });
+    const kept = await importRequest(auth, "preview", network);
+    expect(kept.status).toBe(400);
+    expect(((await kept.json()) as { error: { message: string } }).error.message).toMatch(/Guest Wi-Fi.*Unmanaged network id: there/);
+  });
+
   it("leaves out a database dump that would make the export too large to import back", async () => {
     setDatabaseDumpForTests(async () => ({ data: Buffer.alloc(IMPORT_MAX_BYTES) }));
     const archive = await exportArchive(await recoveryAuth());

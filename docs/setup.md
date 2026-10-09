@@ -134,7 +134,9 @@ phone-only gateway (`FAMILYFI_REMOTE_ACCESS_PORT`, 7002 by default: `http://app:
 or the host's port 7002 for a router port forward or a reverse proxy elsewhere), never the app itself
 on 7001, which would put the web admin and its sign-in page on the internet. The Compose file
 publishes it on the host, but it closes every connection without answering until **Pair Device →
-Remote access** publishes a route you run.
+Remote access** publishes a route you run. It opens in every mode but the demo, which is reached
+through its own public route; outside the container (`make dev`) it listens on the machine's port
+7002 the same way.
 
 ### Cloudflare Tunnel you run
 
@@ -169,7 +171,7 @@ the household's time zone), through [Watchtower](https://github.com/nicholas-fed
 sidecar that holds the Docker socket so FamilyFi never does. `docker compose up -d` starts it with
 FamilyFi; there is nothing to set up. To run without it, start only `db` and `app`
 (`docker compose -f docker/docker-compose.yml up -d db app`); the Update page then says to update by
-hand.
+hand, and neither Install nor the schedule does anything until Watchtower answers.
 
 The `watchtower` service in [docker-compose.yml](../docker/docker-compose.yml) is the maintained fork
 (the original `containrrr/watchtower` was archived in December 2025), at its `latest` tag. It updates

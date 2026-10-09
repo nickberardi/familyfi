@@ -677,9 +677,10 @@ paths:
       description: |
         Asks the Watchtower sidecar to replace FamilyFi with the release the update check found. Watchtower
         backs up the database first and skips the install when the backup fails. FamilyFi restarts on the
-        new release; poll `GET /api/v1/update` for the outcome. 409 `updater_not_configured` without the
-        sidecar, `no_update_available` when there is nothing newer and `update_in_progress` while an install
-        is under way; 502 `updater_unreachable` when Watchtower cannot be reached or refuses the token.
+        new release; poll `GET /api/v1/update` for the outcome. 409 `updater_not_configured` when the
+        sidecar does not answer to FamilyFi's token, `no_update_available` when there is nothing newer and
+        `update_in_progress` while an install is under way; 502 `updater_unreachable` when Watchtower answered
+        but failed the request.
         403 `demo_locked` in the demo.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
