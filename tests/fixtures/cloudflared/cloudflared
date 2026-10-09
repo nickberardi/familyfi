@@ -40,7 +40,19 @@ case " $* " in
     exec sleep 600 ;;
   *" --url "*)
     echo "pid: $$" >> "$log"
-    echo "2026-09-23T00:00:00Z INF |  https://fake-quick-tunnel-demo.trycloudflare.com  |" >&2
+    url="2026-09-23T00:00:00Z INF |  https://fake-quick-tunnel-demo.trycloudflare.com  |"
+    # A quick-hold file next to the log holds the next quick tunnel's address back: it
+    # prints it only on SIGUSR1, or late, as it is being stopped.
+    hold="$(dirname "$log")/quick-hold"
+    if [ -e "$hold" ]; then
+      rm -f "$hold"
+      sleep 600 &
+      trap 'echo "$url" >&2' USR1
+      trap 'echo "$url" >&2; echo "late: $$" >> "$log"; kill $!; exit 0' TERM
+      while kill -0 $! 2>/dev/null; do wait $!; done
+      exit 0
+    fi
+    echo "$url" >&2
     exec sleep 600 ;;
 esac
 echo "unexpected: $*" >&2

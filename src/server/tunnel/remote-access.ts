@@ -184,12 +184,23 @@ async function publish(db: Db, endpointId: string | null, enable: boolean) {
 }
 
 /**
+ * Runs `save` in one transaction while `kind` is still the tunnel wanted, and reports
+ * whether it ran: a choice changed while the tunnel came up publishes nothing.
+ */
+async function adoptWhileWanted(kind: typeof RouteKind.quick | typeof RouteKind.domain, save: (db: Db) => Promise<void>): Promise<boolean> {
+  return prisma().$transaction(async (db) => {
+    if (runtime.wanted !== kind) return false;
+    await save(db);
+    return true;
+  });
+}
+
+/**
  * Points the quick-tunnel route at the tunnel's current address and turns it on, keeping
  * its id so phones follow. The first quick tunnel creates the route and publishes it.
  */
-async function adoptQuickUrl(url: string) {
-  await prisma().$transaction(async (db) => {
-    if (runtime.wanted !== RouteKind.quick) return;
+function adoptQuickUrl(url: string) {
+  return adoptWhileWanted(RouteKind.quick, async (db) => {
     const current = await routeOfKind(RouteKind.quick, db);
     if (current) {
       await db.connectionEndpoint.update({ where: { id: current.id }, data: { url } });
@@ -204,11 +215,8 @@ async function adoptQuickUrl(url: string) {
 }
 
 /** The domain route's address never changes; going live only turns it on. */
-async function adoptDomainRoute(id: string) {
-  await prisma().$transaction(async (db) => {
-    if (runtime.wanted !== RouteKind.domain) return;
-    await publish(db, id, true);
-  });
+function adoptDomainRoute(id: string) {
+  return adoptWhileWanted(RouteKind.domain, (db) => publish(db, id, true));
 }
 
 function stopAll() {
@@ -231,11 +239,11 @@ function onAdoptFailure(error: unknown) {
  * Saves the tunnel's route, then reports running — never the other way round, so
  * "running" always means phones can already learn the address.
  */
-function goLive(url: string, adopt: () => Promise<void>) {
+function goLive(url: string, adopt: () => Promise<boolean>) {
   runtime.attempts = 0;
   void adopt()
-    .then(() => {
-      if (runtime.url === url) runtime.status = "running";
+    .then((published) => {
+      if (published && runtime.url === url) runtime.status = "running";
     })
     .catch(onAdoptFailure);
 }
@@ -244,6 +252,8 @@ function goLive(url: string, adopt: () => Promise<void>) {
 function supervise(child: ChildProcess, onChunk: (text: string) => void) {
   runtime.child = child;
   const read = (data: Buffer) => {
+    // A stopped or replaced tunnel can still flush output; only the current one speaks for remote access.
+    if (runtime.child !== child) return;
     const text = data.toString();
     onChunk(text);
     const failure = tunnelError(text);

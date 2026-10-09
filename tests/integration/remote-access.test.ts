@@ -40,6 +40,7 @@ describe("remote access", () => {
   beforeEach(async () => {
     await resetDatabase();
     rmSync(log, { force: true });
+    rmSync(path.join(dir, "quick-hold"), { force: true });
     const response = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }) }));
     auth = authFromLogin(response);
   });
@@ -310,6 +311,45 @@ describe("remote access", () => {
     const back = await waitFor((t) => t.status === "running", "the restarted tunnel", 150);
     expect(lastTunnelPid()).not.toBe(pid);
     expect(back).toMatchObject({ mode: "quick", endpointId: first.endpointId });
+  });
+
+  /** Starts a quick tunnel whose stand-in holds its address back, and returns its pid. */
+  async function heldQuickTunnel(): Promise<number> {
+    writeFileSync(path.join(dir, "quick-hold"), "");
+    await put({ mode: "quick" });
+    await waitFor(() => existsSync(log) && readFileSync(log, "utf8").includes("pid: "), "the held quick tunnel");
+    return lastTunnelPid();
+  }
+
+  /** Polls for a second, failing if the tunnel is ever reported in a way `bad` matches. */
+  async function never(bad: (tunnel: Tunnel) => boolean) {
+    for (let i = 0; i < 10; i++) {
+      const current = await state();
+      expect(bad(current), JSON.stringify(current)).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+
+  it("ignores what a stopped tunnel prints after it was replaced", async () => {
+    await heldQuickTunnel();
+    await put({ mode: "off" });
+    // The stopped tunnel prints its address as it exits, after remote access was turned off.
+    await waitFor(() => readFileSync(log, "utf8").includes("late: "), "the stopped tunnel's last words");
+    await never((t) => t.url !== null || t.status !== "off");
+    expect(await publishedIds()).toEqual([]);
+  });
+
+  it("reports running only once its route is published", async () => {
+    const pid = await heldQuickTunnel();
+    // As if boot resumed a domain while the quick tunnel was still coming up: the quick route is no longer wanted.
+    const domain = await prisma().connectionEndpoint.create({ data: { url: "https://familyfi.example.com", kind: "domain", transport: "cloudflare", trustMode: "system", enabled: false } });
+    await prisma().household.update({ where: { id: "default" }, data: { remoteEndpointId: domain.id } });
+    await resumeRemoteAccess();
+
+    process.kill(pid, "SIGUSR1");
+    await waitFor((t) => t.url !== null, "the quick tunnel's address");
+    await never((t) => t.status === "running");
+    expect(await prisma().connectionEndpoint.count({ where: { kind: "quick" } })).toBe(0);
   });
 
   it("stops its tunnel when another FamilyFi process takes the lease", async () => {
