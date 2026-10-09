@@ -36,17 +36,16 @@ export function useNavDrawer(): { toggle: () => void } {
 }
 
 /**
- * The lockup plus the version/status line, shared by the rail and the drawer. The
- * lockup opens About, as the design's does.
+ * The lockup, shared by the rail and the drawer. It opens About, as the design's does.
  *
  * The pieces are composed here rather than through `Logo` because the rail sets the
  * shield larger than the wordmark's own ladder would give it — the design's rail is a
  * 56px shield over a 22.5px wordmark — and the drawer wants the same block at the
  * width a phone leaves for it.
  */
-function NavBrand({ statusLine, compact, onAbout }: { statusLine: string; compact?: boolean; onAbout: () => void }) {
+function NavBrand({ compact, onAbout }: { compact?: boolean; onAbout: () => void }) {
   return (
-    <div className="flex flex-none flex-col items-center gap-1.5 px-2.5 pt-0.5">
+    <div className="flex flex-none flex-col items-center px-2.5 pt-0.5">
       <button
         type="button"
         onClick={onAbout}
@@ -60,7 +59,6 @@ function NavBrand({ statusLine, compact, onAbout }: { statusLine: string; compac
           <Tagline size={compact ? 6.5 : 7.5} />
         </div>
       </button>
-      <div className="text-center text-[14px] text-[var(--ff-muted)]">{statusLine}</div>
     </div>
   );
 }
@@ -227,16 +225,20 @@ function NavGroups({
   );
 }
 
-/** The quiet row under the nav groups that opens About, on the rail and in the drawer. */
-function AboutRow({ onAbout }: { onAbout: () => void }) {
+/**
+ * The small "FamilyFi v…" line at the foot of the rail and the drawer. It keeps the version in
+ * sight without taking a row of the nav, and opens About.
+ */
+function VersionLink({ onAbout }: { onAbout: () => void }) {
   return (
     <button
       type="button"
       onClick={onAbout}
-      className="flex flex-none items-center gap-1.5 self-start rounded-[7px] border-0 bg-transparent px-2.5 py-0.5 text-[14px] text-[var(--ff-muted)]"
+      aria-label="About FamilyFi"
+      title="About FamilyFi"
+      className="flex-none self-center rounded-[5px] border-0 bg-transparent px-1.5 text-[11px] leading-4 text-[var(--ff-muted)] hover:underline"
     >
-      <Icon name="info" size={14} />
-      About FamilyFi
+      FamilyFi {appVersionLabel()}
     </button>
   );
 }
@@ -244,7 +246,7 @@ function AboutRow({ onAbout }: { onAbout: () => void }) {
 export function AppShell({ children, demo = false }: { children: React.ReactNode; demo?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, devices, sync, unifi, store, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
+  const { session, devices, sync, store, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const railNav = useRef<HTMLElement>(null);
@@ -279,13 +281,11 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
   }
   const closeAbout = useCallback(() => setAboutOpen(false), []);
 
-  const statusLine = `${appVersionLabel()} · ${unifi?.configured ? "Household gateway" : "Setup needed"}`;
-
   return (
     <NavDrawerCtx.Provider value={navDrawer}>
       <div className="ff-shell">
         <aside className="ff-sidebar flex-col gap-5 overflow-hidden border-r border-[var(--ff-line)] bg-[var(--ff-rail)] px-3 py-5">
-          <NavBrand statusLine={statusLine} onAbout={openAbout} />
+          <NavBrand onAbout={openAbout} />
           <nav ref={railNav} className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
             <div ref={railNavContent}>
               <NavGroups
@@ -295,9 +295,6 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
                 familyNeedsDevices={familyNeedsDevices}
                 syncFailed={syncFailed}
               />
-              <div className="mt-5">
-                <AboutRow onAbout={openAbout} />
-              </div>
             </div>
           </nav>
           <div className="ff-sidebar-end flex flex-col gap-2.5">
@@ -312,6 +309,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               navContent={railNavContent}
             />
             <AccountCard session={session} onSignOut={() => void signOut()} />
+            <VersionLink onAbout={openAbout} />
           </div>
         </aside>
         {/* The page scrolls here, so it takes focus: a keyboard user can scroll content with no controls in it. */}
@@ -354,7 +352,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               className="fixed inset-y-0 left-0 z-[71] flex w-[min(78%,280px)] flex-col gap-5 overflow-y-auto p-3 md:hidden"
               style={{ background: "var(--ff-rail)", boxShadow: "var(--ff-shadow-sheet)" }}
             >
-              <NavBrand statusLine={statusLine} compact onAbout={openAbout} />
+              <NavBrand compact onAbout={openAbout} />
               <nav className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
                 <NavGroups
                   idPrefix="drawer-nav"
@@ -364,11 +362,9 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
                   syncFailed={syncFailed}
                   onNavigate={() => setNavOpen(false)}
                 />
-                <div className="mt-5">
-                  <AboutRow onAbout={openAbout} />
-                </div>
               </nav>
               <UpdateAlertCard update={update} />
+              <VersionLink onAbout={openAbout} />
             </div>
           </>
         ) : null}
