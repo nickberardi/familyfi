@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { UpdateCheck, UpdateSettings } from "@/lib/types";
+import type { UpdateCheck, UpdateRun, UpdateSettings } from "@/lib/types";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 const username = "admin";
@@ -259,16 +259,7 @@ test("the Update page installs through the updater and keeps its schedule", asyn
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(settings) });
   });
   await page.route("**/api/v1/settings/update/install", async (route) => {
-    const run = {
-      id: "run",
-      trigger: "manual",
-      fromVersion: "0.5.1",
-      targetVersion: "0.6.0",
-      status: "requested",
-      requestedAt: "2026-10-09T12:00:00.000Z",
-      finishedAt: null,
-      error: null,
-    } as const;
+    const run: UpdateRun = { targetVersion: "0.6.0", status: "requested", requestedAt: "2026-10-09T12:00:00.000Z", error: null };
     settings = { ...settings, lastRun: run };
     await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ run }) });
   });
