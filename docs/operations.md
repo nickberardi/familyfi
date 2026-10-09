@@ -160,10 +160,10 @@ Users should not edit Compose YAML to pick a server.
 - **Phones.** Set `FAMILYFI_DEMO_URL` to the demo's public HTTPS origin (for example `https://demo.getfamilyfi.com`). It is published as the household's remote route: the hosted website itself is the connection, like a household's reverse proxy (a `lan` route with the phone's system certificate check, no tunnel and no Cloudflare Access), so Pair Device issues pairing codes for it as it would at home. Android 17 asks for Nearby devices access when a household has such a route; pairing over the public address works either way. The ingress terminates TLS and must pass `X-Forwarded-Proto` and `X-Forwarded-Host`, which sign-in's origin and secure-cookie checks read.
 - **Reset.** The process exits at 03:00 in the household's time zone each night; it exits with status 1, so any restart policy (`--restart on-failure`, `unless-stopped`, or the platform's own) brings it back with a fresh household. A web banner says the demo resets nightly.
 
-The `Demo image` workflow publishes `ghcr.io/nickberardi/familyfi:demo` from each push to `main`, built to the Dockerfile's `demo` target: the release image plus the UniFi mock's fixtures (`tests/fixtures/unifi`), which the release image leaves out, so only the demo image runs demo mode. To try it locally:
+The release image leaves out the UniFi mock's fixtures (`tests/fixtures/unifi`), which demo mode reads from disk. The hosted demo's image, `ghcr.io/nickberardi/getfamilyfi.com:demo`, is built in the [getfamilyfi.com](https://github.com/nickberardi/getfamilyfi.com) repository from each new release, which it checks for weekly: the release image plus that tag's fixtures. To try it locally:
 
 ```bash
-docker run --rm -p 7001:7001 -e FAMILYFI_MODE=demo -e FAMILYFI_DEFAULT_PASSWORD=choose-a-password ghcr.io/nickberardi/familyfi:demo
+docker run --rm -p 7001:7001 -e FAMILYFI_MODE=demo -e FAMILYFI_DEFAULT_PASSWORD=choose-a-password ghcr.io/nickberardi/getfamilyfi.com:demo
 ```
 
 ## Outages
