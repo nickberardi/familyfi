@@ -335,8 +335,9 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim
   if (household.autoUpdateLastRunAt && household.autoUpdateLastRunAt.getTime() >= due.getTime()) return "nothing";
   const update = await refreshUpdateCheck({ fetchImpl: options.fetchImpl });
   if (update.status !== "ok") return "retry";
-  // Without Watchtower (`docker compose up -d db app`) the schedule installs nothing, and records nothing.
-  if (!(await watchtowerAnswers(settings, options))) return "nothing";
+  // Without Watchtower (`docker compose up -d db app`) the schedule installs and records nothing. It
+  // tries again within the hour: after a restart Watchtower starts only once FamilyFi has.
+  if (!(await watchtowerAnswers(settings, options))) return "retry";
   const claimed = await prisma().household.updateMany({
     where: { id: "default", OR: [{ autoUpdateLastRunAt: null }, { autoUpdateLastRunAt: { lt: due } }] },
     data: { autoUpdateLastRunAt: due },

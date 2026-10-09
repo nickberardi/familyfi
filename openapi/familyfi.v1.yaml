@@ -629,7 +629,7 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
-  /api/v1/update:
+  /api/v1/settings/update:
     get:
       operationId: getUpdateSettings
       tags: [Update]
@@ -647,7 +647,7 @@ paths:
               schema: { $ref: "#/components/schemas/UpdateSettings" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/update/schedule:
+  /api/v1/settings/update/schedule:
     put:
       operationId: updateUpdateSchedule
       tags: [Update]
@@ -669,7 +669,7 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/update/install:
+  /api/v1/settings/update/install:
     post:
       operationId: installUpdate
       tags: [Update]
@@ -677,7 +677,7 @@ paths:
       description: |
         Asks the Watchtower sidecar to replace FamilyFi with the release the update check found. Watchtower
         backs up the database first and skips the install when the backup fails. FamilyFi restarts on the
-        new release; poll `GET /api/v1/update` for the outcome. 409 `updater_not_configured` when the
+        new release; poll `GET /api/v1/settings/update` for the outcome. 409 `updater_not_configured` when the
         sidecar does not answer to FamilyFi's token, `no_update_available` when there is nothing newer and
         `update_in_progress` while an install is under way; 502 `updater_unreachable` when Watchtower answered
         but failed the request.

@@ -350,7 +350,17 @@ describe("household export", () => {
     expect(await householdConfig()).toEqual(before);
   });
 
-  it("refuses a route, an account or a network rule the API would refuse, against what the import keeps", async () => {
+  it("restores its own export after a login's group stopped being an adult, dropping only that link", async () => {
+    await buildHousehold();
+    const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
+    // The groups API changes a role without touching the login linked to the group.
+    await prisma().group.update({ where: { id: parent.groupId! }, data: { familyRole: FamilyRole.teen } });
+    const auth = await recoveryAuth();
+    await imported(auth, await exportArchive(auth));
+    expect(await prisma().account.findUniqueOrThrow({ where: { username: "parent" } })).toMatchObject({ groupId: null, isAdmin: true });
+  });
+
+  it("refuses a route or a network rule the API would refuse, against what the import keeps", async () => {
     await buildHousehold();
     const auth = await recoveryAuth();
     const files = readArchive(await exportArchive(auth), FILES);
@@ -362,7 +372,6 @@ describe("household export", () => {
     const refusals: [Buffer, RegExp][] = [
       [edited((config) => config.endpoints.push({ url: "http://198.51.100.7:7001/path", kind: "own", transport: "lan", trustMode: "system", spkiSha256: null, priority: 9, enabled: true, edgeAuth: "none" })), /route http:\/\/198\.51\.100\.7:7001\/path cannot be imported/],
       [edited((config) => config.endpoints.push({ url: "https://pinned.example.com", kind: "own", transport: "lan", trustMode: "pinned", spkiSha256: null, priority: 9, enabled: true, edgeAuth: "none" })), /SPKI/],
-      [edited((config) => (config.accounts[0].groupId = config.groups.find((group) => group.familyRole === "child")!.id)), /not an adult/],
     ];
     for (const [archive, message] of refusals) {
       const response = await importRequest(auth, "preview", archive);
