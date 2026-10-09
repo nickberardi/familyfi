@@ -534,8 +534,9 @@ export function resetRouteCheckForTests() {
  * Until Remote access publishes such a route it closes every connection without answering.
  */
 export async function startRemoteAccessPort(port: number) {
-  const { port: bound } = await startPhoneGateway(appPort(), { host: "0.0.0.0", port }, () => householdRoutePublished());
-  console.log(`Remote access port ${bound} answers while a route the household runs is published.`);
+  const gateway = await startPhoneGateway(appPort(), { host: "0.0.0.0", port }, () => householdRoutePublished());
+  console.log(`Remote access port ${gateway.port} answers while a route the household runs is published.`);
+  return gateway;
 }
 
 /** Called once at boot: resumes the tunnel behind the route the household left published. */
