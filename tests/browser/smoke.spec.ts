@@ -251,14 +251,14 @@ test("the Update page installs through the updater and keeps its schedule", asyn
     lastRun: null,
   };
   const scheduleWrites: unknown[] = [];
-  await page.route("**/api/v1/update", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(settings) }));
-  await page.route("**/api/v1/update/schedule", async (route) => {
+  await page.route("**/api/v1/settings/update", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(settings) }));
+  await page.route("**/api/v1/settings/update/schedule", async (route) => {
     const body = route.request().postDataJSON() as UpdateSettings["schedule"];
     scheduleWrites.push(body);
     settings = { ...settings, schedule: body };
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(settings) });
   });
-  await page.route("**/api/v1/update/install", async (route) => {
+  await page.route("**/api/v1/settings/update/install", async (route) => {
     const run = {
       id: "run",
       trigger: "manual",

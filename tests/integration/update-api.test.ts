@@ -5,9 +5,9 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as getUpdate } from "@/app/api/v1/update/route";
-import { POST as install } from "@/app/api/v1/update/install/route";
-import { PUT as putSchedule } from "@/app/api/v1/update/schedule/route";
+import { GET as getUpdate } from "@/app/api/v1/settings/update/route";
+import { POST as install } from "@/app/api/v1/settings/update/install/route";
+import { PUT as putSchedule } from "@/app/api/v1/settings/update/schedule/route";
 import { APP_VERSION } from "@/lib/version";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
 import { prisma } from "@/server/db";
@@ -62,7 +62,7 @@ const write = (auth: SessionAuth, path: string, method: string, body?: unknown) 
   request(path, { method, auth, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
 
 async function settings(auth: SessionAuth): Promise<UpdateSettings> {
-  const response = await getUpdate(request("/api/v1/update", { auth }));
+  const response = await getUpdate(request("/api/v1/settings/update", { auth }));
   expect(response.status).toBe(200);
   return (await response.json()) as UpdateSettings;
 }
@@ -137,12 +137,12 @@ describe("update settings", () => {
       { enabled: true, days: [7], time: "03:00" },
       { enabled: true, days: [1] },
     ]) {
-      expect((await putSchedule(write(auth, "/api/v1/update/schedule", "PUT", body))).status).toBe(400);
+      expect((await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", body))).status).toBe(400);
     }
-    const saved = await putSchedule(write(auth, "/api/v1/update/schedule", "PUT", { enabled: true, days: [3, 1, 3], time: "02:30" }));
+    const saved = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: true, days: [3, 1, 3], time: "02:30" }));
     expect(saved.status).toBe(200);
     expect(((await saved.json()) as UpdateSettings).schedule).toEqual({ enabled: true, days: [1, 3], time: "02:30" });
-    const off = await putSchedule(write(auth, "/api/v1/update/schedule", "PUT", { enabled: false, days: [], time: "02:30" }));
+    const off = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: false, days: [], time: "02:30" }));
     expect(((await off.json()) as UpdateSettings).nextRunAt).toBeNull();
   });
 });
@@ -150,13 +150,13 @@ describe("update settings", () => {
 describe("installing", () => {
   it("asks Watchtower once with its token, and refuses a second install meanwhile", async () => {
     const auth = await adminAuth();
-    const response = await install(write(auth, "/api/v1/update/install", "POST"));
+    const response = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(response.status).toBe(202);
     const { run } = (await response.json()) as { run: UpdateRun };
     expect(run).toMatchObject({ trigger: "manual", fromVersion: APP_VERSION, targetVersion: NEWER, status: "requested" });
     expect(watchtower.seen.filter((call) => call.method === "POST")).toEqual([{ method: "POST", url: "/v1/update?async=true", authorization: `Bearer ${TOKEN}` }]);
 
-    const again = await install(write(auth, "/api/v1/update/install", "POST"));
+    const again = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(again.status).toBe(409);
     expect(((await again.json()) as { error: { code: string } }).error.code).toBe("update_in_progress");
     expect(watchtower.seen.filter((call) => call.method === "POST")).toHaveLength(1);
@@ -166,7 +166,7 @@ describe("installing", () => {
 
   it("settles from Watchtower's history while the old release keeps running", async () => {
     const auth = await adminAuth();
-    expect((await install(write(auth, "/api/v1/update/install", "POST"))).status).toBe(202);
+    expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
     expect((await settings(auth)).lastRun?.status).toBe("requested");
     // A scan that ended before this request belongs to an earlier one and settles nothing.
     watchtower.history = { entries: [{ timestamp: "2020-01-01T00:00:00.000000001Z", updated: 0, failed: 1, skipped: 0 }] };
@@ -180,7 +180,7 @@ describe("installing", () => {
 
   it("succeeds when the new release starts", async () => {
     const auth = await adminAuth();
-    expect((await install(write(auth, "/api/v1/update/install", "POST"))).status).toBe(202);
+    expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
     const settled = await settleUpdateRun({ currentVersion: NEWER });
     expect(settled).toMatchObject({ status: "succeeded", error: null });
   });
@@ -188,19 +188,19 @@ describe("installing", () => {
   it("treats Watchtower refusing the token, or not answering, as no updater, and a busy one as in progress", async () => {
     const auth = await adminAuth();
     writeToken("not-the-token");
-    const refused = await install(write(auth, "/api/v1/update/install", "POST"));
+    const refused = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(refused.status).toBe(409);
     expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
 
     writeToken(TOKEN);
     watchtower.updateStatus = 429;
-    const busy = await install(write(auth, "/api/v1/update/install", "POST"));
+    const busy = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(busy.status).toBe(409);
     expect(((await busy.json()) as { error: { code: string } }).error.code).toBe("update_in_progress");
     expect((await settings(auth)).lastRun).toMatchObject({ status: "failed", error: "Watchtower was already updating containers." });
 
     watchtower.updateStatus = 500;
-    const broken = await install(write(auth, "/api/v1/update/install", "POST"));
+    const broken = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(broken.status).toBe(502);
     expect(((await broken.json()) as { error: { code: string } }).error.code).toBe("updater_unreachable");
     expect(await prisma().updateRun.count({ where: { status: "requested" } })).toBe(0);
@@ -210,26 +210,26 @@ describe("installing", () => {
     const auth = await adminAuth();
     process.env.FAMILYFI_UPDATER_URL = "http://127.0.0.1:1";
     setUpdaterTokenFileForTests(tokenFile);
-    const response = await install(write(auth, "/api/v1/update/install", "POST"));
+    const response = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(response.status).toBe(409);
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
     await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
     const fetchImpl: typeof fetch = async (input, init) =>
       String(input).startsWith("https://api.github.com/") ? releases(NEWER)() : fetch(input, init);
-    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: () => new Date("2026-10-14T07:10:00.000Z") })).toBe("nothing");
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: () => new Date("2026-10-14T07:10:00.000Z") })).toBe("retry");
     expect(await prisma().updateRun.count()).toBe(0);
   });
 
   it("refuses without the updater or anything newer", async () => {
     const auth = await adminAuth();
     setUpdaterTokenFileForTests(path.join(tokenDir, "missing"));
-    const unset = await install(write(auth, "/api/v1/update/install", "POST"));
+    const unset = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(unset.status).toBe(409);
     expect(((await unset.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
 
     setUpdaterTokenFileForTests(tokenFile);
     await refreshUpdateCheck({ fetchImpl: releases(APP_VERSION) });
-    const current = await install(write(auth, "/api/v1/update/install", "POST"));
+    const current = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(current.status).toBe(409);
     expect(((await current.json()) as { error: { code: string } }).error.code).toBe("no_update_available");
     expect(watchtower.seen).toEqual([]);

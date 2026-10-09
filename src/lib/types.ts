@@ -142,7 +142,7 @@ export type UpdateRun = {
   error: string | null;
 };
 
-/** GET /api/v1/update: whether the updater is set up, the automatic schedule and the last install. */
+/** GET /api/v1/settings/update: whether the updater is set up, the automatic schedule and the last install. */
 export type UpdateSettings = {
   updater: { configured: boolean };
   schedule: { enabled: boolean; days: number[]; time: string };

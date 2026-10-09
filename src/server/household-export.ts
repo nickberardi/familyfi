@@ -166,10 +166,6 @@ const Config = z
     const groups = new Set(config.groups.map((group) => group.id));
     const known = (id: string | null) => id === null || groups.has(id);
     if (!config.accounts.every((account) => known(account.groupId))) issue("An account names a group the export does not have.");
-    const adults = new Set(config.groups.filter((group) => group.kind === GroupKind.family && group.familyRole === FamilyRole.adult).map((group) => group.id));
-    if (config.accounts.some((account) => account.groupId !== null && !adults.has(account.groupId))) {
-      issue("An account belongs to a group that is not an adult in the family.");
-    }
     if (!config.devices.every((device) => known(device.groupId))) issue("A device names a group the export does not have.");
     if (!config.rules.every((rule) => rule.groupIds.every((id) => groups.has(id)))) issue("A rule names a group the export does not have.");
     if (config.rules.some((rule) => rule.id === QUARANTINE_RULE_ID)) issue("The quarantine rule is built in and never exported.");
@@ -437,7 +433,8 @@ type EndpointRow = { url: string; kind: RouteKind; edgeAuth: EdgeAuth; tunnelCre
  * Only routes the household runs are imported. FamilyFi's own quick tunnel and its tunnel on the
  * household's domain stay with the install that made them.
  */
-const imports = (endpoint: HouseholdConfig["endpoints"][number]) => endpoint.kind === RouteKind.own;
+const imports = (endpoint: HouseholdConfig["endpoints"][number], existing?: EndpointRow) =>
+  endpoint.kind === RouteKind.own && (!existing || existing.kind === RouteKind.own);
 
 /** An `own` Cloudflare route behind Access needs its token; without one here it is imported switched off. */
 function needsToken(endpoint: HouseholdConfig["endpoints"][number], existing: EndpointRow | undefined): boolean {
@@ -476,12 +473,14 @@ function summarize(current: Current, endpoints: EndpointRow[], manifest: Manifes
       devices: config.devices.length,
       rules: config.rules.length,
       categories: config.categories.length,
-      endpoints: config.endpoints.filter(imports).length,
+      endpoints: config.endpoints.filter((endpoint) => imports(endpoint, byUrl.get(endpoint.url))).length,
     },
     gateway,
     unifiKey: current.unifiKeyLastFour ? "kept" : "missing",
-    endpointsNeedingToken: config.endpoints.filter((endpoint) => imports(endpoint) && needsToken(endpoint, byUrl.get(endpoint.url))).map((endpoint) => endpoint.url),
-    skippedEndpoints: config.endpoints.filter((endpoint) => !imports(endpoint)).map((endpoint) => endpoint.url),
+    endpointsNeedingToken: config.endpoints
+      .filter((endpoint) => imports(endpoint, byUrl.get(endpoint.url)) && needsToken(endpoint, byUrl.get(endpoint.url)))
+      .map((endpoint) => endpoint.url),
+    skippedEndpoints: config.endpoints.filter((endpoint) => !imports(endpoint, byUrl.get(endpoint.url))).map((endpoint) => endpoint.url),
     otherInstallPolicies: sameSite && manifest.instanceId !== current.instanceId,
     databaseDump: hasDump,
   };
@@ -582,6 +581,9 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       await tx.group.deleteMany({});
       for (const group of config.groups) await tx.group.create({ data: group });
 
+      // A login links only to an adult in the family. A group's role can change after its login was
+      // linked, so a link that no longer fits is dropped, as the accounts API would refuse to make it.
+      const adults = new Set(config.groups.filter((group) => group.kind === GroupKind.family && group.familyRole === FamilyRole.adult).map((group) => group.id));
       const existingAccounts = await tx.account.findMany({ where: { kind: AccountKind.personal } });
       const byUsername = new Map(existingAccounts.map((account) => [account.username, account]));
       for (const account of config.accounts) {
@@ -592,7 +594,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           displayName: account.displayName,
           passwordHash: isImporter ? existing.passwordHash : account.passwordHash,
           isAdmin: isImporter ? true : account.isAdmin,
-          groupId: account.groupId,
+          groupId: account.groupId !== null && adults.has(account.groupId) ? account.groupId : null,
         };
         if (!existing) {
           await tx.account.create({ data: { ...data, username: account.username, kind: AccountKind.personal } });
@@ -640,10 +642,9 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       await importCategories(tx, config.categories, now);
 
       const byUrl = new Map(endpoints.map((endpoint) => [endpoint.url, endpoint]));
-      for (const endpoint of config.endpoints.filter(imports)) {
+      // An address FamilyFi's own tunnel uses here stays that tunnel's; the export's route is left out.
+      for (const endpoint of config.endpoints.filter((candidate) => imports(candidate, byUrl.get(candidate.url)))) {
         const existing = byUrl.get(endpoint.url);
-        // An address FamilyFi's own tunnel uses here stays that tunnel's; the export's route is left out.
-        if (existing && existing.kind !== RouteKind.own) continue;
         const missingToken = needsToken(endpoint, existing);
         const data = {
           ...endpoint,

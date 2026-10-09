@@ -7,7 +7,7 @@ import type { UpdateSettings } from "@/lib/types";
 import { loadUpdateSettings } from "@/lib/update-writes";
 
 /**
- * Reads `GET /api/v1/update`: every five seconds while an install is under way, so the page follows
+ * Reads `GET /api/v1/settings/update`: every five seconds while an install is under way, so the page follows
  * FamilyFi through its restart, and once a minute otherwise. A failed read keeps the last answer,
  * as it does while FamilyFi restarts.
  */
