@@ -85,6 +85,20 @@ describe("the release version", () => {
   });
 });
 
+describe("reusable workflows", () => {
+  // In a called workflow `github.workflow` is the caller's name, so two workflows one run
+  // calls (release.yml calls ci.yml and container.yml) would share a concurrency group and
+  // cancel each other's jobs. Each names itself in its group instead.
+  it("keep a concurrency group of their own when called", () => {
+    const groups = workflows
+      .filter((file) => /^\s+workflow_call:/m.test(read(file)))
+      .map((file) => read(file).match(/^concurrency:\n\s+group: (.+)$/m)?.[1]);
+    expect(groups.length).toBeGreaterThan(1);
+    for (const group of groups) expect(group).toBeDefined();
+    expect(new Set(groups).size).toBe(groups.length);
+  });
+});
+
 describe("scripts/ paths", () => {
   const sources = [
     ...workflows,
