@@ -76,8 +76,7 @@ async function buildHousehold() {
       unifiKeyIv: SECRET_BYTES,
       unifiKeyAuthTag: SECRET_BYTES,
       unifiKeyLastFour: "abcd",
-      autoUpdateDays: [6],
-      autoUpdateTime: "03:15",
+      updateSchedule: "15 3 * * 6",
       // Import re-arms the DNS check, whose catch-up would otherwise sweep into the next test.
       dohProbeEnabled: false,
     },
@@ -151,7 +150,7 @@ describe("household export", () => {
     await prisma().rule.deleteMany({ where: { id: { not: "quarantine" } } });
     await prisma().group.deleteMany({ where: { id: { in: [built.child.id, built.things.id] } } });
     await prisma().upstreamCategory.deleteMany({ where: { slug: "homework" } });
-    await prisma().household.update({ where: { id: "default" }, data: { timezone: "UTC", autoUpdateEnabled: false } });
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "UTC", updateScheduleEnabled: false } });
     await prisma().account.create({ data: { username: "stranger", displayName: "Stranger", kind: AccountKind.personal, isAdmin: true } });
 
     const summary = await imported(auth, writeArchive([...files].map(([name, data]) => ({ name, data }))));
@@ -193,7 +192,7 @@ describe("household export", () => {
     await imported(auth, archive);
     expect(await prisma().group.count()).toBe(3);
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    expect(household).toMatchObject({ timezone: "Europe/London", unifiKeyLastFour: null, autoUpdateDays: [6], autoUpdateTime: "03:15" });
+    expect(household).toMatchObject({ timezone: "Europe/London", unifiKeyLastFour: null, updateSchedule: "15 3 * * 6" });
     expect(await prisma().connectionEndpoint.findUniqueOrThrow({ where: { url: "https://familyfi.example.com" } })).toMatchObject({ enabled: false });
     expect(await prisma().connectionEndpoint.findUnique({ where: { url: "https://quick-words.trycloudflare.com" } })).toBeNull();
     // The parent signs in with the password they had.

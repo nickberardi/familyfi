@@ -1,20 +1,21 @@
 import { readFileSync } from "node:fs";
-import type { UpdateRun as UpdateRunRow, UpdateRunStatus, UpdateTrigger } from "@prisma/client";
+import type { UpdateStatus } from "@prisma/client";
 import { z } from "zod";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
 import { APP_VERSION } from "@/lib/version";
 import { prisma } from "./db";
 import { unrefTimer } from "./unref-timer";
 import { compareSemver, parseSemver, refreshUpdateCheck, type UpdateCheckSnapshot } from "./update-check";
-import { DEFAULT_WEEKLY_DAYS, DEFAULT_WEEKLY_TIME, dueWeeklyRunAt, nextWeeklyRunAt } from "./weekly-schedule";
+import { dueWeeklyRunAt, nextWeeklyRunAt, parseWeeklyCron } from "./weekly-schedule";
 
 /**
  * Installing a newer release through the Watchtower sidecar (docker/docker-compose.yml). FamilyFi
  * never holds the Docker socket: it asks Watchtower to update the containers it
  * watches, which is the app alone, and reads Watchtower's history to learn what came of it. The
- * process that asked is usually the one being replaced, so every request is written down first and
- * settled by whichever process reads it next: the new release on its first start, or the old one
- * when Watchtower left it running.
+ * process that asked is usually the one being replaced, so the request is written on the household
+ * row first (`updateRequestedAt`, `updateTargetVersion`, `updateStatus`, `updateError`) and settled
+ * by whichever process reads it next: the new release on its first start, or the old one when
+ * Watchtower left it running. Only the latest install is kept.
  */
 const DEFAULT_UPDATER_URL = "http://watchtower:8080";
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -91,16 +92,26 @@ export type UpdaterOptions = {
   currentVersion?: string;
 };
 
-export function publicUpdateRun(row: UpdateRunRow): UpdateRun {
+/** The latest install request, as the household row holds it. */
+export type LatestUpdate = { requestedAt: Date; targetVersion: string; status: UpdateStatus; error: string | null };
+
+type Db = Pick<ReturnType<typeof prisma>, "household">;
+
+async function latestUpdate(db: Db = prisma()): Promise<LatestUpdate | null> {
+  const row = await db.household.findUnique({
+    where: { id: "default" },
+    select: { updateRequestedAt: true, updateTargetVersion: true, updateStatus: true, updateError: true },
+  });
+  if (!row?.updateRequestedAt || !row.updateTargetVersion || !row.updateStatus) return null;
+  return { requestedAt: row.updateRequestedAt, targetVersion: row.updateTargetVersion, status: row.updateStatus, error: row.updateError };
+}
+
+export function publicUpdateRun(latest: LatestUpdate): UpdateRun {
   return {
-    id: row.id,
-    trigger: row.trigger,
-    fromVersion: row.fromVersion,
-    targetVersion: row.targetVersion,
-    status: row.status,
-    requestedAt: row.requestedAt.toISOString(),
-    finishedAt: row.finishedAt?.toISOString() ?? null,
-    error: row.error,
+    targetVersion: latest.targetVersion,
+    status: latest.status,
+    requestedAt: latest.requestedAt.toISOString(),
+    error: latest.error,
   };
 }
 
@@ -120,7 +131,7 @@ const HistorySchema = z.object({
 
 export type WatchtowerHistory = { scans: number; updated: number; failed: number; skipped: number };
 
-export type UpdateOutcome = { status: Exclude<UpdateRunStatus, "requested">; error: string | null } | null;
+export type UpdateOutcome = { status: Exclude<UpdateStatus, "requested">; error: string | null } | null;
 
 /**
  * What an open request came to, or null while it is still under way. Pure, so each outcome is tested
@@ -203,16 +214,20 @@ async function readHistory(since: Date, options: UpdaterOptions): Promise<Watcht
   }
 }
 
-async function finishRun(id: string, status: Exclude<UpdateRunStatus, "requested">, error: string | null, now: Date) {
-  // Only an open run is settled, so two processes settling the same run agree on the first outcome.
-  await prisma().updateRun.updateMany({ where: { id, status: "requested" }, data: { status, error, finishedAt: now } });
-  return prisma().updateRun.findUniqueOrThrow({ where: { id } });
+async function finishRun(requestedAt: Date, status: Exclude<UpdateStatus, "requested">, error: string | null) {
+  // Only the open request made at that instant is settled, so two processes settling it agree on the
+  // first outcome, and a newer request is never settled with an older one's.
+  await prisma().household.updateMany({
+    where: { id: "default", updateStatus: "requested", updateRequestedAt: requestedAt },
+    data: { updateStatus: status, updateError: error },
+  });
+  return latestUpdate();
 }
 
-/** Settles the open request, if there is one and its outcome is known. Returns it either way. */
-export async function settleUpdateRun(options: UpdaterOptions = {}): Promise<UpdateRunRow | null> {
-  const open = await prisma().updateRun.findFirst({ where: { status: "requested" }, orderBy: { requestedAt: "desc" } });
-  if (!open) return null;
+/** Settles the open request, if there is one and its outcome is known. Returns the latest request either way. */
+export async function settleUpdateRun(options: UpdaterOptions = {}): Promise<LatestUpdate | null> {
+  const open = await latestUpdate();
+  if (open?.status !== "requested") return open;
   const now = (options.now ?? (() => new Date()))();
   const currentVersion = options.currentVersion ?? APP_VERSION;
   const current = parseSemver(currentVersion);
@@ -221,7 +236,7 @@ export async function settleUpdateRun(options: UpdaterOptions = {}): Promise<Upd
   const history = reached ? null : await readHistory(open.requestedAt, options);
   const outcome = updateOutcome({ targetVersion: open.targetVersion, currentVersion, requestedAt: open.requestedAt, now, history });
   if (!outcome) return open;
-  return finishRun(open.id, outcome.status, outcome.error, now);
+  return finishRun(open.requestedAt, outcome.status, outcome.error);
 }
 
 /**
@@ -229,9 +244,9 @@ export async function settleUpdateRun(options: UpdaterOptions = {}): Promise<Upd
  * Watchtower is called, inside the household row lock, so two installs at once cannot both start.
  */
 export async function requestUpdate(
-  input: { trigger: UpdateTrigger; accountId: string | null; update: UpdateCheckSnapshot },
+  input: { update: UpdateCheckSnapshot },
   options: UpdaterOptions = {},
-): Promise<UpdateRunRow> {
+): Promise<LatestUpdate> {
   const settings = options.settings === undefined ? updaterSettings() : options.settings;
   if (!settings) {
     throw new UpdaterError("updater_not_configured", "Installing needs the Watchtower updater beside FamilyFi, and this install has no updater token.");
@@ -248,34 +263,31 @@ export async function requestUpdate(
   await settleUpdateRun({ ...options, settings });
   const run = await prisma().$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = 'default' FOR UPDATE`;
-    const open = await tx.updateRun.findFirst({ where: { status: "requested" } });
-    if (open) throw new UpdaterError("update_in_progress", `FamilyFi is already installing v${open.targetVersion}.`);
-    return tx.updateRun.create({
-      data: {
-        trigger: input.trigger,
-        fromVersion: options.currentVersion ?? APP_VERSION,
-        targetVersion,
-        requestedByAccountId: input.accountId,
-        requestedAt: now,
-      },
+    const open = await latestUpdate(tx);
+    if (open?.status === "requested") throw new UpdaterError("update_in_progress", `FamilyFi is already installing v${open.targetVersion}.`);
+    const requested: LatestUpdate = { requestedAt: now, targetVersion, status: "requested", error: null };
+    await tx.household.update({
+      where: { id: "default" },
+      data: { updateRequestedAt: now, updateTargetVersion: targetVersion, updateStatus: "requested", updateError: null },
     });
+    return requested;
   });
   let response: Response;
   try {
     // `async=true` answers 202 before Watchtower stops this container, so the reply always arrives.
     response = await watchtowerRequest(settings, "/v1/update?async=true", { method: "POST" }, options.fetchImpl ?? fetch);
   } catch {
-    await finishRun(run.id, "failed", `Could not reach Watchtower at ${settings.url}.`, now);
+    await finishRun(run.requestedAt, "failed", `Could not reach Watchtower at ${settings.url}.`);
     throw new UpdaterError("updater_unreachable", `Could not reach Watchtower at ${settings.url}.`);
   }
   if (response.status === 429) {
-    await finishRun(run.id, "failed", "Watchtower was already updating containers.", now);
+    await finishRun(run.requestedAt, "failed", "Watchtower was already updating containers.");
     throw new UpdaterError("update_in_progress", "Watchtower is already updating containers. Try again in a minute.");
   }
   if (!response.ok) {
     const message =
       response.status === 401 ? "Watchtower refused FamilyFi's updater token." : `Watchtower answered HTTP ${response.status}.`;
-    await finishRun(run.id, "failed", message, now);
+    await finishRun(run.requestedAt, "failed", message);
     throw new UpdaterError("updater_unreachable", message);
   }
   return run;
@@ -285,22 +297,17 @@ export async function updateSettings(options: UpdaterOptions = {}): Promise<Upda
   const settings = options.settings === undefined ? updaterSettings() : options.settings;
   const household = await prisma().household.findUnique({
     where: { id: "default" },
-    select: { timezone: true, autoUpdateEnabled: true, autoUpdateDays: true, autoUpdateTime: true },
+    select: { timezone: true, updateScheduleEnabled: true, updateSchedule: true },
   });
-  const schedule = {
-    enabled: household?.autoUpdateEnabled ?? true,
-    days: household?.autoUpdateDays ?? DEFAULT_WEEKLY_DAYS,
-    time: household?.autoUpdateTime ?? DEFAULT_WEEKLY_TIME,
-  };
-  await settleUpdateRun({ ...options, settings });
-  const lastRun = await prisma().updateRun.findFirst({ orderBy: { requestedAt: "desc" } });
+  const schedule = { enabled: household?.updateScheduleEnabled ?? true, ...parseWeeklyCron(household?.updateSchedule ?? "") };
+  const lastRun = await settleUpdateRun({ ...options, settings });
   const now = (options.now ?? (() => new Date()))();
   const configured = settings !== null && (await watchtowerAnswers(settings, options));
   return {
     updater: { configured },
     schedule,
     nextRunAt:
-      configured && schedule.enabled && schedule.days.length > 0
+      configured && schedule.enabled
         ? nextWeeklyRunAt(now, household?.timezone ?? "America/New_York", schedule.time, schedule.days).toISOString()
         : null,
     lastRun: lastRun ? publicUpdateRun(lastRun) : null,
@@ -317,7 +324,7 @@ type Claim = "installed" | "nothing" | "retry";
 
 /**
  * Claims the currently due scheduled install and, if a newer release is out, requests it. The claim
- * (`autoUpdateLastRunAt`) is a conditional update, as for the DNS check, so a restart (including the
+ * (`updateScheduleLastRunAt`) is a conditional update, as for the DNS check, so a restart (including the
  * one the install itself causes) never installs twice for the same instant. The release check runs
  * first: when GitHub cannot be asked the slot is left unclaimed, to be tried again within the hour.
  */
@@ -326,27 +333,28 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim
   if (!settings) return "nothing";
   const household = await prisma().household.findUnique({
     where: { id: "default" },
-    select: { timezone: true, autoUpdateEnabled: true, autoUpdateDays: true, autoUpdateTime: true, autoUpdateLastRunAt: true },
+    select: { timezone: true, updateScheduleEnabled: true, updateSchedule: true, updateScheduleLastRunAt: true },
   });
-  if (!household?.autoUpdateEnabled || household.autoUpdateDays.length === 0) return "nothing";
+  if (!household?.updateScheduleEnabled) return "nothing";
+  const { days, time } = parseWeeklyCron(household.updateSchedule);
   const now = (options.now ?? (() => new Date()))();
-  const due = dueWeeklyRunAt(now, household.timezone, household.autoUpdateTime, household.autoUpdateDays);
+  const due = dueWeeklyRunAt(now, household.timezone, time, days);
   if (now.getTime() - due.getTime() > SCHEDULE_CATCH_UP_MS) return "nothing";
-  if (household.autoUpdateLastRunAt && household.autoUpdateLastRunAt.getTime() >= due.getTime()) return "nothing";
+  if (household.updateScheduleLastRunAt && household.updateScheduleLastRunAt.getTime() >= due.getTime()) return "nothing";
   const update = await refreshUpdateCheck({ fetchImpl: options.fetchImpl });
   if (update.status !== "ok") return "retry";
   // Without Watchtower (`docker compose up -d db app`) the schedule installs and records nothing. It
   // tries again within the hour: after a restart Watchtower starts only once FamilyFi has.
   if (!(await watchtowerAnswers(settings, options))) return "retry";
   const claimed = await prisma().household.updateMany({
-    where: { id: "default", OR: [{ autoUpdateLastRunAt: null }, { autoUpdateLastRunAt: { lt: due } }] },
-    data: { autoUpdateLastRunAt: due },
+    where: { id: "default", OR: [{ updateScheduleLastRunAt: null }, { updateScheduleLastRunAt: { lt: due } }] },
+    data: { updateScheduleLastRunAt: due },
   });
   if (claimed.count === 0 || update.available !== true) return "nothing";
   try {
-    await requestUpdate({ trigger: "scheduled", accountId: null, update }, { ...options, settings });
+    await requestUpdate({ update }, { ...options, settings });
   } catch (error) {
-    // Recorded on the run where Watchtower was asked; an install already under way is not an error.
+    // Recorded on the household where Watchtower was asked; an install already under way is not an error.
     if (!(error instanceof UpdaterError && error.code === "update_in_progress")) {
       console.error("Scheduled update did not start:", error instanceof Error ? error.message : error);
     }
@@ -366,12 +374,11 @@ async function arm(armed: number, retry = false): Promise<void> {
   if (!updaterSettings()) return;
   const household = await prisma().household.findUnique({
     where: { id: "default" },
-    select: { timezone: true, autoUpdateEnabled: true, autoUpdateDays: true, autoUpdateTime: true },
+    select: { timezone: true, updateScheduleEnabled: true, updateSchedule: true },
   });
-  if (!household?.autoUpdateEnabled || household.autoUpdateDays.length === 0) return;
-  const next = retry
-    ? new Date(Date.now() + RETRY_MS)
-    : nextWeeklyRunAt(new Date(), household.timezone, household.autoUpdateTime, household.autoUpdateDays);
+  if (!household?.updateScheduleEnabled) return;
+  const { days, time } = parseWeeklyCron(household.updateSchedule);
+  const next = retry ? new Date(Date.now() + RETRY_MS) : nextWeeklyRunAt(new Date(), household.timezone, time, days);
   setTimer(() => fire(armed), next.getTime() - Date.now(), armed);
 }
 

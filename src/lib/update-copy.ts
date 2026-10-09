@@ -95,7 +95,6 @@ export function updateScheduleLine(settings: UpdateSettings, timezone: string, n
   if (!settings.updater.configured) return UPDATE_COPY.scheduleNeedsUpdater;
   const { enabled, days, time } = settings.schedule;
   if (!enabled) return "Off — install from this page";
-  if (days.length === 0) return "No days selected — FamilyFi won't install on its own";
   const when = `${probeScheduleWhen(days)} at ${formatHhmm(time)}`;
   return settings.nextRunAt ? `${when} · next ${relativeDayLabel(new Date(settings.nextRunAt), timezone, now)}` : when;
 }

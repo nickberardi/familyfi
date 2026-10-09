@@ -12,11 +12,11 @@ const STATUS_BY_CODE = {
 } as const;
 
 export async function POST(request: Request) {
-  return withAdmin(request, async (session) => {
+  return withAdmin(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
     try {
-      const run = await requestUpdate({ trigger: "manual", accountId: session.accountId, update: getUpdateCheckSnapshot() });
+      const run = await requestUpdate({ update: getUpdateCheckSnapshot() });
       return Response.json({ run: publicUpdateRun(run) }, { status: 202 });
     } catch (error) {
       if (error instanceof UpdaterError) return jsonError(STATUS_BY_CODE[error.code], error.code, error.message);
