@@ -28,6 +28,7 @@ import { customSlugFor } from "./upstream-seed";
 import { prisma } from "./db";
 import { jsonError } from "./http";
 import { compareSemver, parseSemver } from "./update-check";
+import { parseWeeklyCron, weeklyCron } from "./weekly-schedule";
 
 /**
  * A household export: the configuration an administrator built (groups, rules and their windows,
@@ -237,7 +238,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
         probeDays: household.dohProbeDays,
         probeTimeoutMs: household.dohProbeTimeoutMs,
       },
-      autoUpdate: { enabled: household.autoUpdateEnabled, days: household.autoUpdateDays, time: household.autoUpdateTime },
+      autoUpdate: { enabled: household.updateScheduleEnabled, ...parseWeeklyCron(household.updateSchedule) },
     },
     groups: groups.map((group) => ({
       id: group.id,
@@ -565,9 +566,9 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           dohProbeTime: resolver.probeTime,
           dohProbeDays: resolver.probeDays,
           dohProbeTimeoutMs: resolver.probeTimeoutMs,
-          autoUpdateEnabled: autoUpdate.enabled,
-          autoUpdateDays: autoUpdate.days,
-          autoUpdateTime: autoUpdate.time,
+          // Cron needs a day: a schedule exported with none comes in off, on Sunday.
+          updateScheduleEnabled: autoUpdate.enabled && autoUpdate.days.length > 0,
+          updateSchedule: weeklyCron({ time: autoUpdate.time, days: autoUpdate.days.length > 0 ? autoUpdate.days : [0] }),
         },
       });
       // Pauses are moments, not configuration: the quarantine rule starts the import unpaused.

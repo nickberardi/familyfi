@@ -40,13 +40,9 @@ describe("update copy", () => {
 });
 
 const run = (over: Partial<UpdateRun> = {}): UpdateRun => ({
-  id: "run",
-  trigger: "manual",
-  fromVersion: "0.5.1",
   targetVersion: "0.6.0",
   status: "requested",
   requestedAt: "2026-10-11T04:00:00.000Z",
-  finishedAt: null,
   error: null,
   ...over,
 });

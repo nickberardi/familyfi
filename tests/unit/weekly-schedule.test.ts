@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WEEKLY_DAYS, DEFAULT_WEEKLY_TIME, dueWeeklyRunAt, nextWeeklyRunAt } from "@/server/weekly-schedule";
+import {
+  DEFAULT_WEEKLY_CRON,
+  DEFAULT_WEEKLY_DAYS,
+  DEFAULT_WEEKLY_TIME,
+  dueWeeklyRunAt,
+  nextWeeklyRunAt,
+  parseWeeklyCron,
+  weeklyCron,
+} from "@/server/weekly-schedule";
 
 it("defaults to Sunday midnight and finds the preceding weekly run", () => {
   expect(DEFAULT_WEEKLY_DAYS).toEqual([0]);
@@ -98,5 +106,26 @@ describe("dueWeeklyRunAt", () => {
     const now = new Date("2026-09-17T16:00:00.000Z");
     const due = dueWeeklyRunAt(now, NY, "12:00", ALL_DAYS);
     expect(due.toISOString()).toBe(now.toISOString());
+  });
+});
+
+describe("weekly cron", () => {
+  it("writes days and a time as minute hour * * days, and reads them back", () => {
+    expect(weeklyCron({ days: DEFAULT_WEEKLY_DAYS, time: DEFAULT_WEEKLY_TIME })).toBe(DEFAULT_WEEKLY_CRON);
+    expect(weeklyCron({ days: [5, 1, 3, 1], time: "07:05" })).toBe("5 7 * * 1,3,5");
+    expect(parseWeeklyCron("5 7 * * 1,3,5")).toEqual({ days: [1, 3, 5], time: "07:05" });
+    expect(parseWeeklyCron(" 59 23 * * 6,0 ")).toEqual({ days: [0, 6], time: "23:59" });
+  });
+
+  it("refuses a schedule cron cannot hold", () => {
+    expect(() => weeklyCron({ days: [], time: "00:00" })).toThrow();
+    expect(() => weeklyCron({ days: [7], time: "00:00" })).toThrow();
+    expect(() => weeklyCron({ days: [0], time: "24:00" })).toThrow();
+  });
+
+  it("reads anything it did not write as Sunday at midnight", () => {
+    for (const cron of ["", "*/15 * * * *", "0 0 1 * *", "60 0 * * 0", "0 24 * * 0", "0 0 * * 7", "0 0 * * mon"]) {
+      expect(parseWeeklyCron(cron), cron).toEqual({ days: [0], time: "00:00" });
+    }
   });
 });

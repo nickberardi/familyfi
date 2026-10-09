@@ -87,14 +87,9 @@ enum PolicyOperationIntent {
   delete
 }
 
-enum UpdateTrigger {
-  manual
-  scheduled
-}
-
 /// requested until the outcome is known: the new release is running (succeeded), Watchtower did not
 /// replace it (failed; a failed pre-update backup counts here), skipped it, or found nothing newer.
-enum UpdateRunStatus {
+enum UpdateStatus {
   requested
   succeeded
   failed
@@ -132,12 +127,18 @@ model Household {
   dohProbeLastRunAt      DateTime? @db.Timestamptz(3)
   dohProbeTimeoutMs      Int       @default(5000)
   dohProbeDisabledAt     DateTime? @db.Timestamptz(3)
-  /// Installing a newer release through the Watchtower sidecar, on household-local days at a time
-  /// (src/server/updater.ts). The last claimed instant keeps two processes from both installing.
-  autoUpdateEnabled      Boolean   @default(true)
-  autoUpdateTime         String    @default("00:00")
-  autoUpdateDays         Int[]     @default([0])
-  autoUpdateLastRunAt    DateTime? @db.Timestamptz(3)
+  /// Installing a newer release through the Watchtower sidecar (src/server/updater.ts). The schedule
+  /// is household-local cron, `minute hour * * days` (src/server/weekly-schedule.ts); the last claimed
+  /// instant keeps two processes from both installing.
+  updateScheduleEnabled   Boolean       @default(true)
+  updateSchedule          String        @default("0 0 * * 0")
+  updateScheduleLastRunAt DateTime?     @db.Timestamptz(3)
+  /// The latest install: written before Watchtower is asked, because the process that asks is the
+  /// one being replaced, and settled by the next process to read it. Null until the first install.
+  updateRequestedAt       DateTime?     @db.Timestamptz(3)
+  updateTargetVersion     String?
+  updateStatus            UpdateStatus?
+  updateError             String?
   upstreamResolverSnapshot Json?
   connectionStatus       String    @default("unconfigured")
   connectionError        String?
@@ -601,19 +602,4 @@ model UpstreamCheck {
   @@unique([categoryId, groupId])
   @@index([checkedAt])
   @@index([groupId])
-}
-
-/// One request to install a release through the Watchtower sidecar, and what came of it.
-model UpdateRun {
-  id                   String          @id @default(cuid())
-  trigger              UpdateTrigger
-  fromVersion          String
-  targetVersion        String
-  status               UpdateRunStatus @default(requested)
-  requestedByAccountId String?
-  requestedAt          DateTime        @default(now()) @db.Timestamptz(3)
-  finishedAt           DateTime?       @db.Timestamptz(3)
-  error                String?
-
-  @@index([requestedAt])
 }

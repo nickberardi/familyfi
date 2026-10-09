@@ -65,7 +65,7 @@ export function UpdateScheduleCard({
         <ui.Toggle
           label={COPY.schedule}
           on={schedule.enabled}
-          disabled={off || (!schedule.enabled && schedule.days.length === 0)}
+          disabled={off}
           onToggle={() => void save({ ...schedule, enabled: !schedule.enabled })}
           testID="update-schedule-toggle"
         />
@@ -80,8 +80,8 @@ export function UpdateScheduleCard({
             disabled={off}
             onToggle={(day) => {
               const days = toggleProbeDay(schedule.days, day);
-              // The last day off turns the schedule off rather than leaving it on with nothing to run.
-              void save({ ...schedule, days, enabled: schedule.enabled && days.length > 0 });
+              // A schedule always has a day; the switch above turns it off.
+              if (days.length > 0) void save({ ...schedule, days });
             }}
             testID="update-schedule-day"
           />

@@ -134,6 +134,8 @@ describe("update settings", () => {
     for (const body of [
       { enabled: true, days: [1], time: "25:00" },
       { enabled: true, days: [], time: "03:00" },
+      // Cron needs a day even while the schedule is off.
+      { enabled: false, days: [], time: "03:00" },
       { enabled: true, days: [7], time: "03:00" },
       { enabled: true, days: [1] },
     ]) {
@@ -142,8 +144,10 @@ describe("update settings", () => {
     const saved = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: true, days: [3, 1, 3], time: "02:30" }));
     expect(saved.status).toBe(200);
     expect(((await saved.json()) as UpdateSettings).schedule).toEqual({ enabled: true, days: [1, 3], time: "02:30" });
-    const off = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: false, days: [], time: "02:30" }));
-    expect(((await off.json()) as UpdateSettings).nextRunAt).toBeNull();
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    expect(household).toMatchObject({ updateScheduleEnabled: true, updateSchedule: "30 2 * * 1,3" });
+    const off = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: false, days: [1, 3], time: "02:30" }));
+    expect(((await off.json()) as UpdateSettings)).toMatchObject({ schedule: { enabled: false, days: [1, 3], time: "02:30" }, nextRunAt: null });
   });
 });
 
@@ -153,15 +157,19 @@ describe("installing", () => {
     const response = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(response.status).toBe(202);
     const { run } = (await response.json()) as { run: UpdateRun };
-    expect(run).toMatchObject({ trigger: "manual", fromVersion: APP_VERSION, targetVersion: NEWER, status: "requested" });
+    expect(run).toEqual({ targetVersion: NEWER, status: "requested", requestedAt: expect.any(String), error: null });
     expect(watchtower.seen.filter((call) => call.method === "POST")).toEqual([{ method: "POST", url: "/v1/update?async=true", authorization: `Bearer ${TOKEN}` }]);
 
     const again = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(again.status).toBe(409);
     expect(((await again.json()) as { error: { code: string } }).error.code).toBe("update_in_progress");
     expect(watchtower.seen.filter((call) => call.method === "POST")).toHaveLength(1);
-    const admin = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
-    expect(await prisma().updateRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ requestedByAccountId: admin.id });
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({
+      updateRequestedAt: new Date(run.requestedAt),
+      updateTargetVersion: NEWER,
+      updateStatus: "requested",
+      updateError: null,
+    });
   });
 
   it("settles from Watchtower's history while the old release keeps running", async () => {
@@ -173,8 +181,7 @@ describe("installing", () => {
     expect((await settings(auth)).lastRun?.status).toBe("requested");
     watchtower.history = { entries: [{ timestamp: new Date(Date.now() + 1000).toISOString().replace("Z", "+00:00"), updated: 0, failed: 0, skipped: 1 }] };
     const { lastRun } = await settings(auth);
-    expect(lastRun).toMatchObject({ status: "skipped" });
-    expect(lastRun?.finishedAt).not.toBeNull();
+    expect(lastRun).toMatchObject({ status: "skipped", error: "Watchtower skipped the update; its log says why." });
     expect(watchtower.seen.some((call) => call.method === "GET" && call.url.startsWith("/v1/history?since="))).toBe(true);
   });
 
@@ -203,7 +210,7 @@ describe("installing", () => {
     const broken = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(broken.status).toBe(502);
     expect(((await broken.json()) as { error: { code: string } }).error.code).toBe("updater_unreachable");
-    expect(await prisma().updateRun.count({ where: { status: "requested" } })).toBe(0);
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).updateStatus).toBe("failed");
   });
 
   it("installs nothing when only the token is there and Watchtower is not, now or on schedule", async () => {
@@ -213,11 +220,11 @@ describe("installing", () => {
     const response = await install(write(auth, "/api/v1/settings/update/install", "POST"));
     expect(response.status).toBe(409);
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
-    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", updateSchedule: "0 3 * * 0,1,2,3,4,5,6" } });
     const fetchImpl: typeof fetch = async (input, init) =>
       String(input).startsWith("https://api.github.com/") ? releases(NEWER)() : fetch(input, init);
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: () => new Date("2026-10-14T07:10:00.000Z") })).toBe("retry");
-    expect(await prisma().updateRun.count()).toBe(0);
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).updateRequestedAt).toBeNull();
   });
 
   it("refuses without the updater or anything newer", async () => {
@@ -243,34 +250,34 @@ describe("the schedule", () => {
 
   it("installs once for each scheduled instant, and not when the instant was missed by over an hour", async () => {
     // Every day at 03:00 New York time; 03:10 on 2026-10-14 is ten minutes after the due instant.
-    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", updateSchedule: "0 3 * * 0,1,2,3,4,5,6" } });
     const due = new Date("2026-10-14T07:00:00.000Z");
     const now = () => new Date(due.getTime() + 10 * 60_000);
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("installed");
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("nothing");
-    expect(await prisma().updateRun.findMany()).toMatchObject([{ trigger: "scheduled", targetVersion: NEWER }]);
-    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).autoUpdateLastRunAt).toEqual(due);
+    const installed = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    expect(installed).toMatchObject({ updateTargetVersion: NEWER, updateStatus: "requested", updateScheduleLastRunAt: due });
 
     const missed = () => new Date(due.getTime() + 24 * 60 * 60_000 + 2 * 60 * 60_000);
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: missed })).toBe("nothing");
-    expect(await prisma().updateRun.count()).toBe(1);
+    expect(watchtower.seen.filter((call) => call.method === "POST")).toHaveLength(1);
   });
 
   it("does nothing while switched off or without the updater", async () => {
-    await prisma().household.update({ where: { id: "default" }, data: { autoUpdateEnabled: false } });
+    await prisma().household.update({ where: { id: "default" }, data: { updateScheduleEnabled: false } });
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl })).toBe("nothing");
-    await prisma().household.update({ where: { id: "default" }, data: { autoUpdateEnabled: true } });
+    await prisma().household.update({ where: { id: "default" }, data: { updateScheduleEnabled: true } });
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, settings: null })).toBe("nothing");
     expect(watchtower.seen).toEqual([]);
   });
 
   it("leaves the slot unclaimed when the release check fails, so it is tried again", async () => {
-    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", updateSchedule: "0 3 * * 0,1,2,3,4,5,6" } });
     const now = () => new Date("2026-10-14T07:10:00.000Z");
     const failing: typeof fetch = async (input, init) =>
       github(String(input)) ? new Response("busy", { status: 503 }) : fetch(input, init);
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl: failing, now })).toBe("retry");
-    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).autoUpdateLastRunAt).toBeNull();
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).updateScheduleLastRunAt).toBeNull();
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("installed");
   });
 

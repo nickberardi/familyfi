@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.27.0
+  version: 0.28.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2745,9 +2745,10 @@ components:
         enabled: { type: boolean }
         days:
           type: array
+          minItems: 1
           maxItems: 7
           items: { type: integer, minimum: 0, maximum: 6 }
-          description: 0 is Sunday. At least one day while enabled.
+          description: 0 is Sunday. At least one day, even while the schedule is off.
         time:
           type: string
           pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
@@ -2756,11 +2757,9 @@ components:
     UpdateRun:
       type: object
       additionalProperties: false
-      required: [id, trigger, fromVersion, targetVersion, status, requestedAt, finishedAt, error]
+      description: The latest install request, manual or scheduled. Only the latest is kept.
+      required: [targetVersion, status, requestedAt, error]
       properties:
-        id: { type: string }
-        trigger: { type: string, enum: [manual, scheduled] }
-        fromVersion: { type: string, description: "Semver that asked for the install (no leading v)." }
         targetVersion: { type: string, description: "Semver the update check offered (no leading v)." }
         status:
           type: string
@@ -2771,7 +2770,6 @@ components:
             be reached, or reported nothing within 30 minutes. `skipped`: Watchtower skipped it for a reason of its
             own. `unchanged`: no newer image under the tag FamilyFi runs, as when `FAMILYFI_IMAGE` pins a version.
         requestedAt: { type: string, format: date-time }
-        finishedAt: { type: [string, "null"], format: date-time }
         error: { type: [string, "null"], description: "Why it did not succeed, for the operator." }
     UpdateSettings:
       type: object

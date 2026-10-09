@@ -128,17 +128,13 @@ export type UpdateCheck = {
   error: string | null;
 };
 
-export type UpdateRunStatus = "requested" | "succeeded" | "failed" | "skipped" | "unchanged";
+export type UpdateStatus = "requested" | "succeeded" | "failed" | "skipped" | "unchanged";
 
-/** One request to install a release through the Watchtower sidecar, and its outcome once known. */
+/** The latest request to install a release through the Watchtower sidecar, and its outcome once known. */
 export type UpdateRun = {
-  id: string;
-  trigger: "manual" | "scheduled";
-  fromVersion: string;
   targetVersion: string;
-  status: UpdateRunStatus;
+  status: UpdateStatus;
   requestedAt: string;
-  finishedAt: string | null;
   error: string | null;
 };
 
