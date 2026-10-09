@@ -1,36 +1,73 @@
 "use client";
 
+import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
+import type { ApiRequest } from "@/lib/api-client";
 import { parseReleaseNotes } from "@/lib/release-notes";
-import type { UpdateCheck } from "@/lib/types";
-import { INSTALL_STEPS, UPDATE_COPY as COPY, installCopy, latestRelease, upToDateLine } from "@/lib/update-copy";
+import type { UpdateCheck, UpdateSettings } from "@/lib/types";
+import { INSTALL_STEPS, UPDATE_COPY as COPY, installCopy, installing, latestRelease, updateRunLine, upToDateLine } from "@/lib/update-copy";
+import { installUpdate } from "@/lib/update-writes";
 
 import { ExternalLink } from "./ExternalLink";
-import { useUI } from "./UIContext";
+import { PRESS_OPACITY, useUI } from "./UIContext";
+
+/** What installing needs: the updater's state (`useUpdateSettings`), the transport, and a reload after asking. */
+export type UpdateInstall = { settings: UpdateSettings | null; request: ApiRequest; onChanged: () => void };
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
 /**
  * The Update page below its header: whether FamilyFi is up to date, or a newer release's notes and
- * what installing it will do. Install itself is not built yet, so its button stays disabled.
+ * installing it. Install asks the Watchtower updater; without `install`, or before the updater is set
+ * up, its button stays disabled and the card says how to update by hand.
  */
-export function UpdateContent({ update, onNotNow }: { update: UpdateCheck | null; onNotNow?: () => void }) {
+export function UpdateContent({ update, onNotNow, install }: { update: UpdateCheck | null; onNotNow?: () => void; install?: UpdateInstall }) {
   const ui = useUI();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const text = (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const latest = latestRelease(update);
+  const runLine = updateRunLine(install?.settings?.lastRun);
+  const runText = runLine ? (
+    <Text style={[text(14, 20, install?.settings?.lastRun?.status === "failed" ? "danger" : "muted"), styles.runLine]} testID="update-run">
+      {runLine}
+    </Text>
+  ) : null;
 
   if (!latest) {
     return (
-      <Text style={[text(14, 21, "muted"), styles.card, styles.status, card]} testID="update-status">
-        {upToDateLine(update)}
-      </Text>
+      <View style={[styles.card, styles.status, card]}>
+        <Text style={text(14, 21, "muted")} testID="update-status">
+          {upToDateLine(update)}
+        </Text>
+        {runText}
+      </View>
     );
   }
 
   const sections = parseReleaseNotes(update?.releaseNotes ?? null);
-  const install = installCopy(latest);
+  const configured = Boolean(install?.settings?.updater.configured);
+  // Until the updater's state has loaded, the button does not claim it is missing.
+  const copy = installCopy(latest, configured || (install !== undefined && install.settings === null));
+  const canInstall = Boolean(install) && configured && !installing(install?.settings) && !busy;
+
+  async function start() {
+    if (!install || !canInstall) return;
+    const go = await ui.confirm({ title: copy.title, message: COPY.installConfirm, confirmLabel: copy.button });
+    if (!go) return;
+    setBusy(true);
+    setError("");
+    try {
+      await installUpdate(install.request);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : COPY.installFailed);
+    } finally {
+      setBusy(false);
+      install.onChanged();
+    }
+  }
   return (
     <View style={styles.columns} testID="update-content">
       <View role="region" aria-label={COPY.releaseNotes} style={[styles.card, styles.column, card]}>
@@ -69,12 +106,14 @@ export function UpdateContent({ update, onNotNow }: { update: UpdateCheck | null
         )}
       </View>
 
-      <View role="region" aria-label={install.title} style={[styles.card, styles.column, card]}>
+      <View role="region" aria-label={copy.title} style={[styles.card, styles.column, card]}>
         <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
           <Text role="heading" aria-level={2} style={[text(14, 21, "ink"), styles.bold]}>
-            {install.title}
+            {copy.title}
           </Text>
-          <Text style={[text(14, 20, "muted"), styles.installNote]}>{COPY.installNote}</Text>
+          <Text style={[text(14, 20, "muted"), styles.installNote]}>{configured ? COPY.installReady : COPY.installNote}</Text>
+          {runText}
+          {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
         </View>
         {INSTALL_STEPS.map((step, index) => (
           <View key={step} style={[styles.step, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
@@ -92,8 +131,15 @@ export function UpdateContent({ update, onNotNow }: { update: UpdateCheck | null
               <Text style={[text(14, 21, "muted"), styles.bold, styles.outline, { borderColor: ui.color("control-line") }]}>{COPY.notNow}</Text>
             </ui.Link>
           )}
-          <Pressable role="button" aria-disabled disabled style={[styles.install, { backgroundColor: ui.color("accent") }]} testID="update-install">
-            <Text style={[text(14, 21, "ink-on-fill"), styles.bold]}>{install.button}</Text>
+          <Pressable
+            role="button"
+            aria-disabled={!canInstall}
+            disabled={!canInstall}
+            onPress={() => void start()}
+            style={({ pressed }) => [styles.install, { backgroundColor: ui.color("accent") }, !canInstall && styles.off, pressed && canInstall && { opacity: PRESS_OPACITY }]}
+            testID="update-install"
+          >
+            <Text style={[text(14, 21, "ink-on-fill"), styles.bold]}>{copy.button}</Text>
           </Pressable>
         </View>
       </View>
@@ -119,5 +165,7 @@ const styles = StyleSheet.create({
   stepDot: { width: 22, height: 22, borderRadius: 11, flexShrink: 0 },
   actions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, paddingHorizontal: 18, paddingVertical: 14 },
   outline: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, overflow: "hidden" },
-  install: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, opacity: 0.4 },
+  install: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  off: { opacity: 0.4 },
+  runLine: { marginTop: 6 },
 });

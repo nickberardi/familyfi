@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
+import { BackupCard } from "@/components/BackupCard";
 import { SETTINGS_COPY, createLoginTitle, loginFormState, usernameFromName } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
 import type { Group } from "@/lib/types";
@@ -15,7 +16,7 @@ const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
 
 export default function SettingsPage() {
-  const { unifi, household, accounts, groups, sync, mutate, store } = useAppData();
+  const { unifi, household, accounts, groups, sync, mutate, store, reload } = useAppData();
   const [mode, setMode] = useState<"local" | "cloud">("local");
   const [apiKey, setApiKey] = useState("");
   const [consoleHost, setConsoleHost] = useState("");
@@ -296,6 +297,8 @@ export default function SettingsPage() {
             setPw2("");
           }}
         />
+
+        <BackupCard onImported={() => reload()} />
       </div>
 
       {loginFor ? (

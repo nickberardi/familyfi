@@ -16,6 +16,8 @@ Copy `.env.example` to `.env` and set what you need. This is every setting Famil
 | `FAMILYFI_ENCRYPTION_KEY` | generated | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
 | `FAMILYFI_DEMO_URL` | none | `demo` only. The demo's public HTTPS origin, published as the phones' route ([demo mode](operations.md#demo-mode)). |
 | `FAMILYFI_PHONE_GATEWAY_PORT` | off | Exposes the phone-only gateway to a tunnel sidecar container on the Compose network (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). Never publish it on the host. |
+| `FAMILYFI_UPDATER_TOKEN` | off | Lets FamilyFi install releases through the Watchtower sidecar, which is given the same token (see [Automatic updates](#automatic-updates)). Unset, the Update page tells the operator to update by hand. |
+| `FAMILYFI_UPDATER_URL` | `http://watchtower:8080` | Where Watchtower's HTTP API answers, when it is not the Compose service. |
 | `PORT` | `3000` (`7001` in the image) | The port the server listens on. |
 | `NODE_ENV` | set by Next.js | `production` under `next start` and in the image. Only `prod` and `demo` start in production, and `test` when `CI` is set. |
 
@@ -44,7 +46,7 @@ Read by `docker/docker-compose.yml` (and `docker-compose.dev-db.yml`), not by th
 | --- | --- | --- |
 | `FAMILYFI_PORT` | `7001` | The host port `make docker-up` publishes. |
 | `FAMILYFI_IMAGE` | `ghcr.io/nickberardi/familyfi:latest` | The image `make docker-up` runs. |
-| `APP_CONTAINER_NAME`, `POSTGRES_CONTAINER_NAME` | `familyfi-app`, `familyfi-postgres` | Container names. |
+| `APP_CONTAINER_NAME`, `POSTGRES_CONTAINER_NAME`, `WATCHTOWER_CONTAINER_NAME` | `familyfi-app`, `familyfi-postgres`, `familyfi-watchtower` | Container names. |
 | `APP_DATA_VOLUME_NAME`, `POSTGRES_VOLUME_NAME` | `familyfi-app_data`, `familyfi-postgres_data` (`familyfi-dev-postgres_data` for the dev database) | Volume names. |
 | `POSTGRES_DATA_PATH` | `/var/lib/postgresql` | Where the PostgreSQL volume mounts. |
 
@@ -159,4 +161,28 @@ and the sidecar. To put Cloudflare Access in front of it, see
 
 Pin image tags (a `cloudflared` release) rather than `latest`, so an upgrade happens when you
 choose it.
+
+## Automatic updates
+
+The Update page installs a newer release, now or on a schedule (Sunday at midnight by default, in
+the household's time zone), through [Watchtower](https://github.com/nicholas-fedor/watchtower), a
+sidecar that holds the Docker socket so FamilyFi never does. It is opt-in:
+
+1. Add a token to the host's `.env`, which Compose hands to both containers:
+   `FAMILYFI_UPDATER_TOKEN=$(openssl rand -hex 32)`.
+2. Start the `updater` profile: `docker compose -f docker/docker-compose.yml --profile updater up -d`.
+
+The `watchtower` service in [docker-compose.yml](../docker/docker-compose.yml) is the maintained fork
+(the original `containrrr/watchtower` was archived in December 2025), pinned by digest. It updates
+only containers labelled `com.centurylinklabs.watchtower.enable=true`, which is the app alone, polls
+nothing on its own and publishes no port: FamilyFi calls its `POST /v1/update` and reads its
+`/v1/history` over the Compose network. Before it replaces the app it runs the app's pre-update hook,
+[`pre-update-backup.sh`](../scripts/runtime/pre-update-backup.sh), which dumps the database to
+`/var/lib/familyfi/data/backups` and keeps the newest three; when the dump fails the hook exits 75
+and Watchtower skips the update, so FamilyFi keeps running the release it has.
+
+Watchtower pulls the tag the app runs, so `FAMILYFI_IMAGE` must name a moving tag (`latest`, the
+default) for an install to change anything; a pinned version reports **not installed** on the Update
+page. A container created outside this Compose file can use the same sidecar: give it the labels on
+the `app` service and the token, and set `FAMILYFI_UPDATER_URL` to where Watchtower answers.
 

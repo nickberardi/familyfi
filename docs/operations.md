@@ -8,6 +8,26 @@ Username `admin` with `FAMILYFI_DEFAULT_PASSWORD` remains available after person
 
 Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` after first setup). Restoring the database without that key cannot decrypt the stored UniFi credential or the persisted companion instance signing key. Ordinary `make docker-down` does not delete volumes. Do not regenerate `FAMILYFI_ENCRYPTION_KEY` once a UniFi key has been saved.
 
+**Export and import.** Settings → Backup downloads `familyfi-export-<date>.tar.gz` (`GET /api/v1/settings/export`), and imports one (`POST /api/v1/settings/import`), which first-time setup also offers as **Restore from an export**. The archive holds:
+
+- `manifest.json`: the export format, the FamilyFi version and install that wrote it, and its gateway.
+- `config.json`: groups, rules and their windows, device assignments, administrator accounts with their password hashes, DNS categories, the household's own routes and its settings. No UniFi key, tunnel credential or Access token, no sessions, pairings or paired devices, no history, and no record of the gateway's policies.
+- `database.dump`: a `pg_dump --format=custom` of the whole database, when `pg_dump` could reach it (the release image carries the PostgreSQL 18 client). It holds the secrets encrypted with this install's `FAMILYFI_ENCRYPTION_KEY`, which is never exported.
+
+Import reads `config.json`, says what it will do, then replaces the household with it in one transaction, keeping any key, tunnel credential or Access token already saved here; a route whose Access token is missing comes in switched off, and FamilyFi's own tunnel routes are left out, so turn remote access on again. Phones, Watches and agents pair again. The importing administrator is never removed or demoted, and another account whose password hash changes is signed out. The gateway connection comes from the file unless this install already holds a key for another console or site. An export from a newer FamilyFi is refused: update first.
+
+The next sync rebuilds the gateway's policies. Those this install created are removed by their creation records, as always; a policy another install created stays (FamilyFi never deletes a policy it cannot prove it made), so moving to a new install on the same gateway leaves the old install's FamilyFi policies for the operator to delete in UniFi. The import preview says when that applies.
+
+For an exact copy instead (sessions, pairings, history and all), restore `database.dump` into the same or a newer release with the same `FAMILYFI_ENCRYPTION_KEY`, with FamilyFi stopped:
+
+```bash
+docker compose -f docker/docker-compose.yml stop app
+docker compose -f docker/docker-compose.yml exec -T db pg_restore --clean --if-exists --no-owner -U familyfi -d familyfi < database.dump
+docker compose -f docker/docker-compose.yml start app
+```
+
+The backups the updater takes before each install (`/var/lib/familyfi/data/backups/*.dump`, on the app volume) restore the same way.
+
 ## Remote access and pairing
 
 **System → Pair Device** has two sections. **Home access** is always on: it is the address
@@ -206,6 +226,13 @@ It logs in to GHCR with `GHCR_TOKEN` (from the environment or a gitignored `.rel
 
 FamilyFi checks the published GitHub Releases for `nickberardi/familyfi` directly; GHCR tags and other registries are never used to decide whether an update exists. The running process checks immediately at startup and then once an hour, retaining the result only in its own memory. A restart therefore begins with an explicit `pending` status until its first check completes. While the app is open, the browser reads the cached health snapshot every five seconds while pending and every minute afterward; those reads do not trigger GitHub requests.
 
-Draft releases and malformed tags are ignored. While the running version is below `1.0.0`, published prereleases are eligible because FamilyFi's current release stream uses them. At `1.0.0` and later, only stable releases are offered. When it is newer than the running version, the sidebar shows an Update available alert whose Update button opens the Update page, with the release's notes from GitHub and a link to the release (installing from the app is not available yet); the check is also exposed through `GET /api/v1/health`.
+Draft releases and malformed tags are ignored. While the running version is below `1.0.0`, published prereleases are eligible because FamilyFi's current release stream uses them. At `1.0.0` and later, only stable releases are offered. When it is newer than the running version, the sidebar shows an Update available alert whose Update button opens the Update page, with the release's notes from GitHub, a link to the release and, with the updater set up, its Install button; the check is also exposed through `GET /api/v1/health`.
 
 Allow outbound HTTPS from the app container to `api.github.com`. A GitHub timeout, rate limit, or other failure does not degrade FamilyFi readiness or enforcement, but health reports `update.status: error` and `update.available: null`; it is never presented as up to date. The release check sends no credentials and has a 10-second timeout.
+
+### Automatic updates
+
+With the Watchtower sidecar set up ([setup](setup.md#automatic-updates)), the Update page's **Install** asks it to replace FamilyFi with the release the check found (`POST /api/v1/update/install`), and **Automatic updates** does the same on household-local days and a time, Sunday at midnight unless changed (`PUT /api/v1/update/schedule`). A scheduled install runs only when the check finds a newer release; one missed by more than an hour, because FamilyFi was down, waits for the next scheduled time, and each scheduled instant is claimed once (`Household.autoUpdateLastRunAt`), so the restart an install causes never installs again.
+
+Every request is an `UpdateRun` written before Watchtower is asked, because the process that asks is the one being replaced. The next process to read it settles it: the new release on its first start (`succeeded`), or the old one, from Watchtower's history, when Watchtower left it running: `skipped` when the backup before installing failed, `unchanged` when there was no newer image under the tag it runs, `failed` when the replacement failed or nothing was reported within 30 minutes. The gateway keeps enforcing throughout ([outages](#outages)); startup applies migrations and reconciles, as for any upgrade.
+

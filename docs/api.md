@@ -25,7 +25,8 @@ complete UI parity, all API semantics or live gateway enforcement.
 A server in [demo mode](operations.md#demo-mode) refuses configuration writes with 403
 `demo_locked`: `PUT /settings/household`, `PUT /settings/unifi`, account and password writes,
 `PUT`/`DELETE` on `/upstream/resolver` and `/groups/{id}/resolver`, route writes under
-`/connection/endpoints`, `POST /connection/pins` and `PUT /connection/tunnel`. Clients show the message; the household
+`/connection/endpoints`, `POST /connection/pins`, `PUT /connection/tunnel`, `PUT /update/schedule`,
+`POST /update/install`, and `GET /settings/export` and `POST /settings/import`. Clients show the message; the household
 itself (groups, rules, pauses, devices) and pairing are unchanged.
 
 For a change to either shared artifact:
@@ -66,6 +67,11 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/PATCH/DELETE | `/api/v1/paired/devices/{id}` | Read one; an administrator renames it or changes an agent's scope; an administrator, the device itself or its parent phone revokes it and its sessions. Only an administrator may use `?remove=true` to delete its record |
 | DELETE | `/api/v1/paired/devices?status=revoked` | Administrator removes every revoked device's record; active ones are untouched |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds` |
+| GET | `/api/v1/settings/export` | Administrator downloads the household as `.tar.gz`: `manifest.json`, `config.json` (no secrets) and, where `pg_dump` reaches the database, `database.dump` ([backup and restore](operations.md#backup-and-restore)) |
+| POST | `/api/v1/settings/import` | Administrator previews (`?mode=preview`) or applies (`?mode=apply`) an export, sent as the raw body. Apply replaces groups, rules, devices, accounts, DNS categories and settings and returns a `change`; keys saved here are kept. 400 `invalid_export`, 409 `export_too_new`, 413 `export_too_large` |
+| GET | `/api/v1/update` | Administrator reads whether the Watchtower updater is set up, the automatic schedule, its next run and the last install (`requested`, `succeeded`, `failed`, `skipped`, `unchanged`) |
+| PUT | `/api/v1/update/schedule` | Administrator sets automatic installs: `enabled`, `days` and a household-local `time`; Sunday at midnight by default |
+| POST | `/api/v1/update/install` | Administrator installs the newer release now through Watchtower; 202 with the run. 409 `updater_not_configured`, `no_update_available` or `update_in_progress`; 502 `updater_unreachable` |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |

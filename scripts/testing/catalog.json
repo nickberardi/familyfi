@@ -450,7 +450,7 @@
         "categories"
       ]
     },
-    "tests/unit/upstream-schedule.test.ts": {
+    "tests/unit/weekly-schedule.test.ts": {
       "categories": [
         "categories",
         "schedules"
@@ -914,6 +914,54 @@
     "tests/unit/watch.test.ts": {
       "categories": [
         "pairing"
+      ]
+    },
+    "tests/unit/updater.test.ts": {
+      "categories": [
+        "runtime",
+        "settings"
+      ]
+    },
+    "tests/integration/update-api.test.ts": {
+      "categories": [
+        "runtime",
+        "settings",
+        "schedules"
+      ]
+    },
+    "tests/unit/compose-updater.test.ts": {
+      "categories": [
+        "runtime",
+        "repository"
+      ]
+    },
+    "tests/unit/archive.test.ts": {
+      "categories": [
+        "settings"
+      ]
+    },
+    "tests/integration/household-export.test.ts": {
+      "categories": [
+        "settings",
+        "database",
+        "sync"
+      ]
+    },
+    "tests/unit/backup-copy.test.ts": {
+      "categories": [
+        "settings",
+        "display"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > the Update page installs through the updater and keeps its schedule": {
+      "categories": [
+        "settings",
+        "schedules"
+      ]
+    },
+    "tests/browser/smoke.spec.ts > Settings exports the household and previews an import before replacing anything": {
+      "categories": [
+        "settings"
       ]
     }
   }

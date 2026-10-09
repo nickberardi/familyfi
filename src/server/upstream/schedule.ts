@@ -1,53 +1,12 @@
 import { prisma } from "../db";
-import { nextClockOnDays } from "@/lib/display";
+import { DEFAULT_WEEKLY_DAYS, DEFAULT_WEEKLY_TIME, dueWeeklyRunAt, nextWeeklyRunAt } from "../weekly-schedule";
 import { probeEnabledCategories } from "./probe";
 import { ResolverConfigError } from "./resolver-settings";
 import { withUpstreamLock } from "./transaction";
 import { unrefTimer } from "../unref-timer";
 
-/**
- * A household-local wall-clock schedule, not an interval from the last boot — the
- * earlier version read `dohProbeIntervalMinutes` once at start and re-armed a
- * `setInterval` of that length, so "daily" drifted with every restart and the setting
- * had no way to reach the UI anyway. It is shaped like a rule window's start and days,
- * and reuses `nextClockOnDays` (`src/lib/display.ts`), the same DST-correct function
- * behind a rule window's next start, rather than writing new time math.
- */
-export const DEFAULT_PROBE_TIME = "00:00";
-export const DEFAULT_PROBE_DAYS = [0];
-
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running = false;
-
-/**
- * The next scheduled instant strictly after `now`. Falls back to the default schedule
- * when the stored time is malformed; callers skip scheduling when no day is selected.
- * Failing even the default, use 24 hours out so a bad row cannot stop the loop.
- */
-export function nextProbeRunAt(now: Date, timezone: string, hhmm: string, days: number[]): Date {
-  return (
-    nextClockOnDays(timezone, days, hhmm, now) ??
-    nextClockOnDays(timezone, DEFAULT_PROBE_DAYS, DEFAULT_PROBE_TIME, now) ??
-    new Date(now.getTime() + 24 * 60 * 60 * 1000)
-  );
-}
-
-/**
- * The most recent scheduled instant at or before `now` — the run that is currently
- * due. `nextClockOnDays` only ever returns an instant strictly after the time passed to
- * it, so scan from eight days back to include the preceding Sunday on a weekly schedule.
- */
-export function dueProbeRunAt(now: Date, timezone: string, hhmm: string, days: number[]): Date {
-  let cursor = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
-  let due = nextProbeRunAt(cursor, timezone, hhmm, days);
-  while (due.getTime() <= now.getTime()) {
-    cursor = due;
-    const next = nextProbeRunAt(cursor, timezone, hhmm, days);
-    if (next.getTime() > now.getTime()) return due;
-    due = next;
-  }
-  return due;
-}
 
 async function sweep(): Promise<void> {
   if (running) return;
@@ -97,7 +56,7 @@ async function claimAndSweepIfDue(): Promise<boolean> {
     },
   });
   if (!household?.dohProbeEnabled || household.dohProbeDays.length === 0) return false;
-  const due = dueProbeRunAt(now, household.timezone, household.dohProbeTime, household.dohProbeDays);
+  const due = dueWeeklyRunAt(now, household.timezone, household.dohProbeTime, household.dohProbeDays);
   const claimed = await withUpstreamLock(async (tx) => {
     const result = await tx.household.updateMany({
       where: {
@@ -118,11 +77,11 @@ async function arm(): Promise<void> {
     select: { timezone: true, dohProbeTime: true, dohProbeDays: true, dohProbeEnabled: true },
   });
   if (!household?.dohProbeEnabled || household.dohProbeDays.length === 0) return;
-  const next = nextProbeRunAt(
+  const next = nextWeeklyRunAt(
     new Date(),
     household?.timezone ?? "America/New_York",
-    household?.dohProbeTime ?? DEFAULT_PROBE_TIME,
-    household?.dohProbeDays ?? DEFAULT_PROBE_DAYS,
+    household?.dohProbeTime ?? DEFAULT_WEEKLY_TIME,
+    household?.dohProbeDays ?? DEFAULT_WEEKLY_DAYS,
   );
   const delay = Math.max(0, next.getTime() - Date.now());
   timer = setTimeout(() => {

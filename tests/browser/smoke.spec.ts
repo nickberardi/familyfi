@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { UpdateCheck } from "@/lib/types";
+import type { UpdateCheck, UpdateSettings } from "@/lib/types";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 const username = "admin";
@@ -226,6 +226,75 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(alert).toHaveCount(0);
+});
+
+test("the Update page installs through the updater and keeps its schedule", async ({ page }) => {
+  await signIn(page);
+  const update: UpdateCheck = {
+    status: "ok",
+    available: true,
+    currentVersion: "0.5.1",
+    latestVersion: "0.6.0",
+    releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
+    releaseNotes: "## New\n- Automatic updates",
+    checkedAt: "2026-09-22T12:00:00.000Z",
+    lastSuccessfulAt: "2026-09-22T12:00:00.000Z",
+    error: null,
+  };
+  await page.route("**/api/v1/health", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ status: "ok", db: "ok", version: "0.5.1", revision: 0, update }) }),
+  );
+  let settings: UpdateSettings = {
+    updater: { configured: true },
+    schedule: { enabled: true, days: [0], time: "00:00" },
+    nextRunAt: "2026-10-11T04:00:00.000Z",
+    lastRun: null,
+  };
+  const scheduleWrites: unknown[] = [];
+  await page.route("**/api/v1/update", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(settings) }));
+  await page.route("**/api/v1/update/schedule", async (route) => {
+    const body = route.request().postDataJSON() as UpdateSettings["schedule"];
+    scheduleWrites.push(body);
+    settings = { ...settings, schedule: body };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(settings) });
+  });
+  await page.route("**/api/v1/update/install", async (route) => {
+    const run = {
+      id: "run",
+      trigger: "manual",
+      fromVersion: "0.5.1",
+      targetVersion: "0.6.0",
+      status: "requested",
+      requestedAt: "2026-10-09T12:00:00.000Z",
+      finishedAt: null,
+      error: null,
+    } as const;
+    settings = { ...settings, lastRun: run };
+    await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ run }) });
+  });
+
+  await page.goto("/update");
+  const install = page.getByRole("button", { name: "Install v0.6.0", exact: true });
+  await expect(install).toBeEnabled();
+  await install.click();
+  await expect(page.getByTestId("update-run").first()).toContainText("Installing v0.6.0");
+  await expect(install).toBeDisabled();
+
+  const schedule = page.getByRole("region", { name: "Automatic updates" });
+  await expect(schedule).toContainText("Sunday at 12 AM");
+  await schedule.getByRole("button", { name: "Saturday" }).click();
+  await expect.poll(() => scheduleWrites.at(-1)).toEqual({ enabled: true, days: [0, 6], time: "00:00" });
+  await expect(schedule).toContainText("Weekends at 12 AM");
+});
+
+test("Settings exports the household and previews an import before replacing anything", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/settings");
+  const backup = page.getByRole("region", { name: "Backup" });
+  await expect(backup.getByRole("link", { name: "Export household" })).toHaveAttribute("href", "/api/v1/settings/export");
+  await backup.getByLabel("Import an export").setInputFiles({ name: "not-an-export.tar.gz", mimeType: "application/gzip", buffer: Buffer.from("nope") });
+  await expect(backup.getByRole("alert")).toContainText("not a FamilyFi export");
+  await expect(backup.getByRole("button", { name: "Replace the household" })).toHaveCount(0);
 });
 
 /** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */

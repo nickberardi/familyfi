@@ -1,0 +1,224 @@
+import { createServer, type IncomingMessage, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { POST as login } from "@/app/api/v1/auth/login/route";
+import { GET as getUpdate } from "@/app/api/v1/update/route";
+import { POST as install } from "@/app/api/v1/update/install/route";
+import { PUT as putSchedule } from "@/app/api/v1/update/schedule/route";
+import { APP_VERSION } from "@/lib/version";
+import type { UpdateRun, UpdateSettings } from "@/lib/types";
+import { prisma } from "@/server/db";
+import { refreshUpdateCheck } from "@/server/update-check";
+import { runAutoUpdateCatchUpForTests, settleUpdateRun, stopAutoUpdateForTests } from "@/server/updater";
+import { resetDatabase } from "../helpers/db";
+import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+
+const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
+const TOKEN = "watchtower-test-token";
+const NEWER = "999.0.0";
+const saved = { token: process.env.FAMILYFI_UPDATER_TOKEN, url: process.env.FAMILYFI_UPDATER_URL };
+
+/** A stand-in for the Watchtower sidecar's HTTP API: records each call and answers as told. */
+type Seen = { method: string; url: string; authorization: string | undefined };
+const watchtower = {
+  server: undefined as Server | undefined,
+  url: "",
+  seen: [] as Seen[],
+  updateStatus: 202,
+  history: { entries: [] as Array<{ updated: number; failed: number; skipped: number }> },
+};
+
+function releases(tag: string) {
+  return async () => new Response(JSON.stringify([{ tag_name: `v${tag}` }]), { status: 200 });
+}
+
+async function adminAuth(): Promise<SessionAuth> {
+  return authFromLogin(
+    await login(
+      request("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }),
+      }),
+    ),
+  );
+}
+
+const write = (auth: SessionAuth, path: string, method: string, body?: unknown) =>
+  request(path, { method, auth, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+
+async function settings(auth: SessionAuth): Promise<UpdateSettings> {
+  const response = await getUpdate(request("/api/v1/update", { auth }));
+  expect(response.status).toBe(200);
+  return (await response.json()) as UpdateSettings;
+}
+
+beforeAll(async () => {
+  watchtower.server = createServer((req: IncomingMessage, res) => {
+    watchtower.seen.push({ method: req.method ?? "", url: req.url ?? "", authorization: req.headers.authorization });
+    if (req.headers.authorization !== `Bearer ${TOKEN}`) {
+      res.writeHead(401).end();
+    } else if (req.method === "POST" && req.url?.startsWith("/v1/update")) {
+      res.writeHead(watchtower.updateStatus, { "content-type": "application/json" }).end("{}");
+    } else if (req.method === "GET" && req.url?.startsWith("/v1/history")) {
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(watchtower.history));
+    } else {
+      res.writeHead(404).end();
+    }
+  });
+  await new Promise<void>((resolve) => watchtower.server!.listen(0, "127.0.0.1", resolve));
+  watchtower.url = `http://127.0.0.1:${(watchtower.server.address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => watchtower.server?.close(() => resolve()));
+});
+
+beforeEach(async () => {
+  await resetDatabase();
+  watchtower.seen = [];
+  watchtower.updateStatus = 202;
+  watchtower.history = { entries: [] };
+  process.env.FAMILYFI_UPDATER_TOKEN = TOKEN;
+  process.env.FAMILYFI_UPDATER_URL = watchtower.url;
+  await refreshUpdateCheck({ fetchImpl: releases(NEWER) });
+});
+
+afterEach(async () => {
+  stopAutoUpdateForTests();
+  for (const [key, value] of [["FAMILYFI_UPDATER_TOKEN", saved.token], ["FAMILYFI_UPDATER_URL", saved.url]] as const) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  await refreshUpdateCheck({ fetchImpl: releases(APP_VERSION) });
+});
+
+describe("update settings", () => {
+  it("installs on Sunday at midnight by default, and says when the updater is not set up", async () => {
+    const auth = await adminAuth();
+    expect(await settings(auth)).toMatchObject({
+      updater: { configured: true },
+      schedule: { enabled: true, days: [0], time: "00:00" },
+      lastRun: null,
+    });
+    expect((await settings(auth)).nextRunAt).not.toBeNull();
+    delete process.env.FAMILYFI_UPDATER_TOKEN;
+    expect(await settings(auth)).toMatchObject({ updater: { configured: false }, nextRunAt: null });
+  });
+
+  it("saves a schedule and refuses one it cannot keep", async () => {
+    const auth = await adminAuth();
+    for (const body of [
+      { enabled: true, days: [1], time: "25:00" },
+      { enabled: true, days: [], time: "03:00" },
+      { enabled: true, days: [7], time: "03:00" },
+      { enabled: true, days: [1] },
+    ]) {
+      expect((await putSchedule(write(auth, "/api/v1/update/schedule", "PUT", body))).status).toBe(400);
+    }
+    const saved = await putSchedule(write(auth, "/api/v1/update/schedule", "PUT", { enabled: true, days: [3, 1, 3], time: "02:30" }));
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as UpdateSettings).schedule).toEqual({ enabled: true, days: [1, 3], time: "02:30" });
+    const off = await putSchedule(write(auth, "/api/v1/update/schedule", "PUT", { enabled: false, days: [], time: "02:30" }));
+    expect(((await off.json()) as UpdateSettings).nextRunAt).toBeNull();
+  });
+});
+
+describe("installing", () => {
+  it("asks Watchtower once with its token, and refuses a second install meanwhile", async () => {
+    const auth = await adminAuth();
+    const response = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(response.status).toBe(202);
+    const { run } = (await response.json()) as { run: UpdateRun };
+    expect(run).toMatchObject({ trigger: "manual", fromVersion: APP_VERSION, targetVersion: NEWER, status: "requested" });
+    expect(watchtower.seen).toEqual([{ method: "POST", url: "/v1/update?async=true", authorization: `Bearer ${TOKEN}` }]);
+
+    const again = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { error: { code: string } }).error.code).toBe("update_in_progress");
+    expect(watchtower.seen.filter((call) => call.method === "POST")).toHaveLength(1);
+    const admin = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
+    expect(await prisma().updateRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ requestedByAccountId: admin.id });
+  });
+
+  it("settles from Watchtower's history while the old release keeps running", async () => {
+    const auth = await adminAuth();
+    expect((await install(write(auth, "/api/v1/update/install", "POST"))).status).toBe(202);
+    expect((await settings(auth)).lastRun?.status).toBe("requested");
+    watchtower.history = { entries: [{ updated: 0, failed: 0, skipped: 1 }] };
+    const { lastRun } = await settings(auth);
+    expect(lastRun).toMatchObject({ status: "skipped" });
+    expect(lastRun?.finishedAt).not.toBeNull();
+    expect(watchtower.seen.some((call) => call.method === "GET" && call.url.startsWith("/v1/history?since="))).toBe(true);
+  });
+
+  it("succeeds when the new release starts", async () => {
+    const auth = await adminAuth();
+    expect((await install(write(auth, "/api/v1/update/install", "POST"))).status).toBe(202);
+    const settled = await settleUpdateRun({ currentVersion: NEWER });
+    expect(settled).toMatchObject({ status: "succeeded", error: null });
+  });
+
+  it("records Watchtower refusing the token or being away", async () => {
+    const auth = await adminAuth();
+    process.env.FAMILYFI_UPDATER_TOKEN = "not-the-token";
+    const refused = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(refused.status).toBe(502);
+    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("updater_unreachable");
+    expect((await settings(auth)).lastRun).toMatchObject({ status: "failed", error: "Watchtower refused FAMILYFI_UPDATER_TOKEN." });
+
+    process.env.FAMILYFI_UPDATER_TOKEN = TOKEN;
+    watchtower.updateStatus = 429;
+    const busy = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(busy.status).toBe(409);
+
+    process.env.FAMILYFI_UPDATER_URL = "http://127.0.0.1:1";
+    const away = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(away.status).toBe(502);
+    expect(await prisma().updateRun.count({ where: { status: "requested" } })).toBe(0);
+  });
+
+  it("refuses without the updater or anything newer", async () => {
+    const auth = await adminAuth();
+    delete process.env.FAMILYFI_UPDATER_TOKEN;
+    const unset = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(unset.status).toBe(409);
+    expect(((await unset.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
+
+    process.env.FAMILYFI_UPDATER_TOKEN = TOKEN;
+    await refreshUpdateCheck({ fetchImpl: releases(APP_VERSION) });
+    const current = await install(write(auth, "/api/v1/update/install", "POST"));
+    expect(current.status).toBe(409);
+    expect(((await current.json()) as { error: { code: string } }).error.code).toBe("no_update_available");
+    expect(watchtower.seen).toEqual([]);
+  });
+});
+
+describe("the schedule", () => {
+  const github = (url: string) => url.startsWith("https://api.github.com/");
+  const fetchImpl: typeof fetch = async (input, init) =>
+    github(String(input)) ? releases(NEWER)() : fetch(input, init);
+
+  it("installs once for each scheduled instant, and not when the instant was missed by over an hour", async () => {
+    // Every day at 03:00 New York time; 03:10 on 2026-10-14 is ten minutes after the due instant.
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
+    const due = new Date("2026-10-14T07:00:00.000Z");
+    const now = () => new Date(due.getTime() + 10 * 60_000);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe(true);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe(false);
+    expect(await prisma().updateRun.findMany()).toMatchObject([{ trigger: "scheduled", targetVersion: NEWER }]);
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).autoUpdateLastRunAt).toEqual(due);
+
+    const missed = () => new Date(due.getTime() + 24 * 60 * 60_000 + 2 * 60 * 60_000);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: missed })).toBe(false);
+    expect(await prisma().updateRun.count()).toBe(1);
+  });
+
+  it("does nothing while switched off or without the updater", async () => {
+    await prisma().household.update({ where: { id: "default" }, data: { autoUpdateEnabled: false } });
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl })).toBe(false);
+    await prisma().household.update({ where: { id: "default" }, data: { autoUpdateEnabled: true } });
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, settings: null })).toBe(false);
+    expect(watchtower.seen).toEqual([]);
+  });
+});
