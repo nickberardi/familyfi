@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.26.0
+  version: 0.27.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -29,6 +29,8 @@ tags:
     description: Personal adult administration; recovery admin is permanent
   - name: Settings
     description: Household timezone and UniFi connection
+  - name: Update
+    description: Installing a newer release through the Watchtower sidecar, now or on a schedule. Administrators only.
   - name: Groups
     description: Family and Things
   - name: Devices
@@ -458,6 +460,76 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+  /api/v1/settings/export:
+    get:
+      operationId: exportHousehold
+      tags: [Settings]
+      summary: Download the household as a .tar.gz export
+      description: |
+        `manifest.json`, `config.json` (groups, rules and windows, device assignments, administrator accounts
+        with their password hashes, DNS categories, the household's own routes and settings) and, where
+        `pg_dump` can reach the database, `database.dump` for an exact restore with `pg_restore`. No UniFi key,
+        tunnel credential or Access token is in `config.json`; the dump holds them encrypted with this
+        install's `FAMILYFI_ENCRYPTION_KEY`, which is never exported. 403 `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: The export
+          headers:
+            Content-Disposition:
+              schema: { type: string, example: 'attachment; filename="familyfi-export-2026-10-09.tar.gz"' }
+          content:
+            application/gzip:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/settings/import:
+    post:
+      operationId: importHousehold
+      tags: [Settings]
+      summary: Preview or apply a household export
+      description: |
+        The body is an export from `GET /api/v1/settings/export`. `mode=preview` reads it and says what applying
+        it would do, changing nothing. `mode=apply` replaces the groups, rules, device assignments, accounts,
+        DNS categories and settings with the export's, then reconciles. A UniFi key, tunnel credential or
+        Access token saved here is kept; a route whose token is missing is imported switched off. The importing
+        account is never removed or demoted, and any other account whose password changes is signed out.
+        Pairings, paired devices and history are not imported. 400 `invalid_export` for a file FamilyFi did not
+        write or a damaged one, 409 `export_too_new` for one a newer FamilyFi wrote, 413 `export_too_large`
+        over 50 MB. 403 `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+        - name: mode
+          in: query
+          required: true
+          schema: { type: string, enum: [preview, apply] }
+      requestBody:
+        required: true
+        content:
+          application/gzip:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: What the export holds, and for `apply` the change that reconciles it
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [summary, change]
+                properties:
+                  summary: { $ref: "#/components/schemas/ImportSummary" }
+                  change:
+                    description: The reconciliation `apply` started; null for `preview`.
+                    oneOf:
+                      - $ref: "#/components/schemas/ChangeSummary"
+                      - type: "null"
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
   /api/v1/settings/unifi:
     get:
       operationId: getUnifiSettings
@@ -554,6 +626,75 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+  /api/v1/update:
+    get:
+      operationId: getUpdateSettings
+      tags: [Update]
+      summary: The updater, the automatic schedule and the last install
+      description: |
+        Whether the Watchtower sidecar is set up (`FAMILYFI_UPDATER_TOKEN`), when FamilyFi installs a newer
+        release on its own, and the last install with its outcome. Reading it settles an install that has
+        finished, so a client polls this while `lastRun.status` is `requested`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Update settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UpdateSettings" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/update/schedule:
+    put:
+      operationId: updateUpdateSchedule
+      tags: [Update]
+      summary: Set when FamilyFi installs a newer release on its own
+      description: Days and a household-local time. New households install on Sunday at midnight. 403 `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSchedule" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UpdateSettings" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/update/install:
+    post:
+      operationId: installUpdate
+      tags: [Update]
+      summary: Install the newer release now
+      description: |
+        Asks the Watchtower sidecar to replace FamilyFi with the release the update check found. Watchtower
+        backs up the database first and skips the install when the backup fails. FamilyFi restarts on the
+        new release; poll `GET /api/v1/update` for the outcome. 409 `updater_not_configured` without the
+        sidecar, `no_update_available` when there is nothing newer and `update_in_progress` while an install
+        is under way; 502 `updater_unreachable` when Watchtower cannot be reached or refuses the token.
+        403 `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "202":
+          description: Watchtower accepted the request
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [run]
+                properties:
+                  run: { $ref: "#/components/schemas/UpdateRun" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
   /api/v1/groups:
     get:
       operationId: listGroups
@@ -2554,6 +2695,100 @@ components:
           description: Present when status is degraded due to configuration, not secrets.
         update:
           $ref: "#/components/schemas/UpdateCheck"
+    ImportSummary:
+      type: object
+      additionalProperties: false
+      required: [exportedAt, appVersion, counts, gateway, unifiKey, endpointsNeedingToken, skippedEndpoints, otherInstallPolicies, databaseDump]
+      properties:
+        exportedAt: { type: string, format: date-time }
+        appVersion: { type: string, description: "The FamilyFi version that wrote the export (no leading v)." }
+        counts:
+          type: object
+          additionalProperties: false
+          required: [groups, accounts, devices, rules, categories, endpoints]
+          properties:
+            groups: { type: integer }
+            accounts: { type: integer }
+            devices: { type: integer }
+            rules: { type: integer }
+            categories: { type: integer }
+            endpoints: { type: integer }
+        gateway:
+          type: string
+          enum: [imported, kept]
+          description: "`kept` when a UniFi key is saved here for another console or site: this install's gateway connection stays."
+        unifiKey:
+          type: string
+          enum: [kept, missing]
+          description: "`missing` when no UniFi key is saved here; setup asks for it after the import."
+        endpointsNeedingToken:
+          type: array
+          items: { type: string }
+          description: Routes imported switched off, because their Cloudflare Access token is not saved here.
+        skippedEndpoints:
+          type: array
+          items: { type: string }
+          description: FamilyFi's own tunnel routes, which are not imported; turn remote access on again.
+        otherInstallPolicies:
+          type: boolean
+          description: The export came from another install on this gateway; the FamilyFi policies that install made stay on it for the operator to delete in UniFi.
+        databaseDump: { type: boolean, description: The export carries `database.dump`. }
+    UpdateSchedule:
+      type: object
+      additionalProperties: false
+      required: [enabled, days, time]
+      properties:
+        enabled: { type: boolean }
+        days:
+          type: array
+          maxItems: 7
+          items: { type: integer, minimum: 0, maximum: 6 }
+          description: 0 is Sunday. At least one day while enabled.
+        time:
+          type: string
+          pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          description: Household-local HH:MM.
+          example: "00:00"
+    UpdateRun:
+      type: object
+      additionalProperties: false
+      required: [id, trigger, fromVersion, targetVersion, status, requestedAt, finishedAt, error]
+      properties:
+        id: { type: string }
+        trigger: { type: string, enum: [manual, scheduled] }
+        fromVersion: { type: string, description: "Semver that asked for the install (no leading v)." }
+        targetVersion: { type: string, description: "Semver the update check offered (no leading v)." }
+        status:
+          type: string
+          enum: [requested, succeeded, failed, skipped, unchanged]
+          description: |
+            `requested` until the outcome is known. `succeeded`: the new release is running. `failed`: Watchtower
+            could not replace the container, could not be reached, or reported nothing within 30 minutes.
+            `skipped`: Watchtower skipped it, as when the backup before installing failed. `unchanged`: no newer
+            image under the tag FamilyFi runs, as when `FAMILYFI_IMAGE` pins a version.
+        requestedAt: { type: string, format: date-time }
+        finishedAt: { type: [string, "null"], format: date-time }
+        error: { type: [string, "null"], description: "Why it did not succeed, for the operator." }
+    UpdateSettings:
+      type: object
+      additionalProperties: false
+      required: [updater, schedule, nextRunAt, lastRun]
+      properties:
+        updater:
+          type: object
+          additionalProperties: false
+          required: [configured]
+          properties:
+            configured: { type: boolean, description: "The Watchtower sidecar's token is set, so FamilyFi can install." }
+        schedule: { $ref: "#/components/schemas/UpdateSchedule" }
+        nextRunAt:
+          type: [string, "null"]
+          format: date-time
+          description: The next scheduled install check; null when the schedule is off or the updater is not set up.
+        lastRun:
+          oneOf:
+            - $ref: "#/components/schemas/UpdateRun"
+            - type: "null"
     UpdateCheck:
       type: object
       additionalProperties: false

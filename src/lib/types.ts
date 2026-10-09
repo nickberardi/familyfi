@@ -128,6 +128,46 @@ export type UpdateCheck = {
   error: string | null;
 };
 
+export type UpdateRunStatus = "requested" | "succeeded" | "failed" | "skipped" | "unchanged";
+
+/** One request to install a release through the Watchtower sidecar, and its outcome once known. */
+export type UpdateRun = {
+  id: string;
+  trigger: "manual" | "scheduled";
+  fromVersion: string;
+  targetVersion: string;
+  status: UpdateRunStatus;
+  requestedAt: string;
+  finishedAt: string | null;
+  error: string | null;
+};
+
+/** GET /api/v1/update: whether the updater is set up, the automatic schedule and the last install. */
+export type UpdateSettings = {
+  updater: { configured: boolean };
+  schedule: { enabled: boolean; days: number[]; time: string };
+  nextRunAt: string | null;
+  lastRun: UpdateRun | null;
+};
+
+/** What importing a household export does, shown before it is applied and returned after. */
+export type ImportSummary = {
+  exportedAt: string;
+  appVersion: string;
+  counts: { groups: number; accounts: number; devices: number; rules: number; categories: number; endpoints: number };
+  /** `kept` when this install's gateway is another console or site and its key is saved: only its own connection stays. */
+  gateway: "imported" | "kept";
+  /** `missing` when no UniFi key is saved here: setup asks for it after the import. */
+  unifiKey: "kept" | "missing";
+  /** Routes imported switched off, because their Cloudflare credential is not saved here. */
+  endpointsNeedingToken: string[];
+  /** FamilyFi's own tunnel routes, which are not imported: turn remote access on again. */
+  skippedEndpoints: string[];
+  /** The export came from another install on this same gateway, whose FamilyFi policies stay there. */
+  otherInstallPolicies: boolean;
+  databaseDump: boolean;
+};
+
 export type ConnectionTransport = "lan" | "tailscale" | "cloudflare";
 
 /** Who runs a route: FamilyFi's quick tunnel, FamilyFi's tunnel on the household's domain, or the household. */

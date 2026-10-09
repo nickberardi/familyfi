@@ -45,10 +45,21 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=7001
 ENV HOSTNAME=0.0.0.0
-# Prisma engines need OpenSSL present to pick the right binary (avoids openssl-1.1.x warn).
+# Prisma engines need OpenSSL present to pick the right binary (avoids openssl-1.1.x warn), and
+# pg_dump is for the backup before an update and for export (scripts/runtime/pre-update-backup.sh,
+# src/server/database-dump.ts). It must be the server's major version, PostgreSQL 18, which Debian
+# bookworm does not ship, so it comes from the PostgreSQL project's repository, its key hash-checked.
+ADD https://www.postgresql.org/media/keys/ACCC4CF8.asc /etc/apt/keyrings/pgdg.asc
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates gosu \
-  && rm -rf /var/lib/apt/lists/*
+  && echo "0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76  /etc/apt/keyrings/pgdg.asc" | sha256sum -c - \
+  && chmod 644 /etc/apt/keyrings/pgdg.asc \
+  && echo "deb [signed-by=/etc/apt/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+    > /etc/apt/sources.list.d/pgdg.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends postgresql-client-18 \
+  && rm -rf /var/lib/apt/lists/* \
+  && pg_dump --version
 # cloudflared for Remote access. Pinned and hash-checked at build time; FamilyFi never
 # downloads it at runtime. Bump the version and both hashes together (hashes are in the
 # release notes at github.com/cloudflare/cloudflared/releases).
@@ -75,7 +86,7 @@ COPY --from=build /app/openapi ./openapi
 COPY --from=build /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite
 COPY --from=build /app/.env.example ./.env.example
 COPY scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh \
+RUN chmod +x /app/docker-entrypoint.sh /app/scripts/runtime/pre-update-backup.sh \
   && groupadd --system familyfi \
   && useradd --system --gid familyfi --home-dir /app familyfi \
   && mkdir -p /var/lib/familyfi/data \

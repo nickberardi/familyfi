@@ -5,7 +5,8 @@ import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { parseHm } from "@/lib/schedule";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
-import { DEFAULT_PROBE_DAYS, DEFAULT_PROBE_TIME, nextProbeRunAt, rescheduleUpstreamProbe } from "@/server/upstream/schedule";
+import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
+import { DEFAULT_WEEKLY_DAYS, DEFAULT_WEEKLY_TIME, nextWeeklyRunAt } from "@/server/weekly-schedule";
 import { withUpstreamLock } from "@/server/upstream/transaction";
 import { refreshResolverContexts, type ResolverContext } from "@/server/upstream/discovery";
 import { demoLocked } from "@/server/demo";
@@ -29,8 +30,8 @@ function serialize(household: {
   dohProbeTimeoutMs: number;
   timezone: string;
 }, context: ResolverContext) {
-  const probeTime = household.dohProbeTime ?? DEFAULT_PROBE_TIME;
-  const probeDays = household.dohProbeDays ?? DEFAULT_PROBE_DAYS;
+  const probeTime = household.dohProbeTime ?? DEFAULT_WEEKLY_TIME;
+  const probeDays = household.dohProbeDays ?? DEFAULT_WEEKLY_DAYS;
   return {
     configured: context.source !== "unknown" && !context.reason,
     url: household.dohUrl ?? null,
@@ -44,7 +45,7 @@ function serialize(household: {
     lastRunAt: household.dohProbeLastRunAt?.toISOString() ?? null,
     nextRunAt:
       household.dohProbeEnabled && probeDays.length > 0
-        ? nextProbeRunAt(new Date(), household.timezone, probeTime, probeDays).toISOString()
+        ? nextWeeklyRunAt(new Date(), household.timezone, probeTime, probeDays).toISOString()
         : null,
   };
 }
@@ -63,8 +64,8 @@ export async function GET(request: Request) {
         household ?? {
           dohUrl: null,
           dohProbeEnabled: false,
-          dohProbeTime: DEFAULT_PROBE_TIME,
-          dohProbeDays: DEFAULT_PROBE_DAYS,
+          dohProbeTime: DEFAULT_WEEKLY_TIME,
+          dohProbeDays: DEFAULT_WEEKLY_DAYS,
           dohProbeLastRunAt: null,
           dohProbeTimeoutMs: 5000,
           timezone: "America/New_York",

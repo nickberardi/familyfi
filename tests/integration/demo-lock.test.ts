@@ -17,7 +17,11 @@ import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
 import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
 import { PUT as setHousehold } from "@/app/api/v1/settings/household/route";
+import { GET as exportHousehold } from "@/app/api/v1/settings/export/route";
+import { POST as importHousehold } from "@/app/api/v1/settings/import/route";
 import { PUT as setUnifi } from "@/app/api/v1/settings/unifi/route";
+import { POST as installUpdate } from "@/app/api/v1/update/install/route";
+import { PUT as setUpdateSchedule } from "@/app/api/v1/update/schedule/route";
 import { DELETE as clearResolver, PUT as setResolver } from "@/app/api/v1/upstream/resolver/route";
 import { prisma } from "@/server/db";
 import { ensureDemoRoute } from "@/server/demo";
@@ -26,7 +30,8 @@ import { resetDatabase } from "../helpers/db";
 
 /**
  * In demo mode every visitor shares one household, so its configuration is locked: the gateway,
- * household settings, accounts, resolvers and how phones connect. The household itself (groups,
+ * household settings, accounts, resolvers, how phones connect, installing updates, and exporting or
+ * importing the household. The household itself (groups,
  * rules, pauses, devices) and pairing a phone work as they do at home.
  */
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -84,6 +89,10 @@ describe("demo mode", () => {
       await computePin(write(auth, "/api/v1/connection/pins", "POST", { url: "https://192.0.2.10:8443" })),
       await setTunnel(write(auth, "/api/v1/connection/tunnel", "PUT", { mode: "quick" })),
       await setHome(write(auth, "/api/v1/connection/home", "PUT", { url: "http://192.168.1.10:7001" })),
+      await setUpdateSchedule(write(auth, "/api/v1/update/schedule", "PUT", { enabled: false, days: [], time: "00:00" })),
+      await installUpdate(write(auth, "/api/v1/update/install", "POST")),
+      await exportHousehold(request("/api/v1/settings/export", { auth })),
+      await importHousehold(write(auth, "/api/v1/settings/import?mode=apply", "POST")),
       // The built-in quarantine rule's switch is the household's quarantine setting.
       await turnOnRule(write(auth, "/api/v1/rules/quarantine/on", "POST"), params({ id: "quarantine" })),
       await turnOffRule(write(auth, "/api/v1/rules/quarantine/off", "POST"), params({ id: "quarantine" })),

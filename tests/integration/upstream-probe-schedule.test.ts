@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UpstreamSource } from "@prisma/client";
 import { prisma } from "@/server/db";
-import { dueProbeRunAt, runProbeCatchUpForTests, stopUpstreamProbeForTests } from "@/server/upstream/schedule";
+import { runProbeCatchUpForTests, stopUpstreamProbeForTests } from "@/server/upstream/schedule";
+import { dueWeeklyRunAt } from "@/server/weekly-schedule";
 import { resetDatabase } from "../helpers/db";
 
 const RESOLVER_URL = "https://dns.example.com/dns-query/household";
@@ -44,7 +45,7 @@ describe("upstream probe schedule", () => {
     // Every day, so the most recent due instant is today's midnight whatever weekday the test runs on.
     const everyDay = [0, 1, 2, 3, 4, 5, 6];
     await setHousehold({ dohProbeEnabled: true, dohProbeTime: "00:00", dohProbeDays: everyDay, dohProbeLastRunAt: null });
-    const expectedDue = dueProbeRunAt(new Date(), "America/New_York", "00:00", everyDay);
+    const expectedDue = dueWeeklyRunAt(new Date(), "America/New_York", "00:00", everyDay);
     const claimed = await runProbeCatchUpForTests();
     expect(claimed).toBe(true);
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
@@ -120,7 +121,7 @@ describe("upstream probe schedule", () => {
     const everyDayButToday = [0, 1, 2, 3, 4, 5, 6].filter((day) => day !== todayInNewYork());
     // Already caught up through the most recent scheduled day (today excluded), so
     // today passing local midnight must not, by itself, trigger another claim.
-    const alreadyDue = dueProbeRunAt(new Date(), "America/New_York", "00:00", everyDayButToday);
+    const alreadyDue = dueWeeklyRunAt(new Date(), "America/New_York", "00:00", everyDayButToday);
     await setHousehold({
       dohProbeEnabled: true,
       dohProbeTime: "00:00",

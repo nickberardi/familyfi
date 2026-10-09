@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppData } from "@/components/AppDataProvider";
+import { BackupImport } from "@/components/BackupImport";
 import { FIELD } from "@/components/pair/SheetFrame";
 import { AdminSignInStep, BODY, CHECKBOX, ROW_RULE, SetupFrame, TITLE } from "@/components/setup/SetupFrame";
 import { Icon } from "@/components/ui/Icon";
@@ -285,6 +286,24 @@ export function SetupWizard({ initialStep = 0, password }: { initialStep?: numbe
               Connected to UniFi Network {probe.applicationVersion} · site {probe.site.name}
             </p>
           ) : null}
+          <details className="rounded-[10px] border border-[var(--ff-line)] px-3.5 py-3" data-testid="setup-restore">
+            <summary className="cursor-pointer text-[14px] font-semibold text-[var(--ff-ink)]">Restore from an export</summary>
+            <div className="mt-2.5">
+              <BackupImport
+                onImported={async () => {
+                  await reload();
+                  // Start the remaining steps from the restored household: its gateway, people and rules.
+                  setHost(null);
+                  setSiteId(null);
+                  setMembers(null);
+                  setCreatedRules(null);
+                  setScheduled(null);
+                  setProbe(null);
+                  setSelected(null);
+                }}
+              />
+            </div>
+          </details>
         </>
       ) : null}
 

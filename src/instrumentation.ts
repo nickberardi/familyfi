@@ -22,6 +22,7 @@ export async function register() {
   const { ensureUpstreamCategories } = await import("./server/upstream-seed");
   const { startReconciliation } = await import("./server/reconciliation");
   const { startUpstreamProbe } = await import("./server/upstream/schedule");
+  const { startAutoUpdate } = await import("./server/updater");
   try {
     await ensureRecoveryAccount();
     await ensureHousehold();
@@ -48,6 +49,7 @@ export async function register() {
   startUpdateCheck();
   startReconciliation();
   startUpstreamProbe();
+  startAutoUpdate();
   const { resumeRemoteAccess, startSidecarGateway } = await import("./server/tunnel/remote-access");
   const sidecarPort = Number(process.env.FAMILYFI_PHONE_GATEWAY_PORT);
   if (Number.isInteger(sidecarPort) && sidecarPort > 0 && sidecarPort < 65536) {
