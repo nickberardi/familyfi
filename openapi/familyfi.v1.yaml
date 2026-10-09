@@ -470,8 +470,9 @@ paths:
         with their password hashes, DNS categories, the household's own routes and settings) and, where
         `pg_dump` can reach the database, `database.dump` for an exact restore with `pg_restore`. No UniFi key,
         tunnel credential or Access token is in `config.json`; the dump holds them encrypted with this
-        install's `FAMILYFI_ENCRYPTION_KEY`, which is never exported. 403 `demo_locked` in the demo.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+        install's `FAMILYFI_ENCRYPTION_KEY`, which is never exported. A browser session only: a paired device
+        gets 403 `browser_session_required`. 403 `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }]
       responses:
         "200":
           description: The export
@@ -493,11 +494,13 @@ paths:
         it would do, changing nothing. `mode=apply` replaces the groups, rules, device assignments, accounts,
         DNS categories and settings with the export's, then reconciles. A UniFi key, tunnel credential or
         Access token saved here is kept; a route whose token is missing is imported switched off. The importing
-        account is never removed or demoted, and any other account whose password changes is signed out.
+        account is never removed or demoted and keeps its password; any other account whose password changes
+        is signed out.
         Pairings, paired devices and history are not imported. 400 `invalid_export` for a file FamilyFi did not
         write or a damaged one, 409 `export_too_new` for one a newer FamilyFi wrote, 413 `export_too_large`
-        over 50 MB. 403 `demo_locked` in the demo.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+        over 50 MB. A browser session only: a paired device gets 403 `browser_session_required`. 403
+        `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/CsrfToken"
         - name: mode
@@ -2763,9 +2766,9 @@ components:
           enum: [requested, succeeded, failed, skipped, unchanged]
           description: |
             `requested` until the outcome is known. `succeeded`: the new release is running. `failed`: Watchtower
-            could not replace the container, could not be reached, or reported nothing within 30 minutes.
-            `skipped`: Watchtower skipped it, as when the backup before installing failed. `unchanged`: no newer
-            image under the tag FamilyFi runs, as when `FAMILYFI_IMAGE` pins a version.
+            did not replace the container (the backup before installing failed, or the replacement did), could not
+            be reached, or reported nothing within 30 minutes. `skipped`: Watchtower skipped it for a reason of its
+            own. `unchanged`: no newer image under the tag FamilyFi runs, as when `FAMILYFI_IMAGE` pins a version.
         requestedAt: { type: string, format: date-time }
         finishedAt: { type: [string, "null"], format: date-time }
         error: { type: [string, "null"], description: "Why it did not succeed, for the operator." }

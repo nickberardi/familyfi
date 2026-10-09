@@ -1,7 +1,7 @@
 import { enqueueChange } from "@/server/changes";
 import { demoLocked } from "@/server/demo";
 import { withAdmin } from "@/server/guard";
-import { applyImport, HouseholdImportError, IMPORT_MAX_BYTES, previewImport } from "@/server/household-export";
+import { applyImport, browserOnly, HouseholdImportError, IMPORT_MAX_BYTES, previewImport } from "@/server/household-export";
 import { jsonError } from "@/server/http";
 import { rescheduleAutoUpdate } from "@/server/updater";
 import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
@@ -22,6 +22,8 @@ async function readUpload(request: Request): Promise<Buffer | null> {
 
 export async function POST(request: Request) {
   return withAdmin(request, async (session) => {
+    const refused = browserOnly(session);
+    if (refused) return refused;
     const locked = demoLocked();
     if (locked) return locked;
     const mode = new URL(request.url).searchParams.get("mode");

@@ -1,4 +1,4 @@
-import { AccountKind, AssignmentState, FamilyRole, GroupKind, SessionKind } from "@prisma/client";
+import { AccountKind, AssignmentState, DeviceScope, FamilyRole, GroupKind, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as exportRoute } from "@/app/api/v1/settings/export/route";
@@ -214,6 +214,36 @@ describe("household export", () => {
     const sessions = await prisma().session.findMany({ where: { accountId: parent.id } });
     expect(sessions.length).toBeGreaterThan(0);
     expect(sessions.every((session) => session.revokedAt !== null)).toBe(true);
+  });
+
+  it("lets the importing administrator keep the password they changed since the export, and their session", async () => {
+    await buildHousehold();
+    const archive = await exportArchive(await recoveryAuth());
+    const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
+    const changed = await hashPassword("changed-password-1");
+    await prisma().account.update({ where: { id: parent.id }, data: { passwordHash: changed } });
+    await imported(await sessionFor("parent"), archive);
+    expect(await prisma().account.findUniqueOrThrow({ where: { id: parent.id } })).toMatchObject({ passwordHash: changed, isAdmin: true });
+    const sessions = await prisma().session.findMany({ where: { accountId: parent.id } });
+    expect(sessions.some((session) => session.revokedAt === null)).toBe(true);
+  });
+
+  it("refuses a paired phone, which is never handed the household or allowed to replace it", async () => {
+    await buildHousehold();
+    const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
+    const phone = await prisma().pairedDevice.create({
+      data: { displayName: "Parent's iPhone", client: PairedDeviceClient.phone, scope: DeviceScope.full, accountId: parent.id },
+    });
+    const issued = await createSession({ accountId: parent.id, username: "parent", kind: SessionKind.bearer, deviceId: phone.id });
+    const bearer: SessionAuth = { cookie: "", csrf: "", token: issued.raw };
+    const archive = await exportArchive(await recoveryAuth());
+    for (const response of [
+      await exportRoute(request("/api/v1/settings/export", { auth: bearer })),
+      await importRequest(bearer, "apply", archive),
+    ]) {
+      expect(response.status).toBe(403);
+      expect(((await response.json()) as { error: { code: string } }).error.code).toBe("browser_session_required");
+    }
   });
 
   it("refuses what FamilyFi did not write, a newer FamilyFi's export, and a missing mode", async () => {

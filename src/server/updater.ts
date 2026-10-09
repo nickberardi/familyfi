@@ -100,8 +100,12 @@ export function updateOutcome(input: {
   if (current && target && compareSemver(current, target) >= 0) return { status: "succeeded", error: null };
   const history = input.history;
   if (history && history.scans > 0) {
+    // A pre-update hook that exits 75 (the backup failed) is counted as failed, not skipped.
     if (history.failed > 0) {
-      return { status: "failed", error: "Watchtower could not replace the FamilyFi container. Its log says why." };
+      return {
+        status: "failed",
+        error: "Watchtower did not replace FamilyFi: the backup before installing failed, or the replacement did. The FamilyFi and Watchtower logs say which.",
+      };
     }
     if (history.updated > 0) {
       return {
@@ -112,7 +116,7 @@ export function updateOutcome(input: {
     if (history.skipped > 0) {
       return {
         status: "skipped",
-        error: "Watchtower skipped the update. The backup before installing may have failed; the FamilyFi container's log says why.",
+        error: "Watchtower skipped the update; its log says why.",
       };
     }
     return {
