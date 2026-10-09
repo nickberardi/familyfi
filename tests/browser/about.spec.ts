@@ -11,13 +11,14 @@ async function signIn(page: Page) {
   if (!login.ok()) throw new Error(`login failed (${login.status()})`);
 }
 
-test("opens About from the rail's row and its lockup, and closes on Done and Escape", { tag: "@desktop" }, async ({ page }) => {
+test("opens About from the rail's version line and its lockup, and closes on Done and Escape", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/family");
 
-  // The lockup and the row under the nav groups are both "About FamilyFi".
+  // The lockup and the "FamilyFi v…" line under the account card are both "About FamilyFi".
   const openers = page.getByRole("button", { name: "About FamilyFi" });
   await expect(openers).toHaveCount(2);
+  await expect(openers.last()).toHaveText(/^FamilyFi v\d+\.\d+\.\d+/);
 
   await openers.last().click();
   const about = page.getByRole("dialog", { name: "About FamilyFi" });
