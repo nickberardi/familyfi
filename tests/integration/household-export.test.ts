@@ -325,6 +325,17 @@ describe("household export", () => {
     expect(seeded.domains.some((domain) => domain.domain === "ours.example.com")).toBe(false);
   });
 
+  it("imports a schedule exported with no days as off, on Sunday, since cron needs a day", async () => {
+    const auth = await recoveryAuth();
+    const files = readArchive(await exportArchive(auth), FILES);
+    const config = JSON.parse(files.get("config.json")!.toString());
+    config.household.autoUpdate = { enabled: true, days: [], time: "04:30" };
+    // Import re-arms the DNS check, whose catch-up would otherwise sweep into the next test.
+    config.household.resolver.probeEnabled = false;
+    await imported(auth, writeArchive([{ name: "manifest.json", data: files.get("manifest.json")! }, { name: "config.json", data: Buffer.from(JSON.stringify(config)) }]));
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ updateScheduleEnabled: false, updateSchedule: "30 4 * * 0" });
+  });
+
   it("refuses a rule or resolver the API would refuse, before changing anything", async () => {
     await buildHousehold();
     const auth = await recoveryAuth();
