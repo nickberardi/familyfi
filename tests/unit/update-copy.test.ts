@@ -64,8 +64,8 @@ describe("install progress and schedule", () => {
     expect(updateRunLine(null)).toBeNull();
     expect(updateRunLine(run())).toBe("Installing v0.6.0… FamilyFi restarts on its own; this page reconnects by itself.");
     expect(updateRunLine(run({ status: "succeeded" }))).toBe("Installed v0.6.0.");
-    expect(updateRunLine(run({ status: "failed", error: "Watchtower refused FAMILYFI_UPDATER_TOKEN." }))).toBe(
-      "Installing v0.6.0 failed. Watchtower refused FAMILYFI_UPDATER_TOKEN.",
+    expect(updateRunLine(run({ status: "failed", error: "Watchtower refused FamilyFi's updater token." }))).toBe(
+      "Installing v0.6.0 failed. Watchtower refused FamilyFi's updater token.",
     );
     expect(updateRunLine(run({ status: "unchanged", error: "No newer image." }))).toBe("v0.6.0 was not installed. No newer image.");
     expect(installing(settings({ lastRun: run() }))).toBe(true);

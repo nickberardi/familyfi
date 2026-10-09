@@ -8,6 +8,7 @@ import {
   GroupKind,
   RouteKind,
   RuleKind,
+  RuleLiftKind,
   RuleMode,
   RuleScope,
   UpstreamSource,
@@ -21,6 +22,9 @@ import { APP_VERSION } from "@/lib/version";
 import { ArchiveError, readArchive, writeArchive } from "./archive";
 import { ensureConnectionIdentity, removeAccountDevices } from "./connection";
 import { dumpDatabase } from "./database-dump";
+import { assertManagedNetworkIds, RuleInputError, validateRuleShape } from "./rules";
+import { normalizeResolverUrl, ResolverConfigError } from "./upstream/resolver-settings";
+import { customSlugFor } from "./upstream-seed";
 import { prisma } from "./db";
 import { jsonError } from "./http";
 import { compareSemver, parseSemver } from "./update-check";
@@ -36,6 +40,8 @@ import { compareSemver, parseSemver } from "./update-check";
 export const EXPORT_FORMAT = "familyfi-export";
 export const EXPORT_FORMAT_VERSION = 1;
 export const IMPORT_MAX_BYTES = 50 * 1024 * 1024;
+/** Tar headers and padding for the three files, beyond their contents. */
+const ARCHIVE_OVERHEAD_BYTES = 64 * 1024;
 const FILES = ["manifest.json", "config.json", "database.dump"] as const;
 
 const Hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -295,7 +301,14 @@ export async function exportHousehold(now = new Date()): Promise<{ archive: Buff
   const config = await householdConfig();
   // Which install wrote it, so an import elsewhere on the same gateway can warn about this one's policies.
   const household = await ensureConnectionIdentity();
-  const dump = await dumpDatabase();
+  const configJson = Buffer.from(`${JSON.stringify(config, null, 2)}\n`);
+  // Import reads at most IMPORT_MAX_BYTES of contents, so a dump that would push the export past it
+  // is left out (named in the manifest) rather than making the file unimportable.
+  const dumped = await dumpDatabase();
+  const room = IMPORT_MAX_BYTES - configJson.length - 4096;
+  const dump = dumped.data && dumped.data.length > room
+    ? { data: null, reason: "The database dump would make the export too large to import; back up the database itself instead." }
+    : dumped;
   const manifest: Manifest = {
     format: EXPORT_FORMAT,
     formatVersion: EXPORT_FORMAT_VERSION,
@@ -307,7 +320,7 @@ export async function exportHousehold(now = new Date()): Promise<{ archive: Buff
   };
   const files = [
     { name: "manifest.json", data: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`) },
-    { name: "config.json", data: Buffer.from(`${JSON.stringify(config, null, 2)}\n`) },
+    { name: "config.json", data: configJson },
     ...(dump.data ? [{ name: "database.dump", data: dump.data }] : []),
   ];
   return { archive: writeArchive(files, now), filename: `familyfi-export-${now.toISOString().slice(0, 10)}.tar.gz` };
@@ -333,8 +346,7 @@ function parseJson<T>(schema: z.ZodType<T>, data: Buffer | undefined, name: stri
 export function readExport(upload: Buffer): { manifest: Manifest; config: HouseholdConfig; hasDump: boolean } {
   let files: Map<string, Buffer>;
   try {
-    // The dump alone may reach the per-file cap; the manifest and configuration come on top of it.
-    files = readArchive(upload, { allowed: FILES, maxFileBytes: IMPORT_MAX_BYTES, maxTotalBytes: IMPORT_MAX_BYTES * 2 });
+    files = readArchive(upload, { allowed: FILES, maxFileBytes: IMPORT_MAX_BYTES, maxTotalBytes: IMPORT_MAX_BYTES + ARCHIVE_OVERHEAD_BYTES });
   } catch (error) {
     if (error instanceof ArchiveError) throw new HouseholdImportError("invalid_export", error.message);
     throw error;
@@ -349,13 +361,67 @@ export function readExport(upload: Buffer): { manifest: Manifest; config: Househ
   if (compareSemver(exported, running) > 0) {
     throw new HouseholdImportError("export_too_new", `FamilyFi v${manifest.appVersion} wrote this export. Update FamilyFi, then import it.`);
   }
-  return { manifest, config: parseJson(Config, files.get("config.json"), "config.json"), hasDump: files.has("database.dump") };
+  return { manifest, config: checkWrites(parseJson(Config, files.get("config.json"), "config.json")), hasDump: files.has("database.dump") };
+}
+
+/**
+ * The same checks the API makes on the way in, so an edited or damaged export cannot store a rule or
+ * resolver the routes would refuse: rules through `validateRuleShape` (their groups are checked
+ * against the export itself), network rules against the export's networks, resolvers through
+ * `normalizeResolverUrl`. Returns the configuration as those checks normalise it.
+ */
+function checkWrites(config: HouseholdConfig): HouseholdConfig {
+  const scope = { manageAllNetworks: config.household.unifi.manageAllNetworks, managedNetworkIds: config.household.unifi.managedNetworkIds };
+  const rules = config.rules.map((rule) => {
+    try {
+      const shaped = validateRuleShape({ ...rule, windows: rule.windows.map(({ id, name, days, start, end }) => ({ id, name, days, start, end })) });
+      if (shaped.scope === RuleScope.network) assertManagedNetworkIds(shaped.networkIds, scope);
+      const positions = new Map(rule.windows.map((window) => [window.id, window.position]));
+      return {
+        ...rule,
+        name: shaped.name,
+        targetIds: shaped.targetIds,
+        domains: shaped.domains,
+        groupIds: shaped.groupIds,
+        networkIds: shaped.networkIds,
+        windows: shaped.windows.map((window, index) => ({
+          id: window.id!,
+          position: positions.get(window.id!) ?? index,
+          name: window.name,
+          days: window.days,
+          start: window.start,
+          end: window.end,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof RuleInputError) throw new HouseholdImportError("invalid_export", `The rule “${rule.name}” cannot be imported: ${error.message}`);
+      throw error;
+    }
+  });
+  const resolver = (url: string | null, owner: string) => {
+    if (url === null) return null;
+    try {
+      return normalizeResolverUrl(url);
+    } catch (error) {
+      if (error instanceof ResolverConfigError) throw new HouseholdImportError("invalid_export", `${owner}'s DNS-over-HTTPS endpoint cannot be imported: ${error.message}`);
+      throw error;
+    }
+  };
+  return {
+    ...config,
+    household: { ...config.household, resolver: { ...config.household.resolver, dohUrl: resolver(config.household.resolver.dohUrl, "The household") } },
+    groups: config.groups.map((group) => ({ ...group, dohOverrideUrl: resolver(group.dohOverrideUrl, group.name) })),
+    rules,
+  };
 }
 
 type Current = Prisma.HouseholdGetPayload<object>;
 type EndpointRow = { url: string; kind: RouteKind; edgeAuth: EdgeAuth; tunnelCredentialCiphertext: Uint8Array | null; edgeTokenCiphertext: Uint8Array | null };
 
-/** Routes FamilyFi runs itself (its quick tunnel, its tunnel on the household's domain) stay with the install. */
+/**
+ * Only routes the household runs are imported. FamilyFi's own quick tunnel and its tunnel on the
+ * household's domain stay with the install that made them.
+ */
 const imports = (endpoint: HouseholdConfig["endpoints"][number]) => endpoint.kind === RouteKind.own;
 
 /** An `own` Cloudflare route behind Access needs its token; without one here it is imported switched off. */
@@ -473,7 +539,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       // Pauses are moments, not configuration: the quarantine rule starts the import unpaused.
       await tx.rule.update({
         where: { id: QUARANTINE_RULE_ID },
-        data: { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
+        data: { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
       });
 
       // Rules (system rules go with their groups), then groups; devices and accounts let go of them.
@@ -561,24 +627,40 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
  * own domains in seeded ones, are replaced.
  */
 async function importCategories(tx: Prisma.TransactionClient, categories: HouseholdConfig["categories"], now: Date) {
-  const existing = await tx.upstreamCategory.findMany({ include: { domains: true } });
-  const bySlug = new Map(existing.map((category) => [category.slug, category]));
-  const exported = new Set(categories.map((category) => category.slug));
-  await tx.upstreamCategory.deleteMany({ where: { source: UpstreamSource.user, slug: { notIn: [...exported] } } });
+  const existing = await tx.upstreamCategory.findMany({ select: { slug: true, source: true } });
+  const seeds = new Set(existing.filter((category) => category.source === UpstreamSource.seed).map((category) => category.slug));
+  // A household category whose slug is a seed of this release stays its own category, under the
+  // slug the boot seed would give it (`customSlugFor`), never merged into the seed's.
+  const placed: { category: HouseholdConfig["categories"][number]; slug: string }[] = [];
+  const taken = new Set(categories.map((category) => category.slug));
   for (const category of categories) {
-    const seeded = bySlug.get(category.slug)?.source === UpstreamSource.seed;
-    // A household category that collides with a seed of this release stays a separate category.
-    if (category.source === UpstreamSource.seed && !seeded) continue;
-    const row = seeded
+    if (category.source === UpstreamSource.seed) {
+      // A seed this release no longer ships is not brought back.
+      if (seeds.has(category.slug)) placed.push({ category, slug: category.slug });
+      continue;
+    }
+    if (!seeds.has(category.slug)) {
+      placed.push({ category, slug: category.slug });
+      continue;
+    }
+    const slug = await customSlugFor(tx, category.slug, taken);
+    taken.add(slug);
+    placed.push({ category, slug });
+  }
+  const kept = placed.filter((entry) => entry.category.source === UpstreamSource.user).map((entry) => entry.slug);
+  await tx.upstreamCategory.deleteMany({ where: { source: UpstreamSource.user, slug: { notIn: kept } } });
+  for (const { category, slug } of placed) {
+    const row =
+      category.source === UpstreamSource.seed
       ? await tx.upstreamCategory.update({
-          where: { slug: category.slug },
+          where: { slug },
           data: { enabled: category.enabled, disabledAt: category.enabled ? null : now },
         })
       : await tx.upstreamCategory.upsert({
-          where: { slug: category.slug },
+          where: { slug },
           update: { label: category.label, monogram: category.monogram, enabled: category.enabled, disabledAt: category.enabled ? null : now },
           create: {
-            slug: category.slug,
+            slug,
             label: category.label,
             monogram: category.monogram,
             source: UpstreamSource.user,

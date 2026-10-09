@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { UPDATE_RUN_TIMEOUT_MS, updateOutcome, updaterSettings, type WatchtowerHistory } from "@/server/updater";
 
@@ -6,14 +9,15 @@ const soon = new Date(requestedAt.getTime() + 60_000);
 const history = (counts: Partial<WatchtowerHistory>): WatchtowerHistory => ({ scans: 1, updated: 0, failed: 0, skipped: 0, ...counts });
 
 describe("updaterSettings", () => {
-  it("is set up only with a token, at the Compose service by default", () => {
-    expect(updaterSettings({})).toBeNull();
-    expect(updaterSettings({ FAMILYFI_UPDATER_TOKEN: "  " })).toBeNull();
-    expect(updaterSettings({ FAMILYFI_UPDATER_TOKEN: "secret" })).toEqual({ url: "http://watchtower:8080", token: "secret" });
-    expect(updaterSettings({ FAMILYFI_UPDATER_TOKEN: "secret", FAMILYFI_UPDATER_URL: "http://192.0.2.5:8080/" })).toEqual({
-      url: "http://192.0.2.5:8080",
-      token: "secret",
-    });
+  it("reads the shared token from the updater volume, and is nothing without it", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "familyfi-updater-"));
+    const file = path.join(dir, "token");
+    expect(updaterSettings({}, file)).toBeNull();
+    writeFileSync(file, "  \n");
+    expect(updaterSettings({}, file)).toBeNull();
+    writeFileSync(file, "secret\n");
+    expect(updaterSettings({}, file)).toEqual({ url: "http://watchtower:8080", token: "secret" });
+    expect(updaterSettings({ FAMILYFI_UPDATER_URL: "http://192.0.2.5:8080/" }, file)).toEqual({ url: "http://192.0.2.5:8080", token: "secret" });
   });
 });
 

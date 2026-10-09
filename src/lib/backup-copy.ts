@@ -39,6 +39,8 @@ export function importSummaryLines(summary: ImportSummary): string[] {
   if (summary.otherInstallPolicies) {
     lines.push("Another FamilyFi install made this export on this same gateway. Its policies stay on the gateway; delete them in UniFi.");
   }
-  lines.push("Phones, Watches and agents pair again; pairing is not part of an export.");
+  lines.push(
+    "Phones, Watches and agents paired here stay paired, unless their account is removed or loses administrator access. An export carries no pairings, so on a new install they pair again.",
+  );
   return lines;
 }

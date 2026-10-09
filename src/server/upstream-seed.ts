@@ -1,4 +1,4 @@
-import { UpstreamSource } from "@prisma/client";
+import { UpstreamSource, type Prisma } from "@prisma/client";
 import {
   UPSTREAM_CATEGORY_DOMAINS,
   UPSTREAM_SEED_CATEGORIES,
@@ -37,17 +37,25 @@ export async function ensureUpstreamCategories(): Promise<void> {
   }
 }
 
+/**
+ * Where a household's own category goes when a seed takes its slug: `<slug>-custom`, then
+ * `<slug>-custom-2` and on, the first no category has. `taken` adds slugs about to be written.
+ */
+export async function customSlugFor(tx: Prisma.TransactionClient, slug: string, taken: ReadonlySet<string> = new Set()): Promise<string> {
+  const base = `${slug}-custom`;
+  let candidate = base;
+  let suffix = 2;
+  while (taken.has(candidate) || (await tx.upstreamCategory.findUnique({ where: { slug: candidate } }))) {
+    candidate = `${base}-${suffix++}`;
+  }
+  return candidate;
+}
+
 async function ensureSeedCategory(seed: UpstreamSeedCategory): Promise<void> {
   await withUpstreamLock(async (tx) => {
     const existing = await tx.upstreamCategory.findUnique({ where: { slug: seed.slug } });
     if (existing?.source === UpstreamSource.user) {
-      const base = `${seed.slug}-custom`;
-      let slug = base;
-      let suffix = 2;
-      while (await tx.upstreamCategory.findUnique({ where: { slug } })) {
-        slug = `${base}-${suffix++}`;
-      }
-      await tx.upstreamCategory.update({ where: { id: existing.id }, data: { slug } });
+      await tx.upstreamCategory.update({ where: { id: existing.id }, data: { slug: await customSlugFor(tx, seed.slug) } });
     }
     const category = await tx.upstreamCategory.upsert({
       where: { slug: seed.slug },

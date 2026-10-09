@@ -207,6 +207,23 @@ export async function validateRule(
   input: RuleInput,
   networkScope: () => Promise<{ scope: NetworkScope; known?: Set<string> }>,
 ): Promise<RuleInput> {
+  const shaped = validateRuleShape(input);
+  if (shaped.scope === RuleScope.group) {
+    const groups = await prisma().group.findMany({ where: { id: { in: shaped.groupIds } } });
+    if (groups.length !== shaped.groupIds.length) throw new RuleInputError(404, "not_found", "Group not found.");
+  } else {
+    const { scope, known } = await networkScope();
+    assertManagedNetworkIds(shaped.networkIds, scope, known);
+  }
+  return shaped;
+}
+
+/**
+ * Everything about a rule that needs nothing stored: its name, what it blocks, its scope's shape and
+ * its windows. `validateRule` adds the groups and networks it names; a household import checks those
+ * against the import itself.
+ */
+export function validateRuleShape(input: RuleInput): RuleInput {
   const name = input.name.trim();
   if (!name || name.length > MAX_RULE_NAME) {
     throw new RuleInputError(400, "invalid_name", `A rule needs a name of 1 to ${MAX_RULE_NAME} characters.`);
@@ -230,6 +247,9 @@ export async function validateRule(
   if (input.mode === RuleMode.scheduled && windows.length === 0) {
     throw new RuleInputError(400, "invalid_schedule", "A scheduled rule needs at least one window.");
   }
+  if (windows.length > MAX_RULE_WINDOWS) {
+    throw new RuleInputError(400, "invalid_schedule", `A rule has at most ${MAX_RULE_WINDOWS} windows.`);
+  }
 
   let groupIds: string[] = [];
   let networkIds: string[] = [];
@@ -238,12 +258,8 @@ export async function validateRule(
     if (groupIds.length === 0) {
       throw new RuleInputError(400, "invalid_groups", "Pick at least one person or thing the rule applies to.");
     }
-    const groups = await prisma().group.findMany({ where: { id: { in: groupIds } } });
-    if (groups.length !== groupIds.length) throw new RuleInputError(404, "not_found", "Group not found.");
   } else {
     networkIds = normalizeNetworkIds(input.networkIds);
-    const { scope, known } = await networkScope();
-    assertManagedNetworkIds(networkIds, scope, known);
   }
 
   return { ...input, name, targetIds, domains, groupIds, networkIds, windows };

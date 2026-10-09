@@ -635,7 +635,7 @@ paths:
       tags: [Update]
       summary: The updater, the automatic schedule and the last install
       description: |
-        Whether the Watchtower sidecar is set up (`FAMILYFI_UPDATER_TOKEN`), when FamilyFi installs a newer
+        Whether the Watchtower sidecar is set up (it answers to the token FamilyFi shares with it), when FamilyFi installs a newer
         release on its own, and the last install with its outcome. Reading it settles an install that has
         finished, so a client polls this while `lastRun.status` is `requested`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
@@ -2782,7 +2782,7 @@ components:
           additionalProperties: false
           required: [configured]
           properties:
-            configured: { type: boolean, description: "The Watchtower sidecar's token is set, so FamilyFi can install." }
+            configured: { type: boolean, description: "The Watchtower sidecar answers to FamilyFi's token, so FamilyFi can install." }
         schedule: { $ref: "#/components/schemas/UpdateSchedule" }
         nextRunAt:
           type: [string, "null"]

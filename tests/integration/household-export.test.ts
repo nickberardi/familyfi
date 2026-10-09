@@ -10,7 +10,7 @@ import { readArchive, writeArchive } from "@/server/archive";
 import { createSession, hashPassword } from "@/server/auth";
 import { dumpDatabase, setDatabaseDumpForTests } from "@/server/database-dump";
 import { prisma } from "@/server/db";
-import { householdConfig } from "@/server/household-export";
+import { householdConfig, IMPORT_MAX_BYTES, type HouseholdConfig } from "@/server/household-export";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { stopAutoUpdateForTests } from "@/server/updater";
 import { stopUpstreamProbeForTests } from "@/server/upstream/schedule";
@@ -306,5 +306,56 @@ describe("household export", () => {
     const files = readArchive(await exportArchive(await recoveryAuth()), FILES);
     expect(files.has("database.dump")).toBe(false);
     expect(JSON.parse(files.get("manifest.json")!.toString()).databaseDump).toEqual({ included: false, reason: "pg_dump failed: server version mismatch" });
+  });
+
+  it("keeps a household category whose slug is now built in as its own category", async () => {
+    await ensureUpstreamCategories();
+    const seed = await prisma().upstreamCategory.findFirstOrThrow({ where: { source: "seed" }, orderBy: { slug: "asc" } });
+    const auth = await recoveryAuth();
+    const files = readArchive(await exportArchive(auth), FILES);
+    const config = JSON.parse(files.get("config.json")!.toString());
+    // As an older release that shipped no such seed would have exported it.
+    config.categories.push({ slug: seed.slug, label: "Ours", monogram: "OU", source: "user", enabled: true, domains: [{ domain: "ours.example.com", source: "user", removed: false }] });
+    config.categories = config.categories.filter((category: { slug: string; source: string }) => !(category.slug === seed.slug && category.source === "seed"));
+    await imported(auth, writeArchive([{ name: "manifest.json", data: files.get("manifest.json")! }, { name: "config.json", data: Buffer.from(JSON.stringify(config)) }]));
+    const ours = await prisma().upstreamCategory.findUniqueOrThrow({ where: { slug: `${seed.slug}-custom` }, include: { domains: true } });
+    expect(ours).toMatchObject({ source: "user", label: "Ours" });
+    expect(ours.domains.map((domain) => domain.domain)).toEqual(["ours.example.com"]);
+    const seeded = await prisma().upstreamCategory.findUniqueOrThrow({ where: { slug: seed.slug }, include: { domains: true } });
+    expect(seeded).toMatchObject({ source: "seed", label: seed.label });
+    expect(seeded.domains.some((domain) => domain.domain === "ours.example.com")).toBe(false);
+  });
+
+  it("refuses a rule or resolver the API would refuse, before changing anything", async () => {
+    await buildHousehold();
+    const auth = await recoveryAuth();
+    const files = readArchive(await exportArchive(auth), FILES);
+    type Editable = HouseholdConfig & { rules: Array<HouseholdConfig["rules"][number] & Record<string, unknown>> };
+    const edited = (change: (config: Editable) => void) => {
+      const config = JSON.parse(files.get("config.json")!.toString());
+      change(config);
+      return writeArchive([{ name: "manifest.json", data: files.get("manifest.json")! }, { name: "config.json", data: Buffer.from(JSON.stringify(config)) }]);
+    };
+    const before = await householdConfig();
+    for (const [archive, message] of [
+      [edited((config) => (config.rules[0].windows[0].end = config.rules[0].windows[0].start)), /Bedtime.*cannot be imported/],
+      [edited((config) => (config.rules[0].windows = [])), /needs at least one window/],
+      [edited((config) => config.rules.push({ ...config.rules[0], id: "website", name: "Sites", kind: "domain", mode: "always", domains: [], windows: [] })), /Add at least one website/],
+      [edited((config) => (config.household.resolver.dohUrl = "http://dns.example.com/dns-query")), /must start with https/],
+    ] as const) {
+      const response = await importRequest(auth, "preview", archive);
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: { message: string } }).error.message).toMatch(message);
+    }
+    expect(await householdConfig()).toEqual(before);
+  });
+
+  it("leaves out a database dump that would make the export too large to import back", async () => {
+    setDatabaseDumpForTests(async () => ({ data: Buffer.alloc(IMPORT_MAX_BYTES) }));
+    const archive = await exportArchive(await recoveryAuth());
+    const files = readArchive(archive, FILES);
+    expect(files.has("database.dump")).toBe(false);
+    expect(JSON.parse(files.get("manifest.json")!.toString()).databaseDump).toMatchObject({ included: false });
+    expect((await importRequest(await recoveryAuth(), "preview", archive)).status).toBe(200);
   });
 });

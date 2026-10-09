@@ -13,6 +13,8 @@ export function setDatabaseDumpForTests(dump?: () => Promise<DatabaseDump>) {
 
 /** The same cap the import reader applies to each file. */
 export const DATABASE_DUMP_MAX_BYTES = 50 * 1024 * 1024;
+/** A dump waiting on a lock, or on a database that stopped answering, gives up rather than hold the export. */
+const DUMP_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
  * A `pg_dump --format=custom` of the household database, for an exact restore with `pg_restore`.
@@ -20,7 +22,7 @@ export const DATABASE_DUMP_MAX_BYTES = 50 * 1024 * 1024;
  * missing or older than the server, which is reported rather than failing the export. The in-memory
  * database is never dumped: it is gone after a restart anyway.
  */
-export function dumpDatabase(command = "pg_dump"): Promise<DatabaseDump> {
+export function dumpDatabase(command = "pg_dump", timeoutMs = DUMP_TIMEOUT_MS): Promise<DatabaseDump> {
   if (testDump) return testDump();
   if (inMemoryDatabase()) return Promise.resolve({ data: null, reason: "The database is in memory, so there is nothing to dump." });
   return new Promise((resolve) => {
@@ -31,6 +33,7 @@ export function dumpDatabase(command = "pg_dump"): Promise<DatabaseDump> {
     const finish = (dump: DatabaseDump) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timeout);
       resolve(dump);
     };
     // The password goes in the environment, not the command line any process can list.
@@ -41,6 +44,11 @@ export function dumpDatabase(command = "pg_dump"): Promise<DatabaseDump> {
       env: { ...process.env, PGPASSWORD: password },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    // Every event that settles the dump comes after this line runs, so `finish` always sees it.
+    const timeout = setTimeout(() => {
+      child.kill();
+      finish({ data: null, reason: `pg_dump did not finish within ${Math.round(timeoutMs / 60_000)} minutes.` });
+    }, timeoutMs);
     child.stdout.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size > DATABASE_DUMP_MAX_BYTES) {

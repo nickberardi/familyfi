@@ -1,4 +1,7 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
@@ -9,14 +12,25 @@ import { APP_VERSION } from "@/lib/version";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
 import { prisma } from "@/server/db";
 import { refreshUpdateCheck } from "@/server/update-check";
-import { runAutoUpdateCatchUpForTests, settleUpdateRun, stopAutoUpdateForTests } from "@/server/updater";
+import {
+  autoUpdateArmedForTests,
+  rescheduleAutoUpdate,
+  runAutoUpdateCatchUpForTests,
+  setUpdaterTokenFileForTests,
+  settleUpdateRun,
+  stopAutoUpdateForTests,
+} from "@/server/updater";
 import { resetDatabase } from "../helpers/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const TOKEN = "watchtower-test-token";
 const NEWER = "999.0.0";
-const saved = { token: process.env.FAMILYFI_UPDATER_TOKEN, url: process.env.FAMILYFI_UPDATER_URL };
+const saved = { url: process.env.FAMILYFI_UPDATER_URL };
+/** Stands in for the updater volume the entrypoint writes the shared token into. */
+const tokenDir = mkdtempSync(path.join(tmpdir(), "familyfi-updater-"));
+const tokenFile = path.join(tokenDir, "token");
+const writeToken = (token: string) => writeFileSync(tokenFile, `${token}\n`);
 
 /** A stand-in for the Watchtower sidecar's HTTP API: records each call and answers as told. */
 type Seen = { method: string; url: string; authorization: string | undefined };
@@ -25,7 +39,7 @@ const watchtower = {
   url: "",
   seen: [] as Seen[],
   updateStatus: 202,
-  history: { entries: [] as Array<{ updated: number; failed: number; skipped: number }> },
+  history: { entries: [] as Array<{ timestamp: string; updated: number; failed: number; skipped: number }> },
 };
 
 function releases(tag: string) {
@@ -72,6 +86,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await new Promise<void>((resolve) => watchtower.server?.close(() => resolve()));
+  setUpdaterTokenFileForTests(undefined);
+  rmSync(tokenDir, { recursive: true, force: true });
 });
 
 beforeEach(async () => {
@@ -79,22 +95,21 @@ beforeEach(async () => {
   watchtower.seen = [];
   watchtower.updateStatus = 202;
   watchtower.history = { entries: [] };
-  process.env.FAMILYFI_UPDATER_TOKEN = TOKEN;
+  writeToken(TOKEN);
+  setUpdaterTokenFileForTests(tokenFile);
   process.env.FAMILYFI_UPDATER_URL = watchtower.url;
   await refreshUpdateCheck({ fetchImpl: releases(NEWER) });
 });
 
 afterEach(async () => {
   stopAutoUpdateForTests();
-  for (const [key, value] of [["FAMILYFI_UPDATER_TOKEN", saved.token], ["FAMILYFI_UPDATER_URL", saved.url]] as const) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  if (saved.url === undefined) delete process.env.FAMILYFI_UPDATER_URL;
+  else process.env.FAMILYFI_UPDATER_URL = saved.url;
   await refreshUpdateCheck({ fetchImpl: releases(APP_VERSION) });
 });
 
 describe("update settings", () => {
-  it("installs on Sunday at midnight by default, and says when the updater is not set up", async () => {
+  it("installs on Sunday at midnight by default, and is set up only while Watchtower answers to the token", async () => {
     const auth = await adminAuth();
     expect(await settings(auth)).toMatchObject({
       updater: { configured: true },
@@ -102,7 +117,15 @@ describe("update settings", () => {
       lastRun: null,
     });
     expect((await settings(auth)).nextRunAt).not.toBeNull();
-    delete process.env.FAMILYFI_UPDATER_TOKEN;
+    // A token alone, as every image has, is not an updater: Watchtower must answer to it.
+    process.env.FAMILYFI_UPDATER_URL = "http://127.0.0.1:1";
+    setUpdaterTokenFileForTests(tokenFile);
+    expect(await settings(auth)).toMatchObject({ updater: { configured: false }, nextRunAt: null });
+    process.env.FAMILYFI_UPDATER_URL = watchtower.url;
+    writeToken("not-the-token");
+    setUpdaterTokenFileForTests(tokenFile);
+    expect((await settings(auth)).updater.configured).toBe(false);
+    setUpdaterTokenFileForTests(path.join(tokenDir, "missing"));
     expect(await settings(auth)).toMatchObject({ updater: { configured: false }, nextRunAt: null });
   });
 
@@ -145,7 +168,10 @@ describe("installing", () => {
     const auth = await adminAuth();
     expect((await install(write(auth, "/api/v1/update/install", "POST"))).status).toBe(202);
     expect((await settings(auth)).lastRun?.status).toBe("requested");
-    watchtower.history = { entries: [{ updated: 0, failed: 0, skipped: 1 }] };
+    // A scan that ended before this request belongs to an earlier one and settles nothing.
+    watchtower.history = { entries: [{ timestamp: "2020-01-01T00:00:00.000000001Z", updated: 0, failed: 1, skipped: 0 }] };
+    expect((await settings(auth)).lastRun?.status).toBe("requested");
+    watchtower.history = { entries: [{ timestamp: new Date(Date.now() + 1000).toISOString().replace("Z", "+00:00"), updated: 0, failed: 0, skipped: 1 }] };
     const { lastRun } = await settings(auth);
     expect(lastRun).toMatchObject({ status: "skipped" });
     expect(lastRun?.finishedAt).not.toBeNull();
@@ -161,13 +187,13 @@ describe("installing", () => {
 
   it("records Watchtower refusing the token or being away", async () => {
     const auth = await adminAuth();
-    process.env.FAMILYFI_UPDATER_TOKEN = "not-the-token";
+    writeToken("not-the-token");
     const refused = await install(write(auth, "/api/v1/update/install", "POST"));
     expect(refused.status).toBe(502);
     expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("updater_unreachable");
-    expect((await settings(auth)).lastRun).toMatchObject({ status: "failed", error: "Watchtower refused FAMILYFI_UPDATER_TOKEN." });
+    expect((await settings(auth)).lastRun).toMatchObject({ status: "failed", error: "Watchtower refused FamilyFi's updater token." });
 
-    process.env.FAMILYFI_UPDATER_TOKEN = TOKEN;
+    writeToken(TOKEN);
     watchtower.updateStatus = 429;
     const busy = await install(write(auth, "/api/v1/update/install", "POST"));
     expect(busy.status).toBe(409);
@@ -180,12 +206,12 @@ describe("installing", () => {
 
   it("refuses without the updater or anything newer", async () => {
     const auth = await adminAuth();
-    delete process.env.FAMILYFI_UPDATER_TOKEN;
+    setUpdaterTokenFileForTests(path.join(tokenDir, "missing"));
     const unset = await install(write(auth, "/api/v1/update/install", "POST"));
     expect(unset.status).toBe(409);
     expect(((await unset.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
 
-    process.env.FAMILYFI_UPDATER_TOKEN = TOKEN;
+    setUpdaterTokenFileForTests(tokenFile);
     await refreshUpdateCheck({ fetchImpl: releases(APP_VERSION) });
     const current = await install(write(auth, "/api/v1/update/install", "POST"));
     expect(current.status).toBe(409);
@@ -204,21 +230,40 @@ describe("the schedule", () => {
     await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
     const due = new Date("2026-10-14T07:00:00.000Z");
     const now = () => new Date(due.getTime() + 10 * 60_000);
-    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe(true);
-    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe(false);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("installed");
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("nothing");
     expect(await prisma().updateRun.findMany()).toMatchObject([{ trigger: "scheduled", targetVersion: NEWER }]);
     expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).autoUpdateLastRunAt).toEqual(due);
 
     const missed = () => new Date(due.getTime() + 24 * 60 * 60_000 + 2 * 60 * 60_000);
-    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: missed })).toBe(false);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: missed })).toBe("nothing");
     expect(await prisma().updateRun.count()).toBe(1);
   });
 
   it("does nothing while switched off or without the updater", async () => {
     await prisma().household.update({ where: { id: "default" }, data: { autoUpdateEnabled: false } });
-    expect(await runAutoUpdateCatchUpForTests({ fetchImpl })).toBe(false);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl })).toBe("nothing");
     await prisma().household.update({ where: { id: "default" }, data: { autoUpdateEnabled: true } });
-    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, settings: null })).toBe(false);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, settings: null })).toBe("nothing");
     expect(watchtower.seen).toEqual([]);
+  });
+
+  it("leaves the slot unclaimed when the release check fails, so it is tried again", async () => {
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", autoUpdateDays: [0, 1, 2, 3, 4, 5, 6], autoUpdateTime: "03:00" } });
+    const now = () => new Date("2026-10-14T07:10:00.000Z");
+    const failing: typeof fetch = async (input, init) =>
+      github(String(input)) ? new Response("busy", { status: 503 }) : fetch(input, init);
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl: failing, now })).toBe("retry");
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).autoUpdateLastRunAt).toBeNull();
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("installed");
+  });
+
+  it("never lets an arm overtaken by a newer one set a timer", async () => {
+    rescheduleAutoUpdate();
+    stopAutoUpdateForTests();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(autoUpdateArmedForTests()).toBe(false);
+    rescheduleAutoUpdate();
+    await expect.poll(() => autoUpdateArmedForTests()).toBe(true);
   });
 });

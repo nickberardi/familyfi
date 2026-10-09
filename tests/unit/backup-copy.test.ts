@@ -20,7 +20,7 @@ describe("import summary", () => {
     expect(importSummaryLines(summary())).toEqual([
       "From FamilyFi v0.27.0, exported 2026-10-09.",
       "3 groups, 4 rules, 12 devices, 1 login, 1 DNS category, 2 routes.",
-      "Phones, Watches and agents pair again; pairing is not part of an export.",
+      "Phones, Watches and agents paired here stay paired, unless their account is removed or loses administrator access. An export carries no pairings, so on a new install they pair again.",
     ]);
   });
 

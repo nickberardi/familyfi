@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
-import { resumeRemoteAccess } from "@/server/tunnel/remote-access";
+import { householdRoutePublished, resetRouteCheckForTests, resumeRemoteAccess } from "@/server/tunnel/remote-access";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -212,6 +212,23 @@ describe("remote access", () => {
     // None of the refusals touched what was published, or stopped the tunnel behind it.
     expect(await publishedIds()).toEqual([quick.endpointId]);
     expect(await state()).toMatchObject({ mode: "quick", status: "running", url: quick.url });
+  });
+
+  it("opens the remote access port only while a route the household runs is published", async () => {
+    const open = async () => {
+      resetRouteCheckForTests();
+      return householdRoutePublished();
+    };
+    expect(await open()).toBe(false);
+    await put({ mode: "quick" });
+    await waitFor((t) => t.status === "running", "the quick tunnel");
+    // FamilyFi's own tunnel reaches the gateway on loopback; the published port stays shut.
+    expect(await open()).toBe(false);
+    const home = await ownRoute("https://203.0.113.10:8443", "lan", false);
+    expect((await put({ mode: "named", endpointId: home.id })).status).toBe(200);
+    expect(await open()).toBe(true);
+    expect((await put({ mode: "off" })).status).toBe(200);
+    expect(await open()).toBe(false);
   });
 
   it("switches from a route the household runs back to its domain without signing in again", async () => {
