@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupMonogram, internetMarkLook, internetZoneText } from "@/lib/internet-zone";
+import { groupMonogram, internetMarkLook, internetZoneText, personMonogram } from "@/lib/internet-zone";
 import { formatClock } from "@/lib/display";
 import type { InternetWindow } from "@/lib/rule-windows";
 
@@ -64,5 +64,7 @@ describe("internet zone", () => {
   it("uses a group's own monogram, else the first two letters of its name, at most four", () => {
     expect(groupMonogram({ monogram: null, name: "Printers" })).toBe("Pr");
     expect(groupMonogram({ monogram: "TVROOM", name: "Living room" })).toBe("TVRO");
+    expect(personMonogram({ monogram: null, name: " emma" })).toBe("E");
+    expect(personMonogram({ monogram: "EJ", name: "Emma" })).toBe("EJ");
   });
 });

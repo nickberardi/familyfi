@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type ViewProps } from "react-native";
 
 import { internetDayBands, type InternetWindow } from "@/lib/rule-windows";
 import { internetZoneText } from "@/lib/internet-zone";
@@ -9,6 +9,15 @@ import type { Group } from "@/lib/types";
 
 import { PRESS_OPACITY, useUI } from "./UIContext";
 import { DayTimeline } from "./DayTimeline";
+import { Fold, FoldCaret } from "./Fold";
+
+/** A zone that folds under its heading, as a stacked card's rule zones do. */
+export type ZoneFold = {
+  open: boolean;
+  onToggle: () => void;
+  /** On the heading, which opens and closes it. */
+  testID?: string;
+};
 
 export type ZoneAction = {
   label: string;
@@ -23,7 +32,8 @@ export type ZoneAction = {
  * A group's device-wide controls, shared by every client: whether all of its internet is on,
  * the day's no-internet time, and Pause / Resume / Allow, each named for its scope. A group with
  * no internet rule says so. The caller supplies the actions (from `groupActionSpecs`) and any
- * links (`footer`), since each platform navigates its own way.
+ * links (`footer`), since each platform navigates its own way. With `fold`, the heading opens and
+ * closes the timeline and footer; a group with no internet rule keeps its presets in view.
  */
 export function InternetZone({
   group,
@@ -32,6 +42,7 @@ export function InternetZone({
   now,
   actions,
   footer,
+  fold,
 }: {
   group: Group;
   windows: InternetWindow[];
@@ -40,9 +51,12 @@ export function InternetZone({
   actions: ZoneAction[];
   /** Below the timeline (or, with no rule, the presets): an "Edit internet rule" link, say. */
   footer?: ReactNode;
+  /** Folds the zone under its heading, which becomes its button; a folding zone shows no `actions`. */
+  fold?: ZoneFold;
 }) {
   const ui = useUI();
   const zone = internetZoneText(group, windows, timezone, now);
+  const folding = fold && zone.tone !== "no_rule" ? fold : undefined;
   const background =
     zone.tone === "paused" ? ui.color("paused-fill") : zone.tone === "off" ? ui.color("accent-wash") : zone.tone === "on" ? ui.color("field-soft") : undefined;
   const icon =
@@ -61,7 +75,7 @@ export function InternetZone({
         background ? { backgroundColor: background } : { borderWidth: 1.5, borderStyle: "dashed", borderColor: ui.color("control-line") },
       ]}
     >
-      <View style={styles.heading}>
+      <ZoneHeading fold={folding} style={styles.heading}>
         <View style={[styles.icon, icon.box]} aria-hidden>
           <ui.Icon name="globe-simple" size={16} color={icon.ink} />
         </View>
@@ -71,7 +85,7 @@ export function InternetZone({
           </Text>
           <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, marginTop: 2, color: ui.color("ink-2") }}>{zone.sub}</Text>
         </View>
-        {actions.length ? (
+        {actions.length && !folding ? (
           <View style={styles.actions}>
             {actions.map((action) => (
               <Pressable
@@ -106,17 +120,55 @@ export function InternetZone({
             ))}
           </View>
         ) : null}
-      </View>
-      {zone.tone === "no_rule" ? null : (
-        <DayTimeline
-          bands={internetDayBands(group, windows, now, timezone)}
-          timezone={timezone}
-          now={now}
-          label={`${group.name}’s internet today`}
-        />
+        {folding ? (
+          <View aria-hidden style={styles.caret}>
+            <FoldCaret open={folding.open} color={ui.color("ink-3")} />
+          </View>
+        ) : null}
+      </ZoneHeading>
+      {folding ? (
+        <Fold open={folding.open}>
+          <View style={styles.body}>
+            <DayTimeline
+              bands={internetDayBands(group, windows, now, timezone)}
+              timezone={timezone}
+              now={now}
+              label={`${group.name}’s internet today`}
+            />
+            {footer}
+          </View>
+        </Fold>
+      ) : (
+        <>
+          {zone.tone === "no_rule" ? null : (
+            <DayTimeline
+              bands={internetDayBands(group, windows, now, timezone)}
+              timezone={timezone}
+              now={now}
+              label={`${group.name}’s internet today`}
+            />
+          )}
+          {footer}
+        </>
       )}
-      {footer}
     </View>
+  );
+}
+
+/** A zone's heading row: a plain row, or with `fold` the button that opens and closes the zone. */
+export function ZoneHeading({ fold, style, children }: { fold: ZoneFold | undefined; style: ViewProps["style"]; children: ReactNode }) {
+  const row = <View style={style}>{children}</View>;
+  if (!fold) return row;
+  return (
+    <Pressable
+      role="button"
+      aria-expanded={fold.open}
+      onPress={fold.onToggle}
+      testID={fold.testID}
+      style={({ pressed }) => (pressed ? styles.pressed : null)}
+    >
+      {row}
+    </Pressable>
   );
 }
 
@@ -125,6 +177,9 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: 10 },
   icon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   words: { minWidth: 140, flex: 1 },
+  caret: { alignSelf: "center", flexShrink: 0 },
+  body: { gap: 10 },
+  pressed: { opacity: PRESS_OPACITY },
   // flexShrink lets the row narrow to the line so its buttons wrap (react-native-web defaults to 0).
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 6, flexShrink: 1 },
   action: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minHeight: 32, justifyContent: "center" },

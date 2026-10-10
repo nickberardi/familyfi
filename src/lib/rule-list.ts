@@ -5,6 +5,8 @@
  */
 import { daysLabel, windowTimes } from "./display";
 import type { IconName } from "./icons";
+import { ruleStateLine } from "./rule-actions";
+import { ruleActivelyBlocking } from "./upstream";
 import { CURATED_CATEGORY_SLOTS, rulePaused, windowSegments, type CuratedSlot, type Rule, type RuleWindow } from "./rules";
 import type { Group } from "./types";
 
@@ -43,6 +45,11 @@ export function ruleHref(rule: Pick<Rule, "id"> & Partial<Pick<Rule, "builtIn">>
   return rule.builtIn === "quarantine" ? "/devices" : `/rules/${rule.id}`;
 }
 
+/** The words on the way to a rule's own page: Edit, or for quarantine, which cannot be edited, its devices. */
+export function ruleOpenLabel(rule: Partial<Pick<Rule, "builtIn">>): string {
+  return rule.builtIn === "quarantine" ? "Devices" : "Edit";
+}
+
 /** Who a rule covers, by name: its groups, or its whole networks. */
 export function ruleAppliesTo(
   rule: Pick<Rule, "scope" | "groupIds" | "networkIds"> & Partial<Pick<Rule, "builtIn">>,
@@ -68,6 +75,26 @@ export function ruleWhenLines(rule: Pick<Rule, "mode" | "windows">): { key: stri
 /** A rule that is off or paused reads quieter. */
 export function ruleCardDimmed(rule: Pick<Rule, "enabled" | "pause">, now: Date): boolean {
   return !rule.enabled || rulePaused(rule, now);
+}
+
+/**
+ * A rule in one line under its name, as a stacked card shows it closed, in the colour that says
+ * whether it is doing anything: off, paused or allowed, blocking now, or on with its schedule.
+ * `tone` is a `--ff-*` token name.
+ */
+export function ruleStatus(
+  rule: Pick<Rule, "enabled" | "mode" | "windows" | "pause">,
+  timezone: string,
+  now: Date,
+): { line: string; tone: "muted" | "paused" | "danger" | "on" } {
+  if (!rule.enabled) return { line: "Off · Not enforced", tone: "muted" };
+  const paused = ruleStateLine(rule, timezone, now);
+  if (paused) return { line: paused, tone: "paused" };
+  if (ruleActivelyBlocking(rule, timezone, now)) {
+    return { line: "On · Blocking now", tone: "danger" };
+  }
+  const [first] = ruleWhenLines(rule);
+  return { line: `On · ${first ? `${first.times}${first.days ? ` · ${first.days}` : ""}` : "No windows"}`, tone: "on" };
 }
 
 /** The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower. */
@@ -100,6 +127,7 @@ export const RULES_COPY = {
   newRule: "New rule",
   scopeLabel: "Show rules for",
   all: "All",
+  blocks: "Blocks",
   when: "When",
   appliesTo: "Applies to",
   unassigned: "Unassigned devices",

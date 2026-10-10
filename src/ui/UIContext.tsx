@@ -40,6 +40,13 @@ export type UI = {
   confirm: (request: UIConfirmRequest) => Promise<boolean>;
   /** Puts text on the clipboard: a pairing code to paste on another phone. */
   copyText: (value: string) => Promise<void>;
+  /**
+   * Content that folds away under a heading: a rule zone on a stacked card. The platform may
+   * animate it; without one it simply shows while open.
+   */
+  Fold?: ComponentType<{ open: boolean; children: ReactNode }>;
+  /** A fold's caret, pointing right while folded and down while open; the platform may turn it. */
+  FoldCaret?: ComponentType<{ open: boolean; size: number; color: string }>;
 };
 
 export type UIToggleProps = {
