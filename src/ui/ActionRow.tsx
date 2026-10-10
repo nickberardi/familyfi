@@ -13,6 +13,8 @@ export type CardAction = {
   href?: string;
   /** Its accessible name, when the label alone does not say what it acts on. */
   accessibilityLabel?: string;
+  /** A button that goes to another screen, as a group's Details does, is announced as a link. */
+  navigates?: boolean;
   testID?: string;
 };
 
@@ -62,7 +64,7 @@ export function ActionRow({ actions }: { actions: CardAction[] }) {
         return (
           <Pressable
             key={action.label}
-            role="button"
+            role={action.navigates ? "link" : "button"}
             aria-label={action.accessibilityLabel}
             aria-disabled={action.disabled}
             disabled={action.disabled}
