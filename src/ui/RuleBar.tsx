@@ -34,7 +34,8 @@ export function RuleBar({
       </View>
       <View style={styles.ticks}>
         {RULE_BAR_TICKS.map((tick, index) => (
-          <Text key={index} style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, color: ui.color("muted") }}>
+          // Five labels share one line: at the largest text sizes they stop growing rather than run together.
+          <Text key={index} maxFontSizeMultiplier={1.3} style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, color: ui.color("muted") }}>
             {tick}
           </Text>
         ))}
