@@ -76,3 +76,8 @@ export function internetMarkLook(
 export function groupMonogram(group: Pick<Group, "monogram" | "name">): string {
   return (group.monogram ?? group.name.slice(0, 2)).slice(0, 4);
 }
+
+/** A person's monogram on a stacked card: their own, else their initial. */
+export function personMonogram(group: Pick<Group, "monogram" | "name">): string {
+  return (group.monogram ?? group.name.trim().slice(0, 1).toUpperCase()).slice(0, 4);
+}

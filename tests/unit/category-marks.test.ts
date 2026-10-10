@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardMarks, categoryRuleWhen, fitCardMarks, marksRoom, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
+import { cardMarks, categoryRuleWhen, stackedCardMarks, fitCardMarks, marksRoom, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
@@ -29,6 +29,22 @@ describe("category marks", () => {
     expect(open.focused?.key).toBe("b");
     expect(open.shown.map((item) => item.key)).toEqual(["a", "c"]);
     expect(open.hidden).toBe(0);
+  });
+
+  it("lists a stacked card's categories by what blocks them: rules, the resolver, then the rest", () => {
+    const upstream = (key: string, state: CategorySlotState["state"]) => ({ ...slot(key), state }) as CategorySlotState;
+    const slots = [upstream("a", "open"), slot("b", true), upstream("c", "blocked"), slot("d", false), upstream("e", "partial"), upstream("f", "unknown")];
+    const stacked = stackedCardMarks(slots, false);
+    expect(stacked.ruled.map((item) => item.key)).toEqual(["b"]);
+    expect(stacked.upstream.map((item) => item.key)).toEqual(["c", "e"]);
+    // A rule that is off is no rule: its category is one of the others.
+    expect(stacked.marks.pool.map((item) => item.key)).toEqual(["a", "d", "f"]);
+    expect(stacked.marks.focused).toBeUndefined();
+    expect(stacked.marks.hidden).toBe(0);
+    const many = stackedCardMarks([...Array(7).keys()].map((index) => slot(`x${index}`)), false);
+    expect(many.marks.shown).toHaveLength(5);
+    expect(many.marks.hidden).toBe(2);
+    expect(stackedCardMarks([...Array(7).keys()].map((index) => slot(`x${index}`)), true).marks.shown).toHaveLength(7);
   });
 
   it("keeps More on the row's last place when the marks do not all fit", () => {

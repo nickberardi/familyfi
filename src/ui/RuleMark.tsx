@@ -8,21 +8,30 @@ import type { Rule } from "@/lib/rules";
 import { CategoryGlyph } from "./CategoryGlyph";
 import { useUI } from "./UIContext";
 
-/** The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower. */
-export function RuleMark({ rule }: { rule: Pick<Rule, "kind" | "targetIds"> }) {
+/**
+ * The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower.
+ * 32 pt in a list; a stacked card's head is 44 (`size`).
+ */
+export function RuleMark({ rule, size = 32 }: { rule: Pick<Rule, "kind" | "targetIds">; size?: number }) {
   const ui = useUI();
   const mark = ruleMarkSpec(rule);
+  const scale = size / 32;
+  const box = size === 32 ? null : { width: size, height: size };
   if (mark.shape === "square") {
     return (
-      <View aria-hidden style={[styles.square, { backgroundColor: ui.color("accent") }]}>
-        <ui.Icon name={mark.icon} size={17} color={ui.color("ink-on-fill")} />
+      <View aria-hidden style={[styles.square, box, box && { borderRadius: 8 * scale }, { backgroundColor: ui.color("accent") }]}>
+        <ui.Icon name={mark.icon} size={Math.round(17 * scale)} color={ui.color("ink-on-fill")} />
       </View>
     );
   }
   const ink = ui.color("verdict-rule-ink");
   return (
-    <View aria-hidden style={[styles.round, { backgroundColor: ui.color("verdict-rule-fill") }]}>
-      {mark.slot ? <CategoryGlyph slot={mark.slot} size={15} color={ink} /> : <ui.Icon name={mark.icon} size={16} color={ink} />}
+    <View aria-hidden style={[styles.round, box, box && { borderRadius: size / 2 }, { backgroundColor: ui.color("verdict-rule-fill") }]}>
+      {mark.slot ? (
+        <CategoryGlyph slot={mark.slot} size={Math.round(15 * scale)} color={ink} />
+      ) : (
+        <ui.Icon name={mark.icon} size={Math.round(16 * scale)} color={ink} />
+      )}
     </View>
   );
 }

@@ -125,6 +125,19 @@ export function cardMarks(slots: CategorySlotState[], { open, focus, more }: { o
   return { ordered, focused: open ? focused : undefined, pool, more, cap, ...rowOfMarks(pool, more, cap) };
 }
 
+/**
+ * An open card that lists its categories by what blocks them, as the companion's stacked cards
+ * do: every category with a FamilyFi rule (`ruled`), then each one the resolver blocks or partly
+ * blocks with no rule (`upstream`), and the rest as "Other categories" marks before "More".
+ */
+export function stackedCardMarks(slots: CategorySlotState[], more: boolean) {
+  const ruled = slots.filter((item) => item.rule?.enabled);
+  const upstream = slots.filter((item) => !item.rule?.enabled && (item.state === "blocked" || item.state === "partial"));
+  const pool = slots.filter((item) => !ruled.includes(item) && !upstream.includes(item));
+  const marks: CardMarks = { ordered: slots, focused: undefined, pool, more, cap: OPEN_MARKS, ...rowOfMarks(pool, more, OPEN_MARKS) };
+  return { ruled, upstream, marks };
+}
+
 /** `hidden` is what the row hides collapsed, so expanded it still shows Fewer. */
 function rowOfMarks(pool: CategorySlotState[], more: boolean, cap: number) {
   return { shown: more ? pool : pool.slice(0, cap), hidden: Math.max(0, pool.length - cap) };

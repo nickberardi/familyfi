@@ -8,6 +8,8 @@ import {
   ruleCardDimmed,
   ruleHref,
   ruleMarkSpec,
+  ruleOpenLabel,
+  ruleStatus,
   rulesListView,
   rulesScopeHref,
   ruleToggleNotice,
@@ -163,5 +165,44 @@ describe("a rule card's writes", () => {
       },
     ]);
     expect(options[0]?.feedback?.notice).toBe("Bedtime added for A child. FamilyFi writes it to the gateway next.");
+  });
+});
+
+describe("a rule's status line", () => {
+  const zone = "America/New_York";
+  // A Wednesday: 8:00 AM, outside the Bedtime window, and 10:00 PM, inside it.
+  const morning = new Date("2026-10-07T12:00:00Z");
+  const night = new Date("2026-10-08T02:00:00Z");
+
+  it("says a rule that is off does nothing", () => {
+    expect(ruleStatus(rule({ enabled: false }), zone, night)).toEqual({ line: "Off · Not enforced", tone: "muted" });
+  });
+
+  it("says a paused or allowed rule's pause, as the card's state line does", () => {
+    const until = "2026-10-08T03:30:00Z";
+    expect(ruleStatus(rule({ pause: { active: true, until, kind: "pause", by: null } }), zone, night)).toEqual({ line: "Paused until 11:30 PM", tone: "paused" });
+    expect(ruleStatus(rule({ pause: { active: true, until, kind: "allow", by: null } }), zone, night).tone).toBe("paused");
+  });
+
+  it("says when a rule is blocking now, and otherwise when it blocks", () => {
+    expect(ruleStatus(rule({}), zone, night)).toEqual({ line: "On · Blocking now", tone: "danger" });
+    expect(ruleStatus(rule({ mode: "always", windows: [] }), zone, morning)).toEqual({ line: "On · Blocking now", tone: "danger" });
+    const later = ruleStatus(rule({}), zone, morning);
+    expect(later.tone).toBe("on");
+    expect(later.line).toBe(`On · ${ruleWhenLines(rule({}))[0]!.times} · ${ruleWhenLines(rule({}))[0]!.days}`);
+  });
+
+  it("says a scheduled rule with no windows has none, and leaves out days a window does not name", () => {
+    expect(ruleStatus(rule({ windows: [] }), zone, morning)).toEqual({ line: "On · No windows", tone: "on" });
+    const unnamed = rule({ windows: [{ id: "w1", name: "", days: [], start: "21:00", end: "07:00" }] });
+    expect(ruleStatus(unnamed, zone, morning).line).toBe(`On · ${ruleWhenLines(unnamed)[0]!.times}`);
+  });
+});
+
+describe("the way to a rule's page", () => {
+  it("edits a rule, and shows quarantine's devices, since quarantine is never edited", () => {
+    expect(ruleOpenLabel(rule({}))).toBe("Edit");
+    expect(ruleOpenLabel(rule({ builtIn: "quarantine" }))).toBe("Devices");
+    expect(ruleHref(rule({ builtIn: "quarantine" }))).toBe("/devices");
   });
 });
