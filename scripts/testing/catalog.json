@@ -157,6 +157,11 @@
         "groups"
       ]
     },
+    "tests/unit/card-stack.test.ts": {
+      "categories": [
+        "display"
+      ]
+    },
     "tests/unit/category-marks.test.ts": {
       "categories": [
         "groups",
