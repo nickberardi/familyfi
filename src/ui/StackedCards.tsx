@@ -192,6 +192,7 @@ export function GroupStackActions({
     label: GROUP_CARD_COPY.details,
     accessibilityLabel: GROUP_CARD_COPY.detailsLabel(group.name),
     onPress: onDetails,
+    navigates: true,
     testID: `group-details-${group.id}`,
   });
   return <ActionRow actions={actions} />;
