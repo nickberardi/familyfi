@@ -97,6 +97,29 @@ export function RuleCardSchedule({
   );
 }
 
+/** The open body of a rule card in the companion's phone stack: what it blocks, then its schedule, which opens the rule. */
+export function StackedRuleBody({
+  rule,
+  groups,
+  networks,
+  catalogNames,
+}: {
+  rule: Rule;
+  groups: Pick<Group, "id" | "name">[];
+  networks: { id: string; name: string }[];
+  catalogNames: Map<string, string>;
+}) {
+  return (
+    <RuleCardSchedule
+      rule={rule}
+      groups={groups}
+      networks={networks}
+      blocks={ruleBlocksLabel(rule, catalogNames)}
+      testID={`rule-open-${rule.id}`}
+    />
+  );
+}
+
 /** When a rule blocks and whom it covers, under its bar. */
 function RuleFacts({
   rule,

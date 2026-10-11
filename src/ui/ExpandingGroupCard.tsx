@@ -215,6 +215,16 @@ export function ExpandedGroupBody({
   );
 }
 
+/**
+ * The open body of a group card in the companion's phone stack: `ExpandedGroupBody` leading with the
+ * group's note, which the stack's compact head leaves out, keeping its own focus and More.
+ */
+export function StackedGroupBody(props: ExpandedGroupProps) {
+  const [focus, setFocus] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  return <ExpandedGroupBody {...props} note focus={focus} onFocus={setFocus} more={more} onToggleMore={() => setMore(!more)} />;
+}
+
 /** An open group card's foot, as the web's action row: the group's rules, and its detail where the card is not the detail itself. */
 export function GroupCardLinks({ group, onDetails }: { group: Pick<Group, "id" | "name">; onDetails?: () => void }) {
   return (
