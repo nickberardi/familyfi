@@ -74,17 +74,36 @@ export function phoneHop(state: PhoneHopState, route: Pick<ConnectionRoute, "url
   };
 }
 
-/** FamilyFi → UniFi console: reported by the server, from the last household it sent. */
-export function gatewayHop(unifi: Pick<UnifiSettings, "connectionStatus" | "connectionError"> | null, sync: SyncStatus | null, now = new Date()): Hop {
+/**
+ * FamilyFi → UniFi console: reported by the server, from the last household it sent. While this phone
+ * is offline it cannot ask, so the hop is unknown and says what the server last reported.
+ */
+export function gatewayHop(
+  unifi: Pick<UnifiSettings, "connectionStatus" | "connectionError"> | null,
+  sync: SyncStatus | null,
+  phone: PhoneHopState,
+  now = new Date(),
+): Hop {
   const status = unifi?.connectionStatus ?? null;
-  const tone = status === "connected" ? "var(--ff-on)" : status === "error" ? "var(--ff-danger)" : "var(--ff-muted)";
   const sweep = lastSweepAt(sync);
+  const footnote = sweep ? `Last sweep ${relativeSweep(sweep, now)}` : null;
+  if (phone === "offline") {
+    return {
+      tone: "var(--ff-muted)",
+      section: "FamilyFi → UniFi console",
+      status: "Unknown",
+      detail: status
+        ? `This phone can't reach FamilyFi to ask. Last reported: ${connectionStatusLabel(status)}.`
+        : "This phone can't reach FamilyFi to ask.",
+      footnote,
+    };
+  }
   return {
-    tone,
+    tone: status === "connected" ? "var(--ff-on)" : status === "error" ? "var(--ff-danger)" : "var(--ff-muted)",
     section: "FamilyFi → UniFi console",
     status: status ? connectionStatusLabel(status) : "Unknown",
     detail: unifi?.connectionError || "Local Network Integration API, key held by FamilyFi. Reported by the server, not measured from this phone.",
-    footnote: sweep ? `Last sweep ${relativeSweep(sweep, now)}` : null,
+    footnote,
   };
 }
 
@@ -103,13 +122,30 @@ export function changeHop(sync: SyncStatus | null, timezone: string): Hop {
   };
 }
 
-/** The diagram's two links: this phone to FamilyFi, and FamilyFi to UniFi, each with its word and tone. */
-export function hopLinks(phone: PhoneHopState, unifi: Pick<UnifiSettings, "connectionStatus"> | null) {
-  return {
-    phone: { tone: phone === "connected" ? "var(--ff-on)" : phone === "checking" ? "var(--ff-paused)" : "var(--ff-danger)", label: phone === "offline" ? "Offline" : phone === "checking" ? "Checking" : "Direct" },
-    unifi: {
-      tone: unifi?.connectionStatus === "connected" ? "var(--ff-on)" : unifi?.connectionStatus === "error" ? "var(--ff-danger)" : "var(--ff-muted)",
-      label: unifi ? connectionStatusLabel(unifi.connectionStatus) : "—",
-    },
-  };
+/**
+ * What a diagram link draws: a check when it works, a cross when it fails, dots while this phone checks,
+ * a dash when it is not set up, and a question mark when this phone cannot know.
+ */
+export type HopMark = "ok" | "failed" | "checking" | "off" | "unknown";
+
+export type HopLink = { tone: string; mark: HopMark; label: string };
+
+/** The diagram's two links: this phone to FamilyFi, and FamilyFi to UniFi, each with its mark, tone and spoken label. */
+export function hopLinks(phone: PhoneHopState, unifi: Pick<UnifiSettings, "connectionStatus"> | null): { phone: HopLink; unifi: HopLink } {
+  const phoneLink: HopLink =
+    phone === "connected"
+      ? { tone: "var(--ff-on)", mark: "ok", label: "Connected" }
+      : phone === "checking"
+        ? { tone: "var(--ff-paused)", mark: "checking", label: "Checking" }
+        : { tone: "var(--ff-danger)", mark: "failed", label: "Not connected" };
+  const status = unifi?.connectionStatus ?? null;
+  const unifiLink: HopLink =
+    phone === "offline" || !status
+      ? { tone: "var(--ff-muted)", mark: "unknown", label: "Unknown" }
+      : status === "connected"
+        ? { tone: "var(--ff-on)", mark: "ok", label: connectionStatusLabel(status) }
+        : status === "error"
+          ? { tone: "var(--ff-danger)", mark: "failed", label: connectionStatusLabel(status) }
+          : { tone: "var(--ff-muted)", mark: "off", label: connectionStatusLabel(status) };
+  return { phone: phoneLink, unifi: unifiLink };
 }
