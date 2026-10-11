@@ -2,9 +2,10 @@
  * Where each card of a stack sits, and how tall it is, for familyfi-mobile's stacked cards (the
  * Claude Design "FamilyFi Mobile" stack, `stackify`); the app moves the cards there on its springs.
  * Closed, the cards overlap like a wallet, each showing its head. Open, the chosen card shows all
- * of itself when it fits, and the others fold to a peek of their heads above and below it.
+ * of itself when it fits, the cards above it fold to a peek of their heads, and the cards under it
+ * follow at their full peeks, past the room if need be, where the page scrolls to them.
  * Heights are measured, so the stack follows the platform's text size. The open card comes first:
- * the peeks share what room it leaves, folding as thin as an edge when they must.
+ * the peeks above share what room it leaves, folding as thin as an edge when they must.
  */
 
 /** Room above the first card, and below the last for its shadow. */
@@ -32,8 +33,8 @@ export function peekOf(head: number): number {
 
 /**
  * Each card's frame and the stack's height. `heads` are the cards' head heights, `open` the open
- * card's index (null when the stack is closed), `room` the height the stack may fill while one is
- * open, and `content` the open card's whole height (head, body and foot) once it is measured.
+ * card's index (null when the stack is closed), `room` the height the open card and the cards
+ * above it fill (the cards under it may run past it), and `content` the open card's whole height (head, body and foot) once it is measured.
  */
 export function stackLayout(
   heads: number[],
@@ -53,31 +54,23 @@ export function stackLayout(
     const last = frames[n - 1]!;
     return { frames, height: last.y + last.h + STACK_FOOT };
   }
-  // A measured card is as tall as it is, up to the room the other cards' thinnest peeks leave, and
-  // scrolls only past that.
-  const most = room - 2 * STACK_TOP - (open < n - 1 ? PEEK_GAP : 0) - PEEK_MIN * (n - 1);
+  // The open card and the cards above it share the room; the cards under it keep their whole
+  // peeks past the room, where the page scrolls to them (and on iOS shows them through the tab bar).
+  // A measured card is as tall as it is, up to the room the cards above leave at their thinnest
+  // peeks, and scrolls only past that.
+  const most = room - 2 * STACK_TOP - PEEK_MIN * open;
   const fitted = content === undefined ? undefined : Math.min(content, Math.max(most, heads[open]! + MIN_BODY));
-  // Peeks that would crowd the open card fold thinner, all alike, to an edge at least. Nothing
+  // Peeks above that would crowd the open card fold thinner, all alike, to an edge at least. Nothing
   // covers the last card, so under the open card it shows its whole head.
   const natural = heads.map((head, index) => (index === n - 1 && index > open ? head : peekOf(head)));
-  const others = natural.reduce((sum, peek) => sum + peek, 0) - natural[open]!;
+  const aboveNatural = natural.slice(0, open).reduce((sum, peek) => sum + peek, 0);
   const openMin = fitted ?? Math.max(heads[open]! + MIN_BODY, room * OPEN_SHARE);
-  const peekRoom = room - 2 * STACK_TOP - (open < n - 1 ? PEEK_GAP : 0) - openMin;
-  // The last card keeps its whole head while the rest can still fold to edges around it, so it is
-  // never cut through its name; only when even that leaves too little does it fold with them.
-  const last = n - 1 > open ? n - 1 : null;
-  const keepLast = last !== null && peekRoom - natural[last]! >= PEEK_MIN * (n - 2);
-  const peeks =
-    others <= peekRoom
-      ? natural
-      : keepLast
-        ? foldPeeks(natural, new Set([open, last]), peekRoom - natural[last]!)
-        : foldPeeks(natural, new Set([open]), Math.max(peekRoom, 0));
+  const aboveRoom = room - 2 * STACK_TOP - openMin;
+  const kept = new Set(natural.map((_, index) => index).filter((index) => index >= open));
+  const peeks = aboveNatural <= aboveRoom ? natural : foldPeeks(natural, kept, Math.max(aboveRoom, 0));
   const above = peeks.slice(0, open).reduce((sum, peek) => sum + peek, 0);
-  const below = peeks.slice(open + 1);
-  const belowRoom = below.reduce((sum, peek) => sum + peek, 0) + (below.length ? PEEK_GAP : 0);
   const openY = STACK_TOP + above;
-  const left = Math.max(room - openY - STACK_TOP - belowRoom, heads[open]! + MIN_BODY);
+  const left = Math.max(room - openY - STACK_TOP, heads[open]! + MIN_BODY);
   // Peeks of taller heads fold less than the cap allowed for, so the card also keeps to what they leave.
   const openH = fitted === undefined ? left : Math.min(fitted, left);
   const frames: CardFrame[] = [];
@@ -89,18 +82,18 @@ export function stackLayout(
   frames.push({ y: openY, h: openH });
   y = openY + openH + PEEK_GAP;
   for (let index = open + 1; index < n; index += 1) {
-    // The last card ends where its share does, so its foot shows even folded.
-    frames.push({ y, h: index === n - 1 ? peeks[index]! : heads[index]! });
+    frames.push({ y, h: heads[index]! });
     y += peeks[index]!;
   }
-  const height = (below.length ? y : openY + openH) + STACK_TOP;
+  const below = n - 1 - open;
+  const height = (below ? y : openY + openH) + STACK_TOP;
   return { frames, height };
 }
 
 /**
  * The other cards' peeks folded alike into `room`, none thinner than an edge: a peek that would
  * fold past the edge keeps the edge, and the rest fold further to share what it leaves. `kept`
- * peeks (the open card's, and the last card's when it fits) stay as they are, outside `room`.
+ * peeks (the open card's and those under it) stay as they are, outside `room`.
  */
 function foldPeeks(natural: number[], kept: Set<number>, room: number): number[] {
   const edged = new Set<number>();

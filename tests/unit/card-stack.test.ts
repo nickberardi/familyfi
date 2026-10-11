@@ -26,14 +26,13 @@ describe("the card stack's layout", () => {
     expect(peekOf(84)).toBe(62);
   });
 
-  it("opens the first card to fill the room, with the rest peeking under it", () => {
+  it("opens the first card to fill the room, with the rest following under it, past the room", () => {
     const { frames, height } = stackLayout(heads, 0, 600);
-    // Three peeks of 62 and the gap below the open card.
-    // Two peeks of 62, the last card's whole head, and the gap below the open card.
-    const openH = 600 - STACK_TOP - STACK_TOP - 2 * 62 - 84 - PEEK_GAP;
+    const openH = 600 - STACK_TOP - STACK_TOP;
     expect(frames[0]).toEqual({ y: 4, h: openH });
     expect(frames.slice(1).map((frame) => frame.y)).toEqual([4 + openH + 6, 4 + openH + 6 + 62, 4 + openH + 6 + 124]);
-    expect(height).toBe(600);
+    // Nothing covers the last card, so it shows its whole head; the page scrolls to it.
+    expect(height).toBe(frames[3]!.y + 84 + STACK_TOP);
   });
 
   it("opens a middle card between peeks above and below", () => {
@@ -42,12 +41,11 @@ describe("the card stack's layout", () => {
     expect(frames[1]!.y).toBe(66);
     const open = frames[2]!;
     expect(open.y).toBe(4 + 2 * 62);
-    // The last card shows its whole head.
-    expect(open.h).toBe(600 - open.y - STACK_TOP - 84 - PEEK_GAP);
+    expect(open.h).toBe(600 - open.y - STACK_TOP);
     expect(frames[3]!.y).toBe(open.y + open.h + PEEK_GAP);
     // Above-cards keep their full head, so the next card covers all but the peek.
     expect(frames[1]!.h).toBe(84);
-    expect(height).toBe(600);
+    expect(height).toBe(frames[3]!.y + 84 + STACK_TOP);
   });
 
   it("opens the last card with every other card peeking above", () => {
@@ -97,15 +95,15 @@ describe("the card stack's layout", () => {
     }
   });
 
-  it("keeps the last card's whole head while the cards between can fold to edges", () => {
+  it("keeps the cards under the open one at their whole peeks, however long the stack", () => {
     const many = Array.from({ length: 12 }, () => 84);
     const { frames, height } = stackLayout(many, 0, 500, 300);
     const last = frames[11]!;
     expect(last.h).toBe(84);
     expect(last.y + last.h + STACK_TOP).toBe(height);
     const steps = frames.slice(2).map((frame, index) => frame.y - frames[index + 1]!.y);
-    expect(Math.min(...steps)).toBeGreaterThanOrEqual(PEEK_MIN);
-    expect(Math.max(...steps)).toBeLessThan(62);
+    expect(new Set(steps)).toEqual(new Set([62]));
+    expect(height).toBeGreaterThan(500);
   });
 
   it("treats an open index outside the stack as closed", () => {
@@ -129,25 +127,26 @@ describe("an open card of measured height", () => {
     expect(stackLayout([84], 0, 500, 150)).toEqual({ frames: [{ y: 4, h: 150 }], height: 158 });
   });
 
-  it("packs the others as tightly as it takes to show it whole", () => {
+  it("packs the cards above as tightly as it takes to show it whole, and leaves those under it whole", () => {
     const many = Array.from({ length: 12 }, () => 84);
-    const { frames, height } = stackLayout(many, 5, 640, 420);
+    const { frames } = stackLayout(many, 5, 640, 420);
     expect(frames[5]!.h).toBe(420);
+    expect(frames[5]!.y + 420 + STACK_TOP).toBeLessThanOrEqual(640);
     const steps = frames.slice(1, 5).map((frame, index) => frame.y - frames[index]!.y);
     expect(Math.max(...steps)).toBeLessThan(62);
     expect(Math.min(...steps)).toBeGreaterThanOrEqual(PEEK_MIN);
-    expect(height).toBeLessThanOrEqual(640);
+    const under = frames.slice(7).map((frame, index) => frame.y - frames[index + 6]!.y);
+    expect(new Set(under)).toEqual(new Set([62]));
   });
 
-  it("takes the room the other cards' thinnest peeks leave when it is taller, and scrolls inside it", () => {
-    const { frames, height } = stackLayout(heads, 0, 600, 2000);
-    expect(frames[0]!.h).toBe(600 - 2 * STACK_TOP - PEEK_GAP - 3 * PEEK_MIN);
-    expect(height).toBe(600);
+  it("takes the room the cards above leave at their thinnest when it is taller, and scrolls inside it", () => {
+    const { frames } = stackLayout(heads, 0, 600, 2000);
+    expect(frames[0]!.h).toBe(600 - 2 * STACK_TOP);
     // Lower in a long stack, its foot stays on the screen.
     const long = stackLayout(Array.from({ length: 8 }, () => 84), 6, 600, 2000);
     const open = long.frames[6]!;
-    expect(open.y + open.h).toBeLessThanOrEqual(600 - STACK_TOP);
-    expect(long.height).toBe(600);
+    expect(open.y + open.h).toBe(600 - STACK_TOP);
+    expect(open.y).toBe(STACK_TOP + 6 * PEEK_MIN);
     // Taller heads above fold to more than an edge; the card still keeps to the room.
     // Short peeks that keep their edge leave the taller one to fold further, so the card stays whole.
     expect(stackLayout([300, 30, 30, 30, 30, 30, 30, 30], 7, 600, 400).frames[7]!.h).toBe(400);
