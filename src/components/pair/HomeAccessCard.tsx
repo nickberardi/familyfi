@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { homeAddress, homeOrigin, type HomeAccess } from "@/lib/connection-routes";
-import type { PairedPhone } from "@/lib/types";
-import { AgentRow } from "@/components/agents/AgentRow";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
 /**
@@ -13,7 +11,7 @@ import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
  * proxy's sign-in page: with nothing saved, the address this page is open at stands in only when
  * it is a private one, and otherwise the card asks for an address. Connect an agent is the page's header action.
  */
-export function HomeAccessCard({ agents, onRevoke }: { agents: PairedPhone[]; onRevoke: (agent: PairedPhone) => void }) {
+export function HomeAccessCard() {
   const [home, setHome] = useState<HomeAccess | null>(null);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
@@ -48,7 +46,6 @@ export function HomeAccessCard({ agents, onRevoke }: { agents: PairedPhone[]; on
   const address = home ? homeAddress(home) : null;
   const trimmed = value.trim();
   const valid = trimmed === "" || homeOrigin(trimmed) !== null;
-  const active = agents.filter((agent) => agent.client === "agent" && !agent.revokedAt);
 
   return (
     <section data-testid="home-access" className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
@@ -125,16 +122,6 @@ export function HomeAccessCard({ agents, onRevoke }: { agents: PairedPhone[]; on
             {error}
           </p>
         ) : null}
-      </div>
-      <div className="border-t border-[var(--ff-hairline-card)]">
-        <div className="px-[18px] pt-3 text-[14px] font-semibold">AI agents</div>
-        {active.length ? (
-          active.map((agent) => <AgentRow key={agent.id} agent={agent} onRevoke={() => onRevoke(agent)} />)
-        ) : (
-          <p className="px-[18px] py-3 text-[14px] text-[var(--ff-muted)]">
-            No agents yet. Use Connect an agent to get a prompt for Claude Code, Codex or another agent.
-          </p>
-        )}
       </div>
     </section>
   );

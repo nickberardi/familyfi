@@ -30,7 +30,7 @@ The backups the updater takes before each install (`/var/lib/familyfi/data/backu
 
 ## Remote access and pairing
 
-**System → Pair Device** has two sections. **Home access** is always on: it is the address
+**System → Pair Device** has three sections. **Home access** is always on: it is the address
 FamilyFi has inside the home, where AI agents pair and connect. It shows the address you saved,
 else the address you opened FamilyFi at when that is a private IP or `.local` name, else a warning
 asking you to set one (for example when FamilyFi is opened through an authenticating proxy such as
@@ -59,7 +59,9 @@ same pairing code as text, to copy and paste in the app when the phone can't sca
 when the sheet is open on that phone. The code carries the server address, so nothing else is typed. The code expires in five minutes and is cancelled when you close it. Revoke a lost phone from
 the same page; it is signed out at once and must pair again. A revoked phone stays listed until you
 **Remove** it, or use **Remove all revoked**; **Re-pair** opens a new code with its name filled in,
-and once the phone uses it the old entry disappears. A paired phone learns a newly published route
+and once the phone uses it the old entry disappears. **Paired devices** lists phones, Watches and
+agents together, most recently seen first: what each may do, the account it acts as, how it reaches
+home, and when its sign-in expires. A phone keeps the name you gave it when pairing. A paired phone learns a newly published route
 from the signed manifest the next time it reaches FamilyFi.
 
 HTTPS is required for every route. For a self-signed My domain certificate, choose **Pin this

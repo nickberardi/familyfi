@@ -22,13 +22,10 @@ export const PAIR_COPY = {
   actionFailed: "That didn't work.",
   paired: "Paired devices",
   pairedSub: "Phones, Watches and agents; revoke any of them on its own",
-  noPhones: "No paired devices yet. Use Pair a phone to add one, or connect an agent from FamilyFi’s web Pair Device page.",
-  remoteFirst: "Turn on remote access, then pair a phone. Agents connect from FamilyFi’s web Pair Device page.",
-  /** The web lists agents under Home access, so its device list holds only what reaches home remotely. */
-  pairedRemote: "Paired phones",
-  pairedRemoteSub: "Phones and Watches, which reach home through remote access",
-  noRemotePhones: "No paired phones yet. Use Pair a phone to add one.",
+  noPhones: "No paired devices yet. Pair a phone or connect an agent to add one.",
+  remoteFirst: "Turn on remote access, then pair a phone. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a phone.",
+  expired: "Expired. Revoke it and pair again.",
   showRecent: "Show recent only",
   removeAllRevoked: "Remove all revoked",
   revoke: "Revoke",
@@ -82,24 +79,29 @@ function pairedDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** A device's fallback line when it paired through no listed route: a Watch, an agent, or a removed route. */
-function viaMissing(device: Pick<PairedPhone, "client" | "actsAs">): string {
-  if (device.client === "watch") return "Paired automatically from an iPhone";
-  if (device.client === "agent") return `AI agent on the home network${device.actsAs ? ` · acts as ${device.actsAs.displayName}` : ""}`;
+/** Where a device came from when it paired through no listed route: a Watch's phone, the home network, or a removed route. */
+function origin(device: Pick<PairedPhone, "client">, parentName: string | null): string {
+  if (device.client === "watch") return `Paired automatically from ${parentName ?? "an iPhone"}`;
+  if (device.client === "agent") return "On the home network";
   return "via a route that was removed";
 }
 
-/** A paired device's lines: its scope, when it paired and was last seen (or revoked), the route it paired through, and its sessions. */
-export function phoneLines(phone: PairedPhone, now = new Date()) {
+/**
+ * A paired device's lines, the same for phones, Watches and agents: what it may do, whose account it
+ * acts as and when it was last seen; how it reaches home; and when it paired and its sign-in ends.
+ */
+export function phoneLines(phone: PairedPhone, now = new Date(), parentName: string | null = null) {
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt, now) : "never";
+  const actsAs = phone.actsAs ? ` · acts as ${phone.actsAs.displayName}` : "";
+  const ends = phone.sessions.map((session) => session.expiresAt).sort()[0];
   return {
-    scope: scopeLabel(phone.scope),
-    status: `Paired ${pairedDate(phone.enrolledAt)} · ${
+    access: `${scopeLabel(phone.scope)}${actsAs} · ${
       phone.revokedAt ? `revoked ${pairedDate(phone.revokedAt)}` : `last seen ${seen === "now" || seen === "never" ? seen : `${seen} ago`}`
     }`,
     via: phone.pairedVia ? { url: phone.pairedVia.url, transport: transportLabel(phone.pairedVia.transport) } : null,
-    viaMissing: viaMissing(phone),
-    sessions: phone.sessions.map((session) => ({ id: session.id, line: `${session.username} · expires ${pairedDate(session.expiresAt)}` })),
+    origin: origin(phone, parentName),
+    dates: `Paired ${pairedDate(phone.enrolledAt)}${ends ? ` · expires ${pairedDate(ends)}` : ""}`,
+    expired: !phone.revokedAt && phone.sessions.length === 0,
   };
 }
 

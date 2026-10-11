@@ -58,19 +58,12 @@ export default function PairDevicePage() {
           </p>
         ) : null}
 
-        <HomeAccessCard
-          agents={phones}
-          onRevoke={(agent) => {
-            if (!window.confirm(confirmLine(revokeConfirm(agent)))) return;
-            void run(() => revokePhone(request, agent));
-          }}
-        />
+        <HomeAccessCard />
 
         <RemoteAccessCard tunnel={tunnel} routes={routes} phones={remote} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
 
         <PairedDevicesCard
           phones={phones}
-          phonesOnly
           canPair={canPair}
           onRevoke={(phone) => {
             if (!window.confirm(confirmLine(revokeConfirm(phone)))) return;

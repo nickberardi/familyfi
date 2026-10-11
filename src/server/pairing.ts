@@ -152,7 +152,7 @@ export async function claimResponse(joined: Joined, endpoint: Parameters<typeof 
   };
 }
 
-/** Claims an invite with its single-use token. A Watch invite is never claimable here: its phone claimed it already. */
+/** Claims an invite with its single-use token; a phone takes its invite's name. A Watch invite is never claimable here: its phone claimed it already. */
 export async function claimInvite(input: { id: string; token: string; displayName: string; userAgent?: string | null }) {
   const invite = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true, account: true } });
   if (!invite || invite.client === PairedDeviceClient.watch || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
@@ -164,7 +164,9 @@ export async function claimInvite(input: { id: string; token: string; displayNam
   const joined = await prisma().$transaction(async (db) => {
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
-    return join(db, { invite, account, displayName: input.displayName, userAgent: input.userAgent, now });
+    // A phone is called what the administrator named it when inviting it; what it calls itself is often just "iPhone".
+    const displayName = invite.client === PairedDeviceClient.phone ? invite.displayName : input.displayName;
+    return join(db, { invite, account, displayName, userAgent: input.userAgent, now });
   });
   if (!joined) return null;
   return claimResponse({ invite, account, ...joined }, invite.endpoint);

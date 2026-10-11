@@ -60,16 +60,21 @@ describe("pair device", () => {
     expect(revokedToggleLabel(true, 2)).toBe("Hide revoked (2)");
   });
 
-  it("describes a phone's pairing, last use and sessions", () => {
+  it("describes every device the same way: access, how it reaches home, and its dates", () => {
     const now = new Date("2026-09-14T20:00:00Z");
-    const lines = phoneLines(phone({ sessions: [{ id: "s1", username: "admin", client: "phone", expiresAt: "2026-10-14T12:00:00Z", createdAt: "2026-09-14T12:00:00Z" }] }), now);
-    expect(lines.status).toMatch(/^Paired .+ · last seen 2m ago$/);
+    const session = (id: string, expiresAt: string) => ({ id, username: "admin", client: "phone" as const, expiresAt, createdAt: "2026-09-14T12:00:00Z" });
+    const lines = phoneLines(phone({ actsAs: { username: "admin", displayName: "An adult" }, sessions: [session("s2", "2026-12-14T12:00:00Z"), session("s1", "2026-10-14T12:00:00Z")] }), now);
+    expect(lines.access).toBe("Full access · acts as An adult · last seen 2m ago");
     expect(lines.via).toEqual({ url: "https://home.example", transport: "My domain" });
-    expect(lines.sessions[0]!.line).toMatch(/^admin · expires /);
-    expect(phoneLines(phone({ lastSeenAt: null }), now).status).toMatch(/last seen never$/);
-    expect(phoneLines(phone({ revokedAt: "2026-09-10T00:00:00Z" }), now).status).toMatch(/ · revoked /);
-    expect(phoneLines(phone({ pairedVia: null, client: "watch" }), now)).toMatchObject({ via: null, viaMissing: "Paired automatically from an iPhone" });
-    expect(phoneLines(phone({ pairedVia: null }), now).viaMissing).toBe("via a route that was removed");
+    // The sign-in that ends first is the one that matters.
+    expect(lines.dates).toMatch(/^Paired .+ · expires Oct 1[45], 2026$/);
+    expect(lines.expired).toBe(false);
+    expect(phoneLines(phone({ lastSeenAt: null }), now).access).toMatch(/last seen never$/);
+    const revoked = phoneLines(phone({ revokedAt: "2026-09-10T00:00:00Z" }), now);
+    expect(revoked.access).toMatch(/ · revoked /);
+    expect(revoked.expired).toBe(false);
+    expect(phoneLines(phone(), now)).toMatchObject({ dates: expect.not.stringContaining("expires"), expired: true });
+    expect(phoneLines(phone({ pairedVia: null }), now).origin).toBe("via a route that was removed");
   });
 
   it("titles each step of the pairing sheet", () => {
@@ -106,12 +111,14 @@ describe("pair device", () => {
     ]);
   });
 
-  it("names a device's scope, and the adult an agent acts as", () => {
-    expect(phoneLines(phone()).scope).toBe("Full access");
+  it("names a device's scope, the adult it acts as, and where it came from", () => {
+    expect(phoneLines(phone({ actsAs: null })).access).toMatch(/^Full access · last seen /);
     const agent = phone({ client: "agent", scope: "readOnly", pairedVia: null, actsAs: { username: "admin", displayName: "An adult" } });
-    expect(phoneLines(agent).scope).toBe("Read only");
-    expect(phoneLines(agent).viaMissing).toBe("AI agent on the home network · acts as An adult");
-    expect(phoneLines(phone({ client: "watch", scope: "rulesOnly", pairedVia: null })).viaMissing).toBe("Paired automatically from an iPhone");
+    expect(phoneLines(agent).access).toMatch(/^Read only · acts as An adult · /);
+    expect(phoneLines(agent).origin).toBe("On the home network");
+    const watch = phone({ client: "watch", scope: "rulesOnly", pairedVia: null });
+    expect(phoneLines(watch).origin).toBe("Paired automatically from an iPhone");
+    expect(phoneLines(watch, new Date(), "Kitchen iPhone").origin).toBe("Paired automatically from Kitchen iPhone");
   });
 
   it("offers a phone only administrators to sign in as, the one signed in here first", () => {

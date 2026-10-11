@@ -44,6 +44,15 @@ describe("POST /paired/invites", () => {
     expect(device.accountId).toBe((await prisma().account.findUniqueOrThrow({ where: { username: "admin" } })).id);
   });
 
+  it("names a phone what the administrator typed when inviting it, not what the phone calls itself", async () => {
+    const route = await homeRoute();
+    const created = await invitePhoneRequest(await admin(), { endpointId: route.id, displayName: "Kitchen iPad" });
+    const claimed = await claimInvite(await issuedInvite(created), "iPad");
+    const claim = (await claimed.json()) as Claim;
+    expect(claim.device.displayName).toBe("Kitchen iPad");
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: claim.device.id } })).displayName).toBe("Kitchen iPad");
+  });
+
   it("signs a phone in as the adult the administrator chose", async () => {
     const parent = await adult("parent");
     const claim = await pairPhone(await admin(), { accountId: parent.id });

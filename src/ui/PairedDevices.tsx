@@ -33,17 +33,20 @@ function TextButton({ label, token, onPress, disabled, testID }: { label: string
 }
 
 /**
- * One paired phone, Watch or agent: its scope, when it paired and was last seen, the route it paired
- * through (or the adult an agent acts as), its sessions, and what can be done to it.
+ * One paired phone, Watch or agent, each the same: what it may do and whose account it acts as, how
+ * it reaches home, when it paired and its sign-in ends, and what can be done to it on the right.
  */
 export function PairedPhoneRow({
   phone,
+  parentName = null,
   onRevoke,
   onRepair,
   onRemove,
   disabled,
 }: {
   phone: PairedPhone;
+  /** The name of the phone that paired this Watch. */
+  parentName?: string | null;
   /** No changes while the phone's view of the household is stale. */
   disabled?: boolean;
   onRevoke?: () => void;
@@ -52,35 +55,32 @@ export function PairedPhoneRow({
 }) {
   const ui = useUI();
   const text = useText();
-  const lines = phoneLines(phone);
+  const lines = phoneLines(phone, new Date(), parentName);
   return (
     <View style={[styles.phone, { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]} testID="phone-row">
       <View style={[styles.phoneIcon, { backgroundColor: ui.color("field") }]}>
         <ui.Icon name={phone.client === "watch" ? "watch" : phone.client === "agent" ? "robot" : "device-mobile"} size={18} color={ui.color("ink")} />
       </View>
       <View style={styles.phoneWords}>
-        <Text style={[text(14, 21, "ink"), styles.bold]}>
-          {phone.displayName} <Text style={[text(14, 21, "muted"), styles.regular]}>· {lines.scope}</Text>
-        </Text>
-        <Text style={[text(14, 21, "muted"), styles.line]}>{lines.status}</Text>
+        <Text style={[text(14, 21, "ink"), styles.bold]}>{phone.displayName}</Text>
+        <Text style={[text(14, 21, "muted"), styles.line]}>{lines.access}</Text>
         <Text style={[text(14, 21, "muted"), styles.line]}>
           {lines.via ? (
             <>
               via <Text style={{ fontFamily: MONO }}>{lines.via.url}</Text> · {lines.via.transport}
             </>
           ) : (
-            lines.viaMissing
+            lines.origin
           )}
         </Text>
+        <Text style={[text(14, 21, "muted"), styles.line]}>{lines.dates}</Text>
+        {lines.expired ? <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{COPY.expired}</Text> : null}
       </View>
-      {lines.sessions.map((session) => (
-        <Text key={session.id} style={[text(14, 21, "muted"), styles.session]}>
-          {session.line}
-        </Text>
-      ))}
-      {onRevoke ? <TextButton label={COPY.revoke} token="danger" onPress={onRevoke} disabled={disabled} testID={`phone-revoke-${phone.id}`} /> : null}
-      {onRepair ? <TextButton label={COPY.repair} token="accent" onPress={onRepair} disabled={disabled} testID={`phone-repair-${phone.id}`} /> : null}
-      {onRemove ? <TextButton label={COPY.remove} token="danger" onPress={onRemove} disabled={disabled} testID={`phone-remove-${phone.id}`} /> : null}
+      <View style={styles.actions}>
+        {onRevoke ? <TextButton label={COPY.revoke} token="danger" onPress={onRevoke} disabled={disabled} testID={`phone-revoke-${phone.id}`} /> : null}
+        {onRepair ? <TextButton label={COPY.repair} token="accent" onPress={onRepair} disabled={disabled} testID={`phone-repair-${phone.id}`} /> : null}
+        {onRemove ? <TextButton label={COPY.remove} token="danger" onPress={onRemove} disabled={disabled} testID={`phone-remove-${phone.id}`} /> : null}
+      </View>
     </View>
   );
 }
@@ -97,11 +97,8 @@ export function PairedDevicesCard({
   onRemove,
   onRemoveAllRevoked,
   disabled,
-  phonesOnly = false,
 }: {
   phones: PairedPhone[];
-  /** Only active phones and Watches, the devices remote access serves; active agents are listed elsewhere. */
-  phonesOnly?: boolean;
   /** No changes while the phone's view of the household is stale. */
   disabled?: boolean;
   /** Whether a route is published, so a phone can pair (or re-pair) now. */
@@ -115,24 +112,22 @@ export function PairedDevicesCard({
   const text = useText();
   const [showAll, setShowAll] = useState(false);
   const [showRevoked, setShowRevoked] = useState(false);
-  const split = splitPhones(phones);
-  // Revoked agents stay in the revoked list, the one place they can be removed from.
-  const active = phonesOnly ? split.active.filter((phone) => phone.client !== "agent") : split.active;
-  const revoked = split.revoked;
+  const { active, revoked } = splitPhones(phones);
+  const nameOf = (id: string | null) => phones.find((phone) => phone.id === id)?.displayName ?? null;
   const rule = { borderTopWidth: 1, borderTopColor: ui.color("hairline") };
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="paired-devices">
       <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
-        <Text style={[text(14, 21, "ink"), styles.bold]}>{phonesOnly ? COPY.pairedRemote : COPY.paired}</Text>
-        <Text style={text(14, 21, "muted")}>{phonesOnly ? COPY.pairedRemoteSub : COPY.pairedSub}</Text>
+        <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
+        <Text style={text(14, 21, "muted")}>{COPY.pairedSub}</Text>
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>
-          {phonesOnly ? (canPair ? COPY.noRemotePhones : COPY.remoteFirstPhones) : canPair ? COPY.noPhones : COPY.remoteFirst}
+          {canPair ? COPY.noPhones : COPY.remoteFirst}
         </Text>
       ) : (
         (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (
-          <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />
+          <PairedPhoneRow key={phone.id} phone={phone} parentName={nameOf(phone.parentDeviceId)} disabled={disabled} onRevoke={() => onRevoke(phone)} />
         ))
       )}
       {active.length > PHONES_SHOWN ? (
@@ -151,6 +146,7 @@ export function PairedDevicesCard({
                 <PairedPhoneRow
                   key={phone.id}
                   phone={phone}
+                  parentName={nameOf(phone.parentDeviceId)}
                   disabled={disabled}
                   onRepair={canPair && phone.client === "phone" ? () => onRepair(phone) : undefined}
                   onRemove={() => onRemove(phone)}
@@ -214,10 +210,10 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 200 },
   line: { marginTop: 2 },
   empty: { paddingHorizontal: 18, paddingVertical: 16 },
-  phone: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
+  phone: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
   phoneIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  phoneWords: { flex: 1, minWidth: 200 },
-  session: { width: "100%", paddingLeft: 44 },
+  phoneWords: { flex: 1, minWidth: 0 },
+  actions: { flexShrink: 0, alignItems: "flex-end", gap: 4 },
   listButton: { paddingHorizontal: 18, paddingVertical: 10 },
   remoteBody: { gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
 });

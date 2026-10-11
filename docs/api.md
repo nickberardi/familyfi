@@ -164,7 +164,8 @@ with a five-minute, single-use QR for an enabled route and chooses which adminis
 as (only administrators have paired phones: an invite for any other account is refused, 400
 `administrator_account_required`);
 the phone claims it, verifies the instance identity, and is signed in, with its route and signed
-manifest in the claim. Bearer sessions are tied to that paired phone. Revoking the phone
+manifest in the claim. The phone is called the name the administrator gave its invite; the claim's
+`deviceName` names only an agent. Bearer sessions are tied to that paired phone. Revoking the phone
 invalidates every one of its sessions, and its Watches', and requires a new invite. Sign-in with a password is for
 browsers only.
 

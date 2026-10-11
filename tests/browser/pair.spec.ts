@@ -108,6 +108,8 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     await page.getByRole("button", { name: "Pair a phone" }).click();
     const pairSheet = page.getByRole("dialog", { name: "Pair a phone" });
     await expect(pairSheet.getByTestId("pairing-route")).toContainText(url);
+    // The phone keeps the name given here, not the one it calls itself when it claims the code.
+    await pairSheet.getByLabel("Phone", { exact: true }).fill("Kitchen iPhone");
     await pairSheet.getByRole("button", { name: "Show pairing code" }).click();
 
     const qrSheet = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
@@ -127,13 +129,13 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     // Pairing signs the phone in: its bearer comes with the claim, and there is no password step.
     const { token } = (await claim.json()) as { device: { id: string }; token: string };
 
-    await expect(page.getByTestId("pairing-claimed")).toContainText("Paired Playwright iPhone", { timeout: 10_000 });
+    await expect(page.getByTestId("pairing-claimed")).toContainText("Paired Kitchen iPhone", { timeout: 10_000 });
     const bearer = { authorization: `Bearer ${token}` };
     expect((await page.request.get("/api/v1/connection", { headers: bearer })).status()).toBe(200);
 
     await page.getByRole("dialog", { name: "Phone paired" }).getByRole("button", { name: "Done" }).click();
     await expect(card.getByTestId("published-route")).toContainText("1 phone paired here");
-    const row = page.getByTestId("phone-row").filter({ hasText: "Playwright iPhone" }).filter({ hasText: url });
+    const row = page.getByTestId("phone-row").filter({ hasText: "Kitchen iPhone" }).filter({ hasText: url });
     await expect(row).toBeVisible();
     await shot(page, "paired");
     await row.getByRole("button", { name: "Revoke" }).click();
