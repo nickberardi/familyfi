@@ -86,6 +86,36 @@ describe("the card stack's layout", () => {
   });
 });
 
+describe("an open card of measured height", () => {
+  it("shows all of itself, with the rest peeking in full under it, not filling the room", () => {
+    const { frames, height } = stackLayout(heads, 1, 600, 300);
+    expect(frames[1]).toEqual({ y: 4 + 62, h: 300 });
+    expect(frames[2]!.y).toBe(4 + 62 + 300 + PEEK_GAP);
+    expect(frames[3]!.y - frames[2]!.y).toBe(62);
+    expect(height).toBe(frames[3]!.y + 62 + STACK_TOP);
+    expect(height).toBeLessThan(600);
+  });
+
+  it("keeps a short card short", () => {
+    expect(stackLayout([84], 0, 500, 150)).toEqual({ frames: [{ y: 4, h: 150 }], height: 158 });
+  });
+
+  it("packs the others as tightly as it takes to show it whole", () => {
+    const many = Array.from({ length: 12 }, () => 84);
+    const { frames, height } = stackLayout(many, 5, 640, 420);
+    expect(frames[5]!.h).toBe(420);
+    const steps = frames.slice(1, 5).map((frame, index) => frame.y - frames[index]!.y);
+    expect(Math.max(...steps)).toBeLessThan(62);
+    expect(Math.min(...steps)).toBeGreaterThanOrEqual(PEEK_MIN);
+    expect(height).toBeLessThanOrEqual(640);
+  });
+
+  it("takes the whole room when it is taller, and scrolls inside it", () => {
+    const { frames } = stackLayout(heads, 0, 600, 2000);
+    expect(frames[0]!.h).toBe(600 - 2 * STACK_TOP);
+  });
+});
+
 describe("dragging an open card", () => {
   it("closes past the distance, or on a quick flick, and springs back otherwise", () => {
     expect(dismisses(DISMISS_DISTANCE + 1, 0)).toBe(true);
@@ -108,7 +138,7 @@ describe("dragging an open card", () => {
   });
 });
 
-describe("a long stack", () => {
+describe("a long stack, before its open card is measured", () => {
   const many = Array.from({ length: 13 }, () => 84);
 
   it("folds its peeks thinner so the open card keeps most of the room", () => {
