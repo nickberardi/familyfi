@@ -66,6 +66,13 @@ export const MODULES = { display, groupActions: groupActionsModule, pauseSheet, 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {
   internetRulePath: "an API path, not display text",
+  // The Watch keeps the quick options, so it ports none of the custom choices; their clock text
+  // comes from formatClock and relativeDayLabel, which have vectors.
+  pauseSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
+  rulePauseSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
+  customPauseLabel: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
+  withCustomChoices: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
+  parseCustomPause: "reads stored device data, not display text; tests/unit/pause-sheet-custom.test.ts",
 };
 
 export type Outcome =

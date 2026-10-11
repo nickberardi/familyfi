@@ -786,6 +786,12 @@
         "devices"
       ]
     },
+    "tests/browser/smoke.spec.ts > Pause for a custom time, then offer it first next time": {
+      "categories": [
+        "groups",
+        "schedules"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Pause all internet names its scope and can be undone": {
       "categories": [
         "groups",
@@ -843,6 +849,12 @@
       "categories": [
         "display",
         "accessibility"
+      ]
+    },
+    "tests/unit/pause-sheet-custom.test.ts": {
+      "categories": [
+        "groups",
+        "display"
       ]
     },
     "tests/unit/group-pause-sheet.test.ts": {
