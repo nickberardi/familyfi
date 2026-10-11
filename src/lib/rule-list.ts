@@ -152,7 +152,6 @@ export const RULES_COPY = {
   newRule: "New rule",
   scopeLabel: "Show rules for",
   all: "All",
-  blocks: "Blocks",
   when: "When",
   appliesTo: "Applies to",
   unassigned: "Unassigned devices",
