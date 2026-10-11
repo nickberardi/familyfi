@@ -5,7 +5,9 @@ import { applyGroupPause, applyRulePause } from "@/lib/group-writes";
 import {
   CUSTOM_PAUSE_MAX_MINUTES,
   RECENT_CUSTOM_PAUSE_KEY,
+  customPauseLabel,
   parseCustomPause,
+  pauseSheetCustom,
   rulePauseSheetBody,
   rulePauseSheetCustom,
   rulePauseSheetOptions,
@@ -49,7 +51,8 @@ export function PauseSheet({
       mode={mode}
       choices={sheet.choices}
       recent={recent}
-      custom={sheet.custom}
+      // Resolved when it is tapped, so a sheet left open never sends an end already passed.
+      custom={(choice) => pauseSheetCustom(group, choice, mode, timezone, new Date())}
       onPick={(request) => run(request)}
       onCustom={remember}
       onClose={onClose}
@@ -73,7 +76,8 @@ export function RulePauseSheet({
   const [recent, remember] = useRecentCustomPause();
   const now = new Date();
   const options = rulePauseSheetOptions(rule, ruleInternetWindows(rule), mode, timezone, now);
-  const custom = (choice: CustomPause) => rulePauseSheetCustom(rule, choice, mode, timezone, now);
+  // Resolved when it is tapped, so a sheet left open never sends an end already passed.
+  const custom = (choice: CustomPause) => rulePauseSheetCustom(rule, choice, mode, timezone, new Date());
 
   async function run(request: PauseSheetRequest) {
     await applyRulePause(store.mutate, rule, request, timezone);
@@ -143,6 +147,9 @@ function PauseSheetView({
   onClose: () => void;
 }) {
   const [open, setOpen] = useState<PauseSheetPicker["picker"] | null>(null);
+  // The last custom choice is worked out again at the tap, like the picker's.
+  const resolve = (option: PauseSheetOption) =>
+    (recent && option.label === customPauseLabel(recent) && custom(recent)) || option;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ff-scrim)] p-6" onClick={onClose}>
       <div
@@ -166,7 +173,7 @@ function PauseSheetView({
               className="flex w-full items-baseline gap-2.5 border-t border-[var(--ff-line)] px-[18px] py-3 text-left"
               onClick={() => {
                 if (isPicker(choice)) setOpen(open === choice.picker ? null : choice.picker);
-                else void onPick(choice.request).then(onClose);
+                else void onPick(resolve(choice).request).then(onClose);
               }}
             >
               <span className="flex-1 text-[15px] font-semibold text-[var(--ff-accent)]">{choice.label}</span>
@@ -236,7 +243,8 @@ function CustomPausePicker({
       className="flex flex-wrap items-center gap-2.5 bg-[var(--ff-field-soft)] px-[18px] py-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (choice && option) onDone(choice, option);
+        const fresh = choice && custom(choice);
+        if (choice && fresh) onDone(choice, fresh);
       }}
     >
       {picker === "for" ? (
