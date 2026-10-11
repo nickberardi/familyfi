@@ -53,9 +53,10 @@ export function stackLayout(
     const last = frames[n - 1]!;
     return { frames, height: last.y + last.h + STACK_FOOT };
   }
-  // A measured card is as tall as it is, up to the whole room, and scrolls only past that. With
-  // peeks above it the stack then runs past the room, and the page scrolls the card up to its top.
-  const fitted = content === undefined ? undefined : Math.min(content, Math.max(room - 2 * STACK_TOP, heads[open]! + MIN_BODY));
+  // A measured card is as tall as it is, up to the room the other cards' thinnest peeks leave, and
+  // scrolls only past that.
+  const most = room - 2 * STACK_TOP - (open < n - 1 ? PEEK_GAP : 0) - PEEK_MIN * (n - 1);
+  const fitted = content === undefined ? undefined : Math.min(content, Math.max(most, heads[open]! + MIN_BODY));
   // Peeks that would crowd the open card fold thinner, all alike, to an edge at least.
   const natural = heads.map(peekOf);
   const others = natural.reduce((sum, peek) => sum + peek, 0) - natural[open]!;

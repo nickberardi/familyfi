@@ -110,9 +110,17 @@ describe("an open card of measured height", () => {
     expect(height).toBeLessThanOrEqual(640);
   });
 
-  it("takes the whole room when it is taller, and scrolls inside it", () => {
-    const { frames } = stackLayout(heads, 0, 600, 2000);
-    expect(frames[0]!.h).toBe(600 - 2 * STACK_TOP);
+  it("takes the room the other cards' thinnest peeks leave when it is taller, and scrolls inside it", () => {
+    const { frames, height } = stackLayout(heads, 0, 600, 2000);
+    expect(frames[0]!.h).toBe(600 - 2 * STACK_TOP - PEEK_GAP - 3 * PEEK_MIN);
+    expect(height).toBe(600);
+    // Lower in a long stack, its foot stays on the screen.
+    const long = stackLayout(Array.from({ length: 8 }, () => 84), 6, 600, 2000);
+    const open = long.frames[6]!;
+    expect(open.y + open.h).toBeLessThanOrEqual(600 - STACK_TOP);
+    expect(long.height).toBe(600);
+    const near = stackLayout(Array.from({ length: 8 }, () => 84), 6, 600, 580);
+    expect(near.frames[6]!.y + near.frames[6]!.h).toBeLessThanOrEqual(600 - STACK_TOP);
   });
 });
 
