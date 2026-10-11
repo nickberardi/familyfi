@@ -16,7 +16,7 @@ export const STACK_TUCK = 8;
 export const PEEK_COVER = 22;
 /** The gap between the open card and the peeks under it. */
 export const PEEK_GAP = 6;
-/** The open card is never shorter than its head and this much body, however little room there is. */
+/** Until it is measured, the open card is never shorter than its head and this much body, however little room there is. */
 export const MIN_BODY = 160;
 /** Until its height is measured, an open card takes at least this share of the room. */
 export const OPEN_SHARE = 0.6;
@@ -53,7 +53,8 @@ export function stackLayout(
     const last = frames[n - 1]!;
     return { frames, height: last.y + last.h + STACK_FOOT };
   }
-  // A measured card is as tall as it is, up to the whole room, and scrolls only past that.
+  // A measured card is as tall as it is, up to the whole room, and scrolls only past that. With
+  // peeks above it the stack then runs past the room, and the page scrolls the card up to its top.
   const fitted = content === undefined ? undefined : Math.min(content, Math.max(room - 2 * STACK_TOP, heads[open]! + MIN_BODY));
   // Peeks that would crowd the open card fold thinner, all alike, to an edge at least.
   const natural = heads.map(peekOf);
