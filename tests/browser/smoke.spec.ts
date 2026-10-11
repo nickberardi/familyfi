@@ -609,6 +609,48 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
   }
 });
 
+test("Pause for a custom time, then offer it first next time", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };
+  const tv = groups.find((group) => group.name === "TV");
+  expect(tv, "The mock seed must include the TV things group").toBeTruthy();
+  // As above: with the TV rule off, the card offers a pause whatever the time of day.
+  const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as {
+    rules: { id: string; kind: string; enabled: boolean; groupIds: string[] }[];
+  };
+  const internetRules = rules.filter((rule) => rule.kind === "internet" && rule.enabled && rule.groupIds.includes(tv!.id));
+  const setEnabled = async (enabled: boolean) => {
+    for (const rule of internetRules) {
+      const response = await page.request.patch(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page), data: { enabled } });
+      expect(response.ok()).toBeTruthy();
+    }
+  };
+  await setEnabled(false);
+  try {
+    await page.goto(`/things/${tv!.id}`);
+    await page.getByRole("button", { name: "Pause all internet" }).click();
+    const sheet = page.getByRole("dialog", { name: `Pause all internet for ${tv!.name}?` });
+    await sheet.getByRole("button", { name: /^For…/ }).click();
+    await sheet.getByRole("spinbutton").first().fill("3");
+    await sheet.getByRole("spinbutton").nth(1).fill("0");
+    const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/pause`));
+    await sheet.getByRole("button", { name: "Pause", exact: true }).click();
+    const response = await paused;
+    expect(response.ok()).toBeTruthy();
+    const { until } = response.request().postDataJSON() as { until: string };
+    // Three hours from the tap, give or take the time the test took.
+    expect(Math.abs(Date.parse(until) - Date.now() - 3 * 3_600_000)).toBeLessThan(60_000);
+
+    await page.request.post(`/api/v1/groups/${tv!.id}/rules/internet/resume`, { headers: await csrfHeaders(page) });
+    await page.reload();
+    await page.getByRole("button", { name: "Pause all internet" }).click();
+    await expect(page.getByRole("dialog").getByRole("button").first()).toHaveText(/^For 3 hours/);
+  } finally {
+    await page.request.post(`/api/v1/groups/${tv!.id}/rules/internet/resume`, { headers: await csrfHeaders(page) });
+    await setEnabled(true);
+  }
+});
+
 test("Pause all internet names its scope and can be undone", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");
