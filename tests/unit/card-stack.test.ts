@@ -97,6 +97,17 @@ describe("the card stack's layout", () => {
     }
   });
 
+  it("keeps the last card's whole head while the cards between can fold to edges", () => {
+    const many = Array.from({ length: 12 }, () => 84);
+    const { frames, height } = stackLayout(many, 0, 500, 300);
+    const last = frames[11]!;
+    expect(last.h).toBe(84);
+    expect(last.y + last.h + STACK_TOP).toBe(height);
+    const steps = frames.slice(2).map((frame, index) => frame.y - frames[index + 1]!.y);
+    expect(Math.min(...steps)).toBeGreaterThanOrEqual(PEEK_MIN);
+    expect(Math.max(...steps)).toBeLessThan(62);
+  });
+
   it("treats an open index outside the stack as closed", () => {
     expect(stackLayout(heads, 9, 600)).toEqual(stackLayout(heads, null, 600));
     expect(stackLayout(heads, -1, 600)).toEqual(stackLayout(heads, null, 600));
