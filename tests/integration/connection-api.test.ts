@@ -211,7 +211,7 @@ describe("companion admin surface", () => {
     expect((await claim(pairing.id, pairing.token)).status).toBe(200);
 
     const status = await pairingStatus(request(`/api/v1/paired/invites/${pairing.id}`, { auth }), params(pairing.id));
-    expect(((await status.json()) as { invite: { status: string; device: { displayName: string } } }).invite).toMatchObject({ status: "claimed", device: { displayName: "Nick's iPhone" } });
+    expect(((await status.json()) as { invite: { status: string; device: { displayName: string } } }).invite).toMatchObject({ status: "claimed", device: { displayName: "Kitchen iPhone" } });
 
     type Devices = { devices: { pairedVia: { endpointId: string; url: string; transport: string } | null }[] };
     const before = (await (await listDevices(request("/api/v1/paired/devices", { auth }))).json()) as Devices;
