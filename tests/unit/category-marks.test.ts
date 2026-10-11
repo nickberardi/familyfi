@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cardMarks, categoryRuleWhen, stackedCardMarks, fitCardMarks, marksRoom, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
-import type { Rule } from "@/lib/rules";
+import { cardMarks, categoryRuleItems, categoryRuleWhen, stackedCardMarks, fitCardMarks, marksRoom, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
+import { CURATED_CATEGORY_SLOTS, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 const slot = (key: string, enabled?: boolean) => ({ key, label: key, rule: enabled === undefined ? undefined : ({ enabled } as Rule) }) as CategorySlotState;
@@ -34,17 +34,56 @@ describe("category marks", () => {
   it("lists a stacked card's categories by what blocks them: rules, the resolver, then the rest", () => {
     const upstream = (key: string, state: CategorySlotState["state"]) => ({ ...slot(key), state }) as CategorySlotState;
     const slots = [upstream("a", "open"), slot("b", true), upstream("c", "blocked"), slot("d", false), upstream("e", "partial"), upstream("f", "unknown")];
-    const stacked = stackedCardMarks(slots, false);
+    const stacked = stackedCardMarks(slots, false, [slots[1]!]);
     expect(stacked.ruled.map((item) => item.key)).toEqual(["b"]);
     expect(stacked.upstream.map((item) => item.key)).toEqual(["c", "e"]);
     // A rule that is off is no rule: its category is one of the others.
     expect(stacked.marks.pool.map((item) => item.key)).toEqual(["a", "d", "f"]);
     expect(stacked.marks.focused).toBeUndefined();
     expect(stacked.marks.hidden).toBe(0);
-    const many = stackedCardMarks([...Array(7).keys()].map((index) => slot(`x${index}`)), false);
+    const many = stackedCardMarks([...Array(7).keys()].map((index) => slot(`x${index}`)), false, []);
     expect(many.marks.shown).toHaveLength(5);
     expect(many.marks.hidden).toBe(2);
-    expect(stackedCardMarks([...Array(7).keys()].map((index) => slot(`x${index}`)), true).marks.shown).toHaveLength(7);
+    expect(stackedCardMarks([...Array(7).keys()].map((index) => slot(`x${index}`)), true, []).marks.shown).toHaveLength(7);
+  });
+
+  it("gives a stacked card a zone for every enabled category rule, curated or not", () => {
+    const video = CURATED_CATEGORY_SLOTS[0]!;
+    const rule = (id: string, targetIds: number[], over: Partial<Rule> = {}) =>
+      ({
+        id,
+        name: id,
+        kind: "category",
+        scope: "group",
+        enabled: true,
+        groupIds: ["g1"],
+        networkIds: [],
+        targetIds,
+        domains: [],
+        mode: "always",
+        windows: [],
+        pause: { active: false, until: null, kind: "pause", by: null },
+        groupPauses: [],
+        ...over,
+      }) as Rule;
+    const rules = [
+      rule("first", [video.categoryId]),
+      rule("second", [video.categoryId]),
+      rule("gateway", [999]),
+      rule("off", [998], { enabled: false }),
+      rule("elsewhere", [997], { groupIds: ["g2"] }),
+      rule("app", [5], { kind: "app" }),
+    ];
+    const slots = categorySlotStates(group, rules, [], "America/New_York");
+    const names = new Map([["category:999", "Shopping"]]);
+    const items = categoryRuleItems("g1", rules, slots, names, "America/New_York");
+    expect(items.map((item) => item.key)).toEqual([video.slot, `${video.slot}:second`, "rule:gateway"]);
+    expect(items.map((item) => item.rule?.id)).toEqual(["first", "second", "gateway"]);
+    // A gateway category no slot names takes its catalog name, and an always rule blocks it now.
+    expect(items[2]).toMatchObject({ label: "Shopping", slot: undefined, blocking: true, state: "rule" });
+    // Its zone is in `ruled`, so the curated slot is not offered again as another category.
+    const stacked = stackedCardMarks(slots, false, items);
+    expect(stacked.marks.pool.map((item) => item.key)).not.toContain(video.slot);
   });
 
   it("keeps More on the row's last place when the marks do not all fit", () => {

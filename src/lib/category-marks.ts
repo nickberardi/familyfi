@@ -10,7 +10,14 @@
 import type { ApiRequest } from "./api-client";
 import { windowTimes } from "./display";
 import type { IconName } from "./icons";
-import { CURATED_CATEGORY_SLOTS, categoryRuleForSlot, type CuratedCategorySlot, type Rule } from "./rules";
+import {
+  CURATED_CATEGORY_SLOTS,
+  categoryRuleForSlot,
+  groupScopedRules,
+  parentFacingRuleLabel,
+  type CuratedCategorySlot,
+  type Rule,
+} from "./rules";
 import type { Group } from "./types";
 import {
   categoryMarkState,
@@ -56,7 +63,9 @@ export function categorySlotStates(
     const upstream = upstreamCategoryForSlot(upstreamCategories, slot.slot);
     return { slot, upstream: upstream && seededSlot(upstream) ? upstream : undefined };
   });
-  const others = upstreamCategories.filter((row) => !seededSlot(row)).map((row) => ({ slot: undefined, upstream: row }));
+  const others = upstreamCategories
+    .filter((row) => !seededSlot(row))
+    .map((row) => ({ slot: undefined, upstream: row }));
   return [...mapped, ...others].map(({ slot, upstream }) => {
     const rule = slot ? categoryRuleForSlot(rules, group.id, slot.categoryId) : undefined;
     // A rule blocking *right now* wins; otherwise this group's resolver decides.
@@ -117,7 +126,10 @@ export const OPEN_MARKS = 5;
  * focused (the one tapped, or the first) and the rest are "Other categories"; either way the row
  * shows a few before "More".
  */
-export function cardMarks(slots: CategorySlotState[], { open, focus, more }: { open: boolean; focus: string | null; more: boolean }) {
+export function cardMarks(
+  slots: CategorySlotState[],
+  { open, focus, more }: { open: boolean; focus: string | null; more: boolean },
+) {
   const ordered = [...slots.filter((item) => item.rule?.enabled), ...slots.filter((item) => !item.rule?.enabled)];
   const focused = ordered.find((item) => item.key === focus) ?? ordered[0];
   const pool = open ? ordered.filter((item) => item !== focused) : ordered;
@@ -127,15 +139,67 @@ export function cardMarks(slots: CategorySlotState[], { open, focus, more }: { o
 
 /**
  * An open card that lists its categories by what blocks them, as the companion's stacked cards
- * do: every category with a FamilyFi rule (`ruled`), then each one the resolver blocks or partly
- * blocks with no rule (`upstream`), and the rest as "Other categories" marks before "More".
+ * do: every enabled FamilyFi category rule (`ruled`, from `categoryRuleItems`), then each category
+ * the resolver blocks or partly blocks with no rule (`upstream`), and the rest as "Other
+ * categories" marks before "More".
  */
-export function stackedCardMarks(slots: CategorySlotState[], more: boolean) {
-  const ruled = slots.filter((item) => item.rule?.enabled);
-  const upstream = slots.filter((item) => !item.rule?.enabled && (item.state === "blocked" || item.state === "partial"));
-  const pool = slots.filter((item) => !ruled.includes(item) && !upstream.includes(item));
-  const marks: CardMarks = { ordered: slots, focused: undefined, pool, more, cap: OPEN_MARKS, ...rowOfMarks(pool, more, OPEN_MARKS) };
+export function stackedCardMarks(slots: CategorySlotState[], more: boolean, ruled: CategorySlotState[]) {
+  const covered = new Set(ruled.map((item) => item.key));
+  const unruled = slots.filter((item) => !covered.has(item.key) && !item.rule?.enabled);
+  const upstream = unruled.filter((item) => item.state === "blocked" || item.state === "partial");
+  const pool = unruled.filter((item) => !upstream.includes(item));
+  const marks: CardMarks = {
+    ordered: slots,
+    focused: undefined,
+    pool,
+    more,
+    cap: OPEN_MARKS,
+    ...rowOfMarks(pool, more, OPEN_MARKS),
+  };
   return { ruled, upstream, marks };
+}
+
+/**
+ * One item per enabled category rule of the group, for its zone: the category's own slot where
+ * the rule is the one its mark shows, a copy of that slot for a second rule on the same category,
+ * and, for a gateway category no slot names, an item of its own under its catalog name.
+ */
+export function categoryRuleItems(
+  groupId: string,
+  rules: Rule[],
+  slots: CategorySlotState[],
+  catalogNames: CatalogNames,
+  timezone: string,
+): CategorySlotState[] {
+  return groupScopedRules(rules, groupId)
+    .filter((rule) => rule.kind === "category" && rule.enabled)
+    .map((rule) => {
+      const own = slots.find((item) => item.rule?.id === rule.id);
+      if (own) return own;
+      const blocking = ruleActivelyBlocking(rule, timezone);
+      const shared = slots.find((item) => item.slot && rule.targetIds.includes(item.slot.categoryId));
+      if (shared)
+        return {
+          ...shared,
+          key: `${shared.key}:${rule.id}`,
+          rule,
+          blocking,
+          state: categoryMarkState(blocking, shared.check),
+        };
+      const label = parentFacingRuleLabel(rule, catalogNames);
+      return {
+        key: `rule:${rule.id}`,
+        label,
+        slot: undefined,
+        icon: undefined,
+        monogram: label.slice(0, 3).toUpperCase(),
+        domains: [],
+        rule,
+        check: null,
+        blocking,
+        state: categoryMarkState(blocking, null),
+      };
+    });
 }
 
 /** `hidden` is what the row hides collapsed, so expanded it still shows Fewer. */
@@ -202,12 +266,16 @@ export type CatalogNames = Map<string, string>;
  * resolver's categories with every verdict, from which each card resolves its own — two kids on
  * different resolvers show different answers on the same page. A list that fails to load is empty.
  */
-export async function loadFilterCatalog(request: ApiRequest): Promise<{ catalogNames: CatalogNames; upstreamCategories: UpstreamCategoryRow[] }> {
+export async function loadFilterCatalog(
+  request: ApiRequest,
+): Promise<{ catalogNames: CatalogNames; upstreamCategories: UpstreamCategoryRow[] }> {
   type Item = { id: number | string; name: string };
   const [categories, applications, upstream] = await Promise.all([
     request<{ categories: Item[] }>("/api/v1/dpi/categories").catch(() => ({ categories: [] as Item[] })),
     request<{ applications: Item[] }>("/api/v1/dpi/applications").catch(() => ({ applications: [] as Item[] })),
-    request<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({ categories: [] as UpstreamCategoryRow[] })),
+    request<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({
+      categories: [] as UpstreamCategoryRow[],
+    })),
   ]);
   const catalogNames: CatalogNames = new Map();
   for (const item of categories.categories) catalogNames.set(`category:${item.id}`, item.name);

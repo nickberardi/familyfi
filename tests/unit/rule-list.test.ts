@@ -35,6 +35,7 @@ const rule = (over: Partial<Rule>) =>
     mode: "scheduled",
     windows: [{ id: "w1", name: "Bedtime", days: [0, 1, 2, 3, 4], start: "21:00", end: "07:00" }],
     pause: { active: false, until: null, kind: "pause", by: null },
+    groupPauses: [],
     ...over,
   }) as Rule;
 
@@ -182,6 +183,20 @@ describe("a rule's status line", () => {
     const until = "2026-10-08T03:30:00Z";
     expect(ruleStatus(rule({ pause: { active: true, until, kind: "pause", by: null } }), zone, night)).toEqual({ line: "Paused until 11:30 PM", tone: "paused" });
     expect(ruleStatus(rule({ pause: { active: true, until, kind: "allow", by: null } }), zone, night).tone).toBe("paused");
+  });
+
+  it("says a rule lifted for every group it covers blocks no one, even inside a window", () => {
+    const lift = (groupId: string, kind: "pause" | "allow") => ({ groupId, pause: { active: true, until: null, kind, by: null } });
+    const both = rule({ groupIds: ["g1", "g2"], groupPauses: [lift("g1", "pause"), lift("g2", "pause")] });
+    expect(ruleStatus(both, zone, night)).toEqual({ line: "Paused for every group", tone: "paused" });
+    expect(ruleStatus(rule({ groupPauses: [lift("g1", "allow")] }), zone, night).line).toBe("Allowed for every group");
+    expect(ruleStatus(rule({ groupIds: ["g1", "g2"], groupPauses: [lift("g1", "pause"), lift("g2", "allow")] }), zone, night).line).toBe(
+      "Paused or allowed for every group",
+    );
+    // Lifted for one group of two, it still blocks the other.
+    expect(ruleStatus(rule({ groupIds: ["g1", "g2"], groupPauses: [lift("g1", "pause")] }), zone, night)).toEqual({ line: "On · Blocking now", tone: "danger" });
+    // A network rule covers no groups to lift.
+    expect(ruleStatus(rule({ scope: "network", groupIds: [], networkIds: ["n1"] }), zone, night).tone).toBe("danger");
   });
 
   it("says when a rule is blocking now, and otherwise when it blocks", () => {
