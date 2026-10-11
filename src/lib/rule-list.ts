@@ -53,11 +53,6 @@ export function ruleHref(rule: Pick<Rule, "id"> & Partial<Pick<Rule, "builtIn">>
   return rule.builtIn === "quarantine" ? "/devices" : `/rules/${rule.id}`;
 }
 
-/** The words on the way to a rule's own page: Edit, or for quarantine, which cannot be edited, its devices. */
-export function ruleOpenLabel(rule: Partial<Pick<Rule, "builtIn">>): string {
-  return rule.builtIn === "quarantine" ? "Devices" : "Edit";
-}
-
 /** Who a rule covers, by name: its groups, or its whole networks. */
 export function ruleAppliesTo(
   rule: Pick<Rule, "scope" | "groupIds" | "networkIds"> & Partial<Pick<Rule, "builtIn">>,

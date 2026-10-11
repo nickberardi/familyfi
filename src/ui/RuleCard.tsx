@@ -60,19 +60,17 @@ export function RuleCard({
         </ui.Link>
         <RuleToggle rule={rule} disabled={disabled} onToggle={onToggle} />
       </View>
-      <ui.Link href={ruleHref(rule)}>
-        <View style={styles.schedule}>
-          <RuleBar rule={rule} />
-          <RuleFacts rule={rule} groups={groups} networks={networks} />
-        </View>
-      </ui.Link>
+      <RuleCardSchedule rule={rule} groups={groups} networks={networks} />
       <RuleCardActions rule={rule} groups={groups} timezone={timezone} now={now} disabled={disabled} onAction={onAction} />
     </View>
   );
 }
 
-/** When a rule blocks and whom it covers, under its bar; a stacked card leads with what it blocks. */
-export function RuleFacts({
+/**
+ * A rule card's schedule, which opens the rule: its windows on a bar, then when it blocks and whom
+ * it covers. A stacked card, whose head names the rule's state instead, leads with what it blocks (`blocks`).
+ */
+export function RuleCardSchedule({
   rule,
   groups,
   networks,
@@ -81,19 +79,35 @@ export function RuleFacts({
   rule: Rule;
   groups: Pick<Group, "id" | "name">[];
   networks: { id: string; name: string }[];
-  /** What it blocks, `ruleBlocksLabel(...)`, as a first row. */
+  /** What it blocks, `ruleBlocksLabel(...)`, above the bar. */
   blocks?: string;
+}) {
+  const ui = useUI();
+  return (
+    <ui.Link href={ruleHref(rule)}>
+      <View style={styles.schedule}>
+        {blocks ? <Text style={[text(ui.font, 14, 21), styles.lead, { color: ui.color("ink-2") }]}>{blocks}</Text> : null}
+        <RuleBar rule={rule} />
+        <RuleFacts rule={rule} groups={groups} networks={networks} />
+      </View>
+    </ui.Link>
+  );
+}
+
+/** When a rule blocks and whom it covers, under its bar. */
+function RuleFacts({
+  rule,
+  groups,
+  networks,
+}: {
+  rule: Rule;
+  groups: Pick<Group, "id" | "name">[];
+  networks: { id: string; name: string }[];
 }) {
   const ui = useUI();
   const body = text(ui.font, 14, 21);
   return (
     <View style={styles.facts}>
-      {blocks ? (
-        <View style={styles.fact}>
-          <Text style={[body, styles.term, { color: ui.color("ink-3") }]}>{COPY.blocks}</Text>
-          <Text style={[body, styles.value, { color: ui.color("ink") }]}>{blocks}</Text>
-        </View>
-      ) : null}
       <View style={styles.fact}>
         <Text style={[body, styles.term, { color: ui.color("ink-3") }]}>{COPY.when}</Text>
         <View style={styles.value}>
@@ -218,6 +232,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, paddingBottom: 12 },
   name: { margin: 0, fontWeight: "600", letterSpacing: -0.4 },
   blocks: { marginTop: 2 },
+  lead: { marginBottom: 10 },
   schedule: { paddingHorizontal: 16, paddingBottom: 16 },
   facts: { marginTop: 12, gap: 6 },
   fact: { flexDirection: "row", gap: 12 },

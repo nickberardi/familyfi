@@ -9,17 +9,8 @@ import { useUI } from "./UIContext";
 
 const pct = (minutes: number) => `${((minutes / 1440) * 100).toFixed(3)}%` as const;
 
-/**
- * The rule's windows on a 24-hour bar, any day: the accent for all internet, the rule verdict's tint
- * for anything narrower. A stacked card's open body draws it taller (`height`).
- */
-export function RuleBar({
-  rule,
-  height,
-}: {
-  rule: { kind: Rule["kind"]; mode: Rule["mode"]; windows: Pick<RuleWindow, "start" | "end">[] };
-  height?: number;
-}) {
+/** The rule's windows on a 24-hour bar, any day: the accent for all internet, the rule verdict's tint for anything narrower. */
+export function RuleBar({ rule }: { rule: { kind: Rule["kind"]; mode: Rule["mode"]; windows: Pick<RuleWindow, "start" | "end">[] } }) {
   const ui = useUI();
   const internet = rule.kind === "internet";
   const band = internet
@@ -27,7 +18,7 @@ export function RuleBar({
     : { backgroundColor: ui.color("verdict-rule-fill"), boxShadow: `inset 0 0 0 1px ${ui.color("verdict-rule-line")}` };
   return (
     <View aria-hidden>
-      <View style={[styles.track, { backgroundColor: ui.color("well") }, height ? { height } : null]}>
+      <View style={[styles.track, { backgroundColor: ui.color("well") }]}>
         {ruleBarBands(rule).map((item, index) => (
           <View key={index} style={[styles.band, band, { left: pct(item.from), width: pct(item.to - item.from) }]} />
         ))}

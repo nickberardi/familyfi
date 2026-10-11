@@ -11,15 +11,12 @@ import type { Group } from "@/lib/types";
 
 import { CategoryMarkGlyph, useMarkColors } from "./CategoryMarks";
 import { DayTimeline } from "./DayTimeline";
-import { Fold, FoldCaret } from "./Fold";
-import { ZoneHeading, type ZoneFold } from "./InternetZone";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /**
  * The focused category on an open card, shared by every client: a FamilyFi rule's windows over the
  * group's faded internet time, or, with no rule, what the resolver reports and a way to add one.
- * The caller supplies "Edit rule" (`editRule`), since each platform navigates its own way. With
- * `fold`, a rule's heading opens and closes its timeline, and Edit rule sits under it.
+ * The caller supplies "Edit rule" (`editRule`), since each platform navigates its own way.
  */
 export function CategoryZone({
   group,
@@ -29,7 +26,6 @@ export function CategoryZone({
   now,
   onAddRule,
   editRule,
-  fold,
 }: {
   group: Group;
   item: CategorySlotState;
@@ -38,7 +34,6 @@ export function CategoryZone({
   now: Date;
   onAddRule: () => void;
   editRule: ReactNode;
-  fold?: ZoneFold;
 }) {
   const ui = useUI();
   const colors = useMarkColors(item.state);
@@ -81,15 +76,9 @@ export function CategoryZone({
     ? { box: ui.color("verdict-rule-ink"), ink: ui.color("ink-on-fill") }
     : { box: ui.color("verdict-rule-fill"), ink: ui.color("verdict-rule-ink") };
 
-  const timeline = (
-    <>
-      <DayTimeline bands={bands} timezone={timezone} now={now} label={`${group.name}’s ${item.label} today`} />
-      {internet.length ? <Text style={[text, { color: ui.color("ink-2") }]}>No-internet time also covers {item.label}.</Text> : null}
-    </>
-  );
   return (
     <View style={[styles.zone, { backgroundColor: ui.color(item.blocking ? "verdict-rule-fill" : "field-soft") }]}>
-      <ZoneHeading fold={fold} style={[styles.row, styles.top]}>
+      <View style={[styles.row, styles.top]}>
         <View aria-hidden style={[styles.badge, { backgroundColor: badge.box }]}>
           <CategoryMarkGlyph item={item} size={14} color={badge.ink} />
         </View>
@@ -99,24 +88,10 @@ export function CategoryZone({
           </Text>
           <Text style={[text, styles.sub, { lineHeight: 20, color: ui.color("ink-2") }]}>{categoryRuleWhen(rule)} Everything else stays on.</Text>
         </View>
-        {fold ? (
-          <View aria-hidden style={styles.caret}>
-            <FoldCaret open={fold.open} color={ui.color("ink-3")} />
-          </View>
-        ) : (
-          editRule
-        )}
-      </ZoneHeading>
-      {fold ? (
-        <Fold open={fold.open}>
-          <View style={styles.body}>
-            {timeline}
-            <View style={styles.edit}>{editRule}</View>
-          </View>
-        </Fold>
-      ) : (
-        timeline
-      )}
+        {editRule}
+      </View>
+      <DayTimeline bands={bands} timezone={timezone} now={now} label={`${group.name}’s ${item.label} today`} />
+      {internet.length ? <Text style={[text, { color: ui.color("ink-2") }]}>No-internet time also covers {item.label}.</Text> : null}
     </View>
   );
 }
@@ -131,7 +106,4 @@ const styles = StyleSheet.create({
   top: { flexWrap: "wrap", alignItems: "flex-start" },
   heading: { flex: 1, minWidth: 140 },
   sub: { marginTop: 2 },
-  caret: { alignSelf: "center", flexShrink: 0 },
-  body: { gap: 10 },
-  edit: { alignSelf: "flex-end" },
 });

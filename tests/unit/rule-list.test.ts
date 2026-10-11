@@ -8,7 +8,6 @@ import {
   ruleCardDimmed,
   ruleHref,
   ruleMarkSpec,
-  ruleOpenLabel,
   ruleStatus,
   rulesListView,
   rulesScopeHref,
@@ -215,9 +214,7 @@ describe("a rule's status line", () => {
 });
 
 describe("the way to a rule's page", () => {
-  it("edits a rule, and shows quarantine's devices, since quarantine is never edited", () => {
-    expect(ruleOpenLabel(rule({}))).toBe("Edit");
-    expect(ruleOpenLabel(rule({ builtIn: "quarantine" }))).toBe("Devices");
+  it("opens a rule, and quarantine's devices, since quarantine is never edited", () => {
     expect(ruleHref(rule({ builtIn: "quarantine" }))).toBe("/devices");
   });
 });

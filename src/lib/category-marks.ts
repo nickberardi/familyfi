@@ -13,8 +13,6 @@ import type { IconName } from "./icons";
 import {
   CURATED_CATEGORY_SLOTS,
   categoryRuleForSlot,
-  groupScopedRules,
-  parentFacingRuleLabel,
   type CuratedCategorySlot,
   type Rule,
 } from "./rules";
@@ -135,71 +133,6 @@ export function cardMarks(
   const pool = open ? ordered.filter((item) => item !== focused) : ordered;
   const cap = open ? OPEN_MARKS : CLOSED_MARKS;
   return { ordered, focused: open ? focused : undefined, pool, more, cap, ...rowOfMarks(pool, more, cap) };
-}
-
-/**
- * An open card that lists its categories by what blocks them, as the companion's stacked cards
- * do: every enabled FamilyFi category rule (`ruled`, from `categoryRuleItems`), then each category
- * the resolver blocks or partly blocks with no rule (`upstream`), and the rest as "Other
- * categories" marks before "More".
- */
-export function stackedCardMarks(slots: CategorySlotState[], more: boolean, ruled: CategorySlotState[]) {
-  const covered = new Set(ruled.map((item) => item.key));
-  const unruled = slots.filter((item) => !covered.has(item.key) && !item.rule?.enabled);
-  const upstream = unruled.filter((item) => item.state === "blocked" || item.state === "partial");
-  const pool = unruled.filter((item) => !upstream.includes(item));
-  const marks: CardMarks = {
-    ordered: slots,
-    focused: undefined,
-    pool,
-    more,
-    cap: OPEN_MARKS,
-    ...rowOfMarks(pool, more, OPEN_MARKS),
-  };
-  return { ruled, upstream, marks };
-}
-
-/**
- * One item per enabled category rule of the group, for its zone: the category's own slot where
- * the rule is the one its mark shows, a copy of that slot for a second rule on the same category,
- * and, for a gateway category no slot names, an item of its own under its catalog name.
- */
-export function categoryRuleItems(
-  groupId: string,
-  rules: Rule[],
-  slots: CategorySlotState[],
-  catalogNames: CatalogNames,
-  timezone: string,
-): CategorySlotState[] {
-  return groupScopedRules(rules, groupId)
-    .filter((rule) => rule.kind === "category" && rule.enabled)
-    .map((rule) => {
-      const own = slots.find((item) => item.rule?.id === rule.id);
-      if (own) return own;
-      const blocking = ruleActivelyBlocking(rule, timezone);
-      const shared = slots.find((item) => item.slot && rule.targetIds.includes(item.slot.categoryId));
-      if (shared)
-        return {
-          ...shared,
-          key: `${shared.key}:${rule.id}`,
-          rule,
-          blocking,
-          state: categoryMarkState(blocking, shared.check),
-        };
-      const label = parentFacingRuleLabel(rule, catalogNames);
-      return {
-        key: `rule:${rule.id}`,
-        label,
-        slot: undefined,
-        icon: undefined,
-        monogram: label.slice(0, 3).toUpperCase(),
-        domains: [],
-        rule,
-        check: null,
-        blocking,
-        state: categoryMarkState(blocking, null),
-      };
-    });
 }
 
 /** `hidden` is what the row hides collapsed, so expanded it still shows Fewer. */
