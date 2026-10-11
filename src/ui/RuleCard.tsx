@@ -75,16 +75,19 @@ export function RuleCardSchedule({
   groups,
   networks,
   blocks,
+  testID,
 }: {
   rule: Rule;
   groups: Pick<Group, "id" | "name">[];
   networks: { id: string; name: string }[];
   /** What it blocks, `ruleBlocksLabel(...)`, above the bar. */
   blocks?: string;
+  /** On the link to the rule's page, where the card's name is not that link. */
+  testID?: string;
 }) {
   const ui = useUI();
   return (
-    <ui.Link href={ruleHref(rule)}>
+    <ui.Link href={ruleHref(rule)} testID={testID}>
       <View style={styles.schedule}>
         {blocks ? <Text style={[text(ui.font, 14, 21), styles.lead, { color: ui.color("ink-2") }]}>{blocks}</Text> : null}
         <RuleBar rule={rule} />
