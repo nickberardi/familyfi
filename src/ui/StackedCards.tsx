@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { categorySlotStates, stackedCardMarks, type CatalogNames } from "@/lib/category-marks";
+import { categoryRuleItems, categorySlotStates, stackedCardMarks, type CatalogNames } from "@/lib/category-marks";
 import { cardNoteLine } from "@/lib/display";
 import { groupActionSpecs, type GroupActionSpec } from "@/lib/group-actions";
 import { GROUP_CARD_COPY } from "@/lib/group-page";
@@ -88,9 +88,11 @@ export function GroupStackBody({
   const [folds, setFolds] = useState<Record<string, boolean>>({});
   const [more, setMore] = useState(false);
   const windows = internetWindowsForGroup(rules, group.id, now);
+  const slots = categorySlotStates(group, rules, upstreamCategories, timezone);
   const { ruled, upstream, marks } = stackedCardMarks(
-    categorySlotStates(group, rules, upstreamCategories, timezone),
+    slots,
     more,
+    categoryRuleItems(group.id, rules, slots, catalogNames, timezone),
   );
   const fold = (key: string) => ({
     open: Boolean(folds[key]),

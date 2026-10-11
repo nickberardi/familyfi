@@ -7,7 +7,15 @@ import { daysLabel, windowTimes } from "./display";
 import type { IconName } from "./icons";
 import { ruleStateLine } from "./rule-actions";
 import { ruleActivelyBlocking } from "./upstream";
-import { CURATED_CATEGORY_SLOTS, rulePaused, windowSegments, type CuratedSlot, type Rule, type RuleWindow } from "./rules";
+import {
+  CURATED_CATEGORY_SLOTS,
+  ruleLiftedForGroup,
+  rulePaused,
+  windowSegments,
+  type CuratedSlot,
+  type Rule,
+  type RuleWindow,
+} from "./rules";
 import type { Group } from "./types";
 
 type Network = { id: string; name: string };
@@ -83,13 +91,25 @@ export function ruleCardDimmed(rule: Pick<Rule, "enabled" | "pause">, now: Date)
  * `tone` is a `--ff-*` token name.
  */
 export function ruleStatus(
-  rule: Pick<Rule, "enabled" | "mode" | "windows" | "pause">,
+  rule: Pick<Rule, "enabled" | "mode" | "windows" | "pause" | "scope" | "groupIds" | "groupPauses">,
   timezone: string,
   now: Date,
 ): { line: string; tone: "muted" | "paused" | "danger" | "on" } {
   if (!rule.enabled) return { line: "Off · Not enforced", tone: "muted" };
   const paused = ruleStateLine(rule, timezone, now);
   if (paused) return { line: paused, tone: "paused" };
+  // Lifted for each group it covers, one by one, the rule blocks no one even inside a window.
+  const lifts =
+    rule.scope === "group" && rule.groupIds.length > 0
+      ? rule.groupIds.map((id) =>
+          rule.groupPauses.find((item) => item.groupId === id && ruleLiftedForGroup(rule, id, now)),
+        )
+      : [];
+  if (lifts.length && lifts.every(Boolean)) {
+    const kinds = new Set(lifts.map((item) => item!.pause.kind));
+    const verb = kinds.size > 1 ? "Paused or allowed" : kinds.has("allow") ? "Allowed" : "Paused";
+    return { line: `${verb} for every group`, tone: "paused" };
+  }
   if (ruleActivelyBlocking(rule, timezone, now)) {
     return { line: "On · Blocking now", tone: "danger" };
   }
@@ -98,9 +118,16 @@ export function ruleStatus(
 }
 
 /** The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower. */
-export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds">): { shape: "square" | "round"; slot?: CuratedSlot; icon: IconName } {
+export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds">): {
+  shape: "square" | "round";
+  slot?: CuratedSlot;
+  icon: IconName;
+} {
   if (rule.kind === "internet") return { shape: "square", icon: "globe-simple" };
-  const slot = rule.kind === "category" ? CURATED_CATEGORY_SLOTS.find((item) => rule.targetIds.includes(item.categoryId)) : undefined;
+  const slot =
+    rule.kind === "category"
+      ? CURATED_CATEGORY_SLOTS.find((item) => rule.targetIds.includes(item.categoryId))
+      : undefined;
   return {
     shape: "round",
     ...(slot ? { slot: slot.slot } : {}),
@@ -109,7 +136,10 @@ export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds">): { shape: "
 }
 
 /** The minutes a rule blocks on a 24-hour bar, any day. */
-export function ruleBarBands(rule: { mode: Rule["mode"]; windows: Pick<RuleWindow, "start" | "end">[] }): { from: number; to: number }[] {
+export function ruleBarBands(rule: {
+  mode: Rule["mode"];
+  windows: Pick<RuleWindow, "start" | "end">[];
+}): { from: number; to: number }[] {
   return rule.mode === "always" ? [{ from: 0, to: 1440 }] : rule.windows.flatMap(windowSegments);
 }
 
