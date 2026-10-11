@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ApiRequest } from "@/lib/api-client";
 import { parseReleaseNotes } from "@/lib/release-notes";
@@ -11,16 +11,21 @@ import { installUpdate } from "@/lib/update-writes";
 
 import { ExternalLink } from "./ExternalLink";
 import { PRESS_OPACITY, useUI } from "./UIContext";
+import { useInstallProgress } from "./use-install-progress";
 
-/** What installing needs: the updater's state (`useUpdateSettings`), the transport, and a reload after asking. */
-export type UpdateInstall = { settings: UpdateSettings | null; request: ApiRequest; onChanged: () => void };
+/**
+ * What installing needs: the updater's state (`useUpdateSettings`), the transport, a reload after
+ * asking, and what to do once the new release answers (`onChanged` when not given).
+ */
+export type UpdateInstall = { settings: UpdateSettings | null; request: ApiRequest; onChanged: () => void; onInstalled?: (version: string) => void };
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
 /**
  * The Update page below its header: whether FamilyFi is up to date, or a newer release's notes and
  * installing it. Install asks the Watchtower updater; without `install`, or before the updater is set
- * up, its button stays disabled and the card says how to update by hand.
+ * up, its button stays disabled and the card says how to update by hand. While an install runs, a
+ * spinner counts down the usual two minutes until FamilyFi reports the new release.
  */
 export function UpdateContent({ update, onNotNow, install }: { update: UpdateCheck | null; onNotNow?: () => void; install?: UpdateInstall }) {
   const ui = useUI();
@@ -30,6 +35,15 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const latest = latestRelease(update);
   const runLine = updateRunLine(install?.settings?.lastRun);
+  const countdown = useInstallProgress(install?.settings ?? null, install?.request, (version) => (install?.onInstalled ? install.onInstalled(version) : install?.onChanged()));
+  const progress = countdown ? (
+    <View style={styles.progress} testID="update-progress">
+      <ActivityIndicator color={ui.color("accent")} />
+      <Text role="timer" style={[text(14, 20, "ink"), styles.bold]}>
+        {countdown}
+      </Text>
+    </View>
+  ) : null;
   const runText = runLine ? (
     <Text style={[text(14, 20, install?.settings?.lastRun?.status === "failed" ? "danger" : "muted"), styles.runLine]} testID="update-run">
       {runLine}
@@ -43,6 +57,7 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
           {upToDateLine(update)}
         </Text>
         {runText}
+        {progress}
       </View>
     );
   }
@@ -113,6 +128,7 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
           </Text>
           <Text style={[text(14, 20, "muted"), styles.installNote]}>{configured ? COPY.installReady : COPY.installNote}</Text>
           {runText}
+          {progress}
           {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
         </View>
         {INSTALL_STEPS.map((step, index) => (
@@ -168,4 +184,5 @@ const styles = StyleSheet.create({
   install: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   off: { opacity: 0.4 },
   runLine: { marginTop: 6 },
+  progress: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
 });

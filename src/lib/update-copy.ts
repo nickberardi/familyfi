@@ -90,6 +90,27 @@ export function updateRunLine(run: UpdateRun | null | undefined): string | null 
   }
 }
 
+/** How long an install usually takes, from the request to the new release answering. */
+export const INSTALL_ESTIMATE_MS = 2 * 60 * 1000;
+
+/**
+ * The countdown beside the install spinner: "About 1:45 left" from when the install was asked for,
+ * then "Taking longer than usual" once the estimate has passed. FamilyFi cannot tell how far
+ * Watchtower has got, so this is an estimate. A start in the future (the device's clock is behind
+ * the server's) counts from now.
+ */
+export function installCountdownLine(requestedAt: string, now: Date): string {
+  const started = Math.min(new Date(requestedAt).getTime(), now.getTime());
+  const left = Math.ceil((INSTALL_ESTIMATE_MS - (now.getTime() - started)) / 1000);
+  if (!(left > 0)) return "Taking longer than usual, still installing…";
+  return `About ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
+}
+
+/** True once the release FamilyFi reports running is the one being installed. */
+export function installedVersion(currentVersion: string, targetVersion: string): boolean {
+  return versionLabel(currentVersion) === versionLabel(targetVersion);
+}
+
 /** When FamilyFi installs on its own: "Sunday at 12:00 AM · next Sunday", or why it does not. */
 export function updateScheduleLine(settings: UpdateSettings, timezone: string, now: Date): string {
   if (!settings.updater.configured) return UPDATE_COPY.scheduleNeedsUpdater;

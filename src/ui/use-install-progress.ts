@@ -1,0 +1,64 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+import type { ApiRequest } from "@/lib/api-client";
+import type { UpdateCheck, UpdateRun, UpdateSettings } from "@/lib/types";
+import { installCountdownLine, installedVersion } from "@/lib/update-copy";
+
+const HEALTH_POLL_MS = 5_000;
+
+/**
+ * Follows an install from the request until `GET /api/v1/health` reports the new release, then calls
+ * `onInstalled` with that release once. Meanwhile it returns the countdown beside the spinner, ticking each second. A
+ * read that fails while FamilyFi restarts is expected and simply tried again. The watch ends without
+ * `onInstalled` when the install settles any other way, and its outcome line says why.
+ */
+export function useInstallProgress(settings: UpdateSettings | null, request: ApiRequest | undefined, onInstalled: (version: string) => void): string | null {
+  const run = settings?.lastRun ?? null;
+  const [watched, setWatched] = useState<UpdateRun | null>(run?.status === "requested" ? run : null);
+  const [now, setNow] = useState(() => new Date());
+  const installed = useRef(onInstalled);
+  useEffect(() => {
+    installed.current = onInstalled;
+  });
+
+  // Each answer from the settings poll starts a watch, or ends one that settled other than by installing.
+  const [seen, setSeen] = useState(run);
+  if (run !== seen) {
+    setSeen(run);
+    if (run?.status === "requested" && watched?.requestedAt !== run.requestedAt) setWatched(run);
+    else if (run && run.status !== "requested" && run.status !== "succeeded" && watched?.requestedAt === run.requestedAt) setWatched(null);
+  }
+
+  useEffect(() => {
+    if (!watched || !request) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const health = await request<{ update: UpdateCheck }>("/api/v1/health");
+        if (cancelled) return;
+        if (installedVersion(health.update.currentVersion, watched.targetVersion)) {
+          setWatched(null);
+          installed.current(watched.targetVersion);
+          return;
+        }
+      } catch {
+        // Nothing answers while FamilyFi restarts.
+      }
+      if (!cancelled) timer = setTimeout(() => void poll(), HEALTH_POLL_MS);
+    };
+    timer = setTimeout(() => void poll(), HEALTH_POLL_MS);
+    const start = setTimeout(() => setNow(new Date()), 0);
+    const tick = setInterval(() => setNow(new Date()), 1_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      clearTimeout(start);
+      clearInterval(tick);
+    };
+  }, [watched, request]);
+
+  return watched ? installCountdownLine(watched.requestedAt, now) : null;
+}
