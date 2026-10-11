@@ -31,9 +31,21 @@ describe("connection hops", () => {
 
   it("relays the gateway hop from the server", () => {
     const now = new Date("2026-09-14T20:00:00Z");
-    expect(gatewayHop({ connectionStatus: "connected", connectionError: null }, sync(), now)).toMatchObject({ tone: "var(--ff-on)", status: "Connected", footnote: "Last sweep 2m" });
-    expect(gatewayHop({ connectionStatus: "error", connectionError: "401 from the console" }, null, now)).toMatchObject({ tone: "var(--ff-danger)", detail: "401 from the console", footnote: null });
-    expect(gatewayHop(null, null, now)).toMatchObject({ status: "Unknown", tone: "var(--ff-muted)" });
+    expect(gatewayHop({ connectionStatus: "connected", connectionError: null }, sync(), "connected", now)).toMatchObject({ tone: "var(--ff-on)", status: "Connected", footnote: "Last sweep 2m" });
+    expect(gatewayHop({ connectionStatus: "error", connectionError: "401 from the console" }, null, "connected", now)).toMatchObject({ tone: "var(--ff-danger)", detail: "401 from the console", footnote: null });
+    expect(gatewayHop(null, null, "connected", now)).toMatchObject({ status: "Unknown", tone: "var(--ff-muted)" });
+    expect(gatewayHop({ connectionStatus: "connected", connectionError: null }, sync(), "checking", now).status).toBe("Connected");
+  });
+
+  it("does not claim the gateway hop while this phone cannot ask", () => {
+    const now = new Date("2026-09-14T20:00:00Z");
+    expect(gatewayHop({ connectionStatus: "connected", connectionError: null }, sync(), "offline", now)).toMatchObject({
+      tone: "var(--ff-muted)",
+      status: "Unknown",
+      detail: "This phone can't reach FamilyFi to ask. Last reported: Connected.",
+      footnote: "Last sweep 2m",
+    });
+    expect(gatewayHop(null, null, "offline", now)).toMatchObject({ status: "Unknown", detail: "This phone can't reach FamilyFi to ask.", footnote: null });
   });
 
   it("shows the latest change's outcome", () => {
@@ -44,11 +56,23 @@ describe("connection hops", () => {
     expect(changeHop(failed, "UTC")).toMatchObject({ status: "Failed", tone: "var(--ff-danger)", detail: "UniFi timed out" });
   });
 
-  it("labels the diagram's links", () => {
-    expect(hopLinks("offline", { connectionStatus: "connected" })).toEqual({
-      phone: { tone: "var(--ff-danger)", label: "Offline" },
-      unifi: { tone: "var(--ff-on)", label: "Connected" },
+  it("marks the diagram's links", () => {
+    expect(hopLinks("connected", { connectionStatus: "connected" })).toEqual({
+      phone: { tone: "var(--ff-on)", mark: "ok", label: "Connected" },
+      unifi: { tone: "var(--ff-on)", mark: "ok", label: "Connected" },
     });
-    expect(hopLinks("connected", null).unifi.label).toBe("—");
+    expect(hopLinks("checking", { connectionStatus: "error" })).toEqual({
+      phone: { tone: "var(--ff-paused)", mark: "checking", label: "Checking" },
+      unifi: { tone: "var(--ff-danger)", mark: "failed", label: "Error" },
+    });
+    expect(hopLinks("connected", { connectionStatus: "unconfigured" }).unifi).toEqual({ tone: "var(--ff-muted)", mark: "off", label: "Not configured" });
+    expect(hopLinks("connected", null).unifi).toEqual({ tone: "var(--ff-muted)", mark: "unknown", label: "Unknown" });
+  });
+
+  it("never shows the server's last answer as current while this phone is offline", () => {
+    expect(hopLinks("offline", { connectionStatus: "connected" })).toEqual({
+      phone: { tone: "var(--ff-danger)", mark: "failed", label: "Not connected" },
+      unifi: { tone: "var(--ff-muted)", mark: "unknown", label: "Unknown" },
+    });
   });
 });
