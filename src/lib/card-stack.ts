@@ -62,8 +62,7 @@ export function stackLayout(
   const others = natural.reduce((sum, peek) => sum + peek, 0) - natural[open]!;
   const openMin = fitted ?? Math.max(heads[open]! + MIN_BODY, room * OPEN_SHARE);
   const peekRoom = room - 2 * STACK_TOP - (open < n - 1 ? PEEK_GAP : 0) - openMin;
-  const fold = others > peekRoom ? Math.max(peekRoom, 0) / others : 1;
-  const peeks = natural.map((peek) => (fold < 1 ? Math.max(Math.floor(peek * fold), PEEK_MIN) : peek));
+  const peeks = others > peekRoom ? foldPeeks(natural, open, Math.max(peekRoom, 0)) : natural;
   const above = peeks.slice(0, open).reduce((sum, peek) => sum + peek, 0);
   const below = peeks.slice(open + 1);
   const belowRoom = below.reduce((sum, peek) => sum + peek, 0) + (below.length ? PEEK_GAP : 0);
@@ -85,6 +84,23 @@ export function stackLayout(
   }
   const height = (below.length ? y : openY + openH) + STACK_TOP;
   return { frames, height };
+}
+
+/**
+ * The other cards' peeks folded alike into `room`, none thinner than an edge: a peek that would
+ * fold past the edge keeps the edge, and the rest fold further to share what it leaves.
+ */
+function foldPeeks(natural: number[], open: number, room: number): number[] {
+  const edged = new Set<number>();
+  let fold = 0;
+  for (;;) {
+    const free = natural.reduce((sum, peek, index) => (index === open || edged.has(index) ? sum : sum + peek), 0);
+    fold = free > 0 ? Math.max(room - edged.size * PEEK_MIN, 0) / free : 0;
+    const next = natural.findIndex((peek, index) => index !== open && !edged.has(index) && peek * fold < PEEK_MIN);
+    if (next < 0) break;
+    edged.add(next);
+  }
+  return natural.map((peek, index) => (index === open ? peek : edged.has(index) ? PEEK_MIN : Math.floor(peek * fold)));
 }
 
 /**

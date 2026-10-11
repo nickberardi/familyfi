@@ -120,6 +120,8 @@ describe("an open card of measured height", () => {
     expect(open.y + open.h).toBeLessThanOrEqual(600 - STACK_TOP);
     expect(long.height).toBe(600);
     // Taller heads above fold to more than an edge; the card still keeps to the room.
+    // Short peeks that keep their edge leave the taller one to fold further, so the card stays whole.
+    expect(stackLayout([300, 30, 30, 30, 30, 30, 30, 30], 7, 600, 400).frames[7]!.h).toBe(400);
     const mixed = stackLayout([200, 50, 50, 50, 50, 50, 50, 50], 7, 600, 2000);
     expect(mixed.frames[7]!.y + mixed.frames[7]!.h).toBeLessThanOrEqual(600 - STACK_TOP);
     const near = stackLayout(Array.from({ length: 8 }, () => 84), 6, 600, 580);
