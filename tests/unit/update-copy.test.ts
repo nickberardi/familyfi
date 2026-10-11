@@ -93,12 +93,15 @@ describe("install countdown", () => {
     expect(installCountdownLine("2026-10-11T04:00:00.000Z", at(900))).toBe("Taking longer than usual, still installing…");
   });
 
-  it("counts from now when the request is ahead of this clock", () => {
+  it("counts from when this device first saw the install when the request is ahead of its clock", () => {
     expect(installCountdownLine("2026-10-11T04:05:00.000Z", at(0))).toBe("About 2:00 left");
+    expect(installCountdownLine("2026-10-11T04:05:00.000Z", at(30), at(0))).toBe("About 1:30 left");
   });
 
-  it("knows the new release by its version, with or without the v", () => {
+  it("knows the new release by its version, with or without the v, or a newer one", () => {
     expect(installedVersion("0.6.0", "v0.6.0")).toBe(true);
+    expect(installedVersion("0.6.1", "0.6.0")).toBe(true);
     expect(installedVersion("0.5.1", "0.6.0")).toBe(false);
+    expect(installedVersion("0.6.0-rc.1", "0.6.0")).toBe(false);
   });
 });

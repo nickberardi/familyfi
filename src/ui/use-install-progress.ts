@@ -17,7 +17,8 @@ const HEALTH_POLL_MS = 5_000;
 export function useInstallProgress(settings: UpdateSettings | null, request: ApiRequest | undefined, onInstalled: (version: string) => void): { target: string; countdown: string } | null {
   const run = settings?.lastRun ?? null;
   const [watched, setWatched] = useState<UpdateRun | null>(run?.status === "requested" ? run : null);
-  const [now, setNow] = useState(() => new Date());
+  // When this device first saw the watched install, and now; set by the effect's timers.
+  const [clock, setClock] = useState<{ seenAt: Date; now: Date } | null>(null);
   const installed = useRef(onInstalled);
   useEffect(() => {
     installed.current = onInstalled;
@@ -50,8 +51,9 @@ export function useInstallProgress(settings: UpdateSettings | null, request: Api
       if (!cancelled) timer = setTimeout(() => void poll(), HEALTH_POLL_MS);
     };
     timer = setTimeout(() => void poll(), HEALTH_POLL_MS);
-    const start = setTimeout(() => setNow(new Date()), 0);
-    const tick = setInterval(() => setNow(new Date()), 1_000);
+    const seenAt = new Date();
+    const start = setTimeout(() => setClock({ seenAt, now: new Date() }), 0);
+    const tick = setInterval(() => setClock({ seenAt, now: new Date() }), 1_000);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -60,5 +62,7 @@ export function useInstallProgress(settings: UpdateSettings | null, request: Api
     };
   }, [watched, request]);
 
-  return watched ? { target: watched.targetVersion, countdown: installCountdownLine(watched.requestedAt, now) } : null;
+  if (!watched) return null;
+  const now = clock?.now ?? new Date(watched.requestedAt);
+  return { target: watched.targetVersion, countdown: installCountdownLine(watched.requestedAt, now, clock?.seenAt ?? now) };
 }

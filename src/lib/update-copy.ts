@@ -1,4 +1,5 @@
 import { formatHhmm, relativeDayLabel } from "./display";
+import { compareSemver, parseSemver } from "./semver";
 import type { UpdateCheck, UpdateRun, UpdateSettings } from "./types";
 import { probeScheduleWhen } from "./upstream";
 
@@ -97,19 +98,24 @@ export const INSTALL_ESTIMATE_MS = 2 * 60 * 1000;
 /**
  * The countdown beside the install spinner: "About 1:45 left" from when the install was asked for,
  * then "Taking longer than usual" once the estimate has passed. FamilyFi cannot tell how far
- * Watchtower has got, so this is an estimate. A start in the future (the device's clock is behind
- * the server's) counts from now.
+ * Watchtower has got, so this is an estimate. A start after `seenAt`, when this device first saw the
+ * install (its clock is behind the server's), counts from `seenAt` instead.
  */
-export function installCountdownLine(requestedAt: string, now: Date): string {
-  const started = Math.min(new Date(requestedAt).getTime(), now.getTime());
+export function installCountdownLine(requestedAt: string, now: Date, seenAt: Date = now): string {
+  const started = Math.min(new Date(requestedAt).getTime(), seenAt.getTime());
   const left = Math.ceil((INSTALL_ESTIMATE_MS - (now.getTime() - started)) / 1000);
   if (!(left > 0)) return "Taking longer than usual, still installing…";
   return `About ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
 }
 
-/** True once the release FamilyFi reports running is the one being installed. */
+/**
+ * True once the release FamilyFi reports running is the one being installed or newer, as the server
+ * settles an install: Watchtower may pull a release published after the check.
+ */
 export function installedVersion(currentVersion: string, targetVersion: string): boolean {
-  return versionLabel(currentVersion) === versionLabel(targetVersion);
+  const current = parseSemver(currentVersion);
+  const target = parseSemver(targetVersion);
+  return current && target ? compareSemver(current, target) >= 0 : versionLabel(currentVersion) === versionLabel(targetVersion);
 }
 
 /** When FamilyFi installs on its own: "Sunday at 12:00 AM · next Sunday", or why it does not. */
