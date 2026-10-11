@@ -241,8 +241,12 @@ test("the Update page installs through the updater and keeps its schedule", asyn
     lastSuccessfulAt: "2026-09-22T12:00:00.000Z",
     error: null,
   };
+  let running = "0.5.1";
   await page.route("**/api/v1/health", (route) =>
-    route.fulfill({ contentType: "application/json", body: JSON.stringify({ status: "ok", db: "ok", version: "0.5.1", revision: 0, update }) }),
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok", db: "ok", version: running, revision: 0, update: { ...update, currentVersion: running } }),
+    }),
   );
   let settings: UpdateSettings = {
     updater: { configured: true },
@@ -270,6 +274,14 @@ test("the Update page installs through the updater and keeps its schedule", asyn
   await install.click();
   await expect(page.getByTestId("update-run").first()).toContainText("Installing v0.6.0");
   await expect(install).toBeDisabled();
+  // The Install card is covered while the install runs, until health reports the new release.
+  const progress = page.getByTestId("update-progress");
+  await expect(progress).toContainText("Installing v0.6.0");
+  await expect(progress).toContainText(/About \d:\d\d left|Taking longer than usual/);
+  running = "0.6.0";
+  settings = { ...settings, lastRun: { ...settings.lastRun!, status: "succeeded" } };
+  await expect(progress).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId("update-run").first()).toContainText("Installed v0.6.0");
 
   const schedule = page.getByRole("region", { name: "Automatic updates" });
   await expect(schedule).toContainText("Sunday at 12 AM");
