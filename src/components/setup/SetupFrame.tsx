@@ -2,6 +2,7 @@
 
 import { useId, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { copyText } from "@/components/ui/copy-text";
 import { Wordmark } from "@/components/ui/Logo";
 import { RECOVERY_USERNAME } from "@/lib/constants";
 import { SETUP_LEDES, SETUP_STEP_COUNT, setupFoot } from "@/lib/setup";
@@ -172,36 +173,6 @@ export function AdminSignInStep({
       </label>
     </>
   );
-}
-
-/**
- * Copies with the clipboard API where the browser offers it, which is only over HTTPS or on
- * localhost. A home server opened at http://192.168.x.x has none, so it falls back to the older
- * copy command.
- */
-async function copyText(value: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {
-    // Refused; try the older way.
-  }
-  const field = document.createElement("textarea");
-  field.value = value;
-  field.setAttribute("readonly", "");
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.append(field);
-  field.select();
-  try {
-    return document.execCommand("copy");
-  } catch {
-    return false;
-  } finally {
-    field.remove();
-  }
 }
 
 /** The password, masked, with Copy. Where nothing can copy, the password is shown to select instead. */

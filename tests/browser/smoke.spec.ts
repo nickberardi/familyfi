@@ -61,7 +61,7 @@ test("sign-in and household pages", async ({ page }) => {
     await expect(page.locator("body")).not.toContainText("Something went wrong");
   }
   await expect(page).toHaveURL(/\/reference/);
-  await expect(page.getByRole("heading", { name: "API", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "FamilyFi API", exact: true })).toBeVisible();
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();

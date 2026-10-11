@@ -33,6 +33,12 @@
         "contracts"
       ]
     },
+    "tests/unit/api-page.test.ts": {
+      "categories": [
+        "navigation",
+        "runtime"
+      ]
+    },
     "tests/unit/device-scope.test.ts": {
       "categories": [
         "pairing",
@@ -705,6 +711,12 @@
       "categories": [
         "pairing",
         "trust"
+      ]
+    },
+    "tests/browser/reference.spec.ts": {
+      "categories": [
+        "navigation",
+        "pairing"
       ]
     },
     "tests/browser/upstream-marks.spec.ts": {

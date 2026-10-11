@@ -337,17 +337,8 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 .ff-swagger .swagger-ui .topbar,
-.ff-swagger .swagger-ui .information-container .info .title small {
+.ff-swagger .swagger-ui .information-container {
   display: none;
-}
-
-.ff-swagger .swagger-ui .info {
-  margin: 12px 0 16px;
-}
-
-.ff-swagger .swagger-ui .info .title {
-  font-size: 22px;
-  font-weight: 700;
 }
 
 .ff-swagger .swagger-ui .opblock-tag,
