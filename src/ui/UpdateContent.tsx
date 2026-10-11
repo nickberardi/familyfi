@@ -6,7 +6,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "
 import type { ApiRequest } from "@/lib/api-client";
 import { parseReleaseNotes } from "@/lib/release-notes";
 import type { UpdateCheck, UpdateSettings } from "@/lib/types";
-import { INSTALL_STEPS, UPDATE_COPY as COPY, installCopy, installing, latestRelease, updateRunLine, upToDateLine } from "@/lib/update-copy";
+import { INSTALL_STEPS, UPDATE_COPY as COPY, installCopy, installing, latestRelease, updateRunLine, upToDateLine, versionLabel } from "@/lib/update-copy";
 import { installUpdate } from "@/lib/update-writes";
 
 import { ExternalLink } from "./ExternalLink";
@@ -24,8 +24,8 @@ const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "
 /**
  * The Update page below its header: whether FamilyFi is up to date, or a newer release's notes and
  * installing it. Install asks the Watchtower updater; without `install`, or before the updater is set
- * up, its button stays disabled and the card says how to update by hand. While an install runs, a
- * spinner counts down the usual two minutes until FamilyFi reports the new release.
+ * up, its button stays disabled and the card says how to update by hand. While an install runs, the
+ * card is covered by a spinner counting down the usual two minutes until FamilyFi reports the new release.
  */
 export function UpdateContent({ update, onNotNow, install }: { update: UpdateCheck | null; onNotNow?: () => void; install?: UpdateInstall }) {
   const ui = useUI();
@@ -35,13 +35,19 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const latest = latestRelease(update);
   const runLine = updateRunLine(install?.settings?.lastRun);
-  const countdown = useInstallProgress(install?.settings ?? null, install?.request, (version) => (install?.onInstalled ? install.onInstalled(version) : install?.onChanged()));
-  const progress = countdown ? (
-    <View style={styles.progress} testID="update-progress">
-      <ActivityIndicator color={ui.color("accent")} />
-      <Text role="timer" style={[text(14, 20, "ink"), styles.bold]}>
-        {countdown}
+  const progress = useInstallProgress(install?.settings ?? null, install?.request, (version) => (install?.onInstalled ? install.onInstalled(version) : install?.onChanged()));
+  // While an install runs, the card it belongs to is covered: a large spinner and the countdown, nothing to press.
+  const overlay = progress ? (
+    <View style={styles.overlay} testID="update-progress">
+      <View style={[StyleSheet.absoluteFill, styles.scrim, { backgroundColor: ui.color("card") }]} />
+      <ActivityIndicator size="large" color={ui.color("accent")} style={styles.spinner} />
+      <Text role="heading" aria-level={2} style={[text(17, 24, "ink"), styles.bold, styles.center]}>
+        {`Installing ${versionLabel(progress.target)}`}
       </Text>
+      <Text role="timer" style={[text(22, 28, "ink"), styles.bold, styles.center, styles.tabular]}>
+        {progress.countdown}
+      </Text>
+      <Text style={[text(14, 20, "muted"), styles.center]}>{COPY.installOverlay}</Text>
     </View>
   ) : null;
   const runText = runLine ? (
@@ -52,12 +58,12 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
 
   if (!latest) {
     return (
-      <View style={[styles.card, styles.status, card]}>
+      <View style={[styles.card, styles.status, card, overlay && styles.statusBusy]}>
         <Text style={text(14, 21, "muted")} testID="update-status">
           {upToDateLine(update)}
         </Text>
         {runText}
-        {progress}
+        {overlay}
       </View>
     );
   }
@@ -128,7 +134,6 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
           </Text>
           <Text style={[text(14, 20, "muted"), styles.installNote]}>{configured ? COPY.installReady : COPY.installNote}</Text>
           {runText}
-          {progress}
           {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
         </View>
         {INSTALL_STEPS.map((step, index) => (
@@ -158,6 +163,7 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
             <Text style={[text(14, 21, "ink-on-fill"), styles.bold]}>{copy.button}</Text>
           </Pressable>
         </View>
+        {overlay}
       </View>
     </View>
   );
@@ -184,5 +190,10 @@ const styles = StyleSheet.create({
   install: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   off: { opacity: 0.4 },
   runLine: { marginTop: 6 },
-  progress: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
+  statusBusy: { minHeight: 220 },
+  overlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center", gap: 10, padding: 24 },
+  scrim: { opacity: 0.97 },
+  spinner: { transform: [{ scale: 1.5 }], marginBottom: 8 },
+  center: { textAlign: "center" },
+  tabular: { fontVariant: ["tabular-nums"] },
 });

@@ -31,6 +31,7 @@ export const UPDATE_COPY = {
     "Watchtower backs up the database, then replaces FamilyFi with the new release. FamilyFi is away for a minute or two; your UniFi policies stay in place meanwhile, and this page reconnects by itself.",
   installConfirm: "FamilyFi restarts on the new release and is away for a minute or two.",
   installFailed: "Could not start the install.",
+  installOverlay: "FamilyFi restarts on the new release. Your UniFi policies stay in place, and this page reloads by itself when it is back.",
   notNow: "Not now",
   schedule: "Automatic updates",
   scheduleSub: "Install a newer release on its own, in the household's time.",

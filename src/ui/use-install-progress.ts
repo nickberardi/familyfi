@@ -10,11 +10,11 @@ const HEALTH_POLL_MS = 5_000;
 
 /**
  * Follows an install from the request until `GET /api/v1/health` reports the new release, then calls
- * `onInstalled` with that release once. Meanwhile it returns the countdown beside the spinner, ticking each second. A
+ * `onInstalled` with that release once. Meanwhile it returns the release and the countdown over the card, ticking each second. A
  * read that fails while FamilyFi restarts is expected and simply tried again. The watch ends without
  * `onInstalled` when the install settles any other way, and its outcome line says why.
  */
-export function useInstallProgress(settings: UpdateSettings | null, request: ApiRequest | undefined, onInstalled: (version: string) => void): string | null {
+export function useInstallProgress(settings: UpdateSettings | null, request: ApiRequest | undefined, onInstalled: (version: string) => void): { target: string; countdown: string } | null {
   const run = settings?.lastRun ?? null;
   const [watched, setWatched] = useState<UpdateRun | null>(run?.status === "requested" ? run : null);
   const [now, setNow] = useState(() => new Date());
@@ -60,5 +60,5 @@ export function useInstallProgress(settings: UpdateSettings | null, request: Api
     };
   }, [watched, request]);
 
-  return watched ? installCountdownLine(watched.requestedAt, now) : null;
+  return watched ? { target: watched.targetVersion, countdown: installCountdownLine(watched.requestedAt, now) } : null;
 }
