@@ -29,7 +29,8 @@ describe("the card stack's layout", () => {
   it("opens the first card to fill the room, with the rest peeking under it", () => {
     const { frames, height } = stackLayout(heads, 0, 600);
     // Three peeks of 62 and the gap below the open card.
-    const openH = 600 - STACK_TOP - STACK_TOP - 3 * 62 - PEEK_GAP;
+    // Two peeks of 62, the last card's whole head, and the gap below the open card.
+    const openH = 600 - STACK_TOP - STACK_TOP - 2 * 62 - 84 - PEEK_GAP;
     expect(frames[0]).toEqual({ y: 4, h: openH });
     expect(frames.slice(1).map((frame) => frame.y)).toEqual([4 + openH + 6, 4 + openH + 6 + 62, 4 + openH + 6 + 124]);
     expect(height).toBe(600);
@@ -41,7 +42,8 @@ describe("the card stack's layout", () => {
     expect(frames[1]!.y).toBe(66);
     const open = frames[2]!;
     expect(open.y).toBe(4 + 2 * 62);
-    expect(open.h).toBe(600 - open.y - STACK_TOP - 62 - PEEK_GAP);
+    // The last card shows its whole head.
+    expect(open.h).toBe(600 - open.y - STACK_TOP - 84 - PEEK_GAP);
     expect(frames[3]!.y).toBe(open.y + open.h + PEEK_GAP);
     // Above-cards keep their full head, so the next card covers all but the peek.
     expect(frames[1]!.h).toBe(84);
@@ -66,7 +68,7 @@ describe("the card stack's layout", () => {
     const large = [140, 120, 160];
     const closed = stackLayout(large, null, 700);
     expect(closed.frames.map((frame) => frame.y)).toEqual([4, 4 + 132, 4 + 132 + 112]);
-    const open = stackLayout(large, 1, 700);
+    const open = stackLayout(large, 1, 760);
     expect(open.frames[1]!.y).toBe(4 + peekOf(140));
     expect(open.frames[2]!.y).toBe(open.frames[1]!.y + open.frames[1]!.h + PEEK_GAP);
     // A tall head still peeks more than half of itself.
@@ -78,6 +80,21 @@ describe("the card stack's layout", () => {
     const { frames, height } = stackLayout(heads, 1, 200);
     expect(frames[1]!.h).toBe(84 + MIN_BODY);
     expect(height).toBeGreaterThan(200);
+  });
+
+  it("shows the last card under the open one whole, inside the stack", () => {
+    for (const [open, content] of [
+      [0, undefined],
+      [1, 300],
+      [5, 420],
+      [5, 2000],
+    ] as const) {
+      const many = open < 2 ? heads : Array.from({ length: 12 }, () => 84);
+      const { frames, height } = stackLayout(many, open, 600, content);
+      const last = frames[frames.length - 1]!;
+      expect(last.y + last.h + STACK_TOP).toBeLessThanOrEqual(height);
+      if (many === heads) expect(last.h).toBe(84);
+    }
   });
 
   it("treats an open index outside the stack as closed", () => {
@@ -92,7 +109,8 @@ describe("an open card of measured height", () => {
     expect(frames[1]).toEqual({ y: 4 + 62, h: 300 });
     expect(frames[2]!.y).toBe(4 + 62 + 300 + PEEK_GAP);
     expect(frames[3]!.y - frames[2]!.y).toBe(62);
-    expect(height).toBe(frames[3]!.y + 62 + STACK_TOP);
+    // Nothing covers the last card, so it shows its whole head.
+    expect(height).toBe(frames[3]!.y + 84 + STACK_TOP);
     expect(height).toBeLessThan(600);
   });
 

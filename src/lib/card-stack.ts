@@ -57,8 +57,9 @@ export function stackLayout(
   // scrolls only past that.
   const most = room - 2 * STACK_TOP - (open < n - 1 ? PEEK_GAP : 0) - PEEK_MIN * (n - 1);
   const fitted = content === undefined ? undefined : Math.min(content, Math.max(most, heads[open]! + MIN_BODY));
-  // Peeks that would crowd the open card fold thinner, all alike, to an edge at least.
-  const natural = heads.map(peekOf);
+  // Peeks that would crowd the open card fold thinner, all alike, to an edge at least. Nothing
+  // covers the last card, so under the open card it shows its whole head.
+  const natural = heads.map((head, index) => (index === n - 1 && index > open ? head : peekOf(head)));
   const others = natural.reduce((sum, peek) => sum + peek, 0) - natural[open]!;
   const openMin = fitted ?? Math.max(heads[open]! + MIN_BODY, room * OPEN_SHARE);
   const peekRoom = room - 2 * STACK_TOP - (open < n - 1 ? PEEK_GAP : 0) - openMin;
@@ -79,7 +80,8 @@ export function stackLayout(
   frames.push({ y: openY, h: openH });
   y = openY + openH + PEEK_GAP;
   for (let index = open + 1; index < n; index += 1) {
-    frames.push({ y, h: heads[index]! });
+    // The last card ends where its share does, so its foot shows even folded.
+    frames.push({ y, h: index === n - 1 ? peeks[index]! : heads[index]! });
     y += peeks[index]!;
   }
   const height = (below.length ? y : openY + openH) + STACK_TOP;
