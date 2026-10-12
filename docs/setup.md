@@ -122,7 +122,7 @@ Tailscale, or want a VPN or reverse proxy in front of FamilyFi. Set it up with t
 choose **Tailscale** or **My domain** and enter its HTTPS address:
 
 - [My domain: VPN or reverse proxy](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network)
-  — including an NGINX sidecar next to FamilyFi.
+  — including a Caddy sidecar next to FamilyFi.
 - [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) — a Tailscale
   Serve sidecar; phones in your tailnet reach `https://familyfi.<your-tailnet>.ts.net`.
 
