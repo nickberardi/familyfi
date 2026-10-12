@@ -11,7 +11,7 @@ function Badge({ store, soon = false }: { store: AppStore; soon?: boolean }) {
       width={store.badgeWidth}
       height={BADGE_HEIGHT}
       unoptimized
-      className={`block flex-none ${soon ? "opacity-50" : ""}`}
+      className="block flex-none"
       style={{ width: store.badgeWidth, height: BADGE_HEIGHT }}
     />
   );

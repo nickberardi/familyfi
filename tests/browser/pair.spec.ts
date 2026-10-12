@@ -384,6 +384,15 @@ test("lays out remote access on a phone", { tag: "@phone" }, async ({ page }) =>
   await shot(page, "remote-access");
 });
 
+test("links the App Store badge and shows Google Play unlinked until it has a link", { tag: "@phone" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/pair");
+  const card = page.getByTestId("app-stores");
+  await expect(card.getByRole("link", { name: "Download on the App Store" })).toHaveAttribute("href", /^https:\/\//);
+  await expect(card.getByRole("img", { name: "Get it on Google Play, coming soon" })).toBeVisible();
+  await expect(card.getByRole("link")).toHaveCount(1);
+});
+
 test("Home access suggests this address, saves a home network address, and agents connect there", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const home = "http://192.168.1.10:7001";
