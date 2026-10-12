@@ -16,7 +16,7 @@ On a computer on your home network that runs Docker (not the UniFi gateway itsel
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/nickberardi/familyfi/main/docker/docker-compose.yml
-echo "POSTGRES_PASSWORD=pick-a-long-password" > .env
+echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" > .env
 docker compose up -d
 ```
 
