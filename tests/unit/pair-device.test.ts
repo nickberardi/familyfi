@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_STORES,
-  appStoreLinks,
   confirmLine,
   defaultPairingAccount,
   pairingAccounts,
@@ -38,14 +37,9 @@ const phone = (over: Partial<PairedPhone> = {}): PairedPhone => ({
 });
 
 describe("pair device", () => {
-  it("links each store that has a link, in store words, and leaves the rest out", () => {
-    expect(appStoreLinks().map((store) => store.label)).toEqual(APP_STORES.filter((store) => store.url).map((store) => store.label));
-    expect(appStoreLinks().every((store) => store.url.startsWith("https://"))).toBe(true);
-    const stores = [
-      { id: "apple", devices: "iPhone", label: "Download on the App Store", url: "https://apps.apple.com/app/familyfi" },
-      { id: "google", devices: "Android", label: "Get it on Google Play", url: null },
-    ];
-    expect(appStoreLinks(stores).map((store) => store.id)).toEqual(["apple"]);
+  it("shows both store badges, linking only to a store that has a link", () => {
+    expect(APP_STORES.map((store) => store.label)).toEqual(["Download on the App Store", "Get it on Google Play"]);
+    expect(APP_STORES.every((store) => store.url === null || store.url.startsWith("https://"))).toBe(true);
   });
 
   it("splits active phones from revoked ones, keeping the API's order", () => {

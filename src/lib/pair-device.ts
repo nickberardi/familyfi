@@ -41,18 +41,19 @@ export const PAIR_COPY = {
 } as const;
 
 /**
- * Where to get the FamilyFi app, worded as the stores they will be. Until the apps are listed, the
- * links open TestFlight and the Google Play testing program; a store with no link yet is not shown.
+ * Where to get the FamilyFi app, shown as each store's own badge. Until the apps are listed, the
+ * links open TestFlight and the Google Play testing program; a store with no link yet shows its
+ * badge unlinked, marked as coming soon.
  */
 export const APP_STORES = [
-  { id: "apple", devices: "iPhone, iPad and Apple Watch", label: "Download on the App Store", url: "https://testflight.apple.com/join/5nuDQjJq" },
-  { id: "google", devices: "Android phones and tablets", label: "Get it on Google Play", url: null },
-] as const satisfies readonly { id: string; devices: string; label: string; url: string | null }[];
+  { id: "apple", label: "Download on the App Store", badge: "/stores/app-store.svg", badgeWidth: 120, url: "https://testflight.apple.com/join/5nuDQjJq" },
+  { id: "google", label: "Get it on Google Play", badge: "/stores/google-play.svg", badgeWidth: 135, url: null },
+] as const satisfies readonly AppStore[];
 
-/** The stores that have a link to show. */
-export function appStoreLinks(stores: readonly { id: string; devices: string; label: string; url: string | null }[] = APP_STORES) {
-  return stores.filter((store): store is typeof store & { url: string } => store.url !== null);
-}
+/** `badgeWidth` is the badge drawn 40 points tall, the height both are shown at. */
+export type AppStore = { id: string; label: string; badge: string; badgeWidth: number; url: string | null };
+
+export const APP_STORE_SOON = "Coming soon";
 
 export function showAllLabel(count: number): string {
   return `Show all ${count} devices`;
