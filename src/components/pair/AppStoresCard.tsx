@@ -11,7 +11,8 @@ function Badge({ store, soon = false }: { store: AppStore; soon?: boolean }) {
       width={store.badgeWidth}
       height={BADGE_HEIGHT}
       unoptimized
-      className="block flex-none"
+      // Nick chose to dim the badge of a store that isn't open yet, an exception to the 0.7 alpha rule.
+      className={`block flex-none ${soon ? "opacity-50" : ""}`}
       style={{ width: store.badgeWidth, height: BADGE_HEIGHT }}
     />
   );
@@ -33,9 +34,15 @@ export function AppStoresCard() {
                 <Badge store={store} />
               </a>
             ) : (
-              <div key={store.id} className="flex flex-col items-center gap-1">
+              // The ribbon lies across the badge, so a store that isn't open yet takes the same space as one that is.
+              <div key={store.id} className="relative overflow-hidden rounded-[6px]">
                 <Badge store={store} soon />
-                <span className="text-[14px] text-[var(--ff-muted)]">{APP_STORE_SOON}</span>
+                <span
+                  aria-hidden="true"
+                  className="absolute top-1/2 left-1/2 w-[140%] -translate-x-1/2 -translate-y-1/2 -rotate-[10deg] bg-[var(--ff-accent)] text-center text-[14px] leading-5 font-semibold text-[var(--ff-ink-on-fill)]"
+                >
+                  {APP_STORE_SOON}
+                </span>
               </div>
             ),
           )}
