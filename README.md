@@ -8,6 +8,8 @@ Family internet controls for a UniFi gateway. One install, one household.
 
 Put each person's devices in a group, set rules such as **Bedtime** or **No social media during homework**, and pause the internet for anyone with one tap, from the web or the [FamilyFi app](https://github.com/nickberardi/familyfi-mobile) on iPhone, iPad, Apple Watch and Android. FamilyFi stores what you want and enforces it with its own UniFi firewall policies. **Your own policies are never modified, disabled, deleted or reordered.**
 
+![FamilyFi on the web, iPhone and Apple Watch](docs/images/familyfi-apps.png)
+
 **[Try the live demo](https://demo.getfamilyfi.com)** • **[User guide](https://github.com/nickberardi/familyfi/wiki)** • **[getfamilyfi.com](https://getfamilyfi.com)**
 
 ## Install
