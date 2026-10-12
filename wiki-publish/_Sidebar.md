@@ -8,8 +8,10 @@
 
 **Phone and Watch**
 - [Phone and Watch app](Phone-and-Watch-app)
+- [Quick tunnel](Remote-access-Quick-tunnel)
+- [Cloudflare (Automatic)](Remote-access-Cloudflare-Automatic)
+- [Cloudflare (Advanced)](Remote-access-Cloudflare-Tunnel)
 - [Tailscale](Remote-access-Tailscale)
-- [Cloudflare Tunnel](Remote-access-Cloudflare-Tunnel)
 - [My domain](Remote-access-home-network)
 
 **Keeping it running**

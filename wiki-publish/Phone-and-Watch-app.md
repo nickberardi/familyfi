@@ -12,21 +12,16 @@ Your phone needs a way to reach FamilyFi when you're away from home. Pick one un
 
 | Choice | Good for | What you set up |
 | --- | --- | --- |
-| **Quick tunnel** | Trying the app today | Nothing. The address changes when FamilyFi restarts, so it's not meant to stay on. |
-| **Cloudflare → Automatic** | Most households with a domain on Cloudflare | Sign in to Cloudflare from FamilyFi once; FamilyFi creates the tunnel. |
-| **Tailscale** | Households already using Tailscale | A small container next to FamilyFi. [Guide](Remote-access-Tailscale) |
-| **Cloudflare → Advanced** | Running your own tunnel, optionally behind Cloudflare Access | A `cloudflared` container you manage. [Guide](Remote-access-Cloudflare-Tunnel) |
-| **My domain** | Your own reverse proxy or VPN | A reverse proxy with an HTTPS certificate. [Guide](Remote-access-home-network) |
-| **Off** | Using only the website | Phones can't reach home and can't pair. |
+| [**Quick tunnel**](Remote-access-Quick-tunnel) | Trying the app today | Nothing. The address changes whenever FamilyFi restarts, so it's not meant to stay on. |
+| [**Cloudflare → Automatic**](Remote-access-Cloudflare-Automatic) | Most households with a domain on Cloudflare | Sign in to Cloudflare from FamilyFi once; FamilyFi creates and runs the tunnel. |
+| [**Tailscale**](Remote-access-Tailscale) | Households already using Tailscale | A small container next to FamilyFi; phones join your tailnet. |
+| [**Cloudflare → Advanced**](Remote-access-Cloudflare-Tunnel) | Running your own tunnel, optionally behind Cloudflare Access | A `cloudflared` container you manage. |
+| [**My domain**](Remote-access-home-network) | Your own reverse proxy or VPN | A reverse proxy with an HTTPS certificate, and usually a port forward. |
+| **Off** | Using only the website | Nothing. Phones can't reach home and can't pair. |
+
+Each option has its own page with setup steps, checks and troubleshooting.
 
 Remote access only ever exposes what the app needs. The FamilyFi website and its sign-in page are never reachable through it, and nobody can sign in with a password from outside: only a phone you paired can get in.
-
-### Cloudflare → Automatic
-
-1. On **Pair Device**, choose **Cloudflare → Automatic** and enter an address on a domain in your Cloudflare account, such as `familyfi.example.com`.
-2. Select **Connect with Cloudflare**, open the link it shows, pick the domain, and come back. The page updates on its own.
-
-FamilyFi creates a tunnel and a DNS record for that address, and keeps only that tunnel's own credential. It never overwrites a DNS record that already exists. **Forget domain** turns it off; the tunnel and record stay in your Cloudflare account until you delete them there.
 
 ## Pair your phone
 
@@ -35,7 +30,7 @@ FamilyFi creates a tunnel and a DNS record for that address, and keeps only that
 
 The code works once and expires after five minutes. Your Apple Watch pairs through your iPhone, with nothing to scan.
 
-**Paired devices** on the same page lists every phone, Watch and agent, when each was last seen, and how it reaches home. **Revoke** signs a lost phone out at once; **Re-pair** gives it a fresh code with its name filled in.
+**Paired devices** on the same page lists every phone, Watch and agent, when each was last seen, and how it reaches home. **Revoke** signs a lost phone out at once. A revoked phone can be brought back with **Re-pair**, which gives a fresh code with its name filled in.
 
 ## AI agents
 

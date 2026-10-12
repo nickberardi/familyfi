@@ -18,9 +18,11 @@ It runs on a small computer in your home (anything that runs Docker), talks to y
 ## More
 
 - [Phone and Watch app](Phone-and-Watch-app): pair your phone and choose how it reaches home when you're out.
-  - [Remote access with Tailscale](Remote-access-Tailscale)
-  - [Remote access with your own Cloudflare Tunnel](Remote-access-Cloudflare-Tunnel)
-  - [Remote access with your own domain (VPN or reverse proxy)](Remote-access-home-network)
+  - [Quick tunnel](Remote-access-Quick-tunnel)
+  - [Cloudflare (Automatic)](Remote-access-Cloudflare-Automatic)
+  - [Your own Cloudflare Tunnel (Advanced)](Remote-access-Cloudflare-Tunnel)
+  - [Tailscale](Remote-access-Tailscale)
+  - [My domain: your own reverse proxy or VPN](Remote-access-home-network)
 - [Updates and backups](Updates-and-backups)
 - [Troubleshooting and FAQ](Troubleshooting-and-FAQ)
 

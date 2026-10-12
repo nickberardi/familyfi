@@ -41,7 +41,9 @@ Remote access is **Off**. Choose one of the options under **Pair Device → Remo
 
 ### The app can't reach home
 
-Check the remote access option on **Pair Device** shows the address you expect. A **Quick tunnel** address changes whenever FamilyFi restarts; phones learn the new one the next time they reach FamilyFi another way, such as on your home Wi-Fi. For an address that doesn't change, use Cloudflare, Tailscale or My domain.
+Check that **Pair Device → Remote access** shows the address you expect and says **On**. Each option's page has its own troubleshooting section.
+
+If you use a **Quick tunnel**, its address changes whenever FamilyFi restarts or updates, and a phone that only knew the old address can't find the new one. **Revoke** the phone under **Paired devices**, then **Re-pair** it with a new code. For an address that doesn't change, use Cloudflare, Tailscale or My domain. See [Quick tunnel](Remote-access-Quick-tunnel).
 
 ## FAQ
 
