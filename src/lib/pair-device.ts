@@ -36,7 +36,23 @@ export const PAIR_COPY = {
   remoteOff: "No route is published, so phones can’t reach home or pair.",
   /** Where a client that cannot change remote access sends the household instead. */
   remoteOnWeb: "Change remote access on FamilyFi’s web Pair Device page.",
+  getApp: "Get the FamilyFi app",
+  getAppSub: "Install it on each phone before you pair it.",
 } as const;
+
+/**
+ * Where to get the FamilyFi app, worded as the stores they will be. Until the apps are listed, the
+ * links open TestFlight and the Google Play testing program; a store with no link yet is not shown.
+ */
+export const APP_STORES = [
+  { id: "apple", devices: "iPhone, iPad and Apple Watch", label: "Download on the App Store", url: "https://testflight.apple.com/join/5nuDQjJq" },
+  { id: "google", devices: "Android phones and tablets", label: "Get it on Google Play", url: null },
+] as const satisfies readonly { id: string; devices: string; label: string; url: string | null }[];
+
+/** The stores that have a link to show. */
+export function appStoreLinks(stores: readonly { id: string; devices: string; label: string; url: string | null }[] = APP_STORES) {
+  return stores.filter((store): store is typeof store & { url: string } => store.url !== null);
+}
 
 export function showAllLabel(count: number): string {
   return `Show all ${count} devices`;

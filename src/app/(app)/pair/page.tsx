@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AppStoresCard } from "@/components/pair/AppStoresCard";
 import { ConnectAgentSheet } from "@/components/agents/ConnectAgentSheet";
 import { PageHeader } from "@/components/PageHeader";
 import { HomeAccessCard } from "@/components/pair/HomeAccessCard";
@@ -57,6 +58,8 @@ export default function PairDevicePage() {
             {error}
           </p>
         ) : null}
+
+        <AppStoresCard />
 
         <HomeAccessCard />
 
