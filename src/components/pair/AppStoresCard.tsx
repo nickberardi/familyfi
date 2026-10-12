@@ -39,7 +39,7 @@ export function AppStoresCard() {
                 <Badge store={store} soon />
                 <span
                   aria-hidden="true"
-                  className="absolute top-1/2 left-1/2 w-[140%] -translate-x-1/2 -translate-y-1/2 -rotate-[10deg] bg-[var(--ff-accent)] text-center text-[14px] leading-5 font-semibold text-[var(--ff-ink-on-fill)]"
+                  className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-[var(--ff-accent)] text-center text-[14px] leading-5 font-semibold text-[var(--ff-ink-on-fill)]"
                 >
                   {APP_STORE_SOON}
                 </span>
