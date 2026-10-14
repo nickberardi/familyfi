@@ -48,7 +48,7 @@ The authorization matrix runs with the integration suite. When you add a route, 
   - A line no test can reach takes `// coverage-exempt: <why>` at its end, or alone on the line above. The reason is required, and the run summary lists every exemption so a reviewer sees it.
   - Run it yourself after `make test-coverage`: `scripts/test.py check coverage --run-id <run-id>`, with the run ID that run printed.
 - **Never skip your way to green.** A test that skips fails the run, and so does a browser test that passes only on its retry.
-  - Tag a test that belongs to one viewport `@desktop` or `@phone`.
+  - Tag a test that belongs to one viewport `@desktop` or `@phone`. A flow that behaves the same at any width is `@desktop` too; the phone project checks only what changes on a narrow screen.
   - A test that cannot run in CI takes a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`, with the reason.
   - Never skip, disable or quarantine a failing test.
 - **Test data is synthetic.** `tests/unit/repository-hygiene.test.ts` enforces this:
@@ -85,8 +85,8 @@ The workflows that run tests call `scripts/test.py`, so a local run is the CI ru
 
 | Workflow | When | Checks |
 | --- | --- | --- |
-| `ci.yml` | Every push and pull request | **verify:** `check audit lint typecheck api db-drift db-upgrade catalog`; `run --platform host --coverage` (unit, integration and harness tests, and the coverage floors); the unit suite again with `--timezone Pacific/Kiritimati`; `check coverage` for changed lines (pull requests only; fails on an untested changed line in a gated path); `build`.<br>**browser:** `run --layer ui`: Playwright on desktop and phone. A failed job uploads the run's results, logs and traces as `playwright-results` |
-| `container.yml` | Pull requests | Image build, image hygiene, container smoke; the same helpers as `check container`, with the build action's layer cache |
+| `ci.yml` | Pull requests and every release | **verify:** `check audit lint typecheck api catalog`; `check db-drift db-upgrade` (on a pull request, only when it changes `prisma/`, `prisma.config.ts`, the upgrade script, `scripts/test.py`, `scripts/runtime/`, `scripts/testing/`, the dependencies or `ci.yml`); `run --platform host --coverage` (unit, integration and harness tests, and the coverage floors); `check coverage` for changed lines (pull requests only; fails on an untested changed line in a gated path).<br>**browser:** `run --layer ui`: a production build, then Playwright on desktop and phone. A flow that behaves the same at any width is tagged `@desktop`; the phone project checks layouts, sheets and navigation that change on a narrow screen. Then the unit suite again with `--timezone Pacific/Kiritimati`, even when a browser test failed. A failed job uploads the run's results, logs and traces as `playwright-results`. Every job has a `timeout-minutes`, so a stuck runner cannot hold it for hours |
+| `container.yml` | Every release, or by hand | Image build, image hygiene, container smoke; the same helpers as `check container`, with the build action's layer cache |
 | `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`, with the helpers `check api-version` and `check api-breaking` call. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | `check mutation`. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 
@@ -95,12 +95,11 @@ The workflows that run tests call `scripts/test.py`, so a local run is the CI ru
 Run the same commands the jobs run. Each run starts and removes its own PostgreSQL containers, so the development database is never touched, and prints its run ID and results directory.
 
 ```bash
-scripts/test.py check audit lint typecheck api db-drift db-upgrade catalog
+scripts/test.py check audit lint typecheck api catalog db-drift db-upgrade
 scripts/test.py run --platform host --coverage
-scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
 scripts/test.py check coverage --run-id <run-id>
-scripts/test.py build
 scripts/test.py run --layer ui
+scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
 scripts/test.py check container api-version api-breaking
 ```
 
@@ -110,7 +109,7 @@ CodeQL runs through the repository's GitHub default setup (Settings → Code sec
 
 Jobs run on GitHub-hosted runners unless the repository variable `USE_SELF_HOSTED` is `true` (Settings → Secrets and variables → Actions → Variables), which moves every job that can run self-hosted onto the self-hosted runners, as in familyfi-mobile. The arm64 image, the version bump PR and the mutation run always use GitHub-hosted runners.
 
-Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup; on a GitHub-hosted runner the action does nothing. The script removes unused Docker data, test databases a killed job left running (containers labelled `familyfi.test-run`), the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. Two agents share a machine, so while another job is running the script leaves the shared Docker daemon and any shared Go or pnpm cache alone. Each runner service keeps its own Go and pnpm caches.
+Self-hosted jobs keep their disk between runs. Jobs that check out the repository call [`scripts/ci/runner-cleanup.sh`](../scripts/ci/runner-cleanup.sh) through `.github/actions/runner-cleanup` before setup; on a GitHub-hosted runner the action does nothing. The script removes unused Docker data, test databases a killed job left running (containers labelled `familyfi.test-run`), the pnpm store, old tool caches, apt's package cache, `familyfi-*` directories in `/tmp`, and old runner diagnostics. Several agents share a machine, so while another job is running the script prunes only Docker data unused for a day and leaves any shared Go or pnpm cache alone. Each runner service keeps its own Go and pnpm caches.
 
 **Never run this cleanup script on a development machine.** Local work must clean only resources created by that task; `scripts/test.py` removes only what its own run recorded and never runs runner cleanup.
 

@@ -25,7 +25,7 @@ async function firstChild(page: Page) {
   return kid!;
 }
 
-test("a group can take its own resolver and hand it back", async ({ page }) => {
+test("a group can take its own resolver and hand it back", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await firstChild(page);
   await page.goto(`/family/${kid.id}`);
@@ -53,7 +53,7 @@ test("a group can take its own resolver and hand it back", async ({ page }) => {
   await expect(card.getByText(/Uses the household's DNS-over-HTTPS override/i)).toBeVisible();
 });
 
-test("a bad endpoint is refused with a reason", async ({ page }) => {
+test("a bad endpoint is refused with a reason", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await firstChild(page);
   await page.goto(`/family/${kid.id}`);

@@ -43,7 +43,14 @@ remove_tree() {
 }
 
 # Docker is one daemon for every agent. Pruning it while another job builds deletes
-# that job's cache and its Go-unrelated image layers.
+# that job's cache and its Go-unrelated image layers, so while one runs, only data unused
+# for a day goes. Five agents share one disk and are rarely all idle, so without this the
+# full prune almost never ran and the disk filled.
+if command -v docker >/dev/null 2>&1 && [ "$others" -ne 0 ]; then
+  docker container prune --force --filter until=6h >/dev/null 2>&1 || true
+  docker image prune --all --force --filter until=24h >/dev/null 2>&1 || true
+  docker builder prune --all --force --filter until=24h >/dev/null 2>&1 || true
+fi
 if command -v docker >/dev/null 2>&1 && [ "$others" -eq 0 ]; then
   # Test databases of a job killed before scripts/test.py could remove them; prune skips running containers.
   ids=$(docker ps -aq --filter label=familyfi.test-run 2>/dev/null || true)
