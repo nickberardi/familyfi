@@ -48,7 +48,7 @@ The authorization matrix runs with the integration suite. When you add a route, 
   - A line no test can reach takes `// coverage-exempt: <why>` at its end, or alone on the line above. The reason is required, and the run summary lists every exemption so a reviewer sees it.
   - Run it yourself after `make test-coverage`: `scripts/test.py check coverage --run-id <run-id>`, with the run ID that run printed.
 - **Never skip your way to green.** A test that skips fails the run, and so does a browser test that passes only on its retry.
-  - Tag a test that belongs to one viewport `@desktop` or `@phone`.
+  - Tag a test that belongs to one viewport `@desktop` or `@phone`. A flow that behaves the same at any width is `@desktop` too; the phone project checks only what changes on a narrow screen.
   - A test that cannot run in CI takes a tag from `CI_EXCLUDED_TAGS` in `tests/browser-ci-guard.ts`, with the reason.
   - Never skip, disable or quarantine a failing test.
 - **Test data is synthetic.** `tests/unit/repository-hygiene.test.ts` enforces this:

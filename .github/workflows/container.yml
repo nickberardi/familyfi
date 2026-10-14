@@ -1,7 +1,7 @@
 name: Container
 
-# Pull requests, not pushes to main: the image build is slow, and a merged PR
-# already passed it. It also gates every release (see release.yml).
+# Not on pull requests or pushes to main: the image build is slow. It gates every
+# release (see release.yml) and runs by hand.
 on:
   workflow_dispatch:
   workflow_call:
