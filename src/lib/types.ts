@@ -78,6 +78,46 @@ export type UnifiSettings = {
   connectionError: string | null;
 };
 
+/** One UniFi device's latest load, as the console reports it; null for what it did not report. */
+export type GatewayDeviceHealth = {
+  id: string;
+  name: string;
+  model: string | null;
+  state: string | null;
+  gateway: boolean;
+  /** False when the console would not give this device's statistics; every reading is then null. */
+  reported: boolean;
+  cpuUtilizationPct: number | null;
+  memoryUtilizationPct: number | null;
+  loadAverage1Min: number | null;
+  loadAverage5Min: number | null;
+  loadAverage15Min: number | null;
+  uptimeSec: number | null;
+  lastHeartbeatAt: string | null;
+};
+
+/** The requests this FamilyFi server sent the console, for one endpoint, over the window. */
+export type UnifiEndpointLoad = {
+  endpoint: string;
+  count: number;
+  errors: number;
+  averageMs: number;
+  maxMs: number;
+};
+
+export type GatewayHealth = {
+  checkedAt: string;
+  /** Null when the console could not be asked; `devicesError` says why. */
+  devices: GatewayDeviceHealth[] | null;
+  devicesError: string | null;
+  requests: {
+    windowSec: number;
+    total: number;
+    errors: number;
+    endpoints: UnifiEndpointLoad[];
+  };
+};
+
 export type Account = {
   id: string;
   username: string;

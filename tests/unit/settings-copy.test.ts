@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createLoginTitle, gatewayFacts, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeAdminConfirm, removeLoginConfirm, usernameFromName } from "@/lib/settings-copy";
-import type { UnifiSettings } from "@/lib/types";
+import { createLoginTitle, formatUptime, gatewayFacts, gatewayHealthFacts, requestLoadLine, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeAdminConfirm, removeLoginConfirm, usernameFromName } from "@/lib/settings-copy";
+import type { GatewayDeviceHealth, UnifiSettings } from "@/lib/types";
 
 const unifi: UnifiSettings = {
   configured: true,
@@ -86,5 +86,46 @@ describe("settings copy", () => {
       message: "adult can no longer sign in to FamilyFi. An adult stays in the household.",
       confirmLabel: "Remove login",
     });
+  });
+});
+
+describe("gateway load copy", () => {
+  const device: GatewayDeviceHealth = {
+    id: "device-1",
+    name: "Dream Machine",
+    model: "UDM Pro",
+    state: "ONLINE",
+    gateway: true,
+    reported: true,
+    cpuUtilizationPct: 18.4,
+    memoryUtilizationPct: 61.6,
+    loadAverage1Min: 0.62,
+    loadAverage5Min: 0.5,
+    loadAverage15Min: null,
+    uptimeSec: 1_209_600 + 7200,
+    lastHeartbeatAt: null,
+  };
+
+  it("lists a device's load, and shows what the console did not report as unknown, never zero", () => {
+    expect(gatewayHealthFacts(device)).toEqual([
+      { k: "CPU", v: "18%" },
+      { k: "Memory", v: "62%" },
+      { k: "Load (1/5/15 min)", v: "0.62 / 0.50 / —" },
+      { k: "Uptime", v: "14 d 2 h" },
+    ]);
+    const blank = gatewayHealthFacts({ ...device, cpuUtilizationPct: null, memoryUtilizationPct: null, loadAverage1Min: null, loadAverage5Min: null, uptimeSec: null });
+    expect(blank.map((fact) => fact.v)).toEqual(["—", "—", "—", "—"]);
+  });
+
+  it("names uptime at the scale that reads", () => {
+    expect(formatUptime(59)).toBe("0 min");
+    expect(formatUptime(3 * 3600 + 5 * 60)).toBe("3 h 5 min");
+    expect(formatUptime(null)).toBe("—");
+  });
+
+  it("says how many requests FamilyFi sent the console lately", () => {
+    expect(requestLoadLine({ windowSec: 300, total: 0, errors: 0, endpoints: [] })).toBe("None in the last 5 min");
+    expect(requestLoadLine({ windowSec: 300, total: 62, errors: 1, endpoints: [] })).toBe("62 in the last 5 min · 12.4 a minute · 1 failed");
+    expect(requestLoadLine({ windowSec: 300, total: 10, errors: 2, endpoints: [] })).toBe("10 in the last 5 min · 2.0 a minute · 2 failed");
   });
 });

@@ -7,6 +7,7 @@ import { enqueueChange } from "./changes";
 import { pruneNetworkScopedRulesForScope } from "./network-rules";
 import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type PublicUnifiNetwork } from "./unifi/scope";
 import { loadNetworkDetails } from "./unifi/networks";
+import { recentSiteNetworks, rememberSiteNetworks } from "./unifi/network-cache";
 import type { Household } from "@prisma/client";
 
 async function probeWithClient(client: ReturnType<typeof probeClient>, siteId?: string) {
@@ -50,11 +51,19 @@ export async function testStoredUnifiConnection() {
   return probeWithClient(clientForHousehold(household), household.unifiSiteId ?? undefined);
 }
 
-export async function listSiteNetworks(household: Household): Promise<PublicUnifiNetwork[]> {
+/**
+ * The site's networks, from the last few minutes' reconcile pass when there is one. `fresh`
+ * asks the console, for a choice that must be checked against what is there now.
+ */
+export async function listSiteNetworks(household: Household, options: { fresh?: boolean } = {}): Promise<PublicUnifiNetwork[]> {
   if (!household.unifiKeyLastFour || !household.unifiSiteId) return [];
+  const identity = connectionIdentity(household);
+  const recent = options.fresh ? null : recentSiteNetworks(identity);
+  if (recent) return recent;
   const client = clientForHousehold(household);
-  const networks = await loadNetworkDetails(client, household.unifiSiteId);
-  return networks.map(publicUnifiNetwork);
+  const networks = (await loadNetworkDetails(client, household.unifiSiteId)).map(publicUnifiNetwork);
+  rememberSiteNetworks(identity, networks);
+  return networks;
 }
 
 export async function saveUnifiConnection(input: {
@@ -113,6 +122,7 @@ export async function saveUnifiConnection(input: {
       connectionError: null,
     },
   });
+  rememberSiteNetworks(nextIdentity, probed.networks);
   await pruneNetworkScopedRulesForScope(scope);
   return enqueueChange("unifi");
 }
@@ -122,7 +132,7 @@ export async function saveManagedNetworks(input: { manageAllNetworks?: boolean; 
   if (!household.unifiKeyLastFour) {
     throw new UnifiConfigError("Save a UniFi API key before choosing networks.");
   }
-  const networks = await listSiteNetworks(household);
+  const networks = await listSiteNetworks(household, { fresh: true });
   const scope = resolveAndValidateScope(input, household, new Set(networks.map((network) => network.id)));
   await prisma().household.update({
     where: { id: "default" },

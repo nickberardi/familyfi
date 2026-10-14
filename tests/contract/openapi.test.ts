@@ -39,6 +39,7 @@ describe("openapi contract", () => {
     const sometimesOmitted = [
       "Health.revision", // only when the database answered
       "Health.error", // only when degraded by configuration
+      "Health.gateway", // only with ?gateway=true, for a session, while ready
       "PairedClaim.connection", // never for agents
       "PairedClaim.connection.endpoint", // only when the invite named a route
       "PairedInviteIssued.invite.url", // only for an agent

@@ -3,7 +3,7 @@ import { prisma } from "@/server/db";
 import { enqueueChange } from "@/server/changes";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { observeQuarantineBlocking } from "@/server/quarantine";
+import { storedQuarantineBlocking } from "@/server/quarantine";
 import { setQuarantineEnforced } from "@/server/rules";
 import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 import type { Household } from "@prisma/client";
@@ -20,7 +20,7 @@ const Body = z
   });
 
 export async function publicHousehold(household: Household) {
-  const live = await observeQuarantineBlocking(household);
+  const live = await storedQuarantineBlocking();
   return {
     timezone: household.timezone,
     revision: household.revision,

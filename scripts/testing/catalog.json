@@ -405,6 +405,16 @@
         "unifi"
       ]
     },
+    "tests/unit/unifi-request-meter.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
+    "tests/unit/structural-sharing.test.ts": {
+      "categories": [
+        "sync"
+      ]
+    },
     "tests/unit/unifi.test.ts": {
       "categories": [
         "unifi",
@@ -548,6 +558,12 @@
     "tests/integration/policy-ownership.test.ts": {
       "categories": [
         "sync",
+        "unifi"
+      ]
+    },
+    "tests/integration/gateway-health-api.test.ts": {
+      "categories": [
+        "settings",
         "unifi"
       ]
     },

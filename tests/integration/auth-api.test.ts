@@ -47,7 +47,7 @@ describe("auth and accounts API", () => {
   });
 
   it("serves non-secret health", async () => {
-    const response = await getHealth();
+    const response = await getHealth(request("/api/v1/health"));
     const body = (await response.json()) as { status: string; db: string; version: string; update: { status: string; available: boolean | null } };
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
@@ -60,7 +60,7 @@ describe("auth and accounts API", () => {
     await refreshUpdateCheck({
       fetchImpl: async () => new Response(JSON.stringify([{ tag_name: `v${APP_VERSION}` }])),
     });
-    const current = await getHealth();
+    const current = await getHealth(request("/api/v1/health"));
     expect(current.status).toBe(200);
     await expect(current.json()).resolves.toMatchObject({
       status: "ok",
@@ -71,7 +71,7 @@ describe("auth and accounts API", () => {
       fetchImpl: async () => new Response(JSON.stringify([{ tag_name: "v999.0.0", prerelease: true }])),
       now: () => new Date("2026-09-22T12:00:00.000Z"),
     });
-    const available = await getHealth();
+    const available = await getHealth(request("/api/v1/health"));
     expect(available.status).toBe(200);
     await expect(available.json()).resolves.toMatchObject({
       status: "ok",
@@ -79,7 +79,7 @@ describe("auth and accounts API", () => {
     });
 
     await refreshUpdateCheck({ fetchImpl: async () => new Response("rate limited", { status: 429 }) });
-    const failed = await getHealth();
+    const failed = await getHealth(request("/api/v1/health"));
     expect(failed.status).toBe(200);
     await expect(failed.json()).resolves.toMatchObject({
       status: "ok",

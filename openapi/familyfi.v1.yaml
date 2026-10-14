@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.28.3
+  version: 0.29.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -55,8 +55,23 @@ paths:
       operationId: getHealth
       tags: [Health]
       summary: Deployment health
-      description: Minimal non-secret readiness. Does not expose credentials. The optional update snapshot is cached GitHub release metadata and does not affect application readiness.
+      description: >-
+        Minimal non-secret readiness. Does not expose credentials. The optional update snapshot is
+        cached GitHub release metadata and does not affect application readiness. With
+        `gateway=true` the caller needs a session (an administrator, or a paired phone; a Watch or
+        agent gets 403) and, while the application is ready, the response adds `gateway`: each
+        UniFi site device's latest CPU, memory, load and uptime, gateway first, and the requests
+        this server sent the console over the last `windowSec` seconds, by method and path with ids
+        replaced by `{id}`. `gateway.devices` is null, and `devicesError` says why, when the
+        console could not be asked. Each gateway read costs the console a request per device:
+        ask on demand, never poll it.
       security: []
+      parameters:
+        - name: gateway
+          in: query
+          required: false
+          description: "`true` adds the UniFi devices' latest load and FamilyFi's requests to the console. Needs a session."
+          schema: { type: string, enum: ["true", "false"] }
       responses:
         "200":
           description: Application and database are reachable.
@@ -81,6 +96,10 @@ paths:
                       checkedAt: "2026-09-22T12:00:00.000Z"
                       lastSuccessfulAt: "2026-09-22T12:00:00.000Z"
                       error: null
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "503":
           description: Application is up but the database is not.
           content:
@@ -2699,6 +2718,8 @@ components:
           description: Present when status is degraded due to configuration, not secrets.
         update:
           $ref: "#/components/schemas/UpdateCheck"
+        gateway:
+          $ref: "#/components/schemas/GatewayHealth"
     ImportSummary:
       type: object
       additionalProperties: false
@@ -2930,7 +2951,10 @@ components:
         quarantineEnforced: { type: boolean }
         quarantineObservedEnabled:
           type: [boolean, "null"]
-          description: Live UniFi enabled flag across app-owned quarantine policies. True if any is enabled.
+          description: >-
+            Whether app-owned quarantine policies were enabled on the gateway as the last reconcile
+            pass saw them (about every 30 seconds). True if any is enabled; null when none could be
+            seen, such as a policy missing from the gateway at that pass.
         quarantinePolicyCount: { type: integer, minimum: 0 }
     ConnectionIdentity:
       type: object
@@ -3325,6 +3349,54 @@ components:
           items: { $ref: "#/components/schemas/UnifiNetwork" }
         connectionStatus: { type: string }
         connectionError: { type: [string, "null"] }
+    GatewayHealth:
+      type: object
+      additionalProperties: false
+      required: [checkedAt, devices, devicesError, requests]
+      properties:
+        checkedAt: { type: string, format: date-time }
+        devices:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/GatewayDeviceHealth" }
+        devicesError: { type: [string, "null"] }
+        requests:
+          type: object
+          additionalProperties: false
+          required: [windowSec, total, errors, endpoints]
+          properties:
+            windowSec: { type: integer }
+            total: { type: integer }
+            errors: { type: integer }
+            endpoints:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [endpoint, count, errors, averageMs, maxMs]
+                properties:
+                  endpoint: { type: string }
+                  count: { type: integer }
+                  errors: { type: integer }
+                  averageMs: { type: integer }
+                  maxMs: { type: integer }
+    GatewayDeviceHealth:
+      type: object
+      additionalProperties: false
+      required: [id, name, model, state, gateway, reported, cpuUtilizationPct, memoryUtilizationPct, loadAverage1Min, loadAverage5Min, loadAverage15Min, uptimeSec, lastHeartbeatAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        model: { type: [string, "null"] }
+        state: { type: [string, "null"] }
+        gateway: { type: boolean }
+        reported: { type: boolean, description: "False when the console would not give this device's statistics; every reading is then null." }
+        cpuUtilizationPct: { type: [number, "null"] }
+        memoryUtilizationPct: { type: [number, "null"] }
+        loadAverage1Min: { type: [number, "null"] }
+        loadAverage5Min: { type: [number, "null"] }
+        loadAverage15Min: { type: [number, "null"] }
+        uptimeSec: { type: [integer, "null"] }
+        lastHeartbeatAt: { type: [string, "null"], format: date-time }
     UnifiNetwork:
       type: object
       additionalProperties: false

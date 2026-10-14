@@ -21,6 +21,7 @@ export async function register() {
   const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
   const { ensureUpstreamCategories } = await import("./server/upstream-seed");
   const { startReconciliation } = await import("./server/reconciliation");
+  const { startUnifiRequestLog } = await import("./server/unifi/request-meter");
   const { startUpstreamProbe } = await import("./server/upstream/schedule");
   const { startAutoUpdate } = await import("./server/updater");
   try {
@@ -48,6 +49,7 @@ export async function register() {
   }
   startUpdateCheck();
   startReconciliation();
+  startUnifiRequestLog();
   startUpstreamProbe();
   startAutoUpdate();
   const { resumeRemoteAccess, startRemoteAccessPort } = await import("./server/tunnel/remote-access");
