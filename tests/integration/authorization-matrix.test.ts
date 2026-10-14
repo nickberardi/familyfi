@@ -187,6 +187,7 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/settings/import": { access: "administrator" },
   "GET /api/v1/settings/unifi": { access: "session" },
   "PUT /api/v1/settings/unifi": { access: "session" },
+  "GET /api/v1/settings/unifi/health": { access: "session" },
   "POST /api/v1/settings/unifi/test": { access: "session" },
   "GET /api/v1/settings/update": { access: "administrator" },
   "POST /api/v1/settings/update/install": { access: "administrator" },

@@ -8,6 +8,7 @@ import {
 } from "./household-state";
 import { beginMutate, canCommitMutate, type MutateGate } from "./mutate-gate";
 import type { Rule } from "./rules";
+import { shareUnchanged } from "./structural-sharing";
 import type { Account, Device, Group, Session, SyncStatus, UnifiSettings } from "./types";
 
 /**
@@ -77,8 +78,23 @@ export type MutateOptions = {
 /** How long a notice stays: long enough to use its Undo when it has one. Errors stay. */
 export const NOTICE_MS = 6000;
 export const NOTICE_WITH_ACTION_MS = 12_000;
-/** How often a client refreshes the household while it is showing it. */
+/**
+ * How often a client refreshes what changes on its own while it is showing the household:
+ * groups and rules (windows open and close, pauses end), devices and sync.
+ */
 export const REFRESH_MS = 15_000;
+/** How often it also rereads what only a write changes: the session, settings and accounts. */
+export const FULL_REFRESH_MS = 5 * 60_000;
+
+/**
+ * Whether the household is on screen. A client that is hidden (a background tab, a
+ * backgrounded app) stops refreshing, and catches up the moment it is shown again.
+ */
+export type Visibility = {
+  hidden(): boolean;
+  /** Calls `onChange` whenever `hidden()` may have changed; returns the unsubscribe. */
+  subscribe(onChange: () => void): () => void;
+};
 
 export type HouseholdStore = ReturnType<typeof createHouseholdStore>;
 
@@ -86,8 +102,9 @@ export function createHouseholdStore(deps: {
   request: ApiRequest;
   waitForChange?: (request: ApiRequest, changeId: string) => Promise<ChangeOutcome>;
   offlineGuard?: OfflineGuard;
+  visibility?: Visibility;
 }) {
-  const { request, offlineGuard } = deps;
+  const { request, offlineGuard, visibility } = deps;
   const follow = deps.waitForChange ?? ((send: ApiRequest, id: string) => pollChange(send, id));
   const connectionMessages = new Set(offlineGuard ? [offlineGuard.stale, offlineGuard.notSent, offlineGuard.maybeNotSent] : []);
   let state: HouseholdState = {
@@ -113,10 +130,14 @@ export function createHouseholdStore(deps: {
   const gate: MutateGate = { latest: 0 };
   let loadGen = 0;
   let followGen = 0;
+  /** When the last full reload started, so the timer knows when the next is due. */
+  let fullLoadAt = Number.NEGATIVE_INFINITY;
   let busyCount = 0;
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const set = (patch: Partial<HouseholdState>) => {
+    // Nothing new: keep the state object, so no subscriber renders again.
+    if ((Object.keys(patch) as (keyof HouseholdState)[]).every((key) => Object.is(state[key], patch[key]))) return;
     const before = state;
     state = { ...state, ...patch };
     if (state.notice !== before.notice || state.noticeAction !== before.noticeAction || state.error !== before.error) {
@@ -143,8 +164,30 @@ export function createHouseholdStore(deps: {
   /** Whether a control may send a write now. */
   const canControl = () => !offlineGuard || (state.status === "ready" && !state.stale);
 
+  /** Content the server sent again unchanged keeps the references already shown. */
+  const shared = <K extends keyof HouseholdState>(key: K, next: HouseholdState[K]) => shareUnchanged(state[key], next);
+
+  function failed(error: unknown) {
+    if (error instanceof ApiError && error.status === 401) {
+      set({ status: "signedOut", loaded: true, stale: true, unreachable: false });
+      return;
+    }
+    if (offlineGuard) {
+      // Keep what is shown, but say it may be out of date. A write's own failure message,
+      // already shown, says more than this one, so it stays.
+      set({ loaded: true, stale: true, unreachable: error instanceof TransportError, error: state.error || offlineGuard.stale });
+    } else {
+      // The first load says why it failed; a later refresh keeps the page as it is.
+      set({ loaded: true, stale: true, unreachable: error instanceof TransportError, ...(state.loaded ? {} : { error: error instanceof Error ? error.message : "Request failed." }) });
+    }
+  }
+
+  // Reaching the server again answers any message about not reaching it.
+  const reached = () => ({ stale: false, unreachable: false, ...(connectionMessages.has(state.error) ? { error: "" } : {}) });
+
   async function reload(): Promise<void> {
     const gen = ++loadGen;
+    fullLoadAt = Date.now();
     try {
       const { session } = await request<{ session: Session }>("/api/v1/auth/session");
       const [groups, devices, rules, sync, unifi, household, accounts] = await Promise.all([
@@ -160,33 +203,43 @@ export function createHouseholdStore(deps: {
       set({
         status: "ready",
         loaded: true,
-        session,
-        groups: groups.groups,
-        devices: devices.devices,
-        rules: rules.rules,
-        sync,
-        unifi: unifi.unifi,
-        household: household.household,
-        accounts: accounts.accounts,
-        stale: false,
-        unreachable: false,
-        // Reaching the server again answers any message about not reaching it.
-        ...(connectionMessages.has(state.error) ? { error: "" } : {}),
+        session: shared("session", session),
+        groups: shared("groups", groups.groups),
+        devices: shared("devices", devices.devices),
+        rules: shared("rules", rules.rules),
+        sync: shared("sync", sync),
+        unifi: shared("unifi", unifi.unifi),
+        household: shared("household", household.household),
+        accounts: shared("accounts", accounts.accounts),
+        ...reached(),
       });
     } catch (error) {
       if (gen !== loadGen) return;
-      if (error instanceof ApiError && error.status === 401) {
-        set({ status: "signedOut", loaded: true, stale: true, unreachable: false });
-        return;
-      }
-      if (offlineGuard) {
-        // Keep what is shown, but say it may be out of date. A write's own failure message,
-        // already shown, says more than this one, so it stays.
-        set({ loaded: true, stale: true, unreachable: error instanceof TransportError, error: state.error || offlineGuard.stale });
-      } else {
-        // The first load says why it failed; a later refresh keeps the page as it is.
-        set({ loaded: true, stale: true, unreachable: error instanceof TransportError, ...(state.loaded ? {} : { error: error instanceof Error ? error.message : "Request failed." }) });
-      }
+      failed(error);
+    }
+  }
+
+  /** Rereads only what changes without a write. A full reload or a write started meanwhile wins. */
+  async function refreshLive(): Promise<void> {
+    const gen = loadGen;
+    try {
+      const [groups, devices, rules, sync] = await Promise.all([
+        request<{ groups: Group[] }>("/api/v1/groups"),
+        request<{ devices: Device[] }>("/api/v1/devices"),
+        request<{ rules: Rule[] }>("/api/v1/rules"),
+        request<SyncStatus>("/api/v1/sync"),
+      ]);
+      if (gen !== loadGen) return;
+      set({
+        groups: shared("groups", groups.groups),
+        devices: shared("devices", devices.devices),
+        rules: shared("rules", rules.rules),
+        sync: shared("sync", sync),
+        ...reached(),
+      });
+    } catch (error) {
+      if (gen !== loadGen) return;
+      failed(error);
     }
   }
 
@@ -297,11 +350,35 @@ export function createHouseholdStore(deps: {
     dismissFeedback: () => set({ error: "", notice: "", noticeAction: null }),
     /** Runs a notice's action (such as Undo) as a write of its own. */
     runNoticeAction: (action: NoticeAction) => mutate(action.run),
-    /** Loads now and every `REFRESH_MS` until the returned function stops it. */
-    startRefreshing(interval = REFRESH_MS): () => void {
-      void reload();
-      const timer = setInterval(() => void reload(), interval);
-      return () => clearInterval(timer);
+    /**
+     * Loads now, then every `interval` refreshes what changes on its own, with a full reload
+     * every `fullInterval` (or whenever the view is stale), until the returned function stops
+     * it. While hidden it sends nothing, and refreshes as soon as it is shown again.
+     */
+    startRefreshing(interval = REFRESH_MS, fullInterval = FULL_REFRESH_MS): () => void {
+      // One refresh at a time: a slow server gets no second request stacked behind the first.
+      let inFlight = false;
+      const run = async (load: () => Promise<void>) => {
+        if (inFlight) return;
+        inFlight = true;
+        try {
+          await load();
+        } finally {
+          inFlight = false;
+        }
+      };
+      const tick = () => {
+        if (visibility?.hidden()) return;
+        const full = !state.loaded || state.stale || Date.now() - fullLoadAt >= fullInterval;
+        void run(full ? reload : refreshLive);
+      };
+      void run(reload);
+      const timer = setInterval(tick, interval);
+      const unsubscribe = visibility?.subscribe(tick);
+      return () => {
+        clearInterval(timer);
+        unsubscribe?.();
+      };
     },
   };
 }

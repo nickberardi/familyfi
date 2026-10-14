@@ -1,10 +1,11 @@
 {
-  "count": 2,
+  "count": 3,
   "offset": 0,
   "limit": 200,
-  "totalCount": 2,
+  "totalCount": 3,
   "data": [
-    { "id": "77777777-7777-4777-8777-777777777771", "name": "Upstairs AP" },
-    { "id": "77777777-7777-4777-8777-777777777772", "name": "Living Room AP" }
+    { "id": "77777777-7777-4777-8777-777777777771", "name": "Upstairs AP", "model": "U7 Pro", "state": "ONLINE", "features": ["accessPoint"] },
+    { "id": "77777777-7777-4777-8777-777777777772", "name": "Living Room AP", "model": "U7 Lite", "state": "ONLINE", "features": ["accessPoint"] },
+    { "id": "77777777-7777-4777-8777-777777777770", "name": "Dream Machine", "model": "UDM Pro", "state": "ONLINE", "features": ["gateway", "switching"] }
   ]
 }

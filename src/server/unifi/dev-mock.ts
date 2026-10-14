@@ -4,6 +4,7 @@ import { DEV_APPS, DEV_DEVICES, devDeviceIp } from "../dev-household";
 import { MockUnifiClient, createMockUnifiState, type MockUnifiState } from "./mock";
 import type {
   ClientOverview,
+  DeviceLatestStatistics,
   DpiCatalogItem,
   FirewallPolicy,
   FirewallZone,
@@ -83,6 +84,7 @@ export function createFixtureUnifiState(options?: { friendlyNames?: boolean }): 
     zones: readJson<UnifiPage<FirewallZone>>("zones.page.json").data,
     clients: readJson<UnifiPage<ClientOverview>>("clients.page.json").data,
     siteDevices: readJson<UnifiPage<SiteDeviceOverview>>("site-devices.page.json").data,
+    deviceStatistics: new Map(Object.entries(readJson<Record<string, DeviceLatestStatistics>>("device-statistics.json"))),
     policies: [admin, rogue],
     ordering: { beforeSystemDefined: [], afterSystemDefined: [DEV_MOCK_ADMIN_POLICY_ID, rogue.id] },
     dpiCategories: readJson<UnifiPage<DpiCatalogItem>>("dpi-categories.page.json").data,

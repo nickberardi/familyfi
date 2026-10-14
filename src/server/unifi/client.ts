@@ -1,10 +1,12 @@
 import { resolveIntegrationBase } from "./base-url";
 import { UnifiHttpError, UnifiTimeoutError } from "./errors";
 import { collectPages } from "./paginate";
+import { recordUnifiRequest } from "./request-meter";
 import { UNIFI_PAGE_LIMIT } from "./types";
 import type {
   ApplicationInfo,
   ClientOverview,
+  DeviceLatestStatistics,
   DpiCatalogItem,
   FirewallPolicy,
   FirewallPolicyWrite,
@@ -27,6 +29,7 @@ export type UnifiClient = {
   listZones(siteId: string): Promise<FirewallZone[]>;
   listClients(siteId: string, filter?: string): Promise<ClientOverview[]>;
   listSiteDevices(siteId: string): Promise<SiteDeviceOverview[]>;
+  getDeviceStatistics(siteId: string, deviceId: string): Promise<DeviceLatestStatistics>;
   getClient(siteId: string, clientId: string): Promise<ClientOverview>;
   listPolicies(siteId: string): Promise<FirewallPolicy[]>;
   getPolicy(siteId: string, policyId: string): Promise<FirewallPolicy>;
@@ -111,6 +114,10 @@ export class HttpUnifiClient implements UnifiClient {
     return this.paginate(`/v1/sites/${siteId}/devices`);
   }
 
+  async getDeviceStatistics(siteId: string, deviceId: string): Promise<DeviceLatestStatistics> {
+    return this.request("GET", `/v1/sites/${siteId}/devices/${deviceId}/statistics/latest`);
+  }
+
   async getClient(siteId: string, clientId: string): Promise<ClientOverview> {
     return this.request("GET", `/v1/sites/${siteId}/clients/${clientId}`);
   }
@@ -162,6 +169,8 @@ export class HttpUnifiClient implements UnifiClient {
     assertNotPolicyOrderingPut(method, path);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const started = performance.now();
+    let ok = false;
     try {
       const init: RequestInit = {
         method,
@@ -178,6 +187,7 @@ export class HttpUnifiClient implements UnifiClient {
       if (!response.ok) {
         throw new UnifiHttpError(response.status, method, path, text.slice(0, 2000));
       }
+      ok = true;
       if (!text) return undefined as T;
       return JSON.parse(text) as T;
     } catch (error) {
@@ -190,14 +200,19 @@ export class HttpUnifiClient implements UnifiClient {
       throw error;
     } finally {
       clearTimeout(timer);
+      recordUnifiRequest(method, path, performance.now() - started, ok);
     }
   }
 }
 
 export const defaultPageLimit = UNIFI_PAGE_LIMIT;
 
+// One agent for the process, so requests reuse kept-alive connections instead of making the
+// console negotiate TLS again for each one.
+let insecureDispatcher: import("undici").Agent | undefined;
+
 const insecureFetch: typeof fetch = async (input, init) => {
   const undici = await import("undici");
-  const dispatcher = new undici.Agent({ connect: { rejectUnauthorized: false } });
+  const dispatcher = (insecureDispatcher ??= new undici.Agent({ connect: { rejectUnauthorized: false } }));
   return undici.fetch(String(input), { ...(init as object), dispatcher } as never) as unknown as Response;
 };

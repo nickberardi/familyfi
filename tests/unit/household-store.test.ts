@@ -346,11 +346,124 @@ describe("household store", () => {
   it("refreshes on a timer until stopped", async () => {
     vi.useFakeTimers();
     const { store, server } = setup(reads(() => childGroup()));
-    const stop = store.startRefreshing(1000);
+    const stop = store.startRefreshing(1000, 2000);
     await vi.advanceTimersByTimeAsync(2500);
     stop();
     await vi.advanceTimersByTimeAsync(5000);
-    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(3);
+    // A full load at 0 and again at 2000 when it falls due; the tick between rereads what changes on its own.
+    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(2);
+    expect(server.calls.filter((call) => call.path === "/api/v1/groups")).toHaveLength(3);
+  });
+
+  it("rereads only what changes on its own between full loads", async () => {
+    vi.useFakeTimers();
+    const { store, server } = setup(reads(() => childGroup()));
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(10);
+    const afterLoad = server.calls.length;
+    await vi.advanceTimersByTimeAsync(1000);
+    stop();
+    expect(server.calls.slice(afterLoad).map((call) => call.path).sort()).toEqual([
+      "/api/v1/devices",
+      "/api/v1/groups",
+      "/api/v1/rules",
+      "/api/v1/sync",
+    ]);
+  });
+
+  it("keeps the same state and references, and tells no one, when a refresh brings nothing new", async () => {
+    const { store } = setup(reads(() => childGroup()));
+    await store.reload();
+    const before = store.getState();
+    const listener = vi.fn();
+    store.subscribe(listener);
+    await store.reload();
+    expect(listener).not.toHaveBeenCalled();
+    expect(store.getState()).toBe(before);
+    expect(store.getState().groups).toBe(before.groups);
+    expect(store.getState().rules).toBe(before.rules);
+  });
+
+  it("replaces only what changed, keeping the references of the rest", async () => {
+    let paused = false;
+    const { store } = setup({
+      ...reads(() => childGroup({ access: paused ? "paused" : "available" })),
+      "GET /api/v1/devices": () => ({ json: { devices: [{ id: "device-1", name: "A tablet" }] } }),
+    });
+    await store.reload();
+    const before = store.getState();
+    const listener = vi.fn();
+    store.subscribe(listener);
+    paused = true;
+    await store.reload();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(store.getState().groups).not.toBe(before.groups);
+    expect(store.getState().groups[0]?.access).toBe("paused");
+    expect(store.getState().groups[0]?.suspension).toBe(before.groups[0]?.suspension);
+    expect(store.getState().devices).toBe(before.devices);
+    expect(store.getState().accounts).toBe(before.accounts);
+  });
+
+  it("sends nothing while hidden, and catches up as soon as it is shown", async () => {
+    vi.useFakeTimers();
+    let hidden = false;
+    let onChange = () => {};
+    const unsubscribe = vi.fn();
+    const server = fakeServer(reads(() => childGroup()));
+    const store = createHouseholdStore({
+      request: server.request,
+      visibility: { hidden: () => hidden, subscribe: (callback) => ((onChange = callback), unsubscribe) },
+    });
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(10);
+    const loaded = server.calls.length;
+
+    hidden = true;
+    onChange();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(server.calls).toHaveLength(loaded);
+
+    hidden = false;
+    onChange();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(server.calls.length).toBeGreaterThan(loaded);
+    stop();
+    expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it("reloads in full on the next tick after a refresh failed", async () => {
+    vi.useFakeTimers();
+    let fail = false;
+    const routes = reads(() => childGroup());
+    const { store, server } = setup({ ...routes, "GET /api/v1/sync": () => (fail ? { status: 500, json: { error: { message: "Down." } } } : routes["GET /api/v1/sync"]!(undefined)) });
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(10);
+    fail = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(store.getState().stale).toBe(true);
+    fail = false;
+    const sessions = server.calls.filter((call) => call.path === "/api/v1/auth/session").length;
+    await vi.advanceTimersByTimeAsync(1000);
+    stop();
+    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(sessions + 1);
+    expect(store.getState().stale).toBe(false);
+  });
+
+  it("does not stack a refresh behind one still waiting on the server", async () => {
+    vi.useFakeTimers();
+    let release = () => {};
+    const routes = reads(() => childGroup());
+    const { store, server } = setup({
+      ...routes,
+      "GET /api/v1/auth/session": () => new Promise<Reply>((resolve) => (release = () => resolve(routes["GET /api/v1/auth/session"]!(undefined) as Reply))),
+    });
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(server.calls).toHaveLength(1);
+    release();
+    await vi.advanceTimersByTimeAsync(10);
+    stop();
+    expect(store.getState().status).toBe("ready");
   });
 });
 

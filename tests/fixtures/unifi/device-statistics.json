@@ -1,0 +1,14 @@
+{
+  "77777777-7777-4777-8777-777777777770": {
+    "uptimeSec": 1209600,
+    "lastHeartbeatAt": "2026-10-14T12:00:00Z",
+    "nextHeartbeatAt": "2026-10-14T12:00:10Z",
+    "loadAverage1Min": 0.62,
+    "loadAverage5Min": 0.58,
+    "loadAverage15Min": 0.55,
+    "cpuUtilizationPct": 18.4,
+    "memoryUtilizationPct": 61.2,
+    "uplink": { "txRateBps": 120000, "rxRateBps": 2400000 },
+    "interfaces": {}
+  }
+}

@@ -7,6 +7,7 @@ import { enqueueChange } from "./changes";
 import { pruneNetworkScopedRulesForScope } from "./network-rules";
 import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type PublicUnifiNetwork } from "./unifi/scope";
 import { loadNetworkDetails } from "./unifi/networks";
+import { recentSiteNetworks, rememberSiteNetworks } from "./unifi/network-cache";
 import type { Household } from "@prisma/client";
 
 async function probeWithClient(client: ReturnType<typeof probeClient>, siteId?: string) {
@@ -50,11 +51,16 @@ export async function testStoredUnifiConnection() {
   return probeWithClient(clientForHousehold(household), household.unifiSiteId ?? undefined);
 }
 
+/** The site's networks, from the last few minutes' reconcile pass when there is one. */
 export async function listSiteNetworks(household: Household): Promise<PublicUnifiNetwork[]> {
   if (!household.unifiKeyLastFour || !household.unifiSiteId) return [];
+  const identity = connectionIdentity(household);
+  const recent = recentSiteNetworks(identity);
+  if (recent) return recent;
   const client = clientForHousehold(household);
-  const networks = await loadNetworkDetails(client, household.unifiSiteId);
-  return networks.map(publicUnifiNetwork);
+  const networks = (await loadNetworkDetails(client, household.unifiSiteId)).map(publicUnifiNetwork);
+  rememberSiteNetworks(identity, networks);
+  return networks;
 }
 
 export async function saveUnifiConnection(input: {
@@ -113,6 +119,7 @@ export async function saveUnifiConnection(input: {
       connectionError: null,
     },
   });
+  rememberSiteNetworks(nextIdentity, probed.networks);
   await pruneNetworkScopedRulesForScope(scope);
   return enqueueChange("unifi");
 }

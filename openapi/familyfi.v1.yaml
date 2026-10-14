@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.28.2
+  version: 0.29.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -584,6 +584,32 @@ paths:
                   change: { $ref: "#/components/schemas/ChangeSummary" }
         "400":
           $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/settings/unifi/health:
+    get:
+      operationId: getUnifiHealth
+      tags: [Settings]
+      summary: The UniFi devices' latest CPU, memory and load, and the requests FamilyFi sent the console
+      description: >-
+        Asks the console for each site device's latest statistics, gateway first; nothing
+        polls it. `devices` is null, and `devicesError` says why, when the console could not
+        be asked. `requests` counts what this server sent the console over the last
+        `windowSec` seconds, by method and path with ids replaced by `{id}`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Latest readings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [health]
+                properties:
+                  health: { $ref: "#/components/schemas/GatewayHealth" }
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -3325,6 +3351,54 @@ components:
           items: { $ref: "#/components/schemas/UnifiNetwork" }
         connectionStatus: { type: string }
         connectionError: { type: [string, "null"] }
+    GatewayHealth:
+      type: object
+      additionalProperties: false
+      required: [checkedAt, devices, devicesError, requests]
+      properties:
+        checkedAt: { type: string, format: date-time }
+        devices:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/GatewayDeviceHealth" }
+        devicesError: { type: [string, "null"] }
+        requests:
+          type: object
+          additionalProperties: false
+          required: [windowSec, total, errors, endpoints]
+          properties:
+            windowSec: { type: integer }
+            total: { type: integer }
+            errors: { type: integer }
+            endpoints:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [endpoint, count, errors, averageMs, maxMs]
+                properties:
+                  endpoint: { type: string }
+                  count: { type: integer }
+                  errors: { type: integer }
+                  averageMs: { type: integer }
+                  maxMs: { type: integer }
+    GatewayDeviceHealth:
+      type: object
+      additionalProperties: false
+      required: [id, name, model, state, gateway, reported, cpuUtilizationPct, memoryUtilizationPct, loadAverage1Min, loadAverage5Min, loadAverage15Min, uptimeSec, lastHeartbeatAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        model: { type: [string, "null"] }
+        state: { type: [string, "null"] }
+        gateway: { type: boolean }
+        reported: { type: boolean, description: "False when the console would not give this device's statistics; every reading is then null." }
+        cpuUtilizationPct: { type: [number, "null"] }
+        memoryUtilizationPct: { type: [number, "null"] }
+        loadAverage1Min: { type: [number, "null"] }
+        loadAverage5Min: { type: [number, "null"] }
+        loadAverage15Min: { type: [number, "null"] }
+        uptimeSec: { type: [integer, "null"] }
+        lastHeartbeatAt: { type: [string, "null"], format: date-time }
     UnifiNetwork:
       type: object
       additionalProperties: false

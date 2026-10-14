@@ -75,8 +75,12 @@ responsibilities; visiting a page is not what starts enforcement.
 
 The [household store](../src/lib/household-store.ts), through the browser's
 [AppDataProvider](../src/components/AppDataProvider.tsx), reads the session first, then groups,
-devices, rules, sync, gateway settings, household settings and accounts. It refreshes every 15
-seconds; generation checks discard superseded reads. An unauthorized session redirects to login.
+devices, rules, sync, gateway settings, household settings and accounts. Every 15 seconds it rereads
+what changes without a write (groups, devices, rules and sync); the rest is reread in full every five
+minutes, after a write's change is followed, and whenever a refresh failed. A read that brings nothing
+new keeps the previous references and notifies no one, so pages do not render again. A hidden tab
+(or, natively, a backgrounded app passing its own `Visibility`) sends nothing and refreshes as soon as
+it is shown. Generation checks discard superseded reads. An unauthorized session redirects to login.
 Initial read errors are shown; periodic refresh failures retain the previous data and mark it
 `stale`, which the browser does not show. Do not interpret that retained snapshot as a fresh gateway
 observation. A native client passes an offline guard instead: a stale view says so, and its
@@ -140,7 +144,7 @@ then read its callers and focused tests. Native feature details belong in its ow
 | Rules and group filter sheets | Household rules (internet, category, app, website), their windows, groups and UniFi policy names | [rules](../src/server/rules.ts), [rule planner](../src/server/unifi/plan-rules.ts), [rule editor](../src/components/rules/RuleEditor.tsx) on the shared [RuleEditorForm](../src/ui/RuleEditorForm.tsx) and its logic ([rule-list](../src/lib/rule-list.ts), [rule-editor](../src/lib/rule-editor.ts), [rule-catalog](../src/lib/rule-catalog.ts)), [rules API tests](../tests/integration/rules-api.test.ts), [DPI tests](../tests/integration/dpi-rules.test.ts) |
 | Categories | Domain lists, resolver configuration and DNS observations | [probe](../src/server/upstream/probe.ts), [upstream-writes](../src/lib/upstream-writes.ts), [category API tests](../tests/integration/upstream-categories-api.test.ts), [browser tests](../tests/browser/categories.spec.ts) |
 | First-time setup | While a household has no gateway, `/`, `/login` and `/setup` open setup before sign-in: its first step hands over the admin password (masked, to copy) and continuing signs the browser in with it. It then walks through the gateway, the networks it watches, the people who live there and a few suggested schedules, each saved through the gateway, group and rule APIs | [setup page](../src/app/setup/page.tsx), [SetupFlow](../src/components/setup/SetupFlow.tsx), [SetupWizard](../src/components/setup/SetupWizard.tsx), [setup](../src/lib/setup.ts), [setup tests](../tests/unit/setup.test.ts), [redirect tests](../tests/integration/setup-redirect.test.ts), [write tests](../tests/integration/setup-writes.test.ts) |
-| Settings | Gateway key/network scope, household settings, roles and logins | [gateway settings](../src/server/unifi-settings.ts), [accounts](../src/server/accounts.ts), [authorization matrix](../tests/integration/authorization-matrix.test.ts) |
+| Settings | Gateway key/network scope, gateway load, household settings, roles and logins | [gateway settings](../src/server/unifi-settings.ts), [gateway health](../src/server/gateway-health.ts), [accounts](../src/server/accounts.ts), [authorization matrix](../tests/integration/authorization-matrix.test.ts) |
 | Update | Release notes, installing a newer release through the Watchtower sidecar, now or on the household's schedule, and the last install's outcome | [updater](../src/server/updater.ts), [update check](../src/server/update-check.ts), [UpdateContent](../src/ui/UpdateContent.tsx), [UpdateScheduleCard](../src/ui/UpdateScheduleCard.tsx), [update-copy](../src/lib/update-copy.ts), [Compose service](../docker/docker-compose.yml), [backup hook](../scripts/runtime/pre-update-backup.sh), [update API tests](../tests/integration/update-api.test.ts), [operations](operations.md#automatic-updates) |
 | Backup | Exporting the household to a `.tar.gz` and importing one, from Settings or first-time setup | [household-export](../src/server/household-export.ts), [archive](../src/server/archive.ts), [database-dump](../src/server/database-dump.ts), [BackupImport](../src/components/BackupImport.tsx), [export tests](../tests/integration/household-export.test.ts), [operations](operations.md#backup-and-restore) |
 | Sync | Reconciliation history and per-change outcomes | [reconciliation](../src/server/reconciliation.ts), [changes](../src/server/changes.ts), [reconciliation path tests](../tests/integration/reconcile-paths.test.ts) |
@@ -173,6 +177,8 @@ Discovery and quarantine only include clients whose UniFi **network (VLAN)** is 
 Days identify the local weekday a window starts. Windows are half-open. Evaluation uses the household IANA timezone and local wall time, including both occurrences of a repeated DST time. UniFi uses the console clock for native schedules; household timezone vs console timezone must be aligned or documented.
 
 ## Reconciliation
+
+Each pass also leaves what Settings shows from the gateway, so the routes every open page polls never ask the console themselves: the site's networks, kept in memory for `GET /settings/unifi` (read from the console only when no pass has in the last two minutes), and each quarantine policy's `observedEnabled`, which `GET /settings/household` reports. Every request the server sends the console is counted by endpoint ([request-meter.ts](../src/server/unifi/request-meter.ts)); the server logs a summary every five minutes while there is traffic, and Settings' **Gateway load** shows it beside each device's latest CPU, memory, load and uptime (`GET /settings/unifi/health`, asked only when opened). A console with a self-signed certificate is reached over one kept-alive connection pool, not a TLS handshake per request.
 
 A database-backed lock serializes startup, interval (~30s), and mutation-triggered runs. Overlapping writers, including container replacement, must not apply stale revisions. Interval work is discovery, membership, and pause and allowance expiry — not window start/end. Until a UniFi key is saved in Settings, reconciliation is a no-op.
 

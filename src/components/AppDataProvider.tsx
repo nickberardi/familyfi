@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import type { ApiRequest } from "@/lib/api-client";
 import type { HouseholdLists, HouseholdPublic, MutationPayload } from "@/lib/household-state";
-import { createHouseholdStore, type HouseholdStore, type NoticeAction } from "@/lib/household-store";
+import { createHouseholdStore, type HouseholdStore, type NoticeAction, type Visibility } from "@/lib/household-store";
 import type { Rule } from "@/lib/rules";
 import type { Account, Device, Group, Session, SyncStatus, UnifiSettings } from "@/lib/types";
 
@@ -39,13 +39,22 @@ type AppData = {
 
 const Ctx = createContext<AppData | null>(null);
 
+/** A background tab stops refreshing the household, and catches up when it is shown again. */
+const documentVisibility: Visibility = {
+  hidden: () => document.visibilityState === "hidden",
+  subscribe(onChange) {
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  },
+};
+
 /**
  * The household for every page: the shared store (`src/lib/household-store.ts`), which the native
- * app uses too, loaded on mount and refreshed every 15 seconds, with the browser's cookie session.
+ * app uses too, loaded on mount and refreshed while the tab is visible, with the browser's cookie session.
  */
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [store] = useState(() => createHouseholdStore({ request }));
+  const [store] = useState(() => createHouseholdStore({ request, visibility: documentVisibility }));
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState);
 
   useEffect(() => store.startRefreshing(), [store]);

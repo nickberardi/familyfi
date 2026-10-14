@@ -4,6 +4,7 @@ import { UnifiHttpError } from "./errors";
 import type {
   ApplicationInfo,
   ClientOverview,
+  DeviceLatestStatistics,
   DpiCatalogItem,
   FirewallPolicy,
   FirewallPolicyWrite,
@@ -25,6 +26,7 @@ export type MockUnifiState = {
   zones: FirewallZone[];
   clients: ClientOverview[];
   siteDevices: SiteDeviceOverview[];
+  deviceStatistics: Map<string, DeviceLatestStatistics>;
   policies: FirewallPolicy[];
   ordering: PolicyOrdering;
   networkClientIds: Map<string, Set<string>>;
@@ -45,6 +47,7 @@ export function createMockUnifiState(partial: Partial<MockUnifiState> = {}): Moc
     zones: partial.zones ?? [],
     clients: partial.clients ?? [],
     siteDevices: partial.siteDevices ?? [],
+    deviceStatistics: partial.deviceStatistics ?? new Map(),
     policies: partial.policies ?? [],
     ordering: partial.ordering ?? { beforeSystemDefined: [], afterSystemDefined: [] },
     networkClientIds: partial.networkClientIds ?? new Map(),
@@ -111,6 +114,14 @@ export class MockUnifiClient implements UnifiClient {
   async listSiteDevices(siteId: string): Promise<SiteDeviceOverview[]> {
     this.record("GET", `/v1/sites/${siteId}/devices`);
     return [...this.state.siteDevices];
+  }
+
+  async getDeviceStatistics(siteId: string, deviceId: string): Promise<DeviceLatestStatistics> {
+    const path = `/v1/sites/${siteId}/devices/${deviceId}/statistics/latest`;
+    this.record("GET", path);
+    const statistics = this.state.deviceStatistics.get(deviceId);
+    if (!statistics) throw notFound("GET", path);
+    return { ...statistics };
   }
 
   async getClient(siteId: string, clientId: string): Promise<ClientOverview> {

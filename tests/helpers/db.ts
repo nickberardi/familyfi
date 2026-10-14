@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { ensureHousehold, ensureRecoveryAccount } from "@/server/auth";
 import { setAutoReconcileForTests, setReconcileClientForTests } from "@/server/reconciliation";
 import { resetDevMockClientForTests } from "@/server/unifi/dev-mock";
+import { forgetSiteNetworks } from "@/server/unifi/network-cache";
 import { TEST_POSTGRES_DB } from "./test-env";
 
 export const SITE_ID = "11111111-1111-4111-8111-111111111111";
@@ -16,6 +17,7 @@ export async function resetDatabase() {
   setAutoReconcileForTests(false);
   setReconcileClientForTests(undefined);
   resetDevMockClientForTests();
+  forgetSiteNetworks();
   const db = prisma();
   // Refuse anything but the test database: this empties whatever it is pointed at. The in-memory
   // PGlite of `scripts/test.py run --database memory` serves one database of its own name, and exists

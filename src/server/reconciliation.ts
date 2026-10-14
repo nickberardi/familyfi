@@ -13,7 +13,9 @@ import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
 import { internetBlockPolicy, toPolicyUpdate } from "./unifi/payloads";
-import { networkInScope } from "./unifi/scope";
+import { networkInScope, publicUnifiNetwork } from "./unifi/scope";
+import { rememberSiteNetworks } from "./unifi/network-cache";
+import { recordQuarantineObservation } from "./quarantine";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
@@ -143,17 +145,18 @@ async function tick(owner: string): Promise<boolean> {
     const client = testClient ? withPolicyOwnership(testClient, ownershipScope(household)) : clientForHousehold(household);
     const identity = connectionIdentity(household);
     const siteId = household.unifiSiteId;
-    const [zones, networks, clients, info, gatewayPolicies] = await Promise.all([
+    const [zones, networks, clients, gatewayPolicies] = await Promise.all([
       client.listZones(siteId),
       loadNetworkDetails(client, siteId),
       client.listClients(siteId),
-      client.getInfo(),
       client.listPolicies(siteId),
     ]);
+    // Settings reads both from here rather than asking the console on every page refresh.
+    rememberSiteNetworks(identity, networks.map(publicUnifiNetwork));
+    await recordQuarantineObservation(gatewayPolicies);
     // What the gateway holds right now, kept current as this pass creates and deletes, so a
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
-    void info;
     let accessPoints: Map<string, string> | null = null;
     try {
       const siteDevices = await client.listSiteDevices(siteId);

@@ -1,4 +1,4 @@
-import type { Account, Group, UnifiSettings } from "./types";
+import type { Account, GatewayDeviceHealth, GatewayHealth, Group, UnifiSettings } from "./types";
 import { consoleHostFromBaseUrl } from "./unifi-host";
 
 export function managedNetworksLabel(unifi: UnifiSettings): string {
@@ -111,7 +111,52 @@ export const SETTINGS_COPY = {
   passwordPlaceholder: "At least 8 characters",
   confirmPlaceholder: "Type it again",
   loginNote: "This password unlocks FamilyFi only — the gateway keeps its own credentials.",
+  health: "Gateway load",
+  healthSub: "As the UniFi console reports it",
+  healthCheck: "Check now",
+  healthChecking: "Checking…",
+  healthNotReported: "The console did not report this device’s load.",
+  healthNoDevices: "The console lists no devices on this site.",
+  gatewayBadge: "Gateway",
+  requests: "FamilyFi’s requests to the console",
 } as const;
+
+/** A reading the console did not give is unknown, never zero. */
+function reading(value: number | null, format: (value: number) => string): string {
+  return value === null ? "—" : format(value);
+}
+
+export function formatUptime(seconds: number | null): string {
+  return reading(seconds, (value) => {
+    const days = Math.floor(value / 86_400);
+    const hours = Math.floor((value % 86_400) / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+    if (days > 0) return `${days} d ${hours} h`;
+    if (hours > 0) return `${hours} h ${minutes} min`;
+    return `${minutes} min`;
+  });
+}
+
+/** One device's load, as Settings lists it. */
+export function gatewayHealthFacts(device: GatewayDeviceHealth): { k: string; v: string }[] {
+  const percent = (value: number) => `${Math.round(value)}%`;
+  const load = [device.loadAverage1Min, device.loadAverage5Min, device.loadAverage15Min];
+  return [
+    { k: "CPU", v: reading(device.cpuUtilizationPct, percent) },
+    { k: "Memory", v: reading(device.memoryUtilizationPct, percent) },
+    { k: "Load (1/5/15 min)", v: load.every((value) => value === null) ? "—" : load.map((value) => reading(value, (v) => v.toFixed(2))).join(" / ") },
+    { k: "Uptime", v: formatUptime(device.uptimeSec) },
+  ];
+}
+
+/** How hard FamilyFi itself has been working the console lately. */
+export function requestLoadLine(requests: GatewayHealth["requests"]): string {
+  const minutes = requests.windowSec / 60;
+  const failed = requests.errors === 1 ? "1 failed" : `${requests.errors} failed`;
+  if (requests.total === 0) return `None in the last ${minutes} min`;
+  const perMinute = (requests.total / minutes).toFixed(1);
+  return `${requests.total} in the last ${minutes} min · ${perMinute} a minute · ${failed}`;
+}
 
 /** The line under the key: why it is failing, or when it was last used. */
 export function keyStatusLine(unifi: Pick<UnifiSettings, "connectionError"> | null, lastSweep: string | null, sweepAge: (iso: string) => string): string {

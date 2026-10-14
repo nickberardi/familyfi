@@ -77,6 +77,21 @@ export type ClientOverview = {
 export type SiteDeviceOverview = {
   id: string;
   name: string;
+  model?: string;
+  state?: string;
+  /** What the device does on the site: `gateway`, `switching`, `accessPoint`. */
+  features?: string[];
+};
+
+/** `GET /v1/sites/{siteId}/devices/{deviceId}/statistics/latest`; the API omits what a device does not report. */
+export type DeviceLatestStatistics = {
+  uptimeSec?: number;
+  lastHeartbeatAt?: string;
+  loadAverage1Min?: number;
+  loadAverage5Min?: number;
+  loadAverage15Min?: number;
+  cpuUtilizationPct?: number;
+  memoryUtilizationPct?: number;
 };
 
 export type FirewallPolicyAction = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
 import { PageHeader } from "@/components/PageHeader";
@@ -8,12 +8,15 @@ import { useAppData } from "@/components/AppDataProvider";
 import { BackupCard } from "@/components/BackupCard";
 import { SETTINGS_COPY, createLoginTitle, loginFormState, usernameFromName } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
-import type { Group } from "@/lib/types";
+import type { GatewayHealth, Group } from "@/lib/types";
 import { NewLoginFields } from "@/ui/NewLoginFields";
-import { GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
+import { GatewayCard, GatewayHealthCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
 
 const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
+
+const readHealth = () => api<{ health: GatewayHealth }>("/api/v1/settings/unifi/health").then((result) => result.health);
+const healthFailure = (error: unknown) => (error instanceof Error ? error.message : "Could not check the gateway.");
 
 export default function SettingsPage() {
   const { unifi, household, accounts, groups, sync, mutate, store, reload } = useAppData();
@@ -34,6 +37,34 @@ export default function SettingsPage() {
   const [pw2, setPw2] = useState("");
 
   const [unifiStamp, setUnifiStamp] = useState<string | null>(null);
+  const [health, setHealth] = useState<GatewayHealth | null>(null);
+  const [healthError, setHealthError] = useState("");
+  const [checkingHealth, setCheckingHealth] = useState(false);
+
+  // Asked when the page opens and on request only: each check is a request per device to the console.
+  const checkHealth = useCallback(async () => {
+    setCheckingHealth(true);
+    try {
+      setHealth(await readHealth());
+      setHealthError("");
+    } catch (error) {
+      setHealthError(healthFailure(error));
+    } finally {
+      setCheckingHealth(false);
+    }
+  }, []);
+  const configured = unifi?.configured ?? false;
+  useEffect(() => {
+    if (!configured) return;
+    let active = true;
+    readHealth().then(
+      (result) => active && setHealth(result),
+      (error: unknown) => active && setHealthError(healthFailure(error)),
+    );
+    return () => {
+      active = false;
+    };
+  }, [configured]);
 
   const nextUnifiStamp = unifi
     ? [
@@ -284,6 +315,9 @@ export default function SettingsPage() {
             )}
             {probe ? <p className="mt-2.5 text-[14px]">{probe}</p> : null}
           </KeyCard>
+          {configured ? (
+            <GatewayHealthCard health={health} checking={checkingHealth} error={healthError} onCheck={() => void checkHealth()} />
+          ) : null}
         </div>
 
         <HouseholdCard
