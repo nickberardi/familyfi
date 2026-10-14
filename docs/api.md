@@ -44,7 +44,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. |
+| GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. With `?gateway=true` it needs a session (an administrator or a `phone:full` device; a Watch or agent gets 403) and adds `gateway`: each site device's latest CPU, memory, load and uptime from the console, gateway first, and the requests this server sent the console in the last five minutes. That costs the console a request per device, so only Settings asks, when the card opens; never poll it. |
 | POST | `/api/v1/auth/login` | Browser cookie session only; paired devices join by invite. Administrators only (403 `administrator_account_required` otherwise). Refused through remote access |
 | POST | `/api/v1/auth/refresh` | A paired device trades its refresh token for a new one-hour bearer and a new refresh token; reuse of a replaced one ends the sign-in |
 | POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for paired devices |
@@ -72,7 +72,6 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET | `/api/v1/settings/update` | Administrator reads whether the Watchtower updater is set up, the automatic schedule, its next run and the last install (`requested`, `succeeded`, `failed`, `skipped`, `unchanged`) |
 | PUT | `/api/v1/settings/update/schedule` | Administrator sets automatic installs: `enabled`, `days` (at least one, even while off) and a household-local `time`; Sunday at midnight by default. Stored as cron, `minute hour * * days` |
 | POST | `/api/v1/settings/update/install` | Administrator installs the newer release now through Watchtower; 202 with the run. 409 `updater_not_configured` (Watchtower does not answer to FamilyFi's token), `no_update_available` or `update_in_progress`; 502 `updater_unreachable` when Watchtower answered but failed the request |
-| GET | `/api/v1/settings/unifi/health` | Each site device's latest CPU, memory, load and uptime from the console, gateway first, and the requests this server sent the console in the last five minutes. Read on demand; nothing polls it |
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | Delete quarantines member devices |

@@ -55,8 +55,23 @@ paths:
       operationId: getHealth
       tags: [Health]
       summary: Deployment health
-      description: Minimal non-secret readiness. Does not expose credentials. The optional update snapshot is cached GitHub release metadata and does not affect application readiness.
+      description: >-
+        Minimal non-secret readiness. Does not expose credentials. The optional update snapshot is
+        cached GitHub release metadata and does not affect application readiness. With
+        `gateway=true` the caller needs a session (an administrator, or a paired phone; a Watch or
+        agent gets 403) and, while the application is ready, the response adds `gateway`: each
+        UniFi site device's latest CPU, memory, load and uptime, gateway first, and the requests
+        this server sent the console over the last `windowSec` seconds, by method and path with ids
+        replaced by `{id}`. `gateway.devices` is null, and `devicesError` says why, when the
+        console could not be asked. Each gateway read costs the console a request per device:
+        ask on demand, never poll it.
       security: []
+      parameters:
+        - name: gateway
+          in: query
+          required: false
+          description: "`true` adds the UniFi devices' latest load and FamilyFi's requests to the console. Needs a session."
+          schema: { type: string, enum: ["true", "false"] }
       responses:
         "200":
           description: Application and database are reachable.
@@ -81,6 +96,10 @@ paths:
                       checkedAt: "2026-09-22T12:00:00.000Z"
                       lastSuccessfulAt: "2026-09-22T12:00:00.000Z"
                       error: null
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "503":
           description: Application is up but the database is not.
           content:
@@ -584,32 +603,6 @@ paths:
                   change: { $ref: "#/components/schemas/ChangeSummary" }
         "400":
           $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-  /api/v1/settings/unifi/health:
-    get:
-      operationId: getUnifiHealth
-      tags: [Settings]
-      summary: The UniFi devices' latest CPU, memory and load, and the requests FamilyFi sent the console
-      description: >-
-        Asks the console for each site device's latest statistics, gateway first; nothing
-        polls it. `devices` is null, and `devicesError` says why, when the console could not
-        be asked. `requests` counts what this server sent the console over the last
-        `windowSec` seconds, by method and path with ids replaced by `{id}`.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      responses:
-        "200":
-          description: Latest readings
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [health]
-                properties:
-                  health: { $ref: "#/components/schemas/GatewayHealth" }
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -2725,6 +2718,8 @@ components:
           description: Present when status is degraded due to configuration, not secrets.
         update:
           $ref: "#/components/schemas/UpdateCheck"
+        gateway:
+          $ref: "#/components/schemas/GatewayHealth"
     ImportSummary:
       type: object
       additionalProperties: false

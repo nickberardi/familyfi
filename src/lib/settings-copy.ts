@@ -117,6 +117,7 @@ export const SETTINGS_COPY = {
   healthChecking: "Checking…",
   healthNotReported: "The console did not report this device’s load.",
   healthNoDevices: "The console lists no devices on this site.",
+  healthFailed: "Could not check the gateway.",
   gatewayBadge: "Gateway",
   requests: "FamilyFi’s requests to the console",
 } as const;

@@ -10,5 +10,29 @@
     "memoryUtilizationPct": 61.2,
     "uplink": { "txRateBps": 120000, "rxRateBps": 2400000 },
     "interfaces": {}
+  },
+  "77777777-7777-4777-8777-777777777771": {
+    "uptimeSec": 604800,
+    "lastHeartbeatAt": "2026-10-14T12:00:00Z",
+    "nextHeartbeatAt": "2026-10-14T12:00:10Z",
+    "loadAverage1Min": 0.21,
+    "loadAverage5Min": 0.19,
+    "loadAverage15Min": 0.18,
+    "cpuUtilizationPct": 7.5,
+    "memoryUtilizationPct": 44.0,
+    "uplink": { "txRateBps": 80000, "rxRateBps": 1200000 },
+    "interfaces": { "radios": [{ "frequencyGHz": "5", "txRetriesPct": 2.1 }] }
+  },
+  "77777777-7777-4777-8777-777777777772": {
+    "uptimeSec": 604800,
+    "lastHeartbeatAt": "2026-10-14T12:00:00Z",
+    "nextHeartbeatAt": "2026-10-14T12:00:10Z",
+    "loadAverage1Min": 0.12,
+    "loadAverage5Min": 0.15,
+    "loadAverage15Min": 0.14,
+    "cpuUtilizationPct": 5.2,
+    "memoryUtilizationPct": 39.8,
+    "uplink": { "txRateBps": 40000, "rxRateBps": 600000 },
+    "interfaces": { "radios": [{ "frequencyGHz": "2.4", "txRetriesPct": 3.4 }] }
   }
 }

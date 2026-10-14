@@ -432,6 +432,31 @@ describe("household store", () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
+  it("reloads in full when shown again, even while a tick is still waiting on the server", async () => {
+    vi.useFakeTimers();
+    let hidden = false;
+    let onChange = () => {};
+    let slow = false;
+    const routes = reads(() => childGroup());
+    const server = fakeServer({ ...routes, "GET /api/v1/sync": () => (slow ? new Promise<Reply>(() => {}) : routes["GET /api/v1/sync"]!(undefined)) });
+    const store = createHouseholdStore({
+      request: server.request,
+      visibility: { hidden: () => hidden, subscribe: (callback) => ((onChange = callback), () => {}) },
+    });
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(10);
+    slow = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    hidden = true;
+    onChange();
+    hidden = false;
+    const sessions = server.calls.filter((call) => call.path === "/api/v1/auth/session").length;
+    onChange();
+    await vi.advanceTimersByTimeAsync(10);
+    stop();
+    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(sessions + 1);
+  });
+
   it("reloads in full on the next tick after a refresh failed", async () => {
     vi.useFakeTimers();
     let fail = false;

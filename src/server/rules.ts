@@ -387,6 +387,7 @@ export async function householdNetworkScope(): Promise<{ scope: NetworkScope; kn
   const scope = { manageAllNetworks: household.unifiManageAllNetworks, managedNetworkIds: household.unifiManagedNetworkIds };
   if (!scope.manageAllNetworks) return { scope };
   const { listSiteNetworks } = await import("./unifi-settings");
-  const networks = await listSiteNetworks(household);
+  // A rule names networks as they are on the console now, not as the last reconcile pass listed them.
+  const networks = await listSiteNetworks(household, { fresh: true });
   return { scope, known: new Set(networks.map((network) => network.id)) };
 }

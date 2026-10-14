@@ -15,8 +15,8 @@ import { GatewayCard, GatewayHealthCard, HouseholdCard, KeyCard } from "@/ui/Set
 const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
 
-const readHealth = () => api<{ health: GatewayHealth }>("/api/v1/settings/unifi/health").then((result) => result.health);
-const healthFailure = (error: unknown) => (error instanceof Error ? error.message : "Could not check the gateway.");
+const readHealth = () => api<{ gateway: GatewayHealth }>("/api/v1/health?gateway=true").then((result) => result.gateway);
+const healthFailure = (error: unknown) => (error instanceof Error ? error.message : SETTINGS_COPY.healthFailed);
 
 export default function SettingsPage() {
   const { unifi, household, accounts, groups, sync, mutate, store, reload } = useAppData();
@@ -39,8 +39,16 @@ export default function SettingsPage() {
   const [unifiStamp, setUnifiStamp] = useState<string | null>(null);
   const [health, setHealth] = useState<GatewayHealth | null>(null);
   const [healthError, setHealthError] = useState("");
-  // True until the first check, which starts as soon as a console is connected, has answered.
   const [checkingHealth, setCheckingHealth] = useState(true);
+  // The console and site the readings are for: another one starts over, never showing the last one's.
+  const healthTarget = unifi?.configured ? [unifi.consoleId ?? "", unifi.baseUrl ?? "", unifi.siteId ?? ""].join("|") : null;
+  const [shownTarget, setShownTarget] = useState<string | null>(null);
+  if (healthTarget !== shownTarget) {
+    setShownTarget(healthTarget);
+    setHealth(null);
+    setHealthError("");
+    setCheckingHealth(healthTarget !== null);
+  }
 
   // Asked when the page opens and on request only: each check is a request per device to the console.
   const checkHealth = useCallback(async () => {
@@ -54,9 +62,8 @@ export default function SettingsPage() {
       setCheckingHealth(false);
     }
   }, []);
-  const configured = unifi?.configured ?? false;
   useEffect(() => {
-    if (!configured) return;
+    if (healthTarget === null) return;
     let active = true;
     readHealth()
       .then(
@@ -67,7 +74,7 @@ export default function SettingsPage() {
     return () => {
       active = false;
     };
-  }, [configured]);
+  }, [healthTarget]);
 
   const nextUnifiStamp = unifi
     ? [
@@ -318,7 +325,7 @@ export default function SettingsPage() {
             )}
             {probe ? <p className="mt-2.5 text-[14px]">{probe}</p> : null}
           </KeyCard>
-          {configured ? (
+          {healthTarget !== null ? (
             <GatewayHealthCard health={health} checking={checkingHealth} error={healthError} onCheck={() => void checkHealth()} />
           ) : null}
         </div>

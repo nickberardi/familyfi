@@ -377,8 +377,9 @@ export function createHouseholdStore(deps: {
       };
       void run(reload);
       const timer = setInterval(tick, interval);
+      // Shown again: everything, even past a tick still in flight, which the reload supersedes.
       const unsubscribe = visibility?.subscribe(() => {
-        if (!visibility.hidden()) void run(reload);
+        if (!visibility.hidden()) void reload();
       });
       return () => {
         clearInterval(timer);

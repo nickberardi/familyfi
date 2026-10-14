@@ -1,13 +1,16 @@
 /**
- * The console's own load, and FamilyFi's share of it. `GET /settings/unifi/health` asks the
- * console only when called; the routes every open page polls must not ask it at all once a
+ * The console's own load, and FamilyFi's share of it. `GET /health?gateway=true` asks the
+ * console only when called, and only for a session; the plain `/health` never asks it; the routes every open page polls must not ask it at all once a
  * reconcile pass has read what they show.
  */
+import { DeviceScope, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getHousehold } from "@/app/api/v1/settings/household/route";
-import { GET as getHealth } from "@/app/api/v1/settings/unifi/health/route";
+import { GET as getHealth } from "@/app/api/v1/health/route";
 import { GET as getUnifi } from "@/app/api/v1/settings/unifi/route";
+import { createSession } from "@/server/auth";
+import { prisma } from "@/server/db";
 import { runReconcileOnce } from "@/server/reconciliation";
 import { saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
 import { DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, getSharedDevMockClient, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
@@ -32,9 +35,11 @@ async function signedIn(): Promise<SessionAuth> {
 }
 
 async function health(auth: SessionAuth): Promise<GatewayHealth> {
-  const response = await getHealth(request("/api/v1/settings/unifi/health", { auth }));
+  const response = await getHealth(request("/api/v1/health?gateway=true", { auth }));
   expect(response.status).toBe(200);
-  return ((await response.json()) as { health: GatewayHealth }).health;
+  const body = (await response.json()) as { status: string; gateway: GatewayHealth };
+  expect(body.status).toBe("ok");
+  return body.gateway;
 }
 
 describe("gateway health and the console's polled load", () => {
@@ -54,6 +59,31 @@ describe("gateway health and the console's polled load", () => {
     resetDevMockClientForTests();
   });
 
+  it("keeps the plain readiness check public, and never asks the console for it", async () => {
+    await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    const client = getSharedDevMockClient();
+    const before = client.calls.length;
+    const response = await getHealth(request("/api/v1/health"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).not.toHaveProperty("gateway");
+    expect(client.calls.slice(before)).toEqual([]);
+  });
+
+  it("gives the gateway's readings only to a session, and to no Watch or agent", async () => {
+    expect((await getHealth(request("/api/v1/health?gateway=true"))).status).toBe(401);
+    const account = await prisma().account.findFirstOrThrow({ where: { isAdmin: true } });
+    for (const [client, scope] of [
+      [PairedDeviceClient.watch, DeviceScope.rulesOnly],
+      [PairedDeviceClient.agent, DeviceScope.full],
+      [PairedDeviceClient.agent, DeviceScope.readOnly],
+    ] as const) {
+      const device = await prisma().pairedDevice.create({ data: { displayName: `${client} ${scope}`, client, scope, accountId: client === PairedDeviceClient.agent ? account.id : null } });
+      const issued = await createSession({ accountId: account.id, username: account.username, kind: SessionKind.bearer, deviceId: device.id });
+      const response = await getHealth(request("/api/v1/health?gateway=true", { auth: { cookie: "", csrf: "", token: issued.raw } }));
+      expect(response.status, `${client}:${scope}`).toBe(403);
+    }
+  });
+
   it("asks for a console first when none is connected", async () => {
     const result = await health(auth);
     expect(result.devices).toBeNull();
@@ -63,6 +93,9 @@ describe("gateway health and the console's polled load", () => {
 
   it("reads each device's latest load, gateway first, and marks a device that would not report", async () => {
     await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    // An offline or adopting device has no current statistics: the console answers 404 for it.
+    const client = getSharedDevMockClient();
+    client.state.deviceStatistics.delete("77777777-7777-4777-8777-777777777771");
     const result = await health(auth);
     expect(result.devicesError).toBeNull();
     expect(result.devices?.[0]).toMatchObject({
@@ -75,11 +108,12 @@ describe("gateway health and the console's polled load", () => {
       loadAverage1Min: 0.62,
       uptimeSec: 1_209_600,
     });
-    // The fixture's access points have no statistics: listed, unreported, every reading unknown.
-    expect(result.devices?.slice(1)).toHaveLength(2);
-    for (const device of result.devices!.slice(1)) {
-      expect(device).toMatchObject({ gateway: false, reported: false, cpuUtilizationPct: null, uptimeSec: null });
-    }
+    expect(result.devices?.slice(1).map((device) => [device.name, device.reported, device.cpuUtilizationPct])).toEqual([
+      ["Living Room AP", true, 5.2],
+      // Listed, unreported, every reading unknown rather than zero.
+      ["Upstairs AP", false, null],
+    ]);
+    expect(result.devices?.[2]).toMatchObject({ gateway: false, uptimeSec: null, loadAverage1Min: null });
   });
 
   it("says why when the console cannot be asked", async () => {
