@@ -61,7 +61,7 @@ async function childGroup(page: Page) {
  * and otherwise reports what the group's resolver is doing. The kid has a blocked verdict
  * for Social and a partial one for Gaming, and Video is left unmeasured.
  */
-test("a mark reports DNS when no FamilyFi rule is blocking", async ({ page }) => {
+test("a mark reports DNS when no FamilyFi rule is blocking", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await childGroup(page);
   // Clear every slot this test asserts on, not just Social: a Video policy left by
@@ -80,7 +80,7 @@ test("a mark reports DNS when no FamilyFi rule is blocking", async ({ page }) =>
   await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
 });
 
-test("the sheet explains an upstream block without claiming FamilyFi did it", async ({ page }) => {
+test("the sheet explains an upstream block without claiming FamilyFi did it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await childGroup(page);
   await clearSlotRules(page, kid.id, 24);
@@ -96,7 +96,7 @@ test("the sheet explains an upstream block without claiming FamilyFi did it", as
   await sheet.getByRole("button", { name: /Never mind|Cancel|Close/i }).first().click();
 });
 
-test("a FamilyFi rule outranks the DNS verdict on the same mark", async ({ page }) => {
+test("a FamilyFi rule outranks the DNS verdict on the same mark", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await childGroup(page);
   await clearSlotRules(page, kid.id, 24);
@@ -131,7 +131,7 @@ test("a FamilyFi rule outranks the DNS verdict on the same mark", async ({ page 
  * stays neutral, because green is an assurance and we can only give it for a category
  * we actually measured. The mock seeds VPN open and leaves Video unmeasured.
  */
-test("a measured all-clear is not the same mark as an unmeasured category", async ({ page }) => {
+test("a measured all-clear is not the same mark as an unmeasured category", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await childGroup(page);
   await clearSlotRules(page, kid.id, 11);
@@ -159,7 +159,7 @@ test("a measured all-clear is not the same mark as an unmeasured category", asyn
  * "Off", which sat under a mark where *nothing* was blocking and meant the opposite;
  * that reading is gone along with On, DNS and Part.
  */
-test("a mark's word names its state, and says nothing when nothing was measured", async ({
+test("a mark's word names its state, and says nothing when nothing was measured", { tag: "@desktop" }, async ({
   page,
 }) => {
   await signIn(page);

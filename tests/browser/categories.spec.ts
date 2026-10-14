@@ -14,7 +14,7 @@ async function signIn(page: Page) {
   }
 }
 
-test("Categories lists the seeded set and states the reporting-only stance", async ({ page }) => {
+test("Categories lists the seeded set and states the reporting-only stance", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/categories");
 
@@ -46,7 +46,7 @@ function struckDomains(page: Page) {
   );
 }
 
-test("a seeded domain strikes through on remove and comes back on restore", async ({ page }) => {
+test("a seeded domain strikes through on remove and comes back on restore", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/categories");
   await page.locator("a[href^='/categories/']").first().click();
@@ -77,7 +77,7 @@ test("a seeded domain strikes through on remove and comes back on restore", asyn
   await expect.poll(() => struckDomains(page)).toBe(0);
 });
 
-test("a custom category is created report-only and can be deleted", async ({ page }) => {
+test("a custom category is created report-only and can be deleted", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/categories");
 
@@ -97,7 +97,7 @@ test("a custom category is created report-only and can be deleted", async ({ pag
   await expect(page.getByText(label, { exact: true })).toHaveCount(0);
 });
 
-test("a built-in category offers no delete", async ({ page }) => {
+test("a built-in category offers no delete", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/categories");
   await page.locator("a[href^='/categories/']").first().click();

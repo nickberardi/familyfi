@@ -54,6 +54,8 @@ export default defineConfig({
   },
   projects: [
     // A test tagged for one viewport never runs in the other, so it needs no run-time skip.
+    // A flow that behaves the same at any width is `@desktop`; the phone project checks
+    // layouts, sheets and navigation that change on a narrow screen.
     { name: "desktop", use: { ...devices["Desktop Chrome"] }, grepInvert: [tagPattern("@phone"), ...ciExcluded] },
     { name: "phone", use: { ...devices["Pixel 7"] }, grepInvert: [tagPattern("@desktop"), ...ciExcluded] },
   ],

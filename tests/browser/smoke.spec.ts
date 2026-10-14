@@ -228,7 +228,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   await expect(alert).toHaveCount(0);
 });
 
-test("the Update page installs through the updater and keeps its schedule", async ({ page }) => {
+test("the Update page installs through the updater and keeps its schedule", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const update: UpdateCheck = {
     status: "ok",
@@ -290,7 +290,7 @@ test("the Update page installs through the updater and keeps its schedule", asyn
   await expect(schedule).toContainText("Weekends at 12 AM");
 });
 
-test("Settings exports the household and previews an import before replacing anything", async ({ page }) => {
+test("Settings exports the household and previews an import before replacing anything", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/settings");
   const backup = page.getByRole("region", { name: "Backup" });
@@ -360,7 +360,7 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   await expect(page.getByText("Group not found.")).toBeVisible();
 });
 
-test("add things group opens a sheet over Things, and the new group can be edited", async ({ page }) => {
+test("add things group opens a sheet over Things, and the new group can be edited", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
 
   const name = `Things ${test.info().project.name} ${Date.now()}`;
@@ -430,7 +430,7 @@ test("a device opened from its group returns to that group", async ({ page }) =>
   await expect(page.getByRole("link", { name: "‹ All devices" })).toHaveAttribute("href", "/devices");
 });
 
-test("device assignment updates immediately", async ({ page }) => {
+test("device assignment updates immediately", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
 
   await page.goto("/devices");
@@ -477,7 +477,7 @@ test("device identity opens readable connection details", async ({ page }) => {
   }
 });
 
-test("Rules: a two-window internet rule across midnight, named in UniFi, on the card", async ({ page }) => {
+test("Rules: a two-window internet rule across midnight, named in UniFi, on the card", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
 
   const groupsRes = await page.request.get("/api/v1/groups");
@@ -487,8 +487,7 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   };
   const adult = body.groups.find((group) => group.familyRole === "adult");
   expect(adult, "The mock seed must include an adult with no rules").toBeTruthy();
-  // Distinct seeded kids per project, so desktop and phone never edit the same group.
-  const preferredName = test.info().project.name === "phone" ? "Abby" : "Betsy";
+  const preferredName = "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
   expect(child, "The mock seed must include Betsy and Abby").toBeTruthy();
   const ruleName = `QA lights out ${test.info().project.name} ${Date.now() % 100000}`;
@@ -557,11 +556,11 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   }
 });
 
-test("Rules: pause a rule from its card and resume it", async ({ page }) => {
+test("Rules: pause a rule from its card and resume it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");
   const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string }[] };
-  const preferredName = test.info().project.name === "phone" ? "Abby" : "Betsy";
+  const preferredName = "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
   expect(child, "The mock seed must include Betsy and Abby").toBeTruthy();
   const ruleName = `QA pause ${test.info().project.name} ${Date.now() % 100000}`;
@@ -714,11 +713,11 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
   }
 });
 
-test("Websites rule blocks named domains, with the encrypted DNS caveat", async ({ page }) => {
+test("Websites rule blocks named domains, with the encrypted DNS caveat", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");
   const body = (await groupsRes.json()) as { groups: { id: string; name: string }[] };
-  const child = body.groups.find((group) => group.name === (test.info().project.name === "phone" ? "Abby" : "Betsy"));
+  const child = body.groups.find((group) => group.name === "Betsy");
   const ruleName = `QA sites ${test.info().project.name} ${Date.now() % 100000}`;
 
   await page.goto(`/rules/new?group=${child!.id}`);
@@ -740,11 +739,11 @@ test("Websites rule blocks named domains, with the encrypted DNS caveat", async 
   await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
 });
 
-test("cards show every household category; one UniFi cannot block offers a Websites rule", async ({ page }) => {
+test("cards show every household category; one UniFi cannot block offers a Websites rule", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const body = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
-  const kid = body.groups.find((group) => group.kind === "family" && group.name === (test.info().project.name === "phone" ? "Abby" : "Betsy"));
-  expect(kid, "The mock seed must include Betsy and Abby").toBeTruthy();
+  const kid = body.groups.find((group) => group.kind === "family" && group.name === "Betsy");
+  expect(kid, "The mock seed must include Betsy").toBeTruthy();
 
   await page.goto("/family");
   const marks = page.getByTestId(`filter-marks-${kid!.id}`);
