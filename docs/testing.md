@@ -85,7 +85,7 @@ The workflows that run tests call `scripts/test.py`, so a local run is the CI ru
 
 | Workflow | When | Checks |
 | --- | --- | --- |
-| `ci.yml` | Pull requests and every release | **verify:** `check audit lint typecheck api catalog`; `check db-drift db-upgrade` (on a pull request, only when it changes `prisma/`, the upgrade script, `scripts/runtime/`, `scripts/testing/`, the dependencies or `ci.yml`); `run --platform host --coverage` (unit, integration and harness tests, and the coverage floors); `check coverage` for changed lines (pull requests only; fails on an untested changed line in a gated path).<br>**browser:** the unit suite again with `--timezone Pacific/Kiritimati`; `run --layer ui`: a production build, then Playwright on desktop and phone. A flow that behaves the same at any width is tagged `@desktop`; the phone project checks layouts, sheets and navigation that change on a narrow screen. A failed job uploads the run's results, logs and traces as `playwright-results`. Every job has a `timeout-minutes`, so a stuck runner cannot hold it for hours |
+| `ci.yml` | Pull requests and every release | **verify:** `check audit lint typecheck api catalog`; `check db-drift db-upgrade` (on a pull request, only when it changes `prisma/`, `prisma.config.ts`, the upgrade script, `scripts/test.py`, `scripts/runtime/`, `scripts/testing/`, the dependencies or `ci.yml`); `run --platform host --coverage` (unit, integration and harness tests, and the coverage floors); `check coverage` for changed lines (pull requests only; fails on an untested changed line in a gated path).<br>**browser:** `run --layer ui`: a production build, then Playwright on desktop and phone. A flow that behaves the same at any width is tagged `@desktop`; the phone project checks layouts, sheets and navigation that change on a narrow screen. Then the unit suite again with `--timezone Pacific/Kiritimati`, even when a browser test failed. A failed job uploads the run's results, logs and traces as `playwright-results`. Every job has a `timeout-minutes`, so a stuck runner cannot hold it for hours |
 | `container.yml` | Every release, or by hand | Image build, image hygiene, container smoke; the same helpers as `check container`, with the build action's layer cache |
 | `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`, with the helpers `check api-version` and `check api-breaking` call. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | `check mutation`. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
@@ -95,12 +95,11 @@ The workflows that run tests call `scripts/test.py`, so a local run is the CI ru
 Run the same commands the jobs run. Each run starts and removes its own PostgreSQL containers, so the development database is never touched, and prints its run ID and results directory.
 
 ```bash
-scripts/test.py check audit lint typecheck api db-drift db-upgrade catalog
+scripts/test.py check audit lint typecheck api catalog db-drift db-upgrade
 scripts/test.py run --platform host --coverage
-scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
 scripts/test.py check coverage --run-id <run-id>
-scripts/test.py build
 scripts/test.py run --layer ui
+scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
 scripts/test.py check container api-version api-breaking
 ```
 

@@ -489,7 +489,7 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   expect(adult, "The mock seed must include an adult with no rules").toBeTruthy();
   const preferredName = "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
-  expect(child, "The mock seed must include Betsy and Abby").toBeTruthy();
+  expect(child, "The mock seed must include Betsy").toBeTruthy();
   const ruleName = `QA lights out ${test.info().project.name} ${Date.now() % 100000}`;
 
   await page.goto("/rules");
@@ -562,7 +562,7 @@ test("Rules: pause a rule from its card and resume it", { tag: "@desktop" }, asy
   const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string }[] };
   const preferredName = "Betsy";
   const child = body.groups.find((group) => group.kind === "family" && group.name === preferredName);
-  expect(child, "The mock seed must include Betsy and Abby").toBeTruthy();
+  expect(child, "The mock seed must include Betsy").toBeTruthy();
   const ruleName = `QA pause ${test.info().project.name} ${Date.now() % 100000}`;
   const created = await page.request.post("/api/v1/rules", {
     headers: await csrfHeaders(page),

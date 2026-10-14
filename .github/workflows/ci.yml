@@ -44,7 +44,7 @@ jobs:
       - id: changes
         if: github.event_name == 'pull_request'
         run: |
-          if git diff --name-only HEAD^1 HEAD | grep -qE '^(prisma/|scripts/ci/check-migration-upgrade\.mjs|scripts/runtime/|scripts/testing/|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
+          if git diff --name-only HEAD^1 HEAD | grep -qE '^(prisma/|prisma\.config\.ts|scripts/test\.py|scripts/ci/check-migration-upgrade\.mjs|scripts/runtime/|scripts/testing/|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
             echo "database=true" >> "$GITHUB_OUTPUT"
           fi
       - if: github.event_name != 'pull_request' || steps.changes.outputs.database == 'true'
@@ -91,12 +91,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: pnpm install --frozen-lockfile
-      # The unit suite again with the server clock at UTC+14: household time must never lean on the server's zone.
-      - run: scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
       - run: pnpm exec playwright install chromium
       # A production build (the only one this workflow makes), then desktop and phone, each against its own
       # database and server.
       - run: scripts/test.py run --layer ui
+      # The unit suite again with the server clock at UTC+14: household time must never lean on the server's zone.
+      # It runs even when a browser test failed, so one failure never hides the other.
+      - if: ${{ !cancelled() }}
+        run: scripts/test.py run --platform host --layer unit --timezone Pacific/Kiritimati
       # Traces, screenshots and error context for whatever failed, to open with `playwright show-trace`.
       - if: failure()
         uses: actions/upload-artifact@v7
