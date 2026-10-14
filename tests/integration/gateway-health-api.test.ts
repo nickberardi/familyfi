@@ -9,7 +9,7 @@ import { GET as getHousehold } from "@/app/api/v1/settings/household/route";
 import { GET as getHealth } from "@/app/api/v1/settings/unifi/health/route";
 import { GET as getUnifi } from "@/app/api/v1/settings/unifi/route";
 import { runReconcileOnce } from "@/server/reconciliation";
-import { saveUnifiConnection } from "@/server/unifi-settings";
+import { saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
 import { DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, getSharedDevMockClient, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
 import { forgetSiteNetworks } from "@/server/unifi/network-cache";
 import type { GatewayHealth, UnifiSettings } from "@/lib/types";
@@ -121,5 +121,14 @@ describe("gateway health and the console's polled load", () => {
     // The answer is kept for the next page refresh.
     await getUnifi(request("/api/v1/settings/unifi", { auth }));
     expect(client.calls.length - before).toBe(asked);
+  });
+
+  it("checks a network choice against the console itself, not the last pass's list", async () => {
+    await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    await runReconcileOnce();
+    const client = getSharedDevMockClient();
+    const before = client.calls.length;
+    await saveManagedNetworks({ manageAllNetworks: true });
+    expect(client.calls.slice(before).some((call) => call.path.endsWith("/networks"))).toBe(true);
   });
 });

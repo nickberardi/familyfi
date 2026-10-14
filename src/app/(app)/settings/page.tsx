@@ -39,7 +39,8 @@ export default function SettingsPage() {
   const [unifiStamp, setUnifiStamp] = useState<string | null>(null);
   const [health, setHealth] = useState<GatewayHealth | null>(null);
   const [healthError, setHealthError] = useState("");
-  const [checkingHealth, setCheckingHealth] = useState(false);
+  // True until the first check, which starts as soon as a console is connected, has answered.
+  const [checkingHealth, setCheckingHealth] = useState(true);
 
   // Asked when the page opens and on request only: each check is a request per device to the console.
   const checkHealth = useCallback(async () => {
@@ -57,10 +58,12 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!configured) return;
     let active = true;
-    readHealth().then(
-      (result) => active && setHealth(result),
-      (error: unknown) => active && setHealthError(healthFailure(error)),
-    );
+    readHealth()
+      .then(
+        (result) => active && setHealth(result),
+        (error: unknown) => active && setHealthError(healthFailure(error)),
+      )
+      .finally(() => active && setCheckingHealth(false));
     return () => {
       active = false;
     };

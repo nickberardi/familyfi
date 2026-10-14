@@ -2956,7 +2956,10 @@ components:
         quarantineEnforced: { type: boolean }
         quarantineObservedEnabled:
           type: [boolean, "null"]
-          description: Live UniFi enabled flag across app-owned quarantine policies. True if any is enabled.
+          description: >-
+            Whether app-owned quarantine policies were enabled on the gateway as the last reconcile
+            pass saw them (about every 30 seconds). True if any is enabled; null when none could be
+            seen, such as a policy missing from the gateway at that pass.
         quarantinePolicyCount: { type: integer, minimum: 0 }
     ConnectionIdentity:
       type: object

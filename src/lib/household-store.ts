@@ -79,11 +79,14 @@ export type MutateOptions = {
 export const NOTICE_MS = 6000;
 export const NOTICE_WITH_ACTION_MS = 12_000;
 /**
- * How often a client refreshes what changes on its own while it is showing the household:
+ * How often a client refreshes what changes most on its own while it is showing the household:
  * groups and rules (windows open and close, pauses end), devices and sync.
  */
 export const REFRESH_MS = 15_000;
-/** How often it also rereads what only a write changes: the session, settings and accounts. */
+/**
+ * How often it also rereads the rest: the session, settings and accounts, which change by a write
+ * or, for the gateway's status and quarantine observation, at reconcile's pace.
+ */
 export const FULL_REFRESH_MS = 5 * 60_000;
 
 /**
@@ -353,7 +356,7 @@ export function createHouseholdStore(deps: {
     /**
      * Loads now, then every `interval` refreshes what changes on its own, with a full reload
      * every `fullInterval` (or whenever the view is stale), until the returned function stops
-     * it. While hidden it sends nothing, and refreshes as soon as it is shown again.
+     * it. While hidden it sends nothing, and reloads in full as soon as it is shown again.
      */
     startRefreshing(interval = REFRESH_MS, fullInterval = FULL_REFRESH_MS): () => void {
       // One refresh at a time: a slow server gets no second request stacked behind the first.
@@ -374,7 +377,9 @@ export function createHouseholdStore(deps: {
       };
       void run(reload);
       const timer = setInterval(tick, interval);
-      const unsubscribe = visibility?.subscribe(tick);
+      const unsubscribe = visibility?.subscribe(() => {
+        if (!visibility.hidden()) void run(reload);
+      });
       return () => {
         clearInterval(timer);
         unsubscribe?.();

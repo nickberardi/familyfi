@@ -426,7 +426,8 @@ describe("household store", () => {
     hidden = false;
     onChange();
     await vi.advanceTimersByTimeAsync(10);
-    expect(server.calls.length).toBeGreaterThan(loaded);
+    // Shown again, it reads everything, not only what the timer would have.
+    expect(server.calls.slice(loaded).map((call) => call.path)).toContain("/api/v1/auth/session");
     stop();
     expect(unsubscribe).toHaveBeenCalled();
   });
