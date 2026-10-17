@@ -339,11 +339,13 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   const renamed = `${name} Jr`;
   await page.getByLabel("Name").fill(renamed);
   const editHeading = page.getByRole("heading", { name: "Edit" });
-  const yBefore = (await editHeading.boundingBox())?.y;
+  // Measured on the page, not the viewport: Save may scroll into view on a phone.
+  const pageY = () => editHeading.evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
+  const yBefore = await pageY();
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
-  expect((await editHeading.boundingBox())?.y).toBe(yBefore);
+  expect(await pageY()).toBe(yBefore);
 
   // Groups can no longer be protected from FamilyFi.
   await expect(page.getByLabel(/Protected/)).toHaveCount(0);
@@ -753,8 +755,10 @@ test("cards show every household category; one UniFi cannot block offers a Websi
     await expect(marks.getByRole("button", { name: new RegExp(`^${name} `) })).toBeVisible();
   }
 
+  // On a closed card a mark opens the card; open, it opens the mark's sheet.
   await marks.getByRole("button", { name: /^AI / }).click();
-  await card.getByRole("button", { name: "Add rule" }).click();
+  await expect(card.locator("button[aria-expanded=true]")).toBeVisible();
+  await marks.getByRole("button", { name: /^AI / }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByText(/UniFi has no AI category/)).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Create policy" })).toHaveCount(0);
@@ -843,8 +847,11 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   // No group is exempt: an adult's card shows its marks too.
   await expect(page.getByTestId(`filter-marks-${adult!.id}`)).toBeVisible();
 
-  // A mark opens its sheet. With no rule and nothing measured, the sheet must not
-  // claim anything about DNS either way.
+  // A mark opens the card, and then its sheet. With no rule and nothing measured, the
+  // sheet must not claim anything about DNS either way.
+  const card = page.locator("article").filter({ has: marks });
+  await marks.getByRole("button", { name: /Video not blocked/i }).click();
+  await expect(card.locator("button[aria-expanded=true]")).toBeVisible();
   await marks.getByRole("button", { name: /Video not blocked/i }).click();
   const offSheet = page.getByRole("dialog");
   await expect(offSheet.getByRole("heading", { name: /Nothing's blocking Video yet/i })).toBeVisible();
