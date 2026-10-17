@@ -151,7 +151,9 @@ export function groupScheduleRuleRows(
     const live = !lifted && blocking.has(rule.id);
     const { action, more } = groupRuleActions(group, [rule], now);
     const windows = ruleInternetWindows(rule);
-    const times = windows.map((window) => `${window.name.trim() ? `${window.name.trim()} ` : ""}${windowSpan(window)}`).join(", ");
+    // A window named like its rule ("Homework" in Homework) says nothing its title does not.
+    const named = (window: InternetWindow) => (window.name.trim() && window.name.trim() !== rule.name.trim() ? `${window.name.trim()} ` : "");
+    const times = windows.map((window) => `${named(window)}${windowSpan(window)}`).join(", ");
     const days = rule.mode === "always" ? "Every day" : daysLabel(windows.flatMap((window) => window.days));
     return {
       ruleId: rule.id,

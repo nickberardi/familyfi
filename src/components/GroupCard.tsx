@@ -57,13 +57,13 @@ export function GroupCard({
   const [open, setOpen] = useState(false);
   const [more, setMore] = useState(false);
   const [sheet, setSheet] = useState<FilterSheetState | null>(null);
-  const { store } = useAppData();
+  const { store, busy } = useAppData();
 
   const now = new Date();
   const windows = internetWindowsForGroup(rules, group.id, now);
 
   const marks = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, more });
-  const header = groupCardControls(group, rules, timezone, now, (tap) => runGroupCardAction(store.mutate, group, tap, onSheet));
+  const header = groupCardControls(group, rules, timezone, now, (tap) => runGroupCardAction(store.mutate, group, tap, onSheet), !busy);
 
   return (
     <GroupCardFrame

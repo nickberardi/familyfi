@@ -78,11 +78,11 @@ export function GroupSchedule({
             <View key={row.ruleId} role="listitem" style={[styles.row, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ui.color("hairline") }]}>
               <Swatch tone={row.tone} />
               <View style={styles.grow}>
-                <Text style={[text, { color: ui.color("ink") }]}>
-                  <ui.Link href={`/rules/${row.ruleId}?group=${group.id}`} testID={`schedule-rule-${row.ruleId}-${group.id}`}>
-                    <Text style={{ fontWeight: "600", color: ui.color("accent") }}>{row.title}</Text>
-                  </ui.Link>
-                  <Text style={{ color: ui.color("ink-2") }}> · {row.times}</Text>
+                <ui.Link href={`/rules/${row.ruleId}?group=${group.id}`} testID={`schedule-rule-${row.ruleId}-${group.id}`}>
+                  <Text style={[text, { fontWeight: "600", color: ui.color("accent") }]}>{row.title}</Text>
+                </ui.Link>
+                <Text style={[text, { color: ui.color("ink-2") }]}>
+                  {row.times}
                   {state(row.state, row.live)}
                 </Text>
                 {row.more && onRun ? (

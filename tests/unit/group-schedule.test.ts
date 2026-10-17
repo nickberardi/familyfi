@@ -92,7 +92,7 @@ describe("group schedule", () => {
       ["Video", "7 AM–8 AM, 8 PM–10 PM", null],
       ["Social", "8 AM–3 PM · Mon–Fri", null],
       ["Homework (Video and Social)", "4 PM–6 PM", "Now"],
-      ["Overnight", "Overnight 10 PM–7 AM", null],
+      ["Overnight", "10 PM–7 AM", null],
     ]);
     expect(rows[2]?.action?.run).toBe("pause");
   });
