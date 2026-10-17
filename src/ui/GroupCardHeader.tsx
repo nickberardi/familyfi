@@ -2,9 +2,11 @@
 
 import { StyleSheet, Text, View } from "react-native";
 
-import { accessColor, cardNoteLine, cardStateLabel, roleTag } from "@/lib/display";
+import { cardNoteLine, roleTag } from "@/lib/display";
+import { groupStatus, groupStatusColor } from "@/lib/group-actions";
 import { groupMonogram, personMonogram } from "@/lib/internet-zone";
 import type { InternetWindow } from "@/lib/rule-windows";
+import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 import { tokenOf, useUI } from "./UIContext";
@@ -12,12 +14,13 @@ import { useWide } from "./use-wide";
 
 /**
  * A group card's identity, shared by every client: a things group's monogram tile, the name and
- * role, what its internet is doing now (in the access colour), and the note line. The card
+ * role, what is blocking it now (`groupStatus`, in its colour), and the note line. The card
  * around it (open or closed, marks, actions) belongs to the caller. A stacked card shows a person's
  * monogram too (`mark`), and its note in the card's body instead (`note={false}`).
  */
 export function GroupCardHeader({
   group,
+  rules,
   windows,
   timezone,
   now,
@@ -25,6 +28,7 @@ export function GroupCardHeader({
   mark = false,
 }: {
   group: Group;
+  rules: Rule[];
   windows: InternetWindow[];
   timezone: string;
   now: Date;
@@ -35,7 +39,8 @@ export function GroupCardHeader({
 }) {
   const ui = useUI();
   const monogram = groupMonogram(group);
-  const stateColor = ui.color(tokenOf(accessColor(group.access)));
+  const status = groupStatus(group, rules, timezone, now);
+  const stateColor = ui.color(tokenOf(groupStatusColor(status.tone)));
   const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
   const wide = useWide();
 
@@ -81,7 +86,7 @@ export function GroupCardHeader({
         </View>
         <View style={styles.state}>
           <View style={[styles.dot, { backgroundColor: stateColor }]} />
-          <Text style={[body, styles.shrink, { color: stateColor }]}>{cardStateLabel(group, windows, timezone, now)}</Text>
+          <Text style={[body, styles.shrink, { color: stateColor }]}>{status.label}</Text>
         </View>
         {note ? <Text style={[body, { marginTop: 2, color: ui.color("ink-3") }]}>{cardNoteLine(group, windows)}</Text> : null}
       </View>

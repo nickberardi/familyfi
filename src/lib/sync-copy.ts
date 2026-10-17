@@ -5,6 +5,7 @@ const ACTION: Record<string, string> = {
   resume: "Resume internet",
   extend: "Extend pause",
   allow: "Allow internet",
+  unblock: "Unblock",
   rule: "Update rule",
   // Before household rules, a group's bedtime; kept so older history reads.
   schedule: "Update schedule",

@@ -1,6 +1,8 @@
 import { formatClock } from "./display";
 import { groupAddedNotice, groupEditBody, newGroupBody, type GroupEditDraft, type NewGroupDraft } from "./group-form";
-import { internetRulePath } from "./group-actions";
+import { internetRulePath, type GroupRuleRun, type GroupRun } from "./group-actions";
+import type { GroupSheetTarget } from "./group-pause-sheet";
+import type { ApiRequest } from "./api-client";
 import type { HouseholdStore } from "./household-store";
 import type { PauseSheetRequest } from "./pause-sheet";
 import type { InternetRulePreset, Rule } from "./rules";
@@ -15,27 +17,84 @@ import type { Device, Group } from "./types";
 
 type Mutate = HouseholdStore["mutate"];
 
-function pauseUntil(request: Exclude<PauseSheetRequest, { kind: "extend" }>, now: Date): string | null {
+function pauseUntil(request: Exclude<PauseSheetRequest, { kind: "extend" } | { kind: "current" }>, now: Date): string | null {
   return request.kind === "pauseFor" ? new Date(now.getTime() + request.minutes * 60_000).toISOString() : request.until;
 }
 
 const until = (iso: string | null, timezone: string) => (iso ? `until ${formatClock(new Date(iso), timezone)}` : "until you resume");
 
-/** A group's pause-sheet choice: extend its pause, or pause all its internet until a time or until resumed. */
+/** A group's block-sheet choice: give its block more time, or block all its internet until a time or until unblocked. */
 export function applyGroupPause(mutate: Mutate, group: Group, request: PauseSheetRequest, timezone: string, now: Date = new Date()) {
   const path = internetRulePath(group);
   if (request.kind === "extend") {
     return mutate((send) => send(`${path}/extend`, { method: "POST", body: { minutes: request.minutes } }), { groupId: group.id });
   }
+  if (request.kind === "current") return Promise.resolve(undefined);
   const to = pauseUntil(request, now);
   // Name the scope and who it hits, and offer the way back.
   return mutate((send) => send(`${path}/pause`, { method: "POST", body: to === null ? {} : { until: to } }), {
     groupId: group.id,
     feedback: {
-      notice: `All internet paused for ${group.name} ${until(to, timezone)}.`,
+      notice: `All internet blocked for ${group.name} ${to ? until(to, timezone) : "until you unblock"}.`,
       action: { label: "Undo", run: (send) => send(`${path}/resume`, { method: "POST" }) },
     },
   });
+}
+
+/**
+ * A group sheet's choice (`groupSheet`): its block, its unblock (what blocks now until it ends,
+ * or every rule until a time), or a pause of a rule area's rules for this group alone.
+ */
+export function applyGroupSheet(mutate: Mutate, group: Group, target: GroupSheetTarget, request: PauseSheetRequest, timezone: string, now: Date = new Date()) {
+  if (target.kind === "block") return applyGroupPause(mutate, group, request, timezone, now);
+  if (target.kind === "unblock") {
+    const path = `/api/v1/groups/${group.id}/unblock`;
+    if (request.kind === "extend") {
+      return mutate((send) => send(`${path}/extend`, { method: "POST", body: { minutes: request.minutes } }), { groupId: group.id });
+    }
+    const to = request.kind === "current" ? undefined : pauseUntil(request, now);
+    return mutate((send) => send(path, { method: "POST", body: to === undefined ? {} : { until: to } }), {
+      groupId: group.id,
+      feedback: {
+        notice: to === undefined ? `${group.name} unblocked until the block ends.` : `${group.name} unblocked ${until(to, timezone)}.`,
+        // Undo can bring back its rules, but not a block the unblock ended.
+        ...(group.suspension.active ? {} : { action: { label: "Undo", run: (send: ApiRequest) => send(`${path}/end`, { method: "POST" }) } }),
+      },
+    });
+  }
+  if (request.kind === "current") return Promise.resolve(undefined);
+  const paths = target.ruleIds.map((ruleId) => `/api/v1/groups/${group.id}/rules/${ruleId}`);
+  if (request.kind === "extend") {
+    return mutate((send) => sendEach(send, paths, "extend", { minutes: request.minutes }), { groupId: group.id });
+  }
+  const to = pauseUntil(request, now);
+  return mutate((send) => sendEach(send, paths, "pause", to === null ? {} : { until: to }), {
+    groupId: group.id,
+    feedback: {
+      notice: `${target.name.charAt(0).toUpperCase()}${target.name.slice(1)} paused for ${group.name} ${until(to, timezone)}.`,
+      action: { label: "Undo", run: (send) => sendEach(send, paths, "resume") },
+    },
+  });
+}
+
+/** One verb to each of a group's rules, as one write: the rules it returns, and the last change. */
+async function sendEach(send: ApiRequest, paths: string[], verb: string, body?: object) {
+  const results = await Promise.all(paths.map((path) => send<{ rule: Rule; change: { changeId: string } }>(`${path}/${verb}`, { method: "POST", body })));
+  return { rules: results.map((result) => result.rule), change: results.at(-1)?.change };
+}
+
+/** A group card's direct header actions: unblock when only its own block holds it, or end its unblock. */
+export function runGroupHeaderAction(mutate: Mutate, group: Group, run: "unblockNow" | "resume") {
+  const path = `/api/v1/groups/${group.id}/unblock`;
+  return mutate((send) => send(run === "unblockNow" ? path : `${path}/end`, { method: "POST", body: run === "unblockNow" ? {} : undefined }), {
+    groupId: group.id,
+  });
+}
+
+/** A rule area's Resume: its rules apply to the group again. */
+export function resumeGroupRules(mutate: Mutate, group: Group, ruleIds: string[]) {
+  const paths = ruleIds.map((ruleId) => `/api/v1/groups/${group.id}/rules/${ruleId}`);
+  return mutate((send) => sendEach(send, paths, "resume"), { groupId: group.id });
 }
 
 /** A rule's pause-sheet choice: extend its pause, or pause the rule until a time or until resumed. */
@@ -44,6 +103,7 @@ export function applyRulePause(mutate: Mutate, rule: Pick<Rule, "id" | "name">, 
   if (request.kind === "extend") {
     return mutate((send) => send(`${path}/extend`, { method: "POST", body: { minutes: request.minutes } }));
   }
+  if (request.kind === "current") return Promise.resolve(undefined);
   const to = pauseUntil(request, now);
   return mutate((send) => send(`${path}/pause`, { method: "POST", body: to === null ? {} : { until: to } }), {
     feedback: {
@@ -51,12 +111,6 @@ export function applyRulePause(mutate: Mutate, rule: Pick<Rule, "id" | "name">, 
       action: { label: "Undo", run: (send) => send(`${path}/resume`, { method: "POST" }) },
     },
   });
-}
-
-/** A card's direct actions: resume a pause, allow internet now, or resume the schedule after an allowance. */
-export function runGroupAction(mutate: Mutate, group: Group, run: "resume" | "allow" | "disallow") {
-  const path = internetRulePath(group);
-  return mutate((send) => send(`${path}/${run}`, { method: "POST", body: run === "allow" ? {} : undefined }), { groupId: group.id });
 }
 
 /**
@@ -132,4 +186,33 @@ export function addInternetPreset(mutate: Mutate, group: Pick<Group, "id" | "nam
       }),
     { feedback: { notice: `${preset.name} added for ${group.name}. FamilyFi writes it to the gateway next.` } },
   );
+}
+
+/** A tap on a group card: its header's button or More time, or a rule area's (`ruleIds`, called `name`). */
+export type GroupCardRun =
+  | { kind: "header"; run: GroupRun }
+  | { kind: "rule"; run: GroupRuleRun; ruleIds: string[]; name: string };
+
+/**
+ * What a group card's tap does, the same on every client: Block, Unblock, Pause and every More
+ * time open a sheet (`openSheet`, each platform its own way); Unblock with only the group's own
+ * block holding it, Resume of an unblock, and a rule area's Resume write at once.
+ */
+export function runGroupCardAction(mutate: Mutate, group: Group, tap: GroupCardRun, openSheet: (target: GroupSheetTarget) => void) {
+  if (tap.kind === "rule") {
+    if (tap.run === "resume") return void resumeGroupRules(mutate, group, tap.ruleIds);
+    return openSheet({ kind: "rule", ruleIds: tap.ruleIds, name: tap.name, mode: tap.run === "extend" ? "extend" : "pause" });
+  }
+  switch (tap.run) {
+    case "block":
+      return openSheet({ kind: "block", mode: "pause" });
+    case "moreBlock":
+      return openSheet({ kind: "block", mode: "extend" });
+    case "unblock":
+      return openSheet({ kind: "unblock", mode: "pause" });
+    case "moreUnblock":
+      return openSheet({ kind: "unblock", mode: "extend" });
+    default:
+      return void runGroupHeaderAction(mutate, group, tap.run);
+  }
 }

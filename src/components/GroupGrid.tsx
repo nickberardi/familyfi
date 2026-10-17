@@ -5,6 +5,7 @@ import { request } from "@/lib/api";
 import { loadFilterCatalog, type CatalogNames } from "@/lib/category-marks";
 import { groupPageSummary, groupPageTitle } from "@/lib/group-page";
 import { householdTimezone } from "@/lib/household-state";
+import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
 import type { Group } from "@/lib/types";
 import { useAppData } from "./AppDataProvider";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
@@ -29,7 +30,7 @@ export function useFilterCatalog() {
 
 export function GroupGrid({ kind }: { kind: "family" | "things" }) {
   const { groups, rules, household, reload } = useAppData();
-  const [sheet, setSheet] = useState<{ group: Group; mode: "pause" | "extend" } | null>(null);
+  const [sheet, setSheet] = useState<{ group: Group; target: GroupSheetTarget } | null>(null);
   const [adding, setAdding] = useState(false);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
   const rows = groups.filter((group) => group.kind === kind);
@@ -58,8 +59,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
               rules={rules}
               catalogNames={catalogNames}
               upstreamCategories={upstreamCategories}
-              onPause={() => setSheet({ group, mode: "pause" })}
-              onExtend={() => setSheet({ group, mode: "extend" })}
+              onSheet={(target) => setSheet({ group, target })}
               onRulesChanged={() => void reload()}
             />
           ))
@@ -68,8 +68,9 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
       {adding ? <NewGroupSheet kind={kind} onClose={() => setAdding(false)} /> : null}
       {sheet ? (
         <PauseSheet
-          group={sheet.group}
-          mode={sheet.mode}
+          // The group as it is now, since a write may have changed it after the sheet opened.
+          group={groups.find((group) => group.id === sheet.group.id) ?? sheet.group}
+          target={sheet.target}
           timezone={timezone}
           onClose={() => setSheet(null)}
         />

@@ -1,6 +1,6 @@
 /** Client-safe rule helpers + curated slots (mirrors server curated-categories). */
 
-import { windowDayBands, type InternetWindow } from "./rule-windows";
+import { isWindowActive, windowDayBands, windowEndsAt, type InternetWindow } from "./rule-windows";
 import type { Actor } from "./types";
 
 export type RuleKind = "internet" | "category" | "app" | "domain";
@@ -164,6 +164,23 @@ export function rulePaused(rule: Pick<Rule, "pause">, now: Date): boolean {
 /** Whether the rule is lifted for this group alone at `now`. */
 export function ruleLiftedForGroup(rule: Pick<Rule, "groupPauses">, groupId: string, now: Date): boolean {
   return rule.groupPauses.some((item) => item.groupId === groupId && lifting(item.pause, now));
+}
+
+/** The rule's pause or allowance for this group alone, while it lifts the rule; null otherwise. */
+export function groupLift(rule: Pick<Rule, "groupPauses">, groupId: string, now: Date): RulePause | null {
+  return rule.groupPauses.find((item) => item.groupId === groupId && lifting(item.pause, now))?.pause ?? null;
+}
+
+/**
+ * Until when the rule's windows active now last: the latest end, or null when one never ends.
+ * Undefined when none is active, so the rule is not blocking now.
+ */
+export function activeWindowsEnd(windows: InternetWindow[], now: Date, timezone: string): Date | null | undefined {
+  const active = windows.filter((window) => isWindowActive(window, now, timezone));
+  if (active.length === 0) return undefined;
+  const ends = active.map((window) => windowEndsAt(window, now, timezone));
+  if (ends.some((end) => end === null)) return null;
+  return ends.reduce<Date | null>((latest, end) => (!latest || end!.getTime() > latest.getTime() ? end : latest), null);
 }
 
 /**

@@ -1,13 +1,12 @@
 "use client";
 
-import { groupPauseSheet } from "@/lib/group-pause-sheet";
-import { applyGroupPause, applyRulePause } from "@/lib/group-writes";
+import { groupSheet, type GroupSheetTarget } from "@/lib/group-pause-sheet";
+import { applyGroupSheet, applyRulePause } from "@/lib/group-writes";
 import {
   CUSTOM_PAUSE_MAX_MINUTES,
   RECENT_CUSTOM_PAUSE_KEY,
   customPauseLabel,
   parseCustomPause,
-  pauseSheetCustom,
   rulePauseSheetBody,
   rulePauseSheetCustom,
   rulePauseSheetOptions,
@@ -24,35 +23,35 @@ import type { Group } from "@/lib/types";
 import { useState } from "react";
 import { useAppData } from "./AppDataProvider";
 
+/** A group card's sheet: its block, its unblock, or a rule area's pause for it alone (`groupSheet`). */
 export function PauseSheet({
   group,
-  mode,
+  target,
   timezone,
   onClose,
 }: {
   group: Group;
-  mode: "pause" | "extend";
+  target: GroupSheetTarget;
   timezone: string;
   onClose: () => void;
 }) {
   const { store, rules, devices } = useAppData();
   const [recent, remember] = useRecentCustomPause();
-  const now = new Date();
-  const sheet = groupPauseSheet(group, rules, devices, mode, timezone, now, recent);
+  const sheet = groupSheet(group, rules, devices, target, timezone, new Date(), recent);
 
   async function run(request: PauseSheetRequest) {
-    await applyGroupPause(store.mutate, group, request, timezone);
+    await applyGroupSheet(store.mutate, group, target, request, timezone);
   }
 
   return (
     <PauseSheetView
       title={sheet.title}
       body={sheet.body}
-      mode={mode}
+      confirm={sheet.confirm}
       choices={sheet.choices}
       recent={recent}
       // Resolved when it is tapped, so a sheet left open never sends an end already passed.
-      custom={(choice) => pauseSheetCustom(group, choice, mode, timezone, new Date())}
+      custom={(choice) => sheet.custom(choice, new Date())}
       onPick={(request) => run(request)}
       onCustom={remember}
       onClose={onClose}
@@ -87,7 +86,7 @@ export function RulePauseSheet({
     <PauseSheetView
       title={rulePauseSheetTitle(rule, mode)}
       body={rulePauseSheetBody(rule, mode)}
-      mode={mode}
+      confirm={mode === "extend" ? "Add time" : "Pause"}
       choices={withCustomChoices(options, recent && custom(recent))}
       recent={recent}
       custom={custom}
@@ -128,7 +127,7 @@ function isPicker(choice: PauseSheetChoice): choice is PauseSheetPicker {
 function PauseSheetView({
   title,
   body,
-  mode,
+  confirm,
   choices,
   recent,
   custom,
@@ -138,7 +137,8 @@ function PauseSheetView({
 }: {
   title: string;
   body: string;
-  mode: "pause" | "extend";
+  /** The picker's button: Block, Unblock, Pause or Add time. */
+  confirm: string;
   choices: PauseSheetChoice[];
   recent: CustomPause | null;
   custom: (choice: CustomPause) => PauseSheetOption | null;
@@ -183,7 +183,7 @@ function PauseSheetView({
               <CustomPausePicker
                 picker={choice.picker}
                 recent={recent}
-                mode={mode}
+                confirm={confirm}
                 custom={custom}
                 onDone={(picked, option) => {
                   void onPick(option.request).then(() => {
@@ -211,13 +211,13 @@ function PauseSheetView({
 function CustomPausePicker({
   picker,
   recent,
-  mode,
+  confirm,
   custom,
   onDone,
 }: {
   picker: PauseSheetPicker["picker"];
   recent: CustomPause | null;
-  mode: "pause" | "extend";
+  confirm: string;
   custom: (choice: CustomPause) => PauseSheetOption | null;
   onDone: (choice: CustomPause, option: PauseSheetOption) => void;
 }) {
@@ -297,7 +297,7 @@ function CustomPausePicker({
         disabled={!option}
         className="rounded-[7px] bg-[var(--ff-accent)] px-3 py-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
       >
-        {mode === "extend" ? "Add time" : "Pause"}
+        {confirm}
       </button>
     </form>
   );

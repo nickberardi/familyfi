@@ -10,11 +10,11 @@ describe("group page heading", () => {
     expect(groupPageTitle("things")).toBe("Things");
   });
 
-  it("names who is paused and who is in a no-internet window on Family", () => {
+  it("names who is blocked and who is in a no-internet window on Family", () => {
     expect(groupPageSummary("family", [row("A child", "paused"), row("A teen", "blocked"), row("Another teen", "blocked"), row("An adult", "available")])).toBe(
-      "A child paused · A teen and Another teen in a no-internet window",
+      "A child blocked · A teen and Another teen in a no-internet window",
     );
-    expect(groupPageSummary("family", [row("A child", "paused")])).toBe("A child paused");
+    expect(groupPageSummary("family", [row("A child", "paused")])).toBe("A child blocked");
   });
 
   it("says everyone is online, ignoring Things groups", () => {

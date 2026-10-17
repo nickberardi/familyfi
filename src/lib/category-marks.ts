@@ -13,6 +13,8 @@ import type { IconName } from "./icons";
 import {
   CURATED_CATEGORY_SLOTS,
   categoryRuleForSlot,
+  ruleLiftedForGroup,
+  rulePaused,
   type CuratedCategorySlot,
   type Rule,
 } from "./rules";
@@ -54,6 +56,7 @@ export function categorySlotStates(
   rules: Rule[],
   upstreamCategories: UpstreamCategoryRow[],
   timezone: string,
+  now: Date = new Date(),
 ): CategorySlotState[] {
   const seededSlot = (row: UpstreamCategoryRow) =>
     row.source === "seed" ? CURATED_CATEGORY_SLOTS.find((slot) => slot.slot === row.slug) : undefined;
@@ -66,9 +69,11 @@ export function categorySlotStates(
     .map((row) => ({ slot: undefined, upstream: row }));
   return [...mapped, ...others].map(({ slot, upstream }) => {
     const rule = slot ? categoryRuleForSlot(rules, group.id, slot.categoryId) : undefined;
-    // A rule blocking *right now* wins; otherwise this group's resolver decides.
+    // A rule blocking *right now* wins; otherwise this group's resolver decides. A rule paused
+    // for everyone, or lifted for this group, is not blocking it.
     const check = upstream ? effectiveCheck(upstream.checks, group) : null;
-    const blocking = ruleActivelyBlocking(rule, timezone);
+    const lifted = rule ? rulePaused(rule, now) || ruleLiftedForGroup(rule, group.id, now) : false;
+    const blocking = !lifted && ruleActivelyBlocking(rule, timezone, now);
     return {
       key: slot?.slot ?? upstream!.slug,
       label: slot?.label ?? upstream!.label,

@@ -1,48 +1,46 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { internetDayBands, type InternetWindow } from "@/lib/rule-windows";
+import type { GroupLiftState } from "@/lib/group-actions";
 import { internetZoneText } from "@/lib/internet-zone";
 import type { Group } from "@/lib/types";
 
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { CardButton, type ZoneAction } from "./CardActions";
+import { useUI } from "./UIContext";
 import { DayTimeline } from "./DayTimeline";
 
-export type ZoneAction = {
-  label: string;
-  onPress: () => void;
-  strong?: boolean;
-  disabled?: boolean;
-  /** For UI tests: `data-testid` on the web, the accessibility identifier natively. */
-  testID?: string;
-};
+export type { ZoneAction } from "./CardActions";
 
 /**
- * A group's device-wide controls, shared by every client: whether all of its internet is on,
- * the day's no-internet time, and Pause / Resume / Allow, each named for its scope. A group with
- * no internet rule says so. The caller supplies the actions (from `groupActionSpecs`) and any
- * links (`footer`), since each platform navigates its own way.
+ * A group's device-wide controls, shared by every client: whether all of its internet is on, the
+ * day's no-internet time, and Pause or Resume of its internet rules for this group alone. A group
+ * with no internet rule says so. The caller supplies the action (from `groupRuleActions`), the
+ * rules' pause for the group (`paused`, from `groupRulePause`) and the foot (`footer`), since each
+ * platform navigates its own way.
  */
 export function InternetZone({
   group,
   windows,
   timezone,
   now,
-  actions,
+  action,
+  paused = null,
   footer,
 }: {
   group: Group;
   windows: InternetWindow[];
   timezone: string;
   now: Date;
-  actions: ZoneAction[];
-  /** Below the timeline (or, with no rule, the presets): an "Edit internet rule" link, say. */
+  action?: ZoneAction | null;
+  paused?: GroupLiftState | null;
+  /** Below the timeline (or, with no rule, the presets): More time and "Edit internet rule", say. */
   footer?: ReactNode;
 }) {
   const ui = useUI();
-  const zone = internetZoneText(group, windows, timezone, now);
+  const zone = internetZoneText(group, windows, timezone, now, paused);
   const background =
     zone.tone === "paused" ? ui.color("paused-fill") : zone.tone === "off" ? ui.color("accent-wash") : zone.tone === "on" ? ui.color("field-soft") : undefined;
   const icon =
@@ -71,41 +69,7 @@ export function InternetZone({
           </Text>
           <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, marginTop: 2, color: ui.color("ink-2") }}>{zone.sub}</Text>
         </View>
-        {actions.length ? (
-          <View style={styles.actions}>
-            {actions.map((action) => (
-              <Pressable
-                key={action.label}
-                role="button"
-                aria-disabled={action.disabled}
-                // 44 pt to touch on a phone; react-native-web ignores it, so the web is unchanged.
-                hitSlop={{ top: 6, bottom: 6 }}
-                disabled={action.disabled}
-                onPress={action.onPress}
-                testID={action.testID}
-                style={({ pressed }) => [
-                  styles.action,
-                  action.strong
-                    ? { backgroundColor: ui.color(action.disabled ? "disabled" : "accent") }
-                    : { backgroundColor: ui.color("card"), borderWidth: 1, borderColor: ui.color("control-line"), paddingHorizontal: 9, paddingVertical: 5 },
-                  pressed && { opacity: PRESS_OPACITY },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontFamily: ui.font,
-                    fontSize: 14,
-                    lineHeight: 21,
-                    fontWeight: "600",
-                    color: action.strong ? ui.color("ink-on-fill") : ui.color(action.disabled ? "disabled" : "accent"),
-                  }}
-                >
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        {action ? <CardButton action={action} /> : null}
       </View>
       {zone.tone === "no_rule" ? null : (
         <DayTimeline
@@ -125,7 +89,4 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: 10 },
   icon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   words: { minWidth: 140, flex: 1 },
-  // flexShrink lets the row narrow to the line so its buttons wrap (react-native-web defaults to 0).
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 6, flexShrink: 1 },
-  action: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minHeight: 32, justifyContent: "center" },
 });

@@ -5,10 +5,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { categoryRuleWhen, UPSTREAM_VERDICT_WORDS, type CategorySlotState } from "@/lib/category-marks";
 import type { TimelineBand } from "@/lib/day-timeline";
+import { formatClock } from "@/lib/display";
+import type { GroupLiftState } from "@/lib/group-actions";
 import { internetDayBands, localWeekday } from "@/lib/rule-windows";
 import { internetWindowsForGroup, ruleDayBands, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
+import { CardButton, ZoneFooter, type ZoneAction } from "./CardActions";
 import { CategoryMarkGlyph, useMarkColors } from "./CategoryMarks";
 import { DayTimeline } from "./DayTimeline";
 import { PRESS_OPACITY, useUI } from "./UIContext";
@@ -16,7 +19,9 @@ import { PRESS_OPACITY, useUI } from "./UIContext";
 /**
  * The focused category on an open card, shared by every client: a FamilyFi rule's windows over the
  * group's faded internet time, or, with no rule, what the resolver reports and a way to add one.
- * The caller supplies "Edit rule" (`editRule`), since each platform navigates its own way.
+ * With a rule, Pause or Resume at the top right acts for this group alone (`action`, from
+ * `groupRuleActions`), and the foot has More time while a timed pause lasts and the link to edit
+ * the rule (`editRule`), which the caller supplies since each platform navigates its own way.
  */
 export function CategoryZone({
   group,
@@ -26,6 +31,9 @@ export function CategoryZone({
   now,
   onAddRule,
   editRule,
+  action = null,
+  more = null,
+  paused = null,
 }: {
   group: Group;
   item: CategorySlotState;
@@ -34,6 +42,10 @@ export function CategoryZone({
   now: Date;
   onAddRule: () => void;
   editRule: ReactNode;
+  action?: ZoneAction | null;
+  more?: ZoneAction | null;
+  /** The rule's pause for this group (`groupRulePause`). */
+  paused?: GroupLiftState | null;
 }) {
   const ui = useUI();
   const colors = useMarkColors(item.state);
@@ -84,14 +96,20 @@ export function CategoryZone({
         </View>
         <View style={styles.heading}>
           <Text role="heading" aria-level={3} style={[text, { fontWeight: "600", color: ui.color("ink") }]}>
-            {item.label} · {item.blocking ? "blocked" : "allowed now"}
+            {item.label} ·{" "}
+            {paused
+              ? `paused ${paused.until ? `until ${formatClock(new Date(paused.until), timezone)}` : "until you resume"}`
+              : item.blocking
+                ? "blocked"
+                : "allowed now"}
           </Text>
           <Text style={[text, styles.sub, { lineHeight: 20, color: ui.color("ink-2") }]}>{categoryRuleWhen(rule)} Everything else stays on.</Text>
         </View>
-        {editRule}
+        {action ? <CardButton action={action} /> : null}
       </View>
       <DayTimeline bands={bands} timezone={timezone} now={now} label={`${group.name}’s ${item.label} today`} />
       {internet.length ? <Text style={[text, { color: ui.color("ink-2") }]}>No-internet time also covers {item.label}.</Text> : null}
+      <ZoneFooter more={more} edit={editRule} />
     </View>
   );
 }

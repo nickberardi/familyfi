@@ -42,10 +42,10 @@ describe("internet zone", () => {
     const by = { accountId: "a1", name: "An adult" };
     const paused = internetZoneText(group({ suspension: { active: true, until, by } }), [bedtime], TZ, at("2026-09-28T12:00:00"));
     expect(paused).toMatchObject({ tone: "paused", title: "All internet · off" });
-    expect(paused.sub).toBe(`Paused until ${clock("2026-09-28T13:00:00")} by An adult, on all 2 of its devices.`);
+    expect(paused.sub).toBe(`Blocked until ${clock("2026-09-28T13:00:00")} by An adult, on all 2 of its devices.`);
 
     const open = internetZoneText(group({ suspension: { active: true, until: null, by: null } }), [], TZ, at("2026-09-28T12:00:00"));
-    expect(open.sub).toBe("Paused until you resume, on all 2 of its devices.");
+    expect(open.sub).toBe("Blocked until you unblock, on all 2 of its devices.");
   });
 
   it("says which window an allowance lifts", () => {
@@ -55,7 +55,7 @@ describe("internet zone", () => {
 
   it("marks a closed card's internet as Paused, Off, On or No rule, in token names", () => {
     const noon = at("2026-09-28T12:00:00");
-    expect(internetMarkLook(group({ suspension: { active: true, until: null, by: null } }), [], TZ, noon)).toMatchObject({ word: "Paused", fill: "paused" });
+    expect(internetMarkLook(group({ suspension: { active: true, until: null, by: null } }), [], TZ, noon)).toMatchObject({ word: "Blocked", fill: "paused" });
     expect(internetMarkLook(group(), [bedtime], TZ, at("2026-09-28T23:00:00"))).toMatchObject({ word: "Off", fill: "accent" });
     expect(internetMarkLook(group(), [bedtime], TZ, noon)).toMatchObject({ word: "On", fill: "field" });
     expect(internetMarkLook(group(), [], TZ, noon)).toEqual({ word: "No rule", fill: null, ink: "ink-3", wordInk: "ink-2", border: "dashed" });

@@ -221,6 +221,7 @@ export function createHouseholdStore(deps: {
       const next = applyMutationResult(lists(), result);
       let rules = state.rules;
       if (result.rule) rules = upsertBy(rules, result.rule, (rule) => rule.id);
+      for (const rule of result.rules ?? []) rules = upsertBy(rules, rule, (item) => item.id);
       if (result.removedRuleId) rules = rules.filter((rule) => rule.id !== result.removedRuleId);
       // The built-in quarantine rule's switch is the household's quarantine setting: keep both in step.
       let household = result.household ?? state.household;

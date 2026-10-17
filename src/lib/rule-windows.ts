@@ -35,7 +35,7 @@ export type DayBand = {
   kind: "window" | "pause" | "allowance";
   from: number;
   to: number;
-  /** What the band is: a window's name, "Paused" or "Allowed". */
+  /** What the band is: a window's name, "Blocked" (the group's block) or "Unblocked". */
   label: string;
   /** Where it comes from, for the band's details. */
   source: string;
@@ -176,14 +176,14 @@ export function internetDayBands(group: InternetGroup, windows: InternetWindow[]
     if (localWeekday(end, timeZone) !== weekday || end.getTime() - now.getTime() >= DAY * 60_000) return DAY;
     return Math.max(localMinutes(end, timeZone), minutes + 1);
   };
-  const untilText = (until: string | null) => (until ? `until ${formatClock(new Date(until), timeZone)}` : "until resumed");
+  const untilText = (until: string | null, open: string) => (until ? `until ${formatClock(new Date(until), timeZone)}` : open);
   if (isActiveUntil(group.suspension, now)) {
     bands.push({
       kind: "pause",
       from: minutes,
       to: endToday(group.suspension.until),
-      label: "Paused",
-      source: `Paused by ${actorName(group.suspension.by)} ${untilText(group.suspension.until)}`,
+      label: "Blocked",
+      source: `Blocked by ${actorName(group.suspension.by)} ${untilText(group.suspension.until, "until unblocked")}`,
       carried: false,
     });
   } else if (isActiveUntil(group.allowance, now)) {
@@ -191,8 +191,8 @@ export function internetDayBands(group: InternetGroup, windows: InternetWindow[]
       kind: "allowance",
       from: minutes,
       to: endToday(group.allowance.until),
-      label: "Allowed",
-      source: `Allowed by ${actorName(group.allowance.by)} ${untilText(group.allowance.until)}`,
+      label: "Unblocked",
+      source: `Unblocked by ${actorName(group.allowance.by)} ${untilText(group.allowance.until, "until resumed")}`,
       carried: false,
     });
   }

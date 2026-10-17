@@ -6,11 +6,14 @@ import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import { loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
 import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, rulesNeedDevice, type FamilyRole } from "@/lib/group-form";
-import { deleteGroup, updateGroup } from "@/lib/group-writes";
+import { deleteGroup, runGroupCardAction, updateGroup } from "@/lib/group-writes";
+import { groupStatus, groupStatusColor } from "@/lib/group-actions";
+import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
+import { groupCardControls } from "@/ui/group-card-controls";
 import { deviceName } from "@/lib/device-assign";
 import { deviceHref } from "@/lib/device-detail";
 import { internetWindowsForGroup } from "@/lib/rules";
-import { accessColor, cardNoteLine, cardStateLabel } from "@/lib/display";
+import { cardNoteLine } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
 import { GroupFilterMarks } from "@/components/FilterMarks";
 import { PauseSheet } from "@/components/PauseSheet";
@@ -95,7 +98,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   const { groups, devices, rules, household, store, reload, loading, busy } = useAppData();
   const [groupResolver, setGroupResolver] = useState<GroupResolver | null>(null);
   const group = groups.find((item) => item.id === id);
-  const [sheet, setSheet] = useState<"pause" | "extend" | null>(null);
+  const [sheet, setSheet] = useState<GroupSheetTarget | null>(null);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
 
   // The effective source may be this group's DoH override or its devices' networks.
@@ -112,7 +115,11 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   }
   const members = devices.filter((device) => device.groupId === id);
   const timezone = household?.timezone ?? "America/New_York";
-  const windows = internetWindowsForGroup(rules, group.id, new Date());
+  const now = new Date();
+  const windows = internetWindowsForGroup(rules, group.id, now);
+  const status = groupStatus(group, rules, timezone, now);
+  // The page lists its categories as marks, so only the internet zone and the header have buttons.
+  const controls = groupCardControls(group, rules, null, timezone, now, (tap) => runGroupCardAction(store.mutate, group, tap, setSheet), !busy);
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -174,21 +181,41 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
         </div>
         <div className="flex min-w-0 flex-col gap-[18px]">
           <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-            <div className="px-[18px] pt-4 pb-3">
-              <h2 className="flex items-center gap-1.5 text-[14px] font-normal" style={{ color: accessColor(group.access) }}>
-                <span className="h-[7px] w-[7px] rounded-full" style={{ background: accessColor(group.access) }} />
-                {cardStateLabel(group, windows, timezone, new Date())}
-              </h2>
-              <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
+            <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
+              <div className="min-w-0 flex-1">
+                <h2 className="flex items-center gap-1.5 text-[14px] font-normal" style={{ color: groupStatusColor(status.tone) }}>
+                  <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: groupStatusColor(status.tone) }} />
+                  {status.label}
+                </h2>
+                <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
+                {controls.header.more ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={controls.header.more.onPress}
+                    data-testid={controls.header.more.testID}
+                    className="mt-1 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
+                  >
+                    {controls.header.more.label}
+                  </button>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={controls.header.action.onPress}
+                data-testid={controls.header.action.testID}
+                className="shrink-0 rounded-[8px] bg-[var(--ff-accent)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
+              >
+                {controls.header.action.label}
+              </button>
             </div>
             <div className="px-3 pb-3">
               <InternetZone
                 group={group}
                 windows={windows}
                 timezone={timezone}
-                surface="web"
-                onPause={() => setSheet("pause")}
-                onExtend={() => setSheet("extend")}
+                controls={controls.internet}
                 editHref={`/rules?group=${group.id}`}
               />
             </div>
@@ -204,7 +231,7 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           </section>
         </div>
       </div>
-      {sheet ? <PauseSheet group={group} mode={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
+      {sheet ? <PauseSheet group={group} target={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
     </div>
   );
 }

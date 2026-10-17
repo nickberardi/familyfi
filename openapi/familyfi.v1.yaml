@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.28.3
+  version: 0.29.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -1669,6 +1669,147 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/unblock:
+    post:
+      operationId: unblockGroup
+      tags: [Rules]
+      summary: Unblock a group
+      description: |
+        Lifts whatever blocks the group now, for this group alone, whatever kind of rule it is. The group's pause ends, and each rule blocking it now is allowed for the group until that rule's active windows end; an always-on rule until the unblock is ended. Given `until`, every enabled rule the group has is allowed until then, including windows that start meanwhile. Each lift is the rule's allowance for this group, as `/groups/{id}/rules/{ruleId}/allow` makes: its devices leave the rule's policies and the rule is unchanged for everyone else. A rule paused for everyone or for this group is left as it is. 409 `not_blocked` when nothing is blocking the group and no `until` is given.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, rules, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  rules:
+                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
+                    type: array
+                    items: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/unblock/end:
+    post:
+      operationId: endGroupUnblock
+      tags: [Rules]
+      summary: End a group's unblock
+      description: |
+        Ends every allowance the group has on its rules, so each applies to it again. A rule paused for this group stays paused; the group's own pause is `/groups/{id}/rules/internet/pause`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, rules, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  rules:
+                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
+                    type: array
+                    items: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/unblock/extend:
+    post:
+      operationId: extendGroupUnblock
+      tags: [Rules]
+      summary: Add time to a group's unblock
+      description: |
+        Adds `minutes` to each timed allowance the group has on its rules. 409 `not_unblocked` when it has none, `indefinite` when none has an end time.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, rules, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  rules:
+                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
+                    type: array
+                    items: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /api/v1/devices:
     get:

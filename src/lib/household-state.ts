@@ -23,6 +23,8 @@ export type MutationPayload = {
   account?: Account;
   unifi?: UnifiSettings;
   rule?: Rule;
+  /** Several rules a write changed together, such as a group's unblock. */
+  rules?: Rule[];
   removedGroupId?: string;
   removedRuleId?: string;
 };
