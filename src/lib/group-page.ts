@@ -19,13 +19,10 @@ export function groupPageSummary(kind: Group["kind"], groups: Pick<Group, "kind"
     .join(" · ");
 }
 
-/** An open card's links: the focused category's rule, and the action row under the marks. */
+/** An open card's action row under its marks. */
 export const GROUP_CARD_COPY = {
-  /** "Edit Video rule": the focused category's rule. */
-  editRule: (label: string) => `Edit ${label} rule`,
   /** An open card's way to close, since its header button takes the caret's corner. */
   showLess: "Show less ⌃",
-  rules: "Rules",
   details: "Details",
   detailsLabel: (name: string) => `Details for ${name}`,
 } as const;

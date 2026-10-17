@@ -8,22 +8,20 @@ import { cardNoteLine } from "@/lib/display";
 import { GROUP_CARD_COPY } from "@/lib/group-page";
 import type { GroupCardRun } from "@/lib/group-writes";
 import type { HouseholdStore } from "@/lib/household-store";
-import { internetWindowsForGroup, type Rule } from "@/lib/rules";
+import { internetRulesForGroup, internetWindowsForGroup, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
 
 import { ActionRow } from "./ActionRow";
-import { CategoryZone } from "./CategoryZone";
 import { groupCardControls } from "./group-card-controls";
 import { GroupCardFrame } from "./GroupCardFrame";
 import { GroupCardMarks } from "./GroupCardMarks";
-import { InternetZone } from "./InternetZone";
-import { InternetZoneFooter } from "./InternetZoneFooter";
+import { GROUP_SCHEDULE_COPY, GroupSchedule, ScheduleLink } from "./GroupSchedule";
+import { InternetPresets } from "./InternetPresets";
 import { useUI } from "./UIContext";
 
 /** What a mark opens in the filter sheet: a category by its key, or an app rule by its id. */
 export type FilterTarget = { category: string } | { rule: string };
-
 
 /**
  * A person or group of things as the companion's wide screens and group pages show it, mirroring
@@ -48,20 +46,13 @@ export function ExpandingGroupCard({
   defaultOpen = false,
   mutate,
 }: ExpandedGroupProps & {
-  /** The group detail; absent on the detail itself. */
-  onDetails?: () => void;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [focus, setFocus] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const windows = internetWindowsForGroup(rules, group.id, now);
-  const openOn = (slot?: string) => {
-    if (slot) setFocus(slot);
-    setOpen(true);
-  };
-  const shared = { group, rules, timezone, now, catalogNames, upstreamCategories, controlsEnabled, onRun, onFilter, onAddApp, mutate };
-  const { header } = groupCardControls(group, rules, null, timezone, now, onRun, controlsEnabled);
+  const shared = { group, rules, timezone, now, catalogNames, upstreamCategories, controlsEnabled, onRun, onFilter, onDetails, onAddApp, mutate };
+  const header = groupCardControls(group, rules, timezone, now, onRun, controlsEnabled);
 
   return (
     <GroupCardFrame
@@ -78,7 +69,7 @@ export function ExpandingGroupCard({
     >
       {open ? (
         <>
-          <ExpandedGroupBody {...shared} focus={focus} onFocus={setFocus} more={more} onToggleMore={() => setMore(!more)} />
+          <ExpandedGroupBody {...shared} more={more} onToggleMore={() => setMore(!more)} />
           <GroupCardLinks group={group} onDetails={onDetails} onShowLess={() => setOpen(false)} />
         </>
       ) : (
@@ -90,9 +81,10 @@ export function ExpandingGroupCard({
           rules={rules}
           catalogNames={catalogNames}
           open={false}
-          marks={cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, focus, more })}
+          marks={cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, more })}
           more={more}
-          onOpen={openOn}
+          onOpen={() => setOpen(true)}
+          onCategory={(item) => onFilter({ category: item.key })}
           onToggleMore={() => setMore(!more)}
           onApp={(rule) => onFilter({ rule: rule.id })}
           onAddApp={onAddApp && controlsEnabled ? onAddApp : undefined}
@@ -111,21 +103,23 @@ export type ExpandedGroupProps = {
   upstreamCategories: UpstreamCategoryRow[];
   /** False while the view is stale or a write for this group is in flight. */
   controlsEnabled: boolean;
-  /** A tap on one of the card's buttons, for `runGroupCardAction`. */
+  /** A tap on the group's button, or on a rule's Pause or Resume on its page, for `runGroupCardAction`. */
   onRun: (tap: GroupCardRun) => void;
   /** A mark's filter sheet: add or change its rule. */
   onFilter: (target: FilterTarget) => void;
+  /** The group's page; absent on the page itself, where the schedule lists each rule with its Pause. */
+  onDetails?: () => void;
   /** Blocks another app for the group; the detail offers it, as the web's member page does. */
   onAddApp?: () => void;
   mutate: HouseholdStore["mutate"];
 };
 
 /**
- * An open group card's body, wide or stacked: the internet zone, one focused category, each with
- * its Pause or Resume for this group, then the row of marks (the other categories and app rules).
- * A mark focuses its category; Edit rule, Edit internet rule and Add rule open the editor and the
- * filter sheet. Under
- * a head that leaves out the group's note (a stacked card's), the body leads with it (`note`).
+ * An open group card's body, wide or stacked: the group's schedule, then its categories and app
+ * rules, each mark opening its filter sheet. On a card the schedule lists today's windows and
+ * links to the group's page (`onDetails`); on that page it lists each rule with its Pause or
+ * Resume, the quick internet schedules when the group has no internet rule, and Add a schedule.
+ * Under a head that leaves out the group's note (a stacked card's), the body leads with it (`note`).
  */
 export function ExpandedGroupBody({
   group,
@@ -137,64 +131,48 @@ export function ExpandedGroupBody({
   controlsEnabled,
   onRun,
   onFilter,
+  onDetails,
   onAddApp,
   mutate,
-  focus,
-  onFocus,
   more,
   onToggleMore,
   note = false,
 }: ExpandedGroupProps & {
   note?: boolean;
-  focus: string | null;
-  onFocus: (slot: string) => void;
   more: boolean;
   onToggleMore: () => void;
 }) {
   const ui = useUI();
   const windows = internetWindowsForGroup(rules, group.id, now);
-  const marks = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open: true, focus, more });
-  const { focused } = marks;
-  const controls = groupCardControls(group, rules, focused ?? null, timezone, now, onRun, controlsEnabled);
+  const marks = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open: true, more });
+  const link = { fontFamily: ui.font, fontSize: 14, lineHeight: 21, fontWeight: "600" as const, color: ui.color("accent") };
 
   return (
     <>
       {note ? <Text style={[styles.note, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{cardNoteLine(group, windows)}</Text> : null}
-      <View style={styles.zones}>
-        <InternetZone
+      <View style={styles.schedule}>
+        <GroupSchedule
           group={group}
-          windows={windows}
+          rules={rules}
+          catalogNames={catalogNames}
           timezone={timezone}
           now={now}
-          action={controls.internet.action}
-          paused={controls.internet.paused}
+          variant={onDetails ? "card" : "details"}
+          onRun={onRun}
+          enabled={controlsEnabled}
           footer={
-            <InternetZoneFooter
-              group={group}
-              windows={windows}
-              timezone={timezone}
-              now={now}
-              mutate={mutate}
-              disabled={!controlsEnabled}
-              more={controls.internet.more}
-              paused={controls.internet.paused}
-            />
+            onDetails ? (
+              <ScheduleLink label={GROUP_SCHEDULE_COPY.details} onPress={onDetails} testID={`schedule-details-${group.id}`} />
+            ) : (
+              <View style={styles.foot}>
+                {internetRulesForGroup(rules, group.id).length === 0 ? <InternetPresets group={group} mutate={mutate} disabled={!controlsEnabled} /> : null}
+                <ui.Link href={`/rules/new?group=${group.id}`} testID={`schedule-add-${group.id}`}>
+                  <Text style={link}>{GROUP_SCHEDULE_COPY.add}</Text>
+                </ui.Link>
+              </View>
+            )
           }
         />
-        {focused ? (
-          <CategoryZone
-            group={group}
-            item={focused}
-            rules={rules}
-            timezone={timezone}
-            now={now}
-            onAddRule={() => onFilter({ category: focused.key })}
-            action={controls.category?.action}
-            more={controls.category?.more}
-            paused={controls.category?.paused}
-            editRule={focused.rule ? <EditRuleLink group={group} slot={focused.key} label={focused.label} rule={focused.rule} /> : null}
-          />
-        ) : null}
       </View>
       <GroupCardMarks
         group={group}
@@ -206,7 +184,8 @@ export function ExpandedGroupBody({
         open
         marks={marks}
         more={more}
-        onOpen={(slot) => (slot ? onFocus(slot) : undefined)}
+        onOpen={() => undefined}
+        onCategory={(item) => onFilter({ category: item.key })}
         onToggleMore={onToggleMore}
         onApp={(rule) => onFilter({ rule: rule.id })}
         onAddApp={onAddApp && controlsEnabled ? onAddApp : undefined}
@@ -217,17 +196,16 @@ export function ExpandedGroupBody({
 
 /**
  * The open body of a group card in the companion's phone stack: `ExpandedGroupBody` leading with the
- * group's note, which the stack's compact head leaves out, keeping its own focus and More.
+ * group's note, which the stack's compact head leaves out, keeping its own More.
  */
 export function StackedGroupBody(props: ExpandedGroupProps) {
-  const [focus, setFocus] = useState<string | null>(null);
   const [more, setMore] = useState(false);
-  return <ExpandedGroupBody {...props} note focus={focus} onFocus={setFocus} more={more} onToggleMore={() => setMore(!more)} />;
+  return <ExpandedGroupBody {...props} note more={more} onToggleMore={() => setMore(!more)} />;
 }
 
 /**
- * An open group card's foot, as the web's action row: the group's rules, its detail where the card
- * is not the detail itself, and Show less where the card closes (`onShowLess`).
+ * An open group card's foot, as the web's action row: the group's page where the card is not the
+ * page itself, and Show less where the card closes (`onShowLess`).
  */
 export function GroupCardLinks({
   group,
@@ -241,7 +219,6 @@ export function GroupCardLinks({
   return (
     <ActionRow
       actions={[
-        { label: GROUP_CARD_COPY.rules, href: `/rules?group=${group.id}`, testID: `group-rules-${group.id}` },
         ...(onDetails
           ? [
               {
@@ -259,27 +236,8 @@ export function GroupCardLinks({
   );
 }
 
-/** A focused category's way to its rule's editor, scoped to the card's group: "Edit Video rule". */
-export function EditRuleLink({
-  group,
-  slot,
-  label,
-  rule,
-}: {
-  group: Pick<Group, "id">;
-  slot: string;
-  label: string;
-  rule: Pick<Rule, "id">;
-}) {
-  const ui = useUI();
-  return (
-    <ui.Link href={`/rules/${rule.id}?group=${group.id}`} testID={`edit-rule-${slot}-${group.id}`}>
-      <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, fontWeight: "600", color: ui.color("accent") }}>{GROUP_CARD_COPY.editRule(label)}</Text>
-    </ui.Link>
-  );
-}
-
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 18, paddingBottom: 10, fontSize: 14, lineHeight: 20 },
-  zones: { gap: 10, paddingHorizontal: 12, paddingBottom: 12 },
+  schedule: { paddingHorizontal: 12, paddingBottom: 12 },
+  foot: { gap: 10, alignItems: "flex-start" },
 });

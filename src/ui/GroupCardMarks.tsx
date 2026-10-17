@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { MARK_ROW_GAP, MARK_ROW_PADDING, fitCardMarks, marksRoom, type CardMarks } from "@/lib/category-marks";
+import { MARK_ROW_GAP, MARK_ROW_PADDING, fitCardMarks, marksRoom, type CardMarks, type CategorySlotState } from "@/lib/category-marks";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { appRulesForGroup, glyphForAppName, parentFacingRuleLabel, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -15,9 +15,9 @@ import { useUI } from "./UIContext";
 
 /**
  * A group card's marks, shared by every client. Closed: the Internet mark, a divider, then its
- * categories with FamilyFi's own rules first, and More. Open: the other categories, then its app
- * rules. Every mark says what tapping it does through the callbacks, since each client opens its
- * own sheet.
+ * categories with FamilyFi's own rules first, and More; any mark opens the card. Open: its
+ * categories, each opening its rule or a way to add one, then its app rules. Every mark says what
+ * tapping it does through the callbacks, since each client opens its own sheet.
  */
 export function GroupCardMarks({
   group,
@@ -30,6 +30,7 @@ export function GroupCardMarks({
   marks,
   more,
   onOpen,
+  onCategory,
   onToggleMore,
   onApp,
   onAddApp,
@@ -44,8 +45,10 @@ export function GroupCardMarks({
   /** `cardMarks(...)` for this card. */
   marks: CardMarks;
   more: boolean;
-  /** Opens the card, focused on a category when one was tapped. */
-  onOpen: (slot?: string) => void;
+  /** Opens a closed card. */
+  onOpen: () => void;
+  /** An open card's category: its rule, or a way to add one. */
+  onCategory: (item: CategorySlotState) => void;
   onToggleMore: () => void;
   onApp: (rule: Rule, name: string) => void;
   /** Blocks another app for the group: an Add tile after the app marks, on the group's own page only. */
@@ -60,7 +63,7 @@ export function GroupCardMarks({
     <View testID={`filter-marks-${group.id}`}>
       {open ? (
         <View style={styles.heading}>
-          <SectionLabel>Other categories</SectionLabel>
+          <SectionLabel>Categories</SectionLabel>
         </View>
       ) : null}
       <View style={styles.row} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
@@ -71,7 +74,7 @@ export function GroupCardMarks({
           </>
         )}
         {fitted.shown.map((item) => (
-          <CategoryMark key={item.key} item={item} onPress={() => onOpen(item.key)} testID={`mark-${item.key}-${group.id}`} />
+          <CategoryMark key={item.key} item={item} onPress={() => (open ? onCategory(item) : onOpen())} testID={`mark-${item.key}-${group.id}`} />
         ))}
         {fitted.hidden ? <MoreMark more={more} total={marks.ordered.length} hidden={fitted.hidden} onPress={onToggleMore} /> : null}
       </View>

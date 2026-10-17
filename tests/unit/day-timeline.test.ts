@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TIMELINE_BAND_LOOK, bandTimes, timelineLegend, timelinePercent, timelineRank, type TimelineBand } from "@/lib/day-timeline";
+import { TIMELINE_BAND_LOOK, bandTimes, timelineBandLook, timelineLegend, timelinePercent, timelineRank, type TimelineBand } from "@/lib/day-timeline";
 
 const band = (patch: Partial<TimelineBand>): TimelineBand => ({ kind: "window", from: 0, to: 60, label: "Bedtime", source: "Bedtime rule", ...patch });
 
@@ -48,5 +48,12 @@ describe("day timeline", () => {
       expect(look.fill).toMatch(/^[a-z0-9-]+$/);
       if (look.line) expect(look.line).toMatch(/^[a-z0-9-]+$/);
     }
+  });
+
+  it("gives each scheduled rule its own colour and fades a lifted one", () => {
+    expect(timelineBandLook({ kind: "window" })).toEqual(TIMELINE_BAND_LOOK.window);
+    expect(timelineBandLook({ kind: "window", tone: 2 })).toEqual(TIMELINE_BAND_LOOK.window);
+    expect(timelineBandLook({ kind: "category", tone: 2 })).toEqual({ fill: "schedule-3-fill", line: "schedule-3-line" });
+    expect(timelineBandLook({ kind: "category", tone: 0, dim: true }).opacity).toBeCloseTo(0.35);
   });
 });

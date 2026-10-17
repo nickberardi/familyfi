@@ -1,7 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
@@ -69,18 +68,6 @@ export function CardTextButton({ action }: { action: ZoneAction }) {
   );
 }
 
-/** A rule area's foot: More time at the left while a timed pause lasts, the way to edit the rule at the right. */
-export function ZoneFooter({ more, edit }: { more?: ZoneAction | null; edit?: ReactNode }) {
-  if (!more && !edit) return null;
-  return (
-    <View style={styles.footer}>
-      {more ? <CardTextButton action={more} /> : <View />}
-      {edit ?? null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   button: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minHeight: 32, justifyContent: "center" },
-  footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
 });

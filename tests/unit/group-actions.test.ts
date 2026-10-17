@@ -50,32 +50,18 @@ const TZ = "America/New_York";
 const NOW = new Date("2026-10-15T20:30:00Z");
 const downtime = rule({ id: "r-downtime", name: "TV downtime", windows: [{ id: "w1", name: "Dinner", days: [0, 1, 2, 3, 4, 5, 6], start: "18:00", end: "20:00" }] });
 const video = rule({ id: "r-video", name: "TV video evenings", kind: "category", targetIds: [4], windows: [{ id: "w2", name: "", days: [1, 2, 3, 4, 5], start: "16:00", end: "18:00" }] });
-const focused = { rule: video, label: "Video", key: "video" };
-
 describe("groupCardControls", () => {
-  it("puts Unblock in the header and Pause on each rule area, each tap naming what it is for", () => {
+  it("gives the group one button, its tap naming what it is for", () => {
     const onRun = vi.fn();
-    const controls = groupCardControls(group(), [downtime, video], focused, TZ, NOW, onRun);
-    expect(controls.header.action).toMatchObject({ label: "Unblock", strong: true, testID: "group-action-unblock-g1" });
-    expect(controls.header.more).toBeNull();
-    expect(controls.internet.action?.label).toBe("Pause");
-    expect(controls.category?.action?.label).toBe("Pause");
-
-    controls.header.action.onPress();
-    controls.internet.action?.onPress();
-    controls.category?.action?.onPress();
-    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([
-      { kind: "header", run: "unblock" },
-      { kind: "rule", run: "pause", ruleIds: ["r-downtime"], name: "TV downtime" },
-      { kind: "rule", run: "pause", ruleIds: ["r-video"], name: "Video" },
-    ]);
+    const controls = groupCardControls(group(), [downtime, video], TZ, NOW, onRun);
+    expect(controls.action).toMatchObject({ label: "Unblock", strong: true, testID: "group-action-unblock-g1" });
+    expect(controls.more).toBeNull();
+    controls.action.onPress();
+    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "unblock" }]);
   });
 
-  it("disables every button while the view is stale, and has no category area without a rule", () => {
-    const controls = groupCardControls(group(), [downtime], { rule: undefined, label: "Video", key: "video" }, TZ, NOW, vi.fn(), false);
-    expect(controls.header.action.disabled).toBe(true);
-    expect(controls.internet.action?.disabled).toBe(true);
-    expect(controls.category).toBeNull();
+  it("disables the button while the view is stale", () => {
+    expect(groupCardControls(group(), [downtime], TZ, NOW, vi.fn(), false).action.disabled).toBe(true);
   });
 });
 

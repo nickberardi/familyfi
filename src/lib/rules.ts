@@ -100,10 +100,13 @@ export function internetRulesForGroup(rules: Rule[], groupId: string): Rule[] {
 
 /** Find the category rule for a curated slot (prefer enabled). */
 export function categoryRuleForSlot(rules: Rule[], groupId: string, categoryId: number): Rule | undefined {
-  const matches = groupScopedRules(rules, groupId).filter(
-    (rule) => rule.kind === "category" && rule.targetIds.includes(categoryId),
-  );
+  const matches = categoryRulesForSlot(rules, groupId, categoryId);
   return matches.find((rule) => rule.enabled) ?? matches[0];
+}
+
+/** Every one of the group's category rules that blocks `categoryId`, oldest first. */
+export function categoryRulesForSlot(rules: Rule[], groupId: string, categoryId: number): Rule[] {
+  return groupScopedRules(rules, groupId).filter((rule) => rule.kind === "category" && rule.targetIds.includes(categoryId));
 }
 
 export function appRulesForGroup(rules: Rule[], groupId: string): Rule[] {

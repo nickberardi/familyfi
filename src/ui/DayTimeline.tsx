@@ -5,11 +5,11 @@ import { Pressable, StyleSheet, Text, View, type DimensionValue, type NativeSynt
 
 import { localNowPercent } from "@/lib/display";
 import {
-  TIMELINE_BAND_LOOK,
   TIMELINE_HOURS,
   bandTimes,
   timelineLegend,
   timelinePercent,
+  timelineBandLook,
   timelineRank,
   type TimelineBand,
 } from "@/lib/day-timeline";
@@ -42,8 +42,8 @@ export function DayTimeline({
   const order = bands.map((band, index) => ({ band, index })).sort((a, b) => timelineRank(a.band) - timelineRank(b.band));
   const items = legend ? timelineLegend(bands) : [];
   const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 21, color: ui.color("ink-2") };
-  const fill = (kind: TimelineBand["kind"]) => {
-    const look = TIMELINE_BAND_LOOK[kind];
+  const fill = (band: Pick<TimelineBand, "kind" | "tone" | "dim">) => {
+    const look = timelineBandLook(band);
     return {
       backgroundColor: ui.color(look.fill),
       opacity: look.opacity,
@@ -71,7 +71,7 @@ export function DayTimeline({
             style={[
               styles.band,
               { left: timelinePercent(band.from), width: timelinePercent(Math.max(band.to - band.from, 4)) },
-              fill(band.kind),
+              fill(band),
               // The bar clips anything outside a band, so its focus ring is drawn inside.
               ring === index && { outlineWidth: 2, outlineStyle: "solid", outlineOffset: -2, outlineColor: ui.color("ink") },
             ]}
@@ -100,7 +100,7 @@ export function DayTimeline({
         <View role="list" style={styles.legend}>
           {items.map((item) => (
             <View role="listitem" key={`${item.kind}:${item.label}:${item.source}`} style={styles.legendItem}>
-              <View aria-hidden style={[styles.swatch, fill(item.kind)]} />
+              <View aria-hidden style={[styles.swatch, fill(item)]} />
               <Text style={[text, { flexShrink: 1 }]}>
                 {item.label} {item.times}
               </Text>

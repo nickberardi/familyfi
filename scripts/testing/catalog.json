@@ -168,6 +168,12 @@
         "display"
       ]
     },
+    "tests/unit/group-schedule.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
+    },
     "tests/unit/category-marks.test.ts": {
       "categories": [
         "groups",
@@ -803,13 +809,13 @@
         "devices"
       ]
     },
-    "tests/browser/smoke.spec.ts > Pause for a custom time, then offer it first next time": {
+    "tests/browser/smoke.spec.ts > Block for a custom time, then offer it first next time": {
       "categories": [
         "groups",
         "schedules"
       ]
     },
-    "tests/browser/smoke.spec.ts > Pause all internet names its scope and can be undone": {
+    "tests/browser/smoke.spec.ts > Block names its scope and can be undone": {
       "categories": [
         "groups",
         "schedules"
