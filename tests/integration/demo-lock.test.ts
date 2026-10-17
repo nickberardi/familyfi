@@ -11,6 +11,9 @@ import { PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { POST as createGroup } from "@/app/api/v1/groups/route";
 import { DELETE as clearGroupResolver, PUT as setGroupResolver } from "@/app/api/v1/groups/[id]/resolver/route";
 import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
+import { POST as unblockGroup } from "@/app/api/v1/groups/[id]/unblock/route";
+import { POST as endUnblock } from "@/app/api/v1/groups/[id]/unblock/end/route";
+import { POST as extendUnblock } from "@/app/api/v1/groups/[id]/unblock/extend/route";
 import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
 import { PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
 import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
@@ -115,6 +118,11 @@ describe("demo mode", () => {
     const { group } = (await created.json()) as { group: { id: string } };
     const paused = await pauseGroupRule(write(auth, `/api/v1/groups/${group.id}/rules/internet/pause`, "POST"), params({ id: group.id, ruleId: "internet" }));
     expect(paused.status).toBe(200);
+    // Unblock and its end and extend are household controls, not configuration.
+    expect((await unblockGroup(write(auth, `/api/v1/groups/${group.id}/unblock`, "POST"), params({ id: group.id }))).status).toBe(200);
+    const extended = await extendUnblock(write(auth, `/api/v1/groups/${group.id}/unblock/extend`, "POST", { minutes: 15 }), params({ id: group.id }));
+    expect(((await extended.json()) as { error: { code: string } }).error.code).toBe("not_unblocked");
+    expect((await endUnblock(write(auth, `/api/v1/groups/${group.id}/unblock/end`, "POST"), params({ id: group.id }))).status).toBe(200);
     // Quarantine is paused like any rule; only its switch is configuration.
     await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: true } });
     expect((await pauseRule(write(auth, "/api/v1/rules/quarantine/pause", "POST"), params({ id: "quarantine" }))).status).toBe(200);

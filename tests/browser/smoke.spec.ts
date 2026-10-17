@@ -714,6 +714,50 @@ test("Block names its scope and can be undone", { tag: "@desktop" }, async ({ pa
   }
 });
 
+test("a group card's one button, its schedule link, Show less, and a rule paused on the details page", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const name = `QA card ${test.info().project.name} ${Date.now() % 100000}`;
+  const made = await page.request.post("/api/v1/groups", { headers: await csrfHeaders(page), data: { name, kind: "family", familyRole: "child" } });
+  expect(made.ok()).toBeTruthy();
+  const { group } = (await made.json()) as { group: { id: string } };
+  const created = await page.request.post("/api/v1/rules", {
+    headers: await csrfHeaders(page),
+    data: { name: `${name} video`, kind: "category", groupIds: [group.id], targetIds: [4], mode: "always" },
+  });
+  expect(created.ok()).toBeTruthy();
+  const { rule } = (await created.json()) as { rule: { id: string } };
+
+  try {
+    await page.goto("/family");
+    const card = page.locator("article").filter({ has: page.getByTestId(`filter-marks-${group.id}`) });
+    // Closed, the card shows no button; open, its one button is Unblock, since Video blocks it now.
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toHaveCount(0);
+    await card.locator("button[aria-expanded=false]").first().click();
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toBeVisible();
+    await expect(card.getByRole("button", { name: "Pause", exact: true })).toHaveCount(0);
+    await expect(card.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
+    await card.getByTestId(`group-show-less-${group.id}`).click();
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toHaveCount(0);
+
+    await card.locator("button[aria-expanded=false]").first().click();
+    await card.getByRole("link", { name: "Pause or change schedules →" }).click();
+    await expect(page).toHaveURL(new RegExp(`/family/${group.id}$`));
+
+    // On the details page the rule pauses for this group alone, and resumes.
+    await page.getByTestId(`schedule-pause-${rule.id}-${group.id}`).click();
+    const sheet = page.getByRole("dialog", { name: new RegExp(`^Pause .* for ${name}\\?$`) });
+    const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
+    await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
+    expect((await paused).ok()).toBeTruthy();
+    await expect(page.getByTestId(`schedule-${group.id}`).getByText(/Paused until /)).toBeVisible();
+    await page.getByTestId(`schedule-resume-${rule.id}-${group.id}`).click();
+    await expect(page.getByTestId(`schedule-pause-${rule.id}-${group.id}`)).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+    await page.request.delete(`/api/v1/groups/${group.id}`, { headers: await csrfHeaders(page) });
+  }
+});
+
 test("Websites rule blocks named domains, with the encrypted DNS caveat", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");

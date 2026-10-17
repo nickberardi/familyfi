@@ -821,6 +821,12 @@
         "schedules"
       ]
     },
+    "tests/browser/smoke.spec.ts > a group card's one button, its schedule link, Show less, and a rule paused on the details page": {
+      "categories": [
+        "groups",
+        "schedules"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Websites rule blocks named domains, with the encrypted DNS caveat": {
       "categories": [
         "rules"
