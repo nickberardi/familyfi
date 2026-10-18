@@ -1,11 +1,12 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createServer, request as httpRequest } from "node:http";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, request as httpRequest, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
+import { encryptSecret } from "@/server/crypto";
 import { prisma } from "@/server/db";
 import { householdRoutePublished, resetRouteCheckForTests, resumeRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
@@ -15,14 +16,25 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
 const FAKE = path.join(process.cwd(), "tests/fixtures/cloudflared/cloudflared");
 
 type Tunnel = { mode: string; status: string; url: string | null; error: string | null; hostname: string | null; loginUrl: string | null; endpointId: string | null };
+type DnsRecord = { id: string; type: string; name: string; content: string };
+
+const FIRST_TUNNEL = "11111111-2222-3333-4444-555555555555";
+const SECOND_TUNNEL = "11111111-2222-3333-4444-555555555556";
 
 describe("remote access", () => {
   let dir: string;
   let log: string;
   let auth: SessionAuth;
   const saved = process.env.CLOUDFLARED_BIN;
+  const savedApi = process.env.CLOUDFLARE_API_URL;
 
-  beforeAll(() => {
+  /** A stand-in for Cloudflare's DNS API: zone `zone-1` is example.com, and `dnsFailure` makes every call fail with that status. */
+  let dns: Server;
+  let records: DnsRecord[] = [];
+  let dnsFailure: number | null = null;
+  let dnsCalls: string[] = [];
+
+  beforeAll(async () => {
     dir = mkdtempSync(path.join(tmpdir(), "familyfi-fake-cf-"));
     log = path.join(dir, "calls.log");
     // FamilyFi gives cloudflared a minimal environment, so the log path is baked into a wrapper.
@@ -30,17 +42,45 @@ describe("remote access", () => {
     writeFileSync(wrapper, `#!/bin/sh\nFAKE_CLOUDFLARED_LOG='${log}' exec '${FAKE}' "$@"\n`);
     chmodSync(wrapper, 0o755);
     process.env.CLOUDFLARED_BIN = wrapper;
+
+    dns = createServer((req, res) => {
+      const url = new URL(req.url!, "http://dns.test");
+      dnsCalls.push(`${req.method} ${url.pathname}${url.search} ${req.headers.authorization}`);
+      const answer = (status: number, body: unknown) => res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+      if (dnsFailure) return answer(dnsFailure, { success: false, errors: [{ message: "Authentication error" }] });
+      if (url.pathname === "/zones/zone-1") return answer(200, { success: true, result: { id: "zone-1", name: "example.com" } });
+      if (url.pathname === "/zones/zone-1/dns_records" && req.method === "GET") {
+        const [type, content, name] = [url.searchParams.get("type"), url.searchParams.get("content"), url.searchParams.get("name")];
+        return answer(200, { success: true, result: records.filter((r) => r.type === type && r.content === content && (!name || r.name === name)) });
+      }
+      const id = url.pathname.match(/^\/zones\/zone-1\/dns_records\/(.+)$/)?.[1];
+      if (id && req.method === "DELETE") {
+        const gone = records.find((r) => r.id === id);
+        records = records.filter((r) => r.id !== id);
+        if (gone && !records.some((r) => r.name === gone.name)) rmSync(path.join(dir, "dns", gone.name), { force: true });
+        return answer(200, { success: true, result: { id } });
+      }
+      answer(404, { success: false, errors: [{ message: "not found" }] });
+    });
+    await new Promise<void>((resolve) => dns.listen(0, "127.0.0.1", resolve));
+    process.env.CLOUDFLARE_API_URL = `http://127.0.0.1:${(dns.address() as AddressInfo).port}`;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     process.env.CLOUDFLARED_BIN = saved;
+    if (savedApi === undefined) delete process.env.CLOUDFLARE_API_URL;
+    else process.env.CLOUDFLARE_API_URL = savedApi;
+    await new Promise((resolve) => dns.close(resolve));
     rmSync(dir, { recursive: true, force: true });
   });
 
   beforeEach(async () => {
     await resetDatabase();
     rmSync(log, { force: true });
-    rmSync(path.join(dir, "quick-hold"), { force: true });
+    for (const file of ["dns", "quick-hold", "tunnels", "created", "legacy-cert", "list-broken", "delete-fails", "login-fails"]) rmSync(path.join(dir, file), { force: true, recursive: true });
+    records = [];
+    dnsFailure = null;
+    dnsCalls = [];
     const response = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }) }));
     auth = authFromLogin(response);
   });
@@ -131,11 +171,62 @@ describe("remote access", () => {
     await waitFor((t) => t.status === "running", "the tunnel again");
     expect(readFileSync(log, "utf8")).not.toContain("tunnel login");
 
+    addRecord(tunnelRecord("our-record", "familyfi.example.com", FIRST_TUNNEL));
     await put({ mode: "off", forget: true });
-    // Forgetting deletes the domain route, and its tunnel key with it.
+    // Forgetting deletes the domain route, and its tunnel key with it, straight away.
     expect(await prisma().connectionEndpoint.count({ where: { kind: "domain" } })).toBe(0);
     expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ remoteEndpointId: null });
-    expect(await state()).toMatchObject({ mode: "off", status: "off", hostname: null, endpointId: null });
+    // Then one more Cloudflare sign-in lets FamilyFi delete its tunnel and DNS record there.
+    const signingIn = await waitFor((t) => t.loginUrl !== null, "the Cloudflare link for Forget");
+    expect(signingIn).toMatchObject({ mode: "off", status: "signing-in", hostname: null, endpointId: null });
+    expect(await waitFor((t) => t.status === "off", "the cleanup", 150)).toMatchObject({ mode: "off", error: null, loginUrl: null });
+    expect(records).toEqual([]);
+    expect(accountTunnels()).toEqual([]);
+    expect(readFileSync(log, "utf8")).toMatch(new RegExp(`argv: tunnel --origincert \\S+ delete -f ${FIRST_TUNNEL}`));
+  });
+
+  it("removes a skipped Forget's record when another hostname is connected, so the first can come back", async () => {
+    await connect("familyfi.example.com");
+    addRecord(tunnelRecord("forgotten-record", "familyfi.example.com", FIRST_TUNNEL));
+    await put({ mode: "off", forget: true });
+    await put({ mode: "off" });
+
+    // The forgotten tunnel is found by name, and its record by what it points at.
+    expect((await connect("home.example.com")).error).toBeNull();
+    expect(records).toEqual([]);
+    expect(accountTunnels()).toEqual([SECOND_TUNNEL]);
+    // So the first hostname is free to connect again.
+    expect((await connect("familyfi.example.com", "the first hostname again")).error).toBeNull();
+  });
+
+  it("leaves Cloudflare alone when Forget's sign-in is cancelled", async () => {
+    await connect("familyfi.example.com");
+    await put({ mode: "off", forget: true });
+    await waitFor((t) => t.loginUrl !== null, "the Cloudflare link for Forget");
+    // Cancel: the domain stays forgotten, and nothing is touched in Cloudflare.
+    await put({ mode: "off" });
+    await never((t) => t.status !== "off" || t.error !== null);
+    expect(accountTunnels()).toEqual([FIRST_TUNNEL]);
+  });
+
+  it("finds a forgotten domain's tunnels by name when its credential can't be read", async () => {
+    await connect("familyfi.example.com");
+    addRecord(tunnelRecord("our-record", "familyfi.example.com", FIRST_TUNNEL));
+    await unreadableCredential();
+    await put({ mode: "off", forget: true });
+    expect(await waitFor((t) => t.status === "off", "the cleanup", 150)).toMatchObject({ error: null });
+    expect(accountTunnels()).toEqual([]);
+    expect(records).toEqual([]);
+    // Found by name, so not forced: a tunnel someone else still runs would not be deleted.
+    expect(readFileSync(log, "utf8")).toMatch(new RegExp(`argv: tunnel --origincert \\S+ delete ${FIRST_TUNNEL}`));
+  });
+
+  it("reports a failed Forget sign-in", async () => {
+    await connect("familyfi.example.com");
+    writeFileSync(path.join(dir, "login-fails"), "");
+    await put({ mode: "off", forget: true });
+    const left = await waitFor((t) => t.status === "off" && t.error !== null, "the leftover note", 150);
+    expect(left.error).toBe("Cloudflare sign-in did not finish. The tunnel and DNS record for familyfi.example.com stay in your Cloudflare account; delete them there.");
   });
 
   it("refuses to take over a hostname that already has a DNS record", async () => {
@@ -369,6 +460,138 @@ describe("remote access", () => {
     const failed = await waitFor((t) => t.status === "error", "the refusal");
     expect(failed.error).toBe("Another route already uses https://familyfi.example.com. Remove it first, or choose another hostname.");
     expect(await prisma().connectionEndpoint.count({ where: { kind: "domain" } })).toBe(0);
+    // The tunnel and record made for it are taken back out.
+    expect(accountTunnels()).toEqual([]);
+    expect(dnsCalls).toContain(`GET /zones/zone-1/dns_records?type=CNAME&content=${FIRST_TUNNEL}.cfargotunnel.com Bearer fake-zone-api-token`);
     expect(await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: taken.id } })).toMatchObject({ kind: "own", url: "https://familyfi.example.com" });
+  });
+
+  /** The tunnels the stand-in cloudflared still has in the account, by id. */
+  function accountTunnels(): string[] {
+    const file = path.join(dir, "tunnels");
+    return existsSync(file) ? readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((line) => line.split(" ")[0]) : [];
+  }
+
+  /** Puts a record in the stand-in zone, where the stand-in cloudflared's `route dns` also sees it. */
+  function addRecord(record: DnsRecord) {
+    records.push(record);
+    mkdirSync(path.join(dir, "dns"), { recursive: true });
+    writeFileSync(path.join(dir, "dns", record.name), "");
+  }
+
+  /** The CNAME `cloudflared tunnel route dns` would have made for a tunnel. */
+  function tunnelRecord(id: string, name: string, tunnelId: string): DnsRecord {
+    return { id, type: "CNAME", name, content: `${tunnelId}.cfargotunnel.com` };
+  }
+
+  async function connect(hostname: string, label = hostname) {
+    await put({ mode: "named", hostname });
+    return waitFor((t) => t.status === "running" && t.url === `https://${hostname}`, label, 150);
+  }
+
+  it("removes the old hostname's DNS record and tunnel once a new hostname is live", async () => {
+    const first = await connect("familyfi.example.com");
+    addRecord(tunnelRecord("old-record", "familyfi.example.com", FIRST_TUNNEL));
+
+    const changed = await connect("home.example.com");
+    // The domain route keeps its id, so phones follow it to the new hostname.
+    expect(changed).toMatchObject({ endpointId: first.endpointId, hostname: "home.example.com", error: null });
+    expect(records).toEqual([]);
+    expect(accountTunnels()).toEqual([SECOND_TUNNEL]);
+    const calls = readFileSync(log, "utf8");
+    // Each setup names its own tunnel, and the old one goes by its recorded id, never by name.
+    expect(calls).toMatch(/argv: tunnel --origincert \S+ create --credentials-file \S+ familyfi-\S+-[0-9a-f]{8}\n/);
+    expect(calls).toMatch(new RegExp(`argv: tunnel --origincert \\S+ delete -f ${FIRST_TUNNEL}`));
+    expect(calls).not.toMatch(/delete familyfi-/);
+    // The calls carry the zone token from the sign-in certificate.
+    expect(dnsCalls).toContain("DELETE /zones/zone-1/dns_records/old-record Bearer fake-zone-api-token");
+  });
+
+  it("leaves a record under the old hostname that points somewhere else", async () => {
+    await connect("familyfi.example.com");
+    const theirs = { id: "their-record", type: "CNAME", name: "familyfi.example.com", content: "someone-else.example.net" };
+    addRecord(theirs);
+    await connect("home.example.com");
+    expect(records).toEqual([theirs]);
+    expect(dnsCalls.some((call) => call.startsWith("DELETE"))).toBe(false);
+  });
+
+  it.each([500, 403])("still moves to the new hostname when Cloudflare answers %i, and says what is left", async (status) => {
+    await connect("familyfi.example.com");
+    addRecord(tunnelRecord("old-record", "familyfi.example.com", FIRST_TUNNEL));
+    dnsFailure = status;
+
+    const changed = await connect("home.example.com");
+    expect(changed.error).toBe("The old DNS record for familyfi.example.com could not be removed; delete it in Cloudflare.");
+    expect(records).toHaveLength(1);
+    // The old tunnel goes even so: deleting it needs only cloudflared.
+    expect(accountTunnels()).toEqual([SECOND_TUNNEL]);
+  });
+
+  it("says what is left when the sign-in certificate has no API token, or the old tunnel won't delete", async () => {
+    await connect("familyfi.example.com");
+    writeFileSync(path.join(dir, "legacy-cert"), "");
+    writeFileSync(path.join(dir, "delete-fails"), "");
+    const changed = await connect("home.example.com");
+    expect(changed.error).toBe(
+      `The old DNS record for familyfi.example.com could not be removed; delete it in Cloudflare. The old tunnel ${FIRST_TUNNEL} could not be removed; delete it in Cloudflare.`,
+    );
+    expect(dnsCalls).toEqual([]);
+  });
+
+  it("brings the old domain back when the new hostname can't be routed", async () => {
+    const first = await connect("familyfi.example.com");
+    addRecord(tunnelRecord("old-record", "familyfi.example.com", FIRST_TUNNEL));
+
+    await put({ mode: "named", hostname: "taken.example.com" });
+    const kept = await waitFor((t) => t.status === "running" && t.error !== null, "the old domain again", 150);
+    expect(kept).toMatchObject({ url: "https://familyfi.example.com", hostname: "familyfi.example.com", endpointId: first.endpointId });
+    expect(kept.error).toContain("taken.example.com already has a DNS record");
+    expect(await publishedIds()).toEqual([first.endpointId]);
+    // Its tunnel and record were never touched; only the new tunnel was taken out again.
+    expect(accountTunnels()).toEqual([FIRST_TUNNEL]);
+    expect(records).toHaveLength(1);
+    expect(readFileSync(log, "utf8").split("\n").filter((line) => line.startsWith("cred-contents:")).at(-1)).toContain(FIRST_TUNNEL);
+  });
+
+  it("replaces its own leftover record when a forgotten hostname is connected again", async () => {
+    await connect("familyfi.example.com");
+    addRecord(tunnelRecord("old-record", "familyfi.example.com", FIRST_TUNNEL));
+    await put({ mode: "off", forget: true });
+
+    await connect("familyfi.example.com", "the same hostname again");
+    expect(records).toEqual([]);
+    // The forgotten tunnel was found by its name in the account and removed by id.
+    expect(readFileSync(log, "utf8")).toMatch(/argv: tunnel --origincert \S+ list --name-prefix familyfi-\S+ --output json/);
+    expect(accountTunnels()).toEqual([SECOND_TUNNEL]);
+  });
+
+  it("connects after Forget even when the account's tunnels can't be listed", async () => {
+    await connect("familyfi.example.com");
+    await put({ mode: "off", forget: true });
+    writeFileSync(path.join(dir, "list-broken"), "");
+    expect((await connect("home.example.com")).error).toBeNull();
+    expect(accountTunnels()).toEqual([FIRST_TUNNEL, SECOND_TUNNEL]);
+  });
+
+  /** Replaces the domain route's tunnel credential with one FamilyFi can't use, as after a damaged backup. */
+  async function unreadableCredential() {
+    const sealed = encryptSecret("not a tunnel credential");
+    await prisma().connectionEndpoint.updateMany({
+      where: { kind: "domain" },
+      data: { tunnelCredentialCiphertext: new Uint8Array(sealed.ciphertext), tunnelCredentialIv: new Uint8Array(sealed.iv), tunnelCredentialAuthTag: new Uint8Array(sealed.authTag) },
+    });
+  }
+
+  it("reconnects the same hostname when the domain's credential can't be read, replacing its own record", async () => {
+    await connect("familyfi.example.com");
+    addRecord(tunnelRecord("our-record", "familyfi.example.com", FIRST_TUNNEL));
+    await unreadableCredential();
+    await put({ mode: "off" });
+
+    const back = await connect("familyfi.example.com", "the same hostname again");
+    expect(back.error).toBeNull();
+    expect(records).toEqual([]);
+    expect(accountTunnels()).toEqual([SECOND_TUNNEL]);
   });
 });

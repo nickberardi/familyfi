@@ -52,7 +52,9 @@ def execute(plan, resources, report, args, lookup):
                 resources.migrate(env, log=directory / "migrate.log")
             if environment["build"]:
                 env.update(CI="1", FAMILYFI_MODE="test", PLAYWRIGHT_PORT=str(resources.port(platform)),
-                           CLOUDFLARED_BIN=str(resources.root / "tests/fixtures/cloudflared/cloudflared"))
+                           CLOUDFLARED_BIN=str(resources.root / "tests/fixtures/cloudflared/cloudflared"),
+                           # The stand-in's sign-in token must never reach Cloudflare: nothing answers here.
+                           CLOUDFLARE_API_URL="http://127.0.0.1:9")
                 if build_error:
                     raise RuntimeError(build_error)
                 if not built:

@@ -1,16 +1,17 @@
 import type { ChildProcess } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { ConnectionTransport, ConnectionTrustMode, RouteKind, type ConnectionEndpoint } from "@prisma/client";
-import { isUniqueViolation } from "../connection";
+import { ensureConnectionIdentity, isUniqueViolation } from "../connection";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { prisma } from "../db";
 import {
   findCloudflared,
   loginUrl,
+  parseOriginCert,
   parseTunnelCredential,
   quickTunnelUrl,
   runCloudflared,
@@ -19,8 +20,10 @@ import {
   tunnelError,
   tunnelRegistered,
   validHostname,
+  type OriginCert,
   type TunnelCredential,
 } from "./cloudflared";
+import { deleteTunnelDnsRecords } from "./cloudflare-dns";
 import { startPhoneGateway } from "./phone-gateway";
 
 export type RemoteAccessStatus = "off" | "signing-in" | "starting" | "running" | "error" | "unavailable";
@@ -49,6 +52,8 @@ type Runtime = {
   loginUrl: string | null;
   child: ChildProcess | null;
   setup: AbortController | null;
+  /** The setup running is Forget domain's cleanup in Cloudflare, not a domain coming up. */
+  forgetting: boolean;
   gateway: { server: Server; port: number } | null;
   restartTimer: ReturnType<typeof setTimeout> | null;
   attempts: number;
@@ -67,6 +72,7 @@ const runtime: Runtime = ((globalThis as { familyfiRemoteAccess?: Runtime }).fam
   loginUrl: null,
   child: null,
   setup: null,
+  forgetting: false,
   gateway: null,
   restartTimer: null,
   attempts: 0,
@@ -224,6 +230,7 @@ function stopAll() {
   runtime.restartTimer = null;
   runtime.setup?.abort();
   runtime.setup = null;
+  runtime.forgetting = false;
   runtime.child?.kill();
   runtime.child = null;
   runtime.url = null;
@@ -345,50 +352,153 @@ async function saveDomainRoute(hostname: string, credential: TunnelCredential) {
   }
 }
 
+/** Tunnels FamilyFi made for this household: `familyfi-<instance id>`, or that with a suffix since each setup names its own. */
+function ownTunnelName(base: string, name: string): boolean {
+  return name === base || new RegExp(`^${base.replace(/[^\w-]/g, "\\$&")}-[0-9a-f]{8}$`).test(name);
+}
+
+/** The ids of this household's tunnels in the account, for finding what a forgotten domain left behind. */
+async function listOwnTunnels(bin: string, args: { home: string; signal: AbortSignal }, origin: string[], base: string): Promise<string[]> {
+  const listed = await runCloudflared(bin, ["tunnel", ...origin, "list", "--name-prefix", base, "--output", "json"], { ...args, timeoutMs: 30_000 });
+  // The JSON is on stdout alone; cloudflared logs, an update notice say, go to stderr after it. A failed list
+  // prints no JSON: nothing is found, and setup carries on as on a first connect.
+  try {
+    const tunnels = JSON.parse(listed.stdout) as { id?: string; name?: string }[];
+    return tunnels.filter((tunnel) => tunnel.id && tunnel.name && ownTunnelName(base, tunnel.name)).map((tunnel) => tunnel.id!);
+  } catch {
+    console.warn(`Remote access: could not list FamilyFi's tunnels in Cloudflare: ${tunnelError(listed.output) ?? `exit ${listed.code}`}`);
+    return [];
+  }
+}
+
+function readCredential(route: ConnectionEndpoint | null): TunnelCredential | null {
+  try {
+    return route ? storedCredential(route) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A finished Cloudflare sign-in: cloudflared commands that act with its certificate, and the certificate's API token. */
+type SignedIn = { run: (args: string[], signal?: AbortSignal) => ReturnType<typeof runCloudflared>; api: OriginCert | null; list: (base: string) => Promise<string[]> };
+
+/**
+ * Runs `cloudflared tunnel login` in `home`, showing its link while a person authorizes
+ * FamilyFi. Null when aborted. The certificate it writes stays in `home`, which the caller deletes.
+ */
+async function signIn(bin: string, home: string, signal: AbortSignal): Promise<SignedIn | null> {
+  runtime.status = "signing-in";
+  const login = await runCloudflared(bin, ["tunnel", "login"], {
+    home,
+    timeoutMs: LOGIN_TIMEOUT_MS,
+    signal,
+    onOutput: (text) => {
+      runtime.loginUrl ??= loginUrl(text);
+    },
+  });
+  runtime.loginUrl = null;
+  if (signal.aborted) return null;
+  const cert = path.join(home, ".cloudflared", "cert.pem");
+  if (login.code !== 0 || !existsSync(cert)) {
+    throw new RemoteAccessError("Cloudflare sign-in did not finish. Start again and complete the authorization within five minutes.");
+  }
+  runtime.status = "starting";
+  const origin = ["--origincert", cert];
+  let api: OriginCert | null = null;
+  try {
+    api = parseOriginCert(readFileSync(cert, "utf8"));
+  } catch (error) {
+    console.warn(`Remote access: ${error instanceof Error ? error.message : String(error)} Old DNS records are left in place.`);
+  }
+  return {
+    run: (args, runSignal) => runCloudflared(bin, ["tunnel", ...origin, ...args], { home, timeoutMs: 30_000, signal: runSignal }),
+    api,
+    list: (base) => listOwnTunnels(bin, { home, signal }, origin, base),
+  };
+}
+
+/**
+ * Deletes FamilyFi's old tunnels by their ids, each after the DNS records pointing at it, and
+ * returns what could not be removed, as sentences for the person to act on. `hostname` is the
+ * one the person knows those records by, when there is one. `force` is for the domain's own
+ * recorded tunnel, which this process stopped moments ago and Cloudflare may still count
+ * connections for; a tunnel only found by name is never forced, in case another FamilyFi (a
+ * restored backup, say) still runs it.
+ */
+async function removeOldTunnels(cloudflare: SignedIn, hostname: string | null, tunnelIds: string[], force: boolean): Promise<string[]> {
+  const leftovers: string[] = [];
+  const records = async (tunnelId: string) => {
+    try {
+      if (!cloudflare.api) throw new Error("no API token in the sign-in certificate");
+      await deleteTunnelDnsRecords({ cert: cloudflare.api, tunnelId, hostname: hostname ?? undefined });
+    } catch (error) {
+      console.warn(`Remote access: could not remove the DNS records for the old tunnel ${tunnelId}: ${error instanceof Error ? error.message : String(error)}`);
+      leftovers.push(hostname ? `The old DNS record for ${hostname} could not be removed; delete it in Cloudflare.` : `The DNS records for the old tunnel ${tunnelId} could not be removed; delete them in Cloudflare.`);
+    }
+  };
+  for (const tunnelId of tunnelIds) {
+    // The recorded tunnel's records go first: they no longer reach anything. A tunnel found by name keeps
+    // its records unless it could be deleted, so one another FamilyFi still runs keeps working.
+    if (force) await records(tunnelId);
+    const deleted = await cloudflare.run(["delete", ...(force ? ["-f"] : []), tunnelId]);
+    if (deleted.code !== 0) {
+      console.warn(`Remote access: could not delete the old tunnel ${tunnelId}: ${tunnelError(deleted.output) ?? `exit ${deleted.code}`}`);
+      leftovers.push(`The old tunnel ${tunnelId} could not be removed; delete it in Cloudflare.`);
+    } else if (!force) await records(tunnelId);
+  }
+  return leftovers;
+}
+
+/** FamilyFi's tunnels are named for this install's instance id, so a name never matches another install's. */
+async function tunnelBase(): Promise<string> {
+  return `familyfi-${(await ensureConnectionIdentity()).instanceId}`;
+}
+
 /**
  * One-time "Use my domain" setup, the way Scrypted's cloud plugin does it: a person
  * authorizes FamilyFi in Cloudflare, FamilyFi creates a tunnel and a DNS record for
  * the hostname, keeps only that tunnel's credential (encrypted, on the domain route),
  * and throws away the account-wide certificate the login produced.
+ *
+ * A hostname change saves the new domain before it removes anything, so a change that
+ * fails leaves the old domain working. Only then, while the certificate still exists, it
+ * removes the old tunnel and the DNS record FamilyFi made for it. That cleanup never
+ * blocks the change: what it could not remove comes back as a warning to show.
  */
-async function connectDomain(hostname: string, signal: AbortSignal) {
+async function connectDomain(hostname: string, signal: AbortSignal): Promise<string | null> {
   const binary = findCloudflared();
   if (!binary) throw new RemoteAccessError("cloudflared is not installed on this server.");
-  const row = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const previous = await routeOfKind(RouteKind.domain);
+  const oldHostname = previous ? new URL(previous.url).hostname : null;
   const home = mkdtempSync(path.join(tmpdir(), "familyfi-cloudflared-setup-"));
   try {
-    runtime.status = "signing-in";
-    const login = await runCloudflared(binary.bin, ["tunnel", "login"], {
-      home,
-      timeoutMs: LOGIN_TIMEOUT_MS,
-      signal,
-      onOutput: (text) => {
-        runtime.loginUrl ??= loginUrl(text);
-      },
-    });
-    runtime.loginUrl = null;
-    if (signal.aborted) return;
-    const cert = path.join(home, ".cloudflared", "cert.pem");
-    if (login.code !== 0 || !existsSync(cert)) {
-      throw new RemoteAccessError("Cloudflare sign-in did not finish. Start again and complete the authorization within five minutes.");
+    const cloudflare = await signIn(binary.bin, home, signal);
+    if (!cloudflare) return null;
+    const { run, api } = cloudflare;
+    const base = await tunnelBase();
+    // The tunnel the domain route runs, or, after Forget or with a credential FamilyFi can't read, whatever tunnels of ours are in the account.
+    const recorded = readCredential(previous)?.TunnelID;
+    const oldTunnels = recorded ? [recorded] : await cloudflare.list(base);
+
+    // A record FamilyFi made for this hostname before (a forgotten domain, or one whose credential it can't read)
+    // is removed so the hostname can be routed; anyone else's record stops setup below.
+    for (const tunnelId of oldTunnels) {
+      if (api) await deleteTunnelDnsRecords({ cert: api, tunnelId, only: hostname }).catch((error) => console.warn(`Remote access: could not remove the old DNS record for ${hostname}: ${error instanceof Error ? error.message : String(error)}`));
     }
 
-    runtime.status = "starting";
-    const origin = ["--origincert", cert];
-    const name = `familyfi-${row.instanceId ?? "household"}`;
-    // A setup that ran before (same household) leaves a tunnel with this name; clear it so create succeeds.
-    await runCloudflared(binary.bin, ["tunnel", ...origin, "delete", name], { home, timeoutMs: 30_000, signal });
+    // Each setup names its own tunnel, so the old one keeps running until the new domain is saved.
+    const name = `${base}-${randomBytes(4).toString("hex")}`;
     const credentialPath = path.join(home, "tunnel.json");
-    const created = await runCloudflared(binary.bin, ["tunnel", ...origin, "create", "--credentials-file", credentialPath, name], { home, timeoutMs: 30_000, signal });
+    const created = await run(["create", "--credentials-file", credentialPath, name], signal);
     if (created.code !== 0 || !existsSync(credentialPath)) {
       throw new RemoteAccessError(`Cloudflare could not create the tunnel. ${tunnelError(created.output) ?? ""}`.trim());
     }
     const credential = parseTunnelCredential(readFileSync(credentialPath, "utf8"));
 
     // No --overwrite-dns: an existing record for this hostname is the household's, not ours to replace.
-    const routed = await runCloudflared(binary.bin, ["tunnel", ...origin, "route", "dns", credential.TunnelID, hostname], { home, timeoutMs: 30_000, signal });
+    const routed = await run(["route", "dns", credential.TunnelID, hostname], signal);
     if (routed.code !== 0) {
-      await runCloudflared(binary.bin, ["tunnel", ...origin, "delete", credential.TunnelID], { home, timeoutMs: 30_000 });
+      await run(["delete", credential.TunnelID]);
       const reason = tunnelError(routed.output) ?? "";
       throw new RemoteAccessError(
         /already exists/i.test(routed.output)
@@ -397,9 +507,45 @@ async function connectDomain(hostname: string, signal: AbortSignal) {
       );
     }
 
-    await saveDomainRoute(hostname, credential);
+    try {
+      await saveDomainRoute(hostname, credential);
+    } catch (error) {
+      // Nothing points at the new tunnel; take it and its record back out rather than leave them behind.
+      if (api) await deleteTunnelDnsRecords({ cert: api, tunnelId: credential.TunnelID }).catch(() => undefined);
+      await run(["delete", "-f", credential.TunnelID]);
+      throw error;
+    }
+
+    // The new domain is saved: remove what the old one left, by its recorded tunnel id, never by name.
+    const stale = oldTunnels.filter((id) => id !== credential.TunnelID);
+    const leftovers = await removeOldTunnels(cloudflare, oldHostname && oldHostname !== hostname ? oldHostname : null, stale, Boolean(recorded));
+    return leftovers.length ? leftovers.join(" ") : null;
   } finally {
     // The login certificate can create and delete tunnels and DNS across the whole zone. It never outlives setup.
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Forget domain's cleanup in Cloudflare, after the domain route is already gone: one more
+ * sign-in, then FamilyFi deletes its tunnel and that hostname's DNS record. Returns what is
+ * left for the person to delete, or null when nothing is (or the sign-in was cancelled).
+ */
+async function forgetInCloudflare(hostname: string, tunnelId: string | null, signal: AbortSignal): Promise<string | null> {
+  const left = `The tunnel and DNS record for ${hostname} stay in your Cloudflare account; delete them there.`;
+  const binary = findCloudflared();
+  if (!binary) return left; // coverage-exempt: cloudflared set this domain up, so it is missing only if removed since
+  const home = mkdtempSync(path.join(tmpdir(), "familyfi-cloudflared-setup-"));
+  try {
+    const cloudflare = await signIn(binary.bin, home, signal);
+    if (!cloudflare) return null;
+    // A credential FamilyFi could no longer read: its tunnels are still found by name in the account.
+    const tunnels = tunnelId ? [tunnelId] : await cloudflare.list(await tunnelBase());
+    const leftovers = await removeOldTunnels(cloudflare, hostname, tunnels, Boolean(tunnelId));
+    return leftovers.length ? leftovers.join(" ") : null;
+  } catch {
+    return `Cloudflare sign-in did not finish. ${left}`;
+  } finally {
     rmSync(home, { recursive: true, force: true });
   }
 }
@@ -407,6 +553,7 @@ async function connectDomain(hostname: string, signal: AbortSignal) {
 function modeOf(route: ConnectionEndpoint | null): RemoteAccessMode {
   if (route) return route.kind === RouteKind.quick ? "quick" : "named";
   // Nothing is published while a first quick tunnel comes up or a domain is being set up.
+  if (runtime.forgetting) return "off";
   if (runtime.setup || runtime.wanted === RouteKind.domain) return "named";
   return runtime.wanted === RouteKind.quick ? "quick" : "off";
 }
@@ -454,7 +601,23 @@ async function namedTarget(change: Extract<RemoteAccessChange, { mode: "named" }
   const hostname = change.hostname?.trim().toLowerCase() || setUp;
   if (!hostname || !validHostname(hostname)) throw new RemoteAccessError("Enter a hostname on a domain in your Cloudflare account, like familyfi.example.com.");
   // Already set up for this hostname: just run it.
-  return domain && hostname === setUp && storedCredential(domain) ? ({ domain } as const) : ({ hostname } as const);
+  return domain && hostname === setUp && readCredential(domain) ? ({ domain } as const) : ({ hostname } as const);
+}
+
+/** Signs in to Cloudflare once more in the background to delete a forgotten domain's tunnel and DNS record. */
+function forget(hostname: string, tunnelId: string | null) {
+  const setup = new AbortController();
+  runtime.setup = setup;
+  runtime.forgetting = true;
+  runtime.status = "signing-in";
+  const done = (left: string | null) => {
+    if (runtime.setup !== setup) return;
+    runtime.setup = null;
+    runtime.forgetting = false;
+    runtime.status = "off";
+    runtime.error = left;
+  };
+  void forgetInCloudflare(hostname, tunnelId, setup.signal).then(done, () => done(`The tunnel and DNS record for ${hostname} stay in your Cloudflare account; delete them there.`)); // coverage-exempt: the rejection is only a temporary directory that can't be made
 }
 
 export async function setRemoteAccess(change: RemoteAccessChange) {
@@ -465,11 +628,13 @@ export async function setRemoteAccess(change: RemoteAccessChange) {
 
   if (change.mode === "off") {
     await stopTunnel();
+    const domain = change.forget ? await routeOfKind(RouteKind.domain) : null;
     await prisma().$transaction(async (db) => {
       await publish(db, null, false);
       // The credential lives on the domain route, so forgetting the domain deletes it with the route.
       if (change.forget) await db.connectionEndpoint.deleteMany({ where: { householdId: "default", kind: RouteKind.domain } });
     });
+    if (domain) forget(new URL(domain.url).hostname, readCredential(domain)?.TunnelID ?? null);
     return;
   }
 
@@ -496,25 +661,41 @@ export async function setRemoteAccess(change: RemoteAccessChange) {
   }
 
   // New hostname: stop publishing whatever ran before, then set up in the background while the page polls.
+  const before = await publishedRoute();
   await prisma().$transaction((db) => publish(db, null, false));
   runtime.wanted = RouteKind.domain;
   const setup = new AbortController();
   runtime.setup = setup;
   runtime.status = "signing-in";
   void connectDomain(target!.hostname!, setup.signal)
-    .then(async () => {
+    .then(async (warning) => {
       if (setup.signal.aborted || runtime.setup !== setup) return;
       runtime.setup = null;
       const route = await routeOfKind(RouteKind.domain);
       if (route) await prisma().$transaction((db) => publish(db, route.id, false));
       await launch();
+      if (warning) runtime.error = [runtime.error, warning].filter(Boolean).join(" ");
     })
-    .catch((error) => {
+    .catch(async (error) => {
       if (runtime.setup !== setup) return;
       runtime.setup = null;
+      runtime.loginUrl = null;
+      const message = error instanceof Error ? error.message : String(error);
+      // A failed hostname change leaves the domain that was running untouched: run it again.
+      if (before?.kind === RouteKind.domain && readCredential(await routeOfKind(RouteKind.domain))) {
+        await prisma().$transaction((db) => publish(db, before.id, false));
+        await launch();
+        runtime.error = [message, runtime.error].filter(Boolean).join(" ");
+        return;
+      }
       runtime.wanted = null;
       runtime.status = "error";
-      runtime.loginUrl = null;
+      runtime.error = message;
+    })
+    .catch((error) => {
+      // coverage-exempt: a database failure while restoring the old domain
+      runtime.status = "error";
+      // coverage-exempt: a database failure while restoring the old domain
       runtime.error = error instanceof Error ? error.message : String(error);
     });
 }

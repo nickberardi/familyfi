@@ -105,8 +105,10 @@ Cloudflare account (for example `familyfi.example.com`), and **Connect with Clou
 shows a Cloudflare link; open it, pick the domain, and come back — the page updates by itself.
 FamilyFi then:
 
-1. creates a tunnel named `familyfi-<instance id>` and a DNS record for the hostname. It never
-   overwrites a record that already exists; choose another hostname or remove that record first;
+1. creates a tunnel named `familyfi-<instance id>-<random>` and a DNS record for the hostname. It
+   never overwrites a record that already exists; choose another hostname or remove that record
+   first. The one exception is a record FamilyFi itself made for a domain you forgot: connecting
+   that hostname again replaces it;
 2. stores only that tunnel's credential, on the `domain` route and encrypted with
    `FAMILYFI_ENCRYPTION_KEY` like the UniFi key, and passes it to `cloudflared` through its
    environment, never a file;
@@ -114,9 +116,23 @@ FamilyFi then:
    create and delete tunnels and DNS across the zone.
 
 The address is permanent, so phones keep working across restarts. The tunnel still reaches only
-the phone-only gateway. **Forget domain** deletes the domain route and its credential and turns
-remote access off; the tunnel and DNS record stay in your Cloudflare account until you remove them
-there. Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
+the phone-only gateway.
+
+**Changing the hostname** signs in to Cloudflare again and saves the new domain before removing
+anything, so a change that fails (a hostname that is taken, say) brings the old one back. Once
+the new hostname is set up, FamilyFi deletes its old tunnel and the old hostname's DNS record,
+while it still holds the sign-in certificate: the record only if it still points at that tunnel, so
+a record FamilyFi did not create is never touched. If Cloudflare refuses (for example, the old
+hostname is in a zone the sign-in did not cover), the new hostname still goes live and the page says
+which record or tunnel to delete in Cloudflare yourself.
+
+**Forget domain** deletes the domain route and its credential and turns remote access off at once,
+then shows one more Cloudflare link: sign in, and FamilyFi deletes its tunnel and the hostname's
+DNS record (again only a record pointing at that tunnel). **Keep them** leaves both in your
+Cloudflare account; so does a sign-in that does not finish, and the page then says what to delete there.
+The next time you connect a domain, FamilyFi finds what it left behind and removes it then.
+
+Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
 
 ### Your own Cloudflare Tunnel, and Cloudflare Access (Advanced)
 

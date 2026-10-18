@@ -368,9 +368,22 @@ test("sets up remote access on a domain through the Cloudflare sign-in link", { 
     await expect(card.getByTestId("published-route")).toContainText("Cloudflare Tunnel");
     expect(await enabledUrls(page)).toEqual([`https://${hostname}`]);
     await shot(page, "remote-domain-running");
+
+    // Forget asks for one more sign-in to delete FamilyFi's tunnel and DNS record; Keep them leaves them.
+    page.once("dialog", (dialog) => void dialog.accept());
+    await card.getByRole("button", { name: "Forget domain" }).click();
+    const removal = card.getByRole("link", { name: "Sign in to Cloudflare to delete them" });
+    await expect(removal).toHaveAttribute("href", /^https:\/\/dash\.cloudflare\.com\/argotunnel/);
+    await expect(card.getByTestId("remote-login")).toContainText(`${hostname} is forgotten.`);
+    await shot(page, "remote-domain-forget");
+    await card.getByRole("button", { name: "Keep them" }).click();
+    await expect(removal).toBeHidden();
+    expect(await enabledUrls(page)).toEqual([]);
   } finally {
     await signIn(page);
     await page.request.put("/api/v1/connection/tunnel", { headers: await csrf(page), data: { mode: "off", forget: true } });
+    // Skip Forget's Cloudflare sign-in: the stand-in has nothing real to delete.
+    await page.request.put("/api/v1/connection/tunnel", { headers: await csrf(page), data: { mode: "off" } });
   }
 });
 

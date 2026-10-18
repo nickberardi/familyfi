@@ -70,6 +70,7 @@ export function RemoteAccessCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [seen, setSeen] = useState<string | null>(null);
+  const [forgotten, setForgotten] = useState("");
 
   const published = routes?.find((route) => route.id === tunnel?.endpointId) ?? null;
   const publishedChoice = tunnel && routes ? remoteChoice(tunnel, routes) : "off";
@@ -208,6 +209,33 @@ export function RemoteAccessCard({
         />
 
         {choice === "off" ? <p className="text-[var(--ff-muted)]">No route is published, so phones can&rsquo;t reach home or pair.</p> : null}
+        {choice === "off" && (settingUp || tunnel?.status === "starting") ? (
+          // Forget domain's last step: one more sign-in, so FamilyFi can delete its tunnel and DNS record.
+          <div data-testid="remote-login" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5">
+            {settingUp ? (
+              <>
+                <div className="min-w-[200px] flex-1">
+                  {forgotten || "Your domain"} is forgotten. FamilyFi&rsquo;s tunnel and DNS record for it are still in Cloudflare.{" "}
+                  {tunnel?.loginUrl ? (
+                    <>
+                      <a href={tunnel.loginUrl} target="_blank" rel="noreferrer" className="font-semibold text-[var(--ff-accent)] underline">
+                        Sign in to Cloudflare to delete them
+                      </a>
+                      , choose the domain it&rsquo;s on, then come back here.
+                    </>
+                  ) : (
+                    <span className="text-[var(--ff-muted)]">Asking Cloudflare for a sign-in link…</span>
+                  )}
+                </div>
+                <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={() => void put({ mode: "off" })}>
+                  Keep them
+                </button>
+              </>
+            ) : (
+              <span className="text-[var(--ff-muted)]">Deleting FamilyFi&rsquo;s tunnel and DNS record in Cloudflare…</span>
+            )}
+          </div>
+        ) : null}
 
         {choice === "quick" ? (
           <p className="text-[var(--ff-muted)]">
@@ -338,7 +366,13 @@ export function RemoteAccessCard({
                       className="text-[14px] font-semibold text-[var(--ff-danger)]"
                       disabled={busy}
                       onClick={() => {
-                        if (!window.confirm(`Forget ${tunnel.hostname}? FamilyFi deletes its tunnel key and turns remote access off. The tunnel and DNS record stay in your Cloudflare account until you remove them there.`)) return;
+                        if (
+                          !window.confirm(
+                            `Forget ${tunnel.hostname}? FamilyFi deletes its tunnel key and turns remote access off, then asks you to sign in to Cloudflare once more so it can delete its tunnel and DNS record there.`,
+                          )
+                        )
+                          return;
+                        setForgotten(tunnel.hostname ?? "");
                         setHostname("");
                         void put({ mode: "off", forget: true });
                       }}

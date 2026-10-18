@@ -144,6 +144,7 @@ describe("naming conventions (AGENTS.md)", () => {
       "KILL_PORT",
       "SKIP_DB_PREPARE",
       "CLOUDFLARED_BIN",
+      "CLOUDFLARE_API_URL",
       "BASE_REF",
       "BREAKING_API_APPROVED",
     ]);

@@ -66,6 +66,11 @@
         "display"
       ]
     },
+    "tests/unit/cloudflare-dns.test.ts": {
+      "categories": [
+        "trust"
+      ]
+    },
     "tests/unit/client-boundary.test.ts": {
       "categories": [
         "repository"

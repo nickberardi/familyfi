@@ -1,7 +1,11 @@
 #!/bin/sh
 # Stand-in for cloudflared in integration tests. It follows the real CLI's command
 # shapes and log lines, and records what it was given in $FAKE_CLOUDFLARED_LOG.
+# Tunnels it creates are kept in a `tunnels` file next to the log until deleted.
 log="${FAKE_CLOUDFLARED_LOG:-/dev/null}"
+# Without a log (the browser tests), state lives in this command's HOME, which one setup shares.
+state="$HOME"
+[ -n "${FAKE_CLOUDFLARED_LOG:-}" ] && state="$(dirname "$log")"
 echo "argv: $*" >> "$log"
 echo "home: $HOME" >> "$log"
 
@@ -18,16 +22,51 @@ case " $* " in
     echo "Leave cloudflared running to download the cert automatically." >&2
     # A person takes a while to authorize; long enough for the page to poll and show the link.
     sleep 4
-    mkdir -p "$HOME/.cloudflared" && echo "ACCOUNT-WIDE-CERT" > "$HOME/.cloudflared/cert.pem"
+    if [ -e "$state/login-fails" ]; then echo "2026-09-23T00:00:00Z ERR Failed to fetch resource" >&2; exit 1; fi
+    mkdir -p "$HOME/.cloudflared"
+    if [ -e "$state/legacy-cert" ]; then
+      # An old-style certificate: no API token FamilyFi can read.
+      printf -- '-----BEGIN CERTIFICATE-----\nMIIBfake\n-----END CERTIFICATE-----\n' > "$HOME/.cloudflared/cert.pem"
+    else
+      # The real layout: a PEM block holding base64 JSON with the zone's API token.
+      token=$(printf '{"zoneID":"zone-1","accountID":"acct","apiToken":"fake-zone-api-token"}' | base64 | tr -d '\n')
+      printf -- '-----BEGIN ARGO TUNNEL TOKEN-----\n%s\n-----END ARGO TUNNEL TOKEN-----\n' "$token" > "$HOME/.cloudflared/cert.pem"
+    fi
     echo "You have successfully logged in." >&2
     exit 0 ;;
-  *" delete "*) echo "2026-09-23T00:00:00Z ERR tunnel not found" >&2; exit 1 ;;
+  *" list "*)
+    if [ -e "$state/list-broken" ]; then echo "2026-09-23T00:00:00Z ERR Cloudflare API unavailable" >&2; exit 1; fi
+    printf '['
+    sep=""
+    if [ -e "$state/tunnels" ]; then
+      while read -r id name; do printf '%s{"id":"%s","name":"%s","created_at":"2026-09-23T00:00:00Z","deleted_at":"0001-01-01T00:00:00Z","connections":[]}' "$sep" "$id" "$name"; sep=","; done < "$state/tunnels"
+    fi
+    printf ']\n'
+    # The real CLI can log a version notice to stderr after the JSON.
+    echo "2026-09-23T00:00:00Z WRN Your version 2026.9.1 is outdated. We recommend upgrading it to 2026.10.0" >&2
+    exit 0 ;;
+  *" delete "*)
+    id=$(echo "$*" | awk '{print $NF}')
+    if [ -e "$state/delete-fails" ]; then echo "2026-09-23T00:00:00Z ERR Error deleting tunnel $id: unauthorized" >&2; exit 1; fi
+    if [ -e "$state/tunnels" ] && grep -q "^$id " "$state/tunnels"; then
+      grep -v "^$id " "$state/tunnels" > "$state/tunnels.next"; mv "$state/tunnels.next" "$state/tunnels"
+      echo "Deleted tunnel $id" >&2; exit 0
+    fi
+    echo "2026-09-23T00:00:00Z ERR tunnel not found" >&2; exit 1 ;;
   *" create "*)
     creds=$(echo "$*" | sed -n 's/.*--credentials-file \([^ ]*\).*/\1/p')
-    printf '{"AccountTag":"acct","TunnelSecret":"c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0LXNlY3JldA==","TunnelID":"11111111-2222-3333-4444-555555555555"}' > "$creds"
-    echo "Created tunnel familyfi with id 11111111-2222-3333-4444-555555555555" >&2
+    name=$(echo "$*" | awk '{print $NF}')
+    # The first tunnel is 11111111-2222-3333-4444-555555555555, the next ...556, and so on.
+    count=$(cat "$state/created" 2>/dev/null || echo 0); count=$((count + 1)); echo "$count" > "$state/created"
+    id=$(printf '11111111-2222-3333-4444-%012d' $((555555555554 + count)))
+    printf '{"AccountTag":"acct","TunnelSecret":"c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0LXNlY3JldA==","TunnelID":"%s"}' "$id" > "$creds"
+    echo "$id $name" >> "$state/tunnels"
+    echo "Created tunnel $name with id $id" >&2
     exit 0 ;;
   *" route dns "*)
+    # A `dns` directory next to the log holds a file per hostname that already has a record.
+    host=$(echo "$*" | awk '{print $NF}')
+    if [ -e "$state/dns/$host" ]; then echo "2026-09-23T00:00:00Z ERR Failed to add route: code: 1003, reason: An A, AAAA, or CNAME record with that host already exists." >&2; exit 1; fi
     case "$*" in
       *taken.*) echo "2026-09-23T00:00:00Z ERR Failed to add route: code: 1003, reason: An A, AAAA, or CNAME record with that host already exists." >&2; exit 1 ;;
     esac
@@ -43,7 +82,7 @@ case " $* " in
     url="2026-09-23T00:00:00Z INF |  https://fake-quick-tunnel-demo.trycloudflare.com  |"
     # A quick-hold file next to the log holds the next quick tunnel's address back: it
     # prints it only on SIGUSR1, or late, as it is being stopped.
-    hold="$(dirname "$log")/quick-hold"
+    hold="$state/quick-hold"
     if [ -e "$hold" ]; then
       rm -f "$hold"
       sleep 600 &

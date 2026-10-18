@@ -64,21 +64,45 @@ export function parseTunnelCredential(json: string): TunnelCredential {
   return { AccountTag: parsed.AccountTag, TunnelSecret: parsed.TunnelSecret, TunnelID: parsed.TunnelID };
 }
 
+/**
+ * What `tunnel login` writes to cert.pem, in its `ARGO TUNNEL TOKEN` block: an API token for the
+ * zone the person picked, able to create and delete tunnels and DNS there. It lives in memory
+ * only while setup runs, like the file, and is never logged or stored.
+ */
+export type OriginCert = { zoneID: string; accountID: string; apiToken: string; endpoint: string };
+
+export function parseOriginCert(pem: string): OriginCert {
+  const blocks = [...pem.matchAll(/-----BEGIN ([A-Z ]+)-----\r?\n([\s\S]*?)-----END \1-----/g)];
+  const token = blocks.find((block) => block[1] === "ARGO TUNNEL TOKEN");
+  let parsed: Partial<OriginCert> = {};
+  try {
+    parsed = JSON.parse(Buffer.from(token?.[2] ?? "", "base64").toString("utf8")) as Partial<OriginCert>;
+  } catch {
+    // Reported below without the contents, which hold the token.
+  }
+  if (!parsed.zoneID || !parsed.apiToken) throw new Error("The Cloudflare sign-in certificate has no API token FamilyFi can read.");
+  return { zoneID: parsed.zoneID, accountID: parsed.accountID ?? "", apiToken: parsed.apiToken, endpoint: (parsed.endpoint ?? "").toLowerCase() };
+}
+
 /** Runs one cloudflared command to completion, streaming its output to `onOutput`. */
 export function runCloudflared(
   bin: string,
   args: string[],
   { home, timeoutMs, onOutput, signal }: { home: string; timeoutMs: number; onOutput?: (chunk: string) => void; signal?: AbortSignal },
-): Promise<{ code: number | null; output: string }> {
+): Promise<{ code: number | null; output: string; stdout: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { env: childEnv(home), stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
+    let stdout = "";
     const take = (data: Buffer) => {
       const text = data.toString();
       output += text;
       onOutput?.(text);
     };
-    child.stdout?.on("data", take);
+    child.stdout?.on("data", (data: Buffer) => {
+      stdout += data.toString();
+      take(data);
+    });
     child.stderr?.on("data", take);
     const timer = setTimeout(() => child.kill(), timeoutMs);
     const abort = () => child.kill();
@@ -90,7 +114,7 @@ export function runCloudflared(
     child.on("exit", (code) => {
       clearTimeout(timer);
       signal?.removeEventListener("abort", abort);
-      resolve({ code, output });
+      resolve({ code, output, stdout });
     });
   });
 }

@@ -58,6 +58,7 @@ Never part of a deployment.
 | `KILL_PORT` | `1` stops whatever holds the dev port without asking; `0` never does. Unset, `make dev` asks. |
 | `SKIP_DB_PREPARE` | Skips what `with-env.mjs` does before a command: wait for PostgreSQL, `prisma generate` outside production, and `prisma migrate deploy`. |
 | `CLOUDFLARED_BIN` | Points integration tests at a stand-in `cloudflared`. |
+| `CLOUDFLARE_API_URL` | Points integration tests at a stand-in Cloudflare API, which FamilyFi calls only to remove the DNS records of its own old tunnels. Honoured only on this machine (`localhost`, `127.0.0.1`). |
 | `CI` | Lets the production build start in `test` mode, as CI's browser tests run it. |
 | `BASE_REF`, `BREAKING_API_APPROVED` | The OpenAPI checks' base branch and the `breaking_api` label. |
 
