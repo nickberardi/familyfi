@@ -259,6 +259,7 @@ test("lists every saved Tailscale route and removes them, turning remote access 
     await saved.filter({ hasText: second }).getByRole("button", { name: "Remove" }).click();
     await expect(saved).toHaveCount(1);
     expect(asked.pop()).toBe(`Remove ${second}? Phones aren't using it now.`);
+    await shot(page, "removed-unpublished");
     expect((await routes(page)).map((route) => route.url)).not.toContain(second);
 
     // A pairing code still waiting on the published route keeps it, and says why.
@@ -276,6 +277,7 @@ test("lists every saved Tailscale route and removes them, turning remote access 
     await expect(card.getByTestId("remote-url")).toHaveCount(0);
     expect(await enabledUrls(page)).toEqual([]);
     await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
+    await shot(page, "removed-published");
   } finally {
     if (invite) await page.request.delete(`/api/v1/paired/invites/${invite}`, { headers });
     await cleanUp(page, [first, second]);
