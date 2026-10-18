@@ -36,9 +36,7 @@ export default function SettingsPage() {
 function Settings() {
   const { unifi, household, accounts, groups, sync, mutate, store } = useAppData();
   const router = useRouter();
-  const asked = useSearchParams().get("tab");
-  // A household with no gateway yet opens where it is set up.
-  const tab = asked === null && unifi && !unifi.configured ? "gateway" : settingsTab(asked);
+  const tab = settingsTab(useSearchParams().get("tab"));
   const showTab = (next: SettingsTab) => router.replace(next === "household" ? "/settings" : `/settings?tab=${next}`, { scroll: false });
   const [mode, setMode] = useState<"local" | "cloud">("local");
   const [apiKey, setApiKey] = useState("");
