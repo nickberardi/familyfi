@@ -71,6 +71,12 @@
         "repository"
       ]
     },
+    "tests/unit/client-ip.test.ts": {
+      "categories": [
+        "sessions",
+        "trust"
+      ]
+    },
     "tests/unit/companion-session-refresh.test.ts": {
       "categories": [
         "sessions"

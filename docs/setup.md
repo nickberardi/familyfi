@@ -16,6 +16,7 @@ Copy `.env.example` to `.env` and set what you need. This is every setting Famil
 | `FAMILYFI_ENCRYPTION_KEY` | generated | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
 | `FAMILYFI_DEMO_URL` | none | `demo` only. The demo's public HTTPS origin, published as the phones' route ([demo mode](operations.md#demo-mode)). |
 | `FAMILYFI_REMOTE_ACCESS_PORT` | `7002` | The remote access port: the phone-only gateway, published by the Compose file, for a route the household runs (a port forward, reverse proxy, Tailscale or its own tunnel) to point at. It closes every connection unanswered until Remote access publishes such a route (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). |
+| `FAMILYFI_TRUSTED_PROXIES` | none | Reverse proxies in front of the web port, as addresses or CIDRs separated by commas (for example `10.0.0.0/8, 192.168.1.2`). Sign-in throttling counts failures per client address; FamilyFi takes that address from the connection itself, and believes an `X-Forwarded-For` address only when the proxy that added it is loopback or listed here. Unlisted, every sign-in through a proxy counts as the proxy's address. A proxy on the same Docker host usually connects from the bridge gateway (such as `172.17.0.1`), not loopback, so list that. |
 | `FAMILYFI_UPDATER_URL` | `http://watchtower:8080` | Where Watchtower's HTTP API answers, when it is not the Compose service (see [Automatic updates](#automatic-updates)). |
 | `PORT` | `3000` (`7001` in the image) | The port the server listens on. |
 | `NODE_ENV` | set by Next.js | `production` under `next start` and in the image. Only `prod` and `demo` start in production, and `test` when `CI` is set. |
@@ -103,7 +104,7 @@ Phones on the LAN should use the host's LAN address, not `localhost`. HTTPS is r
 - Only administrators use FamilyFi: an adult without admin access is like a child or teen, with no sign-in, session or paired device. Every administrator is trusted with the whole household: accounts, household settings, the UniFi connection, paired devices and remote access. Turning an adult's admin off signs them out and removes their paired devices and pending invites. `tests/integration/authorization-matrix.test.ts` holds each route to this.
 - Children, teens, and Things groups do not receive logins.
 - Browser sessions use an httpOnly cookie plus a CSRF cookie. A phone joins by claiming an administrator-generated, five-minute invite code (scanned as a QR or pasted) at `POST /api/v1/paired/invites/{id}/claim`, which signs it in as the adult the administrator chose; later requests send `Authorization: Bearer`. Phones never sign in with a password, and a bare server address cannot enroll one.
-- Five failed attempts in 15 minutes, per username or IP, are rejected with HTTP 429.
+- Five failed attempts in 15 minutes, per username or IP, are rejected with HTTP 429. The IP is the address that connected, or the client a proxy in `FAMILYFI_TRUSTED_PROXIES` reports; an `X-Forwarded-For` from anyone else is ignored.
 - Browser sessions last 30 days unless revoked (password change, access removal, or logout). A paired phone or Watch holds a one-hour bearer that it renews with a refresh token, which lasts 90 days from its last use and ends the same ways, or when the device is revoked.
 
 Email magic links and self-serve email reset from the sign-in prototype are not implemented. Create personal adult accounts with `POST /api/v1/accounts` (adult Family group only). Recovery `admin` cannot be removed; change its password via `FAMILYFI_DEFAULT_PASSWORD` in `.env`.
@@ -140,13 +141,13 @@ through its own public route; outside the container (`make dev`) it listens on t
 
 ### Cloudflare Tunnel you run
 
-A tunnel you manage in the Cloudflare dashboard (Zero Trust → Networks → Tunnels → Create →
-Cloudflared). In `.env`, set `CLOUDFLARE_TUNNEL_TOKEN` to the token the dashboard shows, and add the
-service:
+A tunnel you manage in the Cloudflare dashboard (**Networking → Tunnels → Create a tunnel**, then
+choose **Docker**). Copy only the token from the command the dashboard shows. In `.env`, set
+`CLOUDFLARE_TUNNEL_TOKEN` to that token, and add the service:
 
 ```yaml
   cloudflared:
-    image: cloudflare/cloudflared:2026.9.1
+    image: cloudflare/cloudflared:2026.10.1
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
@@ -155,8 +156,8 @@ service:
       - app
 ```
 
-In the tunnel's **Public Hostname** settings, point your hostname (for example
-`familyfi.example.com`) at service `http://app:7002`. Then on **Pair Device** choose **Cloudflare → Advanced** and enter
+Select the tunnel, then **Routes → Add route → Published application**: set your hostname (for
+example `familyfi.example.com`) and **Service URL** `http://app:7002`. Then on **Pair Device** choose **Cloudflare → Advanced** and enter
 `https://familyfi.example.com`. FamilyFi never sees the tunnel token: it lives only in your `.env`
 and the sidecar. To put Cloudflare Access in front of it, see
 [operations](operations.md#your-own-cloudflare-tunnel-and-cloudflare-access-advanced).

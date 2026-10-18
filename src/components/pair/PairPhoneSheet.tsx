@@ -21,7 +21,7 @@ export function PairPhoneSheet({
 }: {
   /** The one route Remote access publishes: the address the phone pairs over. */
   route: ConnectionRoute;
-  /** Re-pairing: the (usually revoked) phone this pairing replaces once it is claimed. */
+  /** Re-pairing: the phone, active or revoked, this pairing replaces once it is claimed. */
   replacing?: PairedPhone | null;
   onClose: () => void;
   onPaired: () => void;

@@ -140,7 +140,7 @@ operator replaces the token; a phone replaces what it holds whenever a verified 
 higher one. The phone gateway strips both headers before a request reaches the app.
 
 Cloudflare refuses a request without a valid token before it reaches FamilyFi: a **401** (with the
-Access application's "Return 401 response for Service Auth policies" on, as the operator guide
+Access application's "401 Response for Service Auth policies" on, as the operator guide
 asks), a **403**, or — if the application also has identity policies — a **302** to
 `<team>.cloudflareaccess.com`. None carries FamilyFi's JSON error body. A phone treats any of them
 as that route being unavailable and fails over; it never signs out over one. A phone that missed a

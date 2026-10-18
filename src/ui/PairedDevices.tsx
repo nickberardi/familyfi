@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { REMOTE_STATUS, routeTrust, transportLabel } from "@/lib/connection-routes";
-import { PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
+import { canRepair, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
@@ -74,7 +74,9 @@ export function PairedPhoneRow({
           )}
         </Text>
         <Text style={[text(14, 21, "muted"), styles.line]}>{lines.dates}</Text>
-        {lines.expired ? <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{COPY.expired}</Text> : null}
+        {lines.expired ? (
+          <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{phone.client === "phone" ? COPY.expired : COPY.expiredPairAgain}</Text>
+        ) : null}
       </View>
       <View style={styles.actions}>
         {onRevoke ? <TextButton label={COPY.revoke} token="danger" onPress={onRevoke} disabled={disabled} testID={`phone-revoke-${phone.id}`} /> : null}
@@ -87,10 +89,12 @@ export function PairedPhoneRow({
 
 /**
  * The household's paired phones, Watches and agents, most recently seen first, with revoked ones folded
- * away. Each callback asks first where the platform does, then makes the change.
+ * away. Any phone but this one can be re-paired, active or revoked. Each callback asks first where the
+ * platform does, then makes the change.
  */
 export function PairedDevicesCard({
   phones,
+  selfId,
   canPair,
   onRevoke,
   onRepair,
@@ -99,6 +103,8 @@ export function PairedDevicesCard({
   disabled,
 }: {
   phones: PairedPhone[];
+  /** The paired device showing this card, which cannot re-pair itself mid-flow. */
+  selfId?: string | null;
   /** No changes while the phone's view of the household is stale. */
   disabled?: boolean;
   /** Whether a route is published, so a phone can pair (or re-pair) now. */
@@ -114,6 +120,7 @@ export function PairedDevicesCard({
   const [showRevoked, setShowRevoked] = useState(false);
   const { active, revoked } = splitPhones(phones);
   const nameOf = (id: string | null) => phones.find((phone) => phone.id === id)?.displayName ?? null;
+  const repair = (phone: PairedPhone) => (canRepair(phone, { canPair, selfId }) ? () => onRepair(phone) : undefined);
   const rule = { borderTopWidth: 1, borderTopColor: ui.color("hairline") };
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="paired-devices">
@@ -127,7 +134,14 @@ export function PairedDevicesCard({
         </Text>
       ) : (
         (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (
-          <PairedPhoneRow key={phone.id} phone={phone} parentName={nameOf(phone.parentDeviceId)} disabled={disabled} onRevoke={() => onRevoke(phone)} />
+          <PairedPhoneRow
+            key={phone.id}
+            phone={phone}
+            parentName={nameOf(phone.parentDeviceId)}
+            disabled={disabled}
+            onRevoke={() => onRevoke(phone)}
+            onRepair={repair(phone)}
+          />
         ))
       )}
       {active.length > PHONES_SHOWN ? (
@@ -148,7 +162,7 @@ export function PairedDevicesCard({
                   phone={phone}
                   parentName={nameOf(phone.parentDeviceId)}
                   disabled={disabled}
-                  onRepair={canPair && phone.client === "phone" ? () => onRepair(phone) : undefined}
+                  onRepair={repair(phone)}
                   onRemove={() => onRemove(phone)}
                 />
               ))}

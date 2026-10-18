@@ -44,5 +44,8 @@ if (inMemoryDatabase() && !process.env.FAMILYFI_DATABASE_SERVED) {
     }
   }
 
-  exec(command, args, { ...process.env });
+  // The server appends the address that connected to X-Forwarded-For (forwarded-for.mjs).
+  const preload = `--import=${new URL("./forwarded-for.mjs", import.meta.url).href}`;
+  const nodeOptions = [process.env.NODE_OPTIONS, preload].filter(Boolean).join(" ");
+  exec(command, args, { ...process.env, NODE_OPTIONS: nodeOptions });
 }

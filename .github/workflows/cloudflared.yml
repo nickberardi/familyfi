@@ -1,0 +1,51 @@
+name: cloudflared
+
+# Keeps the image's pinned cloudflared current. Dependabot does not see it: the Dockerfile
+# downloads a release binary and checks it against hashes, rather than using an image.
+# On the 1st and 15th, scripts/update-cloudflared.sh pins Cloudflare's latest release and
+# this opens a PR when that changes the pin. Run it by hand from the Actions tab.
+on:
+  schedule:
+    - cron: "0 6 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # A run started by hand from another branch still bumps main.
+          ref: main
+          # A PR opened with GITHUB_TOKEN starts no workflows, so its checks would never run.
+          # RELEASE_PR_TOKEN (contents and pull requests: write) lets them; without it, the PR
+          # needs a push or a close and reopen by a person before CI runs.
+          token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+      - name: Open a PR when a newer cloudflared is out
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+        run: |
+          version="$(scripts/update-cloudflared.sh)"
+          if git diff --quiet docker/Dockerfile docs/setup.md; then
+            echo "cloudflared is already pinned to $version" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          branch="deps/cloudflared-$version"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "A PR from $branch is already open" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Bump cloudflared to $version"
+          git push --force origin "$branch"
+          gh pr create --base main --head "$branch" --title "Bump cloudflared to $version" \
+            --body "Pins the image's cloudflared to [$version](https://github.com/cloudflare/cloudflared/releases/tag/$version). The sidecar example in docs/setup.md follows. Both Linux hashes were computed from the downloads and match the release notes. Read the notes for changes to quick tunnels or \`tunnel login\` before merging."
