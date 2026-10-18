@@ -200,7 +200,8 @@ scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag
   `check-openapi-version.mjs` take an optional base ref; without one they fetch
   `origin/$BASE_REF` shallowly, the way CI runs them, so local callers pass `origin/main`.
 - **`runtime/`:** `with-env.mjs` loads `.env`, builds `DATABASE_URL`, generates missing secrets
-  and prepares the database before running a command. `package.json`, the Makefile, Prisma's
+  and prepares the database before running a command, preloading `forwarded-for.mjs` so the server
+  appends the address that connected to `X-Forwarded-For`. `package.json`, the Makefile, Prisma's
   config, Playwright and the container's `docker-entrypoint.sh` all start through it. The
   Dockerfile copies this folder and nothing else from `scripts/`, and `ci/check-image.sh` fails
   an image that carries `ci/`.

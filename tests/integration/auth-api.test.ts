@@ -305,6 +305,21 @@ describe("sign-in throttling on the public demo", () => {
     expect(await authenticate("admin", PASSWORD, "203.0.113.2")).toMatchObject({ ok: true });
   });
 
+  it("keeps counting an address that claims a new X-Forwarded-For on every attempt", async () => {
+    process.env.FAMILYFI_MODE = "demo";
+    // FamilyFi's server appends the address that connected (192.0.2.10); the entry before it is the visitor's claim.
+    const attempt = (claimed: string, password: string) =>
+      login(
+        request("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": `${claimed}, 192.0.2.10` },
+          body: JSON.stringify({ username: "admin", password, client: "browser" }),
+        }),
+      );
+    for (let i = 1; i <= LOGIN_MAX_FAILURES; i++) await attempt(`198.51.100.${i}`, "wrong-password");
+    expect((await attempt("198.51.100.99", PASSWORD)).status).toBe(429);
+  });
+
   it("still limits a username across addresses outside the demo", async () => {
     await failFrom("203.0.113.1");
     expect(await authenticate("admin", PASSWORD, "203.0.113.2")).toMatchObject({ status: 429 });

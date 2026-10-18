@@ -36,8 +36,8 @@ export function tunnelHeaders(incoming: IncomingHttpHeaders): Record<string, str
     headers[name] = value;
   }
   // Cloudflare overwrites CF-Connecting-IP with the real client; X-Forwarded-For only gets
-  // appended to, so its first entry is whatever the client claimed. Login throttling keys
-  // on the first entry, so rebuild it from the one Cloudflare vouches for.
+  // appended to, so its first entry is whatever the client claimed. Rebuild it from the one
+  // Cloudflare vouches for; the app trusts it because the gateway connects over loopback.
   const client = incoming["cf-connecting-ip"];
   if (typeof client === "string" && client) headers["x-forwarded-for"] = client;
   headers[TUNNEL_HEADER] = "tunnel";
