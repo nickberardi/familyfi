@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_STORES,
+  PLAY_BETA,
   confirmLine,
   defaultPairingAccount,
   pairingAccounts,
@@ -40,6 +41,12 @@ describe("pair device", () => {
   it("shows both store badges, linking only to a store that has a link", () => {
     expect(APP_STORES.map((store) => store.label)).toEqual(["Download on the App Store", "Get it on Google Play"]);
     expect(APP_STORES.every((store) => store.url === null || store.url.startsWith("https://"))).toBe(true);
+  });
+
+  it("opens Google Play's closed beta steps, each linked over HTTPS", () => {
+    expect(APP_STORES.filter((store) => "steps" in store && store.steps).map((store) => store.id)).toEqual(["google"]);
+    expect(PLAY_BETA.steps.map((step) => step.text)).toEqual(["Join the beta group", "Become a tester", "Install FamilyFi from Google Play"]);
+    expect(PLAY_BETA.steps.every((step) => step.url.startsWith("https://"))).toBe(true);
   });
 
   it("splits active phones from revoked ones, keeping the API's order", () => {

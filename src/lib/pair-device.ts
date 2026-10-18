@@ -42,16 +42,31 @@ export const PAIR_COPY = {
 
 /**
  * Where to get the FamilyFi app, shown as each store's own badge. Until the apps are listed, the
- * links open TestFlight and the Google Play testing program; a store with no link yet shows its
- * badge unlinked, marked as coming soon.
+ * App Store badge opens TestFlight, and the Google Play badge opens brief steps for joining its
+ * closed beta (`PLAY_BETA`); a store with no link yet shows its badge unlinked, marked as coming soon.
  */
 export const APP_STORES = [
   { id: "apple", label: "Download on the App Store", badge: "/stores/app-store.svg", badgeWidth: 120, url: "https://testflight.apple.com/join/5nuDQjJq" },
-  { id: "google", label: "Get it on Google Play", badge: "/stores/google-play.svg", badgeWidth: 135, url: null },
+  { id: "google", label: "Get it on Google Play", badge: "/stores/google-play.svg", badgeWidth: 135, url: "https://getfamilyfi.com/android/", steps: true },
 ] as const satisfies readonly AppStore[];
 
-/** `badgeWidth` is the badge drawn 40 points tall, the height both are shown at. */
-export type AppStore = { id: string; label: string; badge: string; badgeWidth: number; url: string | null };
+/**
+ * `badgeWidth` is the badge drawn 40 points tall, the height both are shown at. A store with
+ * `steps` opens `PLAY_BETA`'s steps instead of its link, which is their full version.
+ */
+export type AppStore = { id: string; label: string; badge: string; badgeWidth: number; url: string | null; steps?: boolean };
+
+/** Google Play's closed beta: a tester joins the group, opts in, then installs. */
+export const PLAY_BETA = {
+  title: "Join the Android beta",
+  sub: "FamilyFi is in a closed beta on Google Play. Use the Google account on the phone.",
+  steps: [
+    { text: "Join the beta group", url: "https://groups.google.com/g/familyfi-beta" },
+    { text: "Become a tester", url: "https://play.google.com/apps/testing/com.getfamilyfi" },
+    { text: "Install FamilyFi from Google Play", url: "https://play.google.com/store/apps/details?id=com.getfamilyfi" },
+  ],
+  more: "Full instructions",
+} as const;
 
 export const APP_STORE_SOON = "Coming soon";
 
