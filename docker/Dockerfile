@@ -61,14 +61,14 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/* \
   && pg_dump --version
 # cloudflared for Remote access. Pinned and hash-checked at build time; FamilyFi never
-# downloads it at runtime. Bump the version and both hashes together (hashes are in the
-# release notes at github.com/cloudflare/cloudflared/releases).
+# downloads it at runtime. scripts/update-cloudflared.sh bumps the version and both hashes
+# together, and .github/workflows/cloudflared.yml opens a PR with it twice a month.
 ARG TARGETARCH
-ARG CLOUDFLARED_VERSION=2026.9.1
+ARG CLOUDFLARED_VERSION=2026.10.1
 ADD --chmod=755 https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-${TARGETARCH} /usr/local/bin/cloudflared
 RUN case "${TARGETARCH}" in \
-    amd64) sum=03f1f25d1cc93b9ad6c60569d44060bc4f17ed97075760ed8cfca4b12dcd68cc ;; \
-    arm64) sum=3d97437c71848bd8df68041e12436b484a661d95073ea1937f01a845ce88faa3 ;; \
+    amd64) sum=3bfc539f45d2620c71debb7a86be0efa737ed5ccbad9eb85c787116900e5c586 ;; \
+    arm64) sum=2c65dfabf616c40efc7545d107d7a57ad5e21377e2964b7e88af19a238074a46 ;; \
     *) echo "no cloudflared hash for ${TARGETARCH}" >&2; exit 1 ;; \
   esac \
   && echo "${sum}  /usr/local/bin/cloudflared" | sha256sum -c - \

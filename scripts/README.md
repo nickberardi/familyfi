@@ -1,7 +1,7 @@
 # scripts
 
-The top level of this folder holds the scripts you run: `test.py`, `release.sh` and
-`doh-probe.mjs`. `testing/` is the implementation behind `test.py`, `ci/` holds the helpers
+The top level of this folder holds the scripts you run: `test.py`, `release.sh`,
+`doh-probe.mjs` and the `update-…` scripts. `testing/` is the implementation behind `test.py`, `ci/` holds the helpers
 that the harness and the workflows both call, and `runtime/` the environment and database
 bootstrap that the dev server, the tests and the container start through. You normally don't
 call `ci/` or `runtime/` directly. `test.py` and `release.sh` print their full usage with
@@ -17,6 +17,7 @@ scripts/
 ├── release.sh         checks and tests, then build, push and publish a release from this machine
 ├── doh-probe.mjs      ask a DNS-over-HTTPS endpoint which transports it actually serves
 ├── update-mac-vendors.py  rebuild the committed IEEE MAC registrant database; run on request
+├── update-cloudflared.sh  pin the image's cloudflared to a release (default: the latest)
 └── runtime/           with-env, validate-env, docker-entrypoint and the rest of startup;
                        the only part of scripts/ the container image carries
 ```
