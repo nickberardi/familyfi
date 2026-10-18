@@ -349,6 +349,59 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
   }
 });
 
+test("re-pairs an active phone without revoking it first", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const url = `https://active-e2e-${Date.now()}.home`;
+  const tag = `${Date.now()}`;
+  const name = `Active phone ${tag}`;
+  const headers = await csrf(page);
+  const route = ((await (await page.request.post("/api/v1/connection/endpoints", { headers, data: { url, transport: "lan", trustMode: "system" } })).json()) as { endpoint: { id: string } }).endpoint.id;
+  await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
+  type Device = { id: string; displayName: string; client: string; parentDeviceId: string | null; revokedAt: string | null };
+  const devices = async () => ((await (await page.request.get("/api/v1/paired/devices")).json()) as { devices: Device[] }).devices;
+
+  try {
+    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: route, displayName: name } })).json()) as { invite: { id: string; code: string } };
+    const old = (await (await page.request.post(`/api/v1/paired/invites/${invite.id}/claim`, { data: { token: decodePairingCode(invite.code).token, deviceName: name } })).json()) as { device: { id: string }; token: string };
+    const bearer = { authorization: `Bearer ${old.token}` };
+    const watch = (await (
+      await page.request.post("/api/v1/paired/invites?claim=true", { headers: bearer, data: { client: "watch", clientId: crypto.randomUUID(), displayName: `Watch ${tag}` } })
+    ).json()) as { device: { id: string } };
+
+    await page.goto("/pair");
+    // The Watch's row names its phone too, so rows are found by the phone's own name.
+    const rows = () => page.getByTestId("phone-row").filter({ has: page.getByText(name, { exact: true }) });
+    const row = rows();
+    await expect(row.getByRole("button", { name: "Revoke" })).toBeVisible();
+    // A Watch is re-paired from its phone, never from the list.
+    await expect(page.getByTestId("phone-row").filter({ hasText: `Watch ${tag}` }).getByRole("button", { name: "Re-pair" })).toHaveCount(0);
+    await shot(page, "active-repair");
+    await row.getByRole("button", { name: "Re-pair" }).click();
+    const sheet = page.getByRole("dialog", { name: `Re-pair ${name}` });
+    await expect(sheet).toContainText("Its old pairing keeps working until the code is used");
+    await sheet.getByRole("button", { name: "Show pairing code" }).click();
+    const { pairingId, token: pairingToken } = decodePairingCode((await page.getByTestId("pairing-code").textContent()) ?? "");
+    // The old phone still works while the new code waits.
+    expect((await page.request.get("/api/v1/connection", { headers: bearer })).status()).toBe(200);
+    const claim = await page.request.post(`/api/v1/paired/invites/${pairingId}/claim`, { data: { token: pairingToken, deviceName: name } });
+    expect(claim.ok()).toBe(true);
+    const replacement = ((await claim.json()) as { device: { id: string } }).device.id;
+    await expect(page.getByTestId("pairing-claimed")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Done" }).click();
+
+    await expect(rows()).toHaveCount(1);
+    const listed = await devices();
+    expect(listed.filter((device) => device.displayName === name).map((device) => device.id)).toEqual([replacement]);
+    expect(listed.find((device) => device.id === watch.device.id)).toMatchObject({ parentDeviceId: replacement, revokedAt: null });
+    expect((await page.request.get("/api/v1/connection", { headers: bearer })).status()).toBe(401);
+  } finally {
+    for (const device of (await devices()).filter((item) => item.displayName.includes(tag))) {
+      await page.request.delete(`/api/v1/paired/devices/${device.id}?remove=true`, { headers });
+    }
+    await cleanUp(page, [url]);
+  }
+});
+
 test("sets up remote access on a domain through the Cloudflare sign-in link", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/pair");

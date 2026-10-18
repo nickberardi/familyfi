@@ -25,7 +25,9 @@ export const PAIR_COPY = {
   noPhones: "No paired devices yet. Pair a phone or connect an agent to add one.",
   remoteFirst: "Turn on remote access, then pair a phone. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a phone.",
-  expired: "Expired. Revoke it and pair again.",
+  expired: "Expired. Re-pair it to sign it in again.",
+  /** Watches and agents are not re-paired from the list. */
+  expiredPairAgain: "Expired. Revoke it and pair again.",
   showRecent: "Show recent only",
   removeAllRevoked: "Remove all revoked",
   revoke: "Revoke",
@@ -82,6 +84,14 @@ export function revokedToggleLabel(open: boolean, count: number): string {
 /** Devices still able to sign in, and those revoked, each in the API's order. */
 export function splitPhones(phones: readonly PairedPhone[]) {
   return { active: phones.filter((phone) => !phone.revokedAt), revoked: phones.filter((phone) => phone.revokedAt) };
+}
+
+/**
+ * Whether a device's row offers Re-pair: any phone, active or revoked, while a route is published,
+ * except the phone showing the list, which would sign itself out mid-flow.
+ */
+export function canRepair(phone: Pick<PairedPhone, "id" | "client">, { canPair, selfId }: { canPair: boolean; selfId?: string | null }): boolean {
+  return canPair && phone.client === "phone" && phone.id !== selfId;
 }
 
 /** The one route remote access publishes, once it is live: the address phones pair over. */
@@ -144,7 +154,7 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     name: {
       title: replacing ? `Re-pair ${replacing.displayName}` : PAIR_COPY.pairPhone,
       sub: replacing
-        ? "Makes a new single-use code for this phone. Once the phone uses it, its old entry is removed from the list."
+        ? "Makes a new single-use code for this phone. Its old pairing keeps working until the code is used, then is signed out and removed, and its Watch moves to the new pairing."
         : "Makes a single-use code that pairs one phone and signs it in as the adult you choose. It expires in five minutes.",
     },
     code: claimed
