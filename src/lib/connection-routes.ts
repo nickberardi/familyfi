@@ -100,7 +100,7 @@ export function accessRollout(
     return { done: true, text: `Every active phone has ${token}.${replaced ? " You can remove the old one in Cloudflare." : ""}` };
   }
   const names = behind.map((device) => device.displayName).join(", ");
-  const hold = replaced ? "Keep the old token in Cloudflare until then." : "Create the Access application in Cloudflare after that.";
+  const hold = replaced ? "Keep the old token in Cloudflare until then." : "Create the Access application in Cloudflare after that; if it already exists, Cloudflare turns them away until then.";
   return { done: false, text: `${active.length - behind.length} of ${active.length} active phones have ${token}. Waiting for ${names}. ${hold}` };
 }
 
