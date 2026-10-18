@@ -146,7 +146,7 @@ service:
 
 ```yaml
   cloudflared:
-    image: cloudflare/cloudflared:2026.9.1
+    image: cloudflare/cloudflared:2026.10.1
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:

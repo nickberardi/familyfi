@@ -1,6 +1,7 @@
 #!/bin/sh
 # Pin docker/Dockerfile to a cloudflared release: its version and the SHA-256 of both Linux
-# binaries the image downloads. With no argument it takes Cloudflare's latest release.
+# binaries the image downloads. The sidecar example in docs/setup.md follows the same
+# version. With no argument it takes Cloudflare's latest release.
 # Each hash is computed from the download and must also appear in the release notes, so a
 # bad download or a swapped asset fails rather than being pinned. Reading the notes and
 # finding the latest release need `gh`; given a version without `gh`, the notes check is
@@ -10,6 +11,7 @@ set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dockerfile="$root/docker/Dockerfile"
+setup="$root/docs/setup.md"
 repo="cloudflare/cloudflared"
 
 version="${1:-}"
@@ -46,6 +48,7 @@ for arch in amd64 arm64; do
   grep -q "$arch) sum=$sum ;;" "$dockerfile" || { echo "no $arch hash line to change in $dockerfile" >&2; exit 1; }
 done
 sed -i.bak -E "s/^ARG CLOUDFLARED_VERSION=.*/ARG CLOUDFLARED_VERSION=$version/" "$dockerfile"
-rm -f "$dockerfile.bak"
+sed -i.bak -E "s#cloudflare/cloudflared:[0-9.]+#cloudflare/cloudflared:$version#" "$setup"
+rm -f "$dockerfile.bak" "$setup.bak"
 grep -q "^ARG CLOUDFLARED_VERSION=$version\$" "$dockerfile" || { echo "no CLOUDFLARED_VERSION to change in $dockerfile" >&2; exit 1; }
 echo "$version"
