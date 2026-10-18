@@ -780,6 +780,16 @@ describe("household rules", () => {
       await runReconcileOnce();
       expect(blockedMacs("FamilyFi Video")).toEqual([OTHER_MAC]);
 
+      // More time counts from the unblock's end, the latest allowance, and every allowance ends then.
+      const extended = await extendGroupUnblock(
+        request(`/api/v1/groups/${emma.id}/unblock/extend`, { method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes: 15 }) }),
+        { params: Promise.resolve({ id: emma.id }) },
+      );
+      expect(extended.status).toBe(200);
+      const target = homeworkLift.pauseUntil!.getTime() + 15 * 60_000;
+      expect((await liftOf(homework.id, emma.id)).pauseUntil!.getTime()).toBe(target);
+      expect((await liftOf(video.id, emma.id)).pauseUntil!.getTime()).toBe(target);
+
       const ended = await endGroupUnblock(request(`/api/v1/groups/${emma.id}/unblock/end`, { method: "POST", auth }), { params: Promise.resolve({ id: emma.id }) });
       expect(ended.status).toBe(200);
       expect(((await ended.json()) as { group: PublicGroup }).group.access).toBe("blocked");

@@ -16,7 +16,7 @@ const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: nul
  * it is. The group's own pause ends, and each rule blocking it now is allowed for the group until
  * its active windows end, or every rule it has until `until`. An allowance, one per rule, so its
  * devices leave the rule's policies and the rule itself is untouched. `end` and `extend` act on
- * those allowances together. Returns `{ group, rules, change }`, `rules` being the group's own.
+ * those allowances together: `extend` gives each timed one the same new end, the latest plus `minutes`. Returns `{ group, rules, change }`, `rules` being the group's own.
  */
 export async function runGroupUnblock(
   request: Request,
@@ -74,13 +74,13 @@ export async function runGroupUnblock(
     if (allowances.length === 0) return jsonError(409, "not_unblocked", "Extend requires an active unblock.");
     const timed = allowances.filter((link) => link.pauseUntil !== null);
     if (timed.length === 0) return jsonError(409, "indefinite", "An unblock with no end time has no expiry to extend.");
-    await prisma().$transaction(async (tx) => {
-      for (const link of timed) {
-        await tx.ruleGroup.update({
-          where: { ruleId_groupId: { ruleId: link.ruleId, groupId } },
-          data: { pauseUntil: extendSuspensionUntil(link.pauseUntil!, now, body.minutes! * 60_000) },
-        });
-      }
+    // More time counts from the unblock's end, its latest allowance, as the sheet does; every
+    // timed allowance then lasts until that one new time, so the group blocks again all at once.
+    const latest = new Date(Math.max(...timed.map((link) => link.pauseUntil!.getTime())));
+    const until = extendSuspensionUntil(latest, now, body.minutes! * 60_000);
+    await prisma().ruleGroup.updateMany({
+      where: { groupId, ruleId: { in: timed.map((link) => link.ruleId) } },
+      data: { pauseUntil: until },
     });
   }
 

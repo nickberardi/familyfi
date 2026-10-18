@@ -1676,7 +1676,7 @@ paths:
       tags: [Rules]
       summary: Unblock a group
       description: |
-        Lifts whatever blocks the group now, for this group alone, whatever kind of rule it is. The group's pause ends, and each rule blocking it now is allowed for the group until that rule's active windows end; an always-on rule until the unblock is ended. Given `until`, every enabled rule the group has is allowed until then, including windows that start meanwhile. Each lift is the rule's allowance for this group, as `/groups/{id}/rules/{ruleId}/allow` makes: its devices leave the rule's policies and the rule is unchanged for everyone else. A rule paused for everyone or for this group is left as it is. 409 `not_blocked` when nothing is blocking the group and no `until` is given.
+        Lifts whatever blocks the group now, for this group alone, whatever kind of rule it is. The group's pause ends, and each rule blocking it now is allowed for the group until that rule's active windows end; an always-on rule until the unblock is ended. Given `until`, every enabled rule the group has is allowed until then, including windows that start meanwhile. Each lift is the rule's allowance for this group, as `/groups/{id}/rules/{ruleId}/allow` makes: its devices leave the rule's policies and the rule is unchanged for everyone else. A rule paused for everyone or for this group is left as it is. Only rules that name the group are lifted: a rule for whole networks has no allowance per group and is paused for everyone instead. 409 `not_blocked` when nothing is blocking the group and no `until` is given.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1767,7 +1767,7 @@ paths:
       tags: [Rules]
       summary: Add time to a group's unblock
       description: |
-        Adds `minutes` to each timed allowance the group has on its rules. 409 `not_unblocked` when it has none, `indefinite` when none has an end time.
+        Gives each timed allowance the group has on its rules one new end: the latest of them plus `minutes`, so the group's rules apply again together. 409 `not_unblocked` when it has none, `indefinite` when none has an end time.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
