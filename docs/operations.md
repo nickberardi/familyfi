@@ -79,7 +79,7 @@ openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform der \
 
 **Check** on a pinned route compares the stored pin with what the address serves now. Renewing the
 certificate with a new key breaks the pin until you update it; phones fail closed rather than
-trust the new key. A certificate the iPhone already trusts should use ordinary trust instead.
+trust the new key. A certificate phones already trust should use ordinary trust instead.
 FamilyFi does not manage your VPN, proxy, or certificate issuer. For Tailscale, the phone must be in
 the same tailnet; use Serve, never Funnel, which would expose the household service publicly.
 

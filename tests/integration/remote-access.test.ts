@@ -208,7 +208,10 @@ describe("remote access", () => {
     const quick = await waitFor((t) => t.status === "running", "the quick tunnel");
     const home = await ownRoute("https://192.168.1.10:8443", "lan", false);
 
-    expect((await put({ mode: "named", endpointId: quick.endpointId })).status).toBe(400);
+    const owned = await put({ mode: "named", endpointId: quick.endpointId });
+    expect(owned.status).toBe(400);
+    // The domain FamilyFi's tunnel runs is Cloudflare Automatic, not the My domain choice.
+    expect((await owned.json()).error).toMatchObject({ code: "invalid_tunnel", message: expect.stringContaining("Cloudflare Automatic") });
     expect((await put({ mode: "named", endpointId: "no-such-route" })).status).toBe(400);
     expect((await put({ mode: "named", endpointId: home.id, hostname: "familyfi.example.com" })).status).toBe(400);
     expect((await put({ mode: "named", hostname: "localhost" })).status).toBe(400);

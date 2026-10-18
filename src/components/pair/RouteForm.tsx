@@ -29,7 +29,7 @@ function origin(value: string): string | null {
 
 /**
  * The address of a route the household runs, and for a home-network route how the phone
- * trusts its certificate. A pinned route is for a certificate the iPhone would not
+ * trusts its certificate. A pinned route is for a certificate the phone would not
  * otherwise trust; FamilyFi reads the pin from the address (or a pasted certificate) so
  * nobody computes it by hand, and the field stays editable as the override.
  *
@@ -151,7 +151,7 @@ export function RouteForm({
             grow
             onChange={setTrust}
             segments={[
-              { value: "system", label: "Trusted by iPhone" },
+              { value: "system", label: "Trusted by phones" },
               { value: "pinned", label: "Pin this certificate" },
             ]}
           />
@@ -199,7 +199,7 @@ export function RouteForm({
           ) : null}
           {read?.systemTrusted ? (
             <p className="font-semibold text-[var(--ff-paused)]">
-              This certificate is already trusted by devices. Choose Trusted by iPhone instead, so renewals don&rsquo;t break
+              This certificate is already trusted by devices. Choose Trusted by phones instead, so renewals don&rsquo;t break
               the pin.
             </p>
           ) : null}
@@ -222,7 +222,7 @@ export function RouteForm({
         </div>
       ) : (
         <p className="rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 leading-5 text-[var(--ff-muted)]">
-          The phone checks this address&rsquo;s certificate the ordinary way, so it needs a certificate the iPhone already trusts.
+          The phone checks this address&rsquo;s certificate the ordinary way, so it needs a certificate phones already trust.
         </p>
       )}
       {extra}

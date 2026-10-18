@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_STORES,
+  PAIR_COPY,
   PLAY_BETA,
   confirmLine,
   defaultPairingAccount,
@@ -97,6 +98,11 @@ describe("pair device", () => {
     expect(pairingSheetCopy().name.sub).toBe("Makes a single-use code that pairs one phone and signs it in as the adult you choose. It expires in five minutes.");
     expect(pairingSheetCopy({ claimed: true, claimedName: "New phone" }).code).toEqual({ title: "Phone paired", sub: "New phone is paired and signed in." });
     expect(pairingSheetCopy({ claimed: true, replacing: { displayName: "Old" } }).code.sub).toBe("The phone is paired and signed in; its old entry is gone.");
+  });
+
+  it("speaks of any phone, not only an iPhone, since the app runs on Android too", () => {
+    expect(PAIR_COPY.sub).not.toContain("iPhone");
+    expect(pairingSheetCopy().defaultName).not.toContain("iPhone");
   });
 
   it("expires a code at its time, or when the server says so", () => {

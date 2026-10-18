@@ -14,7 +14,7 @@ export const PHONES_SHOWN = 8;
 
 export const PAIR_COPY = {
   title: "Pair Device",
-  sub: "Pair the FamilyFi iPhone app and choose how it reaches home.",
+  sub: "Pair the FamilyFi app on a phone and choose how it reaches home.",
   pairPhone: "Pair a phone",
   connectAgent: "Connect an agent",
   adminOnly: "Only a household admin can pair phones or change remote access.",
@@ -157,7 +157,7 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     routeNote: "The phone must reach this address while it pairs. Change it under Remote access.",
     phone: "Phone",
     signsInAs: "Signs in as",
-    defaultName: "iPhone",
+    defaultName: "Phone",
     cancel: "Cancel",
     show: "Show pairing code",
     newCode: "New code",
