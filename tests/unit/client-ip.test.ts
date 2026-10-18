@@ -23,7 +23,7 @@ describe("clientIp", () => {
     const proxies = trustedProxies("10.0.0.0/8, 2001:db8::/32");
     expect(clientIp(from("203.0.113.5, 198.51.100.7, 10.1.2.3"), proxies)).toBe("198.51.100.7");
     expect(clientIp(from("198.51.100.7, 2001:db8::1, 10.0.0.2"), proxies)).toBe("198.51.100.7");
-    // Loopback is always trusted: the phone gateway and cloudflared reach the app that way.
+    // Loopback is always trusted: the phone gateway reaches the app that way.
     expect(clientIp(from("198.51.100.7, 127.0.0.1"), none)).toBe("198.51.100.7");
     expect(clientIp(from("198.51.100.7, ::ffff:127.0.0.1"), none)).toBe("198.51.100.7");
     expect(clientIp(from("198.51.100.7, ::1"), none)).toBe("198.51.100.7");
