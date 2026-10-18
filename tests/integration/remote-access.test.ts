@@ -194,7 +194,7 @@ describe("remote access", () => {
     expect(await publishedIds()).toEqual([tailnet.id]);
     expect(await prisma().connectionEndpoint.count({ where: { kind: "quick" } })).toBe(1);
 
-    // A second quick tunnel reuses the same route, so phones that paired through it follow.
+    // A second quick tunnel reuses the same route rather than adding another.
     await put({ mode: "quick" });
     expect((await waitFor((t) => t.status === "running", "the quick tunnel again")).endpointId).toBe(quickRoute.id);
 

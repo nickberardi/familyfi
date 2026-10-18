@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OFFLINE_AFTER_FAILURES, changeHop, gatewayHop, hopLinks, isOffline, phoneHop, retryDelay } from "@/lib/connection-hops";
+import { OFFLINE_AFTER_FAILURES, changeHop, gatewayHop, hopLinks, HOP_COPY, isOffline, offlineCopy, phoneHop, retryDelay } from "@/lib/connection-hops";
 import type { SyncStatus } from "@/lib/types";
 
 const route = { url: "https://home.example", transport: "lan", trustMode: "pinned", spkiSha256: "abcdefghijklmnopqrstuvwxyz", edgeAuth: "none" } as const;
@@ -20,6 +20,14 @@ describe("connection hops", () => {
     expect(isOffline(OFFLINE_AFTER_FAILURES - 1)).toBe(false);
     expect(isOffline(OFFLINE_AFTER_FAILURES)).toBe(true);
     expect(OFFLINE_AFTER_FAILURES).toBeGreaterThan(1);
+  });
+
+  it("tells a phone holding only Quick tunnel routes to pair again", () => {
+    const quick = { kind: "quick" } as const;
+    expect(offlineCopy([quick])).toBe(`${HOP_COPY.offlineBody} ${HOP_COPY.offlineQuick}`);
+    expect(offlineCopy([quick, { kind: "own" }])).toBe(HOP_COPY.offlineBody);
+    expect(offlineCopy([{ kind: "domain" }])).toBe(HOP_COPY.offlineBody);
+    expect(offlineCopy([])).toBe(HOP_COPY.offlineBody);
   });
 
   it("reports this phone's hop as measured", () => {

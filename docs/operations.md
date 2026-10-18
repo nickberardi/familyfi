@@ -90,17 +90,18 @@ the same tailnet; use Serve, never Funnel, which would expose the household serv
 
 **Quick tunnel** needs no Cloudflare account, router change, DNS or certificate. FamilyFi runs the
 pinned `cloudflared` shipped in the image (never a runtime download) and keeps one `quick` route
-pointed at the tunnel's address, so paired phones pick it up from the signed manifest.
+pointed at the tunnel's address, which paired phones receive in the signed manifest.
 
 The tunnel reaches only a phone-only gateway on loopback. It forwards `/api/v1/*` and nothing
 else, drops cookies, and marks each call as remote. The web app and its sign-in page are not
 reachable through it. Signing in remotely requires the FamilyFi app on a paired phone; its
 device credential is checked before the password, so the internet cannot test passwords.
 
-A quick tunnel's address changes whenever FamilyFi restarts. Phones learn the new one the next
-time they reach FamilyFi another way. Cloudflare offers quick tunnels for testing, with no uptime
-guarantee and a 200-request concurrency limit. For a permanent address, use **Cloudflare →
-Automatic** or **Tailscale**, or **My domain** for a VPN or reverse proxy you already run.
+A quick tunnel's address changes whenever FamilyFi restarts. Phones paired through it can't reach
+the new address and must be unpaired and paired again; the app's offline screen says so. Cloudflare
+offers quick tunnels for testing, with no uptime guarantee and a 200-request concurrency limit. For
+a permanent address, use **Cloudflare → Automatic** or **Tailscale**, or **My domain** for a VPN or
+reverse proxy you already run.
 
 ### Cloudflare Tunnel on your own domain (Automatic)
 

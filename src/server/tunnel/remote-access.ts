@@ -197,7 +197,8 @@ async function adoptWhileWanted(kind: typeof RouteKind.quick | typeof RouteKind.
 
 /**
  * Points the quick-tunnel route at the tunnel's current address and turns it on, keeping
- * its id so phones follow. The first quick tunnel creates the route and publishes it.
+ * its id rather than adding a route. Phones paired through the old address can't reach this
+ * one and must pair again. The first quick tunnel creates the route and publishes it.
  */
 function adoptQuickUrl(url: string) {
   return adoptWhileWanted(RouteKind.quick, async (db) => {

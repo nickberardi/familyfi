@@ -89,7 +89,7 @@ export function RemoteAccessCard({
     const count = pairedThrough(published.id);
     if (!count) return true;
     return window.confirm(
-      `${count} phone${count === 1 ? "" : "s"} paired through ${published.url}. They pick up the new address the next time they reach FamilyFi, and can't use this one once you switch.`,
+      `${count} phone${count === 1 ? "" : "s"} paired through ${published.url}. They can't reach FamilyFi once you switch, and must be paired again over the new route.`,
     );
   }
 
@@ -211,8 +211,8 @@ export function RemoteAccessCard({
 
         {choice === "quick" ? (
           <p className="text-[var(--ff-muted)]">
-            A free Cloudflare quick tunnel: no account needed. Its address changes when FamilyFi restarts, and phones pick up the new
-            one next time they&rsquo;re home. Cloudflare offers quick tunnels for trying things out, without an uptime promise.
+            A free Cloudflare quick tunnel: no account needed. Its address changes whenever FamilyFi restarts, and phones paired
+            through it must then be paired again. Cloudflare offers quick tunnels for trying things out, without an uptime promise.
           </p>
         ) : null}
 
