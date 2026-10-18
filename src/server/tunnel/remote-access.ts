@@ -416,7 +416,7 @@ function modeOf(route: ConnectionEndpoint | null): RemoteAccessMode {
 export async function remoteAccessState(): Promise<RemoteAccessState> {
   // The tunnel's status is read on both sides of the database reads, and "running" only when both say so.
   // goLive saves its route before it reports running, and every switch leaves running before it unpublishes
-  // one, so "running" always comes with the route it published.
+  // one, so "running" never comes back without a route.
   const before = runtime.status;
   const route = await publishedRoute();
   const domain = await routeOfKind(RouteKind.domain);

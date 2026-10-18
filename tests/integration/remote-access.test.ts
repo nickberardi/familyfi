@@ -3,11 +3,11 @@ import { createServer, request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
-import { householdRoutePublished, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
+import { householdRoutePublished, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, setRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -362,6 +362,27 @@ describe("remote access", () => {
     // The tunnel saves its route and goes live while the state is still reading the database.
     runtime.status = "running";
     expect(await pending).toMatchObject({ status: "starting", endpointId: null });
+  });
+
+  it("leaves running before a switch unpublishes the tunnel's route", async () => {
+    await put({ mode: "quick" });
+    await waitFor((t) => t.status === "running" && t.endpointId !== null, "the quick tunnel");
+    const runtime = (globalThis as { familyfiRemoteAccess?: { status: string } }).familyfiRemoteAccess!;
+    // Each write the switch makes, including the one that unpublishes the quick route, notes the status it starts under.
+    const db = prisma();
+    const transaction = db.$transaction.bind(db);
+    const statuses: string[] = [];
+    const spy = vi.spyOn(db, "$transaction").mockImplementation(((...args: Parameters<typeof transaction>) => {
+      statuses.push(runtime.status);
+      return transaction(...args);
+    }) as typeof transaction);
+    try {
+      await setRemoteAccess({ mode: "named", hostname: "familyfi.example.com" });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(statuses.length).toBeGreaterThan(0);
+    expect(statuses).not.toContain("running");
   });
 
   it("stops its tunnel when another FamilyFi process takes the lease", async () => {
