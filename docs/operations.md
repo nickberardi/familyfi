@@ -96,7 +96,8 @@ device credential is checked before the password, so the internet cannot test pa
 
 A quick tunnel's address changes whenever FamilyFi restarts. Phones learn the new one the next
 time they reach FamilyFi another way. Cloudflare offers quick tunnels for testing, with no uptime
-guarantee and a 200-request concurrency limit. For a permanent address, use **My domain**.
+guarantee and a 200-request concurrency limit. For a permanent address, use **Cloudflare →
+Automatic** or **Tailscale**, or **My domain** for a VPN or reverse proxy you already run.
 
 ### Cloudflare Tunnel on your own domain (Automatic)
 
@@ -123,7 +124,8 @@ there. Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key
 **Advanced** is a tunnel you run in your own Cloudflare account, with the `cloudflared` sidecar in
 [setup](setup.md#cloudflare-tunnel-you-run). FamilyFi doesn't manage it: it only needs the address.
 
-1. Create the tunnel, and point its public hostname at the remote access port, `http://app:7002`
+1. Create the tunnel, and add a published application route whose Service URL is the remote
+   access port, `http://app:7002`
    (`FAMILYFI_REMOTE_ACCESS_PORT`) — never at the app on 7001.
 2. On **Pair Device**, choose **Cloudflare → Advanced**, enter
    `https://<your hostname>`, and **Use this address**. Phones use it like any other trusted route.
@@ -132,23 +134,28 @@ there. Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key
 the route's service token, before it reaches FamilyFi. A request that gets past it still needs a
 paired phone and a signed-in account, as without Access.
 
-1. In Cloudflare Zero Trust, create a **service token**, then a **self-hosted application** for
-   your hostname with one **Service Auth** policy that includes that token. Turn on **Return 401
-   response for Service Auth policies**, so the app sees a plain refusal rather than a login page.
-   Add no identity policies to this application.
+Creating the Access application is what turns Access on, so it comes last, once phones hold the
+token:
+
+1. In Cloudflare Zero Trust, create a **service token**.
 2. On **Pair Device**, edit the Advanced route, tick **Protect with Cloudflare Access**, and paste
    the token's Client ID and Client Secret. FamilyFi stores them encrypted with
-   `FAMILYFI_ENCRYPTION_KEY`.
-3. Pair phones as usual. The pairing code carries the token, so a phone can reach the protected
-   address to pair; a phone already paired picks it up from its next signed manifest. Pair Device
-   shows how many active phones have it. Turn the Access policy on once they all do.
+   `FAMILYFI_ENCRYPTION_KEY`. The pairing code carries the token, and a phone already paired picks
+   it up from its next signed manifest.
+3. Wait until Pair Device shows "Every active phone has the token." (or "No active phones yet.").
+4. Only then create a **self-hosted application** for your hostname with one **Service Auth**
+   policy that includes that token. Turn on **401 Response for Service Auth policies**, so the app
+   sees a plain refusal rather than a login page. Add no identity policies to this application.
 
 The token only gets a request past Cloudflare, so it is treated as a shared key rather than a
 password: it is in the pairing code and on paired phones, and never in `/api/v1/connection/identity`, a
 browser's responses, or FamilyFi's logs. Anyone who sees a phone's HTTPS traffic, or a photo of a
 pairing code, can read it; replacing it is the remedy.
 
-**Replacing the token** (a leak, or its expiry) never needs a phone outage:
+When the token nears its expiry, **Refresh** it (or edit its duration) in Cloudflare's Service
+Tokens. That keeps the same Client ID and Secret, so nothing changes in FamilyFi.
+
+**Replacing the token** (after a leak) never needs a phone outage:
 
 1. In Cloudflare, **rotate** the token's secret and pick a grace period (up to 30 days) during which
    the old secret still works — or create a second token and add it to the same policy.

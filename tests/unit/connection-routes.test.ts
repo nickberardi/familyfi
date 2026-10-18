@@ -95,7 +95,7 @@ describe("connection routes", () => {
     expect(accessRollout(first, [phone("A", 1), phone("B", 1)], now)).toEqual({ done: true, text: "Every active phone has the token." });
     expect(accessRollout(first, [phone("A", 1), phone("Sam's iPhone", null)], now)).toEqual({
       done: false,
-      text: "1 of 2 active phones have the token. Waiting for Sam's iPhone. Cloudflare turns them away until then.",
+      text: "1 of 2 active phones have the token. Waiting for Sam's iPhone. Create the Access application in Cloudflare after that.",
     });
     expect(accessRollout(third, [phone("A", 2), phone("B", null), phone("C", 3)], now)).toEqual({
       done: false,

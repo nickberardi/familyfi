@@ -140,9 +140,9 @@ through its own public route; outside the container (`make dev`) it listens on t
 
 ### Cloudflare Tunnel you run
 
-A tunnel you manage in the Cloudflare dashboard (Zero Trust → Networks → Tunnels → Create →
-Cloudflared). In `.env`, set `CLOUDFLARE_TUNNEL_TOKEN` to the token the dashboard shows, and add the
-service:
+A tunnel you manage in the Cloudflare dashboard (**Networking → Tunnels → Create a tunnel**, then
+choose **Docker**). Copy only the token from the command the dashboard shows. In `.env`, set
+`CLOUDFLARE_TUNNEL_TOKEN` to that token, and add the service:
 
 ```yaml
   cloudflared:
@@ -155,8 +155,8 @@ service:
       - app
 ```
 
-In the tunnel's **Public Hostname** settings, point your hostname (for example
-`familyfi.example.com`) at service `http://app:7002`. Then on **Pair Device** choose **Cloudflare → Advanced** and enter
+Select the tunnel, then **Routes → Add route → Published application**: set your hostname (for
+example `familyfi.example.com`) and **Service URL** `http://app:7002`. Then on **Pair Device** choose **Cloudflare → Advanced** and enter
 `https://familyfi.example.com`. FamilyFi never sees the tunnel token: it lives only in your `.env`
 and the sidecar. To put Cloudflare Access in front of it, see
 [operations](operations.md#your-own-cloudflare-tunnel-and-cloudflare-access-advanced).

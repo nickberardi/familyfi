@@ -81,8 +81,8 @@ export const ACTIVE_DEVICE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 /**
  * How far a route's current Cloudflare Access token has reached the household's devices.
  * Devices pick it up the next time they reach FamilyFi; until all active ones have it,
- * Cloudflare must keep accepting what they hold — no Access yet for a first token, the old
- * token for a replacement — or it turns them away. Revoked devices, and ones not seen within
+ * Cloudflare must keep accepting what they hold — no Access application yet for a first token,
+ * the old token for a replacement — or it turns them away. Revoked devices, and ones not seen within
  * Cloudflare's longest grace period, are not waited for.
  */
 export function accessRollout(
@@ -100,7 +100,7 @@ export function accessRollout(
     return { done: true, text: `Every active phone has ${token}.${replaced ? " You can remove the old one in Cloudflare." : ""}` };
   }
   const names = behind.map((device) => device.displayName).join(", ");
-  const hold = replaced ? "Keep the old token in Cloudflare until then." : "Cloudflare turns them away until then.";
+  const hold = replaced ? "Keep the old token in Cloudflare until then." : "Create the Access application in Cloudflare after that.";
   return { done: false, text: `${active.length - behind.length} of ${active.length} active phones have ${token}. Waiting for ${names}. ${hold}` };
 }
 
