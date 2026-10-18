@@ -18,6 +18,9 @@ import { POST as extendGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]
 import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
 import { POST as resumeGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/resume/route";
 import { POST as disallowGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/disallow/route";
+import { POST as unblockGroup } from "@/app/api/v1/groups/[id]/unblock/route";
+import { POST as endGroupUnblock } from "@/app/api/v1/groups/[id]/unblock/end/route";
+import { POST as extendGroupUnblock } from "@/app/api/v1/groups/[id]/unblock/extend/route";
 import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
 import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
@@ -25,6 +28,7 @@ import { POST as resumeRule } from "@/app/api/v1/rules/[id]/resume/route";
 import { DELETE as deleteRule, GET as getRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
+import type { Rule } from "@/lib/rules";
 import type { FirewallPolicy } from "@/server/unifi/types";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { INTERNAL_ZONE, configureConnectedHousehold, resetDatabase, seedDevice } from "../helpers/db";
@@ -104,6 +108,13 @@ async function groupRuleAction(handler: typeof pauseGroupRule, auth: SessionAuth
   return handler(
     request(`/api/v1/groups/${groupId}/rules/${ruleId}/x`, { method: "POST", auth, headers: { "content-type": "application/json" }, body: body === null ? undefined : JSON.stringify(body) }),
     { params: Promise.resolve({ id: groupId, ruleId }) },
+  );
+}
+
+async function unblockAction(handler: typeof unblockGroup, auth: SessionAuth, id: string, body: object | null = null) {
+  return handler(
+    request(`/api/v1/groups/${id}/unblock`, { method: "POST", auth, headers: { "content-type": "application/json" }, body: body === null ? undefined : JSON.stringify(body) }),
+    { params: Promise.resolve({ id }) },
   );
 }
 
@@ -698,6 +709,132 @@ describe("household rules", () => {
       await runReconcileOnce();
       const link = await prisma().ruleGroup.findUniqueOrThrow({ where: { ruleId_groupId: { ruleId: video.id, groupId: emma.id } } });
       expect([link.pauseActive, link.pauseUntil, link.pausedByName]).toEqual([false, null, null]);
+    });
+  });
+
+  describe("a group's unblock", () => {
+    const OTHER_MAC = "02:00:00:00:00:02";
+    const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+
+    /** The devices the rule's enabled policies still block. */
+    function blockedMacs(prefix: string): string[] {
+      return policiesNamed(client, prefix).filter((policy) => policy.enabled).flatMap((policy) => policyMacs(policy)).sort();
+    }
+
+    async function liftOf(ruleId: string, groupId: string) {
+      return prisma().ruleGroup.findUniqueOrThrow({ where: { ruleId_groupId: { ruleId, groupId } } });
+    }
+
+    it("lifts every kind of rule blocking the group now, for it alone, until each window ends", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      const noah = await prisma().group.create({ data: { kind: GroupKind.family, name: "Noah", familyRole: FamilyRole.child } });
+      await seedDevice({ mac: OTHER_MAC, groupId: noah.id, zoneId: INTERNAL_ZONE, assignment: AssignmentState.assigned });
+      expect(await errorCode(await unblockAction(unblockGroup, auth, emma.id))).toEqual([409, "not_blocked"]);
+
+      const homework = await ruleOf(await postRule(auth, {
+        name: "Homework",
+        kind: "internet",
+        groupIds: [emma.id],
+        mode: "scheduled",
+        windows: [{ days: EVERY_DAY, start: utcClock(-60), end: utcClock(60) }],
+      }));
+      const video = await ruleOf(await postRule(auth, {
+        name: "Video",
+        kind: "category",
+        groupIds: [emma.id, noah.id],
+        targetIds: [4],
+        mode: "scheduled",
+        windows: [{ days: EVERY_DAY, start: utcClock(-30), end: utcClock(30) }],
+      }));
+      const later = await ruleOf(await postRule(auth, {
+        name: "Gaming",
+        kind: "category",
+        groupIds: [emma.id],
+        targetIds: [8],
+        mode: "scheduled",
+        windows: [{ days: EVERY_DAY, start: utcClock(120), end: utcClock(180) }],
+      }));
+      await runReconcileOnce();
+      expect(blockedMacs("FamilyFi Video")).toEqual([MAC, OTHER_MAC].sort());
+
+      const unblocked = await unblockAction(unblockGroup, auth, emma.id);
+      expect(unblocked.status).toBe(200);
+      const body = (await unblocked.json()) as { group: PublicGroup; rules: Rule[] };
+      expect(body.group.access).toBe("allowed");
+      // Each of the group's rules comes back with its lift for the group, so a client can show it.
+      expect(body.rules.map((rule) => rule.name).sort()).toEqual(["Gaming", "Homework", "Video"]);
+      expect(body.rules.find((rule) => rule.id === video.id)!.groupPauses).toEqual([
+        expect.objectContaining({ groupId: emma.id, pause: expect.objectContaining({ active: true, kind: "allow" }) }),
+      ]);
+      const homeworkLift = await liftOf(homework.id, emma.id);
+      const videoLift = await liftOf(video.id, emma.id);
+      expect([homeworkLift.pauseKind, videoLift.pauseKind]).toEqual(["allow", "allow"]);
+      expect(Math.abs(homeworkLift.pauseUntil!.getTime() - inMinutes(60).getTime())).toBeLessThan(2 * 60_000);
+      expect(Math.abs(videoLift.pauseUntil!.getTime() - inMinutes(30).getTime())).toBeLessThan(2 * 60_000);
+      // A rule not blocking now is left to start on time; the rule is unchanged for everyone else.
+      expect((await liftOf(later.id, emma.id)).pauseActive).toBe(false);
+      expect((await liftOf(video.id, noah.id)).pauseActive).toBe(false);
+      expect((await prisma().rule.findUniqueOrThrow({ where: { id: video.id } })).pauseActive).toBe(false);
+
+      await runReconcileOnce();
+      expect(blockedMacs("FamilyFi Video")).toEqual([OTHER_MAC]);
+
+      // More time counts from the unblock's end, the latest allowance, and every allowance ends then.
+      const extended = await extendGroupUnblock(
+        request(`/api/v1/groups/${emma.id}/unblock/extend`, { method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes: 15 }) }),
+        { params: Promise.resolve({ id: emma.id }) },
+      );
+      expect(extended.status).toBe(200);
+      const target = homeworkLift.pauseUntil!.getTime() + 15 * 60_000;
+      expect((await liftOf(homework.id, emma.id)).pauseUntil!.getTime()).toBe(target);
+      expect((await liftOf(video.id, emma.id)).pauseUntil!.getTime()).toBe(target);
+
+      const ended = await endGroupUnblock(request(`/api/v1/groups/${emma.id}/unblock/end`, { method: "POST", auth }), { params: Promise.resolve({ id: emma.id }) });
+      expect(ended.status).toBe(200);
+      expect(((await ended.json()) as { group: PublicGroup }).group.access).toBe("blocked");
+      await runReconcileOnce();
+      expect(blockedMacs("FamilyFi Video")).toEqual([MAC, OTHER_MAC].sort());
+    });
+
+    it("given a time, lifts every rule the group has, ends its pause, and extends together", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      const later = await ruleOf(await postRule(auth, {
+        name: "Gaming",
+        kind: "category",
+        groupIds: [emma.id],
+        targetIds: [8],
+        mode: "scheduled",
+        windows: [{ days: EVERY_DAY, start: utcClock(120), end: utcClock(180) }],
+      }));
+      const extend = (minutes: number) =>
+        extendGroupUnblock(
+          request(`/api/v1/groups/${emma.id}/unblock/extend`, { method: "POST", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes }) }),
+          { params: Promise.resolve({ id: emma.id }) },
+        );
+      expect(await errorCode(await extend(15))).toEqual([409, "not_unblocked"]);
+      await groupAction(pause, auth, emma.id);
+
+      const until = inMinutes(240);
+      const unblocked = await unblockAction(unblockGroup, auth, emma.id, { until: until.toISOString() });
+      expect(unblocked.status).toBe(200);
+      expect(((await unblocked.json()) as { group: PublicGroup }).group.suspension.active).toBe(false);
+      expect((await liftOf(later.id, emma.id)).pauseUntil?.getTime()).toBe(until.getTime());
+
+      expect((await extend(15)).status).toBe(200);
+      expect((await liftOf(later.id, emma.id)).pauseUntil?.getTime()).toBe(until.getTime() + 15 * 60_000);
+      expect(await errorCode(await unblockAction(unblockGroup, auth, emma.id, { until: inMinutes(-5).toISOString() }))).toEqual([400, "invalid_request"]);
+    });
+
+    it("ends the group's own pause even when no rule blocks it", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      await groupAction(pause, auth, emma.id);
+      const unblocked = await unblockAction(unblockGroup, auth, emma.id);
+      expect(unblocked.status).toBe(200);
+      expect(((await unblocked.json()) as { group: PublicGroup }).group.access).toBe("available");
+      expect(await errorCode(await unblockAction(unblockGroup, auth, "missing"))).toEqual([404, "not_found"]);
     });
   });
 

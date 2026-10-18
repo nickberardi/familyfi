@@ -332,16 +332,15 @@ export function appMarkState(activelyBlocking: boolean): CategoryMarkState {
 }
 
 /**
- * The word under a mark. One word per state, and the same word wherever that state
- * appears: the word says *what* is true of the thing and the colour says *who* made
- * it so, which is why `rule` and `blocked` no longer share one. `Off` pairs with the
- * sheet's Turn off, the control that undoes it. `unknown` alone is wordless — we did
- * not look, and a word for that would be louder than the fact deserves.
+ * The word under a mark: the word says *what* is true of the thing and the colour
+ * says *who* made it so. A FamilyFi rule blocking now (`rule`) and the resolver blocking
+ * it (`blocked`) both read Blocked, told apart by colour and by the screen reader's
+ * label. `unknown` alone is wordless — we did not look, and a word for that would be
+ * louder than the fact deserves.
  */
 export function categoryMarkWord(state: CategoryMarkState): string {
   switch (state) {
     case "rule":
-      return "Off";
     case "blocked":
       return "Blocked";
     case "partial":

@@ -2,11 +2,14 @@ import { Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/cli
 import { z } from "zod";
 import { rulePolicyNames } from "@/lib/policy-names";
 import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain, QUARANTINE_RULE_ID } from "@/lib/rules";
-import { isWindowActive, windowEndsAt, type InternetWindow } from "@/lib/rule-windows";
+import type { InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
 import { prisma } from "./db";
 import { quarantinePolicyName } from "./unifi/names";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
+
+// A group's and a rule's allow share it with the clients.
+export { activeWindowsEnd } from "@/lib/rules";
 
 export const ruleInclude = {
   groups: true,
@@ -126,18 +129,6 @@ export function ruleInternetWindows(rule: Pick<RuleWithWindows, "name" | "mode" 
     : [...rule.windows]
         .sort((a, b) => a.position - b.position)
         .map((window) => ({ name: window.name, days: window.days, start: window.start, end: window.end, ruleName: rule.name }));
-}
-
-/**
- * Until when the windows active now last: the latest end, or null when one never ends.
- * Undefined when none is active. Shared by a group's and a rule's allow.
- */
-export function activeWindowsEnd(windows: InternetWindow[], now: Date, timezone: string): Date | null | undefined {
-  const active = windows.filter((window) => isWindowActive(window, now, timezone));
-  if (active.length === 0) return undefined;
-  const ends = active.map((window) => windowEndsAt(window, now, timezone));
-  if (ends.some((end) => end === null)) return null;
-  return ends.reduce<Date | null>((latest, end) => (!latest || end!.getTime() > latest.getTime() ? end : latest), null);
 }
 
 const WindowBody = z.object({

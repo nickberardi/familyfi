@@ -71,7 +71,7 @@ needed for future work belongs here when implemented, not only in a canvas or se
 | Web colour, typography and spacing tokens | [globals.css](../src/app/globals.css); font loading in [layout.tsx](../src/app/layout.tsx) |
 | Reusable controls and marks | [src/components/ui](../src/components/ui); compose these before introducing a new primitive |
 | Brand artwork and its composition | [public/brand](../public/brand) and [Logo.tsx](../src/components/ui/Logo.tsx) |
-| Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/lib/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts), [rule-actions.ts](../src/lib/rule-actions.ts), [day-timeline.ts](../src/lib/day-timeline.ts), [internet-zone.ts](../src/lib/internet-zone.ts) and [shared vectors](testing.md#display-vectors) |
+| Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/lib/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts), [rule-actions.ts](../src/lib/rule-actions.ts), [day-timeline.ts](../src/lib/day-timeline.ts), [group-schedule.ts](../src/lib/group-schedule.ts), [internet-zone.ts](../src/lib/internet-zone.ts) and [shared vectors](testing.md#display-vectors) |
 | Components shared with the native app | [src/ui](../src/ui): React Native components the web renders through react-native-web; see [shared components](#shared-components) |
 | Rule and resolver verdicts | [rules.ts](../src/lib/rules.ts), [upstream.ts](../src/lib/upstream.ts) and [architecture](architecture.md#upstream-dns-categories) |
 | Native typography, navigation and adaptive layout | [familyfi-mobile's components and design](https://github.com/nickberardi/familyfi-mobile/blob/main/docs/architecture.md#components-and-design-srccomponents-srcdesign); read its current sources for platform details |
@@ -86,7 +86,7 @@ Record deliberate web choices here and native choices there, with links rather t
 
 - Colours come from `useUI().color("<token>")`, never a literal: the web's `DefaultUI.web.tsx` returns `var(--ff-<token>)`, and native clients supply the palette for their appearance through `UIProvider`. Glyphs come from `useUI().Icon` (Phosphor's `Icon` on the web), and form controls from `useUI().TextField` and `useUI().Segmented`: the web passes its own input and segmented control (`src/components/ui`), so a shared form's fields are the web's own elements, and native clients pass their platform controls.
 - react-native-web resets `line-height`, so every shared `Text` sets its own (1.5× its size, the web's default). Pressed controls use `PRESS_OPACITY`, the web's `--ff-press-opacity`.
-- A web-only concern (a Next `Link`, a DOM sheet) stays in the `src/components` wrapper around the shared component and reaches it through a prop or slot, such as the internet zone's `footer`.
+- A web-only concern (a Next `Link`, a DOM sheet) stays in the `src/components` wrapper around the shared component and reaches it through a prop or slot, such as the group schedule's `footer`.
 
 ### Interaction rules
 

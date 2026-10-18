@@ -328,9 +328,10 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   await page.goto(`/family/${id}`);
   await expect(page.getByText("Group not found.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
-  // A new person has no internet rule, and the page says so rather than implying one.
-  await expect(page.getByRole("heading", { name: "All internet · no rule" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+  // A new person has nothing scheduled, and the page says so rather than implying a rule.
+  await expect(page.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
+  await expect(page.getByText(/^Nothing scheduled\./)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Block", exact: true })).toBeVisible();
   // A child is offered one-tap schedules.
   await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Homework 3–6 PM" })).toBeVisible();
@@ -338,11 +339,13 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   const renamed = `${name} Jr`;
   await page.getByLabel("Name").fill(renamed);
   const editHeading = page.getByRole("heading", { name: "Edit" });
-  const yBefore = (await editHeading.boundingBox())?.y;
+  // Measured on the page, not the viewport: Save may scroll into view on a phone.
+  const pageY = () => editHeading.evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
+  const yBefore = await pageY();
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
   await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
-  expect((await editHeading.boundingBox())?.y).toBe(yBefore);
+  expect(await pageY()).toBe(yBefore);
 
   // Groups can no longer be protected from FamilyFi.
   await expect(page.getByLabel(/Protected/)).toHaveCount(0);
@@ -352,8 +355,8 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("link", { name: "Custom schedule" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toHaveCount(0);
-  // Role never limits a control: an adult can be paused too. Only the suggested schedules differ.
-  await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+  // Role never limits a control: an adult can be blocked too. Only the suggested schedules differ.
+  await expect(page.getByRole("button", { name: "Block", exact: true })).toBeVisible();
 
   await page.goto("/family/does-not-exist");
   await expect(page.getByText("Loading household…")).toHaveCount(0);
@@ -541,16 +544,16 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
     await expect(page).toHaveURL(new RegExp(`/rules\\?group=${child!.id}`));
     await expect(page.getByRole("heading", { name: ruleName })).toBeVisible();
 
-    // The card's internet zone shows both windows on today's bar, by name.
+    // The card's schedule shows both windows on today's bar, by name.
     await page.goto("/family");
     const card = page.locator("article").filter({ has: page.getByText(child!.name, { exact: true }) }).first();
-    // Cards start closed: the header opens the zones.
-    const bar = card.getByRole("group", { name: `${child!.name}’s internet today` });
+    // Cards start closed: the header opens the schedule.
+    const bar = card.getByRole("group", { name: `${child!.name}’s schedule today` });
     await expect(bar).toHaveCount(0);
     await card.locator("button[aria-expanded=false]").first().click();
     await expect(bar.getByRole("button", { name: /^Bed, / }).first()).toBeVisible();
     await bar.getByRole("button", { name: /^Study, / }).click();
-    await expect(card.getByText(`${ruleName} rule · Study`)).toBeVisible();
+    await expect(card.getByText(new RegExp(`· ${ruleName} rule$`))).toBeVisible();
   } finally {
     await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
   }
@@ -574,15 +577,15 @@ test("Rules: pause a rule from its card and resume it", { tag: "@desktop" }, asy
   try {
     await page.goto(`/rules?group=${child!.id}`);
     const card = page.locator("article").filter({ has: page.getByRole("heading", { name: ruleName }) });
-    await card.getByRole("button", { name: "Pause rule" }).click();
+    await card.getByRole("button", { name: "Pause for everyone" }).click();
     await page.getByRole("button", { name: /For 30 minutes/ }).click();
     await expect(card.getByText(/^Paused until .* by /)).toBeVisible();
     // The toggle still reads On: pausing is not turning the rule off.
     await expect(card.getByRole("switch", { name: ruleName })).toBeChecked();
 
-    await card.getByRole("button", { name: "Resume rule" }).click();
+    await card.getByRole("button", { name: "Resume", exact: true }).click();
     await expect(card.getByText(/^Paused until/)).toHaveCount(0);
-    await expect(card.getByRole("button", { name: "Pause rule" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Pause for everyone" })).toBeVisible();
   } finally {
     await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
   }
@@ -598,14 +601,13 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
     // The mock household enforces quarantine; it is paused, never allowed.
     const toggle = card.getByRole("switch", { name: "Quarantine" });
     await expect(toggle).toBeChecked();
-    await expect(card.getByRole("button", { name: "Allow now" })).toHaveCount(0);
     // Its switch is the household's quarantine setting, the one Devices shows.
     await toggle.click();
     await expect(toggle).not.toBeChecked();
-    await expect(card.getByRole("button", { name: "Pause rule" })).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Pause for everyone" })).toHaveCount(0);
     await toggle.click();
     await expect(toggle).toBeChecked();
-    await card.getByRole("button", { name: "Pause rule" }).click();
+    await card.getByRole("button", { name: "Pause for everyone" }).click();
     await page.getByRole("button", { name: /For 30 minutes/ }).click();
     await expect(card.getByText(/^Paused until .* by /)).toBeVisible();
 
@@ -620,12 +622,12 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
   }
 });
 
-test("Pause for a custom time, then offer it first next time", { tag: "@desktop" }, async ({ page }) => {
+test("Block for a custom time, then offer it first next time", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };
   const tv = groups.find((group) => group.name === "TV");
   expect(tv, "The mock seed must include the TV things group").toBeTruthy();
-  // As above: with the TV rule off, the card offers a pause whatever the time of day.
+  // As below: with the TV rule off, the page offers Block whatever the time of day.
   const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as {
     rules: { id: string; kind: string; enabled: boolean; groupIds: string[] }[];
   };
@@ -639,13 +641,13 @@ test("Pause for a custom time, then offer it first next time", { tag: "@desktop"
   await setEnabled(false);
   try {
     await page.goto(`/things/${tv!.id}`);
-    await page.getByRole("button", { name: "Pause all internet" }).click();
-    const sheet = page.getByRole("dialog", { name: `Pause all internet for ${tv!.name}?` });
+    await page.getByRole("button", { name: "Block", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: `Block all internet for ${tv!.name}?` });
     await sheet.getByRole("button", { name: /^For…/ }).click();
     await sheet.getByRole("spinbutton").first().fill("3");
     await sheet.getByRole("spinbutton").nth(1).fill("0");
     const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/pause`));
-    await sheet.getByRole("button", { name: "Pause", exact: true }).click();
+    await sheet.getByRole("button", { name: "Block", exact: true }).click();
     const response = await paused;
     expect(response.ok()).toBeTruthy();
     const { until } = response.request().postDataJSON() as { until: string };
@@ -654,7 +656,7 @@ test("Pause for a custom time, then offer it first next time", { tag: "@desktop"
 
     await page.request.post(`/api/v1/groups/${tv!.id}/rules/internet/resume`, { headers: await csrfHeaders(page) });
     await page.reload();
-    await page.getByRole("button", { name: "Pause all internet" }).click();
+    await page.getByRole("button", { name: "Block", exact: true }).click();
     await expect(page.getByRole("dialog").getByRole("button").first()).toHaveText(/^For 3 hours/);
   } finally {
     await page.request.post(`/api/v1/groups/${tv!.id}/rules/internet/resume`, { headers: await csrfHeaders(page) });
@@ -662,7 +664,7 @@ test("Pause for a custom time, then offer it first next time", { tag: "@desktop"
   }
 });
 
-test("Pause all internet names its scope and can be undone", { tag: "@desktop" }, async ({ page }) => {
+test("Block names its scope and can be undone", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groupsRes = await page.request.get("/api/v1/groups");
   const body = (await groupsRes.json()) as { groups: { id: string; name: string; kind: string; deviceCount: number }[] };
@@ -670,7 +672,7 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
   const tv = body.groups.find((group) => group.name === "TV");
   expect(tv, "The mock seed must include the TV things group").toBeTruthy();
 
-  // A no-internet window offers "Allow internet now" instead of a pause, so turn the
+  // A no-internet window offers Unblock instead of Block, so turn the
   // seeded TV rule off while this runs: the test must not depend on the time of day.
   const rulesRes = await page.request.get("/api/v1/rules");
   const { rules } = (await rulesRes.json()) as { rules: { id: string; kind: string; enabled: boolean; groupIds: string[] }[] };
@@ -684,10 +686,9 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
   await setEnabled(false);
   try {
     await page.goto(`/things/${tv!.id}`);
-    const zone = page.getByRole("heading", { name: /^All internet · / });
-    await expect(zone).toBeVisible();
-    await page.getByRole("button", { name: "Pause all internet" }).click();
-    const sheet = page.getByRole("dialog", { name: `Pause all internet for ${tv!.name}?` });
+    await expect(page.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
+    await page.getByRole("button", { name: "Block", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: `Block all internet for ${tv!.name}?` });
     await expect(sheet).toBeVisible();
     // The confirmation names a device and says the other rules keep applying.
     const devicesRes = await page.request.get("/api/v1/devices");
@@ -699,17 +700,61 @@ test("Pause all internet names its scope and can be undone", { tag: "@desktop" }
     const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/pause`));
     await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
     expect((await paused).ok()).toBeTruthy();
-    await expect(page.getByRole("heading", { name: "All internet · off" })).toBeVisible();
-    await expect(page.getByText(/All internet paused until/).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Blocked until / })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unblock", exact: true })).toBeVisible();
 
     const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/resume`));
     await page.locator('[aria-live="polite"]').getByRole("button", { name: "Undo" }).click();
     expect((await resumed).ok()).toBeTruthy();
-    await expect(page.getByRole("button", { name: "Pause all internet" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Block", exact: true })).toBeVisible();
   } finally {
     // Leave the group as the seed had it, even when a step above failed.
     await page.request.post(`/api/v1/groups/${tv!.id}/rules/internet/resume`, { headers: await csrfHeaders(page) });
     await setEnabled(true);
+  }
+});
+
+test("a group card's one button, its schedule link, Show less, and a rule paused on the details page", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const name = `QA card ${test.info().project.name} ${Date.now() % 100000}`;
+  const made = await page.request.post("/api/v1/groups", { headers: await csrfHeaders(page), data: { name, kind: "family", familyRole: "child" } });
+  expect(made.ok()).toBeTruthy();
+  const { group } = (await made.json()) as { group: { id: string } };
+  const created = await page.request.post("/api/v1/rules", {
+    headers: await csrfHeaders(page),
+    data: { name: `${name} video`, kind: "category", groupIds: [group.id], targetIds: [4], mode: "always" },
+  });
+  expect(created.ok()).toBeTruthy();
+  const { rule } = (await created.json()) as { rule: { id: string } };
+
+  try {
+    await page.goto("/family");
+    const card = page.locator("article").filter({ has: page.getByTestId(`filter-marks-${group.id}`) });
+    // Closed, the card shows no button; open, its one button is Unblock, since Video blocks it now.
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toHaveCount(0);
+    await card.locator("button[aria-expanded=false]").first().click();
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toBeVisible();
+    await expect(card.getByRole("button", { name: "Pause", exact: true })).toHaveCount(0);
+    await expect(card.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
+    await card.getByTestId(`group-show-less-${group.id}`).click();
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toHaveCount(0);
+
+    await card.locator("button[aria-expanded=false]").first().click();
+    await card.getByRole("link", { name: "Pause or change schedules →" }).click();
+    await expect(page).toHaveURL(new RegExp(`/family/${group.id}$`));
+
+    // On the details page the rule pauses for this group alone, and resumes.
+    await page.getByTestId(`schedule-pause-${rule.id}-${group.id}`).click();
+    const sheet = page.getByRole("dialog", { name: new RegExp(`^Pause .* for ${name}\\?$`) });
+    const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
+    await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
+    expect((await paused).ok()).toBeTruthy();
+    await expect(page.getByTestId(`schedule-${group.id}`).getByText(/Paused until /)).toBeVisible();
+    await page.getByTestId(`schedule-resume-${rule.id}-${group.id}`).click();
+    await expect(page.getByTestId(`schedule-pause-${rule.id}-${group.id}`)).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+    await page.request.delete(`/api/v1/groups/${group.id}`, { headers: await csrfHeaders(page) });
   }
 });
 
@@ -754,8 +799,10 @@ test("cards show every household category; one UniFi cannot block offers a Websi
     await expect(marks.getByRole("button", { name: new RegExp(`^${name} `) })).toBeVisible();
   }
 
+  // On a closed card a mark opens the card; open, it opens the mark's sheet.
   await marks.getByRole("button", { name: /^AI / }).click();
-  await card.getByRole("button", { name: "Add rule" }).click();
+  await expect(card.locator("button[aria-expanded=true]")).toBeVisible();
+  await marks.getByRole("button", { name: /^AI / }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByText(/UniFi has no AI category/)).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Create policy" })).toHaveCount(0);
@@ -844,13 +891,12 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   // No group is exempt: an adult's card shows its marks too.
   await expect(page.getByTestId(`filter-marks-${adult!.id}`)).toBeVisible();
 
-  // A mark opens the card on that category. With no rule and nothing measured, the
-  // zone and the sheet must not claim anything about DNS either way.
+  // A mark opens the card, and then its sheet. With no rule and nothing measured, the
+  // sheet must not claim anything about DNS either way.
   const card = page.locator("article").filter({ has: marks });
   await marks.getByRole("button", { name: /Video not blocked/i }).click();
   await expect(card.locator("button[aria-expanded=true]")).toBeVisible();
-  await expect(card.getByText("· no rule · not checked")).toBeVisible();
-  await card.getByRole("button", { name: "Add rule" }).click();
+  await marks.getByRole("button", { name: /Video not blocked/i }).click();
   const offSheet = page.getByRole("dialog");
   await expect(offSheet.getByRole("heading", { name: /Nothing's blocking Video yet/i })).toBeVisible();
   await expect(offSheet.getByText(/DNS/i)).toHaveCount(0);
@@ -866,9 +912,8 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await offSheet.getByRole("button", { name: "Create policy" }).click();
   expect((await create).ok()).toBeTruthy();
 
-  // The focused zone now shows the rule, with a way to edit it.
-  await expect(card.getByRole("heading", { name: "Video · blocked" })).toBeVisible();
-  await expect(card.getByRole("link", { name: "Edit rule" })).toBeVisible();
+  // The mark now stands for the rule.
+  await expect(marks.getByRole("button", { name: /Video blocked by FamilyFi/i })).toBeVisible();
 
   // On the group's page, the mark opens the sheet: On → Turn off
   await page.goto(`/family/${child!.id}`);

@@ -127,6 +127,22 @@
   --ff-rule-detail-indent: 39px;
 
   /*
+   * A group's schedule: one colour per rule on its timeline and in its list, in the order the
+   * group's rules were made. The internet keeps the accent blue; these five are for category,
+   * app and website rules, so two rules side by side on the bar read as two.
+   */
+  --ff-schedule-1-fill: #f6c9c4;
+  --ff-schedule-1-line: #d1493b;
+  --ff-schedule-2-fill: #f9e0a8;
+  --ff-schedule-2-line: #c98a12;
+  --ff-schedule-3-fill: #ddd2f7;
+  --ff-schedule-3-line: #7e57c9;
+  --ff-schedule-4-fill: #c3ebe3;
+  --ff-schedule-4-line: #21917f;
+  --ff-schedule-5-fill: #f7cde5;
+  --ff-schedule-5-line: #bd3f8a;
+
+  /*
    * Verdict chips and marks. Five states, each needing its own ink, fill and line,
    * because the design sets the border independently of the fill. `rule` is ours —
    * a FamilyFi rule blocking right now, which always wins over the upstream reading —

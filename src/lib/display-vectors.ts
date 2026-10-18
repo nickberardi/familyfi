@@ -5,6 +5,7 @@
  */
 import * as groupActionsModule from "./group-actions";
 import * as display from "./display";
+import * as groupSchedule from "./group-schedule";
 import * as pauseSheet from "./pause-sheet";
 import * as ruleActions from "./rule-actions";
 import * as ruleWindows from "./rule-windows";
@@ -39,13 +40,26 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   bedtimeEndDays: (i) => display.bedtimeEndDays(i.days, i.start, i.end),
   nextClockOnDays: (i) => iso(display.nextClockOnDays(i.timeZone, i.days, i.hhmm, at(i.now))),
   relativeDayLabel: (i) => display.relativeDayLabel(at(i.instant), i.timeZone, at(i.now)),
-  groupActionSpecs: (i) => groupActionsModule.groupActionSpecs(i.group as Group, i.surface),
+  rulesBlockingGroup: (i) => groupActionsModule.rulesBlockingGroup(i.group, i.rules as Rule[], i.timeZone, at(i.now)),
+  groupUnblock: (i) => groupActionsModule.groupUnblock(i.group, i.rules as Rule[], at(i.now)),
+  groupRulePause: (i) => groupActionsModule.groupRulePause(i.group, i.rules as Rule[], at(i.now)),
+  groupStatus: (i) => groupActionsModule.groupStatus(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
+  groupStatusColor: (i) => groupActionsModule.groupStatusColor(i.tone),
+  groupHeaderActions: (i) => groupActionsModule.groupHeaderActions(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
+  groupRuleActions: (i) => groupActionsModule.groupRuleActions(i.group as Group, i.rules as Rule[], at(i.now)),
+  // A client without the gateway's catalog replays these, so a category or app is named only when FamilyFi knows it.
+  groupScheduleRuleRows: (i) => groupSchedule.groupScheduleRuleRows(i.group as Group, i.rules as Rule[], new Map(), i.timeZone, at(i.now)),
   pauseSheetTitle: (i) => pauseSheet.pauseSheetTitle(i.group, i.mode),
   pauseSheetBody: (i) => pauseSheet.pauseSheetBody(i.group, i.mode, i.deviceNames),
   pauseSheetOptions: (i) => pauseSheet.pauseSheetOptions(i.group, i.windows, i.mode, i.timeZone, at(i.now)),
   rulePauseSheetTitle: (i) => pauseSheet.rulePauseSheetTitle(i.rule, i.mode),
   rulePauseSheetBody: (i) => pauseSheet.rulePauseSheetBody(i.rule, i.mode),
   rulePauseSheetOptions: (i) => pauseSheet.rulePauseSheetOptions(i.rule, i.windows, i.mode, i.timeZone, at(i.now)),
+  unblockSheetTitle: (i) => pauseSheet.unblockSheetTitle(i.group, i.mode),
+  unblockSheetBody: (i) => pauseSheet.unblockSheetBody(i.group, i.blocking, i.mode),
+  unblockSheetOptions: (i) => pauseSheet.unblockSheetOptions(i.unblock, i.blocking, i.mode, i.timeZone, at(i.now)),
+  groupRuleSheetTitle: (i) => pauseSheet.groupRuleSheetTitle(i.group, i.name, i.mode),
+  groupRuleSheetBody: (i) => pauseSheet.groupRuleSheetBody(i.group, i.name, i.mode),
   ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),
   ruleStateLine: (i) => ruleActions.ruleStateLine(i.rule, i.timeZone, at(i.now)),
   ruleGroupStateLines: (i) => ruleActions.ruleGroupStateLines(i.rule, i.groupNames, i.timeZone, at(i.now)),
@@ -61,15 +75,19 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
 };
 
 /** The modules whose every exported function must have a vector, or a reason in `EXCLUDED`. */
-export const MODULES = { display, groupActions: groupActionsModule, pauseSheet, ruleActions, ruleWindows };
+export const MODULES = { display, groupActions: groupActionsModule, groupSchedule, pauseSheet, ruleActions, ruleWindows };
 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {
   internetRulePath: "an API path, not display text",
+  // The Watch lists a group's rules but draws no schedule bar.
+  groupScheduleToday: "the schedule bar and today's list are phone and web only; tests/unit/group-schedule.test.ts",
+  groupScheduleRules: "returns the rules themselves; the groupScheduleRuleRows vectors cover their titles and order",
   // The Watch keeps the quick options, so it ports none of the custom choices; their clock text
   // comes from formatClock and relativeDayLabel, which have vectors.
   pauseSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
   rulePauseSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
+  unblockSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
   customPauseLabel: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
   withCustomChoices: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
   parseCustomPause: "reads stored device data, not display text; tests/unit/pause-sheet-custom.test.ts",

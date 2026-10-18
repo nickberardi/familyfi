@@ -1,74 +1,92 @@
 import { describe, expect, it, vi } from "vitest";
-import { groupActions } from "@/components/group-actions";
+import { runGroupCardAction } from "@/lib/group-writes";
+import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
+import { groupCardControls } from "@/ui/group-card-controls";
+
+/* The labels and states are pinned by tests/fixtures/display-vectors.json; this checks the wiring. */
 
 function group(overrides: Partial<Group> = {}): Group {
   return {
     id: "g1",
-    kind: "family",
-    name: "Betsy",
-    monogram: null,
-    familyRole: "child",
-    deviceCount: 4,
+    kind: "things",
+    name: "TV",
+    monogram: "TV",
+    familyRole: null,
+    deviceCount: 3,
     suspension: { active: false, until: null, by: null },
     allowance: { active: false, until: null, by: null },
-    internetRuleIds: ["r1"],
+    internetRuleIds: ["r-downtime"],
     dohOverrideUrl: null,
     access: "available",
     ...overrides,
   };
 }
 
-const mutate = vi.fn();
-const openPause = vi.fn();
-const openExtend = vi.fn();
-const labels = (value: Group, surface: "phone" | "web" = "web") =>
-  groupActions(value, surface, openPause, openExtend, mutate).map((item) => item.label);
+function rule(overrides: Partial<Rule>): Rule {
+  return {
+    id: "r",
+    name: "Rule",
+    kind: "internet",
+    scope: "group",
+    groupIds: ["g1"],
+    networkIds: [],
+    targetIds: [],
+    domains: [],
+    enabled: true,
+    pause: { active: false, until: null, kind: "pause", by: null },
+    groupPauses: [],
+    mode: "scheduled",
+    windows: [],
+    useGeneratedName: false,
+    policyNames: [],
+    builtIn: null,
+    ...overrides,
+  };
+}
 
-describe("groupActions", () => {
-  it("names the scope: Pause all internet, then Rules and Detail on the web card", () => {
-    const actions = groupActions(group(), "web", openPause, openExtend, mutate);
-    expect(actions.map((item) => item.label)).toEqual(["Pause all internet", "Rules", "Detail"]);
-    expect(actions.find((item) => item.label === "Rules")?.href).toBe("/rules?group=g1");
+const TZ = "America/New_York";
+// Thursday 4:30 PM in New York: Video blocks until 6, Dinner starts at 6.
+const NOW = new Date("2026-10-15T20:30:00Z");
+const downtime = rule({ id: "r-downtime", name: "TV downtime", windows: [{ id: "w1", name: "Dinner", days: [0, 1, 2, 3, 4, 5, 6], start: "18:00", end: "20:00" }] });
+const video = rule({ id: "r-video", name: "TV video evenings", kind: "category", targetIds: [4], windows: [{ id: "w2", name: "", days: [1, 2, 3, 4, 5], start: "16:00", end: "18:00" }] });
+describe("groupCardControls", () => {
+  it("gives the group one button, its tap naming what it is for", () => {
+    const onRun = vi.fn();
+    const controls = groupCardControls(group(), [downtime, video], TZ, NOW, onRun);
+    expect(controls.action).toMatchObject({ label: "Unblock", strong: true, testID: "group-action-unblock-g1" });
+    expect(controls.more).toBeNull();
+    controls.action.onPress();
+    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "unblock" }]);
   });
 
-  it("omits Detail on the phone card because the row already navigates", () => {
-    expect(labels(group(), "phone")).toEqual(["Pause all internet", "Rules"]);
+  it("disables the button while the view is stale", () => {
+    expect(groupCardControls(group(), [downtime], TZ, NOW, vi.fn(), false).action.disabled).toBe(true);
   });
+});
 
-  it("offers Pause on a group with no internet rule", () => {
-    expect(labels(group({ kind: "things", familyRole: null, internetRuleIds: [] }))).toEqual(["Pause all internet", "Rules", "Detail"]);
-  });
-
-  it("resumes a pause, allows during a window, and resumes a schedule after an allowance", () => {
-    expect(labels(group({ suspension: { active: true, until: "2026-09-14T20:00:00.000Z", by: null }, access: "paused" }))).toEqual([
-      "Resume internet",
-      "More time",
-      "Rules",
+describe("runGroupCardAction", () => {
+  it("opens a sheet for Block, Unblock, Pause and More time, and writes Resume at once", () => {
+    const mutate = vi.fn(() => Promise.resolve(undefined));
+    const openSheet = vi.fn();
+    const tv = group();
+    for (const run of ["block", "moreBlock", "unblock", "moreUnblock"] as const) runGroupCardAction(mutate, tv, { kind: "header", run }, openSheet);
+    runGroupCardAction(mutate, tv, { kind: "rule", run: "pause", ruleIds: ["r-video"], name: "Video" }, openSheet);
+    runGroupCardAction(mutate, tv, { kind: "rule", run: "extend", ruleIds: ["r-video"], name: "Video" }, openSheet);
+    expect(openSheet.mock.calls.map(([target]) => target)).toEqual([
+      { kind: "block", mode: "pause" },
+      { kind: "block", mode: "extend" },
+      { kind: "unblock", mode: "pause" },
+      { kind: "unblock", mode: "extend" },
+      { kind: "rule", ruleIds: ["r-video"], name: "Video", mode: "pause" },
+      { kind: "rule", ruleIds: ["r-video"], name: "Video", mode: "extend" },
     ]);
-    expect(labels(group({ access: "blocked" }))).toEqual(["Allow internet now", "Rules"]);
-    expect(labels(group({ access: "allowed", allowance: { active: true, until: null, by: null } }))).toEqual([
-      "Resume schedule",
-      "Pause all internet",
-      "Rules",
-    ]);
-  });
+    expect(mutate).not.toHaveBeenCalled();
 
-  /* `groupActionSpecs` is pinned by tests/fixtures/display-vectors.json; this checks the wiring. */
-  it("binds each tap to its handler", () => {
-    const pauseCard = groupActions(group(), "web", openPause, openExtend, mutate);
-    pauseCard[0]?.onClick?.();
-    expect(openPause).toHaveBeenCalledWith(expect.objectContaining({ id: "g1" }));
-    expect(pauseCard.slice(1).every((item) => item.onClick === undefined)).toBe(true);
-
-    const pausedCard = groupActions(group({ suspension: { active: true, until: null, by: null }, access: "paused" }), "phone", openPause, openExtend, mutate);
-    pausedCard[0]?.onClick?.();
-    expect(mutate).toHaveBeenCalledTimes(1);
-    pausedCard[1]?.onClick?.();
-    expect(openExtend).toHaveBeenCalledWith(expect.objectContaining({ id: "g1" }));
-
-    groupActions(group({ access: "blocked" }), "web", openPause, openExtend, mutate)[0]?.onClick?.();
-    groupActions(group({ access: "allowed" }), "web", openPause, openExtend, mutate)[0]?.onClick?.();
+    runGroupCardAction(mutate, tv, { kind: "header", run: "resume" }, openSheet);
+    runGroupCardAction(mutate, tv, { kind: "header", run: "unblockNow" }, openSheet);
+    runGroupCardAction(mutate, tv, { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video" }, openSheet);
     expect(mutate).toHaveBeenCalledTimes(3);
+    expect(openSheet).toHaveBeenCalledTimes(6);
   });
 });

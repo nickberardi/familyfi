@@ -3,14 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { GROUP_CARD_COPY } from "@/lib/group-page";
+import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
+import { runGroupCardAction } from "@/lib/group-writes";
 import { cardMarks, categorySheet, categorySlotStates } from "@/lib/category-marks";
 import { internetWindowsForGroup, type Rule } from "@/lib/rules";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
 import type { Group } from "@/lib/types";
-import { CategoryZone } from "@/ui/CategoryZone";
+import { groupCardControls } from "@/ui/group-card-controls";
 import { GroupCardMarks } from "@/ui/GroupCardMarks";
+import { GROUP_SCHEDULE_COPY, GroupSchedule } from "@/ui/GroupSchedule";
+import { useAppData } from "./AppDataProvider";
 import { FilterSheet, type FilterSheetState } from "./filters/FilterSheet";
-import { InternetZone } from "./InternetZone";
 import { GroupCardFrame } from "@/ui/GroupCardFrame";
 
 export type CardAction = {
@@ -18,6 +21,7 @@ export type CardAction = {
   href?: string;
   onClick?: () => void;
   strong?: boolean;
+  testID?: string;
 };
 
 /**
@@ -25,9 +29,10 @@ export type CardAction = {
  *
  * Closed, the card is its state and one row of marks: the Internet mark (all internet on
  * every device), a divider, then its categories with FamilyFi's own rules first. Opening
- * it — the header, or any mark — shows the internet zone with today's no-internet time
- * and its controls, one focused category in the rule's lighter treatment, and the other
- * categories. Device-wide and category controls never share a zone.
+ * it — the header, or any mark — puts the group's Block, Unblock or Resume in the header's
+ * corner, and shows its schedule (every rule on one bar, and today's windows), its categories
+ * and app rules. Pausing one rule for the group happens on its page, which the schedule links
+ * to; the card's only button is the group's own. Show less closes it.
  */
 export function GroupCard({
   group,
@@ -36,8 +41,7 @@ export function GroupCard({
   rules,
   catalogNames,
   upstreamCategories,
-  onPause,
-  onExtend,
+  onSheet,
   onRulesChanged,
 }: {
   group: Group;
@@ -46,60 +50,49 @@ export function GroupCard({
   rules: Rule[];
   catalogNames: Map<string, string>;
   upstreamCategories: UpstreamCategoryRow[];
-  onPause: () => void;
-  onExtend: () => void;
+  /** Opens the group's block or unblock sheet. */
+  onSheet: (target: GroupSheetTarget) => void;
   onRulesChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [focus, setFocus] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const [sheet, setSheet] = useState<FilterSheetState | null>(null);
+  const { store, busy } = useAppData();
 
   const now = new Date();
   const windows = internetWindowsForGroup(rules, group.id, now);
 
-  const marks = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, focus, more });
-  const { focused } = marks;
-
-  const openOn = (slot?: string) => {
-    if (slot) setFocus(slot);
-    setOpen(true);
-  };
+  const marks = cardMarks(categorySlotStates(group, rules, upstreamCategories, timezone), { open, more });
+  const header = groupCardControls(group, rules, timezone, now, (tap) => runGroupCardAction(store.mutate, group, tap, onSheet), !busy);
 
   return (
-    <GroupCardFrame group={group} windows={windows} timezone={timezone} now={now} open={open} onToggle={() => setOpen(!open)}>
+    <GroupCardFrame
+      group={group}
+      rules={rules}
+      windows={windows}
+      timezone={timezone}
+      now={now}
+      open={open}
+      onToggle={() => setOpen(!open)}
+      action={header.action}
+      more={header.more}
+    >
 
       {open ? (
-        <div className="flex flex-col gap-2.5 px-3 pb-3">
-          <InternetZone
+        <div className="px-3 pb-3">
+          <GroupSchedule
             group={group}
-            windows={windows}
+            rules={rules}
+            catalogNames={catalogNames}
             timezone={timezone}
-            surface="web"
-            onPause={onPause}
-            onExtend={onExtend}
-            editHref={`/rules?group=${group.id}`}
+            now={now}
+            variant="card"
+            footer={
+              <Link href={href} className="self-end text-[14px] font-semibold text-[var(--ff-accent)]" data-testid={`schedule-details-${group.id}`}>
+                {GROUP_SCHEDULE_COPY.details}
+              </Link>
+            }
           />
-          {focused ? (
-            <CategoryZone
-              group={group}
-              item={focused}
-              rules={rules}
-              timezone={timezone}
-              now={now}
-              onAddRule={() => setSheet(categorySheet(focused))}
-              editRule={
-                focused.rule ? (
-                  <Link
-                    href={`/rules/${focused.rule.id}?group=${group.id}`}
-                    className="rounded-[8px] bg-[var(--ff-card)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-accent)] shadow-[inset_0_0_0_1px_var(--ff-control-line)]"
-                  >
-                    {GROUP_CARD_COPY.editRule}
-                  </Link>
-                ) : null
-              }
-            />
-          ) : null}
         </div>
       ) : null}
 
@@ -113,7 +106,8 @@ export function GroupCard({
         open={open}
         marks={marks}
         more={more}
-        onOpen={openOn}
+        onOpen={() => setOpen(true)}
+        onCategory={(item) => setSheet(categorySheet(item))}
         onToggleMore={() => setMore(!more)}
         onApp={(rule, name) => setSheet({ kind: "app", name, rule })}
       />
@@ -121,8 +115,8 @@ export function GroupCard({
       {open ? (
         <ActionRow
           actions={[
-            { label: GROUP_CARD_COPY.rules, href: `/rules?group=${group.id}` },
             { label: GROUP_CARD_COPY.details, href },
+            { label: GROUP_CARD_COPY.showLess, onClick: () => setOpen(false), testID: `group-show-less-${group.id}` },
           ]}
         />
       ) : null}
@@ -151,7 +145,7 @@ function ActionRow({ actions }: { actions: CardAction[] }) {
           );
         }
         return (
-          <button key={action.label} type="button" onClick={action.onClick} className={className} style={style}>
+          <button key={action.label} type="button" onClick={action.onClick} className={className} style={style} data-testid={action.testID}>
             {action.label}
           </button>
         );

@@ -152,12 +152,9 @@ test("a measured all-clear is not the same mark as an unmeasured category", { ta
 });
 
 /**
- * One word per state, and the colour says who is doing it.
- *
- * "Off" is the word for a FamilyFi rule blocking right now, and it pairs with the
- * sheet's Turn off — the control that put it there. It is not the old vocabulary's
- * "Off", which sat under a mark where *nothing* was blocking and meant the opposite;
- * that reading is gone along with On, DNS and Part.
+ * The word names the state, and the colour says who is doing it: a FamilyFi rule
+ * blocking now and the resolver blocking both read "Blocked". The old vocabulary's
+ * On, DNS and Part are gone.
  */
 test("a mark's word names its state, and says nothing when nothing was measured", { tag: "@desktop" }, async ({
   page,

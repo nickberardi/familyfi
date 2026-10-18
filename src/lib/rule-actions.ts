@@ -1,6 +1,5 @@
 import { formatClock } from "./display";
-import { isWindowActive } from "./rule-windows";
-import { rulePaused, ruleInternetWindows, type Rule } from "./rules";
+import { rulePaused, type Rule } from "./rules";
 
 /**
  * A rule card action as plain data, like a group's: `run` names what a tap does.
@@ -13,26 +12,16 @@ export type RuleActionSpec = {
 };
 
 /**
- * What an adult can do to a rule now. Pausing lifts the rule for every group it covers
- * until a time, so it means nothing while the rule is off.
+ * What an adult can do to a rule now, for every group it covers: Pause for everyone lifts it
+ * until a time (its sheet offers until the windows active now end), Resume brings it back. A pause
+ * means nothing while the rule is off. A group's own pause of the rule is on the group's card.
  */
-export function ruleActionSpecs(rule: Rule, timezone: string, now: Date): RuleActionSpec[] {
+export function ruleActionSpecs(rule: Rule, _timezone: string, now: Date): RuleActionSpec[] {
   if (!rule.enabled) return [];
-  // Quarantine blocks around the clock: it is paused, never allowed.
-  if (rule.builtIn === "quarantine" && !rulePaused(rule, now)) return [{ label: "Pause rule", run: "pause" }];
-  if (rulePaused(rule, now) && rule.pause.kind === "allow") {
-    return [{ label: "Resume schedule", strong: true, run: "disallow" }, { label: "Pause rule", run: "pause" }];
-  }
-  if (rulePaused(rule, now)) {
-    return [
-      { label: "Resume rule", strong: true, run: "resume" },
-      ...(rule.pause.until ? [{ label: "More time", run: "extend" } as const] : []),
-    ];
-  }
-  if (ruleInternetWindows(rule).some((window) => isWindowActive(window, now, timezone))) {
-    return [{ label: "Allow now", strong: true, run: "allow" }, { label: "Pause rule", run: "pause" }];
-  }
-  return [{ label: "Pause rule", run: "pause" }];
+  if (!rulePaused(rule, now)) return [{ label: "Pause for everyone", run: "pause" }];
+  // An allowance made before allow left the rule card ends the same way a pause does.
+  if (rule.pause.kind === "allow") return [{ label: "Resume", strong: true, run: "disallow" }];
+  return [{ label: "Resume", strong: true, run: "resume" }, ...(rule.pause.until ? [{ label: "More time", run: "extend" } as const] : [])];
 }
 
 /** The line a paused rule's card shows, "Paused until 1:30 AM by Nick"; null when it is not paused. */
@@ -44,7 +33,8 @@ export function ruleStateLine(rule: Pick<Rule, "pause">, timezone: string, now: 
 }
 
 /**
- * One line per group the rule is lifted for alone, "Paused for Emma until 8:00 PM"; empty
+ * One line per group the rule is lifted for alone, "Paused for Emma until 8:00 PM" or "Unblocked
+ * for Emma until 6:00 PM"; empty
  * when there are none. `groupNames` maps a group id to its name.
  */
 export function ruleGroupStateLines(
@@ -56,8 +46,9 @@ export function ruleGroupStateLines(
   return rule.groupPauses
     .filter((item) => rulePaused({ pause: item.pause }, now))
     .map((item) => {
-      const line = ruleStateLine({ pause: item.pause }, timezone, now)!;
-      const at = line.indexOf(" ");
-      return `${line.slice(0, at)} for ${groupNames[item.groupId] ?? "a deleted group"}${line.slice(at)}`;
+      // A group's allowance on a rule is its unblock.
+      const verb = item.pause.kind === "allow" ? "Unblocked" : "Paused";
+      const until = item.pause.until ? `until ${formatClock(new Date(item.pause.until), timezone)}` : "until resumed";
+      return `${verb} for ${groupNames[item.groupId] ?? "a deleted group"} ${until}${item.pause.by ? ` by ${item.pause.by.name}` : ""}`;
     });
 }

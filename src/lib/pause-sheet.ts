@@ -1,4 +1,5 @@
 import { formatClock, nextClockOnDays, relativeDayLabel } from "./display";
+import type { BlockingRule, GroupLiftState } from "./group-actions";
 import { isWindowActive, nextWindowStart, windowEndsAt, windowTitle, type InternetWindow } from "./rule-windows";
 import type { Rule } from "./rules";
 import type { Group } from "./types";
@@ -11,6 +12,8 @@ export type PauseSheetMode = "pause" | "extend";
  */
 export type PauseSheetRequest =
   | { kind: "pauseFor"; minutes: number }
+  /** An unblock's first choice: lift what blocks now until it ends, each rule its own end. */
+  | { kind: "current" }
   | { kind: "pauseUntil"; until: string | null }
   | { kind: "extend"; minutes: number };
 
@@ -37,17 +40,17 @@ const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /*
  * The pause sheet's copy and options as plain data, so familyfi-mobile's Apple Watch can port
- * them and `tests/fixtures/display-vectors.json` can pin them. A pause blocks all internet on
- * every device in the group, so the copy names that scope and the devices.
+ * them and `tests/fixtures/display-vectors.json` can pin them. A group's block (its pause) blocks
+ * all internet on every device in the group, so the copy names that scope and the devices.
  */
 
 export function pauseSheetTitle(group: Pick<Group, "name">, mode: PauseSheetMode): string {
-  return mode === "extend" ? `Keep all internet off for ${group.name} longer?` : `Pause all internet for ${group.name}?`;
+  return mode === "extend" ? `Keep ${group.name} blocked longer?` : `Block all internet for ${group.name}?`;
 }
 
 /** `deviceNames` are the group's devices' known names; the first one names the devices. */
 export function pauseSheetBody(group: Pick<Group, "kind" | "deviceCount">, mode: PauseSheetMode, deviceNames: string[] = []): string {
-  if (mode === "extend") return "Every device stays offline for longer. Resume brings internet back sooner.";
+  if (mode === "extend") return "Every device stays offline for longer. Unblock brings internet back sooner.";
   const named = deviceNames.find((name) => name.trim())?.trim();
   const others = group.deviceCount - 1;
   const devices = named
@@ -105,7 +108,7 @@ export function pauseSheetOptions(
           },
         ]
       : []),
-    { label: "Until I resume", note: "no end time", request: { kind: "pauseUntil", until: null } },
+    { label: "Until I unblock", note: "no end time", request: { kind: "pauseUntil", until: null } },
   ];
 }
 
@@ -177,6 +180,73 @@ export function rulePauseSheetOptions(
 export function rulePauseSheetCustom(rule: Pick<Rule, "pause">, custom: CustomPause, mode: PauseSheetMode, timezone: string, now: Date): PauseSheetOption | null {
   const extending = mode === "extend" && rule.pause.active && Boolean(rule.pause.until);
   return customOption(custom, extending ? rule.pause.until : null, "blocks again at", timezone, now);
+}
+
+/*
+ * A group's unblock: whatever blocks it now stops, for this group alone. Its first choice lifts
+ * each rule blocking now until that rule's windows end; For… and Until… lift every rule the group
+ * has for the time chosen. `blocking` is `rulesBlockingGroup`, longest first.
+ */
+
+export function unblockSheetTitle(group: Pick<Group, "name">, mode: PauseSheetMode): string {
+  return mode === "extend" ? `Keep ${group.name} unblocked longer?` : `Unblock ${group.name}?`;
+}
+
+export function unblockSheetBody(group: Pick<Group, "name" | "suspension">, blocking: Pick<BlockingRule, "name">[], mode: PauseSheetMode): string {
+  if (mode === "extend") return "Its rules stay lifted for longer. Resume brings them back sooner.";
+  const what = blocking.length ? listNames(blocking.map((rule) => rule.name)) : "its rules";
+  const lifts = group.suspension.active ? `Ends the block and lifts ${what}` : `Lifts ${what}`;
+  return `${lifts} for ${group.name} only. For… and Until… lift every rule ${group.name} has for that time. The rules stay as they are for everyone else.`;
+}
+
+export function unblockSheetOptions(
+  unblock: GroupLiftState | null,
+  blocking: Pick<BlockingRule, "name" | "until">[],
+  mode: PauseSheetMode,
+  timezone: string,
+  now: Date,
+): PauseSheetOption[] {
+  if (mode === "extend") {
+    const from = extendFrom(unblock?.until ?? null, now);
+    return [30, 60].map((minutes) => ({
+      label: minutes === 60 ? "For an hour" : `For ${minutes} minutes`,
+      note: `blocks again at ${formatClock(new Date(from + minutes * 60_000), timezone)}`,
+      request: { kind: "extend", minutes },
+    }));
+  }
+  if (blocking.length === 0) return [];
+  const last = blocking.some((rule) => rule.until === null) ? null : blocking[0]!.until;
+  return [
+    {
+      label: last ? `Until ${formatClock(new Date(last), timezone)}` : "Until I resume",
+      note: last === null ? "no end time" : blocking.length === 1 ? `when ${blocking[0]!.name} ends` : "when these end",
+      request: { kind: "current" },
+    },
+  ];
+}
+
+/** An unblock's option for a custom choice: its rules block again at the end of the time chosen. */
+export function unblockSheetCustom(unblock: GroupLiftState | null, custom: CustomPause, mode: PauseSheetMode, timezone: string, now: Date): PauseSheetOption | null {
+  return customOption(custom, mode === "extend" ? (unblock?.until ?? null) : null, "blocks again at", timezone, now);
+}
+
+/*
+ * A rule area's pause under a group: the rule stops blocking this group alone, and is unchanged
+ * for everyone else. Its choices are a rule's (`rulePauseSheetOptions`), from the group's lift.
+ */
+
+export function groupRuleSheetTitle(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
+  return mode === "extend" ? `Keep ${name} paused for ${group.name} longer?` : `Pause ${name} for ${group.name}?`;
+}
+
+export function groupRuleSheetBody(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
+  if (mode === "extend") return "The rule stays lifted for longer. Resume brings it back sooner.";
+  return `${name} stops blocking ${group.name}. Other groups, and the rule itself, stay as they are.`;
+}
+
+function listNames(items: string[]): string {
+  const unique = [...new Set(items)];
+  return unique.length <= 1 ? (unique[0] ?? "") : `${unique.slice(0, -1).join(", ")} and ${unique.at(-1)}`;
 }
 
 /** "For 45 minutes", "For an hour", "For 2 hours 30 minutes", "Until 9:00 PM". */

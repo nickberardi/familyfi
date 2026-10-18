@@ -6,7 +6,17 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, TransportError, type ApiRequest } from "@/lib/api-client";
-import { applyGroupPause, applyRulePause, assignDevice, createGroup, deleteGroup, runGroupAction, updateGroup } from "@/lib/group-writes";
+import {
+  applyGroupPause,
+  applyGroupSheet,
+  applyRulePause,
+  assignDevice,
+  createGroup,
+  deleteGroup,
+  resumeGroupRules,
+  runGroupHeaderAction,
+  updateGroup,
+} from "@/lib/group-writes";
 import { createHouseholdStore, NOTICE_MS, NOTICE_WITH_ACTION_MS, type OfflineGuard } from "@/lib/household-store";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -114,11 +124,11 @@ describe("household store", () => {
     const pending = applyGroupPause(store.mutate, current, { kind: "pauseUntil", until: null }, "America/New_York");
     // While the write is in flight the group is busy, so a second tap sends nothing.
     expect(store.getState()).toMatchObject({ busy: true, busyGroupIds: ["group-child"] });
-    await expect(runGroupAction(store.mutate, current, "resume")).resolves.toBeUndefined();
+    await expect(runGroupHeaderAction(store.mutate, current, "unblockNow")).resolves.toBeUndefined();
     await pending;
     const state = store.getState();
     expect(state.groups[0]?.access).toBe("paused");
-    expect(state.notice).toBe("All internet paused for A child until you resume.");
+    expect(state.notice).toBe("All internet blocked for A child until you unblock.");
     expect(state.noticeAction?.label).toBe("Undo");
     expect(state).toMatchObject({ busy: false, busyGroupIds: [] });
     await flush();
@@ -137,31 +147,53 @@ describe("household store", () => {
     await store.reload();
     await applyGroupPause(store.mutate, childGroup(), { kind: "pauseFor", minutes: 30 }, "America/New_York", new Date("2026-09-28T16:00:00Z"));
     expect(server.calls.at(-1)?.body).toEqual({ until: "2026-09-28T16:30:00.000Z" });
-    expect(store.getState().notice).toMatch(/^All internet paused for A child until 12:30/);
+    expect(store.getState().notice).toMatch(/^All internet blocked for A child until 12:30/);
     await store.runNoticeAction(store.getState().noticeAction!);
     expect(server.calls.at(-1)).toMatchObject({ method: "POST", path: "/api/v1/groups/group-child/rules/internet/resume" });
   });
 
-  it("extends, resumes, allows and disallows with the requests the API expects", async () => {
+  it("blocks more, unblocks, ends an unblock and pauses a rule for the group with the requests the API expects", async () => {
     const paused = childGroup({ access: "paused", suspension: { active: true, until: null, by: null } });
     const ok = () => ({ json: { group: paused } });
+    const rule = (id: string) => () => ({ json: { rule: { id }, change: { changeId: `c-${id}` } } });
     const { store, server } = setup({
       ...reads(() => paused),
       "POST /api/v1/groups/group-child/rules/internet/extend": ok,
-      "POST /api/v1/groups/group-child/rules/internet/resume": ok,
-      "POST /api/v1/groups/group-child/rules/internet/allow": ok,
-      "POST /api/v1/groups/group-child/rules/internet/disallow": ok,
+      "POST /api/v1/groups/group-child/unblock": ok,
+      "POST /api/v1/groups/group-child/unblock/end": ok,
+      "POST /api/v1/groups/group-child/unblock/extend": ok,
+      "POST /api/v1/groups/group-child/rules/r1/pause": rule("r1"),
+      "POST /api/v1/groups/group-child/rules/r2/pause": rule("r2"),
+      "POST /api/v1/groups/group-child/rules/r1/resume": rule("r1"),
+      "POST /api/v1/groups/group-child/rules/r1/extend": rule("r1"),
     });
     await store.reload();
-    await applyGroupPause(store.mutate, paused, { kind: "extend", minutes: 30 }, "America/New_York");
-    await runGroupAction(store.mutate, paused, "resume");
-    await runGroupAction(store.mutate, paused, "allow");
-    await runGroupAction(store.mutate, paused, "disallow");
-    expect(server.calls.filter((call) => call.method === "POST").map((call) => [call.path.split("/").pop(), call.body])).toEqual([
-      ["extend", { minutes: 30 }],
-      ["resume", undefined],
-      ["allow", {}],
-      ["disallow", undefined],
+    const now = new Date("2026-09-28T16:00:00Z");
+    const tz = "America/New_York";
+    await applyGroupPause(store.mutate, paused, { kind: "extend", minutes: 30 }, tz);
+    await applyGroupSheet(store.mutate, paused, { kind: "unblock", mode: "pause" }, { kind: "current" }, tz, now);
+    expect(store.getState().notice).toBe("A child unblocked until the block ends.");
+    await applyGroupSheet(store.mutate, paused, { kind: "unblock", mode: "pause" }, { kind: "pauseFor", minutes: 60 }, tz, now);
+    await applyGroupSheet(store.mutate, paused, { kind: "unblock", mode: "extend" }, { kind: "extend", minutes: 30 }, tz, now);
+    await runGroupHeaderAction(store.mutate, paused, "resume");
+    await runGroupHeaderAction(store.mutate, paused, "unblockNow");
+    const zone = { kind: "rule" as const, ruleIds: ["r1", "r2"], name: "internet rules", mode: "pause" as const };
+    await applyGroupSheet(store.mutate, paused, zone, { kind: "pauseUntil", until: null }, tz, now);
+    expect(store.getState().notice).toBe("Internet rules paused for A child until you resume.");
+    expect(store.getState().rules.map((item) => item.id)).toEqual(expect.arrayContaining(["r1", "r2"]));
+    await applyGroupSheet(store.mutate, paused, { ...zone, ruleIds: ["r1"], mode: "extend" }, { kind: "extend", minutes: 15 }, tz, now);
+    await resumeGroupRules(store.mutate, paused, ["r1"]);
+    expect(server.calls.filter((call) => call.method === "POST").map((call) => [call.path.replace("/api/v1/groups/group-child/", ""), call.body])).toEqual([
+      ["rules/internet/extend", { minutes: 30 }],
+      ["unblock", {}],
+      ["unblock", { until: "2026-09-28T17:00:00.000Z" }],
+      ["unblock/extend", { minutes: 30 }],
+      ["unblock/end", undefined],
+      ["unblock", {}],
+      ["rules/r1/pause", {}],
+      ["rules/r2/pause", {}],
+      ["rules/r1/extend", { minutes: 15 }],
+      ["rules/r1/resume", undefined],
     ]);
   });
 
@@ -267,17 +299,17 @@ describe("household store", () => {
     let release: () => void = () => {};
     const { store, server } = setup({
       ...reads(() => childGroup()),
-      "POST /api/v1/groups/group-child/rules/internet/resume": () =>
+      "POST /api/v1/groups/group-child/unblock/end": () =>
         new Promise((resolve) => {
           release = () => resolve({ json: {} });
         }),
     });
     await store.reload();
-    const first = runGroupAction(store.mutate, childGroup(), "resume");
-    await expect(runGroupAction(store.mutate, childGroup(), "allow")).resolves.toBeUndefined();
+    const first = runGroupHeaderAction(store.mutate, childGroup(), "resume");
+    await expect(runGroupHeaderAction(store.mutate, childGroup(), "unblockNow")).resolves.toBeUndefined();
     release();
     await first;
-    expect(server.calls.filter((call) => call.method === "POST").map((call) => call.path.split("/").pop())).toEqual(["resume"]);
+    expect(server.calls.filter((call) => call.method === "POST").map((call) => call.path.split("/").pop())).toEqual(["end"]);
   });
 
   it("rolls the optimistic change back and shows the server's error", async () => {
@@ -295,11 +327,11 @@ describe("household store", () => {
 
   it("reports a failed change from the gateway", async () => {
     const { store } = setup(
-      { ...reads(() => childGroup()), "POST /api/v1/groups/group-child/rules/internet/resume": () => ({ json: { change: { changeId: "c" } } }) },
+      { ...reads(() => childGroup()), "POST /api/v1/groups/group-child/unblock/end": () => ({ json: { change: { changeId: "c" } } }) },
       { outcome: { status: "failed", error: "The gateway refused the policy." } },
     );
     await store.reload();
-    await runGroupAction(store.mutate, childGroup(), "resume");
+    await runGroupHeaderAction(store.mutate, childGroup(), "resume");
     await flush();
     expect(store.getState().error).toBe("The gateway refused the policy.");
   });
@@ -538,7 +570,7 @@ describe("household store with an offline guard (a phone)", () => {
     expect(store.getState().groups).toHaveLength(1);
     expect(store.canControl()).toBe(false);
 
-    await expect(runGroupAction(store.mutate, childGroup(), "resume")).resolves.toBeUndefined();
+    await expect(runGroupHeaderAction(store.mutate, childGroup(), "resume")).resolves.toBeUndefined();
     expect(store.getState().error).toBe(GUARD.notSent);
     expect(server.calls.some((call) => call.method === "POST")).toBe(false);
 
@@ -567,13 +599,13 @@ describe("household store with an offline guard (a phone)", () => {
       {
         ...routes,
         "GET /api/v1/auth/session": () => (reachable ? routes["GET /api/v1/auth/session"]!(undefined) : offline()),
-        "POST /api/v1/groups/group-child/rules/internet/resume": offline,
+        "POST /api/v1/groups/group-child/unblock/end": offline,
       },
       { offlineGuard: GUARD },
     );
     await store.reload();
     reachable = false;
-    await runGroupAction(store.mutate, childGroup(), "resume");
+    await runGroupHeaderAction(store.mutate, childGroup(), "resume");
     await flush();
     expect(store.getState()).toMatchObject({ stale: true, error: GUARD.maybeNotSent });
   });

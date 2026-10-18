@@ -7,7 +7,7 @@ import { DeviceScope, PairedDeviceClient } from "@prisma/client";
  * device whatever its account may do. A pair not named here allows nothing.
  *
  * - `phone:full`: everything its account may do.
- * - `watch:rulesOnly`: lists, the rule verbs, and `GET /connection` for the manifest it needs away from home.
+ * - `watch:rulesOnly`: lists, the rule verbs, a group's unblock, and `GET /connection` for the manifest it needs away from home.
  * - `agent:full`: household reads and controls; never accounts, UniFi settings, resolvers, household
  *   settings changes or connection management, including `GET /connection`, whose manifest carries
  *   Cloudflare Access tokens.
@@ -21,6 +21,8 @@ import { DeviceScope, PairedDeviceClient } from "@prisma/client";
 const RULE_VERBS = /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/;
 /** The same verbs for one group alone, including its built-in `internet` rule. */
 const GROUP_RULE_VERBS = /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/;
+/** A group's unblock, which lifts whatever blocks it now, and its end and extend. */
+const GROUP_UNBLOCK = /^\/api\/v1\/groups\/[^/]+\/unblock(\/(end|extend))?$/;
 
 /** The built-in quarantine rule's switch: PATCH, DELETE, on and off. Its other verbs are rule verbs. */
 const QUARANTINE_SWITCH = /^\/api\/v1\/rules\/quarantine(\/(on|off))?$/;
@@ -42,7 +44,7 @@ function watchRulesOnly({ method, path }: ScopedCall): boolean {
   // The route itself lets a Watch revoke only itself.
   if (method === "DELETE" && /^\/api\/v1\/paired\/devices\/[^/]+$/.test(path)) return true;
   if (changesQuarantineSetting({ method, path, deviceId: "" })) return false;
-  return method === "POST" && (RULE_VERBS.test(path) || GROUP_RULE_VERBS.test(path));
+  return method === "POST" && (RULE_VERBS.test(path) || GROUP_RULE_VERBS.test(path) || GROUP_UNBLOCK.test(path));
 }
 
 const AGENT_READS: RegExp[] = [
@@ -65,6 +67,7 @@ const AGENT_WRITES: Record<string, RegExp[]> = {
     /^\/api\/v1\/rules$/,
     RULE_VERBS,
     GROUP_RULE_VERBS,
+    GROUP_UNBLOCK,
     /^\/api\/v1\/sync\/retry$/,
     /^\/api\/v1\/upstream\/categories$/,
     /^\/api\/v1\/upstream\/categories\/[^/]+\/check$/,

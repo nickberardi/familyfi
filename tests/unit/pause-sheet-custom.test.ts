@@ -5,6 +5,8 @@ import {
   pauseSheetCustom,
   pauseSheetOptions,
   rulePauseSheetCustom,
+  unblockSheetCustom,
+  unblockSheetOptions,
   withCustomChoices,
 } from "@/lib/pause-sheet";
 
@@ -72,12 +74,27 @@ describe("custom pause choices", () => {
       "For an hour",
       "For…",
       "Until…",
-      "Until I resume",
+      "Until I unblock",
     ]);
     // A custom choice a quick option already offers is not repeated.
     const hour = pauseSheetCustom(idle, { kind: "for", minutes: 60 }, "pause", tz, now);
     expect(withCustomChoices(options, hour).map((choice) => choice.label)[0]).toBe("For 30 minutes");
     expect(withCustomChoices(options, null)).toHaveLength(5);
+  });
+
+  it("offers an unblock's first choice, then the pickers, which lift every rule until the time chosen", () => {
+    const blocking = [{ name: "Video", until: "2026-09-28T22:00:00.000Z" }];
+    const options = unblockSheetOptions(null, blocking, "pause", tz, now);
+    expect(withCustomChoices(options, null).map((choice) => choice.label)).toEqual(["Until 6:00 PM", "For…", "Until…"]);
+    expect(unblockSheetCustom(null, { kind: "for", minutes: 45 }, "pause", tz, now)).toEqual({
+      label: "For 45 minutes",
+      note: "blocks again at 12:45 PM",
+      request: { kind: "pauseFor", minutes: 45 },
+    });
+    // More time counts from the unblock's end.
+    const unblock = { until: "2026-09-28T22:00:00.000Z", by: null };
+    expect(unblockSheetCustom(unblock, { kind: "for", minutes: 30 }, "extend", tz, now)?.request).toEqual({ kind: "extend", minutes: 30 });
+    expect(unblockSheetCustom(unblock, { kind: "for", minutes: 30 }, "extend", tz, now)?.note).toBe("blocks again at 6:30 PM");
   });
 
   it("keeps a window's quick option with the others, ahead of the pickers", () => {
@@ -89,7 +106,7 @@ describe("custom pause choices", () => {
       "Until Bedtime ends",
       "For…",
       "Until…",
-      "Until I resume",
+      "Until I unblock",
     ]);
   });
 

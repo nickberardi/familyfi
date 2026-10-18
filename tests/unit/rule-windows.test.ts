@@ -146,16 +146,16 @@ describe("internetDayBands", () => {
     const paused = group({ suspension: { active: true, until: at("2026-09-28T20:10:00").toISOString(), by: { accountId: "a1", name: "Nick" } } });
     const bands = internetDayBands(paused, [], at("2026-09-28T19:40:00"), TZ);
     expect(bands).toEqual([
-      { kind: "pause", from: 1180, to: 1210, label: "Paused", source: "Paused by Nick until 8:10 PM", carried: false },
+      { kind: "pause", from: 1180, to: 1210, label: "Blocked", source: "Blocked by Nick until 8:10 PM", carried: false },
     ]);
     const indefinite = group({ suspension: { active: true, until: null, by: null } });
-    expect(internetDayBands(indefinite, [], at("2026-09-28T19:40:00"), TZ)[0]).toMatchObject({ to: 1440, source: "Paused by someone until resumed" });
+    expect(internetDayBands(indefinite, [], at("2026-09-28T19:40:00"), TZ)[0]).toMatchObject({ to: 1440, source: "Blocked by someone until unblocked" });
   });
 
   it("adds an allowance over the window it lifts", () => {
     const allowed = group({ allowance: { active: true, until: at("2026-09-28T18:00:00").toISOString(), by: { accountId: "a1", name: "Nick" } } });
     const bands = internetDayBands(allowed, [homework], at("2026-09-28T16:00:00"), TZ);
-    expect(bands.at(-1)).toEqual({ kind: "allowance", from: 960, to: 1080, label: "Allowed", source: "Allowed by Nick until 6:00 PM", carried: false });
+    expect(bands.at(-1)).toEqual({ kind: "allowance", from: 960, to: 1080, label: "Unblocked", source: "Unblocked by Nick until 6:00 PM", carried: false });
   });
 });
 

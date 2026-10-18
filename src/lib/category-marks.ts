@@ -13,6 +13,9 @@ import type { IconName } from "./icons";
 import {
   CURATED_CATEGORY_SLOTS,
   categoryRuleForSlot,
+  categoryRulesForSlot,
+  ruleLiftedForGroup,
+  rulePaused,
   type CuratedCategorySlot,
   type Rule,
 } from "./rules";
@@ -54,6 +57,7 @@ export function categorySlotStates(
   rules: Rule[],
   upstreamCategories: UpstreamCategoryRow[],
   timezone: string,
+  now: Date = new Date(),
 ): CategorySlotState[] {
   const seededSlot = (row: UpstreamCategoryRow) =>
     row.source === "seed" ? CURATED_CATEGORY_SLOTS.find((slot) => slot.slot === row.slug) : undefined;
@@ -65,10 +69,18 @@ export function categorySlotStates(
     .filter((row) => !seededSlot(row))
     .map((row) => ({ slot: undefined, upstream: row }));
   return [...mapped, ...others].map(({ slot, upstream }) => {
-    const rule = slot ? categoryRuleForSlot(rules, group.id, slot.categoryId) : undefined;
-    // A rule blocking *right now* wins; otherwise this group's resolver decides.
+    // A rule blocking *right now* wins; otherwise this group's resolver decides. A rule paused
+    // for everyone, or lifted for this group, is not blocking it. Any of the group's rules for the
+    // category can be the one blocking (Video alone, or Homework over Video and Social), and the
+    // mark then stands for that rule.
     const check = upstream ? effectiveCheck(upstream.checks, group) : null;
-    const blocking = ruleActivelyBlocking(rule, timezone);
+    const blocker = slot
+      ? categoryRulesForSlot(rules, group.id, slot.categoryId).find(
+          (candidate) => !rulePaused(candidate, now) && !ruleLiftedForGroup(candidate, group.id, now) && ruleActivelyBlocking(candidate, timezone, now),
+        )
+      : undefined;
+    const rule = blocker ?? (slot ? categoryRuleForSlot(rules, group.id, slot.categoryId) : undefined);
+    const blocking = blocker !== undefined;
     return {
       key: slot?.slot ?? upstream!.slug,
       label: slot?.label ?? upstream!.label,
@@ -120,19 +132,13 @@ export const CLOSED_MARKS = 4;
 export const OPEN_MARKS = 5;
 
 /**
- * A card's marks: FamilyFi's own rules first, then the resolver's verdicts. Open, one category is
- * focused (the one tapped, or the first) and the rest are "Other categories"; either way the row
- * shows a few before "More".
+ * A card's marks: FamilyFi's own rules first, then the resolver's verdicts. The row shows a few
+ * before "More"; open, a few more.
  */
-export function cardMarks(
-  slots: CategorySlotState[],
-  { open, focus, more }: { open: boolean; focus: string | null; more: boolean },
-) {
+export function cardMarks(slots: CategorySlotState[], { open, more }: { open: boolean; more: boolean }) {
   const ordered = [...slots.filter((item) => item.rule?.enabled), ...slots.filter((item) => !item.rule?.enabled)];
-  const focused = ordered.find((item) => item.key === focus) ?? ordered[0];
-  const pool = open ? ordered.filter((item) => item !== focused) : ordered;
   const cap = open ? OPEN_MARKS : CLOSED_MARKS;
-  return { ordered, focused: open ? focused : undefined, pool, more, cap, ...rowOfMarks(pool, more, cap) };
+  return { ordered, pool: ordered, more, cap, ...rowOfMarks(ordered, more, cap) };
 }
 
 /** `hidden` is what the row hides collapsed, so expanded it still shows Fewer. */

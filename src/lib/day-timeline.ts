@@ -6,7 +6,8 @@ import { formatHhmm } from "./display";
  * and the legend. Internet windows are the accent, a pause the paused ink, and an allowance an
  * outlined gap over the window it lifts. Category, app and website windows use the rule
  * verdict's lighter treatment, with the internet windows faded behind them, so a category
- * schedule never reads as losing all internet.
+ * schedule never reads as losing all internet. A group's schedule gives each such rule its own
+ * colour instead (`tone`), and draws a rule lifted for now faintly (`dim`).
  */
 export type TimelineBand = {
   kind: "window" | "pause" | "allowance" | "category" | "faded";
@@ -14,6 +15,10 @@ export type TimelineBand = {
   to: number;
   label: string;
   source: string;
+  /** A category band's own colour, `--ff-schedule-<tone + 1>-*`, in place of the rule verdict's. */
+  tone?: number;
+  /** Drawn faintly: the rule is paused or lifted now. */
+  dim?: boolean;
 };
 
 /** How a band is filled: a token name for its fill, its opacity, and an optional inset outline. */
@@ -26,6 +31,18 @@ export const TIMELINE_BAND_LOOK: Record<TimelineBand["kind"], TimelineBandLook> 
   category: { fill: "verdict-rule-fill", line: "verdict-rule-line" },
   faded: { fill: "accent", opacity: 0.22 },
 };
+
+/** How one band is drawn: its kind's look, its rule's colour when it has a `tone`, faint when `dim`. */
+export function timelineBandLook(band: Pick<TimelineBand, "kind" | "tone" | "dim">): TimelineBandLook {
+  const look =
+    band.tone === undefined || band.kind !== "category"
+      ? TIMELINE_BAND_LOOK[band.kind]
+      : { fill: `schedule-${band.tone + 1}-fill`, line: `schedule-${band.tone + 1}-line` };
+  return band.dim ? { ...look, opacity: (look.opacity ?? 1) * DIM_OPACITY } : look;
+}
+
+/** How much of its colour a lifted rule's band keeps. */
+const DIM_OPACITY = 0.35;
 
 /** The hour labels under the bar, left to right. */
 export const TIMELINE_HOURS = ["12 AM", "6 AM", "NOON", "6 PM", "12 AM"] as const;
@@ -51,8 +68,8 @@ export function timelineRank(band: Pick<TimelineBand, "kind">): number {
 }
 
 /** One legend entry per window, joining its evening and morning pieces. */
-export function timelineLegend(bands: TimelineBand[]): { kind: TimelineBand["kind"]; label: string; source: string; times: string }[] {
-  const items: { kind: TimelineBand["kind"]; label: string; source: string; times: string }[] = [];
+export function timelineLegend(bands: TimelineBand[]): { kind: TimelineBand["kind"]; tone?: number; label: string; source: string; times: string }[] {
+  const items: { kind: TimelineBand["kind"]; tone?: number; label: string; source: string; times: string }[] = [];
   for (const band of bands) {
     if (band.kind === "faded") continue;
     // One entry per window: two rules may name a window alike, so the source tells them apart.
@@ -62,7 +79,7 @@ export function timelineLegend(bands: TimelineBand[]): { kind: TimelineBand["kin
     const tail = same.find((other) => other.from === 0 && other.to < 1440);
     const evening = same.find((other) => other.to === 1440 && other.from > 0);
     const times = tail && evening ? `${clock(evening.from)}–${clock(tail.to)}` : same.map(bandTimes).join(", ");
-    items.push({ kind: band.kind, label: band.label, source: band.source, times });
+    items.push({ kind: band.kind, tone: band.tone, label: band.label, source: band.source, times });
   }
   return items;
 }
