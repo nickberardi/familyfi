@@ -384,13 +384,18 @@ test("lays out remote access on a phone", { tag: "@phone" }, async ({ page }) =>
   await shot(page, "remote-access");
 });
 
-test("links the App Store badge and shows Google Play unlinked until it has a link", { tag: "@phone" }, async ({ page }) => {
+test("links the App Store badge and opens Google Play's closed beta steps in a modal", { tag: "@phone" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/pair");
   const card = page.getByTestId("app-stores");
   await expect(card.getByRole("link", { name: "Download on the App Store" })).toHaveAttribute("href", /^https:\/\//);
-  await expect(card.getByRole("img", { name: "Get it on Google Play, coming soon" })).toBeVisible();
-  await expect(card.getByRole("link")).toHaveCount(1);
+  await card.getByRole("button", { name: "Get it on Google Play" }).click();
+  const dialog = page.getByRole("dialog", { name: "Join the Android beta" });
+  for (const name of ["Join the beta group", "Become a tester", "Install FamilyFi from Google Play", "Full instructions"])
+    await expect(dialog.getByRole("link", { name })).toHaveAttribute("href", /^https:\/\//);
+  await shot(page, "play-beta");
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toBeHidden();
 });
 
 test("Home access suggests this address, saves a home network address, and agents connect there", { tag: "@desktop" }, async ({ page }) => {
