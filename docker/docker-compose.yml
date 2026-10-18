@@ -37,6 +37,8 @@ services:
       # forward, reverse proxy, Tailscale or its own tunnel) to point at. It answers nothing until
       # Pair Device → Remote access publishes such a route (docs/setup.md).
       FAMILYFI_REMOTE_ACCESS_PORT: ${FAMILYFI_REMOTE_ACCESS_PORT:-7002}
+      # Reverse proxies in front of the web port whose X-Forwarded-For sign-in throttling believes (docs/setup.md).
+      FAMILYFI_TRUSTED_PROXIES: ${FAMILYFI_TRUSTED_PROXIES:-}
     labels:
       # Watchtower updates this container and no other, after backing up the database. A failed
       # backup exits 75, which makes Watchtower skip the update.

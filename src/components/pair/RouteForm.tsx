@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
-import { canPin } from "@/lib/connection-routes";
+import { addressConflict, canPin, routeForAddress } from "@/lib/connection-routes";
 import type { ConnectionRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
 import { Segmented } from "@/components/ui/Segmented";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
@@ -19,17 +19,9 @@ function expiry(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function origin(value: string): string | null {
-  try {
-    return new URL(value.trim()).origin;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The address of a route the household runs, and for a home-network route how the phone
- * trusts its certificate. A pinned route is for a certificate the iPhone would not
+ * trusts its certificate. A pinned route is for a certificate the phone would not
  * otherwise trust; FamilyFi reads the pin from the address (or a pasted certificate) so
  * nobody computes it by hand, and the field stays editable as the override.
  *
@@ -110,10 +102,14 @@ export function RouteForm({
             })
           ).endpoint;
         } catch (caught) {
-          // The address is already saved as another of your routes: reuse it rather than refuse.
-          const existing = routes.find((item) => item.kind === "own" && item.url === origin(url));
-          if (!(caught instanceof ApiError && caught.code === "endpoint_exists" && existing)) throw caught;
-          saved = await update(existing.id, body);
+          // The address is already saved: reuse a route of this transport, but never take one over from another choice.
+          const existing = caught instanceof ApiError && caught.code === "endpoint_exists" ? routeForAddress(routes, url, transport) : null;
+          if (!existing) throw caught;
+          if ("conflict" in existing) {
+            setError(addressConflict(existing.conflict));
+            return;
+          }
+          saved = await update(existing.reuse.id, body);
         }
       }
       await onSaved(saved);
@@ -151,7 +147,7 @@ export function RouteForm({
             grow
             onChange={setTrust}
             segments={[
-              { value: "system", label: "Trusted by iPhone" },
+              { value: "system", label: "Trusted by phones" },
               { value: "pinned", label: "Pin this certificate" },
             ]}
           />
@@ -199,7 +195,7 @@ export function RouteForm({
           ) : null}
           {read?.systemTrusted ? (
             <p className="font-semibold text-[var(--ff-paused)]">
-              This certificate is already trusted by devices. Choose Trusted by iPhone instead, so renewals don&rsquo;t break
+              This certificate is already trusted by devices. Choose Trusted by phones instead, so renewals don&rsquo;t break
               the pin.
             </p>
           ) : null}
@@ -222,7 +218,7 @@ export function RouteForm({
         </div>
       ) : (
         <p className="rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 leading-5 text-[var(--ff-muted)]">
-          The phone checks this address&rsquo;s certificate the ordinary way, so it needs a certificate the iPhone already trusts.
+          The phone checks this address&rsquo;s certificate the ordinary way, so it needs a certificate phones already trust.
         </p>
       )}
       {extra}

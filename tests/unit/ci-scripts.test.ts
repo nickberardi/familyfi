@@ -85,6 +85,18 @@ describe("the release version", () => {
   });
 });
 
+describe("the cloudflared bump", () => {
+  it("opens a PR from the update script's pin", () => {
+    const workflow = read(".github/workflows/cloudflared.yml");
+    expect(workflow).toContain('version="$(scripts/update-cloudflared.sh)"');
+    expect(workflow).toContain("gh pr create --base main");
+  });
+
+  it("refuses a version that is not one", () => {
+    expect(runScript("scripts/update-cloudflared.sh", "latest; rm -rf /").status).toBe(2);
+  });
+});
+
 describe("reusable workflows", () => {
   // In a called workflow `github.workflow` is the caller's name, so two workflows one run
   // calls (release.yml calls ci.yml and container.yml) would share a concurrency group and

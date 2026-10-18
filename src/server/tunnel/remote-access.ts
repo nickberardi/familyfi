@@ -28,7 +28,7 @@ import { startPhoneGateway } from "./phone-gateway";
 
 export type RemoteAccessStatus = "off" | "signing-in" | "starting" | "running" | "error" | "unavailable";
 
-/** What the household chose: no route, FamilyFi's quick tunnel, or "My domain" (FamilyFi's tunnel on it, or a route the household runs). */
+/** What the household chose: no route, FamilyFi's quick tunnel, or `named`: Cloudflare Automatic (FamilyFi's tunnel on a hostname) or a route the household runs (My domain, Tailscale, Cloudflare Advanced). */
 export type RemoteAccessMode = "off" | "quick" | "named";
 
 /** The tunnel this process runs for the published route, if any. */
@@ -316,7 +316,7 @@ async function launch() {
   const credential = route ? storedCredential(route) : null;
   if (!route || !credential) {
     runtime.status = "error";
-    runtime.error = "No domain is set up. Connect your domain again.";
+    runtime.error = "Cloudflare Automatic isn't set up. Sign in to Cloudflare again.";
     return;
   }
   supervise(startNamedTunnel(binary.bin, origin, credential), (text) => {
@@ -588,12 +588,12 @@ async function stopTunnel() {
   await releaseLease();
 }
 
-/** Checks a "My domain" change before anything stops, so a refused request never takes down a running tunnel. */
+/** Checks a `named` change (Cloudflare Automatic, or a route the household runs) before anything stops, so a refused request never takes down a running tunnel. */
 async function namedTarget(change: Extract<RemoteAccessChange, { mode: "named" }>) {
   if (change.endpointId) {
     const route = await prisma().connectionEndpoint.findUnique({ where: { id: change.endpointId } });
     if (!route || route.householdId !== "default") throw new RemoteAccessError("That route doesn't exist.");
-    if (route.kind !== RouteKind.own) throw new RemoteAccessError("That route belongs to FamilyFi's own tunnel. Choose Quick tunnel or your domain instead.");
+    if (route.kind !== RouteKind.own) throw new RemoteAccessError("That route belongs to FamilyFi's own tunnel. Choose Quick tunnel or Cloudflare Automatic instead.");
     return { own: route } as const;
   }
   const domain = await routeOfKind(RouteKind.domain);

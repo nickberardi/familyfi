@@ -61,8 +61,11 @@ Setup guides: [My domain (VPN or reverse proxy)](https://github.com/nickberardi/
 same pairing code as text, to copy and paste in the app when the phone can't scan it — for instance
 when the sheet is open on that phone. The code carries the server address, so nothing else is typed. The code expires in five minutes and is cancelled when you close it. Revoke a lost phone from
 the same page; it is signed out at once and must pair again. A revoked phone stays listed until you
-**Remove** it, or use **Remove all revoked**; **Re-pair** opens a new code with its name filled in,
-and once the phone uses it the old entry disappears. **Paired devices** lists phones, Watches and
+**Remove** it, or use **Remove all revoked**. **Re-pair**, on any phone active or revoked, opens a
+new code with its name filled in. An active phone keeps working until the code is used; then its old
+entry is signed out and disappears, and its Watch moves to the new pairing (if the new pairing signs
+in as another adult, the Watch is signed out instead and set up again from the phone). To recover a phone that
+can't reach FamilyFi, re-pair it rather than revoking it first. **Paired devices** lists phones, Watches and
 agents together, most recently seen first: what each may do, the account it acts as, how it reaches
 home, and when its sign-in expires. A phone keeps the name you gave it when pairing. A paired phone learns a newly published route
 from the signed manifest the next time it reaches FamilyFi.
@@ -79,7 +82,7 @@ openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform der \
 
 **Check** on a pinned route compares the stored pin with what the address serves now. Renewing the
 certificate with a new key breaks the pin until you update it; phones fail closed rather than
-trust the new key. A certificate the iPhone already trusts should use ordinary trust instead.
+trust the new key. A certificate phones already trust should use ordinary trust instead.
 FamilyFi does not manage your VPN, proxy, or certificate issuer. For Tailscale, the phone must be in
 the same tailnet; use Serve, never Funnel, which would expose the household service publicly.
 
@@ -96,7 +99,8 @@ device credential is checked before the password, so the internet cannot test pa
 
 A quick tunnel's address changes whenever FamilyFi restarts. Phones learn the new one the next
 time they reach FamilyFi another way. Cloudflare offers quick tunnels for testing, with no uptime
-guarantee and a 200-request concurrency limit. For a permanent address, use **My domain**.
+guarantee and a 200-request concurrency limit. For a permanent address, use **Cloudflare →
+Automatic** or **Tailscale**, or **My domain** for a VPN or reverse proxy you already run.
 
 ### Cloudflare Tunnel on your own domain (Automatic)
 
@@ -139,7 +143,8 @@ Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
 **Advanced** is a tunnel you run in your own Cloudflare account, with the `cloudflared` sidecar in
 [setup](setup.md#cloudflare-tunnel-you-run). FamilyFi doesn't manage it: it only needs the address.
 
-1. Create the tunnel, and point its public hostname at the remote access port, `http://app:7002`
+1. Create the tunnel, and add a published application route whose Service URL is the remote
+   access port, `http://app:7002`
    (`FAMILYFI_REMOTE_ACCESS_PORT`) — never at the app on 7001.
 2. On **Pair Device**, choose **Cloudflare → Advanced**, enter
    `https://<your hostname>`, and **Use this address**. Phones use it like any other trusted route.
@@ -148,23 +153,28 @@ Back up `FAMILYFI_ENCRYPTION_KEY` with the database, as for the UniFi key.
 the route's service token, before it reaches FamilyFi. A request that gets past it still needs a
 paired phone and a signed-in account, as without Access.
 
-1. In Cloudflare Zero Trust, create a **service token**, then a **self-hosted application** for
-   your hostname with one **Service Auth** policy that includes that token. Turn on **Return 401
-   response for Service Auth policies**, so the app sees a plain refusal rather than a login page.
-   Add no identity policies to this application.
+Creating the Access application is what turns Access on, so it comes last, once phones hold the
+token:
+
+1. In Cloudflare Zero Trust, create a **service token**.
 2. On **Pair Device**, edit the Advanced route, tick **Protect with Cloudflare Access**, and paste
    the token's Client ID and Client Secret. FamilyFi stores them encrypted with
-   `FAMILYFI_ENCRYPTION_KEY`.
-3. Pair phones as usual. The pairing code carries the token, so a phone can reach the protected
-   address to pair; a phone already paired picks it up from its next signed manifest. Pair Device
-   shows how many active phones have it. Turn the Access policy on once they all do.
+   `FAMILYFI_ENCRYPTION_KEY`. The pairing code carries the token, and a phone already paired picks
+   it up from its next signed manifest.
+3. Wait until Pair Device shows "Every active phone has the token." (or "No active phones yet.").
+4. Only then create a **self-hosted application** for your hostname with one **Service Auth**
+   policy that includes that token. Turn on **401 Response for Service Auth policies**, so the app
+   sees a plain refusal rather than a login page. Add no identity policies to this application.
 
 The token only gets a request past Cloudflare, so it is treated as a shared key rather than a
 password: it is in the pairing code and on paired phones, and never in `/api/v1/connection/identity`, a
 browser's responses, or FamilyFi's logs. Anyone who sees a phone's HTTPS traffic, or a photo of a
 pairing code, can read it; replacing it is the remedy.
 
-**Replacing the token** (a leak, or its expiry) never needs a phone outage:
+When the token nears its expiry, **Refresh** it (or edit its duration) in Cloudflare's Service
+Tokens. That keeps the same Client ID and Secret, so nothing changes in FamilyFi.
+
+**Replacing the token** (after a leak) never needs a phone outage:
 
 1. In Cloudflare, **rotate** the token's secret and pick a grace period (up to 30 days) during which
    the old secret still works — or create a second token and add it to the same policy.
@@ -197,7 +207,7 @@ Users should not edit Compose YAML to pick a server.
 - **Database.** The entrypoint hands over to `scripts/runtime/memory-database.mjs`, which serves an in-memory [PGlite](https://pglite.dev) database on loopback (port 5433, or `POSTGRES_PORT`; through its own small wire-protocol server, `pglite-server.mjs`), applies the migrations and runs FamilyFi against it. The other `DB_*` and `POSTGRES_*` settings are ignored and need not be set. No volume is needed; every start begins empty.
 - **Household.** The UniFi mock stands in for the gateway, and the boot seed adds the dummy household, as `FAMILYFI_MODE=dev` does in development. Visitors use groups, rules, pauses, devices and pairing as at home.
 - **Locked configuration.** Every visitor shares one household, so configuration writes answer 403 `demo_locked` ([API](api.md#shared-behaviour-and-consumer-adoption)): household and UniFi settings, accounts and passwords, resolvers, connection routes and their certificate pins, and remote access. The demo never opens a Cloudflare tunnel from its host.
-- **Sign-in.** `admin` (the recovery admin) and `nick` (Nick's administrator account), both with `FAMILYFI_DEFAULT_PASSWORD`. The sign-in page shows the `admin` login to every visitor and fills it in, so anyone can try the demo; accounts and passwords are locked, so the password guards nothing but the simulated household. Sign-in throttling there counts failures per address only, so one visitor cannot lock the shared login. Set it on the host so it survives restarts, and never reuse a password from anywhere else. The session secret and encryption key may be left to generate on each start.
+- **Sign-in.** `admin` (the recovery admin) and `nick` (Nick's administrator account), both with `FAMILYFI_DEFAULT_PASSWORD`. The sign-in page shows the `admin` login to every visitor and fills it in, so anyone can try the demo; accounts and passwords are locked, so the password guards nothing but the simulated household. Sign-in throttling there counts failures per address only, so one visitor cannot lock the shared login. Set `FAMILYFI_TRUSTED_PROXIES` to the ingress's addresses (the private ranges, behind a platform ingress such as Azure Container Apps) so each visitor counts as their own address; unset, every visitor counts as the ingress and one visitor's failures lock everyone out for 15 minutes. Set it on the host so it survives restarts, and never reuse a password from anywhere else. The session secret and encryption key may be left to generate on each start.
 - **Phones.** Set `FAMILYFI_DEMO_URL` to the demo's public HTTPS origin (for example `https://demo.getfamilyfi.com`). It is published as the household's remote route: the hosted website itself is the connection, like a household's reverse proxy (a `lan` route with the phone's system certificate check, no tunnel and no Cloudflare Access), so Pair Device issues pairing codes for it as it would at home. Android 17 asks for Nearby devices access when a household has such a route; pairing over the public address works either way. The ingress terminates TLS and must pass `X-Forwarded-Proto` and `X-Forwarded-Host`, which sign-in's origin and secure-cookie checks read.
 - **Reset.** The process exits at 03:00 in the household's time zone each night; it exits with status 1, so any restart policy (`--restart on-failure`, `unless-stopped`, or the platform's own) brings it back with a fresh household. A web banner says the demo resets nightly.
 
@@ -227,7 +237,7 @@ Publishing requires the operator's request. The release tag is `v` followed by t
 
 For a tag-based release, create and push an annotated tag on the intended commit on `main`. Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml). For an unpublished image tag, it requires CI and container smoke, builds `linux/amd64` and `linux/arm64` images at `ghcr.io/nickberardi/familyfi`, and creates a GitHub Release with generated notes. Stable tags publish the full version, its major/minor tag and `latest`. If the image tag already exists, the workflow assumes local publication and skips these jobs; image existence alone does not prove checks passed.
 
-Both release paths pass the tag's version into the image build (`APP_VERSION` in `docker/Dockerfile`), so Settings, the sign-in screen, `GET /api/v1/health` and the update check report the image's own tag even when `package.json` lags behind it. When a stable tag is newer than `main`'s `package.json`, `release.yml`'s `version-pr` job opens a PR that bumps `package.json` and `openapi/familyfi.v1.yaml` `info.version` to it; merge it after the release. A PR opened with the workflow's own token starts no checks, so the job uses the `RELEASE_PR_TOKEN` secret (contents and pull requests: write) when it exists; without it, the repository setting that allows GitHub Actions to create pull requests must be on, or the job fails after the release is published. Bumping both before tagging still works and opens no PR. `tests/unit/version.test.ts` fails the build when the two drift apart.
+Both release paths pass the tag's version into the image build (`APP_VERSION` in `docker/Dockerfile`), so Settings, the sign-in screen, `GET /api/v1/health` and the update check report the image's own tag even when `package.json` lags behind it. When a stable tag is newer than `main`'s `package.json`, `release.yml`'s `version-pr` job opens a PR that bumps `package.json` and `openapi/familyfi.v1.yaml` `info.version` to it; merge it after the release. A PR opened with the workflow's own token starts no checks, so the job uses the `RELEASE_PR_TOKEN` secret (contents and pull requests: write) when it exists; without it, the repository setting that allows GitHub Actions to create pull requests must be on, or the job fails after the release is published. Bumping both before tagging still works and opens no PR. `tests/unit/version.test.ts` fails the build when the two drift apart. `cloudflared.yml`, which opens a PR bumping the image's cloudflared on the 1st and 15th of each month, uses the same token and needs the same setting without it.
 
 Release notes say whether anyone checked a block on a real gateway since the last release. Nothing in CI proves enforcement ([testing.md](testing.md#what-no-test-proves)), so a release that changes how FamilyFi writes policies says so plainly.
 

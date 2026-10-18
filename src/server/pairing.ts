@@ -124,8 +124,9 @@ async function join(db: Db, input: {
   });
   await db.pairing.update({ where: { id: invite.id }, data: { claimedDeviceId: device.id } });
   if (replaces) {
-    // The new phone keeps the old one's companions: its Watch is still its to manage.
-    await db.pairedDevice.updateMany({ where: { parentDeviceId: replaces }, data: { parentDeviceId: device.id } });
+    // The new phone keeps the old one's companions when it acts as the same account: its Watch is
+    // still its to manage. A Watch acting as another account is revoked with the old phone below.
+    await db.pairedDevice.updateMany({ where: { parentDeviceId: replaces, accountId: account.id }, data: { parentDeviceId: device.id } });
     await removeDevice(replaces, db, now);
   }
   const bearer = bearerSessionData(now);

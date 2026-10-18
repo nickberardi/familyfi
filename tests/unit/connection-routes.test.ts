@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessRollout, canPin, countdown, homeAddress, homeOrigin, isPrivateOrigin, remoteChoice, routeTrust, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
+import { accessRollout, addressConflict, canPin, countdown, homeAddress, homeOrigin, isPrivateOrigin, remoteChoice, routeForAddress, routeTrust, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
 function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
@@ -69,6 +69,35 @@ describe("connection routes", () => {
     });
   });
 
+  describe("routeForAddress", () => {
+    const routes = [route("home"), route("tailnet", 0, "own", "tailscale"), route("advanced", 0, "own", "cloudflare"), route("quick", 0, "quick", "cloudflare"), route("domain", 0, "domain", "cloudflare")];
+
+    it("reuses a saved route of the same transport at the same origin", () => {
+      expect(routeForAddress(routes, " https://tailnet.home/ ", "tailscale")).toEqual({ reuse: routes[1] });
+      expect(routeForAddress(routes, "https://advanced.home", "cloudflare")).toEqual({ reuse: routes[2] });
+    });
+
+    it("reports a route of another transport, or FamilyFi's own tunnel, as a conflict", () => {
+      expect(routeForAddress(routes, "https://tailnet.home", "lan")).toEqual({ conflict: routes[1] });
+      expect(routeForAddress(routes, "https://home.home", "cloudflare")).toEqual({ conflict: routes[0] });
+      expect(routeForAddress(routes, "https://quick.home", "cloudflare")).toEqual({ conflict: routes[3] });
+      expect(routeForAddress(routes, "https://domain.home", "lan")).toEqual({ conflict: routes[4] });
+    });
+
+    it("finds nothing for a new or unreadable address", () => {
+      expect(routeForAddress(routes, "https://new.home", "lan")).toBeNull();
+      expect(routeForAddress(routes, "not a url", "lan")).toBeNull();
+    });
+
+    it("names the choice that already holds the address", () => {
+      expect(addressConflict(routes[1]!)).toBe("This address is already saved as your Tailscale route. Choose Tailscale to use it, or enter a different address.");
+      expect(addressConflict(routes[0]!)).toContain("your My domain route. Choose My domain");
+      expect(addressConflict(routes[2]!)).toContain("Choose Cloudflare Advanced");
+      expect(addressConflict(routes[3]!)).toContain("Choose Quick tunnel");
+      expect(addressConflict(routes[4]!)).toContain("Choose Cloudflare Automatic");
+    });
+  });
+
   it("finds the saved route a choice would publish again", () => {
     const routes = [route("domain", 0, "domain", "cloudflare"), route("home-b", 5), route("home-a", 1), route("tailnet", 0, "own", "tailscale"), route("quick", 0, "quick", "cloudflare")];
     expect(savedRoute("myDomain", routes)?.id).toBe("home-a");
@@ -95,7 +124,7 @@ describe("connection routes", () => {
     expect(accessRollout(first, [phone("A", 1), phone("B", 1)], now)).toEqual({ done: true, text: "Every active phone has the token." });
     expect(accessRollout(first, [phone("A", 1), phone("Sam's iPhone", null)], now)).toEqual({
       done: false,
-      text: "1 of 2 active phones have the token. Waiting for Sam's iPhone. Cloudflare turns them away until then.",
+      text: "1 of 2 active phones have the token. Waiting for Sam's iPhone. Create the Access application in Cloudflare after that; if it already exists, Cloudflare turns them away until then.",
     });
     expect(accessRollout(third, [phone("A", 2), phone("B", null), phone("C", 3)], now)).toEqual({
       done: false,
