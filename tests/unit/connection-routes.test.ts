@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessRollout, canPin, countdown, homeAddress, homeOrigin, isPrivateOrigin, remoteChoice, routeTrust, savedRoute, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
+import { accessRollout, canPin, countdown, homeAddress, homeOrigin, isPrivateOrigin, remoteChoice, removeRouteConfirm, routeTrust, savedRoute, savedRoutes, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
 function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
@@ -78,6 +78,24 @@ describe("connection routes", () => {
     expect(savedRoute("cloudflareAdvanced", [...routes, route("own-tunnel", 0, "own", "cloudflare")])?.id).toBe("own-tunnel");
     expect(savedRoute("quick", routes)).toBeUndefined();
     expect(savedRoute("off", routes)).toBeUndefined();
+  });
+
+  it("lists every saved route of a choice the household runs, in the order phones try them", () => {
+    const routes = [route("domain", 0, "domain", "cloudflare"), route("home-b", 5), route("home-a", 1), route("tailnet-b", 3, "own", "tailscale"), route("tailnet-a", 0, "own", "tailscale")];
+    expect(savedRoutes("myDomain", routes).map((item) => item.id)).toEqual(["home-a", "home-b"]);
+    expect(savedRoutes("tailscale", routes).map((item) => item.id)).toEqual(["tailnet-a", "tailnet-b"]);
+    expect(savedRoutes("cloudflareAutomatic", routes)).toEqual([]);
+    expect(savedRoutes("quick", routes)).toEqual([]);
+  });
+
+  it("warns that removing the published route turns remote access off, and counts the phones paired through it", () => {
+    const home = { url: "https://familyfi.home" };
+    expect(removeRouteConfirm(home, { published: false, pairedCount: 0 })).toEqual({ title: "Remove https://familyfi.home?", message: "Phones aren't using it now.", confirmLabel: "Remove" });
+    expect(removeRouteConfirm(home, { published: false, pairedCount: 1 }).message).toBe("Phones aren't using it now. 1 phone paired through it.");
+    expect(removeRouteConfirm(home, { published: true, pairedCount: 0 }).message).toBe("Phones reach home through it now, so remote access turns off.");
+    expect(removeRouteConfirm(home, { published: true, pairedCount: 2 }).message).toBe(
+      "Phones reach home through it now, so remote access turns off. 2 phones paired through it. They can't reach home from outside until you publish another route.",
+    );
   });
 
   it("says how far a Cloudflare Access token has reached, and when the old one can go", () => {

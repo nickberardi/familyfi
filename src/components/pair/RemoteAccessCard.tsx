@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
+import { confirmLine } from "@/lib/pair-device";
 import {
   MY_DOMAIN_GUIDE,
   OWN_TRANSPORT,
@@ -9,7 +10,9 @@ import {
   TAILSCALE_GUIDE,
   accessRollout,
   remoteChoice,
+  removeRouteConfirm,
   savedRoute,
+  savedRoutes,
   shortPin,
   transportLabel,
   type RemoteChoice,
@@ -65,7 +68,8 @@ export function RemoteAccessCard({
   onChange: () => Promise<void>;
 }) {
   const [choice, setChoice] = useState<RemoteChoice>("off");
-  const [editing, setEditing] = useState(false);
+  /** The saved route open in its form, if any. */
+  const [editing, setEditing] = useState<string | null>(null);
   const [hostname, setHostname] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -79,7 +83,7 @@ export function RemoteAccessCard({
   if (stamp && stamp !== seen) {
     setSeen(stamp);
     setChoice(publishedChoice);
-    setEditing(false);
+    setEditing(null);
     if (!hostname && tunnel?.hostname) setHostname(tunnel.hostname);
   }
 
@@ -101,7 +105,7 @@ export function RemoteAccessCard({
       onTunnel(result.tunnel);
       // Follow the server's answer even when it didn't change, e.g. Off after an unsaved "My domain".
       setSeen(null);
-      setEditing(false);
+      setEditing(null);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not change remote access.");
     } finally {
@@ -124,7 +128,7 @@ export function RemoteAccessCard({
     if (top(choice) === next) return;
     const advancedOnly = !savedRoute("cloudflareAutomatic", routes ?? []) && savedRoute("cloudflareAdvanced", routes ?? []);
     setChoice(next === "cloudflare" ? (advancedOnly ? "cloudflareAdvanced" : "cloudflareAutomatic") : next);
-    setEditing(false);
+    setEditing(null);
   }
 
   function publishRoute(route: ConnectionRoute) {
@@ -138,8 +142,7 @@ export function RemoteAccessCard({
   const domainReady = Boolean(tunnel?.hostname) && hostname.trim().toLowerCase() === tunnel?.hostname;
   const isPublished = choice === publishedChoice && publishedChoice !== "off";
   const ownTransport = OWN_TRANSPORT[choice];
-  const saved = ownTransport ? savedRoute(choice, routes ?? []) : undefined;
-  const protectedRoute = saved?.edgeAuth === "serviceToken";
+  const saved = savedRoutes(choice, routes ?? []);
 
   async function turnOffAccess(route: ConnectionRoute) {
     if (!window.confirm("Turn off Cloudflare Access for this route in FamilyFi? Phones stop sending the token, so remove the Access application in Cloudflare too, or it turns them away.")) return;
@@ -155,23 +158,41 @@ export function RemoteAccessCard({
     }
   }
 
-  /** A saved route, with a way to publish it again and to edit it. */
+  /** Removing the published route leaves nothing published: the server turns remote access off. */
+  async function removeRoute(route: ConnectionRoute) {
+    if (!window.confirm(confirmLine(removeRouteConfirm(route, { published: route.id === published?.id, pairedCount: pairedThrough(route.id) })))) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/v1/connection/endpoints/${route.id}`, { method: "DELETE" });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Could not remove this route.");
+    } finally {
+      setBusy(false);
+      await onChange();
+    }
+  }
+
+  /** A saved route, with a way to publish it again, to edit it and to remove it. */
   function savedCard(route: ConnectionRoute, detail: ReactNode, more?: ReactNode) {
     return (
-      <div data-testid="saved-route" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[9px] border border-[var(--ff-hairline)] px-3 py-2.5">
+      <div key={route.id} data-testid="saved-route" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[9px] border border-[var(--ff-hairline)] px-3 py-2.5">
         <div className="min-w-[200px] flex-1">
           <div className="font-mono break-all">{route.url}</div>
           <div className="mt-0.5 text-[var(--ff-muted)]">{detail}</div>
         </div>
-        {isPublished ? null : (
+        {route.id === published?.id ? null : (
           <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => void publishRoute(route)}>
             Use this route
           </button>
         )}
-        <button type="button" className="font-semibold text-[var(--ff-accent)]" disabled={busy} onClick={() => setEditing(true)}>
+        <button type="button" className="font-semibold text-[var(--ff-accent)]" disabled={busy} onClick={() => setEditing(route.id)}>
           Edit
         </button>
         {more}
+        <button type="button" className="font-semibold text-[var(--ff-danger)]" disabled={busy} onClick={() => void removeRoute(route)}>
+          Remove
+        </button>
       </div>
     );
   }
@@ -232,27 +253,33 @@ export function RemoteAccessCard({
             ) : null}
 
             {ownTransport && choice !== "cloudflareAdvanced" ? (
-              editing || !saved ? (
-                <RouteForm
-                  key={`${choice}-${saved?.id ?? "new"}`}
-                  transport={ownTransport}
-                  route={editing ? saved : undefined}
-                  routes={routes ?? []}
-                  onSaved={publishRoute}
-                  onCancel={saved ? () => setEditing(false) : undefined}
-                />
-              ) : (
-                savedCard(
-                  saved,
-                  saved.trustMode === "pinned" && saved.spkiSha256 ? (
-                    <>
-                      Pinned <span className="font-mono">{shortPin(saved.spkiSha256)}</span>
-                    </>
+              saved.length ? (
+                saved.map((route) =>
+                  editing === route.id ? (
+                    <RouteForm
+                      key={`${choice}-${route.id}`}
+                      transport={ownTransport}
+                      route={route}
+                      routes={routes ?? []}
+                      onSaved={publishRoute}
+                      onCancel={() => setEditing(null)}
+                    />
                   ) : (
-                    "Ordinary certificate checks"
+                    savedCard(
+                      route,
+                      route.trustMode === "pinned" && route.spkiSha256 ? (
+                        <>
+                          Pinned <span className="font-mono">{shortPin(route.spkiSha256)}</span>
+                        </>
+                      ) : (
+                        "Ordinary certificate checks"
+                      ),
+                      route.trustMode === "pinned" && route.spkiSha256 ? <PinCheck route={route} /> : null,
+                    )
                   ),
-                  saved.trustMode === "pinned" && saved.spkiSha256 ? <PinCheck route={saved} /> : null,
                 )
+              ) : (
+                <RouteForm key={`${choice}-new`} transport={ownTransport} routes={routes ?? []} onSaved={publishRoute} />
               )
             ) : null}
 
@@ -273,25 +300,32 @@ export function RemoteAccessCard({
             ) : null}
 
             {choice === "cloudflareAdvanced" ? (
-              editing || !saved ? (
-                <CloudflareAdvanced
-                  key={`advanced-${saved?.id ?? "new"}`}
-                  route={editing ? saved : undefined}
-                  hasToken={editing && protectedRoute}
-                  routes={routes ?? []}
-                  onSaved={publishRoute}
-                  onCancel={saved ? () => setEditing(false) : undefined}
-                />
+              saved.length ? (
+                saved.map((route) => {
+                  const protectedRoute = route.edgeAuth === "serviceToken";
+                  return editing === route.id ? (
+                    <CloudflareAdvanced
+                      key={`advanced-${route.id}`}
+                      route={route}
+                      hasToken={protectedRoute}
+                      routes={routes ?? []}
+                      onSaved={publishRoute}
+                      onCancel={() => setEditing(null)}
+                    />
+                  ) : (
+                    savedCard(
+                      route,
+                      protectedRoute ? <AccessLine route={route} phones={phones} /> : "No Cloudflare Access: the tunnel alone guards this address",
+                      protectedRoute ? (
+                        <button type="button" className="font-semibold text-[var(--ff-danger)]" disabled={busy} onClick={() => void turnOffAccess(route)}>
+                          Turn off Access
+                        </button>
+                      ) : null,
+                    )
+                  );
+                })
               ) : (
-                savedCard(
-                  saved,
-                  protectedRoute ? <AccessLine route={saved} phones={phones} /> : "No Cloudflare Access: the tunnel alone guards this address",
-                  protectedRoute ? (
-                    <button type="button" className="font-semibold text-[var(--ff-danger)]" disabled={busy} onClick={() => void turnOffAccess(saved)}>
-                      Turn off Access
-                    </button>
-                  ) : null,
-                )
+                <CloudflareAdvanced key="advanced-new" routes={routes ?? []} onSaved={publishRoute} />
               )
             ) : null}
 

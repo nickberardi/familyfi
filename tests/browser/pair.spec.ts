@@ -226,6 +226,62 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
   }
 });
 
+test("lists every saved Tailscale route and removes them, turning remote access off with the published one", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const stamp = Date.now();
+  const first = `https://remove-a-${stamp}.tail1234.ts.net`;
+  const second = `https://remove-b-${stamp}.tail1234.ts.net`;
+  const headers = await csrf(page);
+  const add = async (url: string, priority: number) =>
+    ((await (await page.request.post("/api/v1/connection/endpoints", { headers, data: { url, transport: "tailscale", trustMode: "system", priority } })).json()) as { endpoint: { id: string } }).endpoint.id;
+  const published = await add(first, 0);
+  await add(second, 1);
+  await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: published } });
+  const asked: string[] = [];
+  page.on("dialog", (dialog) => {
+    asked.push(dialog.message());
+    void dialog.accept();
+  });
+  let invite = "";
+  try {
+    await page.goto("/pair");
+    const card = page.getByTestId("remote-access");
+    await expect(card.getByRole("button", { name: "Tailscale" })).toHaveAttribute("aria-pressed", "true");
+    const saved = card.getByTestId("saved-route");
+    await expect(saved).toHaveCount(2);
+    await expect(saved.nth(0)).toContainText(first);
+    await expect(saved.nth(1)).toContainText(second);
+    // Only the route that isn't published offers to be used.
+    await expect(saved.nth(0).getByRole("button", { name: "Use this route" })).toHaveCount(0);
+    await expect(saved.nth(1).getByRole("button", { name: "Use this route" })).toBeVisible();
+    await shot(page, "saved-routes");
+
+    await saved.filter({ hasText: second }).getByRole("button", { name: "Remove" }).click();
+    await expect(saved).toHaveCount(1);
+    expect(asked.pop()).toBe(`Remove ${second}? Phones aren't using it now.`);
+    expect((await routes(page)).map((route) => route.url)).not.toContain(second);
+
+    // A pairing code still waiting on the published route keeps it, and says why.
+    invite = ((await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: published, displayName: "Waiting phone" } })).json()) as { invite: { id: string } }).invite.id;
+    await saved.getByRole("button", { name: "Remove" }).click();
+    await expect(card.getByRole("alert")).toHaveText("A pairing code for this route is still active. Cancel it or wait for it to expire.");
+    await expect(saved).toHaveCount(1);
+    await shot(page, "remove-in-use");
+    await page.request.delete(`/api/v1/paired/invites/${invite}`, { headers });
+    invite = "";
+
+    await saved.getByRole("button", { name: "Remove" }).click();
+    expect(asked.pop()).toBe(`Remove ${first}? Phones reach home through it now, so remote access turns off.`);
+    await expect(card.getByRole("button", { name: "Off" })).toHaveAttribute("aria-pressed", "true");
+    await expect(card.getByTestId("remote-url")).toHaveCount(0);
+    expect(await enabledUrls(page)).toEqual([]);
+    await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
+  } finally {
+    if (invite) await page.request.delete(`/api/v1/paired/invites/${invite}`, { headers });
+    await cleanUp(page, [first, second]);
+  }
+});
+
 test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a token replacement", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const stamp = Date.now();

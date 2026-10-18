@@ -131,8 +131,22 @@ export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, 
 /** The saved route a choice would publish again, if it has one. */
 export function savedRoute(choice: RemoteChoice, routes: readonly ConnectionRoute[]): ConnectionRoute | undefined {
   if (choice === "cloudflareAutomatic") return routes.find((route) => route.kind === "domain");
+  return savedRoutes(choice, routes)[0];
+}
+
+/** Every route the household saved for a choice it runs itself, in the order phones try them. */
+export function savedRoutes(choice: RemoteChoice, routes: readonly ConnectionRoute[]): ConnectionRoute[] {
   const transport = OWN_TRANSPORT[choice];
-  return transport ? sortRoutes(routes.filter((route) => route.kind === "own" && route.transport === transport))[0] : undefined;
+  return transport ? sortRoutes(routes.filter((route) => route.kind === "own" && route.transport === transport)) : [];
+}
+
+/** What removing a saved route asks first: the published one turns remote access off. */
+export function removeRouteConfirm(route: Pick<ConnectionRoute, "url">, { published, pairedCount }: { published: boolean; pairedCount: number }) {
+  const phones = pairedCount ? ` ${pairedCount} phone${pairedCount === 1 ? "" : "s"} paired through it.` : "";
+  const message = published
+    ? `Phones reach home through it now, so remote access turns off.${phones}${pairedCount ? " They can't reach home from outside until you publish another route." : ""}`
+    : `Phones aren't using it now.${phones}`;
+  return { title: `Remove ${route.url}?`, message, confirmLabel: "Remove" };
 }
 
 /** Routes in the order phones try them — the same tie-break the server's manifest uses. */
