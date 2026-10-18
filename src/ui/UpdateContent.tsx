@@ -22,7 +22,7 @@ export type UpdateInstall = { settings: UpdateSettings | null; request: ApiReque
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
 /**
- * The Update page below its header: whether FamilyFi is up to date, or a newer release's notes and
+ * The update on Settings' Maintenance tab: whether FamilyFi is up to date, or a newer release's notes and
  * installing it. Install asks the Watchtower updater; without `install`, or before the updater is set
  * up, its button stays disabled and the card says how to update by hand. While an install runs, the
  * card is covered by a spinner counting down the usual two minutes until FamilyFi reports the new release.

@@ -1,4 +1,4 @@
-/** Strict SemVer parsing and ordering, shared by the server's release checks and the Update page. */
+/** Strict SemVer parsing and ordering, shared by the server's release checks and the update card. */
 
 export type Semver = {
   major: string;

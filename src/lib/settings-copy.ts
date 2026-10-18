@@ -82,7 +82,8 @@ export const FAMILY_ROLE_CHOICES = ["child", "teen", "adult"] as const;
 /** The Settings page's words. */
 export const SETTINGS_COPY = {
   title: "Settings",
-  sub: "Gateway connection, credentials, and household roles.",
+  sub: "Household, gateway and maintenance.",
+  tabs: "Settings sections",
   gateway: "Gateway",
   timezone: "Timezone",
   saveTimezone: "Save timezone",
@@ -121,6 +122,21 @@ export const SETTINGS_COPY = {
   gatewayBadge: "Gateway",
   requests: "FamilyFi’s requests to the console",
 } as const;
+
+/** Settings' tabs, in order: the household first, then the gateway, then the occasional maintenance. */
+export const SETTINGS_TABS = [
+  { value: "household", label: "Household" },
+  { value: "gateway", label: "Gateway" },
+  { value: "maintenance", label: "Maintenance" },
+] as const;
+
+export type SettingsTab = (typeof SETTINGS_TABS)[number]["value"];
+
+/** The tab a link or address asks for; anything else opens Household. */
+export function settingsTab(value: string | string[] | null | undefined): SettingsTab {
+  const asked = Array.isArray(value) ? value[0] : value;
+  return SETTINGS_TABS.find((tab) => tab.value === asked)?.value ?? "household";
+}
 
 /** A reading the console did not give is unknown, never zero. */
 function reading(value: number | null, format: (value: number) => string): string {

@@ -1,16 +1,24 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api, request } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { BackupCard } from "@/components/BackupCard";
-import { SETTINGS_COPY, createLoginTitle, loginFormState, usernameFromName } from "@/lib/settings-copy";
+import { SETTINGS_COPY, createLoginTitle, loginFormState, settingsTab, usernameFromName, type SettingsTab } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
 import type { GatewayHealth, Group } from "@/lib/types";
+import { installedVersion } from "@/lib/update-copy";
+import { APP_VERSION } from "@/lib/version";
 import { NewLoginFields } from "@/ui/NewLoginFields";
 import { GatewayCard, GatewayHealthCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
+import { SettingsTabs } from "@/ui/SettingsTabs";
+import { UpdateContent } from "@/ui/UpdateContent";
+import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
+import { useUpdateCheck } from "@/ui/use-update-check";
+import { useUpdateSettings } from "@/ui/use-update-settings";
 
 const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
@@ -19,7 +27,20 @@ const readHealth = () => api<{ gateway: GatewayHealth }>("/api/v1/health?gateway
 const healthFailure = (error: unknown) => (error instanceof Error ? error.message : SETTINGS_COPY.healthFailed);
 
 export default function SettingsPage() {
-  const { unifi, household, accounts, groups, sync, mutate, store, reload } = useAppData();
+  return (
+    <Suspense fallback={null}>
+      <Settings />
+    </Suspense>
+  );
+}
+
+function Settings() {
+  const { unifi, household, accounts, groups, sync, mutate, store } = useAppData();
+  const router = useRouter();
+  const asked = useSearchParams().get("tab");
+  // A household with no gateway yet opens where it is set up.
+  const tab = asked === null && unifi && !unifi.configured ? "gateway" : settingsTab(asked);
+  const showTab = (next: SettingsTab) => router.replace(next === "household" ? "/settings" : `/settings?tab=${next}`, { scroll: false });
   const [mode, setMode] = useState<"local" | "cloud">("local");
   const [apiKey, setApiKey] = useState("");
   const [consoleHost, setConsoleHost] = useState("");
@@ -37,45 +58,6 @@ export default function SettingsPage() {
   const [pw2, setPw2] = useState("");
 
   const [unifiStamp, setUnifiStamp] = useState<string | null>(null);
-  const [health, setHealth] = useState<GatewayHealth | null>(null);
-  const [healthError, setHealthError] = useState("");
-  const [checkingHealth, setCheckingHealth] = useState(true);
-  // The console and site the readings are for: another one starts over, never showing the last one's.
-  const healthTarget = unifi?.configured ? [unifi.consoleId ?? "", unifi.baseUrl ?? "", unifi.siteId ?? ""].join("|") : null;
-  const [shownTarget, setShownTarget] = useState<string | null>(null);
-  if (healthTarget !== shownTarget) {
-    setShownTarget(healthTarget);
-    setHealth(null);
-    setHealthError("");
-    setCheckingHealth(healthTarget !== null);
-  }
-
-  // Asked when the page opens and on request only: each check is a request per device to the console.
-  const checkHealth = useCallback(async () => {
-    setCheckingHealth(true);
-    try {
-      setHealth(await readHealth());
-      setHealthError("");
-    } catch (error) {
-      setHealthError(healthFailure(error));
-    } finally {
-      setCheckingHealth(false);
-    }
-  }, []);
-  useEffect(() => {
-    if (healthTarget === null) return;
-    let active = true;
-    readHealth()
-      .then(
-        (result) => active && setHealth(result),
-        (error: unknown) => active && setHealthError(healthFailure(error)),
-      )
-      .finally(() => active && setCheckingHealth(false));
-    return () => {
-      active = false;
-    };
-  }, [healthTarget]);
-
   const nextUnifiStamp = unifi
     ? [
         unifi.configured,
@@ -149,200 +131,205 @@ export default function SettingsPage() {
     <>
       <PageHeader title={SETTINGS_COPY.title} sub={SETTINGS_COPY.sub} />
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
-          <GatewayCard unifi={unifi} timezone={household?.timezone ?? "America/New_York"} mutate={store.mutate}>
-            {editingGateway ? (
-              <form
-                className="flex flex-col gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-4"
-                onSubmit={(event) => void testConnection(event)}
-              >
-                <div className="flex gap-3 text-[14px]">
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={mode === "local"} onChange={() => setMode("local")} />
-                    Local console
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={mode === "cloud"} onChange={() => setMode("cloud")} />
-                    Cloud console ID
-                  </label>
-                </div>
-                {mode === "local" ? (
-                  <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
-                    Console IP
-                    <input
-                      className={FIELD}
-                      value={consoleHost}
-                      onChange={(e) => setConsoleHost(e.target.value)}
-                      autoComplete="off"
-                      placeholder="10.1.2.1"
-                    />
-                    <span className="mt-1 block font-normal">
-                      FamilyFi talks to https://{consoleHost.trim() || "…"}/proxy/network/integration
-                    </span>
-                  </label>
-                ) : (
-                  <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
-                    Console ID
-                    <input className={FIELD} value={consoleId} onChange={(e) => setConsoleId(e.target.value)} />
-                  </label>
-                )}
-                <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
-                  Site ID (optional)
-                  <input className={FIELD} value={siteId} onChange={(e) => setSiteId(e.target.value)} />
-                </label>
-                <label className="flex items-center gap-2 text-[14px] font-normal text-[var(--ff-ink)]">
-                  <input type="checkbox" checked={tlsInsecure} onChange={(e) => setTlsInsecure(e.target.checked)} />
-                  Allow self-signed TLS (local consoles)
-                </label>
-                <p className="text-[14px] text-[var(--ff-muted)]">
-                  Discovery and quarantine only watch selected UniFi networks. Host and TLS are stored when you save an
-                  API key.
-                </p>
-                <label className="flex items-center gap-2 text-[14px]">
-                  <input type="checkbox" checked={manageAll} onChange={(e) => setManageAll(e.target.checked)} />
-                  Watch every network on the site
-                </label>
-                {(unifi?.networks ?? []).length === 0 ? (
-                  <p className="text-[14px] text-[var(--ff-muted)]">Save a working UniFi connection to list VLANs.</p>
-                ) : (
-                  unifi?.networks.map((network) => (
-                    <label key={network.id} className="flex items-center gap-2 text-[14px]">
-                      <input
-                        type="checkbox"
-                        disabled={manageAll}
-                        checked={manageAll || managedIds.includes(network.id)}
-                        onChange={(event) => {
-                          setManagedIds((current) =>
-                            event.target.checked ? [...current, network.id] : current.filter((id) => id !== network.id),
-                          );
-                        }}
-                      />
-                      {network.name} · VLAN {network.vlanId}
+        <div className="w-full max-w-[520px]">
+          <SettingsTabs value={tab} onChange={showTab} />
+        </div>
+
+        {tab === "household" ? (
+          <HouseholdCard
+            groups={groups}
+            accounts={accounts}
+            mutate={store.mutate}
+            onCreateLogin={(group) => {
+              setLoginFor(group);
+              setLoginUser(usernameFromName(group.name));
+              setPw1("");
+              setPw2("");
+            }}
+          />
+        ) : null}
+
+        {tab === "gateway" ? (
+          <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
+            <GatewayCard unifi={unifi} timezone={household?.timezone ?? "America/New_York"} mutate={store.mutate}>
+              {editingGateway ? (
+                <form
+                  className="flex flex-col gap-3 border-t border-[var(--ff-hairline)] px-[18px] py-4"
+                  onSubmit={(event) => void testConnection(event)}
+                >
+                  <div className="flex gap-3 text-[14px]">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" checked={mode === "local"} onChange={() => setMode("local")} />
+                      Local console
                     </label>
-                  ))
-                )}
-                <div className="flex flex-wrap gap-2">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" checked={mode === "cloud"} onChange={() => setMode("cloud")} />
+                      Cloud console ID
+                    </label>
+                  </div>
+                  {mode === "local" ? (
+                    <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
+                      Console IP
+                      <input
+                        className={FIELD}
+                        value={consoleHost}
+                        onChange={(e) => setConsoleHost(e.target.value)}
+                        autoComplete="off"
+                        placeholder="10.1.2.1"
+                      />
+                      <span className="mt-1 block font-normal">
+                        FamilyFi talks to https://{consoleHost.trim() || "…"}/proxy/network/integration
+                      </span>
+                    </label>
+                  ) : (
+                    <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
+                      Console ID
+                      <input className={FIELD} value={consoleId} onChange={(e) => setConsoleId(e.target.value)} />
+                    </label>
+                  )}
+                  <label className="text-[14px] font-semibold text-[var(--ff-muted)]">
+                    Site ID (optional)
+                    <input className={FIELD} value={siteId} onChange={(e) => setSiteId(e.target.value)} />
+                  </label>
+                  <label className="flex items-center gap-2 text-[14px] font-normal text-[var(--ff-ink)]">
+                    <input type="checkbox" checked={tlsInsecure} onChange={(e) => setTlsInsecure(e.target.checked)} />
+                    Allow self-signed TLS (local consoles)
+                  </label>
+                  <p className="text-[14px] text-[var(--ff-muted)]">
+                    Discovery and quarantine only watch selected UniFi networks. Host and TLS are stored when you save an
+                    API key.
+                  </p>
+                  <label className="flex items-center gap-2 text-[14px]">
+                    <input type="checkbox" checked={manageAll} onChange={(e) => setManageAll(e.target.checked)} />
+                    Watch every network on the site
+                  </label>
+                  {(unifi?.networks ?? []).length === 0 ? (
+                    <p className="text-[14px] text-[var(--ff-muted)]">Save a working UniFi connection to list VLANs.</p>
+                  ) : (
+                    unifi?.networks.map((network) => (
+                      <label key={network.id} className="flex items-center gap-2 text-[14px]">
+                        <input
+                          type="checkbox"
+                          disabled={manageAll}
+                          checked={manageAll || managedIds.includes(network.id)}
+                          onChange={(event) => {
+                            setManagedIds((current) =>
+                              event.target.checked ? [...current, network.id] : current.filter((id) => id !== network.id),
+                            );
+                          }}
+                        />
+                        {network.name} · VLAN {network.vlanId}
+                      </label>
+                    ))
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
+                      onClick={() =>
+                        void mutate(() =>
+                          api("/api/v1/settings/unifi", {
+                            method: "PUT",
+                            body: JSON.stringify({ manageAllNetworks: manageAll, managedNetworkIds: managedIds }),
+                          }),
+                        )
+                      }
+                    >
+                      Save network selection
+                    </button>
+                    {unifi?.configured ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-muted)]"
+                        onClick={() => setEditingGateway(false)}
+                      >
+                        Done
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              ) : (
+                <div className="border-t border-[var(--ff-hairline)] px-[18px] py-3">
+                  <button
+                    type="button"
+                    className="text-[14px] font-semibold text-[var(--ff-accent)]"
+                    onClick={() => setEditingGateway(true)}
+                  >
+                    Edit connection
+                  </button>
+                </div>
+              )}
+            </GatewayCard>
+
+            <KeyCard unifi={unifi} sync={sync}>
+              {pasting ? (
+                <div className="mt-3 flex flex-col gap-2">
+                  <input
+                    className={FIELD}
+                    type="password"
+                    autoComplete="off"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="Paste the key from your UniFi console"
+                  />
+                  <p
+                    className="text-[14px]"
+                    style={{ color: apiKey.trim().length >= 8 ? "var(--ff-on)" : "var(--ff-muted)" }}
+                  >
+                    {apiKey.trim().length < 8
+                      ? "Paste the Network Integration API key, then save to test it against this gateway."
+                      : `Looks like a key — saving will test it before it ${unifi?.configured ? "replaces the old one" : "is stored"}.`}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={apiKey.length < 8}
+                      className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
+                      onClick={saveKey}
+                    >
+                      Save and test
+                    </button>
+                    {unifi?.configured ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-muted)]"
+                        onClick={() => {
+                          setPasting(false);
+                          setApiKey("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3.5 flex flex-wrap gap-2">
                   <button
                     type="button"
                     className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
-                    onClick={() =>
-                      void mutate(() =>
-                        api("/api/v1/settings/unifi", {
-                          method: "PUT",
-                          body: JSON.stringify({ manageAllNetworks: manageAll, managedNetworkIds: managedIds }),
-                        }),
-                      )
-                    }
+                    onClick={() => {
+                      setPasting(true);
+                      setApiKey("");
+                    }}
                   >
-                    Save network selection
+                    Replace key
                   </button>
-                  {unifi?.configured ? (
-                    <button
-                      type="button"
-                      className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-muted)]"
-                      onClick={() => setEditingGateway(false)}
-                    >
-                      Done
-                    </button>
-                  ) : null}
-                </div>
-              </form>
-            ) : (
-              <div className="border-t border-[var(--ff-hairline)] px-[18px] py-3">
-                <button
-                  type="button"
-                  className="text-[14px] font-semibold text-[var(--ff-accent)]"
-                  onClick={() => setEditingGateway(true)}
-                >
-                  Edit connection
-                </button>
-              </div>
-            )}
-          </GatewayCard>
-
-          <KeyCard unifi={unifi} sync={sync}>
-            {pasting ? (
-              <div className="mt-3 flex flex-col gap-2">
-                <input
-                  className={FIELD}
-                  type="password"
-                  autoComplete="off"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Paste the key from your UniFi console"
-                />
-                <p
-                  className="text-[14px]"
-                  style={{ color: apiKey.trim().length >= 8 ? "var(--ff-on)" : "var(--ff-muted)" }}
-                >
-                  {apiKey.trim().length < 8
-                    ? "Paste the Network Integration API key, then save to test it against this gateway."
-                    : `Looks like a key — saving will test it before it ${unifi?.configured ? "replaces the old one" : "is stored"}.`}
-                </p>
-                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={apiKey.length < 8}
-                    className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
-                    onClick={saveKey}
+                    className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]"
+                    onClick={() => void testConnection()}
                   >
-                    Save and test
+                    Test connection
                   </button>
-                  {unifi?.configured ? (
-                    <button
-                      type="button"
-                      className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-muted)]"
-                      onClick={() => {
-                        setPasting(false);
-                        setApiKey("");
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  ) : null}
                 </div>
-              </div>
-            ) : (
-              <div className="mt-3.5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
-                  onClick={() => {
-                    setPasting(true);
-                    setApiKey("");
-                  }}
-                >
-                  Replace key
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]"
-                  onClick={() => void testConnection()}
-                >
-                  Test connection
-                </button>
-              </div>
-            )}
-            {probe ? <p className="mt-2.5 text-[14px]">{probe}</p> : null}
-          </KeyCard>
-          {healthTarget !== null ? (
-            <GatewayHealthCard health={health} checking={checkingHealth} error={healthError} onCheck={() => void checkHealth()} />
-          ) : null}
-        </div>
+              )}
+              {probe ? <p className="mt-2.5 text-[14px]">{probe}</p> : null}
+            </KeyCard>
+          </div>
+        ) : null}
 
-        <HouseholdCard
-          groups={groups}
-          accounts={accounts}
-          mutate={store.mutate}
-          onCreateLogin={(group) => {
-            setLoginFor(group);
-            setLoginUser(usernameFromName(group.name));
-            setPw1("");
-            setPw2("");
-          }}
-        />
-
-        <BackupCard onImported={() => reload()} />
+        {tab === "maintenance" ? <Maintenance /> : null}
       </div>
 
       {loginFor ? (
@@ -386,5 +373,71 @@ export default function SettingsPage() {
         </div>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Settings' Maintenance tab: the server's update and its schedule, the household's backup, and the
+ * gateway's load. It mounts only while the tab is open, so the console is asked for its load then.
+ */
+function Maintenance() {
+  const { unifi, household, reload: reloadHousehold } = useAppData();
+  const update = useUpdateCheck(request);
+  const { settings, reload } = useUpdateSettings(request);
+  // The new release serves new pages, so the browser reloads onto it; a page it already served only rereads.
+  const onInstalled = (version: string) => (installedVersion(APP_VERSION, version) ? reload() : window.location.reload());
+
+  const [health, setHealth] = useState<GatewayHealth | null>(null);
+  const [healthError, setHealthError] = useState("");
+  const [checkingHealth, setCheckingHealth] = useState(true);
+  // The console and site the readings are for: another one starts over, never showing the last one's.
+  const healthTarget = unifi?.configured ? [unifi.consoleId ?? "", unifi.baseUrl ?? "", unifi.siteId ?? ""].join("|") : null;
+  const [shownTarget, setShownTarget] = useState<string | null>(null);
+  if (healthTarget !== shownTarget) {
+    setShownTarget(healthTarget);
+    setHealth(null);
+    setHealthError("");
+    setCheckingHealth(healthTarget !== null);
+  }
+
+  // Asked when the tab opens and on request only: each check is a request per device to the console.
+  const checkHealth = useCallback(async () => {
+    setCheckingHealth(true);
+    try {
+      setHealth(await readHealth());
+      setHealthError("");
+    } catch (error) {
+      setHealthError(healthFailure(error));
+    } finally {
+      setCheckingHealth(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (healthTarget === null) return;
+    let active = true;
+    readHealth()
+      .then(
+        (result) => active && setHealth(result),
+        (error: unknown) => active && setHealthError(healthFailure(error)),
+      )
+      .finally(() => active && setCheckingHealth(false));
+    return () => {
+      active = false;
+    };
+  }, [healthTarget]);
+
+  return (
+    <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
+      <div className="flex flex-col gap-[18px]">
+        <UpdateContent update={update} install={{ settings, request, onChanged: reload, onInstalled }} />
+        <UpdateScheduleCard settings={settings} request={request} timezone={household?.timezone ?? "America/New_York"} onChanged={reload} />
+      </div>
+      <div className="flex flex-col gap-[18px]">
+        <BackupCard onImported={() => reloadHousehold()} />
+        {healthTarget !== null ? (
+          <GatewayHealthCard health={health} checking={checkingHealth} error={healthError} onCheck={() => void checkHealth()} />
+        ) : null}
+      </div>
+    </div>
   );
 }

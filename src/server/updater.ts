@@ -23,7 +23,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 export const UPDATE_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 /** A scheduled install missed by more than this (FamilyFi was down) waits for the next one. */
 const SCHEDULE_CATCH_UP_MS = 60 * 60 * 1000;
-/** How long an answer, or silence, from Watchtower stands for the Update page. */
+/** How long an answer, or silence, from Watchtower stands for the Maintenance tab. */
 const REACHABLE_CACHE_MS = 30_000;
 const REACHABLE_TIMEOUT_MS = 3_000;
 

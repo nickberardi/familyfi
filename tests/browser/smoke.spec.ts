@@ -190,7 +190,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   const alert = page.getByRole("region", { name: "Update available" });
   await expect(alert).toContainText("v0.6.0 is ready. You’re on v0.5.1.");
   await alert.getByRole("link", { name: "Update" }).click();
-  await expect(page).toHaveURL(/\/update$/);
+  await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
   const notes = page.getByRole("region", { name: "Release notes" });
   await expect(notes).toContainText("Pair Device page");
   await expect(notes.getByRole("link", { name: "View on GitHub" })).toHaveAttribute(
@@ -199,7 +199,7 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   );
   await expect(page.getByRole("button", { name: /Install v0\.6\.0/ })).toBeDisabled();
 
-  // Settings no longer carries the update check; the alert is the one place it appears.
+  // Settings' other tabs don't carry the update check; the alert still shows beside them.
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(alert).toBeVisible();
@@ -268,7 +268,9 @@ test("the Update page installs through the updater and keeps its schedule", { ta
     await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ run }) });
   });
 
+  // The old Update page's address opens Settings' Maintenance tab.
   await page.goto("/update");
+  await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
   const install = page.getByRole("button", { name: "Install v0.6.0", exact: true });
   await expect(install).toBeEnabled();
   await install.click();
@@ -292,12 +294,37 @@ test("the Update page installs through the updater and keeps its schedule", { ta
 
 test("Settings exports the household and previews an import before replacing anything", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=maintenance");
   const backup = page.getByRole("region", { name: "Backup" });
   await expect(backup.getByRole("link", { name: "Export household" })).toHaveAttribute("href", "/api/v1/settings/export");
   await backup.getByLabel("Import an export").setInputFiles({ name: "not-an-export.tar.gz", mimeType: "application/gzip", buffer: Buffer.from("nope") });
   await expect(backup.getByRole("alert")).toContainText("not a FamilyFi export");
   await expect(backup.getByRole("button", { name: "Replace the household" })).toHaveCount(0);
+});
+
+test("Settings opens on Household and keeps the chosen tab in its address", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/settings");
+  const tabs = page.getByRole("group", { name: "Settings sections" });
+  await expect(page.getByTestId("settings-household")).toBeVisible();
+  await expect(page.getByTestId("settings-gateway")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Backup" })).toHaveCount(0);
+
+  await tabs.getByRole("button", { name: "Gateway" }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=gateway$/);
+  await expect(page.getByTestId("settings-gateway")).toContainText("Timezone");
+  await expect(page.getByTestId("settings-key")).toBeVisible();
+  await expect(page.getByTestId("settings-household")).toHaveCount(0);
+
+  await tabs.getByRole("button", { name: "Maintenance" }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
+  await expect(page.getByRole("region", { name: "Backup" })).toBeVisible();
+  await expect(page.getByTestId("settings-gateway-health")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Backup" })).toBeVisible();
+  await tabs.getByRole("button", { name: "Household" }).click();
+  await expect(page).toHaveURL(/\/settings$/);
 });
 
 /** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */

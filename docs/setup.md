@@ -168,11 +168,11 @@ choose it.
 
 ## Automatic updates
 
-The Update page installs a newer release, now or on a schedule (Sunday at midnight by default, in
+Settings' Maintenance tab installs a newer release, now or on a schedule (Sunday at midnight by default, in
 the household's time zone), through [Watchtower](https://github.com/nicholas-fedor/watchtower), a
 sidecar that holds the Docker socket so FamilyFi never does. `docker compose up -d` starts it with
 FamilyFi; there is nothing to set up. To run without it, start only `db` and `app`
-(`docker compose -f docker/docker-compose.yml up -d db app`); the Update page then says to update by
+(`docker compose -f docker/docker-compose.yml up -d db app`); the Maintenance tab then says to update by
 hand, and neither Install nor the schedule does anything until Watchtower answers.
 
 The `watchtower` service in [docker-compose.yml](../docker/docker-compose.yml) is the maintained fork
@@ -187,13 +187,13 @@ the updater volume (`familyfi-updater_data`) before anything starts, and never r
 volume read-write; Watchtower mounts it read-only and reads the token from the file
 (`WATCHTOWER_HTTP_API_TOKEN=/run/familyfi-updater/token`). Watchtower starts only once the app's
 healthcheck sees the file, because it would take a path it cannot open as the token itself. The
-Update page counts the updater as set up only once Watchtower answers with that token.
+Maintenance tab counts the updater as set up only once Watchtower answers with that token.
 
 Before it replaces the app, Watchtower runs the app's pre-update hook,
 [`pre-update-backup.sh`](../scripts/runtime/pre-update-backup.sh). The hook dumps the database to
 `/var/lib/familyfi/data/backups` and keeps the newest three. When the dump fails it exits 75 and
 Watchtower skips the update, so FamilyFi keeps running the release it has; Watchtower's history counts
-that as a failure, which the Update page reports.
+that as a failure, which the Maintenance tab reports.
 
 Watchtower pulls the tag the app runs, so `FAMILYFI_IMAGE` must name a moving tag (`latest`, the
 default) for an install to change anything; a pinned version reports **not installed** on the Update

@@ -1032,6 +1032,11 @@
         "settings"
       ]
     },
+    "tests/browser/smoke.spec.ts > Settings opens on Household and keeps the chosen tab in its address": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/unit/import-body-limit.test.ts": {
       "categories": [
         "settings",

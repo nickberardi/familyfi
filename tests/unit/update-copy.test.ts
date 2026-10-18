@@ -25,7 +25,7 @@ describe("update copy", () => {
     expect(latestRelease(check())).toBe("v0.6.0");
     expect(latestRelease(check({ available: false }))).toBeNull();
     expect(latestRelease(check({ latestVersion: null }))).toBeNull();
-    expect(updateAlert(check())).toEqual({ title: "Update available", body: "v0.6.0 is ready. You’re on v0.5.1.", action: "Update", href: "/update" });
+    expect(updateAlert(check())).toEqual({ title: "Update available", body: "v0.6.0 is ready. You’re on v0.5.1.", action: "Update", href: "/settings?tab=maintenance" });
     expect(updateAlert(null)).toBeNull();
     expect(installCopy("v0.6.0")).toEqual({ title: "Install v0.6.0", button: "Install v0.6.0 · needs the updater" });
     expect(installCopy("v0.6.0", true)).toEqual({ title: "Install v0.6.0", button: "Install v0.6.0" });

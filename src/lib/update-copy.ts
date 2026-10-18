@@ -17,7 +17,7 @@ export const INSTALL_STEPS = [
   "Reconcile app-owned policies",
 ] as const;
 
-/** The Update page's words. */
+/** The update's words, on Settings' Maintenance tab. */
 export const UPDATE_COPY = {
   title: "Update",
   sub: "Release notes and installation.",
@@ -46,7 +46,7 @@ export function latestRelease(update: UpdateCheck | null | undefined): string | 
   return update?.available && update.latestVersion ? versionLabel(update.latestVersion) : null;
 }
 
-/** What the Update page says when no newer release is on offer. */
+/** What the update says when no newer release is on offer. */
 export function upToDateLine(update: UpdateCheck | null | undefined): string {
   if (!update || update.status === "pending") return UPDATE_COPY.checking;
   if (update.status === "error") return UPDATE_COPY.unavailable;
@@ -61,7 +61,7 @@ export function updateAlert(update: UpdateCheck | null | undefined) {
     title: "Update available",
     body: `${latest} is ready. You’re on ${versionLabel(update.currentVersion)}.`,
     action: "Update",
-    href: "/update",
+    href: "/settings?tab=maintenance",
   };
 }
 

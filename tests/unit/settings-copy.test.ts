@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLoginTitle, formatUptime, gatewayFacts, gatewayHealthFacts, requestLoadLine, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeAdminConfirm, removeLoginConfirm, usernameFromName } from "@/lib/settings-copy";
+import { createLoginTitle, formatUptime, gatewayFacts, gatewayHealthFacts, requestLoadLine, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeAdminConfirm, removeLoginConfirm, settingsTab, usernameFromName } from "@/lib/settings-copy";
 import type { GatewayDeviceHealth, UnifiSettings } from "@/lib/types";
 
 const unifi: UnifiSettings = {
@@ -127,5 +127,22 @@ describe("gateway load copy", () => {
     expect(requestLoadLine({ windowSec: 300, total: 0, errors: 0, endpoints: [] })).toBe("None in the last 5 min");
     expect(requestLoadLine({ windowSec: 300, total: 62, errors: 1, endpoints: [] })).toBe("62 in the last 5 min · 12.4 a minute · 1 failed");
     expect(requestLoadLine({ windowSec: 300, total: 10, errors: 2, endpoints: [] })).toBe("10 in the last 5 min · 2.0 a minute · 2 failed");
+  });
+});
+
+describe("settingsTab", () => {
+  it("opens the tab the address names", () => {
+    expect(settingsTab("household")).toBe("household");
+    expect(settingsTab("gateway")).toBe("gateway");
+    expect(settingsTab("maintenance")).toBe("maintenance");
+    expect(settingsTab(["maintenance", "gateway"])).toBe("maintenance");
+  });
+
+  it("opens Household for a missing or unknown tab", () => {
+    expect(settingsTab(null)).toBe("household");
+    expect(settingsTab(undefined)).toBe("household");
+    expect(settingsTab("")).toBe("household");
+    expect(settingsTab("Gateway")).toBe("household");
+    expect(settingsTab("update")).toBe("household");
   });
 });
