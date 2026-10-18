@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, request } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
@@ -9,7 +9,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { BackupCard } from "@/components/BackupCard";
 import { SETTINGS_COPY, createLoginTitle, loginFormState, settingsTab, usernameFromName, type SettingsTab } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
-import type { GatewayHealth, Group } from "@/lib/types";
+import type { Group } from "@/lib/types";
 import { installedVersion } from "@/lib/update-copy";
 import { APP_VERSION } from "@/lib/version";
 import { NewLoginFields } from "@/ui/NewLoginFields";
@@ -17,14 +17,13 @@ import { GatewayCard, GatewayHealthCard, HouseholdCard, KeyCard } from "@/ui/Set
 import { SettingsTabs } from "@/ui/SettingsTabs";
 import { UpdateContent } from "@/ui/UpdateContent";
 import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
+import { useGatewayHealth } from "@/ui/use-gateway-health";
 import { useUpdateCheck } from "@/ui/use-update-check";
 import { useUpdateSettings } from "@/ui/use-update-settings";
 
 const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
 
-const readHealth = () => api<{ gateway: GatewayHealth }>("/api/v1/health?gateway=true").then((result) => result.gateway);
-const healthFailure = (error: unknown) => (error instanceof Error ? error.message : SETTINGS_COPY.healthFailed);
 
 export default function SettingsPage() {
   return (
@@ -384,48 +383,9 @@ function Maintenance() {
   const { unifi, household, reload: reloadHousehold } = useAppData();
   const update = useUpdateCheck(request);
   const { settings, reload } = useUpdateSettings(request);
+  const gateway = useGatewayHealth(request, unifi);
   // The new release serves new pages, so the browser reloads onto it; a page it already served only rereads.
   const onInstalled = (version: string) => (installedVersion(APP_VERSION, version) ? reload() : window.location.reload());
-
-  const [health, setHealth] = useState<GatewayHealth | null>(null);
-  const [healthError, setHealthError] = useState("");
-  const [checkingHealth, setCheckingHealth] = useState(true);
-  // The console and site the readings are for: another one starts over, never showing the last one's.
-  const healthTarget = unifi?.configured ? [unifi.consoleId ?? "", unifi.baseUrl ?? "", unifi.siteId ?? ""].join("|") : null;
-  const [shownTarget, setShownTarget] = useState<string | null>(null);
-  if (healthTarget !== shownTarget) {
-    setShownTarget(healthTarget);
-    setHealth(null);
-    setHealthError("");
-    setCheckingHealth(healthTarget !== null);
-  }
-
-  // Asked when the tab opens and on request only: each check is a request per device to the console.
-  const checkHealth = useCallback(async () => {
-    setCheckingHealth(true);
-    try {
-      setHealth(await readHealth());
-      setHealthError("");
-    } catch (error) {
-      setHealthError(healthFailure(error));
-    } finally {
-      setCheckingHealth(false);
-    }
-  }, []);
-  useEffect(() => {
-    if (healthTarget === null) return;
-    let active = true;
-    readHealth()
-      .then(
-        (result) => active && setHealth(result),
-        (error: unknown) => active && setHealthError(healthFailure(error)),
-      )
-      .finally(() => active && setCheckingHealth(false));
-    return () => {
-      active = false;
-    };
-  }, [healthTarget]);
-
   return (
     <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
       <div className="flex flex-col gap-[18px]">
@@ -434,8 +394,8 @@ function Maintenance() {
       </div>
       <div className="flex flex-col gap-[18px]">
         <BackupCard onImported={() => reloadHousehold()} />
-        {healthTarget !== null ? (
-          <GatewayHealthCard health={health} checking={checkingHealth} error={healthError} onCheck={() => void checkHealth()} />
+        {gateway.target !== null ? (
+          <GatewayHealthCard health={gateway.health} checking={gateway.checking} error={gateway.error} onCheck={() => void gateway.check()} />
         ) : null}
       </div>
     </div>
