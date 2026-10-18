@@ -391,7 +391,13 @@ function Maintenance() {
         <UpdateScheduleCard settings={settings} request={request} timezone={household?.timezone ?? "America/New_York"} onChanged={reload} />
       </div>
       <div className="flex flex-col gap-[18px]">
-        <BackupCard onImported={() => reloadHousehold()} />
+        {/* An import restores the update schedule too, so its card rereads it with the household. */}
+        <BackupCard
+          onImported={() => {
+            reload();
+            return reloadHousehold();
+          }}
+        />
         {gateway.target !== null ? (
           <GatewayHealthCard health={gateway.health} checking={gateway.checking} error={gateway.error} onCheck={() => void gateway.check()} />
         ) : null}

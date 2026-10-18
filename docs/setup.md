@@ -196,8 +196,8 @@ Watchtower skips the update, so FamilyFi keeps running the release it has; Watch
 that as a failure, which the Maintenance tab reports.
 
 Watchtower pulls the tag the app runs, so `FAMILYFI_IMAGE` must name a moving tag (`latest`, the
-default) for an install to change anything; a pinned version reports **not installed** on the Update
-page. A container created outside this Compose file can use the same sidecar: give it the labels and
+default) for an install to change anything; a pinned version reports **not installed** on the
+Maintenance tab. A container created outside this Compose file can use the same sidecar: give it the labels and
 the updater volume of the `app` service, give Watchtower the volume read-only, and set
 `FAMILYFI_UPDATER_URL` to where Watchtower answers.
 
