@@ -129,8 +129,8 @@ describe("category mark state", () => {
   });
 
   it("names each state for a reader and for a screen reader", () => {
-    // One word per state: the word says what is true, the colour says who made it so.
-    expect(categoryMarkWord("rule")).toBe("Off");
+    // The word says what is true, the colour says who made it so: a FamilyFi rule and the resolver both block.
+    expect(categoryMarkWord("rule")).toBe("Blocked");
     expect(categoryMarkWord("blocked")).toBe("Blocked");
     expect(categoryMarkWord("partial")).toBe("Partial");
     expect(categoryMarkWord("open")).toBe("Open");

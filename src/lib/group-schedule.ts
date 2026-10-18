@@ -89,7 +89,7 @@ function liftLabel(group: Pick<Group, "id">, rule: Rule, timezone: string, now: 
 
 /**
  * Today's schedule for the group: its bands on the bar, and its windows today in the order they
- * start. Rules that block always are left out. A rule that is lifted for the group now draws faintly and says how in its rows.
+ * start. A rule that blocks always is listed, but not drawn on the bar. A rule that is lifted for the group now draws faintly and says how in its rows.
  */
 export function groupScheduleToday(
   group: Pick<Group, "id" | "suspension">,
@@ -103,16 +103,14 @@ export function groupScheduleToday(
   const bands: TimelineBand[] = [];
   const rows: (ScheduleWindowRow & { start: number })[] = [];
   for (const { rule, title, tone } of groupScheduleRules(group, rules, catalogNames)) {
-    // Only scheduled windows: a rule that blocks all day, every day, is in the status line and on
-    // the details page, not on the day's schedule.
-    if (rule.mode === "always") continue;
     const internet = rule.kind === "internet";
     const lifted = liftLabel(group, rule, timezone, now);
     ruleInternetWindows(rule).forEach((window, index) => {
       const today = windowDayBands(window, weekday);
       if (today.length === 0) return;
       const name = internet ? windowTitle(window) : title;
-      for (const band of today) {
+      // The bar shows scheduled windows only: a rule that blocks all day, every day, is listed but not drawn.
+      for (const band of rule.mode === "always" ? [] : today) {
         bands.push({
           kind: internet ? "window" : "category",
           from: band.from,
@@ -132,7 +130,7 @@ export function groupScheduleToday(
         detail: `${internet ? "no internet" : "blocked"} ${windowSpan(window)}`,
         state: lifted ?? (live ? "Now" : null),
         live,
-        start: startMinutes(window),
+        start: window.always ? 0 : startMinutes(window),
       });
     });
   }

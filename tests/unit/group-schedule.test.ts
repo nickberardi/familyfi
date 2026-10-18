@@ -78,11 +78,15 @@ describe("group schedule", () => {
     expect(bands.find((band) => band.label === "Homework (Video and Social) blocked")?.tone).toBe(2);
   });
 
-  it("leaves rules that block always off today's schedule, but lists them on the details page", () => {
+  it("lists rules that block always but leaves them off the bar", () => {
     const tiktok = rule({ id: "r-tiktok", name: "No TikTok", kind: "app", targetIds: [9], mode: "always", windows: [] });
     const grounded = rule({ id: "r-grounded", name: "Grounded", kind: "internet", mode: "always", windows: [] });
     const { rows, bands } = groupScheduleToday(group(), [tiktok, grounded, night], names, TZ, NOW);
-    expect(rows.map((row) => row.ruleId)).toEqual(["r-night"]);
+    expect(rows.map((row) => [row.ruleId, row.detail, row.state])).toEqual([
+      ["r-tiktok", "blocked all day", "Now"],
+      ["r-grounded", "no internet all day", "Now"],
+      ["r-night", "no internet 10 PM–7 AM", null],
+    ]);
     expect(bands.map((band) => band.label)).toEqual(["Overnight", "Overnight"]);
     expect(groupScheduleRuleRows(group(), [tiktok, grounded, night], names, TZ, NOW).map((row) => [row.ruleId, row.times])).toEqual([
       ["r-tiktok", "all day"],
