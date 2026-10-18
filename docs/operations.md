@@ -53,6 +53,8 @@ one route at a time, and turns every other route off:
 
 Switching is one step and can be done any time. Routes you have saved stay saved, so switching back
 to one of them needs no retyping, and switching back to Automatic needs no new Cloudflare sign-in.
+Remove takes a saved route away; removing the published one turns remote access Off, and a route
+with a pairing code still waiting can't be removed until the code is cancelled or expires.
 Setup guides: [My domain (VPN or reverse proxy)](https://github.com/nickberardi/familyfi/wiki/Remote-access-home-network),
 [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) and
 [your own Cloudflare Tunnel](https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Tunnel).
