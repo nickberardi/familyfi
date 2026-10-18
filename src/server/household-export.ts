@@ -27,6 +27,7 @@ import { normalizeResolverUrl, ResolverConfigError } from "./upstream/resolver-s
 import { customSlugFor } from "./upstream-seed";
 import { prisma } from "./db";
 import { jsonError } from "./http";
+import { NO_EVIDENCE } from "./tunnel/route-check";
 import { compareSemver, parseSemver } from "./update-check";
 import { parseWeeklyCron, weeklyCron } from "./weekly-schedule";
 
@@ -653,7 +654,8 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           // A route the export no longer puts behind Access drops the token this install held for it.
           ...(endpoint.edgeAuth === EdgeAuth.none ? { edgeTokenCiphertext: null, edgeTokenIv: null, edgeTokenAuthTag: null } : {}),
         };
-        await tx.connectionEndpoint.upsert({ where: { url: endpoint.url }, update: data, create: data });
+        // Whatever showed the route worked before says nothing about it as imported.
+        await tx.connectionEndpoint.upsert({ where: { url: endpoint.url }, update: { ...data, ...NO_EVIDENCE }, create: data });
       }
       return summary;
     },

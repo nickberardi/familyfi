@@ -183,4 +183,22 @@ describe("the remote access port", () => {
       await new Promise((resolve) => app.close(resolve));
     }
   });
+
+  it("credits each answer to the route its request was let in on, even if another is published by then", async () => {
+    let published = "route-a";
+    const app = createServer((_req, res) => {
+      published = "route-b";
+      res.end("ok");
+    });
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    const credited: string[] = [];
+    const started = await startPhoneGateway((app.address() as AddressInfo).port, { host: "127.0.0.1", port: 0 }, async () => published, (route) => credited.push(route));
+    try {
+      await new Promise<void>((resolve) => request({ host: "127.0.0.1", port: started.port, path: "/api/v1/connection/identity" }, (res) => res.resume().on("end", resolve)).end());
+      expect(credited).toEqual(["route-a"]);
+    } finally {
+      await new Promise((resolve) => started.server.close(resolve));
+      await new Promise((resolve) => app.close(resolve));
+    }
+  });
 });

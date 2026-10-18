@@ -270,4 +270,17 @@ export type RemoteAccess = {
   cloudflared: string | null;
   hostname: string | null;
   loginUrl: string | null;
+  /** For a published route the household runs: the evidence that it works. Null for FamilyFi's own tunnel or Off. */
+  reachability: RouteReachability | null;
+};
+
+/** Evidence a route the household runs works, since it was last published or changed. */
+export type RouteReachability = {
+  /** The last request that came in through it. */
+  reachedAt: string | null;
+  /** FamilyFi's own last check of it, from home. */
+  checkedAt: string | null;
+  result: "reached" | "failed" | null;
+  /** Why the last check failed. */
+  message: string | null;
 };

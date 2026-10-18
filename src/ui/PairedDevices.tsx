@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { REMOTE_STATUS, routeTrust, transportLabel } from "@/lib/connection-routes";
+import { remoteStatus, routeTrust, transportLabel } from "@/lib/connection-routes";
 import { canRepair, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
@@ -184,7 +184,7 @@ export function PairedDevicesCard({
 export function RemoteAccessSummary({ tunnel, published }: { tunnel: RemoteAccess | null; published: ConnectionRoute | null }) {
   const ui = useUI();
   const text = useText();
-  const status = REMOTE_STATUS[tunnel?.status ?? "off"];
+  const status = remoteStatus(tunnel);
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="remote-access-summary">
       <View style={[styles.head, styles.remoteHead, { borderBottomColor: ui.color("hairline-card") }]}>
@@ -205,6 +205,11 @@ export function RemoteAccessSummary({ tunnel, published }: { tunnel: RemoteAcces
             <Text style={[text(14, 21, "muted"), styles.line]}>
               {transportLabel(published.transport)} · {routeTrust(published)}
             </Text>
+            {status.detail ? (
+              <Text style={[text(14, 21, "muted"), styles.line]} testID="remote-detail">
+                {status.detail}
+              </Text>
+            ) : null}
           </View>
         ) : (
           <Text style={text(14, 21, "muted")}>{COPY.remoteOff}</Text>

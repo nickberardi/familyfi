@@ -46,6 +46,12 @@ enum DeviceScope {
   readOnly
 }
 
+/// What FamilyFi's own check of a route found: its identity answered as this household, or not.
+enum RouteCheckResult {
+  reached
+  failed
+}
+
 enum ConnectionTransport {
   lan
   tailscale
@@ -184,6 +190,12 @@ model ConnectionEndpoint {
   /// Starts at 1 and rises each time the token is replaced, so phones and the Pair Device page can tell tokens apart.
   edgeTokenVersion           Int      @default(0)
   edgeTokenRotatedAt         DateTime? @db.Timestamptz(3)
+  /// Evidence the route works, since it was last published or changed: the last request that
+  /// came in through it, and FamilyFi's own last check of it from home.
+  reachedAt                  DateTime? @db.Timestamptz(3)
+  checkedAt                  DateTime? @db.Timestamptz(3)
+  checkResult                RouteCheckResult?
+  checkMessage               String?
   createdAt    DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime            @updatedAt @db.Timestamptz(3)
   pairings     Pairing[]

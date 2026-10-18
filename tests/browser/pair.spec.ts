@@ -102,8 +102,13 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     await shot(page, "home-network-form");
     await card.getByRole("button", { name: "Use this address" }).click();
     await expect(card.getByTestId("remote-url")).toHaveText(url);
-    await expect(card.getByTestId("remote-status")).toHaveText("On");
+    // Publishing is not evidence the address works: never "On" on its say-so.
+    await expect(card.getByTestId("remote-status")).toHaveText(/^(Published|Not reached)$/);
     expect(await enabledUrls(page)).toEqual([url]);
+    // Nothing answers at this made-up address, and no phone has come in through it.
+    await card.getByTestId("saved-route").getByRole("button", { name: "Check" }).click();
+    await expect(card.getByTestId("remote-status")).toHaveText("Not reached", { timeout: 10_000 });
+    await expect(card.getByTestId("remote-detail")).toContainText("FamilyFi could not resolve");
 
     await page.getByRole("button", { name: "Pair a phone" }).click();
     const pairSheet = page.getByRole("dialog", { name: "Pair a phone" });
@@ -172,9 +177,10 @@ test("pins a My domain certificate from a pasted PEM and puts the pin in the pai
     const saved = card.getByTestId("saved-route");
     await expect(saved).toContainText(url);
     await expect(saved).toContainText("Pinned");
-    // Nothing answers at this made-up address: the check must say it could not look, never "matches".
+    // Published, its Check reaches it as a phone would, pin included. Nothing answers at this
+    // made-up address, so it is not reached, never "matches".
     await saved.getByRole("button", { name: "Check" }).click();
-    await expect(saved.getByTestId("pin-check")).toContainText("Couldn't check", { timeout: 10_000 });
+    await expect(card.getByTestId("remote-status")).toHaveText("Not reached", { timeout: 10_000 });
 
     await page.getByRole("button", { name: "Pair a phone" }).click();
     await page.getByRole("dialog", { name: "Pair a phone" }).getByRole("button", { name: "Show pairing code" }).click();

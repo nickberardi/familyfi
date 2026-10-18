@@ -1,6 +1,6 @@
 import { createServer, request as forward, type IncomingHttpHeaders, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { TUNNEL_HEADER } from "@/lib/constants";
+import { ROUTE_CHECK_HEADER, TUNNEL_HEADER } from "@/lib/constants";
 
 /**
  * The only thing a tunnel ever points at. It listens on loopback, passes nothing but
@@ -30,7 +30,7 @@ export function tunnelHeaders(incoming: IncomingHttpHeaders): Record<string, str
   const headers: Record<string, string | string[]> = {};
   for (const [name, value] of Object.entries(incoming)) {
     if (value === undefined || HOP_BY_HOP.has(name)) continue;
-    if (name === "cookie" || name === TUNNEL_HEADER || name === "x-forwarded-for" || name === "x-real-ip") continue;
+    if (name === "cookie" || name === TUNNEL_HEADER || name === ROUTE_CHECK_HEADER || name === "x-forwarded-for" || name === "x-real-ip") continue;
     // A Cloudflare Access service token is for Cloudflare alone; the app never needs it, so it can never log it.
     if (EDGE_TOKEN_HEADERS.has(name)) continue;
     headers[name] = value;
@@ -64,15 +64,19 @@ function refuse(res: ServerResponse) {
  * By default the gateway listens on a free loopback port for FamilyFi's own cloudflared.
  * `listen` is the remote-access port (FAMILYFI_REMOTE_ACCESS_PORT) for a route the household
  * runs: same rules, reachable from outside the container. `open` gates it: while it answers
- * false the gateway closes every connection without a word, so nothing is learned from it.
+ * nothing (false or null) the gateway closes every connection without a word, so nothing is learned
+ * from it. `answered` is told each time the app answers a call that came in, with what `open`
+ * admitted it on, as evidence that route works.
  */
-export function startPhoneGateway(
+export function startPhoneGateway<Admitted = true>(
   upstreamPort: number,
   listen: { host: string; port: number } = { host: "127.0.0.1", port: 0 },
-  open?: () => Promise<boolean>,
+  open?: () => Promise<Admitted | false | null>,
+  answered?: (admitted: Admitted) => void,
 ): Promise<{ server: Server; port: number }> {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    if (open && !(await open().catch(() => false))) {
+    const admitted = open ? await open().catch(() => false as const) : (true as Admitted);
+    if (admitted === false || admitted === null) {
       req.socket.destroy();
       return;
     }
@@ -86,6 +90,8 @@ export function startPhoneGateway(
       (reply) => {
         const headers = { ...reply.headers };
         delete headers["set-cookie"];
+        // FamilyFi checking its own route from home is not evidence a phone can reach it from outside.
+        if (!req.headers[ROUTE_CHECK_HEADER]) answered?.(admitted);
         res.writeHead(reply.statusCode ?? 502, headers);
         reply.pipe(res);
       },
