@@ -412,6 +412,9 @@ function modeOf(route: ConnectionEndpoint | null): RemoteAccessMode {
 }
 
 export async function remoteAccessState(): Promise<RemoteAccessState> {
+  // Read the tunnel before the database: goLive saves the route before it reports running, so a route
+  // read afterwards is never older than the status, and "running" always comes with its route.
+  const { status, url, error, loginUrl } = runtime;
   const route = await publishedRoute();
   const domain = await routeOfKind(RouteKind.domain);
   const own = route?.kind === RouteKind.own;
@@ -420,13 +423,13 @@ export async function remoteAccessState(): Promise<RemoteAccessState> {
     mode: modeOf(route),
     // A route the household runs is up as far as FamilyFi can tell. Otherwise report what the tunnel is
     // actually doing — including a setup that failed after nothing was published — rather than "off".
-    status: own ? "running" : !tunnelWanted && runtime.status !== "error" ? "off" : runtime.status,
-    url: own ? route.url : runtime.url,
-    error: own ? null : runtime.error,
+    status: own ? "running" : !tunnelWanted && status !== "error" ? "off" : status,
+    url: own ? route.url : url,
+    error: own ? null : error,
     endpointId: route?.id ?? null,
     cloudflared: findCloudflared()?.version ?? null,
     hostname: domain ? new URL(domain.url).hostname : null,
-    loginUrl: runtime.loginUrl,
+    loginUrl,
   };
 }
 

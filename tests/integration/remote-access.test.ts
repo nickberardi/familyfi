@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
-import { householdRoutePublished, resetRouteCheckForTests, resumeRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
+import { householdRoutePublished, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -353,6 +353,16 @@ describe("remote access", () => {
     await waitFor((t) => t.url !== null, "the quick tunnel's address");
     await never((t) => t.status === "running");
     expect(await prisma().connectionEndpoint.count({ where: { kind: "quick" } })).toBe(0);
+  });
+
+  it("never reports running beside a route read before the tunnel went live", async () => {
+    await heldQuickTunnel();
+    const runtime = (globalThis as { familyfiRemoteAccess?: { status: string } }).familyfiRemoteAccess!;
+    const pending = remoteAccessState();
+    // The tunnel saves its route and goes live while the state is still reading the database.
+    runtime.status = "running";
+    const current = await pending;
+    expect(current.status !== "running" || current.endpointId !== null, JSON.stringify(current)).toBe(true);
   });
 
   it("stops its tunnel when another FamilyFi process takes the lease", async () => {
