@@ -98,7 +98,7 @@ reachable through it. Signing in remotely requires the FamilyFi app on a paired 
 device credential is checked before the password, so the internet cannot test passwords.
 
 A quick tunnel's address changes whenever FamilyFi restarts. Phones paired through it can't reach
-the new address and must be unpaired and paired again; the app's offline screen says so. Cloudflare
+the new address and must be re-paired from Pair Device; the app's offline screen says so. Cloudflare
 offers quick tunnels for testing, with no uptime guarantee and a 200-request concurrency limit. For
 a permanent address, use **Cloudflare → Automatic** or **Tailscale**, or **My domain** for a VPN or
 reverse proxy you already run.

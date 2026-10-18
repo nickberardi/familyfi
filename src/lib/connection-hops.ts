@@ -35,7 +35,7 @@ export const HOP_COPY = {
   note: "Two independently authenticated hops. Your phone never talks to UniFi.",
   offlineTitle: "Can't reach FamilyFi",
   offlineBody: "FamilyFi isn't answering on any of this phone's routes. The app is paused until it does, and keeps trying by itself.",
-  offlineQuick: "If FamilyFi restarted, its Quick tunnel address changed. Unpair this phone and pair it again.",
+  offlineQuick: "If FamilyFi restarted, its Quick tunnel address changed. Re-pair this phone from Pair Device in FamilyFi on the web, then unpair here and scan the new code.",
   retrying: "Trying again…",
   tryAgain: "Try again now",
 } as const;
