@@ -396,8 +396,12 @@ describe("remote access", () => {
       await get();
       await new Promise((resolve) => setTimeout(resolve, 200));
       expect(await reachedAt()).toEqual(first);
-      await noteRouteReached(Date.now() + 61_000);
+      await noteRouteReached(home.id, Date.now() + 61_000);
       expect((await reachedAt())!.getTime()).toBeGreaterThan(first!.getTime());
+      // Answers that land together write once: the first claims the minute before its write finishes.
+      const burst = Date.now() + 200_000;
+      await Promise.all([noteRouteReached(home.id, burst), noteRouteReached(home.id, burst + 1), noteRouteReached(home.id, burst + 2)]);
+      expect((await reachedAt())!.getTime()).toBe(burst);
 
       // Publishing it again starts over: what was true before may not be now.
       await put({ mode: "off" });

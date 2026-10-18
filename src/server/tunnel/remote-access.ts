@@ -760,15 +760,16 @@ export async function householdRoutePublished(now = Date.now()): Promise<boolean
 const REACHED_WRITE_MS = 60_000;
 
 /**
- * A request came in through the remote-access port and the app answered it: the published route
- * works. Recorded at most once a minute, so a busy phone does not write on every call.
+ * A request came in through the remote-access port on route `id` and the app answered it: that
+ * route works. Recorded at most once a minute, so a busy phone does not write on every call; the
+ * minute is claimed before the write, so a burst of answers writes once (and a failed write
+ * waits for the next minute like any other).
  */
-export async function noteRouteReached(now = Date.now()): Promise<void> {
-  const id = await openRoute(now);
+export async function noteRouteReached(id: string, now = Date.now()): Promise<void> {
   const last = runtime.reachedWrite;
-  if (!id || (last?.id === id && now - last.at < REACHED_WRITE_MS)) return;
-  await prisma().connectionEndpoint.updateMany({ where: { id }, data: { reachedAt: new Date(now) } });
+  if (last?.id === id && now - last.at < REACHED_WRITE_MS) return;
   runtime.reachedWrite = { at: now, id };
+  await prisma().connectionEndpoint.updateMany({ where: { id }, data: { reachedAt: new Date(now) } });
 }
 
 /**
@@ -795,7 +796,8 @@ export function publishCheckForTests(): Promise<unknown> {
  * Until Remote access publishes such a route it closes every connection without answering.
  */
 export async function startRemoteAccessPort(port: number) {
-  const gateway = await startPhoneGateway(appPort(), { host: "0.0.0.0", port }, () => householdRoutePublished(), () => void noteRouteReached().catch(() => undefined));
+  // Each answer is credited to the route its request was let in on, not whatever is published by then.
+  const gateway = await startPhoneGateway(appPort(), { host: "0.0.0.0", port }, () => openRoute(Date.now()), (id) => void noteRouteReached(id).catch(() => undefined));
   console.log(`Remote access port ${gateway.port} answers while a route the household runs is published.`);
   return gateway;
 }
