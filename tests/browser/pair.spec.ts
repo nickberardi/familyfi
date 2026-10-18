@@ -523,6 +523,25 @@ test("sets up remote access on a domain through the Cloudflare sign-in link", { 
   }
 });
 
+test("shows a Quick tunnel's address as a field nobody can edit", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/pair");
+  const card = page.getByTestId("remote-access");
+  await expect(card.getByRole("button", { name: "Off" })).toBeEnabled();
+  test.skip(await card.getByRole("button", { name: "Quick tunnel" }).isDisabled(), "needs cloudflared (or CLOUDFLARED_BIN pointing at tests/fixtures/cloudflared) on the server");
+  try {
+    await card.getByRole("button", { name: "Quick tunnel" }).click();
+    await expect(card.getByTestId("remote-url")).toHaveText(/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/, { timeout: 15_000 });
+    // Cloudflare picks the address, so there is nothing to type into.
+    await expect(card.getByTestId("published-route").getByRole("textbox")).toHaveCount(0);
+    await expect(card.getByTestId("published-route")).toContainText("Quick tunnel");
+    await shot(page, "remote-quick-running");
+  } finally {
+    await signIn(page);
+    await page.request.put("/api/v1/connection/tunnel", { headers: await csrf(page), data: { mode: "off" } });
+  }
+});
+
 test("lays out remote access on a phone", { tag: "@phone" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/pair");

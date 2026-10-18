@@ -439,10 +439,22 @@ export function RemoteAccessCard({
 
         {tunnel?.url && published ? (
           <div data-testid="published-route">
-            Phones reach home at <span data-testid="remote-url" className="font-mono break-all">{tunnel.url}</span>
-            <span className="text-[var(--ff-muted)]">
-              {" "}
-              · {published.kind === "own" ? transportLabel(published.transport) : published.kind === "quick" ? "Quick tunnel" : "Cloudflare Tunnel"}
+            {published.kind === "quick" ? (
+              // Cloudflare picks this address, so it reads as a field nobody can edit, and wraps rather than cutting off on a phone.
+              <div className="font-semibold text-[var(--ff-muted)]">
+                Phones reach home at
+                <div data-testid="remote-url" className={`${FIELD} bg-[var(--ff-note-fill)] font-mono break-all select-all`}>
+                  {tunnel.url}
+                </div>
+              </div>
+            ) : (
+              <>
+                Phones reach home at <span data-testid="remote-url" className="font-mono break-all">{tunnel.url}</span>{" "}
+              </>
+            )}
+            <span className={published.kind === "quick" ? "mt-1 block text-[var(--ff-muted)]" : "text-[var(--ff-muted)]"}>
+              {published.kind === "quick" ? "" : "· "}
+              {published.kind === "own" ? transportLabel(published.transport) : published.kind === "quick" ? "Quick tunnel" : "Cloudflare Tunnel"}
               {pairedThrough(published.id) ? ` · ${pairedThrough(published.id)} phone${pairedThrough(published.id) === 1 ? "" : "s"} paired here` : ""}
             </span>
           </div>
