@@ -37,6 +37,8 @@ fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Check both downloads before touching a tracked file, then edit copies and move them into
+# place only once every line has changed, so a failure leaves the worktree as it was.
 for arch in amd64 arm64; do
   curl -fsSL --retry 3 -o "$tmp/$arch" "https://github.com/$repo/releases/download/$version/cloudflared-linux-$arch"
   sum="$(sha256sum "$tmp/$arch" | cut -d' ' -f1)"
@@ -44,11 +46,17 @@ for arch in amd64 arm64; do
     echo "cloudflared-linux-$arch $version hashes to $sum, which its release notes do not list" >&2
     exit 1
   fi
-  sed -i.bak -E "s/^(    $arch\) sum=)[0-9a-f]{64}( ;;)/\1$sum\2/" "$dockerfile"
-  grep -q "$arch) sum=$sum ;;" "$dockerfile" || { echo "no $arch hash line to change in $dockerfile" >&2; exit 1; }
+  echo "$sum" > "$tmp/$arch.sum"
 done
-sed -i.bak -E "s/^ARG CLOUDFLARED_VERSION=.*/ARG CLOUDFLARED_VERSION=$version/" "$dockerfile"
-sed -i.bak -E "s#cloudflare/cloudflared:[0-9.]+#cloudflare/cloudflared:$version#" "$setup"
-rm -f "$dockerfile.bak" "$setup.bak"
-grep -q "^ARG CLOUDFLARED_VERSION=$version\$" "$dockerfile" || { echo "no CLOUDFLARED_VERSION to change in $dockerfile" >&2; exit 1; }
+
+sed -E "s/^ARG CLOUDFLARED_VERSION=.*/ARG CLOUDFLARED_VERSION=$version/" "$dockerfile" > "$tmp/Dockerfile"
+grep -q "^ARG CLOUDFLARED_VERSION=$version\$" "$tmp/Dockerfile" || { echo "no CLOUDFLARED_VERSION to change in $dockerfile" >&2; exit 1; }
+for arch in amd64 arm64; do
+  sum="$(cat "$tmp/$arch.sum")"
+  sed -i -E "s/^(    $arch\) sum=)[0-9a-f]{64}( ;;)/\1$sum\2/" "$tmp/Dockerfile"
+  grep -q "$arch) sum=$sum ;;" "$tmp/Dockerfile" || { echo "no $arch hash line to change in $dockerfile" >&2; exit 1; }
+done
+sed -E "s#cloudflare/cloudflared:[0-9.]+#cloudflare/cloudflared:$version#" "$setup" > "$tmp/setup.md"
+cat "$tmp/Dockerfile" > "$dockerfile"
+cat "$tmp/setup.md" > "$setup"
 echo "$version"

@@ -22,6 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # A run started by hand from another branch still bumps main.
+          ref: main
           # A PR opened with GITHUB_TOKEN starts no workflows, so its checks would never run.
           # RELEASE_PR_TOKEN (contents and pull requests: write) lets them; without it, the PR
           # needs a push or a close and reopen by a person before CI runs.
