@@ -6,6 +6,8 @@ import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readJson, withAdmin } from "@/server/guard";
 import { demoLocked } from "@/server/demo";
+import { forgetRouteReached } from "@/server/tunnel/remote-access";
+import { NO_EVIDENCE } from "@/server/tunnel/route-check";
 
 const Body = z.object({ url: z.string().min(1).optional(), transport: z.nativeEnum(ConnectionTransport).optional(), trustMode: z.enum(["system", "pinned"]).optional(), spkiSha256: z.string().nullable().optional(), priority: z.number().int().min(0).max(999).optional(), enabled: z.boolean().optional(),
   edgeAuth: z.nativeEnum(EdgeAuth).optional(), serviceToken: z.object({ clientId: z.string(), clientSecret: z.string() }).strict().optional(),
@@ -47,8 +49,10 @@ export async function PUT(request: Request, context: Ctx) {
       const endpoint = await prisma().$transaction(async (db) => {
         // With Access off, nobody holds a token for this route any more.
         if (edge.cleared) await db.deviceEdgeToken.deleteMany({ where: { endpointId: id } });
-        return db.connectionEndpoint.update({ where: { id }, data: { ...changes, ...edge.data, url, transport, trustMode, spkiSha256 } });
+        // Whatever showed the old route worked says nothing about the changed one.
+        return db.connectionEndpoint.update({ where: { id }, data: { ...changes, ...edge.data, url, transport, trustMode, spkiSha256, ...NO_EVIDENCE } });
       });
+      forgetRouteReached();
       return Response.json({ endpoint: publicEndpoint(endpoint) });
     } catch (error) {
       if (isUniqueViolation(error)) return jsonError(409, "endpoint_exists", "A route with this address already exists.");

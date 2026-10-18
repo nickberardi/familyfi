@@ -7,6 +7,8 @@ export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 export const LOGIN_MAX_FAILURES = 5;
 /** Stamped by the phone-only gateway on every request it forwards from a tunnel. */
 export const TUNNEL_HEADER = "x-familyfi-via";
+/** Marks FamilyFi's own check of a route, which is not a phone coming in through it. */
+export const ROUTE_CHECK_HEADER = "x-familyfi-route-check";
 /** A paired device's bearer; it renews with its refresh token. Browser cookies use `SESSION_TTL_MS`. */
 export const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
 /** A refresh token lives this long from its last use. */

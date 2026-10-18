@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.29.2
+  version: 0.30.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2346,6 +2346,28 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { description: "`endpoint_in_use` — a pending pairing uses this route; `managed_route` — the route follows FamilyFi's own tunnel", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /api/v1/connection/endpoints/{id}/check:
+    post:
+      operationId: checkConnectionEndpoint
+      tags: [Connection]
+      summary: Check from home whether a route the household runs reaches this FamilyFi
+      description: |
+        FamilyFi requests `{url}/api/v1/connection/identity` the way a phone would: with the route's
+        trust (the system's certificate check, or its pinned key) and its Cloudflare Access token when
+        one guards it. The route counts as reached only when the answer carries this household's
+        `instanceId`; a redirect, a sign-in page or another FamilyFi is `failed`, with the reason in
+        `message`. The result is stored and also appears in `GET /connection/tunnel` while the route is
+        published. A check from inside the home can fail when the route works from outside (a router
+        that does not loop back, a tailnet address the server can't reach), so clients weigh it against
+        `reachedAt`. A `quick` or `domain` route is refused with `managed_route`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200": { description: What the check found, content: { application/json: { schema: { type: object, additionalProperties: false, required: [reachability], properties: { reachability: { $ref: "#/components/schemas/RouteReachability" } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { description: "`managed_route` — the route follows FamilyFi's own tunnel", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /api/v1/connection/tunnel:
     get:
       operationId: getRemoteAccess
@@ -3182,7 +3204,7 @@ components:
     RemoteAccess:
       type: object
       additionalProperties: false
-      required: [mode, status, url, error, endpointId, cloudflared, hostname, loginUrl]
+      required: [mode, status, url, error, endpointId, cloudflared, hostname, loginUrl, reachability]
       properties:
         mode: { type: string, enum: ["off", quick, named], description: "`named` is my domain: FamilyFi's tunnel on it, or an `own` route." }
         status: { type: string, enum: ["off", signing-in, starting, running, error, unavailable] }
@@ -3192,6 +3214,22 @@ components:
         cloudflared: { type: [string, "null"], description: "cloudflared version on this server, or null when it is not installed." }
         hostname: { type: [string, "null"], description: "The hostname of the `domain` route, when one is set up — even while another route is published." }
         loginUrl: { type: [string, "null"], format: uri, description: "While status is signing-in, the Cloudflare link a person opens to authorize FamilyFi." }
+        reachability:
+          description: |
+            For a published `own` route, whose `status` is always `running`: the evidence that it works.
+            Null while FamilyFi's own tunnel is published, or nothing is, and in the demo, whose route is the
+            website itself.
+          oneOf: [{ $ref: "#/components/schemas/RouteReachability" }, { type: "null" }]
+    RouteReachability:
+      type: object
+      additionalProperties: false
+      required: [reachedAt, checkedAt, result, message]
+      description: Evidence a route the household runs works, since it was last published or changed. All null means nothing is known yet.
+      properties:
+        reachedAt: { type: [string, "null"], format: date-time, description: "The last time the app answered a request that came in through the route (recorded at most once a minute)." }
+        checkedAt: { type: [string, "null"], format: date-time, description: "When FamilyFi last checked the route itself, from home." }
+        result: { type: [string, "null"], enum: [reached, failed, null], description: "What that check found." }
+        message: { type: [string, "null"], description: "Why the last check failed." }
     ConnectionCertificatePin:
       type: object
       additionalProperties: false

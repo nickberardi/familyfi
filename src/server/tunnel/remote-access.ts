@@ -8,6 +8,7 @@ import { ConnectionTransport, ConnectionTrustMode, RouteKind, type ConnectionEnd
 import { ensureConnectionIdentity, isUniqueViolation } from "../connection";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { prisma } from "../db";
+import { demoModeEnabled } from "../env";
 import {
   findCloudflared,
   loginUrl,
@@ -25,6 +26,7 @@ import {
 } from "./cloudflared";
 import { deleteTunnelDnsRecords } from "./cloudflare-dns";
 import { startPhoneGateway } from "./phone-gateway";
+import { NO_EVIDENCE, checkRoute, reachabilityOf, type RouteReachability } from "./route-check";
 
 export type RemoteAccessStatus = "off" | "signing-in" | "starting" | "running" | "error" | "unavailable";
 
@@ -43,6 +45,8 @@ export type RemoteAccessState = {
   cloudflared: string | null;
   hostname: string | null;
   loginUrl: string | null;
+  /** For a route the household runs, the evidence that it works; null for FamilyFi's own tunnel or Off. */
+  reachability: RouteReachability | null;
 };
 
 type Runtime = {
@@ -64,9 +68,16 @@ type Runtime = {
   exitHook: boolean;
   /** Counts switches, so a state read can tell that one happened while it read the database. */
   switches: number;
+  /** The remote-access port's view of the published route, read at most every five seconds. */
+  routeCheck?: { at: number; route: Promise<string | null> };
+  /** When a request through the published route was last recorded. */
+  reachedWrite?: { at: number; id: string };
 };
 
-/** One tunnel per process, surviving dev reloads of this module. */
+/**
+ * One tunnel per process, surviving dev reloads of this module, and shared by the route handlers and
+ * the remote-access port, which Next.js bundles as separate copies of this module.
+ */
 const runtime: Runtime = ((globalThis as { familyfiRemoteAccess?: Runtime }).familyfiRemoteAccess ??= {
   status: "off",
   url: null,
@@ -580,8 +591,8 @@ export async function remoteAccessState(): Promise<RemoteAccessState> {
   const tunnelWanted = Boolean(route ? !own : runtime.wanted || runtime.setup);
   return {
     mode: modeOf(route),
-    // A route the household runs is up as far as FamilyFi can tell. Otherwise report what the tunnel is
-    // actually doing — including a setup that failed after nothing was published — rather than "off".
+    // A route the household runs is published; whether it works is `reachability`. Otherwise report what
+    // the tunnel is actually doing — including a setup that failed after nothing was published — rather than "off".
     status: own ? "running" : !tunnelWanted && status !== "error" ? "off" : status,
     url: own ? route.url : url,
     error: own ? null : error,
@@ -589,6 +600,8 @@ export async function remoteAccessState(): Promise<RemoteAccessState> {
     cloudflared: findCloudflared()?.version ?? null,
     hostname: domain ? new URL(domain.url).hostname : null,
     loginUrl,
+    // The demo's route is the website every visitor is using, and nothing there can record or check it.
+    reachability: own && !demoModeEnabled() ? reachabilityOf(route) : null,
   };
 }
 
@@ -661,10 +674,16 @@ export async function setRemoteAccess(change: RemoteAccessChange) {
     return;
   }
 
-  // A route the household runs: publish it and run no tunnel.
+  // A route the household runs: publish it and run no tunnel, then look at it from home. Evidence from
+  // before it was published again says nothing about it now.
   if (target?.own) {
     await stopTunnel();
-    await prisma().$transaction((db) => publish(db, target.own.id, true));
+    await prisma().$transaction(async (db) => {
+      await publish(db, target.own.id, true);
+      await db.connectionEndpoint.update({ where: { id: target.own.id }, data: NO_EVIDENCE });
+    });
+    forgetRouteReached();
+    publishCheck = checkRoute(target.own.id).catch(() => null);
     return;
   }
 
@@ -716,22 +735,58 @@ export async function setRemoteAccess(change: RemoteAccessChange) {
 }
 
 const ROUTE_CHECK_MS = 5_000;
-let routeCheck: { at: number; open: Promise<boolean> } | undefined;
+
+/** The check started when a route the household runs was last published, for tests to wait on. */
+let publishCheck: Promise<unknown> = Promise.resolve();
+
+/** The published route the household runs, enabled, read at most every five seconds. */
+function openRoute(now: number): Promise<string | null> {
+  const cached = runtime.routeCheck;
+  if (cached && now - cached.at < ROUTE_CHECK_MS) return cached.route;
+  const route = publishedRoute().then((published) => (published?.kind === RouteKind.own && published.enabled ? published.id : null));
+  runtime.routeCheck = { at: now, route };
+  return route;
+}
 
 /**
  * Whether the remote-access port should answer: only while Remote access publishes a route the
  * household runs (a port forward, reverse proxy, Tailscale or its own tunnel). FamilyFi's own quick
  * and domain tunnels reach the gateway on loopback instead. Read at most every five seconds.
  */
-export function householdRoutePublished(now = Date.now()): Promise<boolean> {
-  if (routeCheck && now - routeCheck.at < ROUTE_CHECK_MS) return routeCheck.open;
-  const open = publishedRoute().then((route) => route?.kind === RouteKind.own && route.enabled);
-  routeCheck = { at: now, open };
-  return open;
+export async function householdRoutePublished(now = Date.now()): Promise<boolean> {
+  return (await openRoute(now)) !== null;
+}
+
+const REACHED_WRITE_MS = 60_000;
+
+/**
+ * A request came in through the remote-access port and the app answered it: the published route
+ * works. Recorded at most once a minute, so a busy phone does not write on every call.
+ */
+export async function noteRouteReached(now = Date.now()): Promise<void> {
+  const id = await openRoute(now);
+  const last = runtime.reachedWrite;
+  if (!id || (last?.id === id && now - last.at < REACHED_WRITE_MS)) return;
+  await prisma().connectionEndpoint.updateMany({ where: { id }, data: { reachedAt: new Date(now) } });
+  runtime.reachedWrite = { at: now, id };
+}
+
+/**
+ * The published route or its evidence changed: the port answers for the new route at once (so
+ * FamilyFi's check on publish is not turned away by what was published a moment ago), and the next
+ * request through it is recorded straight away.
+ */
+export function forgetRouteReached() {
+  runtime.routeCheck = undefined;
+  runtime.reachedWrite = undefined;
 }
 
 export function resetRouteCheckForTests() {
-  routeCheck = undefined;
+  forgetRouteReached();
+}
+
+export function publishCheckForTests(): Promise<unknown> {
+  return publishCheck;
 }
 
 /**
@@ -740,7 +795,7 @@ export function resetRouteCheckForTests() {
  * Until Remote access publishes such a route it closes every connection without answering.
  */
 export async function startRemoteAccessPort(port: number) {
-  const gateway = await startPhoneGateway(appPort(), { host: "0.0.0.0", port }, () => householdRoutePublished());
+  const gateway = await startPhoneGateway(appPort(), { host: "0.0.0.0", port }, () => householdRoutePublished(), () => void noteRouteReached().catch(() => undefined));
   console.log(`Remote access port ${gateway.port} answers while a route the household runs is published.`);
   return gateway;
 }

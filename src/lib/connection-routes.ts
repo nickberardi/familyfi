@@ -3,6 +3,7 @@
  * named, which Remote access choice the published route stands for, and what a pairing
  * code looks like.
  */
+import { relativeSweep } from "./sync-copy";
 import type { ConnectionRoute, ConnectionTransport, PairedPhone, RemoteAccess } from "./types";
 
 export const TRANSPORTS: readonly { value: ConnectionTransport; label: string }[] = [
@@ -223,3 +224,33 @@ export const REMOTE_STATUS: Record<RemoteAccess["status"], { label: string; ink:
   error: { label: "Not connected", ink: "var(--ff-danger)" },
   unavailable: { label: "Unavailable", ink: "var(--ff-danger)" },
 };
+
+/**
+ * How Pair Device names a published route the household runs, from the evidence it has: never
+ * "On" on its say-so alone. A request through the route is the best evidence there is, and
+ * FamilyFi's own check from home is next. A failed check is only "Not reached" while nothing has
+ * come in since; a check from inside the home can fail while the route works from outside.
+ */
+export function ownRouteStatus(reachability: RemoteAccess["reachability"], now = new Date()): { label: string; ink: string; detail: string | null } {
+  const { reachedAt = null, checkedAt = null, result = null, message = null } = reachability ?? {};
+  const failed = result === "failed" && checkedAt !== null;
+  const reached = [reachedAt, result === "reached" ? checkedAt : null].filter((at): at is string => at !== null).sort().at(-1) ?? null;
+  const ago = (at: string) => {
+    const age = relativeSweep(at, now);
+    return age === "now" ? "just now" : `${age} ago`;
+  };
+  if (failed && (!reachedAt || reachedAt < checkedAt)) {
+    const why = message ? ` ${message}` : "";
+    return reachedAt
+      ? { label: `Reached ${ago(reachedAt)}`, ink: "var(--ff-on-ink)", detail: `Couldn't check from FamilyFi.${why}` }
+      : { label: "Not reached", ink: "var(--ff-danger)", detail: `No phone has come in through this address, and FamilyFi couldn't reach it.${why}` };
+  }
+  if (reached) return { label: `Reached ${ago(reached)}`, ink: "var(--ff-on-ink)", detail: null };
+  return { label: "Published", ink: "var(--ff-muted)", detail: "Nothing has come in through this address yet." };
+}
+
+/** What Pair Device says remote access is doing: the tunnel's status, or the evidence for a route the household runs. */
+export function remoteStatus(tunnel: Pick<RemoteAccess, "status" | "reachability"> | null, now = new Date()): { label: string; ink: string; detail: string | null } {
+  if (tunnel?.reachability) return ownRouteStatus(tunnel.reachability, now);
+  return { ...REMOTE_STATUS[tunnel?.status ?? "off"], detail: null };
+}

@@ -7,18 +7,18 @@ import {
   CLOUDFLARE_AUTOMATIC_GUIDE,
   MY_DOMAIN_GUIDE,
   OWN_TRANSPORT,
-  REMOTE_STATUS,
   TAILSCALE_GUIDE,
   accessRollout,
   remoteChoice,
   removeRouteConfirm,
+  remoteStatus,
   savedRoute,
   savedRoutes,
   shortPin,
   transportLabel,
   type RemoteChoice,
 } from "@/lib/connection-routes";
-import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
+import type { ConnectionRoute, PairedPhone, RemoteAccess, RouteReachability } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
 import { CloudflareAdvanced } from "./CloudflareAdvanced";
@@ -76,6 +76,7 @@ export function RemoteAccessCard({
   const [error, setError] = useState("");
   const [seen, setSeen] = useState<string | null>(null);
   const [forgotten, setForgotten] = useState("");
+  const [checking, setChecking] = useState(false);
 
   const published = routes?.find((route) => route.id === tunnel?.endpointId) ?? null;
   const publishedChoice = tunnel && routes ? remoteChoice(tunnel, routes) : "off";
@@ -139,7 +140,7 @@ export function RemoteAccessCard({
   }
 
   const noBinary = tunnel !== null && !tunnel.cloudflared;
-  const status = REMOTE_STATUS[tunnel?.status ?? "off"];
+  const status = remoteStatus(tunnel);
   const settingUp = tunnel?.status === "signing-in";
   const domainReady = Boolean(tunnel?.hostname) && hostname.trim().toLowerCase() === tunnel?.hostname;
   const isPublished = choice === publishedChoice && publishedChoice !== "off";
@@ -176,6 +177,34 @@ export function RemoteAccessCard({
   }
 
   /** A saved route, with a way to publish it again, to edit it and to remove it. */
+  /** Asks FamilyFi to reach the published route now, as a phone would, and shows what it found. */
+  async function checkPublished(route: ConnectionRoute) {
+    setChecking(true);
+    setError("");
+    try {
+      const { reachability } = await api<{ reachability: RouteReachability }>(`/api/v1/connection/endpoints/${route.id}/check`, { method: "POST" });
+      if (tunnel) onTunnel({ ...tunnel, reachability });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Could not check this route.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  /** The published route's Check, which reaches it as a phone would (its pin included); otherwise a pinned route's own pin check. */
+  function routeCheck(route: ConnectionRoute) {
+    // Only a route with evidence to show has one to check: never the demo's.
+    if (route.id === published?.id && tunnel?.reachability) {
+      return (
+        <button type="button" data-testid="route-check" className="font-semibold text-[var(--ff-accent)] disabled:opacity-40" disabled={busy || checking} onClick={() => void checkPublished(route)}>
+          {checking ? "Checking…" : "Check"}
+        </button>
+      );
+    }
+    return route.trustMode === "pinned" && route.spkiSha256 ? <PinCheck route={route} /> : null;
+  }
+
+  /** A saved route, with a way to publish it again and to edit it. */
   function savedCard(route: ConnectionRoute, detail: ReactNode, more?: ReactNode) {
     return (
       <div key={route.id} data-testid="saved-route" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[9px] border border-[var(--ff-hairline)] px-3 py-2.5">
@@ -305,7 +334,7 @@ export function RemoteAccessCard({
                       ) : (
                         "Ordinary certificate checks"
                       ),
-                      route.trustMode === "pinned" && route.spkiSha256 ? <PinCheck route={route} /> : null,
+                      routeCheck(route),
                     )
                   ),
                 )
@@ -347,11 +376,14 @@ export function RemoteAccessCard({
                     savedCard(
                       route,
                       protectedRoute ? <AccessLine route={route} phones={phones} /> : "No Cloudflare Access: the tunnel alone guards this address",
-                      protectedRoute ? (
-                        <button type="button" className="font-semibold text-[var(--ff-danger)]" disabled={busy} onClick={() => void turnOffAccess(route)}>
-                          Turn off Access
-                        </button>
-                      ) : null,
+                      <>
+                        {routeCheck(route)}
+                        {protectedRoute ? (
+                          <button type="button" className="font-semibold text-[var(--ff-danger)]" disabled={busy} onClick={() => void turnOffAccess(route)}>
+                            Turn off Access
+                          </button>
+                        ) : null}
+                      </>,
                     )
                   );
                 })
@@ -445,6 +477,11 @@ export function RemoteAccessCard({
               · {published.kind === "own" ? transportLabel(published.transport) : published.kind === "quick" ? "Quick tunnel" : "Cloudflare Tunnel"}
               {pairedThrough(published.id) ? ` · ${pairedThrough(published.id)} phone${pairedThrough(published.id) === 1 ? "" : "s"} paired here` : ""}
             </span>
+            {status.detail ? (
+              <div data-testid="remote-detail" className="mt-0.5 text-[var(--ff-muted)]">
+                {status.detail}
+              </div>
+            ) : null}
           </div>
         ) : null}
         {tunnel?.error ? <div className="font-semibold text-[var(--ff-danger)]">{tunnel.error}</div> : null}

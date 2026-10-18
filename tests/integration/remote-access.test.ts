@@ -8,14 +8,16 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { encryptSecret } from "@/server/crypto";
 import { prisma } from "@/server/db";
-import { householdRoutePublished, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, setRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
+import { remoteStatus } from "@/lib/connection-routes";
+import type { RemoteAccess } from "@/lib/types";
+import { householdRoutePublished, noteRouteReached, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, setRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const FAKE = path.join(process.cwd(), "tests/fixtures/cloudflared/cloudflared");
 
-type Tunnel = { mode: string; status: string; url: string | null; error: string | null; hostname: string | null; loginUrl: string | null; endpointId: string | null };
+type Tunnel = RemoteAccess;
 type DnsRecord = { id: string; type: string; name: string; content: string };
 
 const FIRST_TUNNEL = "11111111-2222-3333-4444-555555555555";
@@ -350,6 +352,63 @@ describe("remote access", () => {
       expect((await put({ mode: "named", endpointId: home.id })).status).toBe(200);
       resetRouteCheckForTests();
       expect(await get()).toBe(200);
+    } finally {
+      if (savedPort === undefined) delete process.env.PORT;
+      else process.env.PORT = savedPort;
+      await new Promise((resolve) => gateway.server.close(resolve));
+      await new Promise((resolve) => app.close(resolve));
+    }
+  });
+
+  it("never says a route the household runs is On without evidence, and records a phone coming in through it", async () => {
+    const app = createServer((_req, res) => res.end("ok"));
+    await new Promise<void>((resolve) => app.listen(0, "127.0.0.1", resolve));
+    const savedPort = process.env.PORT;
+    process.env.PORT = String((app.address() as AddressInfo).port);
+    const gateway = await startRemoteAccessPort(0);
+    const get = (headers: Record<string, string> = {}) =>
+      new Promise<void>((resolve) => {
+        // While the port is shut it closes the connection unanswered.
+        httpRequest({ host: "127.0.0.1", port: gateway.port, path: "/api/v1/auth/session", headers }, (res) => res.resume().on("end", resolve)).on("error", () => resolve()).end();
+      });
+    const reachedAt = async () => (await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: home.id } })).reachedAt;
+    const home = await ownRoute("https://203.0.113.10:8443", "lan", false);
+    try {
+      // A request while nothing is published leaves the port shut for a few seconds; publishing
+      // opens it at once, or FamilyFi's own check on publish would be turned away.
+      resetRouteCheckForTests();
+      await get();
+      await put({ mode: "named", endpointId: home.id });
+      const published = await state();
+      // Published is all FamilyFi knows: the shared label must not read "On".
+      expect(published.reachability).toEqual({ reachedAt: null, checkedAt: null, result: null, message: null });
+      expect(remoteStatus(published).label).toBe("Published");
+
+      // FamilyFi's own check from home comes in through the port too, and proves nothing about outside.
+      await get({ "x-familyfi-route-check": "1" });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(await reachedAt()).toBeNull();
+      await get();
+      await expect.poll(reachedAt).not.toBeNull();
+      const first = await reachedAt();
+      expect(remoteStatus(await state()).label).toBe("Reached just now");
+      // At most one write a minute, however busy the phone.
+      await get();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(await reachedAt()).toEqual(first);
+      await noteRouteReached(Date.now() + 61_000);
+      expect((await reachedAt())!.getTime()).toBeGreaterThan(first!.getTime());
+
+      // Publishing it again starts over: what was true before may not be now.
+      await put({ mode: "off" });
+      await put({ mode: "named", endpointId: home.id });
+      expect((await state()).reachability).toMatchObject({ reachedAt: null });
+      // The once-a-minute limit starts over with it, so the next phone is recorded straight away.
+      await get();
+      await expect.poll(reachedAt).not.toBeNull();
+      // FamilyFi's own tunnel reports its own status instead.
+      await put({ mode: "quick" });
+      expect((await waitFor((t) => t.status === "running", "the quick tunnel")).reachability).toBeNull();
     } finally {
       if (savedPort === undefined) delete process.env.PORT;
       else process.env.PORT = savedPort;

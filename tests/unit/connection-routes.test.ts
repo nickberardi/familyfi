@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessRollout, addressConflict, canPin, countdown, homeAddress, homeOrigin, isPrivateOrigin, remoteChoice, removeRouteConfirm, routeForAddress, routeTrust, savedRoute, savedRoutes, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
+import { accessRollout, addressConflict, canPin, countdown, homeAddress, homeOrigin, isPrivateOrigin, ownRouteStatus, remoteChoice, remoteStatus, removeRouteConfirm, routeForAddress, routeTrust, savedRoute, savedRoutes, shortPin, sortRoutes, transportLabel } from "@/lib/connection-routes";
 import type { ConnectionRoute, ConnectionTransport, RouteKind } from "@/lib/types";
 
 function route(id: string, priority = 0, kind: RouteKind = "own", transport: ConnectionTransport = "lan"): ConnectionRoute {
@@ -171,5 +171,44 @@ describe("homeAddress", () => {
     expect(homeAddress({ url: "http://familyfi.local:7001", current: { url: "http://192.168.1.10:7001", private: true } })).toBe("http://familyfi.local:7001");
     expect(homeAddress({ url: null, current: { url: "http://192.168.1.10:7001", private: true } })).toBe("http://192.168.1.10:7001");
     expect(homeAddress({ url: null, current: { url: "https://familyfi.example.com", private: false } })).toBeNull();
+  });
+
+  describe("a route the household runs", () => {
+    const now = new Date("2026-10-18T12:00:00Z");
+    const nothing = { reachedAt: null, checkedAt: null, result: null, message: null } as const;
+
+    it("is never On without evidence", () => {
+      expect(ownRouteStatus(nothing, now)).toEqual({ label: "Published", ink: "var(--ff-muted)", detail: "Nothing has come in through this address yet." });
+      expect(remoteStatus({ status: "running", reachability: nothing }, now).label).toBe("Published");
+    });
+
+    it("says when a phone last came in through it, or FamilyFi's own check reached it", () => {
+      expect(ownRouteStatus({ ...nothing, reachedAt: "2026-10-18T11:55:00Z" }, now)).toEqual({ label: "Reached 5m ago", ink: "var(--ff-on-ink)", detail: null });
+      expect(ownRouteStatus({ ...nothing, checkedAt: "2026-10-18T11:59:40Z", result: "reached" }, now).label).toBe("Reached just now");
+      // The newer of the two.
+      expect(ownRouteStatus({ reachedAt: "2026-10-18T09:00:00Z", checkedAt: "2026-10-18T11:00:00Z", result: "reached", message: null }, now).label).toBe("Reached 1h ago");
+    });
+
+    it("is Not reached only when a check failed and nothing has come in through it", () => {
+      const failed = { ...nothing, checkedAt: "2026-10-18T11:59:00Z", result: "failed", message: "No answer from familyfi.example.com within 5 seconds." } as const;
+      expect(ownRouteStatus(failed, now)).toEqual({
+        label: "Not reached",
+        ink: "var(--ff-danger)",
+        detail: "No phone has come in through this address, and FamilyFi couldn't reach it. No answer from familyfi.example.com within 5 seconds.",
+      });
+      // A check from inside the home can fail while phones come in from outside.
+      expect(ownRouteStatus({ ...failed, reachedAt: "2026-10-18T10:00:00Z" }, now)).toEqual({
+        label: "Reached 2h ago",
+        ink: "var(--ff-on-ink)",
+        detail: "Couldn't check from FamilyFi. No answer from familyfi.example.com within 5 seconds.",
+      });
+      // A phone that came in after the failed check settles it.
+      expect(ownRouteStatus({ ...failed, reachedAt: "2026-10-18T11:59:30Z" }, now)).toEqual({ label: "Reached just now", ink: "var(--ff-on-ink)", detail: null });
+    });
+
+    it("leaves FamilyFi's own tunnel to its status", () => {
+      expect(remoteStatus({ status: "running", reachability: null }, now)).toEqual({ label: "On", ink: "var(--ff-on-ink)", detail: null });
+      expect(remoteStatus(null, now).label).toBe("Off");
+    });
   });
 });
