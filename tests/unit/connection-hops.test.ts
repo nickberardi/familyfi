@@ -22,12 +22,16 @@ describe("connection hops", () => {
     expect(OFFLINE_AFTER_FAILURES).toBeGreaterThan(1);
   });
 
-  it("tells a phone holding only Quick tunnel routes to pair again", () => {
+  it("tells a phone holding only Quick tunnel routes to pair again, and how to get a permanent address", () => {
     const quick = { kind: "quick" } as const;
-    expect(offlineCopy([quick])).toBe(`${HOP_COPY.offlineBody} ${HOP_COPY.offlineQuick}`);
-    expect(offlineCopy([quick, { kind: "own" }])).toBe(HOP_COPY.offlineBody);
-    expect(offlineCopy([{ kind: "domain" }])).toBe(HOP_COPY.offlineBody);
-    expect(offlineCopy([])).toBe(HOP_COPY.offlineBody);
+    const plain = { body: HOP_COPY.offlineBody, guide: null };
+    expect(offlineCopy([quick])).toEqual({
+      body: `${HOP_COPY.offlineBody} ${HOP_COPY.offlineQuick}`,
+      guide: { label: "Set up Cloudflare on your domain", url: "https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Automatic" },
+    });
+    expect(offlineCopy([quick, { kind: "own" }])).toEqual(plain);
+    expect(offlineCopy([{ kind: "domain" }])).toEqual(plain);
+    expect(offlineCopy([])).toEqual(plain);
   });
 
   it("reports this phone's hop as measured", () => {

@@ -1,6 +1,6 @@
 import { changeActionLabel, changeResultColor, changeResultLabel, formatLogWhen, lastSweepAt, relativeSweep } from "./sync-copy";
 import { connectionStatusLabel } from "./settings-copy";
-import { routeTrust, transportLabel } from "./connection-routes";
+import { CLOUDFLARE_AUTOMATIC_GUIDE, routeTrust, transportLabel } from "./connection-routes";
 import type { ConnectionRoute, SyncStatus, UnifiSettings } from "./types";
 
 /**
@@ -35,18 +35,23 @@ export const HOP_COPY = {
   note: "Two independently authenticated hops. Your phone never talks to UniFi.",
   offlineTitle: "Can't reach FamilyFi",
   offlineBody: "FamilyFi isn't answering on any of this phone's routes. The app is paused until it does, and keeps trying by itself.",
-  offlineQuick: "If FamilyFi restarted, its Quick tunnel address changed. Re-pair this phone from Pair Device in FamilyFi on the web, then unpair here and scan the new code.",
+  offlineQuick: "If FamilyFi restarted, its Quick tunnel address changed. Re-pair this phone from Pair Device in FamilyFi on the web, then unpair here and scan the new code. For an address that stays the same, set up Cloudflare on your own domain.",
+  offlineQuickGuide: "Set up Cloudflare on your domain",
   retrying: "Trying again…",
   tryAgain: "Try again now",
 } as const;
 
+export type OfflineCopy = { body: string; guide: { label: string; url: string } | null };
+
 /**
  * What the offline screen says. A phone that holds only Quick tunnel routes can't follow a restart's
- * new address, since it refreshes its routes only over the ones it has, so it is told to pair again.
+ * new address, since it refreshes its routes only over the ones it has, so it is told to pair again
+ * and pointed at a permanent Cloudflare address.
  */
-export function offlineCopy(routes: readonly Pick<ConnectionRoute, "kind">[]): string {
+export function offlineCopy(routes: readonly Pick<ConnectionRoute, "kind">[]): OfflineCopy {
   const quickOnly = routes.length > 0 && routes.every((route) => route.kind === "quick");
-  return quickOnly ? `${HOP_COPY.offlineBody} ${HOP_COPY.offlineQuick}` : HOP_COPY.offlineBody;
+  if (!quickOnly) return { body: HOP_COPY.offlineBody, guide: null };
+  return { body: `${HOP_COPY.offlineBody} ${HOP_COPY.offlineQuick}`, guide: { label: HOP_COPY.offlineQuickGuide, url: CLOUDFLARE_AUTOMATIC_GUIDE } };
 }
 
 export type Hop = {

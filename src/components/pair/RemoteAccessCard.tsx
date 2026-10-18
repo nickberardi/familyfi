@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 import {
+  CLOUDFLARE_AUTOMATIC_GUIDE,
   MY_DOMAIN_GUIDE,
   OWN_TRANSPORT,
   REMOTE_STATUS,
@@ -213,6 +214,8 @@ export function RemoteAccessCard({
           <p className="text-[var(--ff-muted)]">
             A free Cloudflare quick tunnel: no account needed. Its address changes whenever FamilyFi restarts, and phones paired
             through it must then be paired again. Cloudflare offers quick tunnels for trying things out, without an uptime promise.
+            For an address that stays the same, use Cloudflare on your own domain.{" "}
+            <Guide href={CLOUDFLARE_AUTOMATIC_GUIDE}>Set up Cloudflare on your domain</Guide>
           </p>
         ) : null}
 

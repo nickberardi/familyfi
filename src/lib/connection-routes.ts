@@ -72,6 +72,8 @@ const WIKI = "https://github.com/nickberardi/familyfi/wiki";
 export const MY_DOMAIN_GUIDE = `${WIKI}/Remote-access-home-network`;
 /** Running Tailscale Serve as a sidecar container. */
 export const TAILSCALE_GUIDE = `${WIKI}/Remote-access-Tailscale`;
+/** FamilyFi's own Cloudflare Tunnel on your domain: the permanent address a Quick tunnel lacks. */
+export const CLOUDFLARE_AUTOMATIC_GUIDE = `${WIKI}/Remote-access-Cloudflare-Automatic`;
 /** Running your own Cloudflare Tunnel, optionally behind Cloudflare Access. */
 export const CLOUDFLARE_GUIDE = `${WIKI}/Remote-access-Cloudflare-Tunnel`;
 
