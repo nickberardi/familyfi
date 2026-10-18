@@ -228,6 +228,8 @@ function stopAll() {
   runtime.child = null;
   runtime.url = null;
   runtime.loginUrl = null;
+  // Before any route is unpublished, so a state read never pairs "running" with no route.
+  runtime.status = "starting";
 }
 
 function onAdoptFailure(error: unknown) {
@@ -412,11 +414,14 @@ function modeOf(route: ConnectionEndpoint | null): RemoteAccessMode {
 }
 
 export async function remoteAccessState(): Promise<RemoteAccessState> {
-  // Read the tunnel before the database: goLive saves the route before it reports running, so a route
-  // read afterwards is never older than the status, and "running" always comes with its route.
-  const { status, url, error, loginUrl } = runtime;
+  // The tunnel's status is read on both sides of the database reads, and "running" only when both say so.
+  // goLive saves its route before it reports running, and every switch leaves running before it unpublishes
+  // one, so "running" always comes with the route it published.
+  const before = runtime.status;
   const route = await publishedRoute();
   const domain = await routeOfKind(RouteKind.domain);
+  const status = runtime.status === "running" && before !== "running" ? before : runtime.status;
+  const { url, error, loginUrl } = runtime;
   const own = route?.kind === RouteKind.own;
   const tunnelWanted = Boolean(route ? !own : runtime.wanted || runtime.setup);
   return {

@@ -361,8 +361,7 @@ describe("remote access", () => {
     const pending = remoteAccessState();
     // The tunnel saves its route and goes live while the state is still reading the database.
     runtime.status = "running";
-    const current = await pending;
-    expect(current.status !== "running" || current.endpointId !== null, JSON.stringify(current)).toBe(true);
+    expect(await pending).toMatchObject({ status: "starting", endpointId: null });
   });
 
   it("stops its tunnel when another FamilyFi process takes the lease", async () => {
