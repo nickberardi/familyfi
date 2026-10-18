@@ -15,7 +15,7 @@ describe("parseOriginCert", () => {
     const pem = certPem({ zoneID: "zone-1", accountID: "acct", apiToken: "a".repeat(120), endpoint: "FED" });
     expect(parseOriginCert(pem)).toEqual({ zoneID: "zone-1", accountID: "acct", apiToken: "a".repeat(120), endpoint: "fed" });
     // Older certificates carry legacy blocks beside the token.
-    expect(parseOriginCert(`-----BEGIN PRIVATE KEY-----\nMIIfake\n-----END PRIVATE KEY-----\n${certPem({ zoneID: "zone-1", apiToken: "t" })}`)).toEqual({ zoneID: "zone-1", accountID: "", apiToken: "t", endpoint: "" });
+    expect(parseOriginCert(`${certPem("legacy", "PRIVATE KEY")}${certPem({ zoneID: "zone-1", apiToken: "t" })}`)).toEqual({ zoneID: "zone-1", accountID: "", apiToken: "t", endpoint: "" });
   });
 
   it("refuses a certificate without a readable token, never echoing its contents", () => {
