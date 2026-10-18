@@ -94,6 +94,20 @@ describe("POST /paired/invites", () => {
     expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.device.id } })).parentDeviceId).toBe(replacement.device.id);
   });
 
+  it("revokes the replaced phone's Watch when the new phone acts as another account", async () => {
+    const auth = await admin();
+    const parent = await adult("parent");
+    const old = await pairPhone(auth);
+    const route = await homeRoute();
+    const watch = (await (await claimWatchRequest(bearer(old.token))).json()) as Claim;
+    const issued = await issuedInvite(await invitePhoneRequest(auth, { endpointId: route.id, replacesDeviceId: old.device.id, accountId: parent.id }));
+    const replacement = (await (await claimInvite(issued)).json()) as Claim;
+    // A Watch acts as its phone's account, so it is not handed to a phone acting as someone else.
+    const kept = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.device.id } });
+    expect(kept.parentDeviceId).not.toBe(replacement.device.id);
+    expect(kept.revokedAt).not.toBeNull();
+  });
+
   it("lets a phone invite and claim its Watch at once, as the phone's account and its parent", async () => {
     const parent = await adult("parent");
     const phone = await pairPhone(await admin(), { accountId: parent.id });

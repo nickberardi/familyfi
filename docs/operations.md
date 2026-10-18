@@ -63,7 +63,8 @@ when the sheet is open on that phone. The code carries the server address, so no
 the same page; it is signed out at once and must pair again. A revoked phone stays listed until you
 **Remove** it, or use **Remove all revoked**. **Re-pair**, on any phone active or revoked, opens a
 new code with its name filled in. An active phone keeps working until the code is used; then its old
-entry is signed out and disappears, and its Watch moves to the new pairing. To recover a phone that
+entry is signed out and disappears, and its Watch moves to the new pairing (if the new pairing signs
+in as another adult, the Watch is signed out instead and set up again from the phone). To recover a phone that
 can't reach FamilyFi, re-pair it rather than revoking it first. **Paired devices** lists phones, Watches and
 agents together, most recently seen first: what each may do, the account it acts as, how it reaches
 home, and when its sign-in expires. A phone keeps the name you gave it when pairing. A paired phone learns a newly published route
