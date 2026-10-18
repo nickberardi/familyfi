@@ -5,6 +5,7 @@
  */
 import * as groupActionsModule from "./group-actions";
 import * as display from "./display";
+import * as groupSchedule from "./group-schedule";
 import * as pauseSheet from "./pause-sheet";
 import * as ruleActions from "./rule-actions";
 import * as ruleWindows from "./rule-windows";
@@ -46,6 +47,8 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   groupStatusColor: (i) => groupActionsModule.groupStatusColor(i.tone),
   groupHeaderActions: (i) => groupActionsModule.groupHeaderActions(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
   groupRuleActions: (i) => groupActionsModule.groupRuleActions(i.group as Group, i.rules as Rule[], at(i.now)),
+  // A client without the gateway's catalog replays these, so a category or app is named only when FamilyFi knows it.
+  groupScheduleRuleRows: (i) => groupSchedule.groupScheduleRuleRows(i.group as Group, i.rules as Rule[], new Map(), i.timeZone, at(i.now)),
   pauseSheetTitle: (i) => pauseSheet.pauseSheetTitle(i.group, i.mode),
   pauseSheetBody: (i) => pauseSheet.pauseSheetBody(i.group, i.mode, i.deviceNames),
   pauseSheetOptions: (i) => pauseSheet.pauseSheetOptions(i.group, i.windows, i.mode, i.timeZone, at(i.now)),
@@ -72,11 +75,14 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
 };
 
 /** The modules whose every exported function must have a vector, or a reason in `EXCLUDED`. */
-export const MODULES = { display, groupActions: groupActionsModule, pauseSheet, ruleActions, ruleWindows };
+export const MODULES = { display, groupActions: groupActionsModule, groupSchedule, pauseSheet, ruleActions, ruleWindows };
 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {
   internetRulePath: "an API path, not display text",
+  // The Watch lists a group's rules but draws no schedule bar.
+  groupScheduleToday: "the schedule bar and today's list are phone and web only; tests/unit/group-schedule.test.ts",
+  groupScheduleRules: "returns the rules themselves; the groupScheduleRuleRows vectors cover their titles and order",
   // The Watch keeps the quick options, so it ports none of the custom choices; their clock text
   // comes from formatClock and relativeDayLabel, which have vectors.
   pauseSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",

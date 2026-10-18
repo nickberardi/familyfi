@@ -6,8 +6,8 @@ import { CURATED_CATEGORY_SLOTS, groupLift, groupScopedRules, parentFacingRuleLa
 import type { Group } from "./types";
 
 /*
- * A group's schedule, as its card and its details page show it: every rule that applies to it on
- * one 24-hour bar, and a list of what is scheduled. The card lists today's windows in time order;
+ * A group's schedule, as its card and its details page show it: every scheduled rule that applies
+ * to it on one 24-hour bar, and a list of what is scheduled, including the rules that block always. The card lists today's windows in time order;
  * the details page lists each rule once with its Pause or Resume, since a pause lifts a whole rule
  * for the group, never one window of it. Internet rules keep the accent blue; every other rule
  * takes the next of the schedule colours (`tone`), in the order the group's rules were made.
@@ -89,7 +89,8 @@ function liftLabel(group: Pick<Group, "id">, rule: Rule, timezone: string, now: 
 
 /**
  * Today's schedule for the group: its bands on the bar, and its windows today in the order they
- * start. A rule that blocks always is listed, but not drawn on the bar. A rule that is lifted for the group now draws faintly and says how in its rows.
+ * start. A rule that blocks always is listed, but not drawn on the bar. A rule that is lifted for
+ * the group now draws faintly and says how in its rows.
  */
 export function groupScheduleToday(
   group: Pick<Group, "id" | "suspension">,

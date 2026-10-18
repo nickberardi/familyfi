@@ -14037,6 +14037,1467 @@
         "mode": "extend"
       },
       "expected": "The rule stays lifted for longer. Resume brings it back sooner."
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "an internet rule blocking now, with its named windows",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-internet",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "22:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-internet",
+          "tone": null,
+          "title": "Bedtime",
+          "times": "Dinner 4 PM–6 PM, Overnight 10 PM–7 AM",
+          "state": "Now",
+          "live": true,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "a single known category, on weekdays",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "Video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "19:00",
+                "end": "21:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-video",
+          "tone": 0,
+          "title": "Video",
+          "times": "7 PM–9 PM · Mon–Fri",
+          "state": null,
+          "live": false,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "a rule over several known categories blocking now",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-homework",
+            "name": "Homework",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4,
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "Homework",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "15:00",
+                "end": "17:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-homework",
+          "tone": 0,
+          "title": "Homework (Video and Social)",
+          "times": "3 PM–5 PM · Mon–Fri",
+          "state": "Now",
+          "live": true,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "a category rule that blocks always",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-gaming",
+            "name": "No games",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              8
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-gaming",
+          "tone": 0,
+          "title": "Gaming",
+          "times": "all day",
+          "state": "Now",
+          "live": true,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "a category the client has no name for",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-shop",
+            "name": "Shopping",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              99
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w5",
+                "name": "",
+                "days": [
+                  0,
+                  6
+                ],
+                "start": "09:00",
+                "end": "12:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-shop",
+          "tone": 0,
+          "title": "Shopping",
+          "times": "9 AM–12 PM · Weekends",
+          "state": null,
+          "live": false,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "a website rule that blocks always",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-site",
+            "name": "Homework sites",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "example.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-site",
+          "tone": 0,
+          "title": "Homework sites",
+          "times": "all day",
+          "state": "Now",
+          "live": true,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "paused for everyone until a time",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-homework",
+            "name": "Homework",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4,
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": true,
+              "until": "2026-10-15T22:00:00.000Z",
+              "kind": "pause",
+              "by": {
+                "accountId": "a1",
+                "name": "An adult"
+              }
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "Homework",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "15:00",
+                "end": "17:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-homework",
+          "tone": 0,
+          "title": "Homework (Video and Social)",
+          "times": "3 PM–5 PM · Mon–Fri",
+          "state": "Paused for everyone until 6:00 PM",
+          "live": false,
+          "action": null,
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "paused for everyone until resumed",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-homework",
+            "name": "Homework",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4,
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": true,
+              "until": null,
+              "kind": "pause",
+              "by": {
+                "accountId": "a1",
+                "name": "An adult"
+              }
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "Homework",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "15:00",
+                "end": "17:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-homework",
+          "tone": 0,
+          "title": "Homework (Video and Social)",
+          "times": "3 PM–5 PM · Mon–Fri",
+          "state": "Paused for everyone until resumed",
+          "live": false,
+          "action": null,
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "unblocked for the group until a time",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-homework",
+            "name": "Homework",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4,
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T21:00:00.000Z",
+                  "kind": "allow",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "An adult"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "Homework",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "15:00",
+                "end": "17:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-homework",
+          "tone": 0,
+          "title": "Homework (Video and Social)",
+          "times": "3 PM–5 PM · Mon–Fri",
+          "state": "Unblocked until 5:00 PM",
+          "live": false,
+          "action": null,
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "unblocked for the group until resumed",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-internet",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": null,
+                  "kind": "allow",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "An adult"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "22:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-internet",
+          "tone": null,
+          "title": "Bedtime",
+          "times": "Dinner 4 PM–6 PM, Overnight 10 PM–7 AM",
+          "state": "Unblocked until you resume",
+          "live": false,
+          "action": null,
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "paused for the group until a time",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "Video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-16T01:00:00.000Z",
+                  "kind": "pause",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "An adult"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "19:00",
+                "end": "21:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-video",
+          "tone": 0,
+          "title": "Video",
+          "times": "7 PM–9 PM · Mon–Fri",
+          "state": "Paused until 9:00 PM",
+          "live": false,
+          "action": {
+            "label": "Resume",
+            "run": "resume"
+          },
+          "more": {
+            "label": "More time",
+            "run": "extend"
+          }
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "paused for the group until resumed",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-gaming",
+            "name": "No games",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              8
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": null,
+                  "kind": "pause",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "An adult"
+                  }
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-gaming",
+          "tone": 0,
+          "title": "Gaming",
+          "times": "all day",
+          "state": "Paused until you resume",
+          "live": false,
+          "action": {
+            "label": "Resume",
+            "run": "resume"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "several rules in the order they were made, skipping one that is off",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-internet",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "22:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "Video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "19:00",
+                "end": "21:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-homework",
+            "name": "Homework",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4,
+              24
+            ],
+            "domains": [],
+            "enabled": false,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "Homework",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "15:00",
+                "end": "17:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-gaming",
+            "name": "No games",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              8
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-site",
+            "name": "Homework sites",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "example.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-internet",
+          "tone": null,
+          "title": "Bedtime",
+          "times": "Dinner 4 PM–6 PM, Overnight 10 PM–7 AM",
+          "state": "Now",
+          "live": true,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        },
+        {
+          "ruleId": "r-video",
+          "tone": 0,
+          "title": "Video",
+          "times": "7 PM–9 PM · Mon–Fri",
+          "state": null,
+          "live": false,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        },
+        {
+          "ruleId": "r-gaming",
+          "tone": 1,
+          "title": "Gaming",
+          "times": "all day",
+          "state": "Now",
+          "live": true,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        },
+        {
+          "ruleId": "r-site",
+          "tone": 2,
+          "title": "Homework sites",
+          "times": "all day",
+          "state": "Now",
+          "live": true,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "another group's rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Teen",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-internet"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "Video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g2"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "19:00",
+                "end": "21:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": []
     }
   ]
 }

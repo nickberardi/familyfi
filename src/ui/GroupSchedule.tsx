@@ -21,7 +21,7 @@ export const GROUP_SCHEDULE_COPY = {
 } as const;
 
 /**
- * A group's schedule, shared by every client: every rule that applies to the group on one bar,
+ * A group's schedule, shared by every client: every scheduled rule of the group on one bar,
  * then a list. On a card (`variant="card"`) the list is today's windows in time order and the
  * foot links to the group's page (`footer`); on that page (`"details"`) each rule is listed once,
  * its name opens its editor, and Pause or Resume (with More time while a timed pause lasts) acts
