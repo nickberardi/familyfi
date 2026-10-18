@@ -66,6 +66,7 @@ export const PLAY_BETA = {
     { text: "Install FamilyFi from Google Play", url: "https://play.google.com/store/apps/details?id=com.getfamilyfi" },
   ],
   more: "Full instructions",
+  done: "Done",
 } as const;
 
 export const APP_STORE_SOON = "Coming soon";

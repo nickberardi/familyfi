@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { Icon } from "@/components/ui/Icon";
 import { APP_STORES, APP_STORE_SOON, PAIR_COPY, PLAY_BETA, type AppStore } from "@/lib/pair-device";
 
@@ -22,62 +23,34 @@ function Badge({ store, soon = false }: { store: AppStore; soon?: boolean }) {
   );
 }
 
-/** A store's badge that opens its brief steps (Google Play's closed beta) under it. */
+/** A store's badge that opens its brief steps (Google Play's closed beta) in the pairing sheets' modal. */
 function StepsBadge({ store }: { store: AppStore }) {
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const panelId = `app-store-steps-${store.id}`;
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      button.current?.focus();
-    }
-    function onPointer(event: PointerEvent) {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointer);
-    };
-  }, [open]);
-
   return (
-    <div
-      ref={root}
-      // Tabbing past the steps closes them, as a click outside does.
-      onBlur={(event) => {
-        const next = event.relatedTarget as Node | null;
-        if (next && !root.current?.contains(next)) setOpen(false);
-      }}
-    >
-      <button
-        ref={button}
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-haspopup="dialog"
-        className="block rounded-[6px] border-0 bg-transparent p-0"
-      >
+    <>
+      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="block rounded-[6px] border-0 bg-transparent p-0">
         <Badge store={store} />
       </button>
       {open ? (
-        <div
-          id={panelId}
-          role="dialog"
-          aria-label={PLAY_BETA.title}
-          className="absolute top-[calc(100%+8px)] left-0 z-[60] sm:right-0 sm:left-auto w-[300px] max-w-[calc(100vw-32px)] rounded-[10px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-4 text-[14px]"
-          style={{ boxShadow: "var(--ff-shadow-toast)" }}
+        <SheetFrame
+          title={PLAY_BETA.title}
+          sub={PLAY_BETA.sub}
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              {store.url ? (
+                <a href={store.url} target="_blank" rel="noreferrer" className={`${SECONDARY_BUTTON} inline-flex items-center gap-1`}>
+                  {PLAY_BETA.more}
+                  <Icon name="arrow-square-out" size={14} />
+                </a>
+              ) : null}
+              <button type="button" onClick={() => setOpen(false)} className={PRIMARY_BUTTON}>
+                {PLAY_BETA.done}
+              </button>
+            </>
+          }
         >
-          <div className="font-semibold">{PLAY_BETA.title}</div>
-          <div className="mt-1 text-[var(--ff-muted)]">{PLAY_BETA.sub}</div>
-          <ol className="mt-3 flex flex-col gap-2">
+          <ol className="flex flex-col gap-2.5 text-[14px]">
             {PLAY_BETA.steps.map((step, index) => (
               <li key={step.url} className="flex items-baseline gap-2">
                 <span className="w-4 flex-none font-semibold text-[var(--ff-muted)]">{index + 1}.</span>
@@ -88,15 +61,9 @@ function StepsBadge({ store }: { store: AppStore }) {
               </li>
             ))}
           </ol>
-          {store.url ? (
-            <a href={store.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-[var(--ff-muted)]">
-              {PLAY_BETA.more}
-              <Icon name="arrow-square-out" size={14} />
-            </a>
-          ) : null}
-        </div>
+        </SheetFrame>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -109,9 +76,7 @@ export function AppStoresCard() {
           <div className="text-[14px] font-semibold">{PAIR_COPY.getApp}</div>
           <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">{PAIR_COPY.getAppSub}</div>
         </div>
-        {/* The steps hang from the badge row: under its left end where the row wraps below the
-            heading on a phone, under its right end beside it. */}
-        <div className="relative flex flex-wrap items-start gap-3">
+        <div className="flex flex-wrap items-start gap-3">
           {APP_STORES.map((store: AppStore) =>
             store.steps ? (
               <StepsBadge key={store.id} store={store} />
