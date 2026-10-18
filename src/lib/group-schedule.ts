@@ -89,7 +89,7 @@ function liftLabel(group: Pick<Group, "id">, rule: Rule, timezone: string, now: 
 
 /**
  * Today's schedule for the group: its bands on the bar, and its windows today in the order they
- * start. A rule that is lifted for the group now draws faintly and says how in its rows.
+ * start. Rules that block always are left out. A rule that is lifted for the group now draws faintly and says how in its rows.
  */
 export function groupScheduleToday(
   group: Pick<Group, "id" | "suspension">,
@@ -103,6 +103,9 @@ export function groupScheduleToday(
   const bands: TimelineBand[] = [];
   const rows: (ScheduleWindowRow & { start: number })[] = [];
   for (const { rule, title, tone } of groupScheduleRules(group, rules, catalogNames)) {
+    // Only scheduled windows: a rule that blocks all day, every day, is in the status line and on
+    // the details page, not on the day's schedule.
+    if (rule.mode === "always") continue;
     const internet = rule.kind === "internet";
     const lifted = liftLabel(group, rule, timezone, now);
     ruleInternetWindows(rule).forEach((window, index) => {
@@ -129,7 +132,7 @@ export function groupScheduleToday(
         detail: `${internet ? "no internet" : "blocked"} ${windowSpan(window)}`,
         state: lifted ?? (live ? "Now" : null),
         live,
-        start: window.always ? 0 : startMinutes(window),
+        start: startMinutes(window),
       });
     });
   }

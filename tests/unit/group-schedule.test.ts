@@ -78,6 +78,19 @@ describe("group schedule", () => {
     expect(bands.find((band) => band.label === "Homework (Video and Social) blocked")?.tone).toBe(2);
   });
 
+  it("leaves rules that block always off today's schedule, but lists them on the details page", () => {
+    const tiktok = rule({ id: "r-tiktok", name: "No TikTok", kind: "app", targetIds: [9], mode: "always", windows: [] });
+    const grounded = rule({ id: "r-grounded", name: "Grounded", kind: "internet", mode: "always", windows: [] });
+    const { rows, bands } = groupScheduleToday(group(), [tiktok, grounded, night], names, TZ, NOW);
+    expect(rows.map((row) => row.ruleId)).toEqual(["r-night"]);
+    expect(bands.map((band) => band.label)).toEqual(["Overnight", "Overnight"]);
+    expect(groupScheduleRuleRows(group(), [tiktok, grounded, night], names, TZ, NOW).map((row) => [row.ruleId, row.times])).toEqual([
+      ["r-tiktok", "all day"],
+      ["r-grounded", "all day"],
+      ["r-night", "10 PM–7 AM"],
+    ]);
+  });
+
   it("dims a rule lifted for the group and says how", () => {
     const paused = { ...homework, groupPauses: [{ groupId: "g1", pause: { active: true, until: "2026-10-15T22:00:00Z", kind: "pause" as const, by: null } }] };
     const { rows, bands } = groupScheduleToday(group(), [video, social, paused, night], names, TZ, NOW);
