@@ -122,10 +122,51 @@ export function remoteChoice(tunnel: Pick<RemoteAccess, "mode" | "endpointId">, 
     if (tunnel.mode === "quick") return "quick";
     return tunnel.mode === "named" ? "cloudflareAutomatic" : "off";
   }
+  return routeChoice(route);
+}
+
+/** The choice that publishes a saved route. */
+export function routeChoice(route: Pick<ConnectionRoute, "kind" | "transport">): Exclude<RemoteChoice, "off"> {
   if (route.kind === "quick") return "quick";
   if (route.kind === "domain") return "cloudflareAutomatic";
   if (route.transport === "tailscale") return "tailscale";
   return route.transport === "cloudflare" ? "cloudflareAdvanced" : "myDomain";
+}
+
+/** Each choice as Remote access names it, Cloudflare's two setups included. */
+export const CHOICE_LABEL: Record<Exclude<RemoteChoice, "off">, string> = {
+  quick: "Quick tunnel",
+  myDomain: "My domain",
+  tailscale: "Tailscale",
+  cloudflareAutomatic: "Cloudflare Automatic",
+  cloudflareAdvanced: "Cloudflare Advanced",
+};
+
+/**
+ * What saving an address under a choice that runs `transport` may do with a route already saved
+ * at that address: reuse one of the same transport, or refuse one any other choice publishes,
+ * since taking it over would move it out of that choice and change its transport for paired phones.
+ */
+export function routeForAddress(
+  routes: readonly ConnectionRoute[],
+  url: string,
+  transport: ConnectionTransport,
+): { reuse: ConnectionRoute } | { conflict: ConnectionRoute } | null {
+  let origin: string;
+  try {
+    origin = new URL(url.trim()).origin;
+  } catch {
+    return null;
+  }
+  const existing = routes.find((route) => route.url === origin);
+  if (!existing) return null;
+  return existing.kind === "own" && existing.transport === transport ? { reuse: existing } : { conflict: existing };
+}
+
+/** Why an address can't be saved under another choice than the one its route already belongs to. */
+export function addressConflict(route: Pick<ConnectionRoute, "kind" | "transport">): string {
+  const label = CHOICE_LABEL[routeChoice(route)];
+  return `This address is already saved as your ${label} route. Choose ${label} to use it, or enter a different address.`;
 }
 
 /** The saved route a choice would publish again, if it has one. */

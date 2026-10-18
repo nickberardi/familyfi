@@ -11,7 +11,7 @@ const shots = process.env.PHONES_SCREENSHOT_DIR;
 // at a time and in one viewport (`@desktop`); the phone viewport only checks the layout.
 test.describe.configure({ mode: "serial" });
 
-type Route = { id: string; url: string; kind: string; enabled: boolean };
+type Route = { id: string; url: string; kind: string; transport: string; enabled: boolean };
 
 async function signIn(page: Page) {
   test.skip(!password, "FAMILYFI_DEFAULT_PASSWORD is required for browser tests");
@@ -223,6 +223,31 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
 
   } finally {
     await cleanUp(page, [home, tailnet]);
+  }
+});
+
+test("won't move an address saved under Tailscale to My domain", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const tailnet = `https://moved-${Date.now()}.tail1234.ts.net`;
+  page.on("dialog", (dialog) => void dialog.accept());
+  try {
+    await page.goto("/pair");
+    const card = page.getByTestId("remote-access");
+    const via = card.getByRole("group", { name: "Remote access" });
+    await via.getByRole("button", { name: "Tailscale" }).click();
+    await card.getByLabel("Address").fill(tailnet);
+    await card.getByRole("button", { name: "Use this address" }).click();
+    await expect(card.getByTestId("remote-url")).toHaveText(tailnet);
+
+    await publishMyDomain(page, tailnet);
+    await card.getByRole("button", { name: "Use this address" }).click();
+    await expect(card.getByRole("alert")).toHaveText(
+      "This address is already saved as your Tailscale route. Choose Tailscale to use it, or enter a different address.",
+    );
+    expect((await routes(page)).filter((route) => route.url === tailnet).map((route) => route.transport)).toEqual(["tailscale"]);
+    expect(await enabledUrls(page)).toEqual([tailnet]);
+  } finally {
+    await cleanUp(page, [tailnet]);
   }
 });
 

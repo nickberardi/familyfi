@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
-import { canPin } from "@/lib/connection-routes";
+import { addressConflict, canPin, routeForAddress } from "@/lib/connection-routes";
 import type { ConnectionRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
 import { Segmented } from "@/components/ui/Segmented";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
@@ -17,14 +17,6 @@ const PLACEHOLDER: Record<ConnectionTransport, string> = {
 
 function expiry(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function origin(value: string): string | null {
-  try {
-    return new URL(value.trim()).origin;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -110,10 +102,14 @@ export function RouteForm({
             })
           ).endpoint;
         } catch (caught) {
-          // The address is already saved as another of your routes: reuse it rather than refuse.
-          const existing = routes.find((item) => item.kind === "own" && item.url === origin(url));
-          if (!(caught instanceof ApiError && caught.code === "endpoint_exists" && existing)) throw caught;
-          saved = await update(existing.id, body);
+          // The address is already saved: reuse a route of this transport, but never take one over from another choice.
+          const existing = caught instanceof ApiError && caught.code === "endpoint_exists" ? routeForAddress(routes, url, transport) : null;
+          if (!existing) throw caught;
+          if ("conflict" in existing) {
+            setError(addressConflict(existing.conflict));
+            return;
+          }
+          saved = await update(existing.reuse.id, body);
         }
       }
       await onSaved(saved);
