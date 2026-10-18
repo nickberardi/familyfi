@@ -364,6 +364,16 @@ describe("remote access", () => {
     expect(await pending).toMatchObject({ status: "starting", endpointId: null });
   });
 
+  it("never reports running beside the route of a tunnel switched away during the read", async () => {
+    await put({ mode: "quick" });
+    await waitFor((t) => t.status === "running" && t.endpointId !== null, "the quick tunnel");
+    const runtime = (globalThis as { familyfiRemoteAccess?: { switches: number } }).familyfiRemoteAccess!;
+    const pending = remoteAccessState();
+    // A whole switch, ending with another tunnel running, completes while the state is still reading the database.
+    runtime.switches += 1;
+    expect(await pending).toMatchObject({ status: "starting" });
+  });
+
   it("leaves running before a switch unpublishes the tunnel's route", async () => {
     await put({ mode: "quick" });
     await waitFor((t) => t.status === "running" && t.endpointId !== null, "the quick tunnel");

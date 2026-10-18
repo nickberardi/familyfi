@@ -57,6 +57,8 @@ type Runtime = {
   owner: string;
   leaseTimer: ReturnType<typeof setInterval> | null;
   exitHook: boolean;
+  /** Counts switches, so a state read can tell that one happened while it read the database. */
+  switches: number;
 };
 
 /** One tunnel per process, surviving dev reloads of this module. */
@@ -74,6 +76,7 @@ const runtime: Runtime = ((globalThis as { familyfiRemoteAccess?: Runtime }).fam
   owner: randomUUID(),
   leaseTimer: null,
   exitHook: false,
+  switches: 0,
 });
 
 /**
@@ -230,6 +233,7 @@ function stopAll() {
   runtime.loginUrl = null;
   // Before any route is unpublished, so a state read never pairs "running" with no route.
   runtime.status = "starting";
+  runtime.switches = (runtime.switches ?? 0) + 1;
 }
 
 function onAdoptFailure(error: unknown) {
@@ -414,13 +418,15 @@ function modeOf(route: ConnectionEndpoint | null): RemoteAccessMode {
 }
 
 export async function remoteAccessState(): Promise<RemoteAccessState> {
-  // The tunnel's status is read on both sides of the database reads, and "running" only when both say so.
-  // goLive saves its route before it reports running, and every switch leaves running before it unpublishes
-  // one, so "running" never comes back without a route.
+  // The tunnel's status is read on both sides of the database reads, and "running" only when both say so
+  // and no switch came between. goLive saves its route before it reports running, and every switch leaves
+  // running before it unpublishes one, so "running" only ever comes back with the route that tunnel published.
   const before = runtime.status;
+  const switches = runtime.switches;
   const route = await publishedRoute();
   const domain = await routeOfKind(RouteKind.domain);
-  const status = runtime.status === "running" && before !== "running" ? before : runtime.status;
+  const settled = before === "running" && runtime.switches === switches;
+  const status = runtime.status === "running" && !settled ? (before === "running" ? "starting" : before) : runtime.status;
   const { url, error, loginUrl } = runtime;
   const own = route?.kind === RouteKind.own;
   const tunnelWanted = Boolean(route ? !own : runtime.wanted || runtime.setup);
