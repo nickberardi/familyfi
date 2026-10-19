@@ -132,3 +132,13 @@ what changed and why — the deviations are usually the most interesting part of
 
 Keep the description current with the branch. A body written for the first commit is
 stale the moment the second one lands, and a stale description is read as the truth.
+
+## Cursor Cloud specific instructions
+
+Cloud agents boot with Node 26.12.0 and pnpm 10.15.1 on `/usr/local/bin`. The image also puts an older Node earlier on `PATH`. Prepend `/usr/local/bin` before `node`, `pnpm`, `make dev`, or `scripts/test.py`, or the process is Node 22 and does not match `.node-version`.
+
+`.cursor/start.sh` starts Docker (fuse-overlayfs), the development PostgreSQL from `docker/docker-compose.dev-db.yml`, and Next.js in the `familyfi-dev` tmux session on port 3000. Open the app at `http://localhost:3000`. Next.js dev blocks client hydration and hot reload when the page is opened as `127.0.0.1`. The first start writes a gitignored `.env` with `FAMILYFI_MODE=dev` and a generated `POSTGRES_PASSWORD`. The recovery admin password is `FAMILYFI_DEFAULT_PASSWORD` in that file and is printed in the `familyfi-dev` pane. Sign in as `admin` or `nick`. `KILL_PORT=1` lets that server restart without a prompt.
+
+`make lint`, `make typecheck`, and `make test-unit` do not need the dev server. Integration and browser tests start their own PostgreSQL containers and need the Docker daemon from the start script. `make test-api-breaking` needs Go, which this environment does not install.
+
+The native app in familyfi-mobile needs macOS. Do not run this repository's `make` targets from that checkout.

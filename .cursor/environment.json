@@ -1,0 +1,8 @@
+{
+  "name": "FamilyFi",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "ports": [
+    { "name": "FamilyFi", "port": 3000 }
+  ]
+}
