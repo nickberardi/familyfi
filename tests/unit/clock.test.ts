@@ -44,6 +44,12 @@ describe("nextClockOnDays across a clock change", () => {
     expect(nextClockOnDays(NEW_YORK, EVERY_DAY, "03:00", new Date("2026-11-01T04:00:00Z"))?.toISOString())
       .toBe(at("2026-11-01T08:00:00Z"));
   });
+
+  it("finds the second 01:30 after the first has passed on fall-back night", () => {
+    // Sunday 01:15 EST (second hour); 01:30 EDT is already past, 01:30 EST is still ahead.
+    expect(nextClockOnDays(NEW_YORK, [0], "01:30", new Date("2026-11-01T06:15:00Z"))?.toISOString())
+      .toBe(at("2026-11-01T06:30:00Z"));
+  });
 });
 
 describe("rule windows across a clock change", () => {
@@ -60,6 +66,13 @@ describe("rule windows across a clock change", () => {
     // Sunday 00:30 EDT, inside the window.
     expect(windowEndsAt(saturdayNight, new Date("2026-11-01T04:30:00Z"), NEW_YORK)?.toISOString())
       .toBe(at("2026-11-01T08:00:00Z")); // 03:00 EST
+  });
+
+  it("ends a window at the second 01:30 during the repeated fall-back hour", () => {
+    // Sunday 01:15 EST, inside Sat 23:00–01:30; the end is 01:30 EST, not next week's first 01:30.
+    const overnight = { name: "", days: [6], start: "23:00", end: "01:30" };
+    expect(windowEndsAt(overnight, new Date("2026-11-01T06:15:00Z"), NEW_YORK)?.toISOString())
+      .toBe(at("2026-11-01T06:30:00Z"));
   });
 
   it("starts a window at 04:00 local on the morning New York falls back", () => {

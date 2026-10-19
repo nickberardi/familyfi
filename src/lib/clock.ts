@@ -49,9 +49,11 @@ export function nextClockOnDays(
   const start = zonedParts(now, timezone);
   for (let offset = 0; offset < 8; offset++) {
     const wall = addCalendarDays(start.year, start.month, start.day, offset);
-    const instant = zonedWallTimeToUtc(timezone, wall.year, wall.month, wall.day, hour, minute);
-    const seen = zonedParts(instant, timezone);
-    if (days.includes(seen.weekday) && instant.getTime() > now.getTime()) return instant;
+    // A fall-back hour happens twice; take the earliest reading still after `now`, not only the first.
+    for (const instant of zonedWallTimesToUtc(timezone, wall.year, wall.month, wall.day, hour, minute)) {
+      const seen = zonedParts(instant, timezone);
+      if (days.includes(seen.weekday) && instant.getTime() > now.getTime()) return instant;
+    }
   }
   return null;
 }
@@ -99,6 +101,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * side of that time, so a day the clocks change is no different from any other. A time
  * that happens twice is its first occurrence; a time the clocks skip is read with the offset
  * from before the change, which moves it forward by the jump (02:30 becomes 03:30).
+ * Callers that need the next reading after a moment (window ends, next starts) use
+ * `nextClockOnDays`, which considers both occurrences of a repeated time.
  */
 export function zonedWallTimeToUtc(
   timeZone: string,
@@ -108,11 +112,25 @@ export function zonedWallTimeToUtc(
   hour: number,
   minute: number,
 ): Date {
+  return zonedWallTimesToUtc(timeZone, year, month, day, hour, minute)[0]!;
+}
+
+/** Every UTC instant when the zone's clock reads the given wall time that calendar day. */
+function zonedWallTimesToUtc(
+  timeZone: string,
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+): Date[] {
   const wall = Date.UTC(year, month - 1, day, hour, minute, 0);
   const candidates = [wall - DAY_MS, wall, wall + DAY_MS].map((probe) => wall - (wallClock(probe, timeZone) - probe));
-  const exact = candidates.filter((instant) => wallClock(instant, timeZone) === wall);
+  const exact = [...new Set(candidates.filter((instant) => wallClock(instant, timeZone) === wall))];
   // A skipped time: clocks skip forward, so the offset from before the change is the smallest and its reading the latest.
-  return new Date(exact.length ? Math.min(...exact) : Math.max(...candidates));
+  if (exact.length === 0) return [new Date(Math.max(...candidates))];
+  exact.sort((a, b) => a - b);
+  return exact.map((instant) => new Date(instant));
 }
 
 /** The zone's clock reading at `instant`, as if that reading were UTC. */

@@ -1683,6 +1683,19 @@
     },
     {
       "fn": "nextClockOnDays",
+      "name": "the second of a time that happens twice",
+      "input": {
+        "timeZone": "America/New_York",
+        "days": [
+          0
+        ],
+        "hhmm": "01:30",
+        "now": "2026-11-01T06:15:00Z"
+      },
+      "expected": "2026-11-01T06:30:00.000Z"
+    },
+    {
+      "fn": "nextClockOnDays",
       "name": "UTC+14",
       "input": {
         "timeZone": "Pacific/Kiritimati",
@@ -3512,6 +3525,24 @@
         "timeZone": "America/New_York"
       },
       "expected": "2026-11-01T08:00:00.000Z"
+    },
+    {
+      "fn": "windowEndsAt",
+      "name": "an overnight window ends at the second 01:30 on fall-back night",
+      "input": {
+        "window": {
+          "name": "",
+          "days": [
+            6
+          ],
+          "start": "23:00",
+          "end": "01:30",
+          "ruleName": "Bedtime"
+        },
+        "now": "2026-11-01T06:15:00Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "2026-11-01T06:30:00.000Z"
     },
     {
       "fn": "windowEndsAt",
