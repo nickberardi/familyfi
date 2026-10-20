@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ApiRequest } from "@/lib/api-client";
 import { parseReleaseNotes } from "@/lib/release-notes";
 import type { UpdateCheck, UpdateSettings } from "@/lib/types";
-import { INSTALL_STEPS, UPDATE_COPY as COPY, installCopy, installing, latestRelease, updateRunLine, upToDateLine, versionLabel } from "@/lib/update-copy";
+import { UPDATE_COPY as COPY, installCopy, installing, latestRelease, updateRunLine, upToDateLine, versionLabel } from "@/lib/update-copy";
 import { installUpdate } from "@/lib/update-writes";
 
 import { ExternalLink } from "./ExternalLink";
@@ -19,7 +19,6 @@ import { useInstallProgress } from "./use-install-progress";
  */
 export type UpdateInstall = { settings: UpdateSettings | null; request: ApiRequest; onChanged: () => void; onInstalled?: (version: string) => void };
 
-const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
 /**
  * The update on Settings' Maintenance tab: whether FamilyFi is up to date, or a newer release's notes and
@@ -90,13 +89,12 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
     }
   }
   return (
-    <View style={styles.columns} testID="update-content">
-      <View role="region" aria-label={COPY.releaseNotes} style={[styles.card, styles.column, card]}>
-        <View style={[styles.head, styles.headRow, { borderBottomColor: ui.color("hairline-card") }]}>
+    <View role="region" aria-label={copy.title} style={[styles.card, card]} testID="update-content">
+      <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
+        <View style={styles.headRow}>
           <Text role="heading" aria-level={2} style={[text(14, 21, "ink"), styles.bold]}>
-            {COPY.releaseNotes}
+            {copy.title}
           </Text>
-          <Text style={[text(14, 21, "muted"), { fontFamily: MONO }]}>{latest}</Text>
           <View style={styles.grow} />
           {update?.releaseUrl ? (
             <ExternalLink href={update.releaseUrl} style={[text(14, 21, "ink"), styles.bold]} color={ui.color("ink")} testID="update-release-link">
@@ -104,6 +102,9 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
             </ExternalLink>
           ) : null}
         </View>
+        <Text style={[text(14, 20, "muted"), styles.installNote]}>{configured ? COPY.installReady : COPY.installNote}</Text>
+      </View>
+      <View role="region" aria-label={COPY.releaseNotes}>
         {sections.length === 0 ? (
           <Text style={[text(14, 21, "muted"), styles.section]}>{COPY.noNotes}</Text>
         ) : (
@@ -126,52 +127,33 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
           ))
         )}
       </View>
-
-      <View role="region" aria-label={copy.title} style={[styles.card, styles.column, card]}>
-        <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
-          <Text role="heading" aria-level={2} style={[text(14, 21, "ink"), styles.bold]}>
-            {copy.title}
-          </Text>
-          <Text style={[text(14, 20, "muted"), styles.installNote]}>{configured ? COPY.installReady : COPY.installNote}</Text>
-          {install?.settings?.lastRun?.status === "succeeded" ? null : runText}
-          {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
-        </View>
-        <View role="list">
-          {INSTALL_STEPS.map((step, index) => (
-            <View key={step.title} role="listitem" style={[styles.step, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
-              <View aria-hidden style={[styles.stepNumber, { backgroundColor: ui.color("field") }]}>
-                <Text style={[text(14, 20, "muted"), styles.bold]}>{index + 1}</Text>
-              </View>
-              <View style={styles.grow}>
-                <Text style={text(14, 21, step.detail ? "ink" : "muted")}>{step.title}</Text>
-                {step.detail ? <Text style={text(14, 20, "muted")}>{step.detail}</Text> : null}
-              </View>
-            </View>
-          ))}
-        </View>
-        <View style={styles.actions}>
-          {onNotNow ? (
-            <Text role="button" onPress={onNotNow} style={[text(14, 21, "muted"), styles.bold, styles.outline, { borderColor: ui.color("control-line") }]} testID="update-not-now">
-              {COPY.notNow}
-            </Text>
-          ) : (
-            <ui.Link href="/family" testID="update-not-now">
-              <Text style={[text(14, 21, "muted"), styles.bold, styles.outline, { borderColor: ui.color("control-line") }]}>{COPY.notNow}</Text>
-            </ui.Link>
-          )}
-          <Pressable
-            role="button"
-            aria-disabled={!canInstall}
-            disabled={!canInstall}
-            onPress={() => void start()}
-            style={({ pressed }) => [styles.install, { backgroundColor: ui.color("accent") }, !canInstall && styles.off, pressed && canInstall && { opacity: PRESS_OPACITY }]}
-            testID="update-install"
-          >
-            <Text style={[text(14, 21, "ink-on-fill"), styles.bold]}>{copy.button}</Text>
-          </Pressable>
-        </View>
-        {overlay}
+      <View style={[styles.foot, { borderTopColor: ui.color("hairline-card") }]}>
+        {configured ? <Text style={text(14, 20, "muted")}>{COPY.backupWhere}</Text> : null}
+        {install?.settings?.lastRun?.status === "succeeded" ? null : runText}
+        {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
       </View>
+      <View style={styles.actions}>
+        {onNotNow ? (
+          <Text role="button" onPress={onNotNow} style={[text(14, 21, "muted"), styles.bold, styles.outline, { borderColor: ui.color("control-line") }]} testID="update-not-now">
+            {COPY.notNow}
+          </Text>
+        ) : (
+          <ui.Link href="/family" testID="update-not-now">
+            <Text style={[text(14, 21, "muted"), styles.bold, styles.outline, { borderColor: ui.color("control-line") }]}>{COPY.notNow}</Text>
+          </ui.Link>
+        )}
+        <Pressable
+          role="button"
+          aria-disabled={!canInstall}
+          disabled={!canInstall}
+          onPress={() => void start()}
+          style={({ pressed }) => [styles.install, { backgroundColor: ui.color("accent") }, !canInstall && styles.off, pressed && canInstall && { opacity: PRESS_OPACITY }]}
+          testID="update-install"
+        >
+          <Text style={[text(14, 21, "ink-on-fill"), styles.bold]}>{copy.button}</Text>
+        </Pressable>
+      </View>
+      {overlay}
     </View>
   );
 }
@@ -179,8 +161,6 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
   status: { padding: 18 },
-  columns: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: 16 },
-  column: { flexGrow: 1, flexBasis: 320, minWidth: 0 },
   head: { paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   headRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 10 },
   bold: { fontWeight: "600" },
@@ -190,8 +170,7 @@ const styles = StyleSheet.create({
   items: { marginTop: 8, gap: 6 },
   item: { flexDirection: "row", gap: 8, paddingLeft: 4 },
   installNote: { marginTop: 2 },
-  step: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 11 },
-  stepNumber: { width: 22, height: 22, borderRadius: 11, flexShrink: 0, alignItems: "center", justifyContent: "center" },
+  foot: { paddingHorizontal: 18, paddingTop: 14, borderTopWidth: 1 },
   actions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, paddingHorizontal: 18, paddingVertical: 14 },
   outline: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, overflow: "hidden" },
   install: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
