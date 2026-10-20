@@ -280,7 +280,8 @@ test("the Update page installs through the updater and keeps its schedule", { ta
   await expect(notes.getByRole("listitem")).toHaveCount(4);
   await page.getByTestId("update-notes-toggle").click();
   await expect(notes.getByRole("listitem")).toHaveCount(5);
-  await expect(notes.getByRole("link", { name: "pull #250" })).toBeVisible();
+  // On the web each is a real anchor, so Enter and copy-link work.
+  await expect(notes.getByRole("link", { name: "pull #250" })).toHaveAttribute("href", "https://github.com/nickberardi/familyfi/pull/250");
   await expect(notes.getByRole("link", { name: "@nickberardi" })).toBeVisible();
   await install.click();
   await expect(page.getByTestId("update-run").first()).toContainText("Installing v0.6.0");

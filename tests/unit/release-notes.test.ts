@@ -45,6 +45,11 @@ describe("parseReleaseNotes", () => {
       { text: "issue #211", href: "https://github.com/nickberardi/familyfi/issues/211" },
       { text: "." },
     ]);
+    expect(releaseNoteParts("See https://github.com/nickberardi/familyfi/pull/21#discussion_r1 now")).toEqual([
+      { text: "See " },
+      { text: "pull #21", href: "https://github.com/nickberardi/familyfi/pull/21#discussion_r1" },
+      { text: " now" },
+    ]);
     expect(releaseNoteParts("Bump pg by @dependabot[bot] in x")).toContainEqual({ text: "@dependabot[bot]", href: "https://github.com/apps/dependabot" });
     expect(releaseNoteParts("See [the guide](https://example.com/guide)")).toEqual([{ text: "See " }, { text: "the guide", href: "https://example.com/guide" }]);
   });

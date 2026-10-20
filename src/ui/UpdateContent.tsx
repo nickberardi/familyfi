@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ApiRequest } from "@/lib/api-client";
 import { collapseReleaseNotes, parseReleaseNotes } from "@/lib/release-notes";
@@ -25,6 +25,14 @@ export type UpdateInstall = { settings: UpdateSettings | null; request: ApiReque
  * up, its button stays disabled and the card says how to update by hand. While an install runs, the
  * card is covered by a spinner counting down the usual two minutes until FamilyFi reports the new release.
  */
+/**
+ * A release-note link: on the web an anchor (react-native-web renders Text with `href` as `<a>`), so
+ * Enter, middle-click and copy-link work; on a phone a press hands the address to the system browser.
+ */
+function noteLinkProps(href: string) {
+  return Platform.OS === "web" ? ({ href, hrefAttrs: { target: "_blank", rel: "noopener noreferrer" } } as object) : { onPress: () => void Linking.openURL(href) };
+}
+
 export function UpdateContent({ update, onNotNow, install }: { update: UpdateCheck | null; onNotNow?: () => void; install?: UpdateInstall }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
@@ -68,6 +76,8 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
   }
 
   const lastRun = install?.settings?.lastRun;
+  // An earlier install's success says nothing about this release; one of this release still does.
+  const shownRun = lastRun?.status === "succeeded" && versionLabel(lastRun.targetVersion) !== latest ? null : runText;
   const allSections = parseReleaseNotes(update?.releaseNotes ?? null);
   const collapsed = collapseReleaseNotes(allSections);
   const sections = notesOpen ? allSections : collapsed.sections;
@@ -125,7 +135,7 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
                     <Text style={[text(14, 20, "ink"), styles.grow]}>
                       {parts.map((part, at) =>
                         part.href ? (
-                          <Text key={at} role="link" onPress={() => void Linking.openURL(part.href!)} style={[styles.bold, { color: ui.color("accent") }]}>
+                          <Text key={at} role="link" {...noteLinkProps(part.href)} style={[styles.bold, { color: ui.color("accent") }]}>
                             {part.text}
                           </Text>
                         ) : (
@@ -145,12 +155,13 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
           </Text>
         ) : null}
       </View>
-      <View style={[styles.foot, { borderTopColor: ui.color("hairline-card") }]}>
-        {configured ? <Text style={text(14, 20, "muted")}>{COPY.backupWhere}</Text> : null}
-        {/* An earlier install's success says nothing about this release; one of this release still does. */}
-        {lastRun?.status === "succeeded" && versionLabel(lastRun.targetVersion) !== latest ? null : runText}
-        {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
-      </View>
+      {configured || shownRun || error ? (
+        <View style={[styles.foot, { borderTopColor: ui.color("hairline-card") }]}>
+          {configured ? <Text style={text(14, 20, "muted")}>{COPY.backupWhere}</Text> : null}
+          {shownRun}
+          {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
+        </View>
+      ) : null}
       <View style={styles.actions}>
         {onNotNow ? (
           <Text role="button" onPress={onNotNow} style={[text(14, 21, "muted"), styles.bold, styles.outline, { borderColor: ui.color("control-line") }]} testID="update-not-now">

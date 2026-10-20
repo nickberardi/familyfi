@@ -5,7 +5,7 @@ export type ReleaseNotesSection = { title: string; items: ReleaseNotesPart[][] }
 // A pull request or issue URL, an @mention (a bot's ends "[bot]"), or a Markdown link. A mention
 // needs a space or the line's start before it and no "/" after it, so "@node-rs/argon2" stays text.
 const REFERENCE =
-  /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(pull|issues)\/(\d+)|(?<![\w/@])@([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)(\[bot\])?(?![\w/-])|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+  /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(pull|issues)\/(\d+)(?:[/#][^\s)]*)?|(?<![\w/@])@([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)(\[bot\])?(?![\w/-])|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
 
 /**
  * Splits an item into words and links: a pull request or issue URL reads "pull #21" or
