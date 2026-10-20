@@ -191,9 +191,9 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
   await expect(alert).toContainText("v0.6.0 is ready. You’re on v0.5.1.");
   await alert.getByRole("link", { name: "Update" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
-  const notes = page.getByRole("region", { name: "Release notes" });
-  await expect(notes).toContainText("Pair Device page");
-  await expect(notes.getByRole("link", { name: "View on GitHub" })).toHaveAttribute(
+  const card = page.getByRole("region", { name: "Install v0.6.0" });
+  await expect(card.getByRole("region", { name: "Release notes" })).toContainText("Pair Device page");
+  await expect(card.getByRole("link", { name: "View on GitHub" })).toHaveAttribute(
     "href",
     "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
   );

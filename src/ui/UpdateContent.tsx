@@ -71,6 +71,7 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
     );
   }
 
+  const lastRun = install?.settings?.lastRun;
   const sections = parseReleaseNotes(update?.releaseNotes ?? null);
   const configured = Boolean(install?.settings?.updater.configured);
   // Until the updater's state has loaded, the button does not claim it is missing.
@@ -152,7 +153,8 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
       </View>
       <View style={[styles.foot, { borderTopColor: ui.color("hairline-card") }]}>
         {configured ? <Text style={text(14, 20, "muted")}>{COPY.backupWhere}</Text> : null}
-        {install?.settings?.lastRun?.status === "succeeded" ? null : runText}
+        {/* An earlier install's success says nothing about this release; one of this release still does. */}
+        {lastRun?.status === "succeeded" && versionLabel(lastRun.targetVersion) !== latest ? null : runText}
         {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
       </View>
       <View style={styles.actions}>
