@@ -58,11 +58,12 @@ export const APP_STORES = [
  */
 export type AppStore = { id: string; label: string; badge: string; badgeWidth: number; url: string | null; steps?: boolean };
 
-/** Google Play's closed beta: a tester joins the group, opts in, then installs. */
+/** Google Play's closed beta: a tester signs in to their phone's Google account, joins the group, opts in, then installs. */
 export const PLAY_BETA = {
   title: "Join the Android beta",
-  sub: "FamilyFi is in a closed beta on Google Play. Before you start, sign in to Google with the same account you use for Google Play on your Android phone.",
+  sub: "FamilyFi is in a closed beta on Google Play.",
   steps: [
+    { text: "Sign in to the Google account you use on your Android phone", url: "https://accounts.google.com" },
     { text: "Join the beta group", url: "https://groups.google.com/g/familyfi-beta" },
     { text: "Become a tester", url: "https://play.google.com/apps/testing/com.getfamilyfi" },
     { text: "Install FamilyFi from Google Play", url: "https://play.google.com/store/apps/details?id=com.getfamilyfi" },

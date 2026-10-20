@@ -565,7 +565,7 @@ test("links the App Store badge and opens Google Play's closed beta steps in a m
   await expect(card.getByRole("link", { name: "Download on the App Store" })).toHaveAttribute("href", /^https:\/\//);
   await card.getByRole("button", { name: "Get it on Google Play" }).click();
   const dialog = page.getByRole("dialog", { name: "Join the Android beta" });
-  for (const name of ["Join the beta group", "Become a tester", "Install FamilyFi from Google Play", "Full instructions"])
+  for (const name of ["Sign in to the Google account you use on your Android phone", "Join the beta group", "Become a tester", "Install FamilyFi from Google Play", "Full instructions"])
     await expect(dialog.getByRole("link", { name })).toHaveAttribute("href", /^https:\/\//);
   await shot(page, "play-beta");
   await dialog.getByRole("button", { name: "Done" }).click();

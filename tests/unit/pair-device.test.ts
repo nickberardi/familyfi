@@ -47,7 +47,7 @@ describe("pair device", () => {
 
   it("opens Google Play's closed beta steps, each linked over HTTPS", () => {
     expect(APP_STORES.filter((store) => "steps" in store && store.steps).map((store) => store.id)).toEqual(["google"]);
-    expect(PLAY_BETA.steps.map((step) => step.text)).toEqual(["Join the beta group", "Become a tester", "Install FamilyFi from Google Play"]);
+    expect(PLAY_BETA.steps.map((step) => step.text)).toEqual(["Sign in to the Google account you use on your Android phone", "Join the beta group", "Become a tester", "Install FamilyFi from Google Play"]);
     expect(PLAY_BETA.steps.every((step) => step.url.startsWith("https://"))).toBe(true);
   });
 
