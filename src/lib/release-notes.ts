@@ -1,4 +1,30 @@
-export type ReleaseNotesSection = { title: string; items: string[] };
+/** A run of an item's words; with `href`, a link (a pull request, an issue or a GitHub user). */
+export type ReleaseNotesPart = { text: string; href?: string };
+export type ReleaseNotesSection = { title: string; items: ReleaseNotesPart[][] };
+
+// A pull request or issue URL, an @mention (a bot's ends "[bot]"), or a Markdown link. A mention
+// needs a space or the line's start before it and no "/" after it, so "@node-rs/argon2" stays text.
+const REFERENCE =
+  /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(pull|issues)\/(\d+)|(?<![\w/@])@([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)(\[bot\])?(?![\w/-])|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+
+/**
+ * Splits an item into words and links: a pull request or issue URL reads "pull #21" or
+ * "issue #21", and "@login" links to that GitHub profile (a bot's to its app page).
+ */
+export function releaseNoteParts(item: string): ReleaseNotesPart[] {
+  const parts: ReleaseNotesPart[] = [];
+  let at = 0;
+  for (const match of item.matchAll(REFERENCE)) {
+    if (match.index > at) parts.push({ text: item.slice(at, match.index) });
+    const [whole, kind, number, login, bot, label, url] = match;
+    if (kind) parts.push({ text: `${kind === "pull" ? "pull" : "issue"} #${number}`, href: whole });
+    else if (login) parts.push({ text: `@${login}${bot ?? ""}`, href: bot ? `https://github.com/apps/${login}` : `https://github.com/${login}` });
+    else parts.push({ text: label!, href: url! });
+    at = match.index + whole.length;
+  }
+  if (at < item.length) parts.push({ text: item.slice(at) });
+  return parts;
+}
 
 /**
  * Turns a GitHub release body into titled bullet lists: `##`/`###` headings start a
@@ -24,7 +50,7 @@ export function parseReleaseNotes(markdown: string | null): ReleaseNotesSection[
         current = { title: "Changes", items: [] };
         sections.push(current);
       }
-      current.items.push(bullet[1]!);
+      current.items.push(releaseNoteParts(bullet[1]!));
     }
   }
   return sections.filter((section) => section.items.length > 0);

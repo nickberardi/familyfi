@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ApiRequest } from "@/lib/api-client";
 import { parseReleaseNotes } from "@/lib/release-notes";
@@ -19,6 +19,8 @@ import { useInstallProgress } from "./use-install-progress";
  */
 export type UpdateInstall = { settings: UpdateSettings | null; request: ApiRequest; onChanged: () => void; onInstalled?: (version: string) => void };
 
+/** How tall the release notes stand until "Show all changes" opens them. */
+const NOTES_COLLAPSED_HEIGHT = 220;
 
 /**
  * The update on Settings' Maintenance tab: whether FamilyFi is up to date, or a newer release's notes and
@@ -30,6 +32,8 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
   const ui = useUI();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesTall, setNotesTall] = useState(false);
   const text = (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const latest = latestRelease(update);
@@ -105,27 +109,46 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
         <Text style={[text(14, 20, "muted"), styles.installNote]}>{configured ? COPY.installReady : COPY.installNote}</Text>
       </View>
       <View role="region" aria-label={COPY.releaseNotes}>
-        {sections.length === 0 ? (
-          <Text style={[text(14, 21, "muted"), styles.section]}>{COPY.noNotes}</Text>
-        ) : (
-          sections.map((section, index) => (
-            <View key={section.title} style={[styles.section, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
-              <Text role="heading" aria-level={3} style={[text(14, 21, "muted"), styles.bold, styles.sectionTitle]}>
-                {section.title}
-              </Text>
-              <View role="list" style={styles.items}>
-                {section.items.map((item) => (
-                  <View key={item} role="listitem" style={styles.item}>
-                    <Text aria-hidden style={text(14, 20, "ink")}>
-                      •
-                    </Text>
-                    <Text style={[text(14, 20, "ink"), styles.grow]}>{item}</Text>
+        <View style={!notesOpen && notesTall ? styles.notesCollapsed : null}>
+          <View onLayout={(event) => setNotesTall(event.nativeEvent.layout.height > NOTES_COLLAPSED_HEIGHT)}>
+            {sections.length === 0 ? (
+              <Text style={[text(14, 21, "muted"), styles.section]}>{COPY.noNotes}</Text>
+            ) : (
+              sections.map((section, index) => (
+                <View key={section.title} style={[styles.section, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
+                  <Text role="heading" aria-level={3} style={[text(14, 21, "muted"), styles.bold, styles.sectionTitle]}>
+                    {section.title}
+                  </Text>
+                  <View role="list" style={styles.items}>
+                    {section.items.map((parts, item) => (
+                      <View key={item} role="listitem" style={styles.item}>
+                        <Text aria-hidden style={text(14, 20, "ink")}>
+                          •
+                        </Text>
+                        <Text style={[text(14, 20, "ink"), styles.grow]}>
+                          {parts.map((part, at) =>
+                            part.href ? (
+                              <Text key={at} role="link" onPress={() => void Linking.openURL(part.href!)} style={[styles.bold, { color: ui.color("accent") }]}>
+                                {part.text}
+                              </Text>
+                            ) : (
+                              part.text
+                            ),
+                          )}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
-            </View>
-          ))
-        )}
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+        {notesTall ? (
+          <Text role="button" aria-expanded={notesOpen} onPress={() => setNotesOpen(!notesOpen)} style={[text(14, 21, "accent"), styles.bold, styles.notesToggle, { borderTopColor: ui.color("hairline") }]} testID="update-notes-toggle">
+            {notesOpen ? COPY.showFewerChanges : COPY.showAllChanges}
+          </Text>
+        ) : null}
       </View>
       <View style={[styles.foot, { borderTopColor: ui.color("hairline-card") }]}>
         {configured ? <Text style={text(14, 20, "muted")}>{COPY.backupWhere}</Text> : null}
@@ -170,6 +193,8 @@ const styles = StyleSheet.create({
   items: { marginTop: 8, gap: 6 },
   item: { flexDirection: "row", gap: 8, paddingLeft: 4 },
   installNote: { marginTop: 2 },
+  notesCollapsed: { maxHeight: NOTES_COLLAPSED_HEIGHT, overflow: "hidden" },
+  notesToggle: { paddingHorizontal: 18, paddingVertical: 11, borderTopWidth: 1 },
   foot: { paddingHorizontal: 18, paddingTop: 14, borderTopWidth: 1 },
   actions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, paddingHorizontal: 18, paddingVertical: 14 },
   outline: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, overflow: "hidden" },

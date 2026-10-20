@@ -16,6 +16,8 @@ export const UPDATE_COPY = {
   unavailable: "Update check unavailable.",
   releaseNotes: "Release notes",
   viewOnGitHub: "View on GitHub",
+  showAllChanges: "Show all changes",
+  showFewerChanges: "Show fewer changes",
   noNotes: "This release has no notes. See the full release on GitHub.",
   installNote:
     "Installing from here needs the Watchtower updater beside FamilyFi; the setup guide explains it. Until then, pull the new image and restart FamilyFi. It applies database changes on start, and your UniFi policies stay in place meanwhile.",
