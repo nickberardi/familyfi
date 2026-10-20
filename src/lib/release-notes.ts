@@ -55,3 +55,22 @@ export function parseReleaseNotes(markdown: string | null): ReleaseNotesSection[
   }
   return sections.filter((section) => section.items.length > 0);
 }
+
+/** How many items the release notes show until "Show all changes" opens them. */
+export const RELEASE_NOTES_COLLAPSED_ITEMS = 4;
+
+/**
+ * The first `limit` items, in their sections, and how many are left out. Collapsed notes leave the
+ * rest out rather than clipping them, so no hidden link takes focus or reaches a screen reader.
+ */
+export function collapseReleaseNotes(sections: ReleaseNotesSection[], limit = RELEASE_NOTES_COLLAPSED_ITEMS): { sections: ReleaseNotesSection[]; hidden: number } {
+  const shown: ReleaseNotesSection[] = [];
+  let left = limit;
+  let hidden = 0;
+  for (const section of sections) {
+    if (left > 0) shown.push({ title: section.title, items: section.items.slice(0, left) });
+    hidden += Math.max(0, section.items.length - left);
+    left = Math.max(0, left - section.items.length);
+  }
+  return { sections: shown, hidden };
+}

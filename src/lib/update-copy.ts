@@ -24,7 +24,7 @@ export const UPDATE_COPY = {
   installReady:
     "Watchtower backs up the database, then replaces FamilyFi with the new release. FamilyFi is away for a minute or two; your UniFi policies stay in place meanwhile, and this page reconnects by itself.",
   // Where pre-update-backup.sh puts its dump: /var/lib/familyfi/data/backups on the app volume (docker/docker-compose.yml).
-  backupWhere: "Before installing, the database is backed up to the backups folder on FamilyFi's data volume, familyfi-app_data. The newest three backups are kept.",
+  backupWhere: "Before installing, the database is backed up to the backups folder on FamilyFi's data volume (familyfi-app_data unless APP_DATA_VOLUME_NAME names another). The newest three backups are kept.",
   installConfirm: "FamilyFi restarts on the new release and is away for a minute or two.",
   installFailed: "Could not start the install.",
   installOverlay: "FamilyFi restarts on the new release. Your UniFi policies stay in place, and this page reloads by itself when it is back.",

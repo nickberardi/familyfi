@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseReleaseNotes, releaseNoteParts } from "@/lib/release-notes";
+import { collapseReleaseNotes, parseReleaseNotes, releaseNoteParts } from "@/lib/release-notes";
 
 const words = (...texts: string[]) => texts.map((text) => [{ text }]);
 
@@ -52,5 +52,25 @@ describe("parseReleaseNotes", () => {
   it("leaves package names and addresses that look like mentions as words", () => {
     expect(releaseNoteParts("Bump @node-rs/argon2 from 2.2.1 to 2.2.2")).toEqual([{ text: "Bump @node-rs/argon2 from 2.2.1 to 2.2.2" }]);
     expect(releaseNoteParts("Mail nick@example.com")).toEqual([{ text: "Mail nick@example.com" }]);
+  });
+});
+
+describe("collapseReleaseNotes", () => {
+  const sections = [
+    { title: "New", items: [[{ text: "a" }], [{ text: "b" }], [{ text: "c" }]] },
+    { title: "Fixed", items: [[{ text: "d" }], [{ text: "e" }]] },
+  ];
+
+  it("keeps the first items across sections and counts the rest", () => {
+    expect(collapseReleaseNotes(sections, 4)).toEqual({
+      sections: [sections[0], { title: "Fixed", items: [[{ text: "d" }]] }],
+      hidden: 1,
+    });
+    expect(collapseReleaseNotes(sections, 2)).toEqual({ sections: [{ title: "New", items: [[{ text: "a" }], [{ text: "b" }]] }], hidden: 3 });
+  });
+
+  it("hides nothing when every item fits", () => {
+    expect(collapseReleaseNotes(sections, 5)).toEqual({ sections, hidden: 0 });
+    expect(collapseReleaseNotes([], 4)).toEqual({ sections: [], hidden: 0 });
   });
 });

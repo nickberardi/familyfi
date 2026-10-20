@@ -236,7 +236,7 @@ test("the Update page installs through the updater and keeps its schedule", { ta
     currentVersion: "0.5.1",
     latestVersion: "0.6.0",
     releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
-    releaseNotes: "## New\n- Automatic updates",
+    releaseNotes: "## New\n- Automatic updates\n- Two\n- Three\n## Fixed\n- Four\n- Five by @nickberardi in https://github.com/nickberardi/familyfi/pull/250",
     checkedAt: "2026-09-22T12:00:00.000Z",
     lastSuccessfulAt: "2026-09-22T12:00:00.000Z",
     error: null,
@@ -252,7 +252,8 @@ test("the Update page installs through the updater and keeps its schedule", { ta
     updater: { configured: true },
     schedule: { enabled: true, days: [0], time: "00:00" },
     nextRunAt: "2026-10-11T04:00:00.000Z",
-    lastRun: null,
+    // An earlier release's install says nothing about the one on offer, so the card leaves it out.
+    lastRun: { targetVersion: "0.5.1", status: "succeeded", requestedAt: "2026-10-01T12:00:00.000Z", error: null },
   };
   const scheduleWrites: unknown[] = [];
   await page.route("**/api/v1/settings/update", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(settings) }));
@@ -273,6 +274,14 @@ test("the Update page installs through the updater and keeps its schedule", { ta
   await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
   const install = page.getByRole("button", { name: "Install v0.6.0", exact: true });
   await expect(install).toBeEnabled();
+  await expect(page.getByTestId("update-run")).toHaveCount(0);
+  // Long notes show their first four changes until opened; links read as short references.
+  const notes = page.getByRole("region", { name: "Release notes" });
+  await expect(notes.getByRole("listitem")).toHaveCount(4);
+  await page.getByTestId("update-notes-toggle").click();
+  await expect(notes.getByRole("listitem")).toHaveCount(5);
+  await expect(notes.getByRole("link", { name: "pull #250" })).toBeVisible();
+  await expect(notes.getByRole("link", { name: "@nickberardi" })).toBeVisible();
   await install.click();
   await expect(page.getByTestId("update-run").first()).toContainText("Installing v0.6.0");
   await expect(install).toBeDisabled();
