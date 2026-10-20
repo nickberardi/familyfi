@@ -8,14 +8,20 @@ export function versionLabel(version: string): string {
   return `v${version.replace(/^v/i, "")}`;
 }
 
-/** What an install does, in order: Watchtower pulls and backs up, then the new release starts. */
-export const INSTALL_STEPS = [
-  "Download the new release",
-  "Back up the database",
-  "Restart FamilyFi",
-  "Apply database changes",
-  "Reconcile app-owned policies",
-] as const;
+/**
+ * What an install does, in order: Watchtower pulls and backs up (scripts/runtime/pre-update-backup.sh),
+ * then the new release starts. The backup's detail says where the dump is kept.
+ */
+export const INSTALL_STEPS: readonly { title: string; detail?: string }[] = [
+  { title: "Download the new release" },
+  {
+    title: "Back up the database",
+    detail: "Saved to the backups folder on FamilyFi's data volume, familyfi-app_data. The newest three are kept.",
+  },
+  { title: "Start the new release" },
+  { title: "Apply database changes" },
+  { title: "Reconcile app-owned policies" },
+];
 
 /** The update's words, on Settings' Maintenance tab. */
 export const UPDATE_COPY = {

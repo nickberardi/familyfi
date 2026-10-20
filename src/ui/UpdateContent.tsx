@@ -133,15 +133,22 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
             {copy.title}
           </Text>
           <Text style={[text(14, 20, "muted"), styles.installNote]}>{configured ? COPY.installReady : COPY.installNote}</Text>
-          {runText}
+          {install?.settings?.lastRun?.status === "succeeded" ? null : runText}
           {error ? <Text style={[text(14, 20, "danger"), styles.runLine]}>{error}</Text> : null}
         </View>
-        {INSTALL_STEPS.map((step, index) => (
-          <View key={step} style={[styles.step, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
-            <View aria-hidden style={[styles.stepDot, { backgroundColor: ui.color("field") }]} />
-            <Text style={[text(14, 21, "muted"), styles.grow]}>{step}</Text>
-          </View>
-        ))}
+        <View role="list">
+          {INSTALL_STEPS.map((step, index) => (
+            <View key={step.title} role="listitem" style={[styles.step, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
+              <View aria-hidden style={[styles.stepNumber, { backgroundColor: ui.color("field") }]}>
+                <Text style={[text(14, 20, "muted"), styles.bold]}>{index + 1}</Text>
+              </View>
+              <View style={styles.grow}>
+                <Text style={text(14, 21, step.detail ? "ink" : "muted")}>{step.title}</Text>
+                {step.detail ? <Text style={text(14, 20, "muted")}>{step.detail}</Text> : null}
+              </View>
+            </View>
+          ))}
+        </View>
         <View style={styles.actions}>
           {onNotNow ? (
             <Text role="button" onPress={onNotNow} style={[text(14, 21, "muted"), styles.bold, styles.outline, { borderColor: ui.color("control-line") }]} testID="update-not-now">
@@ -184,7 +191,7 @@ const styles = StyleSheet.create({
   item: { flexDirection: "row", gap: 8, paddingLeft: 4 },
   installNote: { marginTop: 2 },
   step: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 11 },
-  stepDot: { width: 22, height: 22, borderRadius: 11, flexShrink: 0 },
+  stepNumber: { width: 22, height: 22, borderRadius: 11, flexShrink: 0, alignItems: "center", justifyContent: "center" },
   actions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, paddingHorizontal: 18, paddingVertical: 14 },
   outline: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, overflow: "hidden" },
   install: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
