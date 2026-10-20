@@ -46,10 +46,19 @@ remove_tree() {
 # that job's cache and its Go-unrelated image layers, so while one runs, only data unused
 # for a day goes. Five agents share one disk and are rarely all idle, so without this the
 # full prune almost never ran and the disk filled.
+# Tagged images stay while another job runs: `until` counts from when an image was built, so
+# moby/buildkit and postgres always qualified, and deleting one while a sibling job pulled it
+# failed that pull with "lease does not exist". Only when the disk runs low do they go anyway.
+free_kib() {
+  df -kP / | awk 'NR > 1 { print $4 }'
+}
 if command -v docker >/dev/null 2>&1 && [ "$others" -ne 0 ]; then
   docker container prune --force --filter until=6h >/dev/null 2>&1 || true
-  docker image prune --all --force --filter until=24h >/dev/null 2>&1 || true
+  docker image prune --force --filter until=24h >/dev/null 2>&1 || true
   docker builder prune --all --force --filter until=24h >/dev/null 2>&1 || true
+  if [ "$(free_kib)" -lt $((20 * 1024 * 1024)) ]; then
+    docker image prune --all --force --filter until=24h >/dev/null 2>&1 || true
+  fi
 fi
 if command -v docker >/dev/null 2>&1 && [ "$others" -eq 0 ]; then
   # Test databases of a job killed before scripts/test.py could remove them; prune skips running containers.

@@ -7,7 +7,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -81,7 +82,7 @@ describe("the release version", () => {
     expect(job).toBeDefined();
     expect(job).toContain('npm pkg set "version=$tag_version"');
     expect(job).toContain("openapi/familyfi.v1.yaml");
-    expect(job).toContain("gh pr create --base main");
+    expect(job).toContain(`{base: "main", head: $head, title: $title, body: $body}`);
   });
 });
 
@@ -89,7 +90,7 @@ describe("the cloudflared bump", () => {
   it("opens a PR from the update script's pin", () => {
     const workflow = read(".github/workflows/cloudflared.yml");
     expect(workflow).toContain('version="$(scripts/update-cloudflared.sh)"');
-    expect(workflow).toContain("gh pr create --base main");
+    expect(workflow).toContain(`{base: "main", head: $head, title: $title, body: $body}`);
   });
 
   it("refuses a version that is not one", () => {
@@ -134,5 +135,50 @@ describe("scripts/ paths", () => {
         expect(existsSync(path.join(repoRoot, named)), `${source} names ${named}`).toBe(true);
       }
     }
+  });
+});
+
+describe("scripts/ci/runner-cleanup.sh", () => {
+  /** The docker commands the cleanup runs while `workers` jobs share the daemon and `freeGiB` is free. */
+  function dockerCalls(workers: number, freeGiB: number) {
+    const bin = mkdtempSync(path.join(os.tmpdir(), "familyfi-cleanup-"));
+    try {
+      const fake = (name: string, body: string) => {
+        writeFileSync(path.join(bin, name), `#!/bin/sh\n${body}\n`);
+        chmodSync(path.join(bin, name), 0o755);
+      };
+      fake("docker", `echo "$*" >> "${bin}/calls"`);
+      fake("pgrep", `echo ${workers}`);
+      fake("df", `echo "Filesystem 1024-blocks Used Available Capacity Mounted"; echo "/dev/root 128000000 1 ${freeGiB * 1024 * 1024} 1% /"`);
+      fake("sudo", "exit 1");
+      fake("find", "exit 0");
+      const result = spawnSync("sh", [path.join(repoRoot, "scripts/ci/runner-cleanup.sh")], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        // Only the fake directory: never this machine's caches, /tmp or Docker.
+        env: { NODE_ENV: "test", PATH: `${bin}:/usr/bin:/bin`, HOME: bin },
+      });
+      expect(result.status).toBe(0);
+      return existsSync(path.join(bin, "calls")) ? readFileSync(path.join(bin, "calls"), "utf8").trim().split("\n") : [];
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
+  }
+
+  // v0.30.1's release lost its container job when a sibling job's cleanup removed
+  // moby/buildkit mid-pull: "failed commit on ref ...: lease does not exist".
+  it("keeps tagged images while another job shares the daemon", () => {
+    const calls = dockerCalls(2, 80);
+    expect(calls).toContain("image prune --force --filter until=24h");
+    expect(calls.filter((c) => c.startsWith("image prune --all"))).toEqual([]);
+    expect(calls.filter((c) => c.startsWith("system prune"))).toEqual([]);
+  });
+
+  it("removes old tagged images anyway when the disk runs low", () => {
+    expect(dockerCalls(2, 10)).toContain("image prune --all --force --filter until=24h");
+  });
+
+  it("prunes everything when it is the only job", () => {
+    expect(dockerCalls(1, 80)).toContain("system prune --all --force --volumes");
   });
 });

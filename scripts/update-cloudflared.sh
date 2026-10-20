@@ -4,9 +4,10 @@
 # version. With no argument it takes Cloudflare's latest release.
 # Each hash is computed from the download and must also appear in the release notes, so a
 # bad download or a swapped asset fails rather than being pinned. Reading the notes and
-# finding the latest release need `gh`; given a version without `gh`, the notes check is
-# skipped with a warning, except under CI, where it fails. Prints the version it pinned. .github/workflows/cloudflared.yml
-# runs it twice a month and opens a PR when the pin changes.
+# finding the latest release ask GitHub's API with curl and jq, with GH_TOKEN when it is set;
+# when the notes can't be read, their check is skipped with a warning, except under CI, where
+# it fails. Prints the version it pinned. .github/workflows/cloudflared.yml runs it twice a
+# month and opens a PR when the pin changes.
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,16 +15,24 @@ dockerfile="$root/docker/Dockerfile"
 setup="$root/docs/setup.md"
 repo="cloudflare/cloudflared"
 
+release() {
+  if [ -n "${GH_TOKEN:-}" ]; then
+    curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$repo/releases/$1"
+  else
+    curl -fsSL --retry 3 "https://api.github.com/repos/$repo/releases/$1"
+  fi
+}
+
 version="${1:-}"
 if [ -z "$version" ]; then
-  version="$(gh release view --repo "$repo" --json tagName --jq .tagName)"
+  version="$(release latest | jq -r .tag_name)"
 fi
 case "$version" in
   *[!0-9.]* | "") echo "not a cloudflared version: $version" >&2; exit 2 ;;
 esac
 
 notes=""
-if command -v gh >/dev/null 2>&1 && notes="$(gh release view "$version" --repo "$repo" --json body --jq .body 2>/dev/null)"; then
+if notes="$(release "tags/$version" 2>/dev/null | jq -er .body)"; then
   :
 else
   notes=""

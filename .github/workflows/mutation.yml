@@ -14,12 +14,13 @@ permissions:
 
 jobs:
   mutation:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/runner-cleanup
       - name: Skip a week with no code change
         id: changed
         run: |

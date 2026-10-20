@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   bump:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
     timeout-minutes: 10
     permissions:
       contents: write
@@ -28,17 +28,21 @@ jobs:
           # RELEASE_PR_TOKEN (contents and pull requests: write) lets them; without it, the PR
           # needs a push or a close and reopen by a person before CI runs.
           token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+      - uses: ./.github/actions/runner-cleanup
       - name: Open a PR when a newer cloudflared is out
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
         run: |
+          # curl and jq rather than the GitHub CLI, which a self-hosted runner need not have.
+          pulls="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls"
+          api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
           version="$(scripts/update-cloudflared.sh)"
           if git diff --quiet docker/Dockerfile docs/setup.md; then
             echo "cloudflared is already pinned to $version" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           branch="deps/cloudflared-$version"
-          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+          if [ -n "$(api "$pulls?state=open&head=$GITHUB_REPOSITORY_OWNER:$branch" | jq -r '.[].number')" ]; then
             echo "A PR from $branch is already open" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -47,5 +51,6 @@ jobs:
           git switch -c "$branch"
           git commit -am "Bump cloudflared to $version"
           git push --force origin "$branch"
-          gh pr create --base main --head "$branch" --title "Bump cloudflared to $version" \
-            --body "Pins the image's cloudflared to [$version](https://github.com/cloudflare/cloudflared/releases/tag/$version). The sidecar example in docs/setup.md follows. Both Linux hashes were computed from the downloads and match the release notes. Read the notes for changes to quick tunnels or \`tunnel login\` before merging."
+          body="Pins the image's cloudflared to [$version](https://github.com/cloudflare/cloudflared/releases/tag/$version). The sidecar example in docs/setup.md follows. Both Linux hashes were computed from the downloads and match the release notes. Read the notes for changes to quick tunnels or \`tunnel login\` before merging."
+          jq -n --arg head "$branch" --arg title "Bump cloudflared to $version" --arg body "$body" \
+            '{base: "main", head: $head, title: $title, body: $body}' | api -X POST --data @- "$pulls" >/dev/null
