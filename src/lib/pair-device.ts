@@ -61,7 +61,7 @@ export type AppStore = { id: string; label: string; badge: string; badgeWidth: n
 /** Google Play's closed beta: a tester joins the group, opts in, then installs. */
 export const PLAY_BETA = {
   title: "Join the Android beta",
-  sub: "FamilyFi is in a closed beta on Google Play. Sign in to Google first, with the account the phone uses for Google Play: the group only offers to join once you are signed in.",
+  sub: "FamilyFi is in a closed beta on Google Play. Before you start, sign in to Google with the same account you use for Google Play on your Android phone.",
   steps: [
     { text: "Join the beta group", url: "https://groups.google.com/g/familyfi-beta" },
     { text: "Become a tester", url: "https://play.google.com/apps/testing/com.getfamilyfi" },
