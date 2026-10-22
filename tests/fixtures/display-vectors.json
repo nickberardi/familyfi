@@ -15872,6 +15872,1697 @@
       "expected": []
     },
     {
+      "fn": "customPauseLabel",
+      "name": "whole hours",
+      "input": {
+        "custom": {
+          "kind": "for",
+          "minutes": 180
+        }
+      },
+      "expected": "For 3 hours"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "one hour",
+      "input": {
+        "custom": {
+          "kind": "for",
+          "minutes": 60
+        }
+      },
+      "expected": "For an hour"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "hour and minutes",
+      "input": {
+        "custom": {
+          "kind": "for",
+          "minutes": 90
+        }
+      },
+      "expected": "For 1 hour 30 minutes"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "one hour one minute",
+      "input": {
+        "custom": {
+          "kind": "for",
+          "minutes": 61
+        }
+      },
+      "expected": "For 1 hour 1 minute"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "minutes only",
+      "input": {
+        "custom": {
+          "kind": "for",
+          "minutes": 45
+        }
+      },
+      "expected": "For 45 minutes"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "a day",
+      "input": {
+        "custom": {
+          "kind": "for",
+          "minutes": 1440
+        }
+      },
+      "expected": "For 24 hours"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "evening time",
+      "input": {
+        "custom": {
+          "kind": "until",
+          "clock": "21:00"
+        }
+      },
+      "expected": "Until 9:00 PM"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "just after midnight",
+      "input": {
+        "custom": {
+          "kind": "until",
+          "clock": "00:05"
+        }
+      },
+      "expected": "Until 12:05 AM"
+    },
+    {
+      "fn": "customPauseLabel",
+      "name": "noon",
+      "input": {
+        "custom": {
+          "kind": "until",
+          "clock": "12:30"
+        }
+      },
+      "expected": "Until 12:30 PM"
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "for a duration from now",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 180
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 3 hours",
+        "note": "back at 3:00 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 180
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "until a time later today",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "21:00"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 9:00 PM",
+        "note": "today",
+        "request": {
+          "kind": "pauseUntil",
+          "until": "2026-09-29T01:00:00.000Z"
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "until a time tomorrow",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "08:00"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 8:00 AM",
+        "note": "tomorrow",
+        "request": {
+          "kind": "pauseUntil",
+          "until": "2026-09-29T12:00:00.000Z"
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend a duration from the pause's end",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": "2026-09-28T19:00:00Z",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 120
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 2 hours",
+        "note": "back at 5:00 PM",
+        "request": {
+          "kind": "extend",
+          "minutes": 120
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend to a time after the pause's end",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": "2026-09-28T19:00:00Z",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "21:00"
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 9:00 PM",
+        "note": "today",
+        "request": {
+          "kind": "extend",
+          "minutes": 360
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend to a time the pause's end has passed",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": "2026-09-28T19:00:00Z",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "14:00"
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 2:00 PM",
+        "note": "tomorrow",
+        "request": {
+          "kind": "extend",
+          "minutes": 1380
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend an open-ended pause re-pauses",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "back at 12:30 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "no minutes is no choice",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 0
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "an unreadable clock is no choice",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "9:00"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": null
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "until across a daylight saving change",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "09:00"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-10-31T23:00:00Z"
+      },
+      "expected": {
+        "label": "Until 9:00 AM",
+        "note": "tomorrow",
+        "request": {
+          "kind": "pauseUntil",
+          "until": "2026-11-01T14:00:00.000Z"
+        }
+      }
+    },
+    {
+      "fn": "rulePauseSheetCustom",
+      "name": "for a duration",
+      "input": {
+        "rule": {
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "blocks again at 12:30 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "rulePauseSheetCustom",
+      "name": "until a time",
+      "input": {
+        "rule": {
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": null,
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "17:15"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 5:15 PM",
+        "note": "today",
+        "request": {
+          "kind": "pauseUntil",
+          "until": "2026-09-28T21:15:00.000Z"
+        }
+      }
+    },
+    {
+      "fn": "rulePauseSheetCustom",
+      "name": "extend from the pause's end",
+      "input": {
+        "rule": {
+          "pause": {
+            "active": true,
+            "until": "2026-09-28T19:00:00Z",
+            "kind": "pause",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 45
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 45 minutes",
+        "note": "blocks again at 3:45 PM",
+        "request": {
+          "kind": "extend",
+          "minutes": 45
+        }
+      }
+    },
+    {
+      "fn": "unblockSheetCustom",
+      "name": "for a duration",
+      "input": {
+        "unblock": null,
+        "custom": {
+          "kind": "for",
+          "minutes": 45
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 45 minutes",
+        "note": "blocks again at 12:45 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 45
+        }
+      }
+    },
+    {
+      "fn": "unblockSheetCustom",
+      "name": "until a time",
+      "input": {
+        "unblock": null,
+        "custom": {
+          "kind": "until",
+          "clock": "20:00"
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 8:00 PM",
+        "note": "today",
+        "request": {
+          "kind": "pauseUntil",
+          "until": "2026-09-29T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "fn": "unblockSheetCustom",
+      "name": "extend from the unblock's end",
+      "input": {
+        "unblock": {
+          "until": "2026-09-28T22:00:00.000Z",
+          "by": null
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "blocks again at 6:30 PM",
+        "request": {
+          "kind": "extend",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "unblockSheetCustom",
+      "name": "a new unblock ignores an earlier end",
+      "input": {
+        "unblock": {
+          "until": "2026-09-28T22:00:00.000Z",
+          "by": null
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "blocks again at 12:30 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "withCustomChoices",
+      "name": "the last choice leads",
+      "input": {
+        "options": [
+          {
+            "label": "For 30 minutes",
+            "note": "back at 12:30 PM",
+            "request": {
+              "kind": "pauseFor",
+              "minutes": 30
+            }
+          },
+          {
+            "label": "For an hour",
+            "note": "back at 1:00 PM",
+            "request": {
+              "kind": "pauseFor",
+              "minutes": 60
+            }
+          },
+          {
+            "label": "Until Bedtime ends",
+            "note": "back at 7:00 AM",
+            "request": {
+              "kind": "pauseUntil",
+              "until": "2026-09-29T11:00:00.000Z"
+            }
+          },
+          {
+            "label": "Until I unblock",
+            "note": "no end time",
+            "request": {
+              "kind": "pauseUntil",
+              "until": null
+            }
+          }
+        ],
+        "recent": {
+          "label": "For 3 hours",
+          "note": "back at 3:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 180
+          }
+        }
+      },
+      "expected": [
+        {
+          "label": "For 3 hours",
+          "note": "back at 3:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 180
+          }
+        },
+        {
+          "label": "For 30 minutes",
+          "note": "back at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "back at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until Bedtime ends",
+          "note": "back at 7:00 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-29T11:00:00.000Z"
+          }
+        },
+        {
+          "label": "For…",
+          "note": "choose how long",
+          "picker": "for"
+        },
+        {
+          "label": "Until…",
+          "note": "choose a time",
+          "picker": "until"
+        },
+        {
+          "label": "Until I unblock",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "withCustomChoices",
+      "name": "a last choice a quick option repeats",
+      "input": {
+        "options": [
+          {
+            "label": "For 30 minutes",
+            "note": "back at 12:30 PM",
+            "request": {
+              "kind": "pauseFor",
+              "minutes": 30
+            }
+          },
+          {
+            "label": "For an hour",
+            "note": "back at 1:00 PM",
+            "request": {
+              "kind": "pauseFor",
+              "minutes": 60
+            }
+          },
+          {
+            "label": "Until Bedtime ends",
+            "note": "back at 7:00 AM",
+            "request": {
+              "kind": "pauseUntil",
+              "until": "2026-09-29T11:00:00.000Z"
+            }
+          },
+          {
+            "label": "Until I unblock",
+            "note": "no end time",
+            "request": {
+              "kind": "pauseUntil",
+              "until": null
+            }
+          }
+        ],
+        "recent": {
+          "label": "For an hour",
+          "note": "back at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        }
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "back at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "back at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until Bedtime ends",
+          "note": "back at 7:00 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-29T11:00:00.000Z"
+          }
+        },
+        {
+          "label": "For…",
+          "note": "choose how long",
+          "picker": "for"
+        },
+        {
+          "label": "Until…",
+          "note": "choose a time",
+          "picker": "until"
+        },
+        {
+          "label": "Until I unblock",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "withCustomChoices",
+      "name": "no last choice",
+      "input": {
+        "options": [
+          {
+            "label": "For 30 minutes",
+            "note": "back at 12:30 PM",
+            "request": {
+              "kind": "pauseFor",
+              "minutes": 30
+            }
+          },
+          {
+            "label": "For an hour",
+            "note": "back at 1:00 PM",
+            "request": {
+              "kind": "pauseFor",
+              "minutes": 60
+            }
+          },
+          {
+            "label": "Until Bedtime ends",
+            "note": "back at 7:00 AM",
+            "request": {
+              "kind": "pauseUntil",
+              "until": "2026-09-29T11:00:00.000Z"
+            }
+          },
+          {
+            "label": "Until I unblock",
+            "note": "no end time",
+            "request": {
+              "kind": "pauseUntil",
+              "until": null
+            }
+          }
+        ],
+        "recent": null
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "back at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "back at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until Bedtime ends",
+          "note": "back at 7:00 AM",
+          "request": {
+            "kind": "pauseUntil",
+            "until": "2026-09-29T11:00:00.000Z"
+          }
+        },
+        {
+          "label": "For…",
+          "note": "choose how long",
+          "picker": "for"
+        },
+        {
+          "label": "Until…",
+          "note": "choose a time",
+          "picker": "until"
+        },
+        {
+          "label": "Until I unblock",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
+      "fn": "withCustomChoices",
+      "name": "an unblock with no open choice",
+      "input": {
+        "options": [
+          {
+            "label": "Until 6:00 PM",
+            "note": "when Video ends",
+            "request": {
+              "kind": "current"
+            }
+          }
+        ],
+        "recent": null
+      },
+      "expected": [
+        {
+          "label": "Until 6:00 PM",
+          "note": "when Video ends",
+          "request": {
+            "kind": "current"
+          }
+        },
+        {
+          "label": "For…",
+          "note": "choose how long",
+          "picker": "for"
+        },
+        {
+          "label": "Until…",
+          "note": "choose a time",
+          "picker": "until"
+        }
+      ]
+    },
+    {
+      "fn": "withCustomChoices",
+      "name": "an unblock's More time",
+      "input": {
+        "options": [
+          {
+            "label": "For 30 minutes",
+            "note": "blocks again at 6:30 PM",
+            "request": {
+              "kind": "extend",
+              "minutes": 30
+            }
+          },
+          {
+            "label": "For an hour",
+            "note": "blocks again at 7:00 PM",
+            "request": {
+              "kind": "extend",
+              "minutes": 60
+            }
+          }
+        ],
+        "recent": {
+          "label": "Until 9:00 PM",
+          "note": "today",
+          "request": {
+            "kind": "extend",
+            "minutes": 180
+          }
+        }
+      },
+      "expected": [
+        {
+          "label": "Until 9:00 PM",
+          "note": "today",
+          "request": {
+            "kind": "extend",
+            "minutes": 180
+          }
+        },
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 6:30 PM",
+          "request": {
+            "kind": "extend",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 7:00 PM",
+          "request": {
+            "kind": "extend",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "For…",
+          "note": "choose how long",
+          "picker": "for"
+        },
+        {
+          "label": "Until…",
+          "note": "choose a time",
+          "picker": "until"
+        }
+      ]
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "a duration",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":180}"
+      },
+      "expected": {
+        "kind": "for",
+        "minutes": 180
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "a time of day",
+      "input": {
+        "stored": "{\"kind\":\"until\",\"clock\":\"21:00\"}"
+      },
+      "expected": {
+        "kind": "until",
+        "clock": "21:00"
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "the longest duration",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":1440}"
+      },
+      "expected": {
+        "kind": "for",
+        "minutes": 1440
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "nothing kept",
+      "input": {
+        "stored": null
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "empty",
+      "input": {
+        "stored": ""
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "not JSON",
+      "input": {
+        "stored": "not json"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "JSON null",
+      "input": {
+        "stored": "null"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "no minutes",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":0}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "fractional minutes",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":1.5}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "longer than a day",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":1441}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "minutes as text",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":\"30\"}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "an hour past 23",
+      "input": {
+        "stored": "{\"kind\":\"until\",\"clock\":\"25:00\"}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "an unpadded hour",
+      "input": {
+        "stored": "{\"kind\":\"until\",\"clock\":\"9:00\"}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "an unknown kind",
+      "input": {
+        "stored": "{\"kind\":\"later\"}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "an array",
+      "input": {
+        "stored": "[1]"
+      },
+      "expected": null
+    },
+    {
+      "fn": "unblockSheetCustom",
+      "name": "More time with no unblock re-unblocks",
+      "input": {
+        "unblock": null,
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "blocks again at 12:30 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend a pause whose end has passed counts from now",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": "2026-09-28T15:00:00Z",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "back at 12:30 PM",
+        "request": {
+          "kind": "extend",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "rulePauseSheetCustom",
+      "name": "extend an open-ended pause re-pauses",
+      "input": {
+        "rule": {
+          "pause": {
+            "active": true,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "blocks again at 12:30 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend to a time from an end between minutes rounds up",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": "2026-09-28T19:00:30.000Z",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "21:00"
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 9:00 PM",
+        "note": "today",
+        "request": {
+          "kind": "extend",
+          "minutes": 360
+        }
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "minutes written with a fraction of zero",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":30.0}"
+      },
+      "expected": {
+        "kind": "for",
+        "minutes": 30
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "minutes in exponent form",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":1e2}"
+      },
+      "expected": {
+        "kind": "for",
+        "minutes": 100
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "negative minutes",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":-5}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "minutes as true",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":true}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "groupStatus",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "dns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "tone": "on",
+        "label": "Online · Dinner at 6:00 PM"
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "dns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Block",
+          "run": "block"
+        },
+        "more": null
+      }
+    },
+    {
+      "fn": "rulesBlockingGroup",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "dns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": []
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "dns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-downtime",
+          "tone": null,
+          "title": "TV downtime",
+          "times": "Dinner 6 PM–8 PM, Overnight 11 PM–7 AM",
+          "state": null,
+          "live": false,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
+    },
+    {
       "fn": "watchNoun",
       "name": "apple",
       "input": {
