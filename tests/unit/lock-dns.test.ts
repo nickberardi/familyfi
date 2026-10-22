@@ -13,6 +13,9 @@ import type { Group } from "@/lib/types";
 import { lockDnsExemptions, setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
 import { planRulePolicies, rulePolicyWrite, type PlanRule } from "@/server/unifi/plan-rules";
 
+const dnsLookup = vi.hoisted(() => vi.fn());
+vi.mock("node:dns/promises", () => ({ lookup: dnsLookup }));
+
 const planRule = (patch: Partial<PlanRule> = {}): PlanRule => ({
   id: LOCK_DNS_RULE_ID,
   name: "Lock DNS",
@@ -154,7 +157,7 @@ describe("Lock DNS leaves the household's own DNS alone", () => {
       const network = (servers: string[] | null) => ({ enabled: true, ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: "SERVER", dnsServerIpAddressesOverride: servers } } });
       const exempt = await lockDnsExemptions({
         networks: [network(["9.9.9.11", "192.168.1.53"]), network(null)],
-        resolverUrls: ["https://family.cloudflare-dns.com/dns-query", null, "https://missing.example/dns-query", "https://[2620:fe::11]/dns-query"],
+        resolverUrls: ["https://family.cloudflare-dns.com/dns-query", null, "https://missing.example/dns-query", "https://[2620:fe::11]/dns-query", "not a resolver address"],
       });
       expect(exempt).not.toBeNull();
       // A server on the network itself, like a Pi-hole, needs nothing; a name that cannot be looked up keeps only its name open.
@@ -199,6 +202,42 @@ describe("working out the household's own DNS", () => {
       await lockDnsExemptions({ networks: [], resolverUrls: ["https://a.example/dns-query", "https://b.example/dns-query", "https://c.example/dns-query"] });
       expect(most).toBe(3);
     } finally {
+      setLockDnsResolverForTests(undefined);
+    }
+  });
+
+  it("on a real gateway, asks the system resolver, and gives up on one that is slow", async () => {
+    vi.stubEnv("FAMILYFI_MODE", "prod");
+    vi.useFakeTimers();
+    let fail: (error: Error) => void = () => {};
+    dnsLookup.mockImplementation(async (host: string) => {
+      if (host === "fast.example") return [{ address: "192.0.2.10", family: 4 }];
+      return new Promise((_, reject) => (fail = reject));
+    });
+    try {
+      expect(await lockDnsExemptions({ networks: [], resolverUrls: ["https://fast.example/dns-query"] })).toEqual({ addresses: ["192.0.2.10"], hosts: ["fast.example"] });
+      expect(dnsLookup).toHaveBeenCalledWith("fast.example", { all: true });
+      const slow = lockDnsExemptions({ networks: [], resolverUrls: ["https://slow.example/dns-query"] });
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(await slow).toEqual({ addresses: [], hosts: ["slow.example"] });
+      // Vitest fails the run on an unhandled rejection; the race has already handled this late one.
+      fail(new Error("ETIMEOUT"));
+      await vi.advanceTimersByTimeAsync(0);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+      setLockDnsResolverForTests(undefined);
+    }
+  });
+
+  it("never looks a resolver up for the UniFi mock", async () => {
+    vi.stubEnv("FAMILYFI_MODE", "dev");
+    dnsLookup.mockClear();
+    try {
+      expect(await lockDnsExemptions({ networks: [], resolverUrls: ["https://mock.example/dns-query"] })).toEqual({ addresses: [], hosts: ["mock.example"] });
+      expect(dnsLookup).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
       setLockDnsResolverForTests(undefined);
     }
   });
