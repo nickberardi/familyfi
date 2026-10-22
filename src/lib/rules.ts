@@ -24,7 +24,7 @@ export const QUARANTINE_RULE_ID = "quarantine";
  * paused and allowed like any rule. It never blocks the internet, so a group's status, block and
  * unblock leave it out.
  */
-export const LOCK_DNS_RULE_ID = "lock-dns";
+export const LOCK_DNS_RULE_ID = "dns";
 
 export type Rule = {
   id: string;
@@ -45,7 +45,7 @@ export type Rule = {
   useGeneratedName: boolean;
   policyNames: string[];
   /** Set on a rule FamilyFi provides, which cannot be edited or deleted; null on the household's own. */
-  builtIn: "quarantine" | "lockDns" | null;
+  builtIn: "quarantine" | "dns" | null;
 };
 
 export const MAX_RULE_NAME = 60;
@@ -100,7 +100,7 @@ export function catalogLabel(kind: "category" | "app", id: number, names: Readon
 
 /** The rules that block something for the group. Lock DNS, which blocks only the ways around its DNS, is not one. */
 export function groupScopedRules(rules: Rule[], groupId: string): Rule[] {
-  return rules.filter((rule) => rule.scope === "group" && rule.builtIn !== "lockDns" && rule.groupIds.includes(groupId));
+  return rules.filter((rule) => rule.scope === "group" && rule.builtIn !== "dns" && rule.groupIds.includes(groupId));
 }
 
 /** The group's internet rules, oldest first. */
@@ -219,7 +219,7 @@ export function alwaysWindow(ruleName: string): InternetWindow {
 /** What a rule blocks, in the words its card uses. */
 export function ruleBlocksLabel(rule: Pick<Rule, "kind" | "targetIds" | "domains"> & Partial<Pick<Rule, "builtIn">>, catalogNames: Map<string, string>): string {
   if (rule.builtIn === "quarantine") return "All internet · every unassigned device";
-  if (rule.builtIn === "lockDns") return "Other DNS servers · everything else stays on";
+  if (rule.builtIn === "dns") return "Other DNS servers · everything else stays on";
   if (rule.kind === "internet") return "All internet · every device";
   if (rule.kind === "domain") {
     const shown = rule.domains.slice(0, 2).join(", ") + (rule.domains.length > 2 ? "…" : "");

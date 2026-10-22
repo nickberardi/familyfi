@@ -196,7 +196,7 @@ describe("Phase 3 network-scoped DPI", () => {
       { params: Promise.resolve({ id: createdBody.rule.id }) },
     );
     expect(deleted.status).toBe(200);
-    expect(await prisma().rule.count({ where: { id: { notIn: ["quarantine", "lock-dns"] } } })).toBe(0);
+    expect(await prisma().rule.count({ where: { id: { notIn: ["quarantine", "dns"] } } })).toBe(0);
   });
 
   it("Settings descope prunes network ids and deletes orphan rules (no silent desired-state orphan)", async () => {

@@ -924,7 +924,7 @@ paths:
       summary: List rules
       description: |
         Every rule, household-wide, led by the built-in quarantine rule (`builtIn: quarantine`)
-        and then the built-in Lock DNS rule (`builtIn: lockDns`). `groupId` narrows to the rules
+        and then the built-in Lock DNS rule (`builtIn: dns`). `groupId` narrows to the rules
         covering that group, which leaves quarantine out.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
@@ -3733,7 +3733,7 @@ components:
         useGeneratedName: { type: boolean, description: "Name its UniFi policies \"FamilyFi Rule <id>\" instead of after the rule." }
         builtIn:
           type: [string, "null"]
-          enum: [quarantine, lockDns, null]
+          enum: [quarantine, dns, null]
           description: |
             Set on a rule FamilyFi provides; null on the household's own. `quarantine` (id
             `quarantine`) blocks all internet for unassigned devices on managed networks. It covers
@@ -3741,7 +3741,7 @@ components:
             paused, extended and resumed like any rule, never allowed. Its `enabled` is the
             household's `quarantineEnforced`; its policies are the quarantine policies.
 
-            `lockDns` (id `lock-dns`) blocks the ways around the gateway's DNS for the groups it
+            `dns` (id `dns`) blocks the ways around the gateway's DNS for the groups it
             covers: DNS (TCP and UDP 53) and DNS over TLS (853) to the internet, and every port to
             the addresses and host names of known encrypted DNS services, which `domains` lists.
             The DNS servers the household's networks hand out and the resolvers set in FamilyFi

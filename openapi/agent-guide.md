@@ -74,7 +74,7 @@ Connect from the home network.
 - The household has a built-in rule whose id is `quarantine` (`builtIn: "quarantine"`, no groups):
   it blocks every quarantined device. You may pause, extend and resume it, which lets every
   unassigned device online meanwhile, so say so first. You cannot switch, edit or delete it.
-- The household has a built-in rule whose id is `lock-dns` (`builtIn: "lockDns"`): it stops the
+- The household has a built-in rule whose id is `dns` (`builtIn: "dns"`): it stops the
   groups it covers from using DNS servers other than the gateway, including the encrypted DNS
   services its `domains` list, so their category, app and website rules can't be gotten around. It
   never blocks the internet, so never call it a website block or offer to unblock a group for it.

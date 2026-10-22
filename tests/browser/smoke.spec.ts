@@ -664,7 +664,7 @@ test("Rules: Lock DNS is a built-in rule whose page changes only the groups it c
   const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };
   const nick = groups.find((group) => group.name === "Nick");
   expect(nick, "The mock seed must include Nick").toBeTruthy();
-  const { rule: seeded } = (await (await page.request.get("/api/v1/rules/lock-dns")).json()) as { rule: { groupIds: string[] } };
+  const { rule: seeded } = (await (await page.request.get("/api/v1/rules/dns")).json()) as { rule: { groupIds: string[] } };
   try {
     await page.goto("/rules");
     const card = page.getByTestId("rule-card-lock-dns");
@@ -682,10 +682,10 @@ test("Rules: Lock DNS is a built-in rule whose page changes only the groups it c
     await expect(page.getByText("Groups changed").first()).toBeVisible();
     await page.getByRole("button", { name: "Save" }).first().click();
     await expect(page).toHaveURL(/\/rules$/);
-    const { rule } = (await (await page.request.get("/api/v1/rules/lock-dns")).json()) as { rule: { groupIds: string[] } };
+    const { rule } = (await (await page.request.get("/api/v1/rules/dns")).json()) as { rule: { groupIds: string[] } };
     expect(rule.groupIds).toContain(nick!.id);
   } finally {
-    await page.request.patch("/api/v1/rules/lock-dns", { headers: await csrfHeaders(page), data: { groupIds: seeded.groupIds } });
+    await page.request.patch("/api/v1/rules/dns", { headers: await csrfHeaders(page), data: { groupIds: seeded.groupIds } });
   }
 });
 

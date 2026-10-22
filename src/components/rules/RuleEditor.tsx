@@ -46,7 +46,7 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
     if (loading) return null;
     return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{COPY.notFound}</p>;
   }
-  if (rule?.builtIn === "lockDns") return <LockDnsPage key={rule.id} rule={rule} />;
+  if (rule?.builtIn === "dns") return <LockDnsPage key={rule.id} rule={rule} />;
   if (rule?.builtIn) {
     return (
       <p className="p-6 text-[14px] text-[var(--ff-muted)]">

@@ -60,9 +60,9 @@ describe("dev UniFi mock household", () => {
     const byName = new Map(groups.map((group) => [group.id, group.name]));
 
     // Lock DNS is built in: on for the teens and the child.
-    const lockDns = await prisma().rule.findUniqueOrThrow({ where: { id: "lock-dns" }, include: { groups: true } });
+    const lockDns = await prisma().rule.findUniqueOrThrow({ where: { id: "dns" }, include: { groups: true } });
     expect([lockDns.enabled, lockDns.groups.map((link) => byName.get(link.groupId)).sort()]).toEqual([true, ["Abby", "Betsy", "Cassie"]]);
-    const rules = await prisma().rule.findMany({ where: { systemGroupId: null, id: { notIn: ["quarantine", "lock-dns"] } }, include: { groups: true, windows: true }, orderBy: { name: "asc" } });
+    const rules = await prisma().rule.findMany({ where: { systemGroupId: null, id: { notIn: ["quarantine", "dns"] } }, include: { groups: true, windows: true }, orderBy: { name: "asc" } });
     expect(rules.map((rule) => [rule.name, rule.kind, rule.groups.map((link) => byName.get(link.groupId)).sort(), rule.windows.length])).toEqual([
       ["Adult content", "category", ["Computers"], 0],
       ["Bedtime", "internet", ["Cassie"], 1],

@@ -312,7 +312,7 @@ const lockDns: Rule = {
   windows: [],
   useGeneratedName: false,
   policyNames: [],
-  builtIn: "lockDns",
+  builtIn: "dns",
 };
 
 describe("Lock DNS on the clients", () => {

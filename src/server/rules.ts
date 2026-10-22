@@ -77,7 +77,7 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
       : lockDns
         ? LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part))
         : rulePolicyNames({ ...rule, windows }),
-    builtIn: builtIn ? ("quarantine" as const) : lockDns ? ("lockDns" as const) : null,
+    builtIn: builtIn ? ("quarantine" as const) : lockDns ? ("dns" as const) : null,
   };
 }
 

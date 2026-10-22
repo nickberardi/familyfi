@@ -17100,7 +17100,7 @@
         },
         "rules": [
           {
-            "id": "lock-dns",
+            "id": "dns",
             "name": "Lock DNS",
             "kind": "domain",
             "scope": "group",
@@ -17124,7 +17124,7 @@
             "windows": [],
             "useGeneratedName": false,
             "policyNames": [],
-            "builtIn": "lockDns"
+            "builtIn": "dns"
           },
           {
             "id": "r-downtime",
@@ -17220,7 +17220,7 @@
         },
         "rules": [
           {
-            "id": "lock-dns",
+            "id": "dns",
             "name": "Lock DNS",
             "kind": "domain",
             "scope": "group",
@@ -17244,7 +17244,7 @@
             "windows": [],
             "useGeneratedName": false,
             "policyNames": [],
-            "builtIn": "lockDns"
+            "builtIn": "dns"
           },
           {
             "id": "r-downtime",
@@ -17343,7 +17343,7 @@
         },
         "rules": [
           {
-            "id": "lock-dns",
+            "id": "dns",
             "name": "Lock DNS",
             "kind": "domain",
             "scope": "group",
@@ -17367,7 +17367,7 @@
             "windows": [],
             "useGeneratedName": false,
             "policyNames": [],
-            "builtIn": "lockDns"
+            "builtIn": "dns"
           },
           {
             "id": "r-downtime",
@@ -17460,7 +17460,7 @@
         },
         "rules": [
           {
-            "id": "lock-dns",
+            "id": "dns",
             "name": "Lock DNS",
             "kind": "domain",
             "scope": "group",
@@ -17484,7 +17484,7 @@
             "windows": [],
             "useGeneratedName": false,
             "policyNames": [],
-            "builtIn": "lockDns"
+            "builtIn": "dns"
           },
           {
             "id": "r-downtime",
