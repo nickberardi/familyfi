@@ -2,9 +2,10 @@ import type { ApiRequest } from "./api-client";
 import { verifyManifest, type EndpointManifest } from "./companion-trust";
 import type { ConnectionProfile } from "./companion-pairing";
 import type { Group, PairedPhone, Session } from "./types";
+import { watchNoun, watchPhoneNoun, type WatchPlatform } from "./watch-app-copy";
 
 /**
- * A paired iPhone's Watches: which groups each shows, how the phone enrolls one, and what the phone
+ * A paired phone's watches (an iPhone's Apple Watches, an Android phone's Wear OS watches): which groups each shows, how the phone enrolls one, and what the phone
  * hands it. Each Watch is its own paired device, set up by the phone (its parent): it receives its
  * own bearer and refresh token, never the phone's, and talks to `/api/v1` directly with them. A phone
  * can set up several; unpairing or revoking the phone revokes them too.
@@ -82,11 +83,14 @@ export type WatchEnrollment = {
 /**
  * Enrolls the Watch the phone can reach as its own paired device, in one call: the phone invites and
  * claims it. The Watch's id is its own; enrolling the same Watch again replaces its earlier record.
+ * `displayName` is the watch's own name where the platform tells the phone one (a Wear OS watch's
+ * model); without it the household names it "Apple Watch".
  */
-export function enrollWatch(request: ApiRequest, watchId: string): Promise<WatchEnrollment> {
+export function enrollWatch(request: ApiRequest, watchId: string, displayName?: string): Promise<WatchEnrollment> {
+  const name = displayName?.trim();
   return request<WatchEnrollment>("/api/v1/paired/invites?claim=true", {
     method: "POST",
-    body: { client: "watch", clientId: watchId.toLowerCase() },
+    body: { client: "watch", clientId: watchId.toLowerCase(), ...(name ? { displayName: name } : {}) },
   });
 }
 
@@ -136,39 +140,52 @@ export function removeWatch(request: ApiRequest, watch: Pick<PairedPhone, "id">)
   return request(`/api/v1/paired/devices/${encodeURIComponent(watch.id)}`, { method: "DELETE" });
 }
 
-/** Renames one of this phone's Watches, as the household lists it; a Watch reports only "Apple Watch". */
+/** Renames one of this phone's Watches, as the household lists it; an Apple Watch reports only "Apple Watch". */
 export function renameWatch(request: ApiRequest, watch: Pick<PairedPhone, "id">, displayName: string): Promise<{ device: PairedPhone }> {
   return request(`/api/v1/paired/devices/${encodeURIComponent(watch.id)}`, { method: "PATCH", body: { displayName: displayName.trim() } });
 }
 
-/** The Watch setup screen's words. */
-export const WATCH_COPY = {
-  title: "Watch",
-  section: "Set up a Watch",
-  intro: "Open FamilyFi on the Apple Watch this iPhone is using, then tap Set up Watch here. Keep both apps open until setup finishes.",
-  setUp: "Set up Watch",
-  settingUp: "Setting up…",
-  ready: "This Watch is set up. It signs in on its own and stays signed in while it is used.",
-  unavailable: "Open FamilyFi on the paired Watch and keep the iPhone nearby.",
-  storeFailed: "The Watch could not store its session. Try setup again.",
-  noWatch: "No Apple Watch is paired with this iPhone.",
-  watches: "Watches set up from this phone",
-  none: "No Watch is set up from this phone yet.",
-  onWatch: "On this Watch",
-  choose: "Choose up to eight groups to show on this Watch.",
-  available: "More groups",
-  moveUp: "Move up",
-  moveDown: "Move down",
-  add: "Add",
-  remove: "Remove",
-  rename: "Rename",
-  renameTitle: "Rename this Watch",
-  renameBody: "The name FamilyFi lists it by, here and on the web.",
-  renameConfirm: "Save",
-  removeWatch: "Remove Watch",
-  removeTitle: "Remove this Watch?",
-  removeBody: "It stops working with this household. To use FamilyFi on it again, set it up from this phone.",
-  removeConfirm: "Remove",
-  cancel: "Cancel",
-  ipad: "Set up and manage a Watch from the iPhone it is paired with.",
-} as const;
+/** The phone's Watch screen's words, for the platform of the watches it sets up. */
+export function watchCopy(platform: WatchPlatform) {
+  const watch = watchNoun(platform);
+  const phone = watchPhoneNoun(platform);
+  const apple = platform === "apple";
+  return {
+    title: "Watch",
+    section: `Set up a ${watch}`,
+    intro: apple
+      ? "Open FamilyFi on the Apple Watch this iPhone is using, then tap Set up Watch here. Keep both apps open until setup finishes."
+      : "Open FamilyFi on the Wear OS watch connected to this phone, then tap Set up watch here. Keep both apps open until setup finishes.",
+    setUp: `Set up ${watch}`,
+    settingUp: "Setting up…",
+    ready: `This ${watch} is set up. It signs in on its own and stays signed in while it is used.`,
+    unavailable: `Open FamilyFi on the ${apple ? "paired" : "connected"} ${watch} and keep the ${phone} nearby.`,
+    storeFailed: `The ${watch} could not store its session. Try setup again.`,
+    noWatch: apple ? "No Apple Watch is paired with this iPhone." : "No Wear OS watch is connected to this phone.",
+    // An Apple Watch installs FamilyFi with the iPhone app; a Wear OS watch installs it from Google Play.
+    notInstalled: apple
+      ? "Install FamilyFi on the Apple Watch from the Watch app on this iPhone, then open it."
+      : "FamilyFi isn't on this watch yet. Install it from Google Play on the watch, then open it.",
+    install: apple ? null : "Install on watch",
+    installSent: apple ? null : "Continue on the watch to install FamilyFi.",
+    watches: "Watches set up from this phone",
+    none: `No ${watch} is set up from this phone yet.`,
+    onWatch: `On this ${watch}`,
+    choose: `Choose up to eight groups to show on this ${watch}.`,
+    available: "More groups",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    add: "Add",
+    remove: "Remove",
+    rename: "Rename",
+    renameTitle: `Rename this ${watch}`,
+    renameBody: "The name FamilyFi lists it by, here and on the web.",
+    renameConfirm: "Save",
+    removeWatch: `Remove ${watch}`,
+    removeTitle: `Remove this ${watch}?`,
+    removeBody: "It stops working with this household. To use FamilyFi on it again, set it up from this phone.",
+    removeConfirm: "Remove",
+    cancel: "Cancel",
+    tablet: apple ? "Set up and manage a Watch from the iPhone it is paired with." : "Set up and manage a watch from the phone it is connected to.",
+  } as const;
+}

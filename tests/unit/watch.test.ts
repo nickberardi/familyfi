@@ -12,6 +12,7 @@ import {
   reconcileWatches,
   removeWatch,
   renameWatch,
+  watchCopy,
   watchGroupIds,
   watchIdForDevice,
   watchProvisioning,
@@ -89,6 +90,31 @@ describe("watch", () => {
     }) as never;
     await enrollWatch(request, "ABC-123");
     expect(sent).toEqual([["/api/v1/paired/invites?claim=true", { method: "POST", body: { client: "watch", clientId: "abc-123" } }]]);
+  });
+
+  it("names the Watch when its platform tells the phone its name, and leaves a blank one to the household", async () => {
+    const sent: unknown[] = [];
+    const request = (async (path: string, init?: unknown) => {
+      sent.push(init);
+      return {};
+    }) as never;
+    await enrollWatch(request, "wear-1", "  Pixel Watch 3 ");
+    await enrollWatch(request, "wear-2", "   ");
+    expect(sent).toEqual([
+      { method: "POST", body: { client: "watch", clientId: "wear-1", displayName: "Pixel Watch 3" } },
+      { method: "POST", body: { client: "watch", clientId: "wear-2" } },
+    ]);
+  });
+
+  it("words the Watch screen for the phone's platform", () => {
+    const apple = watchCopy("apple");
+    const wear = watchCopy("wear");
+    expect([apple.setUp, apple.noWatch, apple.install]).toEqual(["Set up Watch", "No Apple Watch is paired with this iPhone.", null]);
+    expect([wear.setUp, wear.noWatch, wear.install]).toEqual(["Set up watch", "No Wear OS watch is connected to this phone.", "Install on watch"]);
+    // Every word is the same set of keys on both platforms, and only Wear OS names Google Play.
+    expect(Object.keys(wear)).toEqual(Object.keys(apple));
+    expect(JSON.stringify(apple)).not.toMatch(/Wear OS|Google Play/);
+    expect(JSON.stringify(wear)).not.toMatch(/Apple|iPhone/);
   });
 
   it("hands the Watch its own tokens and its own signed manifest, never the phone's", () => {
