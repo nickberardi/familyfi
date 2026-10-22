@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Display cases the web app and the companion app (nickberardi/familyfi-mobile, including its Apple Watch port) must pass. Each vector calls fn with the named arguments in input; instants are ISO 8601 strings and a returned instant is compared as its ISO string. See docs/testing.md.",
+  "about": "Display cases the web app and the companion app (nickberardi/familyfi-mobile, including its Apple Watch and Wear OS ports) must pass. Each vector calls fn with the named arguments in input; instants are ISO 8601 strings and a returned instant is compared as its ISO string. See docs/testing.md.",
   "vectors": [
     {
       "fn": "accessLabel",
@@ -15870,6 +15870,102 @@
         "now": "2026-10-15T20:30:00.000Z"
       },
       "expected": []
+    },
+    {
+      "fn": "watchNoun",
+      "name": "apple",
+      "input": {
+        "platform": "apple"
+      },
+      "expected": "Watch"
+    },
+    {
+      "fn": "watchNoun",
+      "name": "wear",
+      "input": {
+        "platform": "wear"
+      },
+      "expected": "watch"
+    },
+    {
+      "fn": "watchPhoneNoun",
+      "name": "apple",
+      "input": {
+        "platform": "apple"
+      },
+      "expected": "iPhone"
+    },
+    {
+      "fn": "watchPhoneNoun",
+      "name": "wear",
+      "input": {
+        "platform": "wear"
+      },
+      "expected": "phone"
+    },
+    {
+      "fn": "watchAppCopy",
+      "name": "apple",
+      "input": {
+        "platform": "apple"
+      },
+      "expected": {
+        "title": "FamilyFi",
+        "setupTitle": "Set up on iPhone",
+        "setupBody": "Open FamilyFi on your iPhone, then More → Watch.",
+        "signedOutTitle": "Signed out",
+        "signedOutBody": "Set up this Watch again in FamilyFi on your iPhone.",
+        "loading": "Checking FamilyFi",
+        "offlineTitle": "Can't reach FamilyFi",
+        "offlineBody": "Trying again…",
+        "noGroups": "Choose groups in FamilyFi on your iPhone.",
+        "notAvailable": "Not available",
+        "applying": "Applying…",
+        "stale": "Checking FamilyFi… Controls are off until it answers.",
+        "rules": "Rules",
+        "applied": "Applied.",
+        "notApplied": "The change did not fully apply.",
+        "superseded": "A newer change replaced this one.",
+        "stillApplying": "Still applying. Check the group before trying again.",
+        "unconfirmed": "Couldn't confirm the change. Check the group before trying again.",
+        "unreachable": "Can't reach FamilyFi.",
+        "signedOutError": "This Watch is signed out. Set it up again from the iPhone.",
+        "notAllowed": "This Watch can't do that.",
+        "unexpected": "FamilyFi answered unexpectedly.",
+        "refused": "FamilyFi refused the request."
+      }
+    },
+    {
+      "fn": "watchAppCopy",
+      "name": "wear",
+      "input": {
+        "platform": "wear"
+      },
+      "expected": {
+        "title": "FamilyFi",
+        "setupTitle": "Set up on phone",
+        "setupBody": "Open FamilyFi on your phone, then More → Watch.",
+        "signedOutTitle": "Signed out",
+        "signedOutBody": "Set up this watch again in FamilyFi on your phone.",
+        "loading": "Checking FamilyFi",
+        "offlineTitle": "Can't reach FamilyFi",
+        "offlineBody": "Trying again…",
+        "noGroups": "Choose groups in FamilyFi on your phone.",
+        "notAvailable": "Not available",
+        "applying": "Applying…",
+        "stale": "Checking FamilyFi… Controls are off until it answers.",
+        "rules": "Rules",
+        "applied": "Applied.",
+        "notApplied": "The change did not fully apply.",
+        "superseded": "A newer change replaced this one.",
+        "stillApplying": "Still applying. Check the group before trying again.",
+        "unconfirmed": "Couldn't confirm the change. Check the group before trying again.",
+        "unreachable": "Can't reach FamilyFi.",
+        "signedOutError": "This watch is signed out. Set it up again from the phone.",
+        "notAllowed": "This watch can't do that.",
+        "unexpected": "FamilyFi answered unexpectedly.",
+        "refused": "FamilyFi refused the request."
+      }
     }
   ]
 }

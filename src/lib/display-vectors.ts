@@ -9,6 +9,7 @@ import * as groupSchedule from "./group-schedule";
 import * as pauseSheet from "./pause-sheet";
 import * as ruleActions from "./rule-actions";
 import * as ruleWindows from "./rule-windows";
+import * as watchApp from "./watch-app-copy";
 import type { Rule } from "./rules";
 import type { Group } from "./types";
 
@@ -72,10 +73,13 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   internetState: (i) => ruleWindows.internetState(i.group, i.windows, at(i.now), i.timeZone),
   internetDayBands: (i) => ruleWindows.internetDayBands(i.group, i.windows, at(i.now), i.timeZone),
   localWeekday: (i) => ruleWindows.localWeekday(at(i.now), i.timeZone),
+  watchNoun: (i) => watchApp.watchNoun(i.platform),
+  watchPhoneNoun: (i) => watchApp.watchPhoneNoun(i.platform),
+  watchAppCopy: (i) => watchApp.watchAppCopy(i.platform),
 };
 
 /** The modules whose every exported function must have a vector, or a reason in `EXCLUDED`. */
-export const MODULES = { display, groupActions: groupActionsModule, groupSchedule, pauseSheet, ruleActions, ruleWindows };
+export const MODULES = { display, groupActions: groupActionsModule, groupSchedule, pauseSheet, ruleActions, ruleWindows, watchApp };
 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {
