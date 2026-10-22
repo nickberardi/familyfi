@@ -4,7 +4,7 @@ import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { switchQuarantineRule } from "@/server/rule-lifts";
-import { isQuarantineRule, presentRule, ruleInclude } from "@/server/rules";
+import { isLockDnsRule, isQuarantineRule, presentRule, ruleInclude, setLockDnsEnabled } from "@/server/rules";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -15,6 +15,11 @@ export async function POST(request: Request, ctx: Ctx) {
     const existing = await prisma().rule.findUnique({ where: { id } });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     if (isQuarantineRule(existing)) return switchQuarantineRule(request, session, false);
+    if (isLockDnsRule(existing)) {
+      const rule = await setLockDnsEnabled(false);
+      const change = await enqueueChange("rule");
+      return Response.json({ rule: await presentRule(rule), change });
+    }
     const rule = await prisma().rule.update({
       where: { id },
       data: { enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },

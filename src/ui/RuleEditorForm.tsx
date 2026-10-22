@@ -262,7 +262,7 @@ export function RuleEditorForm({
       </EditorSection>
 
       <EditorSection title={COPY.writes.title} note={COPY.writes.note}>
-        <Writes writes={state.writes} />
+        <RuleWritesList writes={state.writes} />
       </EditorSection>
     </View>
   );
@@ -365,7 +365,7 @@ const VERB_STYLE: Record<RuleWrite["verb"], { fill: string; ink: string }> = {
 };
 
 /** What saving writes to UniFi, policy by policy. */
-function Writes({ writes }: { writes: RuleWrite[] }) {
+export function RuleWritesList({ writes }: { writes: RuleWrite[] }) {
   const ui = useUI();
   return (
     <View role="list" testID="rule-writes">

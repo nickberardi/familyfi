@@ -1,3 +1,5 @@
+import { encryptedDnsAddresses, encryptedDnsHosts } from "@/lib/encrypted-dns";
+import type { LockDnsPart } from "@/lib/policy-names";
 import { normalizeMac } from "../mac";
 import type { FirewallPolicy, FirewallPolicyWrite, UnifiFirewallSchedule } from "./types";
 
@@ -237,8 +239,8 @@ export function dpiAppNetworkBlockPolicy(input: {
 
 /**
  * Website block (#94): UniFi matches the domains, and their subdomains, by watching DNS
- * lookups, so a device using encrypted DNS can get around it. Source is either the covered
- * devices' MACs or managed networks.
+ * lookups, so a device using its own DNS can get around it unless Lock DNS covers it. Source
+ * is either the covered devices' MACs or managed networks.
  */
 export function domainBlockPolicy(input: {
   name: string;
@@ -275,3 +277,65 @@ export function domainBlockPolicy(input: {
     ...(input.schedule ? { schedule: input.schedule } : {}),
   };
 }
+
+/** Plain DNS and DNS over TLS. */
+export const DNS_PORTS = [53, 853] as const;
+
+/**
+ * One part of the built-in Lock DNS rule for the covered devices' MACs (`LOCK_DNS_PARTS`):
+ * `ports` blocks TCP and UDP 53 and 853 to the destination zone, the internet, so the gateway and
+ * any DNS server on the home network still answer; `addresses` and `addresses-v6` block every port
+ * to the encrypted DNS services' addresses, one IP version each; `names` blocks their host names,
+ * which the gateway sees now that their lookups go through it.
+ */
+export function lockDnsBlockPolicy(input: {
+  name: string;
+  part: LockDnsPart;
+  sourceZoneId: string;
+  destinationZoneId: string;
+  macAddresses: string[];
+  enabled?: boolean;
+}): FirewallPolicyWrite {
+  if (input.part === "names") return { ...domainBlockPolicy({ ...input, domains: encryptedDnsHosts() }), description: LOCK_DNS_DESCRIPTION };
+  const macAddresses = [...new Set(input.macAddresses.map(normalizeMac))].sort();
+  if (macAddresses.length === 0) throw new Error("A Lock DNS policy needs at least one MAC address.");
+  const common = {
+    name: input.name,
+    description: LOCK_DNS_DESCRIPTION,
+    enabled: input.enabled ?? true,
+    loggingEnabled: false,
+    action: { type: INTERNET_BLOCK_ACTION },
+    source: { zoneId: input.sourceZoneId, trafficFilter: { type: "MAC_ADDRESS", macAddressFilter: { macAddresses } } },
+  };
+  if (input.part === "ports") {
+    return {
+      ...common,
+      ipProtocolScope: { ipVersion: "IPV4_AND_IPV6", protocolFilter: { type: "PRESET", preset: { name: "TCP_UDP" } } },
+      destination: {
+        zoneId: input.destinationZoneId,
+        trafficFilter: {
+          type: "PORT",
+          portFilter: { type: "PORTS", matchOpposite: false, items: DNS_PORTS.map((value) => ({ type: "PORT_NUMBER", value })) },
+        },
+      },
+    };
+  }
+  const version = input.part === "addresses" ? "ipv4" : "ipv6";
+  return {
+    ...common,
+    ipProtocolScope: { ipVersion: version === "ipv4" ? "IPV4" : "IPV6" },
+    destination: {
+      zoneId: input.destinationZoneId,
+      trafficFilter: {
+        type: "IP_ADDRESS",
+        ipAddressFilter: {
+          type: "IP_ADDRESSES",
+          matchOpposite: false,
+          items: encryptedDnsAddresses(version).map((value) => ({ type: value.includes("/") ? "SUBNET" : "IP_ADDRESS", value })),
+        },
+      },
+    },
+  };
+}
+
+const LOCK_DNS_DESCRIPTION = "FamilyFi managed Lock DNS: blocks DNS servers other than the gateway.";

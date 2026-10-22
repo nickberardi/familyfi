@@ -298,6 +298,12 @@
         "trust"
       ]
     },
+    "tests/unit/lock-dns.test.ts": {
+      "categories": [
+        "rules",
+        "sync"
+      ]
+    },
     "tests/unit/plan-rules.test.ts": {
       "categories": [
         "rules",

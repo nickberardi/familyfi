@@ -115,6 +115,9 @@ export type DevRule = {
  * child, one shared by both teens, two in one rule for the TV), category schedules, an
  * always-on category, an app rule, a shared website rule, and groups with no rule at all.
  */
+/** The groups the seed household's Lock DNS covers, switched on: the teens and the child. */
+export const DEV_LOCK_DNS_GROUPS: readonly string[] = ["Betsy", "Abby", "Cassie"];
+
 export const DEV_RULES: readonly DevRule[] = [
   { name: "Bedtime", kind: "internet", groups: ["Cassie"], windows: [{ name: "Bedtime", days: EVERY_DAY, start: "20:00", end: "07:00" }] },
   { name: "Homework", kind: "internet", groups: ["Cassie"], windows: [{ name: "Homework", days: SCHOOL_DAYS, start: "15:30", end: "17:30" }] },

@@ -15870,6 +15870,497 @@
         "now": "2026-10-15T20:30:00.000Z"
       },
       "expected": []
+    },
+    {
+      "fn": "groupStatus",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "lock-dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "lockDns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "tone": "on",
+        "label": "Online · Dinner at 6:00 PM"
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "lock-dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "lockDns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Block",
+          "run": "block"
+        },
+        "more": null
+      }
+    },
+    {
+      "fn": "rulesBlockingGroup",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "lock-dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "lockDns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": []
+    },
+    {
+      "fn": "groupScheduleRuleRows",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "lock-dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "lockDns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-downtime",
+          "tone": null,
+          "title": "TV downtime",
+          "times": "Dinner 6 PM–8 PM, Overnight 11 PM–7 AM",
+          "state": null,
+          "live": false,
+          "action": {
+            "label": "Pause",
+            "run": "pause"
+          },
+          "more": null
+        }
+      ]
     }
   ]
 }

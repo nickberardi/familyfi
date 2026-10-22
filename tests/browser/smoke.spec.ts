@@ -804,7 +804,7 @@ test("Websites rule blocks named domains, with the encrypted DNS caveat", { tag:
 
   await page.goto(`/rules/new?group=${child!.id}`);
   await page.getByRole("button", { name: "Websites" }).click();
-  await expect(page.getByText(/a device using encrypted DNS can get around this/)).toBeVisible();
+  await expect(page.getByText(/a device using its own DNS can get around this unless Lock DNS covers its group/)).toBeVisible();
   await page.getByRole("button", { name: "Always", exact: true }).click();
   await page.getByLabel("Rule name").fill(ruleName);
   await page.getByLabel("Add a website").fill("https://www.Example.com/watch");
