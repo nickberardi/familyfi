@@ -23,6 +23,7 @@ const sync = (over: Partial<SyncStatus> = {}): SyncStatus => ({
   issues: [],
   lastRun: { id: "r1", status: "applied", requestedRevision: 4, appliedRevision: 4, startedAt: "2026-09-14T19:50:00Z", finishedAt: "2026-09-14T19:58:00Z", error: null },
   changes: [],
+  checkupProblems: 0,
   ...over,
 });
 

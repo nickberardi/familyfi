@@ -6,7 +6,7 @@ import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
 import { demoModeEnabled, recoveryPassword } from "./env";
 import { originAllowed } from "./origin";
-import { ensureLockDnsRule, ensureQuarantineRule } from "./rules";
+import { ensureCountriesRule, ensureLockDnsRule, ensureQuarantineRule } from "./rules";
 import {
   CSRF_COOKIE,
   CSRF_HEADER,
@@ -71,6 +71,7 @@ export async function ensureHousehold() {
   });
   await ensureQuarantineRule();
   await ensureLockDnsRule();
+  await ensureCountriesRule();
 }
 
 export function requestIsHttps(request: Request): boolean {

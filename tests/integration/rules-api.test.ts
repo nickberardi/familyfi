@@ -330,8 +330,8 @@ describe("household rules", () => {
       const response = await postRule(auth, body);
       expect([response.status, ((await response.json()) as { error: { code: string } }).error.code], JSON.stringify(body)).toEqual([status, code]);
     }
-    // Only the built-in quarantine and Lock DNS rules remain.
-    expect(await prisma().rule.count()).toBe(2);
+    // Only the built-in quarantine, Lock DNS and Block countries rules remain.
+    expect(await prisma().rule.count()).toBe(3);
   });
 
   it("pauses all internet with its own unscheduled policy, and removes it on resume", async () => {
@@ -854,7 +854,7 @@ describe("household rules", () => {
       // The rule that carries it is not a household rule: hidden, and not editable or deletable.
       const block = await prisma().rule.findFirstOrThrow({ where: { systemGroupId: emma.id } });
       const listed = (await (await listRules(request("/api/v1/rules", { auth }))).json()) as { rules: { id: string }[] };
-      expect(listed.rules.map((rule) => rule.id)).toEqual(["quarantine", "dns"]);
+      expect(listed.rules.map((rule) => rule.id)).toEqual(["quarantine", "dns", "countries"]);
       for (const handler of [getRule, patchRule, deleteRule]) {
         const method = handler === getRule ? "GET" : handler === patchRule ? "PATCH" : "DELETE";
         const response = await handler(request(`/api/v1/rules/${block.id}`, { method, auth, headers: { "content-type": "application/json" }, body: method === "PATCH" ? "{}" : undefined }), {
@@ -1152,6 +1152,7 @@ describe("household rules", () => {
       expect(listed.rules.map((rule) => [rule.name, rule.builtIn])).toEqual([
         ["Quarantine", "quarantine"],
         ["Lock DNS", "dns"],
+        ["Block countries", "countries"],
         ["Grounded", null],
       ]);
       const [quarantine] = listed.rules;

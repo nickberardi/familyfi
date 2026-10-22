@@ -735,6 +735,12 @@
         "accessibility"
       ]
     },
+    "tests/browser/checkup.spec.ts": {
+      "categories": [
+        "devices",
+        "rules"
+      ]
+    },
     "tests/browser/categories.spec.ts": {
       "categories": [
         "categories"
@@ -1063,6 +1069,24 @@
       "categories": [
         "runtime",
         "settings"
+      ]
+    },
+    "tests/unit/checkup.test.ts": {
+      "categories": [
+        "devices",
+        "unifi"
+      ]
+    },
+    "tests/unit/countries.test.ts": {
+      "categories": [
+        "rules"
+      ]
+    },
+    "tests/integration/checkup-api.test.ts": {
+      "categories": [
+        "devices",
+        "rules",
+        "unifi"
       ]
     }
   }

@@ -118,9 +118,10 @@ function useCollapsedSections(): [ReadonlySet<string>, (titles: readonly string[
 }
 
 /** The count beside a destination: devices waiting, family members without a device, a failed sync. */
-function navBadge(href: string, counts: { unassignedCount: number; familyNeedsDevices: number; syncFailed: boolean }) {
+function navBadge(href: string, counts: { unassignedCount: number; familyNeedsDevices: number; syncFailed: boolean; checkupProblems: number }) {
   if (href === "/devices") return counts.unassignedCount;
   if (href === "/family") return counts.familyNeedsDevices;
+  if (href === "/checkup") return counts.checkupProblems;
   return href === "/sync" && counts.syncFailed ? 1 : 0;
 }
 
@@ -150,6 +151,7 @@ function NavGroups({
   unassignedCount,
   familyNeedsDevices,
   syncFailed,
+  checkupProblems,
   onNavigate,
   idPrefix,
 }: {
@@ -157,11 +159,13 @@ function NavGroups({
   unassignedCount: number;
   familyNeedsDevices: number;
   syncFailed: boolean;
+  /** Open problems the network checkup found; its badge is never urgent. */
+  checkupProblems: number;
   onNavigate?: () => void;
   /** Keeps the rail's and the drawer's section ids apart. */
   idPrefix: string;
 }) {
-  const counts = { unassignedCount, familyNeedsDevices, syncFailed };
+  const counts = { unassignedCount, familyNeedsDevices, syncFailed, checkupProblems };
   const [collapsed, setCollapsed] = useCollapsedSections();
   // Arriving on a page opens its section. An effect rather than render, since it writes storage the
   // other list (rail or drawer) also reads.
@@ -179,7 +183,7 @@ function NavGroups({
         const closed = collapsed.has(group.title);
         const id = `${idPrefix}-${group.title.toLowerCase()}`;
         const total = group.items.reduce((sum, item) => sum + navBadge(item.href, counts), 0);
-        const urgent = group.items.some((item) => item.href !== "/family" && navBadge(item.href, counts) > 0);
+        const urgent = group.items.some((item) => item.href !== "/family" && item.href !== "/checkup" && navBadge(item.href, counts) > 0);
         return (
           <div key={group.title} className={closed ? "mb-2 last:mb-0" : "mb-5 last:mb-0"}>
             <button
@@ -213,7 +217,7 @@ function NavGroups({
                   >
                     <Icon name={item.icon} size={16} />
                     <span className="min-w-0 flex-1">{item.label}</span>
-                    {badge ? <NavBadge count={badge} tone={item.href === "/family" ? "paused" : "danger"} /> : null}
+                    {badge ? <NavBadge count={badge} tone={item.href === "/family" || item.href === "/checkup" ? "paused" : "danger"} /> : null}
                   </Link>
                 );
               })}
@@ -273,6 +277,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
   const unassignedCount = unassignedBadgeCount(devices);
   const familyNeedsDevices = familyNeedsDevicesCount(sync);
   const syncFailed = syncNeedsAttention(sync);
+  const checkupProblems = sync?.checkupProblems ?? 0;
 
   const navDrawer = useMemo(() => ({ toggle: () => setNavOpen((open) => !open) }), []);
 
@@ -302,6 +307,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
                 unassignedCount={unassignedCount}
                 familyNeedsDevices={familyNeedsDevices}
                 syncFailed={syncFailed}
+                checkupProblems={checkupProblems}
               />
             </div>
           </nav>
@@ -368,6 +374,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
                   unassignedCount={unassignedCount}
                   familyNeedsDevices={familyNeedsDevices}
                   syncFailed={syncFailed}
+                  checkupProblems={checkupProblems}
                   onNavigate={() => setNavOpen(false)}
                 />
               </nav>

@@ -1,5 +1,5 @@
 import { RuleLiftKind } from "@prisma/client";
-import { LOCK_DNS_RULE_ID } from "@/lib/rules";
+import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
@@ -33,8 +33,9 @@ export async function runGroupUnblock(
   if (!existing) return jsonError(404, "not_found", "Group not found.");
   const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
   const now = new Date();
-  // Lock DNS blocks only the ways around the gateway's DNS, never the group: an unblock leaves it on.
-  const links = existing.rules.filter(({ rule }) => rule.systemGroupId === null && !isLockDnsRule(rule));
+  // Lock DNS blocks only the ways around the gateway's DNS, and Block countries is protection, never
+  // a block on the group: an unblock leaves both on.
+  const links = existing.rules.filter(({ rule }) => rule.systemGroupId === null && !isLockDnsRule(rule) && rule.id !== COUNTRIES_RULE_ID);
   const allowances = links.filter((link) => link.pauseKind === RuleLiftKind.allow && lifted(link, now));
 
   if (action === "unblock") {
@@ -69,7 +70,7 @@ export async function runGroupUnblock(
     });
   } else if (action === "end") {
     await prisma().ruleGroup.updateMany({
-      where: { groupId, rule: { systemGroupId: null }, ruleId: { not: LOCK_DNS_RULE_ID }, pauseActive: true, pauseKind: RuleLiftKind.allow },
+      where: { groupId, rule: { systemGroupId: null }, ruleId: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, pauseActive: true, pauseKind: RuleLiftKind.allow },
       data: CLEARED,
     });
   } else {

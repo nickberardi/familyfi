@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
@@ -18,9 +18,19 @@ import {
   validateRuleDraft,
   type EditorDraft as Draft,
 } from "@/lib/rule-editor";
+import {
+  COUNTRIES_EDITOR_COPY,
+  countriesEditorState,
+  fromCountriesRule,
+  saveCountriesRule,
+  validateCountriesDraft,
+  type CountriesDraft,
+} from "@/lib/countries-editor";
+import { loadCheckup, outsideDnsNote, type CheckupState } from "@/lib/checkup";
 import type { Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
+import { CountriesRuleForm } from "@/ui/CountriesRuleForm";
 import { RuleEditorForm } from "@/ui/RuleEditorForm";
 import { LockDnsPage } from "./LockDnsPage";
 
@@ -47,6 +57,7 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
     return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{COPY.notFound}</p>;
   }
   if (rule?.builtIn === "dns") return <LockDnsPage key={rule.id} rule={rule} />;
+  if (rule?.builtIn === "countries") return <CountriesEditor key={rule.id} saved={rule} returnGroup={one(search.group) ?? null} />;
   if (rule?.builtIn) {
     return (
       <p className="p-6 text-[14px] text-[var(--ff-muted)]">
@@ -69,7 +80,8 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
 
 function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initial: Draft; returnGroup: string | null }) {
   const router = useRouter();
-  const { groups, unifi, store, busy } = useAppData();
+  const { groups, devices, unifi, store, busy } = useAppData();
+  const checkup = useCheckup();
   const [draft, setDraft] = useState<Draft>(initial);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -139,6 +151,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
           networks={managedNetworks}
           request={request}
           error={error}
+          outsideDns={outsideDnsNote(draft, devices, checkup)}
           edit={edit}
           onError={setError}
         />
@@ -184,4 +197,70 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
       ) : null}
     </>
   );
+}
+
+/** Block countries: its switch, countries and groups. Its name, kind and schedule are FamilyFi's. */
+function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: string | null }) {
+  const router = useRouter();
+  const { groups, store, busy } = useAppData();
+  const [draft, setDraft] = useState<CountriesDraft>(() => fromCountriesRule(saved, groups));
+  const [error, setError] = useState("");
+  const { href: back, label: backLabel } = ruleEditorBack(returnGroup, groups);
+  const { summary, dirty } = countriesEditorState(draft, saved, groups);
+
+  async function save() {
+    if (busy) return;
+    const problem = validateCountriesDraft(draft);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    const result = await saveCountriesRule(store.mutate, draft, saved);
+    if (result?.rule) router.push(back);
+  }
+
+  return (
+    <>
+      <PageHeader title={COUNTRIES_EDITOR_COPY.title} sub={summary} onAction={() => void save()} actionLabel={COUNTRIES_EDITOR_COPY.save} />
+      <form
+        className="flex max-w-[760px] flex-col gap-4 p-4 md:p-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <Link href={back} className="text-[14px] font-semibold text-[var(--ff-accent)]">
+            ‹ {backLabel}
+          </Link>
+          {dirty ? <span className="text-[14px] text-[var(--ff-paused)]">{COUNTRIES_EDITOR_COPY.unsaved}</span> : null}
+        </div>
+        <CountriesRuleForm
+          draft={draft}
+          groups={groups}
+          error={error}
+          edit={(next) => {
+            setError("");
+            setDraft(next);
+          }}
+        />
+      </form>
+    </>
+  );
+}
+
+/** The last checkup, for the editor's note on networks that hand out their own DNS; null until it loads or when it cannot. */
+function useCheckup(): CheckupState | null {
+  const [checkup, setCheckup] = useState<CheckupState | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadCheckup(request).then(
+      (next) => live && setCheckup(next),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  return checkup;
 }

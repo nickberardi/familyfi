@@ -43,6 +43,12 @@ describe("openapi contract", () => {
       "PairedClaim.connection", // never for agents
       "PairedClaim.connection.endpoint", // only when the invite named a route
       "PairedInviteIssued.invite.url", // only for an agent
+      "CheckupFinding.details.devices", // only for a check about devices
+      "CheckupFinding.details.devices.wired", // only for Sonos wired and on Wi-Fi
+      "CheckupFinding.details.networks", // only for a check about networks
+      "CheckupFinding.details.networks.clientCount", // only for networks FamilyFi doesn't manage
+      "CheckupFinding.details.networks.dnsServers", // only for a network's own DNS
+      "CheckupFinding.details.wifis", // only for a check about Wi-Fi
     ];
     type Schema = Record<string, unknown> & {
       $ref?: string;

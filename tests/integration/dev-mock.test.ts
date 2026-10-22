@@ -36,7 +36,7 @@ describe("dev UniFi mock household", () => {
     expect(household.unifiKeyLastFour).toBe(DEV_MOCK_API_KEY.slice(-4));
     expect(await runReconcileOnce()).toBe(true);
     const devices = await prisma().device.findMany({ orderBy: { mac: "asc" } });
-    expect(devices.map((row) => row.mac)).toEqual(DEV_DEVICES.filter((item) => item.online).map((item) => item.mac));
+    expect(devices.map((row) => row.mac)).toEqual(DEV_DEVICES.filter((item) => item.online).map((item) => item.mac).sort());
     // Every device is on a managed network, so discovery holds each one for assignment.
     expect(devices.every((row) => row.assignment === AssignmentState.quarantined && row.presenceOnline)).toBe(true);
   });
@@ -66,6 +66,7 @@ describe("dev UniFi mock household", () => {
     expect(rules.map((rule) => [rule.name, rule.kind, rule.groups.map((link) => byName.get(link.groupId)).sort(), rule.windows.length])).toEqual([
       ["Adult content", "category", ["Computers"], 0],
       ["Bedtime", "internet", ["Cassie"], 1],
+      ["Block countries", "domain", [], 0],
       ["Focus hours", "category", ["Computers"], 1],
       ["Gaming hours", "internet", ["Games"], 2],
       ["Homework", "internet", ["Cassie"], 1],
@@ -114,20 +115,20 @@ describe("dev UniFi mock household", () => {
     expect(await runReconcileOnce()).toBe(true);
     const devices = await prisma().device.findMany({ include: { group: true }, orderBy: { mac: "asc" } });
     expect(devices.map((row) => [row.hostname, row.group?.name ?? null, row.presenceOnline])).toEqual(
-      DEV_DEVICES.map((item) => [item.name, item.group, item.online]),
+      [...DEV_DEVICES].sort((a, b) => a.mac.localeCompare(b.mac)).map((item) => [item.name, item.group, item.online]),
     );
     // Every group has a device, and some are left unassigned for the Devices banner.
     expect(groups.every((group) => devices.some((row) => row.groupId === group.id))).toBe(true);
     expect(devices.filter((row) => row.assignment === AssignmentState.quarantined).map((row) => row.hostname)).toEqual([
-      "Guest Laptop",
       "Galaxy S24",
       "Echo Dot",
+      "Guest Laptop",
     ]);
 
     await ensureDevDummyData();
     expect(await prisma().group.count()).toBe(9);
-    // Eleven seeded rules and a paused group's built-in rule, beside the built-in quarantine and Lock DNS rules.
-    expect(await prisma().rule.count()).toBe(14);
+    // Eleven seeded rules and a paused group's built-in rule, beside the built-in quarantine, Lock DNS and Block countries rules.
+    expect(await prisma().rule.count()).toBe(15);
     expect(await prisma().account.count({ where: { username: DEV_SEED_ADULT_USERNAME } })).toBe(1);
   });
 });

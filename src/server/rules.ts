@@ -2,7 +2,19 @@ import { GroupKind, Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "
 import { z } from "zod";
 import { encryptedDnsHosts } from "@/lib/encrypted-dns";
 import { LOCK_DNS_PARTS, lockDnsPolicyName, rulePolicyNames } from "@/lib/policy-names";
-import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
+import { isCountryCode, RECOMMENDED_BLOCKED_COUNTRIES } from "@/lib/countries";
+import {
+  alwaysWindow,
+  COUNTRIES_RULE_ID,
+  LOCK_DNS_RULE_ID,
+  MAX_RULE_DOMAINS,
+  MAX_RULE_NAME,
+  MAX_RULE_WINDOWS,
+  MAX_WINDOW_NAME,
+  normalizeDomain,
+  QUARANTINE_RULE_ID,
+  type BuiltInRule,
+} from "@/lib/rules";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
 import { prisma } from "./db";
@@ -45,8 +57,8 @@ function publicPause(state: LiftColumns) {
  */
 export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
   const windows = [...rule.windows].sort((a, b) => a.position - b.position);
-  const builtIn = isQuarantineRule(rule);
-  const lockDns = isLockDnsRule(rule);
+  const builtIn = builtInRule(rule);
+  const quarantine = builtIn === "quarantine";
   return {
     id: rule.id,
     name: rule.name,
@@ -55,8 +67,9 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     groupIds: rule.groups.map((link) => link.groupId).sort(),
     networkIds: [...rule.networkIds],
     targetIds: [...rule.targetIds],
-    domains: lockDns ? encryptedDnsHosts() : [...rule.domains],
-    enabled: builtIn ? quarantineEnforced : rule.enabled,
+    domains: builtIn === "dns" ? encryptedDnsHosts() : [...rule.domains],
+    countries: [...rule.countries],
+    enabled: quarantine ? quarantineEnforced : rule.enabled,
     pause: publicPause(rule),
     groupPauses: rule.groups
       .filter((link) => link.pauseActive)
@@ -72,12 +85,12 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     })),
     useGeneratedName: rule.useGeneratedName,
     /** What UniFi's policy table shows for this rule, one per policy in the Internal zone. */
-    policyNames: builtIn
+    policyNames: quarantine
       ? [quarantinePolicyName("Internal")]
-      : lockDns
+      : builtIn === "dns"
         ? LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part))
         : rulePolicyNames({ ...rule, windows }),
-    builtIn: builtIn ? ("quarantine" as const) : lockDns ? ("dns" as const) : null,
+    builtIn,
   };
 }
 
@@ -99,6 +112,14 @@ export function isQuarantineRule(rule: Pick<RuleWithWindows, "id">): boolean {
 
 export function isLockDnsRule(rule: Pick<RuleWithWindows, "id">): boolean {
   return rule.id === LOCK_DNS_RULE_ID;
+}
+
+/** Which rule FamilyFi provides this is, or null for one of the household's own. */
+export function builtInRule(rule: Pick<RuleWithWindows, "id">): BuiltInRule | null {
+  if (rule.id === QUARANTINE_RULE_ID) return "quarantine";
+  if (rule.id === LOCK_DNS_RULE_ID) return "dns";
+  if (rule.id === COUNTRIES_RULE_ID) return "countries";
+  return null;
 }
 
 /**
@@ -161,6 +182,87 @@ export async function setLockDnsGroups(groupIds: string[]): Promise<RuleWithWind
 }
 
 /**
+ * The household's built-in Block countries rule, created off beside the household with the
+ * recommended countries and no groups: it is a website-kind rule only so that no client meets an
+ * unknown kind and nothing counts it as an internet rule; its policies block by region, not domain.
+ * Switching it on with no groups covers every group (`/rules/countries/on`).
+ */
+export async function ensureCountriesRule(db: Pick<Prisma.TransactionClient, "rule"> = prisma()): Promise<void> {
+  await db.rule.upsert({
+    where: { id: COUNTRIES_RULE_ID },
+    update: {},
+    create: {
+      id: COUNTRIES_RULE_ID,
+      name: "Block countries",
+      kind: RuleKind.domain,
+      mode: RuleMode.always,
+      enabled: false,
+      countries: [...RECOMMENDED_BLOCKED_COUNTRIES],
+    },
+  });
+}
+
+/** A Block countries list as the rule stores it: known codes, upper case, sorted, at least one. */
+export function normalizeCountries(raw: string[]): string[] {
+  const codes = [...new Set(raw.map((code) => code.trim().toUpperCase()))].sort();
+  const unknown = codes.filter((code) => !isCountryCode(code));
+  if (unknown.length) throw new RuleInputError(400, "invalid_countries", `Unknown country code: ${unknown.join(", ")}`);
+  if (codes.length === 0) throw new RuleInputError(400, "invalid_countries", "Pick at least one country.");
+  return codes;
+}
+
+/**
+ * Saves the Block countries rule's switch, groups and countries. Switching it on with no groups
+ * covers every group, the recommended default. Off ends a pause, as for every rule. Returns null
+ * when a group it names does not exist. The caller enqueues the change.
+ */
+export async function saveCountriesRule(patch: { enabled?: boolean; groupIds?: string[]; countries?: string[] }) {
+  const countries = patch.countries ? normalizeCountries(patch.countries) : undefined;
+  return prisma().$transaction(async (tx) => {
+    await lockHousehold(tx);
+    const existing = await tx.rule.findUniqueOrThrow({ where: { id: COUNTRIES_RULE_ID }, include: { groups: true } });
+    const enabled = patch.enabled ?? existing.enabled;
+    let groupIds = patch.groupIds ? [...new Set(patch.groupIds)].sort() : existing.groups.map((link) => link.groupId);
+    if (patch.groupIds) {
+      if (groupIds.length === 0) throw new RuleInputError(400, "invalid_groups", "Pick at least one person or thing the rule applies to.");
+      const found = await tx.group.count({ where: { id: { in: groupIds } } });
+      if (found !== groupIds.length) throw new RuleInputError(404, "not_found", "Group not found.");
+    } else if (enabled && groupIds.length === 0) {
+      groupIds = (await tx.group.findMany({ select: { id: true } })).map((group) => group.id);
+    }
+    await tx.rule.update({
+      where: { id: COUNTRIES_RULE_ID },
+      data: {
+        enabled,
+        ...(countries ? { countries } : {}),
+        ...(enabled ? {} : { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null }),
+      },
+    });
+    await tx.ruleGroup.deleteMany({ where: { ruleId: COUNTRIES_RULE_ID, groupId: { notIn: groupIds } } });
+    await tx.ruleGroup.createMany({ data: groupIds.map((groupId) => ({ ruleId: COUNTRIES_RULE_ID, groupId })), skipDuplicates: true });
+    return tx.rule.findUniqueOrThrow({ where: { id: COUNTRIES_RULE_ID }, include: ruleInclude });
+  });
+}
+
+/**
+ * A new group joins Block countries when the rule covered every other group, so "every group, Things
+ * too" stays true as the household grows. A rule narrowed to some groups is left as it was.
+ */
+export async function joinCountriesRule(tx: Prisma.TransactionClient, groupId: string): Promise<void> {
+  const rule = await tx.rule.findUnique({ where: { id: COUNTRIES_RULE_ID }, include: { groups: true } });
+  const groups = await tx.group.count({ where: { id: { not: groupId } } });
+  if (!rule) return;
+  // Switched on with no groups (none existed, or all were deleted) still means every group.
+  if (rule.groups.length === 0 ? !rule.enabled : rule.groups.length < groups) return;
+  await tx.ruleGroup.createMany({ data: [{ ruleId: COUNTRIES_RULE_ID, groupId }], skipDuplicates: true });
+}
+
+/** Holds the household row for the rest of the transaction, serializing writes that take it. */
+export async function lockHousehold(tx: Prisma.TransactionClient): Promise<void> {
+  await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = 'default' FOR UPDATE`;
+}
+
+/**
  * Turns quarantine on or off for the household, with any other household fields in `data` in the
  * same transaction. Turning it off ends a pause on it, as turning any rule off does, and so does
  * turning it on: a pause written while it was off (one that raced the switch) must not come back
@@ -218,7 +320,7 @@ export const RuleCreateBody = z
   .strict();
 
 export const RuleUpdateBody = z
-  .object(Fields)
+  .object({ ...Fields, countries: z.array(z.string()).max(300) })
   .omit({ kind: true, scope: true })
   .partial()
   .strict();

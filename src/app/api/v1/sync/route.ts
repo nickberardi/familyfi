@@ -1,5 +1,6 @@
 import { ChangeStatus } from "@prisma/client";
 import { publicChange } from "@/server/changes";
+import { checkupProblemCount } from "@/server/checkup";
 import { prisma } from "@/server/db";
 import { deviceScope } from "@/server/devices";
 import { withSession } from "@/server/guard";
@@ -10,12 +11,13 @@ export async function GET(request: Request) {
   return withSession(request, async () => {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const scope = deviceScope(household);
-    const [run, appPolicies, rulePolicies, changeRows, coverage] = await Promise.all([
+    const [run, appPolicies, rulePolicies, changeRows, coverage, checkupProblems] = await Promise.all([
       prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } }),
       prisma().appPolicy.findMany(),
       prisma().rulePolicy.findMany(),
       prisma().changeResult.findMany({ orderBy: { updatedAt: "desc" }, take: 30 }),
       storedCoverage({ now: new Date(), deviceInScope: (networkId) => networkInScope(scope, networkId) }),
+      checkupProblemCount(),
     ]);
     const { issues } = coverage;
     const writeIssues = issues.filter(isWriteFailure);
@@ -57,6 +59,7 @@ export async function GET(request: Request) {
           }
         : null,
       changes: changeRows.map(publicChange),
+      checkupProblems,
     });
   });
 }

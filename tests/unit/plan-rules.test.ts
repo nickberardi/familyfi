@@ -244,4 +244,23 @@ describe("rulePolicyWrite", () => {
       applicationFilter: { applicationIds: [10001] },
     });
   });
+
+  it("blocks Block countries' regions for its groups' devices, whatever its kind", () => {
+    const countries = rule({ id: "countries", name: "Block countries", kind: RuleKind.domain, targetIds: [], countries: ["RU", "KP", "RU"] });
+    const [policy] = plan([countries]).policies;
+    const write = rulePolicyWrite(policy!);
+    expect(write.destination).toEqual({ zoneId: "ext", trafficFilter: { type: "REGION", regionFilter: { regions: ["KP", "RU"] } } });
+    expect(write.source.trafficFilter).toEqual({ type: "MAC_ADDRESS", macAddressFilter: { macAddresses: ["02:00:00:00:00:01"] } });
+    expect(write.schedule).toBeUndefined();
+  });
+
+  it("keeps Block countries' policy disabled while paused, and leaves out a group it is allowed for", () => {
+    const countries = rule({ id: "countries", name: "Block countries", kind: RuleKind.domain, targetIds: [], groupIds: ["g1", "g2"], countries: ["KP"] });
+    const devices = [device("02:00:00:00:00:01", "g1"), device("02:00:00:00:00:02", "g2")];
+    const [paused] = plan([{ ...countries, paused: true }], [group("g1"), group("g2")], devices).policies;
+    expect([paused!.enabled, paused!.macAddresses]).toEqual([false, ["02:00:00:00:00:01", "02:00:00:00:00:02"]]);
+    const [allowed] = plan([{ ...countries, liftedGroupIds: ["g2"] }], [group("g1"), group("g2")], devices).policies;
+    expect([allowed!.enabled, allowed!.macAddresses]).toEqual([true, ["02:00:00:00:00:01"]]);
+    expect(rulePolicyWrite(allowed!).destination.trafficFilter).toEqual({ type: "REGION", regionFilter: { regions: ["KP"] } });
+  });
 });

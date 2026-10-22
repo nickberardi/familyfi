@@ -27,6 +27,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/devices", label: "Devices", icon: "device-mobile" },
       { href: "/rules", label: "Rules", icon: "list-checks" },
       { href: "/categories", label: "Categories", icon: "squares-four" },
+      { href: "/checkup", label: "Checkup", icon: "shield-check" },
     ],
   },
   {

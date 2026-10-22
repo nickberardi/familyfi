@@ -11509,6 +11509,69 @@
       }
     },
     {
+      "fn": "groupStatus",
+      "name": "Block countries on for the group",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "countries",
+            "name": "Block countries",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "countries",
+            "countries": [
+              "KP"
+            ]
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "tone": "on",
+        "label": "Online · no internet rule"
+      }
+    },
+    {
       "fn": "groupHeaderActions",
       "name": "a rule that is off",
       "input": {
@@ -11646,6 +11709,72 @@
       }
     },
     {
+      "fn": "groupHeaderActions",
+      "name": "Block countries on for the group",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "countries",
+            "name": "Block countries",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "countries",
+            "countries": [
+              "KP"
+            ]
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Block",
+          "run": "block"
+        },
+        "more": null
+      }
+    },
+    {
       "fn": "rulesBlockingGroup",
       "name": "a rule that is off",
       "input": {
@@ -11769,6 +11898,66 @@
             "useGeneratedName": false,
             "policyNames": [],
             "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": []
+    },
+    {
+      "fn": "rulesBlockingGroup",
+      "name": "Block countries on for the group",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "countries",
+            "name": "Block countries",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "countries",
+            "countries": [
+              "KP"
+            ]
           }
         ],
         "timeZone": "America/New_York",

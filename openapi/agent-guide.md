@@ -79,6 +79,10 @@ Connect from the home network.
   services its `domains` list, so their category, app and website rules can't be gotten around. It
   never blocks the internet, so never call it a website block or offer to unblock a group for it.
   Pausing or allowing it lets those devices around the other rules meanwhile, so say so first.
+- The household has a built-in rule whose id is `countries` (`builtIn: "countries"`, "Block
+  countries"): it stops the groups it covers from reaching servers in the countries its `countries`
+  lists. It never blocks a group's internet, so never offer to unblock a group for it. You cannot
+  delete or rename it.
 
 ## 4. Changing things
 
@@ -112,7 +116,7 @@ Your scope is in `device.scope`:
 
 - `readOnly`: you may only read household state.
 - `full`: you may also manage groups, rules, pauses, allowances, devices and their
-  assignment, sync and DNS categories.
+  assignment, sync, the network checkup and DNS categories.
 
 Under any scope, you cannot reach accounts, gateway settings or resolvers, change household settings,
 or manage pairing, remote access or paired devices. These answer:

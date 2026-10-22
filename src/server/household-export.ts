@@ -16,13 +16,14 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 import { RECOVERY_USERNAME } from "@/lib/constants";
-import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
+import { isCountryCode } from "@/lib/countries";
+import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import type { ImportSummary } from "@/lib/types";
 import { APP_VERSION } from "@/lib/version";
 import { ArchiveError, readArchive, writeArchive } from "./archive";
 import { assertEndpoint, ensureConnectionIdentity, removeAccountDevices } from "./connection";
 import { dumpDatabase } from "./database-dump";
-import { assertManagedNetworkIds, RuleInputError, validateRuleShape } from "./rules";
+import { assertManagedNetworkIds, ensureCountriesRule, normalizeCountries, RuleInputError, validateRuleShape } from "./rules";
 import { normalizeResolverUrl, ResolverConfigError } from "./upstream/resolver-settings";
 import { customSlugFor } from "./upstream-seed";
 import { prisma } from "./db";
@@ -124,6 +125,8 @@ const Config = z
         networkIds: z.array(z.string()),
         targetIds: z.array(z.number().int()),
         domains: z.array(z.string()),
+        // Only the built-in Block countries rule has countries; exports before it have none.
+        countries: z.array(z.string()).default([]),
         enabled: z.boolean(),
         mode: z.enum(RuleMode),
         groupIds: z.array(Id),
@@ -175,6 +178,8 @@ const Config = z
     if (config.rules.some((rule) => rule.id === QUARANTINE_RULE_ID)) issue("The quarantine rule is built in and never exported.");
     if (config.rules.some((rule) => rule.id === LOCK_DNS_RULE_ID)) issue("Lock DNS is built in and exported with the household.");
     if (!config.household.lockDns.groupIds.every((id) => groups.has(id))) issue("Lock DNS names a group the export does not have.");
+    if (config.rules.some((rule) => rule.countries.length > 0 && rule.id !== COUNTRIES_RULE_ID)) issue("Only the Block countries rule blocks countries.");
+    if (config.rules.some((rule) => !rule.countries.every(isCountryCode))) issue("A rule names a country code FamilyFi does not know.");
     if (config.accounts.some((account) => account.username === RECOVERY_USERNAME)) issue("The recovery account is never exported.");
     if (config.endpoints.some((endpoint) => endpoint.edgeAuth === EdgeAuth.serviceToken && (endpoint.kind !== RouteKind.own || endpoint.transport !== ConnectionTransport.cloudflare))) {
       issue("Only a Cloudflare route the household runs can sit behind Cloudflare Access.");
@@ -272,6 +277,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
       networkIds: rule.networkIds,
       targetIds: rule.targetIds,
       domains: rule.domains,
+      countries: rule.countries,
       enabled: rule.enabled,
       mode: rule.mode,
       groupIds: rule.groups.map((link) => link.groupId),
@@ -383,6 +389,11 @@ export function readExport(upload: Buffer): { manifest: Manifest; config: Househ
 function checkWrites(config: HouseholdConfig): HouseholdConfig {
   const rules = config.rules.map((rule) => {
     try {
+      // The built-in Block countries rule has only its switch, groups and countries to bring.
+      if (rule.id === COUNTRIES_RULE_ID) {
+        const fixed = { name: "Block countries", useGeneratedName: false, kind: RuleKind.domain, scope: RuleScope.group, mode: RuleMode.always };
+        return { ...rule, ...fixed, networkIds: [], targetIds: [], domains: [], windows: [], countries: normalizeCountries(rule.countries) };
+      }
       const shaped = validateRuleShape({ ...rule, windows: rule.windows.map(({ id, name, days, start, end }) => ({ id, name, days, start, end })) });
       const positions = new Map(rule.windows.map((window) => [window.id, window.position]));
       return {
@@ -654,6 +665,12 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
         create: { id: LOCK_DNS_RULE_ID, name: "Lock DNS", kind: RuleKind.domain, mode: RuleMode.always, enabled: lockDns.enabled },
       });
       await tx.ruleGroup.createMany({ data: lockDns.groupIds.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })) });
+
+      // An export from before Block countries brings none: the household gets it back, off.
+      await ensureCountriesRule(tx);
+      // The checkup was about the household this replaces; the next sync checks the imported one.
+      await tx.checkupFinding.deleteMany();
+      await tx.household.update({ where: { id: "default" }, data: { checkupRanAt: null, checkupError: null, checkupSkipped: [] } });
 
       await importCategories(tx, config.categories, now);
 

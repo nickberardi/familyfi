@@ -55,6 +55,7 @@ export function RuleEditorForm({
   request,
   error,
   disabled = false,
+  outsideDns = null,
   edit,
   onError,
 }: {
@@ -67,6 +68,8 @@ export function RuleEditorForm({
   error: string;
   /** True while the household is stale, so nothing can be changed. */
   disabled?: boolean;
+  /** `outsideDnsNote(...)`: the covered devices' network hands out its own DNS. */
+  outsideDns?: string | null;
   edit: Edit;
   onError: (message: string) => void;
 }) {
@@ -230,6 +233,11 @@ export function RuleEditorForm({
           />
         ) : null}
         {draft.kind === "internet" ? <Text style={note}>{COPY.appliesTo.internetNote}</Text> : null}
+        {outsideDns ? (
+          <Text role="note" style={[text(14, 20), styles.overlap, { backgroundColor: ui.color("field-soft"), color: ui.color("ink-2") }]} testID="rule-outside-dns">
+            {outsideDns}
+          </Text>
+        ) : null}
         {draft.scope === "group" ? (
           <ChipGroup label={COPY.appliesTo.groupsLabel}>
             {groups.map((group) => (

@@ -12,6 +12,7 @@ import {
   domainBlockPolicy,
   internetBlockPolicy,
   lockDnsBlockPolicy,
+  regionBlockPolicy,
 } from "./payloads";
 import type { FirewallPolicyWrite, UnifiFirewallSchedule } from "./types";
 
@@ -27,6 +28,8 @@ export type PlanRule = {
   networkIds: string[];
   targetIds: number[];
   domains: string[];
+  /** Block countries' region codes: when set, the rule's policies block by region, not by its kind. */
+  countries?: string[];
   enabled: boolean;
   /** A pause is active: the rule's policies stay, disabled, until it ends. */
   paused: boolean;
@@ -69,6 +72,7 @@ export type PlannedRulePolicy = {
   kind: RuleKind;
   targetIds: number[];
   domains: string[];
+  countries: string[];
   macAddresses: string[];
   networkIds: string[];
   sourceType: "MAC_ADDRESS" | "NETWORK";
@@ -182,6 +186,7 @@ export function planRulePolicies(input: {
           kind: rule.kind,
           targetIds: [...rule.targetIds],
           domains: [...rule.domains],
+          countries: [...(rule.countries ?? [])],
           macAddresses: isNetwork ? [] : found.live.length ? found.live : found.macs,
           networkIds: isNetwork ? [...found.networkIds].sort() : [],
           sourceType: isNetwork ? "NETWORK" : "MAC_ADDRESS",
@@ -234,6 +239,7 @@ export function rulePolicyWrite(planned: PlannedRulePolicy): FirewallPolicyWrite
   if (planned.lockDns) {
     return lockDnsBlockPolicy({ ...common, part: planned.lockDns, macAddresses: planned.macAddresses, targets: planned.lockDnsTargets });
   }
+  if (planned.countries.length > 0) return regionBlockPolicy({ ...common, macAddresses: planned.macAddresses, regions: planned.countries });
   switch (planned.kind) {
     case "internet":
       return internetBlockPolicy({ ...common, macAddresses: planned.macAddresses });

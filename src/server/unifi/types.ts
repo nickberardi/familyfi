@@ -44,6 +44,8 @@ export type NetworkDetails = NetworkOverview & {
   /** Set by FamilyFi when the network's own read failed and only its overview is known. */
   detailsUnread?: boolean;
   internetAccessEnabled?: boolean;
+  /** Whether the gateway forwards mDNS into and out of this network; absent on networks it does not manage. */
+  mdnsForwardingEnabled?: boolean;
   ipv4Configuration?: GatewayIpv4Configuration;
   ipv6Configuration?: {
     additionalHostIpSubnets?: string[];
@@ -58,6 +60,25 @@ export type NetworkReferenceResource = {
 
 export type NetworkReferences = {
   referenceResources: NetworkReferenceResource[];
+};
+
+/** `GET /v1/sites/{siteId}/wifi/broadcasts`: one Wi-Fi network (SSID). */
+export type WifiBroadcastOverview = {
+  id: string;
+  name: string;
+  type: "STANDARD" | "IOT_OPTIMIZED" | string;
+  enabled: boolean;
+  /** The network it carries: `NATIVE` is the default network, `SPECIFIC` names one. */
+  network?: { type: "NATIVE" } | { type: "SPECIFIC"; networkId: string } | { type: string; networkId?: string };
+  securityConfiguration: { type: string };
+};
+
+/** `GET /v1/sites/{siteId}/wifi/broadcasts/{id}`; only the fields the checkup reads. */
+export type WifiBroadcastDetails = WifiBroadcastOverview & {
+  multicastToUnicastConversionEnabled: boolean;
+  clientIsolationEnabled: boolean;
+  /** 2.4, 5 and 6; standard broadcasts only. */
+  broadcastingFrequenciesGHz?: number[];
 };
 
 export type FirewallZone = {
@@ -140,7 +161,12 @@ export type IpAddressFilter = {
   items: { type: "IP_ADDRESS" | "SUBNET"; value: string }[];
 };
 
-/** Destination traffic filter — internet (zone only), DPI APPLICATION_*, DOMAIN, PORT or IP_ADDRESS shapes. */
+/** ISO 3166-1 alpha-2 codes the gateway matches destination addresses against. */
+export type RegionFilter = {
+  regions: string[];
+};
+
+/** Destination traffic filter — internet (zone only), DPI APPLICATION_*, DOMAIN, PORT, IP_ADDRESS or REGION shapes. */
 export type DestinationTrafficFilter =
   | {
       type: "PORT";
@@ -164,6 +190,11 @@ export type DestinationTrafficFilter =
   | {
       type: "DOMAIN";
       domainFilter: DomainFilter;
+      portFilter?: unknown;
+    }
+  | {
+      type: "REGION";
+      regionFilter: RegionFilter;
       portFilter?: unknown;
     }
   | {
