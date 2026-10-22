@@ -1,7 +1,7 @@
-import { encryptedDnsAddresses, encryptedDnsHosts } from "@/lib/encrypted-dns";
 import type { LockDnsPart } from "@/lib/policy-names";
 import { normalizeMac } from "../mac";
-import type { FirewallPolicy, FirewallPolicyWrite, UnifiFirewallSchedule } from "./types";
+import { lockDnsTargets, type LockDnsTargets } from "./lock-dns";
+import type { FirewallPolicy, FirewallPolicyWrite, IpAddressFilter, UnifiFirewallSchedule } from "./types";
 
 export const INTERNET_BLOCK_ACTION = "BLOCK" as const;
 
@@ -295,8 +295,11 @@ export function lockDnsBlockPolicy(input: {
   destinationZoneId: string;
   macAddresses: string[];
   enabled?: boolean;
+  /** What it blocks, leaving out the household's own DNS. */
+  targets?: LockDnsTargets;
 }): FirewallPolicyWrite {
-  if (input.part === "names") return { ...domainBlockPolicy({ ...input, domains: encryptedDnsHosts() }), description: LOCK_DNS_DESCRIPTION };
+  const targets = input.targets ?? lockDnsTargets();
+  if (input.part === "names") return { ...domainBlockPolicy({ ...input, domains: targets.hosts }), description: LOCK_DNS_DESCRIPTION };
   const macAddresses = [...new Set(input.macAddresses.map(normalizeMac))].sort();
   if (macAddresses.length === 0) throw new Error("A Lock DNS policy needs at least one MAC address.");
   const common = {
@@ -308,15 +311,16 @@ export function lockDnsBlockPolicy(input: {
     source: { zoneId: input.sourceZoneId, trafficFilter: { type: "MAC_ADDRESS", macAddressFilter: { macAddresses } } },
   };
   if (input.part === "ports") {
+    const portFilter = { type: "PORTS", matchOpposite: false, items: DNS_PORTS.map((value) => ({ type: "PORT_NUMBER" as const, value })) } as const;
     return {
       ...common,
       ipProtocolScope: { ipVersion: "IPV4_AND_IPV6", protocolFilter: { type: "PRESET", preset: { name: "TCP_UDP" } } },
       destination: {
         zoneId: input.destinationZoneId,
-        trafficFilter: {
-          type: "PORT",
-          portFilter: { type: "PORTS", matchOpposite: false, items: DNS_PORTS.map((value) => ({ type: "PORT_NUMBER", value })) },
-        },
+        // The household's own DNS servers stay reachable: every address but theirs.
+        trafficFilter: targets.allowed.length
+          ? { type: "IP_ADDRESS", ipAddressFilter: { type: "IP_ADDRESSES", matchOpposite: true, items: addressItems(targets.allowed) }, portFilter }
+          : { type: "PORT", portFilter },
       },
     };
   }
@@ -331,11 +335,15 @@ export function lockDnsBlockPolicy(input: {
         ipAddressFilter: {
           type: "IP_ADDRESSES",
           matchOpposite: false,
-          items: encryptedDnsAddresses(version).map((value) => ({ type: value.includes("/") ? "SUBNET" : "IP_ADDRESS", value })),
+          items: addressItems(targets[version]),
         },
       },
     },
   };
+}
+
+function addressItems(values: string[]): IpAddressFilter["items"] {
+  return values.map((value) => ({ type: value.includes("/") ? "SUBNET" : "IP_ADDRESS", value }));
 }
 
 const LOCK_DNS_DESCRIPTION = "FamilyFi managed Lock DNS: blocks DNS servers other than the gateway.";

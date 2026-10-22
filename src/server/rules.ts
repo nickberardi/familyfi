@@ -133,10 +133,10 @@ export async function ensureLockDnsRule(): Promise<void> {
  * like smart TVs and streaming sticks often insist on their own DNS, so they are left to choose.
  * Turning it off ends its pause, as for any rule.
  */
-export async function setLockDnsEnabled(enabled: boolean): Promise<RuleWithWindows> {
+export async function setLockDnsEnabled(enabled: boolean, { coverPeople = true } = {}): Promise<RuleWithWindows> {
   return prisma().$transaction(async (tx) => {
     const rule = await tx.rule.findUniqueOrThrow({ where: { id: LOCK_DNS_RULE_ID }, include: { groups: true } });
-    if (enabled && rule.groups.length === 0) {
+    if (enabled && coverPeople && rule.groups.length === 0) {
       const people = await tx.group.findMany({ where: { kind: GroupKind.family }, select: { id: true } });
       await tx.ruleGroup.createMany({ data: people.map((group) => ({ ruleId: rule.id, groupId: group.id })), skipDuplicates: true });
     }
@@ -151,9 +151,9 @@ export async function setLockDnsEnabled(enabled: boolean): Promise<RuleWithWindo
 /** Sets the groups Lock DNS covers. A group it no longer covers loses its allowance with it. */
 export async function setLockDnsGroups(groupIds: string[]): Promise<RuleWithWindows> {
   const unique = [...new Set(groupIds)];
-  const found = await prisma().group.count({ where: { id: { in: unique } } });
-  if (found !== unique.length) throw new RuleInputError(404, "not_found", "Group not found.");
   return prisma().$transaction(async (tx) => {
+    const found = await tx.group.count({ where: { id: { in: unique } } });
+    if (found !== unique.length) throw new RuleInputError(404, "not_found", "Group not found.");
     await tx.ruleGroup.deleteMany({ where: { ruleId: LOCK_DNS_RULE_ID, groupId: { notIn: unique } } });
     await tx.ruleGroup.createMany({ data: unique.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })), skipDuplicates: true });
     return tx.rule.findUniqueOrThrow({ where: { id: LOCK_DNS_RULE_ID }, include: ruleInclude });

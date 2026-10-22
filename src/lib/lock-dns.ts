@@ -20,11 +20,11 @@ export const LOCK_DNS_COPY = {
     items: [
       {
         title: "Other DNS servers on the internet",
-        body: "Plain DNS and DNS over TLS to anything but your gateway. A DNS server on your own network, like a Pi-hole, still works.",
+        body: "Plain DNS and DNS over TLS to anything but your gateway. A DNS server on your own network, like a Pi-hole, and the DNS servers your networks hand out still work.",
       },
       {
         title: "Known encrypted DNS services",
-        body: `${encryptedDnsSummary()}, by address and by name. Each FamilyFi release keeps this list up to date.`,
+        body: `${encryptedDnsSummary()}, by address and by name, except a resolver you set in FamilyFi. Each FamilyFi release keeps this list up to date.`,
       },
     ],
     caution: "A phone set to its own private DNS name loses internet until that setting goes back to Automatic.",

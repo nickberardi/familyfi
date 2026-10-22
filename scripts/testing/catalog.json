@@ -841,6 +841,11 @@
         "schedules"
       ]
     },
+    "tests/browser/smoke.spec.ts > Rules: Lock DNS is a built-in rule whose page changes only the groups it covers": {
+      "categories": [
+        "rules"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Rules: quarantine is a built-in rule that pauses from its card and resumes on Devices": {
       "categories": [
         "rules",

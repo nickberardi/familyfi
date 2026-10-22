@@ -29,6 +29,7 @@ import { DELETE as deleteRule, GET as getRule, PATCH as patchRule } from "@/app/
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import type { Rule } from "@/lib/rules";
+import { setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
 import type { FirewallPolicy } from "@/server/unifi/types";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { INTERNAL_ZONE, configureConnectedHousehold, resetDatabase, seedDevice } from "../helpers/db";
@@ -1007,6 +1008,9 @@ describe("household rules", () => {
       // Switched on with groups already picked, it keeps them.
       expect((await ruleOf(await ruleAction(turnOnRule, auth, "lock-dns", null))).groupIds).toEqual([emma.id, tv.id].sort());
       expect((await ruleOf(await patch(auth, "lock-dns", { groupIds: [emma.id], enabled: true }))).groupIds).toEqual([emma.id]);
+      // Groups named with the switch are the ones it covers, even none.
+      expect((await ruleOf(await patch(auth, "lock-dns", { groupIds: [], enabled: true }))).groupIds).toEqual([]);
+      await patch(auth, "lock-dns", { groupIds: [emma.id] });
 
       expect(await errorCode(await patch(auth, "lock-dns", { name: "Loose" }))).toEqual([409, "rule_built_in"]);
       expect(await errorCode(await patch(auth, "lock-dns", { groupIds: [emma.id], domains: ["example.com"] }))).toEqual([409, "rule_built_in"]);
@@ -1047,6 +1051,52 @@ describe("household rules", () => {
       expect((await prisma().ruleGroup.findUniqueOrThrow({ where: { ruleId_groupId: { ruleId: "lock-dns", groupId: emma.id } } })).pauseActive).toBe(true);
       await runReconcileOnce();
       expect(lockDnsPolicies().every((policy) => !policy.enabled && policyMacs(policy).join() === MAC)).toBe(true);
+    });
+
+    it("leaves the household's own DNS servers and resolvers alone", async () => {
+      const auth = await signedIn();
+      await child();
+      for (const network of client.state.networks) {
+        network.ipv4Configuration!.dhcpConfiguration = { mode: "SERVER", dnsServerIpAddressesOverride: ["1.1.1.3", "1.0.0.3"] };
+      }
+      await prisma().household.update({ where: { id: "default" }, data: { dohUrl: "https://dns11.quad9.net/dns-query" } });
+      setLockDnsResolverForTests(async () => ["9.9.9.11", "149.112.112.11"]);
+      try {
+        await ruleAction(turnOnRule, auth, "lock-dns", null);
+        await runReconcileOnce();
+        const policy = (name: string) => lockDnsPolicies().find((item) => item.name === name)!;
+        expect(policy("FamilyFi Lock DNS").destination.trafficFilter).toMatchObject({
+          type: "IP_ADDRESS",
+          ipAddressFilter: { matchOpposite: true, items: ["1.0.0.3", "1.1.1.3", "149.112.112.11", "9.9.9.11"].map((value) => ({ type: "IP_ADDRESS", value })) },
+          portFilter: { items: [{ value: 53 }, { value: 853 }] },
+        });
+        const v4 = JSON.stringify(policy("FamilyFi Lock DNS services").destination.trafficFilter);
+        expect([v4.includes('"1.1.1.1"'), v4.includes('"1.1.1.3"'), v4.includes('"9.9.9.11"')]).toEqual([true, false, false]);
+        const names = JSON.stringify(policy("FamilyFi Lock DNS names").destination.trafficFilter);
+        expect([names.includes('"dns.quad9.net"'), names.includes('"dns11.quad9.net"')]).toEqual([true, false]);
+
+        // Nothing changed, so the next pass writes nothing.
+        client.calls.length = 0;
+        await runReconcileOnce();
+        expect(client.calls.filter((call) => call.method !== "GET")).toEqual([]);
+      } finally {
+        setLockDnsResolverForTests(undefined);
+      }
+    });
+
+    it("stays when the only group it covers is deleted, and its policies go", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      await ruleAction(turnOnRule, auth, "lock-dns", null);
+      await runReconcileOnce();
+      expect(lockDnsPolicies()).toHaveLength(4);
+
+      const deleted = await deleteGroup(request(`/api/v1/groups/${emma.id}`, { method: "DELETE", auth }), { params: Promise.resolve({ id: emma.id }) });
+      expect(deleted.status).toBe(200);
+      const stored = await prisma().rule.findUniqueOrThrow({ where: { id: "lock-dns" }, include: { groups: true } });
+      expect([stored.enabled, stored.groups]).toEqual([true, []]);
+      await runReconcileOnce();
+      expect(lockDnsPolicies()).toEqual([]);
     });
   });
 

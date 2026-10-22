@@ -659,6 +659,36 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
   }
 });
 
+test("Rules: Lock DNS is a built-in rule whose page changes only the groups it covers", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };
+  const nick = groups.find((group) => group.name === "Nick");
+  expect(nick, "The mock seed must include Nick").toBeTruthy();
+  const { rule: seeded } = (await (await page.request.get("/api/v1/rules/lock-dns")).json()) as { rule: { groupIds: string[] } };
+  try {
+    await page.goto("/rules");
+    const card = page.getByTestId("rule-card-lock-dns");
+    await expect(card.getByText("Other DNS servers · everything else stays on")).toBeVisible();
+    // The mock household has it on for the teens and the child.
+    await expect(card.getByRole("switch", { name: "Lock DNS" })).toBeChecked();
+    await card.getByRole("link", { name: /^Lock DNS/ }).click();
+    await expect(page).toHaveURL(/\/rules\/lock-dns$/);
+
+    await expect(page.getByRole("heading", { name: "What it blocks" })).toBeVisible();
+    await expect(page.getByTestId("lock-dns-caution")).toBeVisible();
+    await expect(page.getByText("Unsaved changes")).toHaveCount(0);
+    await page.getByTestId(`lock-dns-group-${nick!.id}`).click();
+    await expect(page.getByText("Unsaved changes")).toBeVisible();
+    await expect(page.getByText("Groups changed").first()).toBeVisible();
+    await page.getByRole("button", { name: "Save" }).first().click();
+    await expect(page).toHaveURL(/\/rules$/);
+    const { rule } = (await (await page.request.get("/api/v1/rules/lock-dns")).json()) as { rule: { groupIds: string[] } };
+    expect(rule.groupIds).toContain(nick!.id);
+  } finally {
+    await page.request.patch("/api/v1/rules/lock-dns", { headers: await csrfHeaders(page), data: { groupIds: seeded.groupIds } });
+  }
+});
+
 test("Block for a custom time, then offer it first next time", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };

@@ -123,7 +123,8 @@ async function patchLockDns(patch: z.infer<typeof RuleUpdateBody>): Promise<Resp
   if (keys.length === 0 || keys.some((key) => key !== "groupIds" && key !== "enabled")) return lockDnsRefusal();
   try {
     let rule = patch.groupIds ? await setLockDnsGroups(patch.groupIds) : null;
-    if (patch.enabled !== undefined) rule = await setLockDnsEnabled(patch.enabled);
+    // Groups named in the same request are the ones it covers, even none.
+    if (patch.enabled !== undefined) rule = await setLockDnsEnabled(patch.enabled, { coverPeople: !patch.groupIds });
     const change = await enqueueChange("rule");
     return Response.json({ rule: await presentRule(rule!), change });
   } catch (error) {

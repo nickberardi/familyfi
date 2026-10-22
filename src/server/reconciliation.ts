@@ -1,5 +1,5 @@
 import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope } from "@prisma/client";
-import { QUARANTINE_RULE_ID } from "@/lib/rules";
+import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
 import { prisma } from "./db";
@@ -19,6 +19,7 @@ import { recordQuarantineObservation } from "./quarantine";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
+import { lockDnsExemptions } from "./unifi/lock-dns";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
@@ -338,6 +339,14 @@ async function tick(owner: string): Promise<boolean> {
     const rulePolicies = await prisma().rulePolicy.findMany({
       where: { connectionIdentity: identity, siteId },
     });
+    // Lock DNS leaves the household's own DNS alone; looked up only while it covers someone.
+    const lockDnsRule = rules.find((rule) => rule.id === LOCK_DNS_RULE_ID);
+    const lockDnsExempt = lockDnsRule?.groups.length
+      ? await lockDnsExemptions({
+          networks: networks.filter((network) => networkInScope(scope, network.id)),
+          resolverUrls: [household.dohUrl, ...groups.map((group) => group.dohOverrideUrl)],
+        })
+      : undefined;
     const { policies: desiredRules, retainRuleIds, orphanRuleIds } = planRulePolicies({
       destinationZoneId: external.id,
       zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
@@ -355,6 +364,7 @@ async function tick(owner: string): Promise<boolean> {
         zoneId: network.zoneId ?? null,
       })),
       networkScope: scope,
+      lockDnsExemptions: lockDnsExempt,
       rules: rules.map((rule) => ({
         ...rule,
         groupIds: rule.groups.map((link) => link.groupId),
