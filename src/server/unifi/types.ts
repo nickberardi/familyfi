@@ -41,6 +41,8 @@ export type GatewayIpv4Configuration = {
 };
 
 export type NetworkDetails = NetworkOverview & {
+  /** Set by FamilyFi when the network's own read failed and only its overview is known. */
+  detailsUnread?: boolean;
   internetAccessEnabled?: boolean;
   ipv4Configuration?: GatewayIpv4Configuration;
   ipv6Configuration?: {
@@ -126,8 +128,29 @@ export type DomainFilter = {
   domains: string[];
 };
 
-/** Destination traffic filter — internet (zone only), DPI APPLICATION_* or DOMAIN shapes. */
+export type PortFilter = {
+  type: "PORTS";
+  matchOpposite: boolean;
+  items: { type: "PORT_NUMBER"; value: number }[];
+};
+
+export type IpAddressFilter = {
+  type: "IP_ADDRESSES";
+  matchOpposite: boolean;
+  items: { type: "IP_ADDRESS" | "SUBNET"; value: string }[];
+};
+
+/** Destination traffic filter — internet (zone only), DPI APPLICATION_*, DOMAIN, PORT or IP_ADDRESS shapes. */
 export type DestinationTrafficFilter =
+  | {
+      type: "PORT";
+      portFilter: PortFilter;
+    }
+  | {
+      type: "IP_ADDRESS";
+      ipAddressFilter: IpAddressFilter;
+      portFilter?: PortFilter;
+    }
   | {
       type: "APPLICATION_CATEGORY";
       applicationCategoryFilter: ApplicationCategoryFilter;

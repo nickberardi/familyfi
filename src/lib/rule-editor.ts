@@ -308,7 +308,7 @@ export const RULE_EDITOR_COPY = {
   domains: {
     label: "Add a website",
     placeholder: "Add a domain, then Enter",
-    note: "Subdomains are included. The gateway matches websites by their DNS lookups, so a device using encrypted DNS can get around this.",
+    note: "Subdomains are included. The gateway matches websites by their DNS lookups, so a device using its own DNS can get around this unless Lock DNS covers its group.",
   },
   when: {
     title: "When",

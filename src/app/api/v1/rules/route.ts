@@ -1,5 +1,5 @@
 import { RuleKind, RuleMode, RuleScope } from "@prisma/client";
-import { QUARANTINE_RULE_ID } from "@/lib/rules";
+import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
@@ -24,8 +24,9 @@ export async function GET(request: Request) {
       include: ruleInclude,
       orderBy: [{ scope: "asc" }, { createdAt: "asc" }],
     });
-    // The built-in quarantine rule covers no group, so a group's list leaves it out; it leads every other.
-    rules.sort((a, b) => Number(b.id === QUARANTINE_RULE_ID) - Number(a.id === QUARANTINE_RULE_ID));
+    // The built-in rules lead: quarantine, which covers no group so a group's list leaves it out, then Lock DNS.
+    const lead = (id: string) => (id === QUARANTINE_RULE_ID ? 2 : id === LOCK_DNS_RULE_ID ? 1 : 0);
+    rules.sort((a, b) => lead(b.id) - lead(a.id));
     return Response.json({ rules: await presentRules(rules) });
   });
 }

@@ -22,6 +22,7 @@ import type { Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { RuleEditorForm } from "@/ui/RuleEditorForm";
+import { LockDnsPage } from "./LockDnsPage";
 
 type Params = Promise<{ id: string }>;
 type Search = Promise<{
@@ -45,6 +46,7 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
     if (loading) return null;
     return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{COPY.notFound}</p>;
   }
+  if (rule?.builtIn === "dns") return <LockDnsPage key={rule.id} rule={rule} />;
   if (rule?.builtIn) {
     return (
       <p className="p-6 text-[14px] text-[var(--ff-muted)]">

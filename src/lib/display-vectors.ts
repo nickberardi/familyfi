@@ -59,6 +59,13 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   unblockSheetTitle: (i) => pauseSheet.unblockSheetTitle(i.group, i.mode),
   unblockSheetBody: (i) => pauseSheet.unblockSheetBody(i.group, i.blocking, i.mode),
   unblockSheetOptions: (i) => pauseSheet.unblockSheetOptions(i.unblock, i.blocking, i.mode, i.timeZone, at(i.now)),
+  pauseSheetCustom: (i) => pauseSheet.pauseSheetCustom(i.group, i.custom, i.mode, i.timeZone, at(i.now)),
+  rulePauseSheetCustom: (i) => pauseSheet.rulePauseSheetCustom(i.rule, i.custom, i.mode, i.timeZone, at(i.now)),
+  unblockSheetCustom: (i) => pauseSheet.unblockSheetCustom(i.unblock, i.custom, i.mode, i.timeZone, at(i.now)),
+  customPauseLabel: (i) => pauseSheet.customPauseLabel(i.custom),
+  withCustomChoices: (i) => pauseSheet.withCustomChoices(i.options, i.recent),
+  // Each device keeps its last custom choice in this shape, so every client reads back the same.
+  parseCustomPause: (i) => pauseSheet.parseCustomPause(i.stored),
   groupRuleSheetTitle: (i) => pauseSheet.groupRuleSheetTitle(i.group, i.name, i.mode),
   groupRuleSheetBody: (i) => pauseSheet.groupRuleSheetBody(i.group, i.name, i.mode),
   ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),
@@ -87,14 +94,6 @@ export const EXCLUDED: Record<string, string> = {
   // The Watch lists a group's rules but draws no schedule bar.
   groupScheduleToday: "the schedule bar and today's list are phone and web only; tests/unit/group-schedule.test.ts",
   groupScheduleRules: "returns the rules themselves; the groupScheduleRuleRows vectors cover their titles and order",
-  // The Watch keeps the quick options, so it ports none of the custom choices; their clock text
-  // comes from formatClock and relativeDayLabel, which have vectors.
-  pauseSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
-  rulePauseSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
-  unblockSheetCustom: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
-  customPauseLabel: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
-  withCustomChoices: "custom choices are phone and web only; tests/unit/pause-sheet-custom.test.ts",
-  parseCustomPause: "reads stored device data, not display text; tests/unit/pause-sheet-custom.test.ts",
 };
 
 export type Outcome =

@@ -12,6 +12,8 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { AssignmentState, FamilyRole, GroupKind, RuleKind, RuleMode } from "@prisma/client";
+import { LOCK_DNS_PARTS } from "@/lib/policy-names";
+import { LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { createFixtureUnifiClient } from "@/server/unifi/dev-mock";
@@ -53,6 +55,8 @@ type World = {
   quarantinePaused: boolean;
   groups: GroupSpec[];
   rules: RuleSpec[];
+  /** The built-in Lock DNS rule: its switch and the groups it covers. */
+  lockDns: { enabled: boolean; groups: number[] };
   places: Place[];
   /** Each device's group once discovered, or null to leave it in quarantine. */
   assignments: (number | null)[];
@@ -111,10 +115,11 @@ const world: fc.Arbitrary<World> = fc.record({
     }),
     { maxLength: 3 },
   ),
+  lockDns: fc.record({ enabled: fc.boolean(), groups: fc.subarray([0, 1, 2]) }),
   places: fc.array(place, { minLength: MACS.length, maxLength: MACS.length }),
   assignments: fc.array(fc.option(groupIndex, { nil: null, freq: 3 }), { minLength: MACS.length, maxLength: MACS.length }),
   // Administrator policies, some named like ours: the name must never make them ours.
-  lookalikes: fc.subarray(["Allow printer", "FamilyFi Kids bedtime", "FamilyFi Quarantine Internal Devices"]),
+  lookalikes: fc.subarray(["Allow printer", "FamilyFi Kids bedtime", "FamilyFi Quarantine Internal Devices", "FamilyFi Lock DNS"]),
 });
 
 const step: fc.Arbitrary<Step> = fc.oneof(
@@ -213,6 +218,10 @@ async function build(spec: World): Promise<{ client: Client; groupIds: string[];
       },
     });
   }
+  await prisma().rule.update({
+    where: { id: LOCK_DNS_RULE_ID },
+    data: { enabled: spec.lockDns.enabled, groups: { create: spec.lockDns.groups.map((index) => ({ groupId: groupIds[index]! })) } },
+  });
   for (const [n, group] of spec.groups.entries()) if (group.allowed) await setAllowance(groupIds[n]!, true);
   setReconcileClientForTests(client);
   return { client, groupIds, admin };
@@ -273,7 +282,8 @@ async function apply(change: Step, client: Client, groupIds: string[]) {
     }
     case "toggleRule":
     case "renameRule": {
-      const rules = await db.rule.findMany({ orderBy: { id: "asc" } });
+      // Lock DNS keeps its name: nothing renames it.
+      const rules = await db.rule.findMany({ where: change.kind === "renameRule" ? { id: { not: LOCK_DNS_RULE_ID } } : {}, orderBy: { id: "asc" } });
       if (!rules.length) return;
       const rule = rules[change.pick % rules.length]!;
       await db.rule.update({
@@ -381,7 +391,8 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
     // built-in pause rule only while it is enabled. A lift on its link takes it out of that
     // rule, unless no one is left and the policy is disabled.
     for (const rule of rules.filter((rule) => rule.groups.some((link) => link.groupId === group.id))) {
-      const keys = rule.mode === RuleMode.always ? ["always"] : rule.windows.map((window) => window.id);
+      // Lock DNS has one policy for each of its parts instead.
+      const keys = rule.id === LOCK_DNS_RULE_ID ? [...LOCK_DNS_PARTS] : rule.mode === RuleMode.always ? ["always"] : rule.windows.map((window) => window.id);
       for (const key of keys) {
         const found = ourRules.filter(({ row }) => row.ruleId === rule.id && row.windowKey === key && row.zoneId === device.zoneId);
         if (rule.systemGroupId && !rule.enabled) {
@@ -481,6 +492,7 @@ describe("reconciliation properties", () => {
                   { paused: false, allowed: false },
                 ],
                 rules: [{ kind: "internet", groups: [2], always: false, windows: [{ name: "", days: [6], start: "21:00", end: "06:45" }], enabled: false }],
+                lockDns: { enabled: false, groups: [] },
                 places: ["internal", "iot", "internal", "internal", "internal"],
                 assignments: [null, 2, null, null, null],
                 lookalikes: [],

@@ -34,11 +34,13 @@ export type RulesListView = {
 export function rulesListView(rules: Rule[], groups: Group[], scope: string | null | undefined): RulesListView {
   const scoped = scope ? groups.find((group) => group.id === scope) : undefined;
   const covered = new Set(rules.flatMap((rule) => rule.groupIds));
+  // Lock DNS blocks nothing of its own: a group it alone covers is still online and unfiltered.
+  const filtered = new Set(rules.filter((rule) => rule.builtIn !== "dns").flatMap((rule) => rule.groupIds));
   return {
     scoped,
     list: scoped ? rules.filter((rule) => rule.groupIds.includes(scoped.id)) : rules,
     chips: groups.filter((group) => covered.has(group.id)),
-    unruled: groups.filter((group) => !covered.has(group.id)).map((group) => group.name),
+    unruled: groups.filter((group) => !filtered.has(group.id)).map((group) => group.name),
     newHref: scoped ? `/rules/new?group=${scoped.id}` : "/rules/new",
   };
 }
@@ -113,11 +115,12 @@ export function ruleStatus(
 }
 
 /** The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower. */
-export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds">): {
+export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pick<Rule, "builtIn">>): {
   shape: "square" | "round";
   slot?: CuratedSlot;
   icon: IconName;
 } {
+  if (rule.builtIn === "dns") return { shape: "round", icon: "shield-check" };
   if (rule.kind === "internet") return { shape: "square", icon: "globe-simple" };
   const slot =
     rule.kind === "category"
