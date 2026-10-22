@@ -1,17 +1,21 @@
+import type { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
-import { builtInRefusal, switchQuarantineRule } from "@/server/rule-lifts";
+import { builtInRefusal, lockDnsRefusal, switchQuarantineRule } from "@/server/rule-lifts";
 import {
   householdNetworkScope,
+  isLockDnsRule,
   isQuarantineRule,
   presentRule,
   RuleInputError,
   ruleInclude,
   RuleUpdateBody,
   saveRule,
+  setLockDnsEnabled,
+  setLockDnsGroups,
   validateRule,
 } from "@/server/rules";
 
@@ -47,6 +51,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       if (keys.length !== 1 || patch.enabled === undefined) return builtInRefusal();
       return switchQuarantineRule(request, session, patch.enabled);
     }
+    if (isLockDnsRule(existing)) return patchLockDns(patch);
     const current = await presentRule(existing);
     try {
       const input = await validateRule(
@@ -85,6 +90,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
     });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     if (isQuarantineRule(existing)) return builtInRefusal();
+    if (isLockDnsRule(existing)) return lockDnsRefusal();
     // Delete recorded UniFi policies only (D3). Never touch a group's pause AppPolicy rows.
     const household = await prisma().household.findUnique({ where: { id: "default" } });
     if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
@@ -109,4 +115,20 @@ export async function DELETE(request: Request, ctx: Ctx) {
     const change = await enqueueChange("rule");
     return Response.json({ change });
   });
+}
+
+/** Lock DNS takes its groups and its switch; anything else in the patch is an edit it refuses. */
+async function patchLockDns(patch: z.infer<typeof RuleUpdateBody>): Promise<Response> {
+  const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
+  if (keys.length === 0 || keys.some((key) => key !== "groupIds" && key !== "enabled")) return lockDnsRefusal();
+  try {
+    let rule = patch.groupIds ? await setLockDnsGroups(patch.groupIds) : null;
+    // Groups named in the same request are the ones it covers, even none.
+    if (patch.enabled !== undefined) rule = await setLockDnsEnabled(patch.enabled, { coverPeople: !patch.groupIds });
+    const change = await enqueueChange("rule");
+    return Response.json({ rule: await presentRule(rule!), change });
+  } catch (error) {
+    if (error instanceof RuleInputError) return jsonError(error.status, error.code, error.message);
+    throw error;
+  }
 }

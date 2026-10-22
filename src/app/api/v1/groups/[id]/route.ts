@@ -7,6 +7,7 @@ import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
+import { LOCK_DNS_RULE_ID } from "@/lib/rules";
 
 const Update = z.object({
   name: z.string().min(1).optional(),
@@ -63,9 +64,10 @@ export async function DELETE(request: Request, ctx: Ctx) {
       data: { groupId: null, assignment: AssignmentState.quarantined },
     });
     // A rule that covered only this group goes with it. Delete its recorded UniFi
-    // policies before the Rule rows cascade (D3). Rules shared with other groups stay.
+    // policies before the Rule rows cascade (D3). Rules shared with other groups stay, and
+    // so does Lock DNS: it is built in, and only loses the group.
     const rules = await prisma().rule.findMany({
-      where: { scope: "group", groups: { some: { groupId: id }, every: { groupId: id } } },
+      where: { scope: "group", id: { not: LOCK_DNS_RULE_ID }, groups: { some: { groupId: id }, every: { groupId: id } } },
       include: { policies: true },
     });
     const household = await prisma().household.findUnique({ where: { id: "default" } });

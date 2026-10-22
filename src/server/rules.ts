@@ -1,7 +1,8 @@
-import { Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
+import { GroupKind, Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { z } from "zod";
-import { rulePolicyNames } from "@/lib/policy-names";
-import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain, QUARANTINE_RULE_ID } from "@/lib/rules";
+import { encryptedDnsHosts } from "@/lib/encrypted-dns";
+import { LOCK_DNS_PARTS, lockDnsPolicyName, rulePolicyNames } from "@/lib/policy-names";
+import { alwaysWindow, MAX_RULE_DOMAINS, MAX_RULE_NAME, MAX_RULE_WINDOWS, MAX_WINDOW_NAME, normalizeDomain, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
 import { prisma } from "./db";
@@ -39,11 +40,13 @@ function publicPause(state: LiftColumns) {
 
 /**
  * The rule as the API shows it. The built-in quarantine rule is on while the household enforces
- * quarantine (`quarantineEnforced`), which callers pass; `presentRules` reads it for them.
+ * quarantine (`quarantineEnforced`), which callers pass; `presentRules` reads it for them. Lock DNS
+ * shows the encrypted DNS services' host names it blocks as its `domains`.
  */
 export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
   const windows = [...rule.windows].sort((a, b) => a.position - b.position);
   const builtIn = isQuarantineRule(rule);
+  const lockDns = isLockDnsRule(rule);
   return {
     id: rule.id,
     name: rule.name,
@@ -52,7 +55,7 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     groupIds: rule.groups.map((link) => link.groupId).sort(),
     networkIds: [...rule.networkIds],
     targetIds: [...rule.targetIds],
-    domains: [...rule.domains],
+    domains: lockDns ? encryptedDnsHosts() : [...rule.domains],
     enabled: builtIn ? quarantineEnforced : rule.enabled,
     pause: publicPause(rule),
     groupPauses: rule.groups
@@ -69,8 +72,12 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     })),
     useGeneratedName: rule.useGeneratedName,
     /** What UniFi's policy table shows for this rule, one per policy in the Internal zone. */
-    policyNames: builtIn ? [quarantinePolicyName("Internal")] : rulePolicyNames({ ...rule, windows }),
-    builtIn: builtIn ? ("quarantine" as const) : null,
+    policyNames: builtIn
+      ? [quarantinePolicyName("Internal")]
+      : lockDns
+        ? LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part))
+        : rulePolicyNames({ ...rule, windows }),
+    builtIn: builtIn ? ("quarantine" as const) : lockDns ? ("dns" as const) : null,
   };
 }
 
@@ -90,6 +97,10 @@ export function isQuarantineRule(rule: Pick<RuleWithWindows, "id">): boolean {
   return rule.id === QUARANTINE_RULE_ID;
 }
 
+export function isLockDnsRule(rule: Pick<RuleWithWindows, "id">): boolean {
+  return rule.id === LOCK_DNS_RULE_ID;
+}
+
 /**
  * The household's built-in quarantine rule, created beside the household. It holds only the
  * quarantine pause: whether quarantine is on is `Household.quarantineEnforced`, so the row's own
@@ -100,6 +111,52 @@ export async function ensureQuarantineRule(): Promise<void> {
     where: { id: QUARANTINE_RULE_ID },
     update: {},
     create: { id: QUARANTINE_RULE_ID, name: "Quarantine", kind: RuleKind.internet, mode: RuleMode.always },
+  });
+}
+
+/**
+ * The household's built-in Lock DNS rule, created beside the household, off and covering no group.
+ * Its policies are ordinary `RulePolicy` rows, one per part (`LOCK_DNS_PARTS`) in each zone, so
+ * reconciliation, pauses and allowances treat it as any always-on rule. Its stored `kind` and
+ * `domains` are never read: what it blocks is the encrypted DNS seed.
+ */
+export async function ensureLockDnsRule(): Promise<void> {
+  await prisma().rule.upsert({
+    where: { id: LOCK_DNS_RULE_ID },
+    update: {},
+    create: { id: LOCK_DNS_RULE_ID, name: "Lock DNS", kind: RuleKind.domain, mode: RuleMode.always, enabled: false },
+  });
+}
+
+/**
+ * Turns Lock DNS on or off. Switched on while it covers no group, it covers every person: things
+ * like smart TVs and streaming sticks often insist on their own DNS, so they are left to choose.
+ * Turning it off ends its pause, as for any rule.
+ */
+export async function setLockDnsEnabled(enabled: boolean, { coverPeople = true } = {}): Promise<RuleWithWindows> {
+  return prisma().$transaction(async (tx) => {
+    const rule = await tx.rule.findUniqueOrThrow({ where: { id: LOCK_DNS_RULE_ID }, include: { groups: true } });
+    if (enabled && coverPeople && rule.groups.length === 0) {
+      const people = await tx.group.findMany({ where: { kind: GroupKind.family }, select: { id: true } });
+      await tx.ruleGroup.createMany({ data: people.map((group) => ({ ruleId: rule.id, groupId: group.id })), skipDuplicates: true });
+    }
+    await tx.rule.update({
+      where: { id: rule.id },
+      data: { enabled, ...(enabled ? {} : { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null }) },
+    });
+    return tx.rule.findUniqueOrThrow({ where: { id: rule.id }, include: ruleInclude });
+  });
+}
+
+/** Sets the groups Lock DNS covers. A group it no longer covers loses its allowance with it. */
+export async function setLockDnsGroups(groupIds: string[]): Promise<RuleWithWindows> {
+  const unique = [...new Set(groupIds)];
+  return prisma().$transaction(async (tx) => {
+    const found = await tx.group.count({ where: { id: { in: unique } } });
+    if (found !== unique.length) throw new RuleInputError(404, "not_found", "Group not found.");
+    await tx.ruleGroup.deleteMany({ where: { ruleId: LOCK_DNS_RULE_ID, groupId: { notIn: unique } } });
+    await tx.ruleGroup.createMany({ data: unique.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })), skipDuplicates: true });
+    return tx.rule.findUniqueOrThrow({ where: { id: LOCK_DNS_RULE_ID }, include: ruleInclude });
   });
 }
 

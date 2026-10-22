@@ -1,4 +1,5 @@
 import { AccountKind, AssignmentState, FamilyRole, GroupKind, RuleKind, RuleLiftKind, RuleMode, UpstreamVerdict } from "@prisma/client";
+import { LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { hashPassword } from "./auth";
 import { encryptSecret } from "./crypto";
 import {
@@ -7,6 +8,7 @@ import {
   DEV_DOH_URL,
   DEV_GROUPS,
   DEV_LIVE_STATES,
+  DEV_LOCK_DNS_GROUPS,
   DEV_RULES,
   DEV_UPSTREAM_VERDICTS,
   devDeviceIp,
@@ -111,6 +113,11 @@ async function ensureDummyHouseholdMembers() {
     });
     ruleIds.set(rule.name, created.id);
   }
+
+  await prisma().rule.update({
+    where: { id: LOCK_DNS_RULE_ID },
+    data: { enabled: true, groups: { create: DEV_LOCK_DNS_GROUPS.map((name) => ({ groupId: idOf(name) })) } },
+  });
 
   const now = Date.now();
   const { pausedGroup, allowance, pausedRule, by } = DEV_LIVE_STATES;

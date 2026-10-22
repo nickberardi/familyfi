@@ -12,7 +12,7 @@ import { useUI } from "./UIContext";
  * The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower.
  * 32 pt in a list; a stacked card's head is 44 (`size`).
  */
-export function RuleMark({ rule, size = 32 }: { rule: Pick<Rule, "kind" | "targetIds">; size?: number }) {
+export function RuleMark({ rule, size = 32 }: { rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pick<Rule, "builtIn">>; size?: number }) {
   const ui = useUI();
   const mark = ruleMarkSpec(rule);
   const scale = size / 32;

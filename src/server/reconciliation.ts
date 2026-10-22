@@ -1,5 +1,5 @@
 import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope } from "@prisma/client";
-import { QUARANTINE_RULE_ID } from "@/lib/rules";
+import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
 import { prisma } from "./db";
@@ -19,6 +19,7 @@ import { recordQuarantineObservation } from "./quarantine";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
+import { lockDnsExemptions } from "./unifi/lock-dns";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
@@ -338,7 +339,18 @@ async function tick(owner: string): Promise<boolean> {
     const rulePolicies = await prisma().rulePolicy.findMany({
       where: { connectionIdentity: identity, siteId },
     });
-    const { policies: desiredRules, retainRuleIds, orphanRuleIds } = planRulePolicies({
+    // Lock DNS leaves the household's own DNS alone: the resolvers of the household and of the
+    // groups it covers, looked up only while it covers someone. When that cannot be worked out
+    // this pass, its policies stay as they are.
+    const lockDnsRule = rules.find((rule) => rule.id === LOCK_DNS_RULE_ID);
+    const lockDnsGroups = new Set(lockDnsRule?.groups.map((link) => link.groupId));
+    const lockDnsExempt = lockDnsGroups.size
+      ? await lockDnsExemptions({
+          networks: networks.filter((network) => networkInScope(scope, network.id)),
+          resolverUrls: [household.dohUrl, ...groups.filter((group) => lockDnsGroups.has(group.id)).map((group) => group.dohOverrideUrl)],
+        })
+      : undefined;
+    const rulePlan = planRulePolicies({
       destinationZoneId: external.id,
       zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
       groups: groups.map((group) => ({
@@ -355,7 +367,8 @@ async function tick(owner: string): Promise<boolean> {
         zoneId: network.zoneId ?? null,
       })),
       networkScope: scope,
-      rules: rules.map((rule) => ({
+      lockDnsExemptions: lockDnsExempt ?? undefined,
+      rules: rules.filter((rule) => !(rule.id === LOCK_DNS_RULE_ID && lockDnsExempt === null)).map((rule) => ({
         ...rule,
         groupIds: rule.groups.map((link) => link.groupId),
         paused: isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now),
@@ -365,6 +378,13 @@ async function tick(owner: string): Promise<boolean> {
           .map((link) => link.groupId),
       })),
     });
+    const { policies: desiredRules, retainRuleIds, orphanRuleIds } = rulePlan;
+    if (lockDnsExempt === null) {
+      retainRuleIds.add(LOCK_DNS_RULE_ID);
+      // Not applied: the pass is partial, and the next one tries again.
+      failed += 1;
+      errors.push("Lock DNS kept as it was: a network's DNS settings could not be read.");
+    }
     const desiredRuleKeys = new Set(desiredRules.map((item) => item.key));
 
     for (const planned of desiredRules) {

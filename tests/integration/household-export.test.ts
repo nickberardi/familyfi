@@ -90,6 +90,7 @@ async function buildHousehold() {
   await seedDevice({ mac: "02:00:00:00:00:01", groupId: child.id });
   await seedDevice({ mac: "02:00:00:00:00:02", groupId: things.id });
   await seedDevice({ mac: "02:00:00:00:00:03" });
+  await prisma().rule.update({ where: { id: "dns" }, data: { enabled: true, groups: { create: { groupId: child.id } } } });
   await ensureUpstreamCategories();
   const seeded = await prisma().upstreamCategory.findFirstOrThrow({ where: { source: "seed" }, include: { domains: true }, orderBy: { slug: "asc" } });
   await prisma().upstreamCategory.update({ where: { id: seeded.id }, data: { enabled: false, disabledAt: new Date() } });
@@ -145,6 +146,8 @@ describe("household export", () => {
     for (const secret of ["Ciphertext", "AuthTag", "abcd", "tokenHash", "edgeToken", "instancePrivateKey"]) expect(text).not.toContain(secret);
     const before = await householdConfig();
     expect(JSON.parse(text)).toEqual(JSON.parse(JSON.stringify(before)));
+    expect(before.household.lockDns).toEqual({ enabled: true, groupIds: [built.child.id] });
+    expect(before.rules.map((rule) => rule.id)).not.toContain("dns");
 
     // Undo most of it, as a mistake would, then restore.
     await prisma().rule.deleteMany({ where: { id: { not: "quarantine" } } });
@@ -334,6 +337,18 @@ describe("household export", () => {
     config.household.resolver.probeEnabled = false;
     await imported(auth, writeArchive([{ name: "manifest.json", data: files.get("manifest.json")! }, { name: "config.json", data: Buffer.from(JSON.stringify(config)) }]));
     expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ updateScheduleEnabled: false, updateSchedule: "30 4 * * 0" });
+  });
+
+  it("imports an export from before Lock DNS with Lock DNS off, covering no group", async () => {
+    const built = await buildHousehold();
+    const auth = await recoveryAuth();
+    const files = readArchive(await exportArchive(auth), FILES);
+    const config = JSON.parse(files.get("config.json")!.toString());
+    delete config.household.lockDns;
+    await imported(auth, writeArchive([{ name: "manifest.json", data: files.get("manifest.json")! }, { name: "config.json", data: Buffer.from(JSON.stringify(config)) }]));
+    const lockDns = await prisma().rule.findUniqueOrThrow({ where: { id: "dns" }, include: { groups: true } });
+    expect([lockDns.enabled, lockDns.groups]).toEqual([false, []]);
+    expect(await prisma().group.findUnique({ where: { id: built.child.id } })).not.toBeNull();
   });
 
   it("refuses a rule or resolver the API would refuse, before changing anything", async () => {

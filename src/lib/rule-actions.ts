@@ -38,7 +38,7 @@ export function ruleStateLine(rule: Pick<Rule, "pause">, timezone: string, now: 
  * when there are none. `groupNames` maps a group id to its name.
  */
 export function ruleGroupStateLines(
-  rule: Pick<Rule, "groupPauses">,
+  rule: Pick<Rule, "groupPauses"> & Partial<Pick<Rule, "builtIn">>,
   groupNames: Record<string, string>,
   timezone: string,
   now: Date,
@@ -46,8 +46,8 @@ export function ruleGroupStateLines(
   return rule.groupPauses
     .filter((item) => rulePaused({ pause: item.pause }, now))
     .map((item) => {
-      // A group's allowance on a rule is its unblock.
-      const verb = item.pause.kind === "allow" ? "Unblocked" : "Paused";
+      // A group's allowance on a rule is its unblock; Lock DNS never blocked the group, so it is allowed.
+      const verb = item.pause.kind === "allow" ? (rule.builtIn === "dns" ? "Allowed" : "Unblocked") : "Paused";
       const until = item.pause.until ? `until ${formatClock(new Date(item.pause.until), timezone)}` : "until resumed";
       return `${verb} for ${groupNames[item.groupId] ?? "a deleted group"} ${until}${item.pause.by ? ` by ${item.pause.by.name}` : ""}`;
     });

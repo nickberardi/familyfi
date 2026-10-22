@@ -99,6 +99,11 @@ export function builtInRefusal(): Response {
   return jsonError(409, "rule_built_in", "Quarantine is built in: it can be paused, extended and resumed, but not edited, deleted or allowed.");
 }
 
+/** What editing Lock DNS beyond its groups, or deleting it, answers. */
+export function lockDnsRefusal(): Response {
+  return jsonError(409, "rule_built_in", "Lock DNS is built in: it can be switched, paused and allowed, and the groups it covers changed, but nothing else edited, and it cannot be deleted.");
+}
+
 /**
  * Switches the built-in quarantine rule, which is the household's quarantine setting: the same
  * write as `PUT /settings/household` with `quarantineEnforced`, so demo mode refuses it too.

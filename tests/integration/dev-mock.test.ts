@@ -59,7 +59,10 @@ describe("dev UniFi mock household", () => {
     const idOf = (name: string) => groups.find((group) => group.name === name)!.id;
     const byName = new Map(groups.map((group) => [group.id, group.name]));
 
-    const rules = await prisma().rule.findMany({ where: { systemGroupId: null, id: { not: "quarantine" } }, include: { groups: true, windows: true }, orderBy: { name: "asc" } });
+    // Lock DNS is built in: on for the teens and the child.
+    const lockDns = await prisma().rule.findUniqueOrThrow({ where: { id: "dns" }, include: { groups: true } });
+    expect([lockDns.enabled, lockDns.groups.map((link) => byName.get(link.groupId)).sort()]).toEqual([true, ["Abby", "Betsy", "Cassie"]]);
+    const rules = await prisma().rule.findMany({ where: { systemGroupId: null, id: { notIn: ["quarantine", "dns"] } }, include: { groups: true, windows: true }, orderBy: { name: "asc" } });
     expect(rules.map((rule) => [rule.name, rule.kind, rule.groups.map((link) => byName.get(link.groupId)).sort(), rule.windows.length])).toEqual([
       ["Adult content", "category", ["Computers"], 0],
       ["Bedtime", "internet", ["Cassie"], 1],
@@ -123,8 +126,8 @@ describe("dev UniFi mock household", () => {
 
     await ensureDevDummyData();
     expect(await prisma().group.count()).toBe(9);
-    // Eleven seeded rules and a paused group's built-in rule, beside the built-in quarantine rule.
-    expect(await prisma().rule.count()).toBe(13);
+    // Eleven seeded rules and a paused group's built-in rule, beside the built-in quarantine and Lock DNS rules.
+    expect(await prisma().rule.count()).toBe(14);
     expect(await prisma().account.count({ where: { username: DEV_SEED_ADULT_USERNAME } })).toBe(1);
   });
 });

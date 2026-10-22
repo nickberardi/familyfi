@@ -62,3 +62,23 @@ export function clipName(name: string): string {
   if (name.length <= MAX_POLICY_NAME) return name;
   return name.slice(0, MAX_POLICY_NAME - 1).trimEnd() + "…";
 }
+
+/**
+ * The parts of the built-in Lock DNS rule, each its own UniFi policy in a zone: DNS ports to the
+ * internet, the encrypted DNS services' addresses (one policy per IP version, as UniFi matches
+ * addresses of one version at a time), and their host names.
+ */
+export const LOCK_DNS_PARTS = ["ports", "addresses", "addresses-v6", "names"] as const;
+export type LockDnsPart = (typeof LOCK_DNS_PARTS)[number];
+
+const LOCK_DNS_TAILS: Record<LockDnsPart, string> = {
+  ports: "Lock DNS",
+  addresses: "Lock DNS services",
+  "addresses-v6": "Lock DNS services IPv6",
+  names: "Lock DNS names",
+};
+
+/** A Lock DNS policy's name, e.g. "FamilyFi Lock DNS services". */
+export function lockDnsPolicyName(part: LockDnsPart, zoneName = "Internal"): string {
+  return withZone(`${FAMILYFI_POLICY_PREFIX}${LOCK_DNS_TAILS[part]}`, zoneName);
+}

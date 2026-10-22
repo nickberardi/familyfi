@@ -16,7 +16,7 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 import { RECOVERY_USERNAME } from "@/lib/constants";
-import { QUARANTINE_RULE_ID } from "@/lib/rules";
+import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import type { ImportSummary } from "@/lib/types";
 import { APP_VERSION } from "@/lib/version";
 import { ArchiveError, readArchive, writeArchive } from "./archive";
@@ -84,6 +84,8 @@ const Config = z
         probeTimeoutMs: z.number().int().positive(),
       }),
       autoUpdate: z.object({ enabled: z.boolean(), days: Days, time: Hhmm }),
+      /** The built-in Lock DNS rule: its switch and its groups. An export from before it comes in off. */
+      lockDns: z.object({ enabled: z.boolean(), groupIds: z.array(Id) }).default({ enabled: false, groupIds: [] }),
     }),
     groups: z.array(
       z.object({
@@ -171,6 +173,8 @@ const Config = z
     if (!config.devices.every((device) => known(device.groupId))) issue("A device names a group the export does not have.");
     if (!config.rules.every((rule) => rule.groupIds.every((id) => groups.has(id)))) issue("A rule names a group the export does not have.");
     if (config.rules.some((rule) => rule.id === QUARANTINE_RULE_ID)) issue("The quarantine rule is built in and never exported.");
+    if (config.rules.some((rule) => rule.id === LOCK_DNS_RULE_ID)) issue("Lock DNS is built in and exported with the household.");
+    if (!config.household.lockDns.groupIds.every((id) => groups.has(id))) issue("Lock DNS names a group the export does not have.");
     if (config.accounts.some((account) => account.username === RECOVERY_USERNAME)) issue("The recovery account is never exported.");
     if (config.endpoints.some((endpoint) => endpoint.edgeAuth === EdgeAuth.serviceToken && (endpoint.kind !== RouteKind.own || endpoint.transport !== ConnectionTransport.cloudflare))) {
       issue("Only a Cloudflare route the household runs can sit behind Cloudflare Access.");
@@ -205,18 +209,19 @@ export function browserOnly(session: { deviceId?: string | null }): Response | n
 /** The household's configuration as export writes it. */
 export async function householdConfig(): Promise<HouseholdConfig> {
   const db = prisma();
-  const [household, groups, accounts, devices, rules, categories, endpoints] = await Promise.all([
+  const [household, groups, accounts, devices, rules, categories, endpoints, lockDns] = await Promise.all([
     db.household.findUniqueOrThrow({ where: { id: "default" } }),
     db.group.findMany({ orderBy: { createdAt: "asc" } }),
     db.account.findMany({ where: { kind: AccountKind.personal }, orderBy: { username: "asc" } }),
     db.device.findMany({ orderBy: { mac: "asc" } }),
     db.rule.findMany({
-      where: { systemGroupId: null, id: { not: QUARANTINE_RULE_ID } },
+      where: { systemGroupId: null, id: { notIn: [QUARANTINE_RULE_ID, LOCK_DNS_RULE_ID] } },
       include: { groups: true, windows: { orderBy: { position: "asc" } } },
       orderBy: { createdAt: "asc" },
     }),
     db.upstreamCategory.findMany({ include: { domains: { orderBy: { domain: "asc" } } }, orderBy: { slug: "asc" } }),
     db.connectionEndpoint.findMany({ orderBy: [{ priority: "asc" }, { url: "asc" }] }),
+    db.rule.findUnique({ where: { id: LOCK_DNS_RULE_ID }, include: { groups: true } }),
   ]);
   return {
     household: {
@@ -240,6 +245,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
         probeTimeoutMs: household.dohProbeTimeoutMs,
       },
       autoUpdate: { enabled: household.updateScheduleEnabled, ...parseWeeklyCron(household.updateSchedule) },
+      lockDns: { enabled: lockDns?.enabled ?? false, groupIds: (lockDns?.groups ?? []).map((link) => link.groupId).sort() },
     },
     groups: groups.map((group) => ({
       id: group.id,
@@ -579,7 +585,8 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       });
 
       // Rules (system rules go with their groups), then groups; devices and accounts let go of them.
-      await tx.rule.deleteMany({ where: { systemGroupId: null, id: { not: QUARANTINE_RULE_ID } } });
+      // The built-in rules stay: Lock DNS loses its groups with them and takes the export's below.
+      await tx.rule.deleteMany({ where: { systemGroupId: null, id: { notIn: [QUARANTINE_RULE_ID, LOCK_DNS_RULE_ID] } } });
       await tx.group.deleteMany({});
       for (const group of config.groups) await tx.group.create({ data: group });
 
@@ -640,6 +647,13 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           },
         });
       }
+      const lockDns = config.household.lockDns;
+      await tx.rule.upsert({
+        where: { id: LOCK_DNS_RULE_ID },
+        update: { enabled: lockDns.enabled, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
+        create: { id: LOCK_DNS_RULE_ID, name: "Lock DNS", kind: RuleKind.domain, mode: RuleMode.always, enabled: lockDns.enabled },
+      });
+      await tx.ruleGroup.createMany({ data: lockDns.groupIds.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })) });
 
       await importCategories(tx, config.categories, now);
 

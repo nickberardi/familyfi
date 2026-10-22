@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.30.1
+  version: 0.31.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -923,8 +923,9 @@ paths:
       tags: [Rules]
       summary: List rules
       description: |
-        Every rule, household-wide, led by the built-in quarantine rule (`builtIn: quarantine`).
-        `groupId` narrows to the rules covering that group, which leaves quarantine out.
+        Every rule, household-wide, led by the built-in quarantine rule (`builtIn: quarantine`)
+        and then the built-in Lock DNS rule (`builtIn: dns`). `groupId` narrows to the rules
+        covering that group, which leaves quarantine out.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: groupId
@@ -1031,7 +1032,8 @@ paths:
         a window sent with its `id` keeps its UniFi policy (renamed or rescheduled in
         place), one without an id is new, and a stored window left out is removed with
         its policy. The built-in quarantine rule takes `enabled` alone, as `/on` and `/off`;
-        any other field answers 409 `rule_built_in`.
+        any other field answers 409 `rule_built_in`. The built-in Lock DNS rule takes
+        `groupIds` and `enabled` only, and answers 409 `rule_built_in` to any other field.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -1068,7 +1070,8 @@ paths:
       summary: Delete a rule
       description: |
         Deletes the rule and the UniFi policies recorded for it, by id only. A group's
-        pause policy is never touched. The built-in quarantine rule answers 409 `rule_built_in`.
+        pause policy is never touched. The built-in quarantine and Lock DNS rules answer 409
+        `rule_built_in`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -3730,13 +3733,24 @@ components:
         useGeneratedName: { type: boolean, description: "Name its UniFi policies \"FamilyFi Rule <id>\" instead of after the rule." }
         builtIn:
           type: [string, "null"]
-          enum: [quarantine, null]
+          enum: [quarantine, dns, null]
           description: |
             Set on a rule FamilyFi provides; null on the household's own. `quarantine` (id
             `quarantine`) blocks all internet for unassigned devices on managed networks. It covers
             no group (`groupIds` empty), cannot be edited or deleted (409 `rule_built_in`), and is
             paused, extended and resumed like any rule, never allowed. Its `enabled` is the
             household's `quarantineEnforced`; its policies are the quarantine policies.
+
+            `dns` (id `dns`) blocks the ways around the gateway's DNS for the groups it
+            covers: DNS (TCP and UDP 53) and DNS over TLS (853) to the internet, and every port to
+            the addresses and host names of known encrypted DNS services, which `domains` lists.
+            The DNS servers the household's networks hand out and the resolvers set in FamilyFi
+            stay reachable. It never blocks the internet, so a group's status, block and unblock leave it out.
+            It is always on while `enabled` (`kind` is `domain`, `mode` `always`), starts off with
+            no group, and covers every family group when switched on with none (unless the same
+            request names its groups). Only `groupIds`
+            and `enabled` can change, and it cannot be deleted (409 `rule_built_in`); it is paused
+            and allowed, for everyone or one group, like any rule.
         policyNames:
           type: array
           items: { type: string, maxLength: 100 }

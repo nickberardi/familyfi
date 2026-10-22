@@ -1,5 +1,7 @@
 import { AssignmentState, type GroupKind, type RuleKind, type RuleMode, type RuleScope } from "@prisma/client";
-import { rulePolicyNames } from "@/lib/policy-names";
+import { LOCK_DNS_PARTS, lockDnsPolicyName, rulePolicyNames, type LockDnsPart } from "@/lib/policy-names";
+import { LOCK_DNS_RULE_ID } from "@/lib/rules";
+import { lockDnsTargets, type LockDnsExemptions, type LockDnsTargets } from "./lock-dns";
 import { networkInScope, type NetworkScope } from "./scope";
 import { toUnifiSchedule } from "./schedule-map";
 import {
@@ -9,6 +11,7 @@ import {
   dpiCategoryNetworkBlockPolicy,
   domainBlockPolicy,
   internetBlockPolicy,
+  lockDnsBlockPolicy,
 } from "./payloads";
 import type { FirewallPolicyWrite, UnifiFirewallSchedule } from "./types";
 
@@ -72,6 +75,10 @@ export type PlannedRulePolicy = {
   enabled: boolean;
   schedule?: UnifiFirewallSchedule;
   name: string;
+  /** Set on the built-in Lock DNS rule's policies: which of its parts this one is. */
+  lockDns?: LockDnsPart;
+  /** And what it blocks, leaving out the household's own DNS. */
+  lockDnsTargets?: LockDnsTargets;
 };
 
 export function plannedRuleKey(ruleId: string, windowKey: string, zoneId: string): string {
@@ -94,6 +101,8 @@ export function planRulePolicies(input: {
   networks?: PlanRuleNetwork[];
   networkScope?: NetworkScope;
   rules: PlanRule[];
+  /** The household's own DNS, which Lock DNS leaves alone. */
+  lockDnsExemptions?: LockDnsExemptions;
 }): { policies: PlannedRulePolicy[]; retainRuleIds: Set<string>; orphanRuleIds: Set<string> } {
   const groups = new Map(input.groups.map((group) => [group.id, group]));
   const networks = new Map((input.networks ?? []).map((network) => [network.id, network]));
@@ -102,10 +111,11 @@ export function planRulePolicies(input: {
   const orphanRuleIds = new Set<string>();
   const policies: PlannedRulePolicy[] = [];
   const zoneName = (zoneId: string) => input.zoneNames?.[zoneId] ?? zoneId;
+  const lockDnsBlocks = lockDnsTargets(input.lockDnsExemptions);
 
   for (const rule of input.rules) {
     if (rule.system && !rule.enabled) continue;
-    const windows = ruleWindows(rule);
+    const windows = ruleWindows(rule, lockDnsBlocks);
     if (windows.length === 0) continue;
     const buckets = new Map<string, { macs: string[]; live: string[]; networkIds: string[]; networkNames: string[] }>();
     const bucket = (zoneId: string) => {
@@ -114,8 +124,9 @@ export function planRulePolicies(input: {
       return found;
     };
 
+    const lockDns = rule.id === LOCK_DNS_RULE_ID;
     if (rule.scope === "network") {
-      if (rule.kind === "internet") continue;
+      if (rule.kind === "internet" || lockDns) continue;
       const inScopeIds = [...new Set(rule.networkIds)].filter((id) => networkInScope(networkScope, id)).sort();
       if (inScopeIds.length === 0) {
         // Desired state still lists unmanaged-only networks → treat as orphan for Sync cleanup.
@@ -152,10 +163,12 @@ export function planRulePolicies(input: {
     }
 
     for (const [zoneId, found] of buckets) {
-      const names = rulePolicyNames(
-        { ...rule, windows: rule.mode === "always" ? [] : windows.map((window) => ({ name: window.name })) },
-        zoneName(zoneId),
-      );
+      const names = lockDns
+        ? windows.map((window) => lockDnsPolicyName(window.id as LockDnsPart, zoneName(zoneId)))
+        : rulePolicyNames(
+            { ...rule, windows: rule.mode === "always" ? [] : windows.map((window) => ({ name: window.name })) },
+            zoneName(zoneId),
+          );
       const isNetwork = rule.scope === "network";
       if (isNetwork ? found.networkIds.length === 0 : found.macs.length === 0) continue;
       windows.forEach((window, index) => {
@@ -175,6 +188,7 @@ export function planRulePolicies(input: {
           enabled: rule.enabled && !rule.paused && (isNetwork || found.live.length > 0),
           schedule: window.schedule,
           name: names[index]!,
+          ...(lockDns ? { lockDns: window.id as LockDnsPart, lockDnsTargets: lockDnsBlocks } : {}),
         });
       });
     }
@@ -183,7 +197,17 @@ export function planRulePolicies(input: {
   return { policies, retainRuleIds, orphanRuleIds };
 }
 
-function ruleWindows(rule: PlanRule): { id: string; name: string; schedule?: UnifiFirewallSchedule }[] {
+const LOCK_DNS_PART_LIST: Record<LockDnsPart, keyof LockDnsTargets | null> = { ports: null, addresses: "ipv4", "addresses-v6": "ipv6", names: "hosts" };
+
+function ruleWindows(rule: PlanRule, lockDnsBlocks: LockDnsTargets): { id: string; name: string; schedule?: UnifiFirewallSchedule }[] {
+  // Lock DNS is always on, one policy per part, each keyed by the part where a window's id would be.
+  // A part left with nothing to block, once the household's own DNS is out, has no policy.
+  if (rule.id === LOCK_DNS_RULE_ID) {
+    return LOCK_DNS_PARTS.filter((part) => {
+      const list = LOCK_DNS_PART_LIST[part];
+      return list === null || lockDnsBlocks[list].length > 0;
+    }).map((part) => ({ id: part, name: "" }));
+  }
   if (rule.mode === "always") {
     // One unscheduled policy; for an internet rule, an allowance still takes a group out.
     return [{ id: ALWAYS_WINDOW, name: "" }];
@@ -207,6 +231,9 @@ export function rulePolicyWrite(planned: PlannedRulePolicy): FirewallPolicyWrite
     schedule: planned.schedule,
   };
   const network = planned.sourceType === "NETWORK";
+  if (planned.lockDns) {
+    return lockDnsBlockPolicy({ ...common, part: planned.lockDns, macAddresses: planned.macAddresses, targets: planned.lockDnsTargets });
+  }
   switch (planned.kind) {
     case "internet":
       return internetBlockPolicy({ ...common, macAddresses: planned.macAddresses });
