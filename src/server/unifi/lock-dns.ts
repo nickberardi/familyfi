@@ -103,10 +103,10 @@ function hostOf(url: string): string | null {
  * without its servers would block them.
  */
 export async function lockDnsExemptions(input: {
-  networks: Pick<NetworkDetails, "enabled" | "management" | "ipv4Configuration">[];
+  networks: Pick<NetworkDetails, "enabled" | "detailsUnread" | "ipv4Configuration">[];
   resolverUrls: (string | null)[];
 }): Promise<LockDnsExemptions | null> {
-  if (input.networks.some((network) => network.enabled && network.management === "GATEWAY" && !network.ipv4Configuration)) return null;
+  if (input.networks.some((network) => network.enabled && network.detailsUnread)) return null;
   // A server on one of the household's own networks, like a Pi-hole, is never on the internet to block.
   const local = new BlockList();
   for (const network of input.networks) {

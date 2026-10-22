@@ -30,7 +30,7 @@ import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import type { Rule } from "@/lib/rules";
 import { setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
-import type { FirewallPolicy, NetworkDetails } from "@/server/unifi/types";
+import type { FirewallPolicy } from "@/server/unifi/types";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { INTERNAL_ZONE, configureConnectedHousehold, resetDatabase, seedDevice } from "../helpers/db";
 import { fixtureUnifiClient, policyMacs } from "../helpers/unifi-world";
@@ -1095,23 +1095,23 @@ describe("household rules", () => {
       const before = JSON.stringify(lockDnsPolicies());
       expect(before).toContain('"matchOpposite":true');
 
-      // The list has no DHCP settings, and each network's own read fails.
-      const { getNetwork, listNetworks } = client;
-      client.listNetworks = async (siteId) =>
-        (await listNetworks.call(client, siteId)).map((network) => {
-          const overview: Partial<NetworkDetails> = { ...network };
-          delete overview.ipv4Configuration;
-          return overview as NetworkDetails;
-        });
+      // Each network's own read fails, so only its overview is known.
+      const getNetwork = client.getNetwork;
       client.getNetwork = async () => {
         throw new Error("gateway busy");
       };
       try {
+        await ruleAction(turnOffRule, auth, "lock-dns", null);
         await runReconcileOnce();
         expect(JSON.stringify(lockDnsPolicies())).toBe(before);
+        // Not applied: the pass says so, and the next one tries again.
+        const run = await prisma().syncRun.findFirstOrThrow({ orderBy: { startedAt: "desc" } });
+        expect([run.status, run.error]).toEqual(["partial", "Lock DNS kept as it was: a network's DNS settings could not be read."]);
       } finally {
-        Object.assign(client, { getNetwork, listNetworks });
+        client.getNetwork = getNetwork;
       }
+      await runReconcileOnce();
+      expect(lockDnsPolicies().every((policy) => !policy.enabled)).toBe(true);
     });
 
     it("stays when the only group it covers is deleted, and its policies go", async () => {

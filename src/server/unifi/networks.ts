@@ -9,7 +9,7 @@ export async function loadNetworkDetails(client: UnifiClient, siteId: string): P
     try {
       details.push(await client.getNetwork(siteId, overview.id));
     } catch {
-      details.push(overview);
+      details.push({ ...overview, detailsUnread: true });
     }
   }
   return details;

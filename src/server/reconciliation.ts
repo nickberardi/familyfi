@@ -379,7 +379,12 @@ async function tick(owner: string): Promise<boolean> {
       })),
     });
     const { policies: desiredRules, retainRuleIds, orphanRuleIds } = rulePlan;
-    if (lockDnsExempt === null) retainRuleIds.add(LOCK_DNS_RULE_ID);
+    if (lockDnsExempt === null) {
+      retainRuleIds.add(LOCK_DNS_RULE_ID);
+      // Not applied: the pass is partial, and the next one tries again.
+      failed += 1;
+      errors.push("Lock DNS kept as it was: a network's DNS settings could not be read.");
+    }
     const desiredRuleKeys = new Set(desiredRules.map((item) => item.key));
 
     for (const planned of desiredRules) {

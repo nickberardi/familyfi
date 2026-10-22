@@ -41,6 +41,8 @@ export type GatewayIpv4Configuration = {
 };
 
 export type NetworkDetails = NetworkOverview & {
+  /** Set by FamilyFi when the network's own read failed and only its overview is known. */
+  detailsUnread?: boolean;
   internetAccessEnabled?: boolean;
   ipv4Configuration?: GatewayIpv4Configuration;
   ipv6Configuration?: {

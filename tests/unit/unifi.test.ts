@@ -61,7 +61,8 @@ describe("network loading", () => {
       throw new Error("unreadable");
     };
     const networks = await loadNetworkDetails(client, "site");
-    expect(networks[0]).toEqual(first);
+    // Marked, so Lock DNS knows the DHCP settings it would leave alone are missing.
+    expect(networks[0]).toEqual({ ...first, detailsUnread: true });
     const clients = await loadNetworkClientIds(client, "site", networks);
     expect(clients.get(first.id)).toEqual(new Set());
   });

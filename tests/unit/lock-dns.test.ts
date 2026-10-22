@@ -151,7 +151,7 @@ describe("Lock DNS leaves the household's own DNS alone", () => {
       throw new Error("no such host");
     });
     try {
-      const network = (servers: string[] | null) => ({ enabled: true, management: "GATEWAY", ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: "SERVER", dnsServerIpAddressesOverride: servers } } });
+      const network = (servers: string[] | null) => ({ enabled: true, ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: "SERVER", dnsServerIpAddressesOverride: servers } } });
       const exempt = await lockDnsExemptions({
         networks: [network(["9.9.9.11", "192.168.1.53"]), network(null)],
         resolverUrls: ["https://family.cloudflare-dns.com/dns-query", null, "https://missing.example/dns-query", "https://[2620:fe::11]/dns-query"],
@@ -171,9 +171,8 @@ describe("Lock DNS leaves the household's own DNS alone", () => {
 describe("working out the household's own DNS", () => {
   const network = (patch: Partial<{ enabled: boolean; mode: string; read: boolean }> = {}) => ({
     enabled: patch.enabled ?? true,
-    management: "GATEWAY",
     ...(patch.read === false
-      ? {}
+      ? { detailsUnread: true }
       : { ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: patch.mode ?? "SERVER", dnsServerIpAddressesOverride: ["1.1.1.3"] } } }),
   });
 
