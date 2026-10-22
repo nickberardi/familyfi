@@ -186,6 +186,23 @@ describe("working out the household's own DNS", () => {
     expect(await lockDnsExemptions({ networks: [network({ mode: "RELAY" }), network({ enabled: false })], resolverUrls: [] })).toEqual({ addresses: [], hosts: [] });
   });
 
+  it("looks every resolver up at once, so slow ones never add up", async () => {
+    let inFlight = 0;
+    let most = 0;
+    setLockDnsResolverForTests(async () => {
+      most = Math.max(most, ++inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return [];
+    });
+    try {
+      await lockDnsExemptions({ networks: [], resolverUrls: ["https://a.example/dns-query", "https://b.example/dns-query", "https://c.example/dns-query"] });
+      expect(most).toBe(3);
+    } finally {
+      setLockDnsResolverForTests(undefined);
+    }
+  });
+
   it("keeps a resolver's last addresses when a lookup fails", async () => {
     let answer: string[] | null = ["9.9.9.11"];
     setLockDnsResolverForTests(async () => {

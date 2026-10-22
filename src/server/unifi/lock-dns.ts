@@ -118,15 +118,10 @@ export async function lockDnsExemptions(input: {
     .filter((network) => network.enabled && network.ipv4Configuration?.dhcpConfiguration?.mode === "SERVER")
     .flatMap((network) => network.ipv4Configuration?.dhcpConfiguration?.dnsServerIpAddressesOverride ?? [])
     .filter((address) => isIP(address) && !local.check(address, isIP(address) === 4 ? "ipv4" : "ipv6"));
-  const hosts: string[] = [];
-  for (const host of new Set(input.resolverUrls.flatMap((url) => (url ? [hostOf(url)] : [])))) {
-    if (!host) continue;
-    if (isIP(host)) {
-      addresses.push(host);
-      continue;
-    }
-    hosts.push(host);
-    addresses.push(...(await addressesOf(host)));
-  }
+  const named = [...new Set(input.resolverUrls.flatMap((url) => (url ? [hostOf(url)] : [])))].filter((host): host is string => Boolean(host));
+  addresses.push(...named.filter((host) => isIP(host)));
+  const hosts = named.filter((host) => !isIP(host));
+  // Looked up together, so the pass waits at most one lookup's timeout however many there are.
+  for (const found of await Promise.all(hosts.map(addressesOf))) addresses.push(...found);
   return { addresses: [...new Set(addresses.filter((address) => isIP(address)))].sort(), hosts: hosts.sort() };
 }
