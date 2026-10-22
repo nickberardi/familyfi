@@ -204,11 +204,11 @@ describe("Block countries", () => {
     setReconcileClientForTests(undefined);
   });
 
-  it("is a built-in rule, off, with the recommended countries, after quarantine", async () => {
+  it("is a built-in rule, off, with the recommended countries, after quarantine and Lock DNS", async () => {
     const auth = await signedIn();
     const list = await rules(auth);
-    expect(list.map((rule) => rule.id)).toEqual(["quarantine", "countries"]);
-    const countries = list[1]!;
+    expect(list.map((rule) => rule.id)).toEqual(["quarantine", "dns", "countries"]);
+    const countries = list[2]!;
     expect(countries).toMatchObject({ builtIn: "countries", enabled: false, groupIds: [], countries: ["CN", "CU", "IR", "KP", "RU", "SY"] });
     expect(list[0]!.countries).toEqual([]);
   });
