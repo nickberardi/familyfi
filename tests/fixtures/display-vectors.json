@@ -16925,6 +16925,151 @@
         "stored": "[1]"
       },
       "expected": null
+    },
+    {
+      "fn": "unblockSheetCustom",
+      "name": "More time with no unblock re-unblocks",
+      "input": {
+        "unblock": null,
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "blocks again at 12:30 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend a pause whose end has passed counts from now",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": "2026-09-28T15:00:00Z",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "back at 12:30 PM",
+        "request": {
+          "kind": "extend",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "rulePauseSheetCustom",
+      "name": "extend an open-ended pause re-pauses",
+      "input": {
+        "rule": {
+          "pause": {
+            "active": true,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "for",
+          "minutes": 30
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "For 30 minutes",
+        "note": "blocks again at 12:30 PM",
+        "request": {
+          "kind": "pauseFor",
+          "minutes": 30
+        }
+      }
+    },
+    {
+      "fn": "pauseSheetCustom",
+      "name": "extend to a time from an end between minutes rounds up",
+      "input": {
+        "group": {
+          "suspension": {
+            "active": true,
+            "until": "2026-09-28T19:00:30.000Z",
+            "by": null
+          }
+        },
+        "custom": {
+          "kind": "until",
+          "clock": "21:00"
+        },
+        "mode": "extend",
+        "timeZone": "America/New_York",
+        "now": "2026-09-28T16:00:00Z"
+      },
+      "expected": {
+        "label": "Until 9:00 PM",
+        "note": "today",
+        "request": {
+          "kind": "extend",
+          "minutes": 360
+        }
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "minutes written with a fraction of zero",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":30.0}"
+      },
+      "expected": {
+        "kind": "for",
+        "minutes": 30
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "minutes in exponent form",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":1e2}"
+      },
+      "expected": {
+        "kind": "for",
+        "minutes": 100
+      }
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "negative minutes",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":-5}"
+      },
+      "expected": null
+    },
+    {
+      "fn": "parseCustomPause",
+      "name": "minutes as true",
+      "input": {
+        "stored": "{\"kind\":\"for\",\"minutes\":true}"
+      },
+      "expected": null
     }
   ]
 }
