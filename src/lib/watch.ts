@@ -167,7 +167,7 @@ export function watchCopy(platform: WatchPlatform) {
       ? "Install FamilyFi on the Apple Watch from the Watch app on this iPhone, then open it."
       : "FamilyFi isn't on this watch yet. Install it from Google Play on the watch, then open it.",
     install: apple ? null : "Install on watch",
-    installSent: "Continue on the watch to install FamilyFi.",
+    installSent: apple ? null : "Continue on the watch to install FamilyFi.",
     watches: "Watches set up from this phone",
     none: `No ${watch} is set up from this phone yet.`,
     onWatch: `On this ${watch}`,
