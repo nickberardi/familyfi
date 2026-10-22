@@ -151,6 +151,8 @@ export type SyncStatus = {
     error: string | null;
   } | null;
   changes: Change[];
+  /** Open problems the network checkup found, for the Checkup nav badge. */
+  checkupProblems: number;
 };
 
 export type MutationResult<T> = T & { change: { changeId: string; revision: number } };

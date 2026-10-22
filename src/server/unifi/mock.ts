@@ -16,6 +16,8 @@ import type {
   SiteOverview,
   SiteDeviceOverview,
   UnifiPage,
+  WifiBroadcastDetails,
+  WifiBroadcastOverview,
 } from "./types";
 import { UNIFI_PAGE_LIMIT } from "./types";
 
@@ -24,6 +26,7 @@ export type MockUnifiState = {
   sites: SiteOverview[];
   networks: NetworkDetails[];
   zones: FirewallZone[];
+  wifiBroadcasts: WifiBroadcastDetails[];
   clients: ClientOverview[];
   siteDevices: SiteDeviceOverview[];
   deviceStatistics: Map<string, DeviceLatestStatistics>;
@@ -45,6 +48,7 @@ export function createMockUnifiState(partial: Partial<MockUnifiState> = {}): Moc
     sites: partial.sites ?? [],
     networks: partial.networks ?? [],
     zones: partial.zones ?? [],
+    wifiBroadcasts: partial.wifiBroadcasts ?? [],
     clients: partial.clients ?? [],
     siteDevices: partial.siteDevices ?? [],
     deviceStatistics: partial.deviceStatistics ?? new Map(),
@@ -104,6 +108,19 @@ export class MockUnifiClient implements UnifiClient {
   async listZones(siteId: string): Promise<FirewallZone[]> {
     this.record("GET", `/v1/sites/${siteId}/firewall/zones`);
     return [...this.state.zones];
+  }
+
+  async listWifiBroadcasts(siteId: string): Promise<WifiBroadcastOverview[]> {
+    this.record("GET", `/v1/sites/${siteId}/wifi/broadcasts`);
+    return this.state.wifiBroadcasts.map(({ id, name, type, enabled, network, securityConfiguration }) => ({ id, name, type, enabled, network, securityConfiguration }));
+  }
+
+  async getWifiBroadcast(siteId: string, wifiBroadcastId: string): Promise<WifiBroadcastDetails> {
+    const path = `/v1/sites/${siteId}/wifi/broadcasts/${wifiBroadcastId}`;
+    this.record("GET", path);
+    const wifi = this.state.wifiBroadcasts.find((item) => item.id === wifiBroadcastId);
+    if (!wifi) throw notFound("GET", path);
+    return { ...wifi };
   }
 
   async listClients(siteId: string): Promise<ClientOverview[]> {

@@ -3,7 +3,7 @@ import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { switchQuarantineRule } from "@/server/rule-lifts";
-import { isLockDnsRule, isQuarantineRule, presentRule, ruleInclude, setLockDnsEnabled } from "@/server/rules";
+import { builtInRule, isLockDnsRule, isQuarantineRule, presentRule, ruleInclude, saveCountriesRule, setLockDnsEnabled } from "@/server/rules";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -19,11 +19,11 @@ export async function POST(request: Request, ctx: Ctx) {
       const change = await enqueueChange("rule");
       return Response.json({ rule: await presentRule(rule), change });
     }
-    const rule = await prisma().rule.update({
-      where: { id },
-      data: { enabled: true },
-      include: ruleInclude,
-    });
+    // Block countries switched on with no groups covers every group.
+    const rule =
+      builtInRule(existing) === "countries"
+        ? await saveCountriesRule({ enabled: true })
+        : await prisma().rule.update({ where: { id }, data: { enabled: true }, include: ruleInclude });
     const change = await enqueueChange("rule");
     return Response.json({ rule: await presentRule(rule), change });
   });

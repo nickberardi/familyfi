@@ -42,12 +42,13 @@ export type GroupLiftState = { until: string | null; by: Actor };
 /**
  * The group's rules blocking it now, of every kind, longest first. A rule that is off, paused for
  * everyone or lifted for this group is not blocking. An internet rule is named by its window.
+ * Block countries is protection, not a block on the group: it never makes a group read as blocked.
  */
 export function rulesBlockingGroup(group: Pick<Group, "id">, rules: Rule[], timezone: string, now: Date): BlockingRule[] {
   const lasts = (until: string | null) => (until === null ? Number.MAX_SAFE_INTEGER : Date.parse(until));
   return groupScopedRules(rules, group.id)
     .flatMap((rule) => {
-      if (!rule.enabled || rulePaused(rule, now) || groupLift(rule, group.id, now)) return [];
+      if (rule.builtIn || !rule.enabled || rulePaused(rule, now) || groupLift(rule, group.id, now)) return [];
       const ends = activeWindowsEnd(ruleInternetWindows(rule), now, timezone);
       if (ends === undefined) return [];
       return [{ ruleId: rule.id, kind: rule.kind, name: blockingName(rule, now, timezone), until: ends?.toISOString() ?? null }];

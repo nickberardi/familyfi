@@ -18,6 +18,8 @@ import type {
   SiteOverview,
   SiteDeviceOverview,
   UnifiPage,
+  WifiBroadcastDetails,
+  WifiBroadcastOverview,
 } from "./types";
 
 export type UnifiClient = {
@@ -27,6 +29,8 @@ export type UnifiClient = {
   getNetwork(siteId: string, networkId: string): Promise<NetworkDetails>;
   getNetworkReferences(siteId: string, networkId: string): Promise<NetworkReferences>;
   listZones(siteId: string): Promise<FirewallZone[]>;
+  listWifiBroadcasts(siteId: string): Promise<WifiBroadcastOverview[]>;
+  getWifiBroadcast(siteId: string, wifiBroadcastId: string): Promise<WifiBroadcastDetails>;
   listClients(siteId: string, filter?: string): Promise<ClientOverview[]>;
   listSiteDevices(siteId: string): Promise<SiteDeviceOverview[]>;
   getDeviceStatistics(siteId: string, deviceId: string): Promise<DeviceLatestStatistics>;
@@ -104,6 +108,14 @@ export class HttpUnifiClient implements UnifiClient {
 
   async listZones(siteId: string): Promise<FirewallZone[]> {
     return this.paginate(`/v1/sites/${siteId}/firewall/zones`);
+  }
+
+  async listWifiBroadcasts(siteId: string): Promise<WifiBroadcastOverview[]> {
+    return this.paginate(`/v1/sites/${siteId}/wifi/broadcasts`);
+  }
+
+  async getWifiBroadcast(siteId: string, wifiBroadcastId: string): Promise<WifiBroadcastDetails> {
+    return this.request("GET", `/v1/sites/${siteId}/wifi/broadcasts/${wifiBroadcastId}`);
   }
 
   async listClients(siteId: string, filter?: string): Promise<ClientOverview[]> {

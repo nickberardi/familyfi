@@ -49,6 +49,7 @@ function watchRulesOnly({ method, path }: ScopedCall): boolean {
 
 const AGENT_READS: RegExp[] = [
   /^\/api\/v1\/auth\/session$/,
+  /^\/api\/v1\/checkup$/,
   /^\/api\/v1\/changes\/[^/]+$/,
   /^\/api\/v1\/devices(\/[^/]+)?$/,
   /^\/api\/v1\/dpi\/(applications|categories)$/,
@@ -60,7 +61,7 @@ const AGENT_READS: RegExp[] = [
   /^\/openapi$/,
 ];
 
-/** Household controls: groups, rules and their verbs, device assignment, sync, and DNS reporting categories. */
+/** Household controls: groups, rules and their verbs, device assignment, sync, the network checkup, and DNS reporting categories. */
 const AGENT_WRITES: Record<string, RegExp[]> = {
   POST: [
     /^\/api\/v1\/groups$/,
@@ -69,12 +70,13 @@ const AGENT_WRITES: Record<string, RegExp[]> = {
     GROUP_RULE_VERBS,
     GROUP_UNBLOCK,
     /^\/api\/v1\/sync\/retry$/,
+    /^\/api\/v1\/checkup\/run$/,
     /^\/api\/v1\/upstream\/categories$/,
     /^\/api\/v1\/upstream\/categories\/[^/]+\/check$/,
     /^\/api\/v1\/upstream\/checks\/run$/,
   ],
   PUT: [/^\/api\/v1\/groups\/[^/]+$/, /^\/api\/v1\/devices\/[^/]+\/assignment$/],
-  PATCH: [/^\/api\/v1\/rules\/[^/]+$/, /^\/api\/v1\/upstream\/categories\/[^/]+$/],
+  PATCH: [/^\/api\/v1\/checkup\/findings\/[^/]+$/, /^\/api\/v1\/rules\/[^/]+$/, /^\/api\/v1\/upstream\/categories\/[^/]+$/],
   DELETE: [/^\/api\/v1\/groups\/[^/]+$/, /^\/api\/v1\/rules\/[^/]+$/, /^\/api\/v1\/devices\/[^/]+$/, /^\/api\/v1\/upstream\/categories\/[^/]+$/],
 };
 

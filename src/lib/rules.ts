@@ -1,5 +1,6 @@
 /** Client-safe rule helpers + curated slots (mirrors server curated-categories). */
 
+import { countriesSummary } from "./countries";
 import { isWindowActive, windowDayBands, windowEndsAt, type InternetWindow } from "./rule-windows";
 import type { Actor } from "./types";
 
@@ -18,6 +19,7 @@ export type RuleWindow = { id?: string; name: string; days: number[]; start: str
 export const QUARANTINE_RULE_ID = "quarantine";
 
 /**
+/**
  * The id of the household's built-in Lock DNS rule: it blocks the ways around the gateway's DNS
  * (other DNS servers, and known encrypted DNS services) for the groups it covers, so category, app
  * and website rules hold. Only its groups can be edited; it is always on while switched on, and is
@@ -25,6 +27,16 @@ export const QUARANTINE_RULE_ID = "quarantine";
  * unblock leave it out.
  */
 export const LOCK_DNS_RULE_ID = "dns";
+
+/**
+ * The id of the household's built-in Block countries rule: one of the recommended protections. It
+ * blocks its groups' traffic to a list of countries, always. Its groups and countries can be edited;
+ * its name, kind and schedule cannot, and it cannot be deleted.
+ */
+export const COUNTRIES_RULE_ID = "countries";
+
+/** A rule FamilyFi provides: which one, or null on the household's own. */
+export type BuiltInRule = "quarantine" | "dns" | "countries";
 
 export type Rule = {
   id: string;
@@ -35,6 +47,8 @@ export type Rule = {
   networkIds: string[];
   targetIds: number[];
   domains: string[];
+  /** The Block countries rule's ISO 3166-1 alpha-2 codes; empty on every other rule. */
+  countries: string[];
   enabled: boolean;
   /** A pause or allowance lifts the rule for every group it covers until `until`, or until ended. */
   pause: RulePause;
@@ -44,8 +58,8 @@ export type Rule = {
   windows: (RuleWindow & { id: string })[];
   useGeneratedName: boolean;
   policyNames: string[];
-  /** Set on a rule FamilyFi provides, which cannot be edited or deleted; null on the household's own. */
-  builtIn: "quarantine" | "dns" | null;
+  /** Set on a rule FamilyFi provides, which cannot be deleted or renamed; null on the household's own. */
+  builtIn: BuiltInRule | null;
 };
 
 export const MAX_RULE_NAME = 60;
@@ -217,9 +231,13 @@ export function alwaysWindow(ruleName: string): InternetWindow {
 }
 
 /** What a rule blocks, in the words its card uses. */
-export function ruleBlocksLabel(rule: Pick<Rule, "kind" | "targetIds" | "domains"> & Partial<Pick<Rule, "builtIn">>, catalogNames: Map<string, string>): string {
+export function ruleBlocksLabel(
+  rule: Pick<Rule, "kind" | "targetIds" | "domains"> & Partial<Pick<Rule, "builtIn" | "countries">>,
+  catalogNames: Map<string, string>,
+): string {
   if (rule.builtIn === "quarantine") return "All internet · every unassigned device";
   if (rule.builtIn === "dns") return "Other DNS servers · everything else stays on";
+  if (rule.builtIn === "countries") return `${countriesSummary(rule.countries ?? [])} · everything else stays on`;
   if (rule.kind === "internet") return "All internet · every device";
   if (rule.kind === "domain") {
     const shown = rule.domains.slice(0, 2).join(", ") + (rule.domains.length > 2 ? "…" : "");

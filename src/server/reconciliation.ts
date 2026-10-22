@@ -1,4 +1,4 @@
-import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope } from "@prisma/client";
+import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, type Household } from "@prisma/client";
 import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
@@ -16,6 +16,7 @@ import { internetBlockPolicy, toPolicyUpdate } from "./unifi/payloads";
 import { networkInScope, publicUnifiNetwork } from "./unifi/scope";
 import { rememberSiteNetworks } from "./unifi/network-cache";
 import { recordQuarantineObservation } from "./quarantine";
+import { checkupAfterSync } from "./checkup";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
@@ -46,6 +47,11 @@ function recordedManufacturer(mac: string, previous: string | null): string | nu
 
 export function setReconcileClientForTests(client?: UnifiClient) {
   testClient = client;
+}
+
+/** The client a sync pass uses for this household: the test fixture when one is set, behind the same ownership guard. */
+export function syncClient(household: Household): UnifiClient {
+  return testClient ? withPolicyOwnership(testClient, ownershipScope(household)) : clientForHousehold(household);
 }
 
 export function setAutoReconcileForTests(enabled: boolean) {
@@ -143,7 +149,7 @@ async function tick(owner: string): Promise<boolean> {
 
   try {
     // Tests inject a fixture client; it gets the same ownership guard as the real one.
-    const client = testClient ? withPolicyOwnership(testClient, ownershipScope(household)) : clientForHousehold(household);
+    const client = syncClient(household);
     const identity = connectionIdentity(household);
     const siteId = household.unifiSiteId;
     const [zones, networks, clients, gatewayPolicies] = await Promise.all([
@@ -489,6 +495,8 @@ async function tick(owner: string): Promise<boolean> {
         syncRunId: run.id,
       },
     });
+    // The checkup reads what this pass read, at most once an interval; it never fails the pass.
+    await checkupAfterSync(household, client, { zones, networks, clients, networkClientIds });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await prisma().syncRun.update({

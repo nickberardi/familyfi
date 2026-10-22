@@ -146,6 +146,12 @@ model Household {
   updateStatus            UpdateStatus?
   updateError             String?
   upstreamResolverSnapshot Json?
+  /// The last network checkup (src/server/checkup.ts): when it finished, and why it could not read
+  /// the gateway, when it could not. Its findings are `CheckupFinding` rows.
+  checkupRanAt           DateTime? @db.Timestamptz(3)
+  checkupError           String?
+  /// Checks the last run could not make (a read failed), so they are neither passed nor found.
+  checkupSkipped         String[]  @default([])
   connectionStatus       String    @default("unconfigured")
   connectionError        String?
   displayName            String    @default("FamilyFi household")
@@ -367,6 +373,21 @@ model Device {
   updatedAt  DateTime        @updatedAt @db.Timestamptz(3)
 }
 
+/// Something the network checkup saw that the household may want to change. FamilyFi only reads and
+/// explains; it never changes the gateway because of one. `key` is the check and what it is about,
+/// so a run updates the same row; `subject` fingerprints what was seen, and a dismissal holds only
+/// while the subject is the one dismissed.
+model CheckupFinding {
+  key              String   @id
+  check            String
+  details          Json
+  subject          String
+  firstSeenAt      DateTime @default(now()) @db.Timestamptz(3)
+  lastSeenAt       DateTime @default(now()) @db.Timestamptz(3)
+  dismissedAt      DateTime? @db.Timestamptz(3)
+  dismissedSubject String?
+}
+
 model AppPolicy {
   id                  String           @id @default(cuid())
   connectionIdentity  String
@@ -471,6 +492,8 @@ model Rule {
   networkIds       String[]     @default([])
   targetIds        Int[]        @default([])
   domains          String[]     @default([])
+  /// The built-in `countries` rule's ISO 3166-1 alpha-2 codes; empty on every other rule.
+  countries        String[]     @default([])
   enabled          Boolean      @default(true)
   mode             RuleMode     @default(always)
   /// A pause or allowance lifts the rule for every group it covers until `pauseUntil`, or until ended.

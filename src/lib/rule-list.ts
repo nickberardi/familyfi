@@ -34,8 +34,9 @@ export type RulesListView = {
 export function rulesListView(rules: Rule[], groups: Group[], scope: string | null | undefined): RulesListView {
   const scoped = scope ? groups.find((group) => group.id === scope) : undefined;
   const covered = new Set(rules.flatMap((rule) => rule.groupIds));
-  // Lock DNS blocks nothing of its own: a group it alone covers is still online and unfiltered.
-  const filtered = new Set(rules.filter((rule) => rule.builtIn !== "dns").flatMap((rule) => rule.groupIds));
+  // Lock DNS and Block countries block nothing of a group's own: a group only they cover is still
+  // online and unfiltered.
+  const filtered = new Set(rules.filter((rule) => rule.builtIn !== "dns" && rule.builtIn !== "countries").flatMap((rule) => rule.groupIds));
   return {
     scoped,
     list: scoped ? rules.filter((rule) => rule.groupIds.includes(scoped.id)) : rules,
@@ -50,7 +51,7 @@ export function rulesScopeHref(groupId: string | null): string {
   return groupId ? `/rules?group=${groupId}` : "/rules";
 }
 
-/** A rule's own page. Quarantine cannot be edited, so it opens the devices it holds instead. */
+/** A rule's own page. Quarantine cannot be edited, so it opens the devices it holds instead; Block countries has its own editor at its id. */
 export function ruleHref(rule: Pick<Rule, "id"> & Partial<Pick<Rule, "builtIn">>): string {
   return rule.builtIn === "quarantine" ? "/devices" : `/rules/${rule.id}`;
 }
@@ -62,6 +63,8 @@ export function ruleAppliesTo(
   networks: Network[],
 ): string[] {
   if (rule.builtIn === "quarantine") return [RULES_COPY.unassigned];
+  // Block countries switched on with no groups covers every group.
+  if (rule.builtIn === "countries" && rule.groupIds.length === 0) return [RULES_COPY.everyGroup];
   return rule.scope === "network"
     ? rule.networkIds.map((id) => networks.find((network) => network.id === id)?.name ?? "Network")
     : rule.groupIds.map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group");
@@ -114,7 +117,7 @@ export function ruleStatus(
   return { line: `On · ${first ? `${first.times}${first.days ? ` · ${first.days}` : ""}` : "No windows"}`, tone: "on" };
 }
 
-/** The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower. */
+/** The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower, a round globe for countries. */
 export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pick<Rule, "builtIn">>): {
   shape: "square" | "round";
   slot?: CuratedSlot;
@@ -122,6 +125,7 @@ export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pi
 } {
   if (rule.builtIn === "dns") return { shape: "round", icon: "shield-check" };
   if (rule.kind === "internet") return { shape: "square", icon: "globe-simple" };
+  if (rule.builtIn === "countries") return { shape: "round", icon: "globe-simple" };
   const slot =
     rule.kind === "category"
       ? CURATED_CATEGORY_SLOTS.find((item) => rule.targetIds.includes(item.categoryId))
@@ -158,6 +162,7 @@ export const RULES_COPY = {
   when: "When",
   appliesTo: "Applies to",
   unassigned: "Unassigned devices",
+  everyGroup: "Every group",
   footnote:
     "Each window is its own UniFi policy. Edits are desired configuration, written to UniFi on the next reconcile; Sync shows whether the gateway accepted them.",
 } as const;

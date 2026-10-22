@@ -4,9 +4,11 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
+import { privateAddressDevices } from "@/lib/checkup";
 import { groupHref } from "@/lib/device-detail";
 import { DEVICES_COPY } from "@/lib/device-list";
 import { DeviceDetailContent } from "@/ui/DeviceDetailContent";
+import { PrivateAddressCard } from "@/ui/PrivateAddress";
 
 export function DeviceDetailPage({
   params,
@@ -52,7 +54,10 @@ export function DeviceDetailPage({
             {loading ? DEVICES_COPY.detailLoading : error ? DEVICES_COPY.detailUnavailable : DEVICES_COPY.detailNotFound}
           </div>
         ) : (
-          <DeviceDetailContent device={device} group={group} networks={unifi?.networks ?? []} timezone={timezone} now={now} />
+          <>
+            {privateAddressDevices([device]).length ? <PrivateAddressCard /> : null}
+            <DeviceDetailContent device={device} group={group} networks={unifi?.networks ?? []} timezone={timezone} now={now} />
+          </>
         )}
       </div>
     </>

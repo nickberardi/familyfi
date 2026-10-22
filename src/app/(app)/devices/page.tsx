@@ -15,6 +15,7 @@ import {
   type DeviceFilterId,
 } from "@/lib/device-list";
 import { deleteDevice, setQuarantineEnforced } from "@/lib/device-writes";
+import { privateAddressDevices } from "@/lib/checkup";
 import { runRuleAction } from "@/lib/group-writes";
 import { ruleStateLine } from "@/lib/rule-actions";
 import { QUARANTINE_RULE_ID } from "@/lib/rules";
@@ -24,6 +25,7 @@ import { deviceKindLabel } from "@/lib/display";
 import { AssignNeededBanner } from "@/ui/AssignNeededBanner";
 import { DeviceIdentity } from "@/ui/DeviceIdentity";
 import { DeviceMark } from "@/ui/DeviceMark";
+import { PrivateAddressMark, PrivateAddressNotice } from "@/ui/PrivateAddress";
 import { QuarantineCard } from "@/ui/QuarantineCard";
 
 export default function DevicesPage() {
@@ -40,6 +42,8 @@ function DevicesBody() {
   const assignGroupId = searchParams.get("assign");
   const assignGroup = groups.find((group) => group.id === assignGroupId) ?? null;
   const [filter, setFilter] = useState<DeviceFilterId>(assignGroup ? "loose" : "all");
+  // Checkup's "Show on Devices" arrives with `?private=1`.
+  const [privateOnly, setPrivateOnly] = useState(searchParams.get("private") === "1");
   const [query, setQuery] = useState("");
   const [now, setNow] = useState(() => new Date(0));
   useEffect(() => {
@@ -55,7 +59,13 @@ function DevicesBody() {
   const quarantineRule = rules.find((rule) => rule.id === QUARANTINE_RULE_ID);
   const pausedLine = quarantineRule && enforced ? ruleStateLine(quarantineRule, household?.timezone ?? "UTC", now) : null;
 
-  const rows = useMemo(() => filterDevices(devices, groups, filter, query), [devices, filter, groups, query]);
+  const privates = useMemo(() => privateAddressDevices(devices), [devices]);
+  const privateMacs = useMemo(() => new Set(privates.map((device) => device.mac)), [privates]);
+  const rows = useMemo(() => {
+    const listed = filterDevices(devices, groups, filter, query);
+    // The filter needs the notice that clears it: with no private addresses it does nothing.
+    return privateOnly && privates.length ? listed.filter((device) => privates.includes(device)) : listed;
+  }, [devices, filter, groups, query, privateOnly, privates]);
 
   return (
     <>
@@ -71,6 +81,7 @@ function DevicesBody() {
             onResume={quarantineRule ? () => void runRuleAction(store.mutate, quarantineRule, "resume") : undefined}
           />
         ) : null}
+        {privates.length ? <PrivateAddressNotice count={privates.length} showing={privateOnly} onShow={() => setPrivateOnly(!privateOnly)} /> : null}
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
@@ -133,7 +144,15 @@ function DevicesBody() {
                         timezone={household?.timezone ?? "UTC"}
                         now={now}
                         inline={<span className="lg:hidden">{deviceAddressSuffix(device)}</span>}
-                        below={<div className="mt-0.5 hidden truncate text-[14px] text-[var(--ff-muted)] lg:block">{deviceKindLabel(device.hostname)}</div>}
+                        below={
+                          privateMacs.has(device.mac) ? (
+                            <div className="mt-0.5">
+                              <PrivateAddressMark />
+                            </div>
+                          ) : (
+                            <div className="mt-0.5 hidden truncate text-[14px] text-[var(--ff-muted)] lg:block">{deviceKindLabel(device.hostname)}</div>
+                          )
+                        }
                       />
                     </Link>
                     <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] xl:block">

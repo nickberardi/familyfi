@@ -347,3 +347,37 @@ function addressItems(values: string[]): IpAddressFilter["items"] {
 }
 
 const LOCK_DNS_DESCRIPTION = "FamilyFi managed Lock DNS: blocks DNS servers other than the gateway.";
+
+/**
+ * Block countries: the covered devices' traffic to servers in these regions (ISO 3166-1 alpha-2),
+ * which the gateway locates by IP address. Outgoing only; the payload shape follows the Network
+ * Integration API's region filter and is not yet proven against a gateway.
+ */
+export function regionBlockPolicy(input: {
+  name: string;
+  sourceZoneId: string;
+  destinationZoneId: string;
+  macAddresses: string[];
+  regions: string[];
+  enabled?: boolean;
+  schedule?: UnifiFirewallSchedule;
+}): FirewallPolicyWrite {
+  const macAddresses = [...new Set(input.macAddresses.map(normalizeMac))].sort();
+  const regions = [...new Set(input.regions)].sort();
+  if (macAddresses.length === 0) throw new Error("A country policy needs at least one MAC address.");
+  if (regions.length === 0) throw new Error("A country policy needs at least one country.");
+  return {
+    name: input.name,
+    description: "FamilyFi managed country block.",
+    enabled: input.enabled ?? true,
+    loggingEnabled: false,
+    action: { type: INTERNET_BLOCK_ACTION },
+    ipProtocolScope: { ipVersion: "IPV4_AND_IPV6" },
+    source: { zoneId: input.sourceZoneId, trafficFilter: { type: "MAC_ADDRESS", macAddressFilter: { macAddresses } } },
+    destination: {
+      zoneId: input.destinationZoneId,
+      trafficFilter: { type: "REGION", regionFilter: { regions } },
+    },
+    ...(input.schedule ? { schedule: input.schedule } : {}),
+  };
+}

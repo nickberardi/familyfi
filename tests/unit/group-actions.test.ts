@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { rulesBlockingGroup } from "@/lib/group-actions";
 import { runGroupCardAction } from "@/lib/group-writes";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -33,6 +34,7 @@ function rule(overrides: Partial<Rule>): Rule {
     networkIds: [],
     targetIds: [],
     domains: [],
+    countries: [],
     enabled: true,
     pause: { active: false, until: null, kind: "pause", by: null },
     groupPauses: [],
@@ -62,6 +64,14 @@ describe("groupCardControls", () => {
 
   it("disables the button while the view is stale", () => {
     expect(groupCardControls(group(), [downtime], TZ, NOW, vi.fn(), false).action.disabled).toBe(true);
+  });
+});
+
+describe("Block countries on a group card", () => {
+  it("never reads as blocking the group, so Block stays the card's button", () => {
+    const countries = rule({ id: "countries", name: "Block countries", kind: "domain", mode: "always", builtIn: "countries", countries: ["KP"] });
+    expect(rulesBlockingGroup(group(), [countries], TZ, NOW)).toEqual([]);
+    expect(groupCardControls(group(), [countries], TZ, NOW, vi.fn()).action).toMatchObject({ label: "Block" });
   });
 });
 

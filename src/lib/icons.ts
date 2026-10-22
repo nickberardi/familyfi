@@ -37,6 +37,7 @@ export type IconName =
   | "caret-right"
   | "x"
   | "check-circle"
+  | "warning"
   // About
   | "github-logo"
   // Rule kinds

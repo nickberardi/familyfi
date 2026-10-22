@@ -6,6 +6,7 @@ import { jsonError } from "@/server/http";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
 import { builtInRefusal, lockDnsRefusal, switchQuarantineRule } from "@/server/rule-lifts";
 import {
+  builtInRule,
   householdNetworkScope,
   isLockDnsRule,
   isQuarantineRule,
@@ -13,6 +14,7 @@ import {
   RuleInputError,
   ruleInclude,
   RuleUpdateBody,
+  saveCountriesRule,
   saveRule,
   setLockDnsEnabled,
   setLockDnsGroups,
@@ -52,6 +54,20 @@ export async function PATCH(request: Request, ctx: Ctx) {
       return switchQuarantineRule(request, session, patch.enabled);
     }
     if (isLockDnsRule(existing)) return patchLockDns(patch);
+    if (builtInRule(existing) === "countries") {
+      // Its switch, groups and countries change; its name, kind and schedule are FamilyFi's.
+      const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
+      if (keys.some((key) => !["enabled", "groupIds", "countries"].includes(key))) return builtInRefusal("countries");
+      try {
+        const rule = await saveCountriesRule(patch);
+        const change = await enqueueChange("rule");
+        return Response.json({ rule: await presentRule(rule), change });
+      } catch (error) {
+        if (error instanceof RuleInputError) return jsonError(error.status, error.code, error.message);
+        throw error;
+      }
+    }
+    if (patch.countries !== undefined) return jsonError(400, "invalid_request", "Only Block countries has countries.");
     const current = await presentRule(existing);
     try {
       const input = await validateRule(
@@ -89,8 +105,8 @@ export async function DELETE(request: Request, ctx: Ctx) {
       include: { policies: true },
     });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
-    if (isQuarantineRule(existing)) return builtInRefusal();
-    if (isLockDnsRule(existing)) return lockDnsRefusal();
+    const builtIn = builtInRule(existing);
+    if (builtIn) return builtInRefusal(builtIn);
     // Delete recorded UniFi policies only (D3). Never touch a group's pause AppPolicy rows.
     const household = await prisma().household.findUnique({ where: { id: "default" } });
     if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {

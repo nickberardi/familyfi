@@ -30,6 +30,7 @@ function rule(overrides: Partial<Rule>): Rule {
     networkIds: [],
     targetIds: [],
     domains: [],
+    countries: [],
     enabled: true,
     pause: { active: false, until: null, kind: "pause", by: null },
     groupPauses: [],

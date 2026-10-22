@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.31.0
+  version: 0.32.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -43,6 +43,8 @@ tags:
     description: Category and app rules including network scope (Internet parents remain groups)
   - name: Upstream
     description: Domain-list categories checked against the household resolver (reporting only)
+  - name: Checkup
+    description: What FamilyFi can see about the network that is worth changing. It only reads the gateway.
   - name: Paired
     description: Phones, Watches and agents that call the API. Invites join them; devices manage them.
   - name: Connection
@@ -923,9 +925,9 @@ paths:
       tags: [Rules]
       summary: List rules
       description: |
-        Every rule, household-wide, led by the built-in quarantine rule (`builtIn: quarantine`)
-        and then the built-in Lock DNS rule (`builtIn: dns`). `groupId` narrows to the rules
-        covering that group, which leaves quarantine out.
+        Every rule, household-wide, led by the built-in rules: quarantine (`builtIn: quarantine`),
+        then Lock DNS (`builtIn: dns`), then Block countries (`builtIn: countries`).
+        `groupId` narrows to the rules covering that group, which leaves quarantine out.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: groupId
@@ -1034,6 +1036,11 @@ paths:
         its policy. The built-in quarantine rule takes `enabled` alone, as `/on` and `/off`;
         any other field answers 409 `rule_built_in`. The built-in Lock DNS rule takes
         `groupIds` and `enabled` only, and answers 409 `rule_built_in` to any other field.
+        The built-in Block countries rule takes
+        `enabled`, `groupIds` and `countries` (ISO 3166-1 alpha-2 codes UniFi's region filter
+        accepts, at least one; 400 `invalid_countries` otherwise); any other field answers 409
+        `rule_built_in`. Switching it on while it covers no group covers every group. `countries`
+        on any other rule answers 400.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -1070,8 +1077,8 @@ paths:
       summary: Delete a rule
       description: |
         Deletes the rule and the UniFi policies recorded for it, by id only. A group's
-        pause policy is never touched. The built-in quarantine and Lock DNS rules answer 409
-        `rule_built_in`.
+        pause policy is never touched. A built-in rule (quarantine, Lock DNS, Block countries)
+        answers 409 `rule_built_in`.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -2257,6 +2264,101 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/checkup:
+    get:
+      operationId: getCheckup
+      tags: [Checkup]
+      summary: The network checkup's last findings
+      description: |
+        What the last network checkup found, and which checks passed. Sync runs it at most once an
+        hour, from what it already read plus the Wi-Fi networks. FamilyFi only reads; a finding never
+        changes the gateway.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: The checkup
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [checkup]
+                properties:
+                  checkup: { $ref: "#/components/schemas/CheckupState" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/v1/checkup/run:
+    post:
+      operationId: runCheckup
+      tags: [Checkup]
+      summary: Check now
+      description: Runs the network checkup against the gateway now and returns what it found. 409 `unifi_not_configured` before UniFi is set up.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Checked
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [checkup]
+                properties:
+                  checkup: { $ref: "#/components/schemas/CheckupState" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/checkup/findings/{id}:
+    patch:
+      operationId: updateCheckupFinding
+      tags: [Checkup]
+      summary: Dismiss a finding, or show it again
+      description: |
+        `dismissed: true` dismisses a problem or marks a note intended; it holds until what the
+        finding is about changes. `false` shows it again.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [dismissed]
+              properties:
+                dismissed: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [checkup]
+                properties:
+                  checkup: { $ref: "#/components/schemas/CheckupState" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
   /api/v1/connection/identity:
     get:
@@ -3683,7 +3785,7 @@ components:
     Rule:
       type: object
       additionalProperties: false
-      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
+      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, countries, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 60 }
@@ -3710,6 +3812,10 @@ components:
           items: { type: string }
           maxItems: 100
           description: Website domains for domain rules; empty otherwise
+        countries:
+          type: array
+          items: { type: string, pattern: "^[A-Z]{2}$" }
+          description: ISO 3166-1 alpha-2 codes the built-in Block countries rule blocks; empty on every other rule
         enabled: { type: boolean }
         pause: { $ref: "#/components/schemas/RulePause" }
         groupPauses:
@@ -3733,7 +3839,7 @@ components:
         useGeneratedName: { type: boolean, description: "Name its UniFi policies \"FamilyFi Rule <id>\" instead of after the rule." }
         builtIn:
           type: [string, "null"]
-          enum: [quarantine, dns, null]
+          enum: [quarantine, dns, countries, null]
           description: |
             Set on a rule FamilyFi provides; null on the household's own. `quarantine` (id
             `quarantine`) blocks all internet for unassigned devices on managed networks. It covers
@@ -3751,6 +3857,11 @@ components:
             request names its groups). Only `groupIds`
             and `enabled` can change, and it cannot be deleted (409 `rule_built_in`); it is paused
             and allowed, for everyone or one group, like any rule.
+
+            `countries` (id `countries`, "Block countries") blocks the covered groups' devices from
+            reaching servers in `countries`, through one always-on policy with UniFi's region
+            filter. Only its switch, groups and countries change; it is never deleted. A client
+            that does not know a value treats the rule as built in and leaves it alone.
         policyNames:
           type: array
           items: { type: string, maxLength: 100 }
@@ -3825,6 +3936,12 @@ components:
           items: { type: string }
           minItems: 1
           maxItems: 100
+        countries:
+          type: array
+          items: { type: string }
+          minItems: 1
+          maxItems: 300
+          description: The built-in Block countries rule only
         enabled: { type: boolean }
         mode: { type: string, enum: [always, scheduled] }
         windows:
@@ -3973,7 +4090,7 @@ components:
     SyncStatus:
       type: object
       additionalProperties: false
-      required: [revision, connectionStatus, appPolicyCount, failingCount, issues, lastRun, changes]
+      required: [revision, connectionStatus, appPolicyCount, failingCount, issues, lastRun, changes, checkupProblems]
       properties:
         revision: { type: integer }
         connectionStatus: { type: string }
@@ -4005,6 +4122,91 @@ components:
         changes:
           type: array
           items: { $ref: "#/components/schemas/Change" }
+        checkupProblems:
+          type: integer
+          minimum: 0
+          description: Open problems the network checkup found (not notes, not dismissed), for a badge.
+    CheckupCheck:
+      type: string
+      enum: [sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
+      description: |
+        One check. A client that does not know a value shows the finding by its kind alone.
+        sonos_mixed: Sonos players both wired and on Wi-Fi. private_addresses: devices using a
+        private (randomised) Wi-Fi address. wifi_multicast: the Wi-Fi carrying Sonos has Multicast
+        to Unicast or Client Device Isolation on. sonos_mdns, casting_mdns: speakers, or TVs and
+        printers, on another network from the phones with mDNS forwarding off. dns_override: a
+        managed network's DHCP hands out its own DNS server. smart_home_wifi: Things devices' Wi-Fi
+        has no 2.4 GHz or is WPA3 only. unmanaged_networks: networks FamilyFi does not manage that
+        have devices.
+    CheckupFinding:
+      type: object
+      additionalProperties: false
+      required: [id, check, kind, details, firstSeenAt, lastSeenAt, dismissed]
+      properties:
+        id: { type: string, description: "The check and what it is about, e.g. `dns_override:<network id>`" }
+        check: { $ref: "#/components/schemas/CheckupCheck" }
+        kind:
+          type: string
+          enum: [problem, note]
+          description: A problem is almost never intended; a note may be by design.
+        details:
+          type: object
+          additionalProperties: false
+          description: What the finding is about. Each list is present only when it applies.
+          properties:
+            devices:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [mac, name]
+                properties:
+                  mac: { type: string }
+                  name: { type: string }
+                  wired: { type: boolean }
+            networks:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [id, name]
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  dnsServers: { type: array, items: { type: string } }
+                  clientCount: { type: integer, minimum: 0 }
+            wifis:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [id, name, settings]
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  settings:
+                    type: array
+                    items: { type: string, enum: [multicast_to_unicast, client_isolation, no_2_4_ghz, wpa3_only] }
+        firstSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        dismissed:
+          type: boolean
+          description: Dismissed (or, for a note, marked intended) while it is about what was dismissed; it comes back when that changes.
+    CheckupState:
+      type: object
+      additionalProperties: false
+      required: [ranAt, error, findings, passed]
+      properties:
+        ranAt: { type: [string, "null"], format: date-time, description: When the checkup last ran; null before it first has }
+        error: { type: [string, "null"], description: Why the last run could not read the gateway; its findings are the run before }
+        findings:
+          type: array
+          items: { $ref: "#/components/schemas/CheckupFinding" }
+          description: Problems first, then notes, dismissed ones included
+        passed:
+          type: array
+          items: { $ref: "#/components/schemas/CheckupCheck" }
+          description: Checks that looked and found nothing. A check that could not look is in neither list.
     Error:
       type: object
       additionalProperties: false

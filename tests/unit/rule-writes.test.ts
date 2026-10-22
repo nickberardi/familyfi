@@ -93,6 +93,7 @@ describe("client rule helpers", () => {
     networkIds: [],
     targetIds: [],
     domains: [],
+    countries: [],
     enabled: true,
     pause: { active: false, until: null, kind: "pause", by: null },
     groupPauses: [],

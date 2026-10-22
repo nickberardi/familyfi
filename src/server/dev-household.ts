@@ -45,37 +45,56 @@ export type DevDevice = {
   online: boolean;
 };
 
-const device = (n: number, rest: Omit<DevDevice, "mac">): DevDevice => ({
-  mac: `02:00:00:00:01:${n.toString(16).padStart(2, "0")}`,
+/**
+ * Makers' IEEE prefixes, so FamilyFi names each maker and the checkup finds the Sonos speakers.
+ * A device given none keeps a locally administered address: on Wi-Fi that is a phone's private
+ * address, which Galaxy S24 and Melinda's iPhone use so the checkup has them to show.
+ */
+const OUI = {
+  apple: "f0:18:98",
+  roku: "b0:a7:37",
+  amazon: "44:65:0d",
+  nintendo: "98:b6:e9",
+  gigabyte: "e0:d5:5e",
+  sonos: "5c:aa:fd",
+  sony: "ac:9b:0a",
+} as const;
+
+const device = (n: number, rest: Omit<DevDevice, "mac">, maker?: keyof typeof OUI): DevDevice => ({
+  mac: `${maker ? OUI[maker] : "02:00:00"}:00:01:${n.toString(16).padStart(2, "0")}`,
   ...rest,
 });
 
 export const DEV_DEVICES: readonly DevDevice[] = [
-  device(1, { name: "Nick's iPhone", group: "Nick", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }),
-  device(2, { name: "Nick's MacBook Pro", group: "Nick", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }),
-  device(3, { name: "Nick's Apple Watch", group: "Nick", network: "lan", type: "WIRELESS", online: false }),
+  device(1, { name: "Nick's iPhone", group: "Nick", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }, "apple"),
+  device(2, { name: "Nick's MacBook Pro", group: "Nick", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }, "apple"),
+  device(3, { name: "Nick's Apple Watch", group: "Nick", network: "lan", type: "WIRELESS", online: false }, "apple"),
   device(4, { name: "Melinda's iPhone", group: "Melinda", network: "lan", type: "WIRELESS", accessPoint: 1, online: true }),
-  device(5, { name: "Melinda's iPad", group: "Melinda", network: "lan", type: "WIRELESS", online: false }),
-  device(6, { name: "Betsy's iPhone", group: "Betsy", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }),
-  device(7, { name: "Betsy's MacBook Air", group: "Betsy", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }),
-  device(8, { name: "Abby's iPhone", group: "Abby", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }),
-  device(9, { name: "Abby's iPad", group: "Abby", network: "lan", type: "WIRELESS", online: false }),
-  device(10, { name: "Cassie's iPad", group: "Cassie", network: "lan", type: "WIRELESS", accessPoint: 1, online: true }),
-  device(11, { name: "Cassie's Kindle", group: "Cassie", network: "lan", type: "WIRELESS", online: false }),
-  device(12, { name: "Living Room Apple TV", group: "TV", network: "iot", type: "WIRED", online: true }),
-  device(13, { name: "Bedroom Roku", group: "TV", network: "iot", type: "WIRELESS", accessPoint: 0, online: true }),
+  device(5, { name: "Melinda's iPad", group: "Melinda", network: "lan", type: "WIRELESS", online: false }, "apple"),
+  device(6, { name: "Betsy's iPhone", group: "Betsy", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }, "apple"),
+  device(7, { name: "Betsy's MacBook Air", group: "Betsy", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }, "apple"),
+  device(8, { name: "Abby's iPhone", group: "Abby", network: "lan", type: "WIRELESS", accessPoint: 0, online: true }, "apple"),
+  device(9, { name: "Abby's iPad", group: "Abby", network: "lan", type: "WIRELESS", online: false }, "apple"),
+  device(10, { name: "Cassie's iPad", group: "Cassie", network: "lan", type: "WIRELESS", accessPoint: 1, online: true }, "apple"),
+  device(11, { name: "Cassie's Kindle", group: "Cassie", network: "lan", type: "WIRELESS", online: false }, "amazon"),
+  device(12, { name: "Living Room Apple TV", group: "TV", network: "iot", type: "WIRED", online: true }, "apple"),
+  device(13, { name: "Bedroom Roku", group: "TV", network: "iot", type: "WIRELESS", accessPoint: 0, online: true }, "roku"),
   device(14, { name: "Family iMac", group: "Computers", network: "lan", type: "WIRED", online: true }),
   device(15, { name: "Office PC", group: "Computers", network: "lan", type: "WIRED", online: true }),
   device(16, { name: "Xbox Series X", group: "Games", network: "iot", type: "WIRED", online: true }),
-  device(17, { name: "PlayStation 5", group: "Games", network: "iot", type: "WIRED", online: false }),
-  device(18, { name: "Nintendo Switch", group: "Games", network: "iot", type: "WIRELESS", accessPoint: 1, online: true }),
+  device(17, { name: "PlayStation 5", group: "Games", network: "iot", type: "WIRED", online: false }, "sony"),
+  device(18, { name: "Nintendo Switch", group: "Games", network: "iot", type: "WIRELESS", accessPoint: 1, online: true }, "nintendo"),
   device(19, { name: "Synology NAS", group: "Servers", network: "lan", type: "WIRED", online: true }),
   device(20, { name: "Raspberry Pi", group: "Servers", network: "lan", type: "WIRED", online: true }),
   device(21, { name: "Home Assistant", group: "Servers", network: "iot", type: "WIRED", online: true }),
   // Unassigned, so the Devices quarantine banner and its counts have subjects.
-  device(22, { name: "Guest Laptop", group: null, network: "lan", type: "WIRELESS", accessPoint: 1, online: true }),
+  device(22, { name: "Guest Laptop", group: null, network: "lan", type: "WIRELESS", accessPoint: 1, online: true }, "gigabyte"),
   device(23, { name: "Galaxy S24", group: null, network: "lan", type: "WIRELESS", accessPoint: 0, online: true }),
-  device(24, { name: "Echo Dot", group: null, network: "iot", type: "WIRELESS", accessPoint: 1, online: true }),
+  device(24, { name: "Echo Dot", group: null, network: "iot", type: "WIRELESS", accessPoint: 1, online: true }, "amazon"),
+  // One Sonos wired and two on Wi-Fi, on the IoT network the phones are not on, for the checkup.
+  device(25, { name: "Living Room Sonos Arc", group: "TV", network: "iot", type: "WIRED", online: true }, "sonos"),
+  device(26, { name: "Kitchen Sonos Era 100", group: "TV", network: "iot", type: "WIRELESS", accessPoint: 1, online: true }, "sonos"),
+  device(27, { name: "Bedroom Sonos One", group: "TV", network: "iot", type: "WIRELESS", accessPoint: 0, online: true }, "sonos"),
 ];
 
 /** An address on the device's network, unique per device. */

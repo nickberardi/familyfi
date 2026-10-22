@@ -119,6 +119,8 @@ async function buildHousehold() {
 }
 
 const DUMP = Buffer.from("PGDMP stand-in");
+/** The household's own rule; the export also carries the built-in Block countries rule. */
+const bedtime = <T extends HouseholdConfig>(config: T): T["rules"][number] => config.rules.find((rule) => rule.id !== "countries")!;
 
 beforeEach(async () => {
   await resetDatabase();
@@ -156,9 +158,12 @@ describe("household export", () => {
     await prisma().household.update({ where: { id: "default" }, data: { timezone: "UTC", updateScheduleEnabled: false } });
     await prisma().account.create({ data: { username: "stranger", displayName: "Stranger", kind: AccountKind.personal, isAdmin: true } });
 
+    await prisma().checkupFinding.create({ data: { key: "private_addresses", check: "private_addresses", details: {}, subject: "x", firstSeenAt: new Date(), lastSeenAt: new Date() } });
     const summary = await imported(auth, writeArchive([...files].map(([name, data]) => ({ name, data }))));
+    // The old household's checkup goes with it.
+    expect(await prisma().checkupFinding.count()).toBe(0);
     expect(summary).toMatchObject({
-      counts: { groups: 3, accounts: 1, devices: 3, rules: 1, endpoints: 2 },
+      counts: { groups: 3, accounts: 1, devices: 3, rules: 2, endpoints: 2 },
       gateway: "imported",
       unifiKey: "kept",
       endpointsNeedingToken: [],
@@ -363,9 +368,9 @@ describe("household export", () => {
     };
     const before = await householdConfig();
     for (const [archive, message] of [
-      [edited((config) => (config.rules[0].windows[0].end = config.rules[0].windows[0].start)), /Bedtime.*cannot be imported/],
-      [edited((config) => (config.rules[0].windows = [])), /needs at least one window/],
-      [edited((config) => config.rules.push({ ...config.rules[0], id: "website", name: "Sites", kind: "domain", mode: "always", domains: [], windows: [] })), /Add at least one website/],
+      [edited((config) => (bedtime(config).windows[0].end = bedtime(config).windows[0].start)), /Bedtime.*cannot be imported/],
+      [edited((config) => (bedtime(config).windows = [])), /needs at least one window/],
+      [edited((config) => config.rules.push({ ...bedtime(config), id: "website", name: "Sites", kind: "domain", mode: "always", domains: [], windows: [] })), /Add at least one website/],
       [edited((config) => (config.household.resolver.dohUrl = "http://dns.example.com/dns-query")), /must start with https/],
     ] as const) {
       const response = await importRequest(auth, "preview", archive);
@@ -410,7 +415,7 @@ describe("household export", () => {
     const network = edited((config) => {
       config.household.unifi.manageAllNetworks = false;
       config.household.unifi.managedNetworkIds = ["there"];
-      config.rules.push({ ...config.rules[0], id: "network-rule", name: "Guest Wi-Fi", kind: "domain", scope: "network", networkIds: ["there"], groupIds: [], mode: "always", windows: [], domains: ["games.example.com"] });
+      config.rules.push({ ...bedtime(config), id: "network-rule", name: "Guest Wi-Fi", kind: "domain", scope: "network", networkIds: ["there"], groupIds: [], mode: "always", windows: [], domains: ["games.example.com"] });
     });
     const kept = await importRequest(auth, "preview", network);
     expect(kept.status).toBe(400);

@@ -12,6 +12,7 @@ import type {
   SiteOverview,
   SiteDeviceOverview,
   UnifiPage,
+  WifiBroadcastDetails,
 } from "./types";
 
 export const DEV_MOCK_API_KEY = "mock-unifi-key";
@@ -52,14 +53,61 @@ function readJson<T>(name: string): T {
   return JSON.parse(readFileSync(join(fixturesDir(), name), "utf8")) as T;
 }
 
+/**
+ * The household's Wi-Fi and the settings the checkup reads: mDNS forwarded on LAN but not IoT, IoT
+ * handing out a Pi-hole for DNS, and an IoT Wi-Fi on 5 GHz only with Multicast to Unicast on, so the
+ * demo has findings to show.
+ */
+const FRIENDLY_NETWORK_SETTINGS: Record<string, { mdnsForwardingEnabled: boolean; dnsServers: string[] | null }> = {
+  [DEV_MOCK_INTERNAL_NETWORK]: { mdnsForwardingEnabled: true, dnsServers: null },
+  [DEV_MOCK_IOT_NETWORK]: { mdnsForwardingEnabled: false, dnsServers: ["198.51.100.53"] },
+};
+
+const FRIENDLY_WIFI: WifiBroadcastDetails[] = [
+  {
+    id: "77777777-7777-4777-8777-777777777701",
+    name: "Home",
+    type: "STANDARD",
+    enabled: true,
+    network: { type: "NATIVE" },
+    securityConfiguration: { type: "WPA2_WPA3_PERSONAL" },
+    broadcastingFrequenciesGHz: [2.4, 5],
+    multicastToUnicastConversionEnabled: false,
+    clientIsolationEnabled: false,
+  },
+  {
+    id: "77777777-7777-4777-8777-777777777702",
+    name: "Home IoT",
+    type: "STANDARD",
+    enabled: true,
+    network: { type: "SPECIFIC", networkId: DEV_MOCK_IOT_NETWORK },
+    securityConfiguration: { type: "WPA2_PERSONAL" },
+    broadcastingFrequenciesGHz: [5],
+    multicastToUnicastConversionEnabled: true,
+    clientIsolationEnabled: false,
+  },
+];
+
 function applyFriendlyNames(state: MockUnifiState): MockUnifiState {
   return {
     ...state,
     sites: state.sites.map((site) => ({ ...site, name: FRIENDLY_SITE })),
-    networks: state.networks.map((network) => ({
-      ...network,
-      name: FRIENDLY_NETWORKS[network.id] ?? network.name,
-    })),
+    networks: state.networks.map((network) => {
+      const settings = FRIENDLY_NETWORK_SETTINGS[network.id];
+      return {
+        ...network,
+        name: FRIENDLY_NETWORKS[network.id] ?? network.name,
+        ...(settings
+          ? {
+              mdnsForwardingEnabled: settings.mdnsForwardingEnabled,
+              ...(network.ipv4Configuration
+                ? { ipv4Configuration: { ...network.ipv4Configuration, dhcpConfiguration: { mode: "SERVER", dnsServerIpAddressesOverride: settings.dnsServers } } }
+                : {}),
+            }
+          : {}),
+      };
+    }),
+    wifiBroadcasts: FRIENDLY_WIFI.map((wifi) => ({ ...wifi })),
     clients: householdClients(state.siteDevices),
     dpiApplications: [...state.dpiApplications, ...DEV_APPS.map((app) => ({ ...app }))],
   };

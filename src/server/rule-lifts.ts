@@ -1,6 +1,6 @@
 import { type DeviceScope, type PairedDeviceClient, RuleLiftKind } from "@prisma/client";
 import { z } from "zod";
-import { QUARANTINE_RULE_ID } from "@/lib/rules";
+import { QUARANTINE_RULE_ID, type BuiltInRule } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
 import { enqueueChange } from "./changes";
 import { deviceScopeRefusal } from "./auth";
@@ -94,9 +94,16 @@ export async function runLift(
   return Response.json({ rule: await presentRule(fresh), change });
 }
 
-/** What editing or deleting the built-in quarantine rule answers. */
-export function builtInRefusal(): Response {
-  return jsonError(409, "rule_built_in", "Quarantine is built in: it can be paused, extended and resumed, but not edited, deleted or allowed.");
+/** What editing or deleting a built-in rule answers, beyond what that rule lets change. */
+export function builtInRefusal(which: BuiltInRule = "quarantine"): Response {
+  if (which === "dns") return lockDnsRefusal();
+  return jsonError(
+    409,
+    "rule_built_in",
+    which === "countries"
+      ? "Block countries is built in: its countries and groups can change, and it can be switched, paused and allowed, but it can't be renamed, rescheduled or deleted."
+      : "Quarantine is built in: it can be paused, extended and resumed, but not edited, deleted or allowed.",
+  );
 }
 
 /** What editing Lock DNS beyond its groups, or deleting it, answers. */
