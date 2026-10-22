@@ -667,12 +667,12 @@ test("Rules: Lock DNS is a built-in rule whose page changes only the groups it c
   const { rule: seeded } = (await (await page.request.get("/api/v1/rules/dns")).json()) as { rule: { groupIds: string[] } };
   try {
     await page.goto("/rules");
-    const card = page.getByTestId("rule-card-lock-dns");
+    const card = page.getByTestId("rule-card-dns");
     await expect(card.getByText("Other DNS servers · everything else stays on")).toBeVisible();
     // The mock household has it on for the teens and the child.
     await expect(card.getByRole("switch", { name: "Lock DNS" })).toBeChecked();
     await card.getByRole("link", { name: /^Lock DNS/ }).click();
-    await expect(page).toHaveURL(/\/rules\/lock-dns$/);
+    await expect(page).toHaveURL(/\/rules\/dns$/);
 
     await expect(page.getByRole("heading", { name: "What it blocks" })).toBeVisible();
     await expect(page.getByTestId("lock-dns-caution")).toBeVisible();
