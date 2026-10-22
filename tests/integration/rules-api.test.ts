@@ -30,7 +30,7 @@ import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import type { Rule } from "@/lib/rules";
 import { setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
-import type { FirewallPolicy } from "@/server/unifi/types";
+import type { FirewallPolicy, NetworkDetails } from "@/server/unifi/types";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { INTERNAL_ZONE, configureConnectedHousehold, resetDatabase, seedDevice } from "../helpers/db";
 import { fixtureUnifiClient, policyMacs } from "../helpers/unifi-world";
@@ -1081,6 +1081,36 @@ describe("household rules", () => {
         expect(client.calls.filter((call) => call.method !== "GET")).toEqual([]);
       } finally {
         setLockDnsResolverForTests(undefined);
+      }
+    });
+
+    it("keeps its policies as they are while a network's DNS servers cannot be read", async () => {
+      const auth = await signedIn();
+      await child();
+      for (const network of client.state.networks) {
+        network.ipv4Configuration!.dhcpConfiguration = { mode: "SERVER", dnsServerIpAddressesOverride: ["1.1.1.3"] };
+      }
+      await ruleAction(turnOnRule, auth, "lock-dns", null);
+      await runReconcileOnce();
+      const before = JSON.stringify(lockDnsPolicies());
+      expect(before).toContain('"matchOpposite":true');
+
+      // The list has no DHCP settings, and each network's own read fails.
+      const { getNetwork, listNetworks } = client;
+      client.listNetworks = async (siteId) =>
+        (await listNetworks.call(client, siteId)).map((network) => {
+          const overview: Partial<NetworkDetails> = { ...network };
+          delete overview.ipv4Configuration;
+          return overview as NetworkDetails;
+        });
+      client.getNetwork = async () => {
+        throw new Error("gateway busy");
+      };
+      try {
+        await runReconcileOnce();
+        expect(JSON.stringify(lockDnsPolicies())).toBe(before);
+      } finally {
+        Object.assign(client, { getNetwork, listNetworks });
       }
     });
 

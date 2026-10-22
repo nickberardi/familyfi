@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
 import { AssignmentState, GroupKind, RuleKind, RuleMode, RuleScope } from "@prisma/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ENCRYPTED_DNS_SERVICES, encryptedDnsAddresses, encryptedDnsHosts, encryptedDnsSummary } from "@/lib/encrypted-dns";
 import { groupHeaderActions, groupStatus } from "@/lib/group-actions";
 import { lockDnsDirty, lockDnsWrites, toggleLockDnsGroup } from "@/lib/lock-dns";
@@ -151,17 +151,59 @@ describe("Lock DNS leaves the household's own DNS alone", () => {
       throw new Error("no such host");
     });
     try {
-      const network = (servers: string[] | null) => ({ ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: "SERVER", dnsServerIpAddressesOverride: servers } } });
+      const network = (servers: string[] | null) => ({ enabled: true, management: "GATEWAY", ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: "SERVER", dnsServerIpAddressesOverride: servers } } });
       const exempt = await lockDnsExemptions({
         networks: [network(["9.9.9.11", "192.168.1.53"]), network(null)],
         resolverUrls: ["https://family.cloudflare-dns.com/dns-query", null, "https://missing.example/dns-query", "https://[2620:fe::11]/dns-query"],
       });
+      expect(exempt).not.toBeNull();
       // A server on the network itself, like a Pi-hole, needs nothing; a name that cannot be looked up keeps only its name open.
       expect(exempt).toEqual({
         addresses: ["1.0.0.3", "1.1.1.3", "2606:4700:4700::1113", "2620:fe::11", "9.9.9.11"].sort(),
         hosts: ["family.cloudflare-dns.com", "missing.example"],
       });
     } finally {
+      setLockDnsResolverForTests(undefined);
+    }
+  });
+});
+
+describe("working out the household's own DNS", () => {
+  const network = (patch: Partial<{ enabled: boolean; mode: string; read: boolean }> = {}) => ({
+    enabled: patch.enabled ?? true,
+    management: "GATEWAY",
+    ...(patch.read === false
+      ? {}
+      : { ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: patch.mode ?? "SERVER", dnsServerIpAddressesOverride: ["1.1.1.3"] } } }),
+  });
+
+  it("gives up for the pass when a gateway network's details could not be read", async () => {
+    expect(await lockDnsExemptions({ networks: [network(), network({ read: false })], resolverUrls: [] })).toBeNull();
+    // A disabled network's details do not matter.
+    expect(await lockDnsExemptions({ networks: [network(), network({ read: false, enabled: false })], resolverUrls: [] })).toEqual({ addresses: ["1.1.1.3"], hosts: [] });
+  });
+
+  it("takes servers only from a network's own enabled DHCP server", async () => {
+    expect(await lockDnsExemptions({ networks: [network({ mode: "RELAY" }), network({ enabled: false })], resolverUrls: [] })).toEqual({ addresses: [], hosts: [] });
+  });
+
+  it("keeps a resolver's last addresses when a lookup fails", async () => {
+    let answer: string[] | null = ["9.9.9.11"];
+    setLockDnsResolverForTests(async () => {
+      if (!answer) throw new Error("timed out");
+      return answer;
+    });
+    vi.useFakeTimers({ now: new Date("2026-10-22T12:00:00Z") });
+    try {
+      const own = () => lockDnsExemptions({ networks: [], resolverUrls: ["https://dns11.quad9.net/dns-query"] });
+      expect((await own())!.addresses).toEqual(["9.9.9.11"]);
+      answer = null;
+      vi.setSystemTime(new Date("2026-10-22T14:00:00Z"));
+      expect((await own())!.addresses).toEqual(["9.9.9.11"]);
+      answer = ["9.9.9.12"];
+      expect((await own())!.addresses).toEqual(["9.9.9.12"]);
+    } finally {
+      vi.useRealTimers();
       setLockDnsResolverForTests(undefined);
     }
   });

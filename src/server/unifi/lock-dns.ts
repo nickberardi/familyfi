@@ -79,14 +79,14 @@ const resolveHost: Resolve = (host) => (testResolve ?? (unifiMockEnabled() ? asy
 async function addressesOf(host: string): Promise<string[]> {
   const cached = resolved.get(host);
   if (cached && Date.now() - cached.at < RESOLVE_TTL_MS) return cached.addresses;
-  let addresses: string[] = [];
   try {
-    addresses = [...new Set(await resolveHost(host))].filter((address) => isIP(address)).sort();
+    const addresses = [...new Set(await resolveHost(host))].filter((address) => isIP(address)).sort();
+    resolved.set(host, { at: Date.now(), addresses });
+    return addresses;
   } catch {
-    // Its name stays open; its addresses may still be blocked until a lookup succeeds.
+    // The last answer stands; with none, its name stays open and the next pass looks again.
+    return cached?.addresses ?? [];
   }
-  resolved.set(host, { at: Date.now(), addresses });
-  return addresses;
 }
 
 function hostOf(url: string): string | null {
@@ -97,15 +97,25 @@ function hostOf(url: string): string | null {
   }
 }
 
-/** The household's own DNS, from the managed networks' DHCP settings and the resolvers set in FamilyFi. */
-export async function lockDnsExemptions(input: { networks: Pick<NetworkDetails, "ipv4Configuration">[]; resolverUrls: (string | null)[] }): Promise<LockDnsExemptions> {
+/**
+ * The household's own DNS, from the managed networks' DHCP settings and the resolvers set in
+ * FamilyFi; null while a gateway network's details could not be read this pass, since planning
+ * without its servers would block them.
+ */
+export async function lockDnsExemptions(input: {
+  networks: Pick<NetworkDetails, "enabled" | "management" | "ipv4Configuration">[];
+  resolverUrls: (string | null)[];
+}): Promise<LockDnsExemptions | null> {
+  if (input.networks.some((network) => network.enabled && network.management === "GATEWAY" && !network.ipv4Configuration)) return null;
   // A server on one of the household's own networks, like a Pi-hole, is never on the internet to block.
   const local = new BlockList();
   for (const network of input.networks) {
     const ipv4 = network.ipv4Configuration;
     if (ipv4 && isIP(ipv4.hostIpAddress) === 4) local.addSubnet(ipv4.hostIpAddress, ipv4.prefixLength, "ipv4");
   }
+  // Only a network's own DHCP server hands these out, as upstream discovery reads them.
   const addresses = input.networks
+    .filter((network) => network.enabled && network.ipv4Configuration?.dhcpConfiguration?.mode === "SERVER")
     .flatMap((network) => network.ipv4Configuration?.dhcpConfiguration?.dnsServerIpAddressesOverride ?? [])
     .filter((address) => isIP(address) && !local.check(address, isIP(address) === 4 ? "ipv4" : "ipv6"));
   const hosts: string[] = [];

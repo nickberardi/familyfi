@@ -339,15 +339,18 @@ async function tick(owner: string): Promise<boolean> {
     const rulePolicies = await prisma().rulePolicy.findMany({
       where: { connectionIdentity: identity, siteId },
     });
-    // Lock DNS leaves the household's own DNS alone; looked up only while it covers someone.
+    // Lock DNS leaves the household's own DNS alone: the resolvers of the household and of the
+    // groups it covers, looked up only while it covers someone. When that cannot be worked out
+    // this pass, its policies stay as they are.
     const lockDnsRule = rules.find((rule) => rule.id === LOCK_DNS_RULE_ID);
-    const lockDnsExempt = lockDnsRule?.groups.length
+    const lockDnsGroups = new Set(lockDnsRule?.groups.map((link) => link.groupId));
+    const lockDnsExempt = lockDnsGroups.size
       ? await lockDnsExemptions({
           networks: networks.filter((network) => networkInScope(scope, network.id)),
-          resolverUrls: [household.dohUrl, ...groups.map((group) => group.dohOverrideUrl)],
+          resolverUrls: [household.dohUrl, ...groups.filter((group) => lockDnsGroups.has(group.id)).map((group) => group.dohOverrideUrl)],
         })
       : undefined;
-    const { policies: desiredRules, retainRuleIds, orphanRuleIds } = planRulePolicies({
+    const rulePlan = planRulePolicies({
       destinationZoneId: external.id,
       zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),
       groups: groups.map((group) => ({
@@ -364,8 +367,8 @@ async function tick(owner: string): Promise<boolean> {
         zoneId: network.zoneId ?? null,
       })),
       networkScope: scope,
-      lockDnsExemptions: lockDnsExempt,
-      rules: rules.map((rule) => ({
+      lockDnsExemptions: lockDnsExempt ?? undefined,
+      rules: rules.filter((rule) => !(rule.id === LOCK_DNS_RULE_ID && lockDnsExempt === null)).map((rule) => ({
         ...rule,
         groupIds: rule.groups.map((link) => link.groupId),
         paused: isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now),
@@ -375,6 +378,8 @@ async function tick(owner: string): Promise<boolean> {
           .map((link) => link.groupId),
       })),
     });
+    const { policies: desiredRules, retainRuleIds, orphanRuleIds } = rulePlan;
+    if (lockDnsExempt === null) retainRuleIds.add(LOCK_DNS_RULE_ID);
     const desiredRuleKeys = new Set(desiredRules.map((item) => item.key));
 
     for (const planned of desiredRules) {
