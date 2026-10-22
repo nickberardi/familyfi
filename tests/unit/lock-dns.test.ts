@@ -305,6 +305,7 @@ const lockDns: Rule = {
   networkIds: [],
   targetIds: [],
   domains: encryptedDnsHosts(),
+  countries: [],
   enabled: true,
   pause: { active: false, until: null, kind: "pause", by: null },
   groupPauses: [],
