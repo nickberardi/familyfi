@@ -46,7 +46,8 @@ export type UpdaterSettings = { url: string; token: string };
 export function updaterSettings(source: Record<string, string | undefined> = process.env, file = tokenFile): UpdaterSettings | null {
   let token: string;
   try {
-    token = readFileSync(file, "utf8").trim();
+    // A runtime path outside the app; without the comment Turbopack traces the whole repository into the image.
+    token = readFileSync(/*turbopackIgnore: true*/ file, "utf8").trim();
   } catch {
     return null;
   }
