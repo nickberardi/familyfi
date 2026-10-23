@@ -97,6 +97,16 @@ jobs:
       # A production build (the only one this workflow makes), then desktop and phone, each against its own
       # database and server.
       - run: scripts/test.py run --layer ui
+      # The image ships this build's standalone output (docker/Dockerfile). A filesystem or spawn call the
+      # bundler cannot scope traces the whole repository into it, which check-image.sh only sees at release.
+      - if: ${{ !cancelled() }}
+        run: |
+          for dir in scripts docs .github; do
+            if [ -e ".next/standalone/$dir" ]; then
+              echo "::error::.next/standalone contains $dir/: a dynamic fs or spawn call traced the whole repository (see next build's warnings)"
+              exit 1
+            fi
+          done
       # The unit suite again with the server clock at UTC+14: household time must never lean on the server's zone.
       # It runs even when a browser test failed, so one failure never hides the other.
       - if: ${{ !cancelled() }}
