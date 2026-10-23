@@ -694,13 +694,13 @@ test("Block for a custom time, then offer it first next time", { tag: "@desktop"
   const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };
   const tv = groups.find((group) => group.name === "TV");
   expect(tv, "The mock seed must include the TV things group").toBeTruthy();
-  // As below: with the TV rule off, the page offers Block whatever the time of day.
+  // As below: with the TV rules off, the page offers Block whatever the time of day.
   const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as {
-    rules: { id: string; kind: string; enabled: boolean; groupIds: string[] }[];
+    rules: { id: string; enabled: boolean; groupIds: string[]; builtIn: string | null }[];
   };
-  const internetRules = rules.filter((rule) => rule.kind === "internet" && rule.enabled && rule.groupIds.includes(tv!.id));
+  const tvRules = rules.filter((rule) => !rule.builtIn && rule.enabled && rule.groupIds.includes(tv!.id));
   const setEnabled = async (enabled: boolean) => {
-    for (const rule of internetRules) {
+    for (const rule of tvRules) {
       const response = await page.request.patch(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page), data: { enabled } });
       expect(response.ok()).toBeTruthy();
     }
@@ -739,13 +739,14 @@ test("Block names its scope and can be undone", { tag: "@desktop" }, async ({ pa
   const tv = body.groups.find((group) => group.name === "TV");
   expect(tv, "The mock seed must include the TV things group").toBeTruthy();
 
-  // A no-internet window offers Unblock instead of Block, so turn the
-  // seeded TV rule off while this runs: the test must not depend on the time of day.
+  // A rule blocking TV now (its no-internet window, or the 4–6 PM and 9–11 PM video evenings) offers
+  // Unblock instead of Block, so turn the seeded TV rules off while this runs: the test must not
+  // depend on the time of day.
   const rulesRes = await page.request.get("/api/v1/rules");
-  const { rules } = (await rulesRes.json()) as { rules: { id: string; kind: string; enabled: boolean; groupIds: string[] }[] };
-  const internetRules = rules.filter((rule) => rule.kind === "internet" && rule.enabled && rule.groupIds.includes(tv!.id));
+  const { rules } = (await rulesRes.json()) as { rules: { id: string; enabled: boolean; groupIds: string[]; builtIn: string | null }[] };
+  const tvRules = rules.filter((rule) => !rule.builtIn && rule.enabled && rule.groupIds.includes(tv!.id));
   const setEnabled = async (enabled: boolean) => {
-    for (const rule of internetRules) {
+    for (const rule of tvRules) {
       const response = await page.request.patch(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page), data: { enabled } });
       expect(response.ok()).toBeTruthy();
     }
