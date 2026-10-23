@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createSocket } from "node:dgram";
-import { createServer } from "node:net";
+import { createSocket, type Socket } from "node:dgram";
+import { createServer, type Server } from "node:net";
 import { discoveredNetwork } from "@/server/upstream/discovery";
 import { plainDnsResolver } from "@/server/upstream/plain-dns";
 
@@ -15,6 +15,36 @@ function reply(query: Uint8Array, flags: number): Uint8Array {
   view.setUint16(0, new DataView(query.buffer, query.byteOffset, query.byteLength).getUint16(0));
   view.setUint16(2, flags);
   return bytes;
+}
+
+/**
+ * A UDP socket from `makeUdp` and `tcp` listening on one free loopback port. The port picked for UDP
+ * can already be taken for TCP by another process on a shared runner, so a taken port is tried again.
+ */
+async function listenOnOnePort(makeUdp: () => Socket, tcp: Server): Promise<{ udp: Socket; port: number }> {
+  for (let attempt = 1; ; attempt += 1) {
+    const udp = makeUdp();
+    await new Promise<void>((resolve) => udp.bind(0, "127.0.0.1", resolve));
+    const port = udp.address().port;
+    const listened = await new Promise<boolean>((resolve) => {
+      const taken = () => resolve(false);
+      tcp.once("error", taken);
+      tcp.listen(port, "127.0.0.1", () => {
+        tcp.off("error", taken);
+        resolve(true);
+      });
+    });
+    if (listened) return { udp, port };
+    await new Promise<void>((resolve) => udp.close(resolve));
+    if (attempt === 10) throw new Error("no loopback port was free for both UDP and TCP");
+  }
+}
+
+/** A UDP server that answers every query truncated, sending the resolver on to TCP. */
+function truncatingUdp(): Socket {
+  const udp = createSocket("udp4");
+  udp.on("message", (query, peer) => udp.send(reply(query, 0x8200), peer.port, peer.address));
+  return udp;
 }
 
 describe("DHCP resolver discovery", () => {
@@ -57,7 +87,6 @@ describe("plain DNS", () => {
   });
 
   it("retries a truncated UDP reply over a framed TCP connection", async () => {
-    const udp = createSocket("udp4");
     const tcp = createServer((socket) => {
       let frame = Buffer.alloc(0);
       socket.on("data", (chunk) => {
@@ -71,11 +100,8 @@ describe("plain DNS", () => {
     });
     let tcpQueries = 0;
     tcp.on("connection", () => { tcpQueries += 1; });
-    udp.on("message", (query, peer) => udp.send(reply(query, 0x8200), peer.port, peer.address));
+    const { udp, port } = await listenOnOnePort(truncatingUdp, tcp);
     try {
-      await new Promise<void>((resolve) => udp.bind(0, "127.0.0.1", resolve));
-      const port = udp.address().port;
-      await new Promise<void>((resolve) => tcp.listen(port, "127.0.0.1", resolve));
       const result = await plainDnsResolver({ server: "127.0.0.1", port, timeoutMs: 1000 })("example.com");
       expect(result.blocked).toBe(true);
       expect(tcpQueries).toBe(1);
@@ -99,15 +125,11 @@ describe("plain DNS", () => {
   });
 
   it("reports an early TCP close as unknown after UDP truncation", async () => {
-    const udp = createSocket("udp4");
     const tcp = createServer((socket) => {
       socket.once("data", () => socket.end(Buffer.from([0])));
     });
-    udp.on("message", (query, peer) => udp.send(reply(query, 0x8200), peer.port, peer.address));
+    const { udp, port } = await listenOnOnePort(truncatingUdp, tcp);
     try {
-      await new Promise<void>((resolve) => udp.bind(0, "127.0.0.1", resolve));
-      const port = udp.address().port;
-      await new Promise<void>((resolve) => tcp.listen(port, "127.0.0.1", resolve));
       const result = await plainDnsResolver({ server: "127.0.0.1", port, timeoutMs: 1000 })("example.com");
       expect(result).toMatchObject({ blocked: null, error: "DNS TCP reply ended early." });
     } finally {
