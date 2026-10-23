@@ -40,7 +40,8 @@ export function dumpDatabase(command = "pg_dump", timeoutMs = DUMP_TIMEOUT_MS): 
     const url = new URL(env().DATABASE_URL);
     const password = decodeURIComponent(url.password);
     url.password = "";
-    const child = spawn(command, ["--format=custom", "--no-owner", "--dbname", url.toString()], {
+    // A command on PATH, not a file in the app; without the comment Turbopack traces the whole repository into the image.
+    const child = spawn(/*turbopackIgnore: true*/ command, ["--format=custom", "--no-owner", "--dbname", url.toString()], {
       env: { ...process.env, PGPASSWORD: password },
       stdio: ["ignore", "pipe", "pipe"],
     });
