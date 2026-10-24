@@ -3,6 +3,7 @@ import { GroupKind, RuleKind, RuleMode, RuleScope } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as listRules, POST as createRule } from "@/app/api/v1/rules/route";
 import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
+import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { PUT as putUnifiSettings } from "@/app/api/v1/settings/unifi/route";
 import { prisma } from "@/server/db";
 import { pruneNetworkScopedRulesForScope } from "@/server/network-rules";
@@ -335,6 +336,24 @@ describe("Phase 3 network-scoped DPI", () => {
       const back = (await (await patch(auth, "dns", { scope: "group" })).json()) as Body;
       expect(back.rule).toMatchObject({ scope: "group", groupIds: [emma.id], networkIds: [] });
       expect(((await (await patch(auth, "countries", { groupIds: back.rule.groupIds })).json()) as Body).rule).toMatchObject({ scope: "group", networkIds: [] });
+    });
+
+    it("leave the household's own DNS alone on whole networks, and keep their networks when switched on", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      for (const network of client.state.networks) {
+        network.ipv4Configuration!.dhcpConfiguration = { mode: "SERVER", dnsServerIpAddressesOverride: ["1.1.1.3"] };
+      }
+      const auth = await signedIn();
+      await patch(auth, "dns", { scope: "network", networkIds: [INTERNAL_NETWORK] });
+      const on = await turnOnRule(request("/api/v1/rules/dns/on", { method: "POST", auth }), { params: Promise.resolve({ id: "dns" }) });
+      expect(((await on.json()) as Body).rule).toMatchObject({ enabled: true, scope: "network", groupIds: [], networkIds: [INTERNAL_NETWORK] });
+      expect(await runReconcileOnce()).toBe(true);
+      const ports = client.state.policies.find((policy) => policy.name === "FamilyFi Lock DNS")!;
+      expect(ports.destination.trafficFilter).toMatchObject({
+        type: "IP_ADDRESS",
+        ipAddressFilter: { matchOpposite: true, items: [{ type: "IP_ADDRESS", value: "1.1.1.3" }] },
+      });
     });
 
     it("go back to people and things, off, when Settings stops managing their networks", async () => {

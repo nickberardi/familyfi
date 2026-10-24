@@ -1,4 +1,4 @@
-import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, type Household } from "@prisma/client";
+import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, RuleScope, type Household } from "@prisma/client";
 import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
@@ -346,11 +346,16 @@ async function tick(owner: string): Promise<boolean> {
       where: { connectionIdentity: identity, siteId },
     });
     // Lock DNS leaves the household's own DNS alone: the resolvers of the household and of the
-    // groups it covers, looked up only while it covers someone. When that cannot be worked out
-    // this pass, its policies stay as they are.
+    // groups it covers (on whole networks, the groups with a device on them), looked up only while
+    // it covers something. When that cannot be worked out this pass, its policies stay as they are.
     const lockDnsRule = rules.find((rule) => rule.id === LOCK_DNS_RULE_ID);
-    const lockDnsGroups = new Set(lockDnsRule?.groups.map((link) => link.groupId));
-    const lockDnsExempt = lockDnsGroups.size
+    const lockDnsNetworks = lockDnsRule?.scope === RuleScope.network ? new Set(lockDnsRule.networkIds) : null;
+    const lockDnsGroups = new Set(
+      lockDnsNetworks
+        ? devices.flatMap((device) => (device.groupId && device.networkId && lockDnsNetworks.has(device.networkId) ? [device.groupId] : []))
+        : lockDnsRule?.groups.map((link) => link.groupId),
+    );
+    const lockDnsExempt = (lockDnsNetworks ? lockDnsNetworks.size : lockDnsGroups.size)
       ? await lockDnsExemptions({
           networks: networks.filter((network) => networkInScope(scope, network.id)),
           resolverUrls: [household.dohUrl, ...groups.filter((group) => lockDnsGroups.has(group.id)).map((group) => group.dohOverrideUrl)],
