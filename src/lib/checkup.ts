@@ -324,15 +324,16 @@ export function outsideDnsNetworks(state: Pick<CheckupState, "findings"> | null 
 }
 
 /**
- * The rule editor's note under Applies to: a category, app or website rule covers a group with
- * devices on a network that hands out its own DNS. FamilyFi never refuses the rule; it only says so.
+ * The rule editor's note under Applies to: a website rule covers a group with devices on a network
+ * that hands out its own DNS. Category and app rules match traffic, not lookups, so they get none.
+ * FamilyFi never refuses the rule; it only says so.
  */
 export function outsideDnsNote(
   rule: { kind: string; scope: string; groupIds: string[]; networkIds: string[] },
   devices: { groupId: string | null; networkId: string | null }[],
   state: Pick<CheckupState, "findings"> | null | undefined,
 ): string | null {
-  if (rule.kind === "internet") return null;
+  if (rule.kind !== "domain") return null;
   const outside = outsideDnsNetworks(state);
   if (!outside.size) return null;
   const covered =
@@ -449,7 +450,7 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         icon: "network",
         title: `The ${network?.name ?? ""} network hands out its own DNS`,
         seen: `Devices on ${network?.name ?? "it"} are told to use ${servers} for DNS, not the gateway.`,
-        why: `Category, app and website rules only see lookups that pass through the gateway. If ${servers} is a Pi-hole or AdGuard Home that forwards to the gateway, this is fine. Lock DNS would cut DNS off for these devices if that server is outside your home.`,
+        why: `Category and app rules still work: the gateway recognises that traffic itself. Website rules match the lookups the gateway sees, so they can miss sites these devices look up through ${servers}. If ${servers} is a Pi-hole or AdGuard Home, this is fine. Lock DNS leaves it alone.`,
         fix: [`UniFi Network → Settings → Networks → ${network?.name ?? "the network"} → DHCP DNS Server → Auto.`],
       };
     }
