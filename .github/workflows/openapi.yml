@@ -25,13 +25,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/runner-cleanup
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.15.1
+      # Node first: pnpm/action-setup bootstraps with the npm on PATH, and the runner's own
+      # Node has a broken npm since runner 2.338.0.
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: pnpm
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.15.1
+          cache: true
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Version against the base branch
         env:
