@@ -61,7 +61,9 @@ export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "network
  * What saving the pick writes, policy by policy: Lock DNS has its policies while it applies to
  * something, and a change of what it applies to changes each of them.
  */
-export function lockDnsWrites(saved: LockDnsDraft, draft: LockDnsDraft): RuleWrite[] {
+export function lockDnsWrites(saved: LockDnsDraft, picked: LockDnsDraft): RuleWrite[] {
+  // Whole networks with none picked can't be saved, so it previews nothing changing, never a delete.
+  const draft = validateLockDnsDraft(picked) ? saved : picked;
   if (!appliesToAny(saved) && !appliesToAny(draft)) return [];
   return LOCK_DNS_PARTS.map((part) => {
     const name = lockDnsPolicyName(part);

@@ -356,6 +356,7 @@ describe("Lock DNS on the clients", () => {
     expect(lockDnsWrites(groups("kid"), groups("kid", "teen")).map((write) => write.detail)).toEqual(Array(4).fill("Applies to changed"));
     expect(lockDnsWrites(groups("kid"), networks("lan")).map((write) => write.verb)).toEqual(["CHANGE", "CHANGE", "CHANGE", "CHANGE"]);
     expect(lockDnsWrites(groups("kid"), groups()).map((write) => write.verb)).toEqual(["DELETE", "DELETE", "DELETE", "DELETE"]);
+    expect(lockDnsWrites(groups("kid"), networks()).map((write) => write.verb)).toEqual(["KEEP", "KEEP", "KEEP", "KEEP"]);
     expect(lockDnsWrites(groups(), networks("lan")).map((write) => write.name)).toEqual(LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part)));
   });
 
