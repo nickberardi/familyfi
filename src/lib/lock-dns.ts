@@ -37,7 +37,8 @@ export const LOCK_DNS_COPY = {
   },
   privateRelay: {
     title: "iCloud Private Relay",
-    note: "Experimental. Turning it off lets your website rules work in Safari too.",
+    badge: "Experimental",
+    note: "Turning it off lets your website rules work in Safari too.",
     label: "Turn off iCloud Private Relay",
     body: "iPhones it applies to will say Private Relay is off for this Wi-Fi. Everyone else keeps it.",
   },

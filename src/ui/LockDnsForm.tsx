@@ -70,7 +70,7 @@ export function LockDnsForm({
         {draft.scope === "group" ? <Text style={body}>{COPY.appliesTo.things}</Text> : null}
       </RuleAppliesTo>
 
-      <EditorSection title={COPY.privateRelay.title} note={COPY.privateRelay.note}>
+      <EditorSection title={COPY.privateRelay.title} badge={COPY.privateRelay.badge} note={COPY.privateRelay.note}>
         <View style={styles.toggleRow}>
           <View style={styles.grow}>
             <Text style={[body, styles.itemTitle, { color: ui.color("ink") }]}>{COPY.privateRelay.label}</Text>
