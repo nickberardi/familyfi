@@ -711,9 +711,9 @@ test("Block for a custom time, then offer it first next time", { tag: "@desktop"
   expect(tv, "The mock seed must include the TV things group").toBeTruthy();
   // As below: with the TV rules off, the page offers Block whatever the time of day.
   const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as {
-    rules: { id: string; enabled: boolean; groupIds: string[]; builtIn: string | null }[];
+    rules: { id: string; enabled: boolean; groupIds?: string[]; builtIn: string | null }[];
   };
-  const tvRules = rules.filter((rule) => !rule.builtIn && rule.enabled && rule.groupIds.includes(tv!.id));
+  const tvRules = rules.filter((rule) => !rule.builtIn && rule.enabled && rule.groupIds?.includes(tv!.id));
   const setEnabled = async (enabled: boolean) => {
     for (const rule of tvRules) {
       const response = await page.request.patch(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page), data: { enabled } });
@@ -758,8 +758,8 @@ test("Block names its scope and can be undone", { tag: "@desktop" }, async ({ pa
   // Unblock instead of Block, so turn the seeded TV rules off while this runs: the test must not
   // depend on the time of day.
   const rulesRes = await page.request.get("/api/v1/rules");
-  const { rules } = (await rulesRes.json()) as { rules: { id: string; enabled: boolean; groupIds: string[]; builtIn: string | null }[] };
-  const tvRules = rules.filter((rule) => !rule.builtIn && rule.enabled && rule.groupIds.includes(tv!.id));
+  const { rules } = (await rulesRes.json()) as { rules: { id: string; enabled: boolean; groupIds?: string[]; builtIn: string | null }[] };
+  const tvRules = rules.filter((rule) => !rule.builtIn && rule.enabled && rule.groupIds?.includes(tv!.id));
   const setEnabled = async (enabled: boolean) => {
     for (const rule of tvRules) {
       const response = await page.request.patch(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page), data: { enabled } });
@@ -955,10 +955,10 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const rulesRes = await page.request.get("/api/v1/rules");
   expect(rulesRes.ok()).toBeTruthy();
   const { rules } = (await rulesRes.json()) as {
-    rules: { id: string; kind: string; enabled: boolean; groupIds: string[]; targetIds: number[] }[];
+    rules: { id: string; kind: string; enabled: boolean; groupIds?: string[]; targetIds?: number[] }[];
   };
   for (const rule of rules) {
-    if (rule.kind === "category" && rule.enabled && rule.groupIds.includes(child!.id) && rule.targetIds.includes(4)) {
+    if (rule.kind === "category" && rule.enabled && rule.groupIds?.includes(child!.id) && rule.targetIds?.includes(4)) {
       const off = await page.request.post(`/api/v1/rules/${rule.id}/off`, { headers: await csrfHeaders(page) });
       expect(off.ok()).toBeTruthy();
     }
