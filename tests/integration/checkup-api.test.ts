@@ -94,12 +94,13 @@ describe("network checkup", () => {
     const state = await checkup(auth);
     expect(state.ranAt).not.toBeNull();
     expect(state.error).toBeNull();
-    expect(checks(state)).toEqual(["sonos_mixed", "private_addresses", "wifi_multicast", "sonos_mdns", "casting_mdns", "dns_override"]);
+    expect(checks(state)).toEqual(["private_addresses", "wifi_multicast", "sonos_mdns", "sonos_mixed", "casting_mdns", "dns_override"]);
     // Nothing is in a Things group yet, so no Wi-Fi carries smart-home devices.
     expect(state.passed).toEqual(["smart_home_wifi", "unmanaged_networks"]);
     const privates = state.findings.find((finding) => finding.check === "private_addresses")!;
     expect(privates.details.devices?.map((device) => device.name)).toEqual(["Galaxy S24", "Melinda's iPhone"]);
-    expect(await problems(auth)).toBe(4);
+    // Sonos wired and on Wi-Fi, DNS and casting are notes, which the badge never counts.
+    expect(await problems(auth)).toBe(3);
     // The checkup's reads are GETs; every write of the pass is a firewall policy.
     expect(client.calls.filter((call) => call.method !== "GET").every((call) => call.path.includes("/firewall/policies"))).toBe(true);
     expect(client.calls.some((call) => call.path.endsWith("/wifi/broadcasts"))).toBe(true);
@@ -122,7 +123,7 @@ describe("network checkup", () => {
     const response = await dismiss(auth, "private_addresses", true);
     expect(response.status).toBe(200);
     expect(((await response.json()) as { checkup: CheckupState }).checkup.findings.find((finding) => finding.id === "private_addresses")?.dismissed).toBe(true);
-    expect(await problems(auth)).toBe(3);
+    expect(await problems(auth)).toBe(2);
 
     await checkNow(auth);
     expect((await checkup(auth)).findings.find((finding) => finding.id === "private_addresses")?.dismissed).toBe(true);

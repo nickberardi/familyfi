@@ -170,7 +170,7 @@ describe("network checkup", () => {
     const state = { findings: [{ id: "dns_override:lan", check: "dns_override" as const, kind: "note" as const, details: { networks: [{ id: LAN, name: "LAN", dnsServers: ["192.0.2.53"] }] }, firstSeenAt: "", lastSeenAt: "", dismissed: false }] };
     const devices = [{ groupId: "g1", networkId: LAN }];
     const rule = { kind: "domain", scope: "group", groupIds: ["g1"], networkIds: [] };
-    expect(outsideDnsNote(rule, devices, state)).toContain("LAN, which hands out 192.0.2.53");
+    expect(outsideDnsNote(rule, devices, state)).toContain("LAN, which uses its own DNS server (192.0.2.53)");
     // Category and app rules match traffic, not lookups.
     for (const kind of ["internet", "category", "app"]) expect(outsideDnsNote({ ...rule, kind }, devices, state)).toBeNull();
     expect(outsideDnsNote({ ...rule, groupIds: ["g2"] }, devices, state)).toBeNull();
