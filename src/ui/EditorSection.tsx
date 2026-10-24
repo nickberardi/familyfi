@@ -16,7 +16,7 @@ export function EditorSection({ title, note, badge, children }: { title: string;
             {title}
           </Text>
           {badge ? (
-            <Text style={[styles.badge, { fontFamily: ui.font, backgroundColor: ui.color("paused"), color: ui.color("ink-on-fill") }]}>{badge}</Text>
+            <Text style={[styles.badge, { fontFamily: ui.font, backgroundColor: ui.color("accent-fill"), color: ui.color("accent-hover"), borderWidth: 1, borderColor: ui.color("accent-line") }]}>{badge}</Text>
           ) : null}
         </View>
         <Text style={[styles.note, { fontFamily: ui.font, color: ui.color("ink-2") }]}>{note}</Text>
