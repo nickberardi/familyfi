@@ -203,20 +203,20 @@ export async function saveBuiltInRule(
   networkScope: () => Promise<{ scope: NetworkScope; known?: Set<string> }> = householdNetworkScope,
 ): Promise<RuleWithWindows> {
   const countries = id === COUNTRIES_RULE_ID && patch.countries ? normalizeCountries(patch.countries) : undefined;
-  const existing = await prisma().rule.findUniqueOrThrow({ where: { id } });
-  const scope = patch.scope ?? (patch.networkIds && !patch.groupIds ? RuleScope.network : patch.groupIds && !patch.networkIds ? RuleScope.group : existing.scope);
-  let networkIds: string[] = [];
-  if (scope === RuleScope.network) {
-    networkIds = normalizeNetworkIds(patch.networkIds ?? (existing.scope === RuleScope.network ? existing.networkIds : []));
-    // Unchanged networks were valid when saved; only a new list is checked against the site.
-    if (patch.networkIds || existing.scope !== RuleScope.network) {
-      const { scope: managed, known } = await networkScope();
-      assertManagedNetworkIds(networkIds, managed, known);
-    }
+  const named = patch.scope ?? (patch.networkIds && !patch.groupIds ? RuleScope.network : patch.groupIds && !patch.networkIds ? RuleScope.group : undefined);
+  // A new list of networks is checked against the site before the lock, which the site can't be read under.
+  if (patch.networkIds && named === RuleScope.network) {
+    const { scope: managed, known } = await networkScope();
+    assertManagedNetworkIds(patch.networkIds, managed, known);
   }
   return prisma().$transaction(async (tx) => {
     await lockHousehold(tx);
+    // What the patch leaves out comes from the rule as it is now, so a concurrent edit of it stands.
     const rule = await tx.rule.findUniqueOrThrow({ where: { id }, include: { groups: true } });
+    const scope = named ?? rule.scope;
+    // Unchanged networks were valid when saved; switching to networks without naming any is refused.
+    const networkIds =
+      scope === RuleScope.network ? normalizeNetworkIds(patch.networkIds ?? (rule.scope === RuleScope.network ? rule.networkIds : [])) : [];
     const enabled = patch.enabled ?? rule.enabled;
     let groupIds: string[] = [];
     if (scope === RuleScope.group) {
