@@ -21,6 +21,7 @@ export function LockDnsForm({
   networks,
   draft,
   edit,
+  error = "",
   disabled = false,
 }: {
   rule: Pick<Rule, "scope" | "groupIds" | "networkIds">;
@@ -30,6 +31,8 @@ export function LockDnsForm({
   /** What it applies to now, saved or not. */
   draft: LockDnsDraft;
   edit: (next: (draft: LockDnsDraft) => LockDnsDraft) => void;
+  /** Why the last save was refused (`validateLockDnsDraft`), or empty. */
+  error?: string;
   disabled?: boolean;
 }) {
   const ui = useUI();
@@ -37,6 +40,11 @@ export function LockDnsForm({
   const writes = lockDnsWrites(fromLockDnsRule(rule), draft);
   return (
     <View style={styles.form}>
+      {error ? (
+        <Text role="alert" style={[body, styles.caution, { backgroundColor: ui.color("danger-fill"), color: ui.color("danger") }]} testID="lock-dns-error">
+          {error}
+        </Text>
+      ) : null}
       <EditorSection title={COPY.blocks.title} note={COPY.blocks.note}>
         <View role="list" style={styles.items}>
           {COPY.blocks.items.map((item) => (

@@ -34,6 +34,7 @@ export const LOCK_DNS_COPY = {
     title: "Applies to",
     note: "People and things, or whole networks. Category, app and website rules can’t be gotten around for these.",
     things: "Smart TVs and streaming sticks often insist on Google’s DNS and may stop working with it on.",
+    noNetwork: "Pick at least one network.",
   },
   writes: {
     title: "What FamilyFi will write",
@@ -68,6 +69,11 @@ export function lockDnsWrites(saved: LockDnsDraft, draft: LockDnsDraft): RuleWri
     if (!appliesToAny(draft)) return { verb: "DELETE", name, detail: "Applies to nothing" };
     return sameAppliesTo(saved, draft) ? { verb: "KEEP", name, detail: PART_DETAIL[part] } : { verb: "CHANGE", name, detail: "Applies to changed" };
   });
+}
+
+/** Why the pick cannot be saved, or null. Covering no group is allowed; whole networks need one. */
+export function validateLockDnsDraft(draft: LockDnsDraft): string | null {
+  return draft.scope === "network" && draft.networkIds.length === 0 ? LOCK_DNS_COPY.appliesTo.noNetwork : null;
 }
 
 /** Whether the pick differs from the saved rule. */

@@ -3,7 +3,7 @@ import { AssignmentState, GroupKind, RuleKind, RuleMode, RuleScope } from "@pris
 import { describe, expect, it, vi } from "vitest";
 import { ENCRYPTED_DNS_SERVICES, encryptedDnsAddresses, encryptedDnsHosts, encryptedDnsSummary } from "@/lib/encrypted-dns";
 import { groupHeaderActions, groupStatus } from "@/lib/group-actions";
-import { lockDnsDirty, lockDnsWrites } from "@/lib/lock-dns";
+import { lockDnsDirty, lockDnsWrites, validateLockDnsDraft } from "@/lib/lock-dns";
 import { rulePauseSheetBody } from "@/lib/pause-sheet";
 import { ruleGroupStateLines } from "@/lib/rule-actions";
 import { LOCK_DNS_PARTS, lockDnsPolicyName } from "@/lib/policy-names";
@@ -366,5 +366,8 @@ describe("Lock DNS on the clients", () => {
     // Networks picked and left behind on the other tab are not a change.
     expect(lockDnsDirty(saved, { ...saved, networkIds: ["lan"] })).toBe(false);
     expect(lockDnsDirty(saved, { ...saved, scope: "network", networkIds: ["lan"] })).toBe(true);
+    // No group is allowed; whole networks need at least one, as for any rule.
+    expect(validateLockDnsDraft({ ...saved, groupIds: [] })).toBeNull();
+    expect(validateLockDnsDraft({ ...saved, scope: "network" })).toBe("Pick at least one network.");
   });
 });

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fromLockDnsRule, LOCK_DNS_COPY as COPY, lockDnsDirty, saveLockDns, type LockDnsDraft } from "@/lib/lock-dns";
+import { fromLockDnsRule, LOCK_DNS_COPY as COPY, lockDnsDirty, saveLockDns, validateLockDnsDraft, type LockDnsDraft } from "@/lib/lock-dns";
 import { managedNetworks } from "@/lib/rule-editor";
 import type { Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
@@ -15,10 +15,16 @@ export function LockDnsPage({ rule }: { rule: Rule }) {
   const router = useRouter();
   const { groups, unifi, store, busy } = useAppData();
   const [draft, setDraft] = useState<LockDnsDraft>(() => fromLockDnsRule(rule));
+  const [error, setError] = useState("");
   const dirty = lockDnsDirty(rule, draft);
 
   async function save() {
     if (busy) return;
+    const problem = validateLockDnsDraft(draft);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     const result = await saveLockDns(store.mutate, rule, draft);
     if (result?.rule) router.push("/rules");
   }
@@ -39,7 +45,17 @@ export function LockDnsPage({ rule }: { rule: Rule }) {
           </Link>
           {dirty ? <span className="text-[14px] text-[var(--ff-paused)]">{COPY.unsaved}</span> : null}
         </div>
-        <LockDnsForm rule={rule} groups={groups} networks={managedNetworks(unifi)} draft={draft} edit={setDraft} />
+        <LockDnsForm
+          rule={rule}
+          groups={groups}
+          networks={managedNetworks(unifi)}
+          draft={draft}
+          error={error}
+          edit={(next) => {
+            setError("");
+            setDraft(next);
+          }}
+        />
       </form>
     </>
   );
