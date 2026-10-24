@@ -5,6 +5,7 @@ import {
   isPrivateMac,
   openProblemCount,
   outsideDnsNote,
+  PRIVATE_ADDRESS_COPY,
   protectionLine,
   protectionTitle,
   recommendedRules,
@@ -142,6 +143,8 @@ describe("network checkup", () => {
     const [finding] = found(run, "unmanaged_networks");
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).title).toBe("Guest isn’t managed by FamilyFi");
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).seen).toBe("3 devices on Guest get no rules or quarantine.");
+    // A Fixed iPhone address is still a private one, so only Off clears the finding.
+    expect(PRIVATE_ADDRESS_COPY.iphone.steps).toMatch(/Private Wi-Fi Address → Off\.$/);
     // Settings opens on Household; the managed networks are on the Gateway tab.
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).show?.href).toBe("/settings?tab=gateway");
   });
