@@ -1,5 +1,5 @@
 import { AssignmentState, type GroupKind, type RuleKind, type RuleMode, type RuleScope } from "@prisma/client";
-import { LOCK_DNS_PARTS, lockDnsPolicyName, rulePolicyNames, type LockDnsPart } from "@/lib/policy-names";
+import { lockDnsParts, lockDnsPolicyName, rulePolicyNames, type LockDnsPart } from "@/lib/policy-names";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { lockDnsTargets, type LockDnsExemptions, type LockDnsTargets } from "./lock-dns";
 import { networkInScope, type NetworkScope } from "./scope";
@@ -30,6 +30,8 @@ export type PlanRule = {
   domains: string[];
   /** Block countries' region codes: when set, the rule's policies block by region, not by its kind. */
   countries?: string[];
+  /** Lock DNS also turns off iCloud Private Relay, as one more policy (experimental). */
+  blockPrivateRelay?: boolean;
   enabled: boolean;
   /** A pause is active: the rule's policies stay, disabled, until it ends. */
   paused: boolean;
@@ -203,13 +205,19 @@ export function planRulePolicies(input: {
   return { policies, retainRuleIds, orphanRuleIds };
 }
 
-const LOCK_DNS_PART_LIST: Record<LockDnsPart, keyof LockDnsTargets | null> = { ports: null, addresses: "ipv4", "addresses-v6": "ipv6", names: "hosts" };
+const LOCK_DNS_PART_LIST: Record<LockDnsPart, keyof LockDnsTargets | null> = {
+  ports: null,
+  addresses: "ipv4",
+  "addresses-v6": "ipv6",
+  names: "hosts",
+  "private-relay": null,
+};
 
 function ruleWindows(rule: PlanRule, lockDnsBlocks: LockDnsTargets): { id: string; name: string; schedule?: UnifiFirewallSchedule }[] {
   // Lock DNS is always on, one policy per part, each keyed by the part where a window's id would be.
   // A part left with nothing to block, once the household's own DNS is out, has no policy.
   if (rule.id === LOCK_DNS_RULE_ID) {
-    return LOCK_DNS_PARTS.filter((part) => {
+    return lockDnsParts(Boolean(rule.blockPrivateRelay)).filter((part) => {
       const list = LOCK_DNS_PART_LIST[part];
       return list === null || lockDnsBlocks[list].length > 0;
     }).map((part) => ({ id: part, name: "" }));

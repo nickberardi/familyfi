@@ -50,6 +50,10 @@ export type Rule = {
   domains: string[];
   /** The Block countries rule's ISO 3166-1 alpha-2 codes; empty on every other rule. */
   countries: string[];
+  /** The Lock DNS rule also turns off iCloud Private Relay (experimental); false on every other rule. */
+  blockPrivateRelay: boolean;
+  /** The DNS Lock DNS left open at its last sync; empty on every other rule. */
+  openDns: LockDnsOpen[];
   enabled: boolean;
   /** A pause or allowance lifts the rule for every group it covers until `until`, or until ended. */
   pause: RulePause;
@@ -61,6 +65,19 @@ export type Rule = {
   policyNames: string[];
   /** Set on a rule FamilyFi provides, which cannot be deleted or renamed; null on the household's own. */
   builtIn: BuiltInRule | null;
+};
+
+/**
+ * One DNS server Lock DNS leaves open: a resolver set in FamilyFi (the household's, or a group's
+ * override) with the addresses its name looked up to, or a server a network hands out.
+ */
+export type LockDnsOpen = {
+  source: "household" | "group" | "network";
+  /** The group's or network's name; null for the household's resolver. */
+  name: string | null;
+  /** The resolver's host name; null for an address. */
+  host: string | null;
+  addresses: string[];
 };
 
 export const MAX_RULE_NAME = 60;

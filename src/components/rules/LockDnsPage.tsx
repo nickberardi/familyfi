@@ -3,7 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fromLockDnsRule, LOCK_DNS_COPY as COPY, lockDnsDirty, saveLockDns, validateLockDnsDraft, type LockDnsDraft } from "@/lib/lock-dns";
+import {
+  fromLockDnsRule,
+  LOCK_DNS_COPY as COPY,
+  lockDnsDirty,
+  lockDnsSummary,
+  saveLockDns,
+  validateLockDnsDraft,
+  type LockDnsDraft,
+} from "@/lib/lock-dns";
 import { managedNetworks } from "@/lib/rule-editor";
 import type { Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
@@ -31,7 +39,7 @@ export function LockDnsPage({ rule }: { rule: Rule }) {
 
   return (
     <>
-      <PageHeader title={COPY.title} sub={COPY.summary} onAction={() => void save()} actionLabel={COPY.save} />
+      <PageHeader title={COPY.title} sub={lockDnsSummary(rule)} onAction={() => void save()} actionLabel={COPY.save} />
       <form
         className="flex max-w-[760px] flex-col gap-4 p-4 md:p-6"
         onSubmit={(event) => {

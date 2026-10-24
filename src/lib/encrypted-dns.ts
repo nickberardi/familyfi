@@ -114,6 +114,12 @@ export function encryptedDnsHosts(): string[] {
   return [...new Set(ENCRYPTED_DNS_SERVICES.flatMap((service) => service.hosts))].sort();
 }
 
+/**
+ * The names iCloud Private Relay looks up first. Apple asks a network that can't allow Private
+ * Relay to answer these with no address; the iPhone then says it is off for that network.
+ */
+export const PRIVATE_RELAY_HOSTS = ["mask.icloud.com", "mask-h2.icloud.com"] as const;
+
 /** "Cloudflare, Google, Quad9, OpenDNS, NextDNS, AdGuard and 6 more". */
 export function encryptedDnsSummary(shown = 6): string {
   const names = ENCRYPTED_DNS_SERVICES.map((service) => service.name);

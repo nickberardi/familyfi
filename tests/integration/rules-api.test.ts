@@ -45,6 +45,8 @@ type PublicRule = {
   kind: string;
   groupIds: string[];
   domains: string[];
+  blockPrivateRelay: boolean;
+  openDns: { source: string; name: string | null; host: string | null; addresses: string[] }[];
   mode: string;
   enabled: boolean;
   pause: { active: boolean; until: string | null; kind: string; by: { name: string } | null };
@@ -1053,6 +1055,31 @@ describe("household rules", () => {
       expect(lockDnsPolicies().every((policy) => !policy.enabled && policyMacs(policy).join() === MAC)).toBe(true);
     });
 
+    it("turns off iCloud Private Relay with one more policy while its switch is on", async () => {
+      const auth = await signedIn();
+      await child();
+      await ruleAction(turnOnRule, auth, "dns", null);
+      const on = await ruleOf(await patch(auth, "dns", { blockPrivateRelay: true }));
+      expect(on.blockPrivateRelay).toBe(true);
+      expect(on.policyNames.at(-1)).toBe("FamilyFi Lock DNS Private Relay");
+      await runReconcileOnce();
+      const relay = lockDnsPolicies().find((policy) => policy.name === "FamilyFi Lock DNS Private Relay")!;
+      expect(relay.destination.trafficFilter).toEqual({ type: "DOMAIN", domainFilter: { type: "DOMAINS", domains: ["mask-h2.icloud.com", "mask.icloud.com"] } });
+      expect(policyMacs(relay).join()).toBe(MAC);
+      expect(lockDnsPolicies()).toHaveLength(5);
+
+      // Off again, only its own policy goes.
+      const others = lockDnsPolicies().filter((policy) => policy.id !== relay.id).map((policy) => policy.id).sort();
+      await patch(auth, "dns", { blockPrivateRelay: false });
+      await runReconcileOnce();
+      expect(lockDnsPolicies().map((policy) => policy.id).sort()).toEqual(others);
+
+      // Only Lock DNS has the switch.
+      const rule = await ruleOf(await postRule(auth, { name: "Videos", kind: "domain", groupIds: [(await prisma().group.findFirstOrThrow()).id], mode: "always", domains: ["example.com"] }));
+      expect(await errorCode(await patch(auth, rule.id, { blockPrivateRelay: true }))).toEqual([400, "invalid_request"]);
+      expect(await errorCode(await patch(auth, "countries", { blockPrivateRelay: true }))).toEqual([409, "rule_built_in"]);
+    });
+
     it("leaves the household's own DNS servers and resolvers alone", async () => {
       const auth = await signedIn();
       await child();
@@ -1075,10 +1102,22 @@ describe("household rules", () => {
         const names = JSON.stringify(policy("FamilyFi Lock DNS names").destination.trafficFilter);
         expect([names.includes('"dns.quad9.net"'), names.includes('"dns11.quad9.net"')]).toEqual([true, false]);
 
-        // Nothing changed, so the next pass writes nothing.
+        // Its page lists what it left open, by where each comes from.
+        const listed = (await (await listRules(request("/api/v1/rules", { auth }))).json()) as { rules: PublicRule[] };
+        expect(listed.rules.find((rule) => rule.id === "dns")!.openDns).toEqual([
+          ...client.state.networks
+            .filter((network) => network.enabled !== false && network.ipv4Configuration?.dhcpConfiguration?.mode === "SERVER")
+            .map((network) => ({ source: "network", name: network.name, host: null, addresses: ["1.0.0.3", "1.1.1.3"] })),
+          { source: "household", name: null, host: "dns11.quad9.net", addresses: ["149.112.112.11", "9.9.9.11"] },
+        ]);
+        expect(listed.rules.find((rule) => rule.id !== "dns")?.openDns ?? []).toEqual([]);
+
+        // Nothing changed, so the next pass writes nothing, to the gateway or to the rule.
+        const stored = (await prisma().rule.findUniqueOrThrow({ where: { id: "dns" } })).updatedAt;
         client.calls.length = 0;
         await runReconcileOnce();
         expect(client.calls.filter((call) => call.method !== "GET")).toEqual([]);
+        expect((await prisma().rule.findUniqueOrThrow({ where: { id: "dns" } })).updatedAt).toEqual(stored);
       } finally {
         setLockDnsResolverForTests(undefined);
       }

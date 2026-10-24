@@ -1045,8 +1045,8 @@ paths:
         applies to nothing, Lock DNS covers every family group and Block countries every group,
         unless the same request names its groups. Block countries also takes `countries`
         (ISO 3166-1 alpha-2 codes UniFi's region filter accepts, at least one; 400
-        `invalid_countries` otherwise). Any other field answers 409 `rule_built_in`. `countries`
-        on any other rule answers 400.
+        `invalid_countries` otherwise), and Lock DNS `blockPrivateRelay` (experimental). Any other
+        field answers 409 `rule_built_in`. `countries` or `blockPrivateRelay` on a rule that isn't built in answers 400.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -3791,7 +3791,7 @@ components:
     Rule:
       type: object
       additionalProperties: false
-      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, countries, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
+      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, countries, blockPrivateRelay, openDns, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 60 }
@@ -3822,6 +3822,20 @@ components:
           type: array
           items: { type: string, pattern: "^[A-Z]{2}$" }
           description: ISO 3166-1 alpha-2 codes the built-in Block countries rule blocks; empty on every other rule
+        blockPrivateRelay:
+          type: boolean
+          description: |
+            The built-in Lock DNS rule also turns off iCloud Private Relay for what it applies to
+            (experimental): one more policy, "FamilyFi Lock DNS Private Relay", blocks Apple's relay
+            names `mask.icloud.com` and `mask-h2.icloud.com`, so an iPhone says Private Relay is off
+            for the network. False on every other rule.
+        openDns:
+          type: array
+          items: { $ref: "#/components/schemas/LockDnsOpen" }
+          description: |
+            The DNS the built-in Lock DNS rule left open at its last sync, read-only: the resolvers
+            set in FamilyFi with the addresses their names looked up to, and the DNS servers its
+            networks hand out. Empty until it syncs while applying to something, and on every other rule.
         enabled: { type: boolean }
         pause: { $ref: "#/components/schemas/RulePause" }
         groupPauses:
@@ -3860,8 +3874,8 @@ components:
             stay reachable. It never blocks the internet, so a group's status, block and unblock leave it out.
             It is always on while `enabled` (`kind` is `domain`, `mode` `always`), starts off with
             no group, and covers every family group when switched on with none (unless the same
-            request names its groups). Only `enabled` and what it applies to (`scope`, `groupIds`,
-            `networkIds`, as for any rule) can change, and it cannot be deleted (409 `rule_built_in`);
+            request names its groups). Only `enabled`, what it applies to (`scope`, `groupIds`,
+            `networkIds`, as for any rule) and `blockPrivateRelay` can change, and it cannot be deleted (409 `rule_built_in`);
             it is paused and allowed, for everyone or one group, like any rule.
 
             `countries` (id `countries`, "Block countries") blocks the covered groups' devices, or
@@ -3876,6 +3890,22 @@ components:
             What UniFi's policy table shows for the rule in the Internal zone, one per
             policy: "FamilyFi " and the rule name, then " – " and the window name when it
             has more than one window. Another zone's policy adds " (<zone>)".
+    LockDnsOpen:
+      type: object
+      additionalProperties: false
+      required: [source, name, host, addresses]
+      description: One DNS server Lock DNS leaves open.
+      properties:
+        source:
+          type: string
+          enum: [household, group, network]
+          description: household = the household's resolver; group = a group's resolver override; network = a server a network hands out
+        name: { type: [string, "null"], description: "The group's or network's name; null for the household's resolver" }
+        host: { type: [string, "null"], description: "The resolver's host name; null for an address" }
+        addresses:
+          type: array
+          items: { type: string }
+          description: Its addresses, as last looked up; empty when its name could not be looked up yet
     RuleCreate:
       type: object
       additionalProperties: false
@@ -3953,6 +3983,9 @@ components:
           minItems: 1
           maxItems: 300
           description: The built-in Block countries rule only
+        blockPrivateRelay:
+          type: boolean
+          description: The built-in Lock DNS rule only; see `Rule.blockPrivateRelay`
         enabled: { type: boolean }
         mode: { type: string, enum: [always, scheduled] }
         windows:

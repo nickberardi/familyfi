@@ -1,3 +1,4 @@
+import { PRIVATE_RELAY_HOSTS } from "@/lib/encrypted-dns";
 import type { LockDnsPart } from "@/lib/policy-names";
 import { normalizeMac } from "../mac";
 import { lockDnsTargets, type LockDnsTargets } from "./lock-dns";
@@ -287,7 +288,8 @@ export const DNS_PORTS = [53, 853] as const;
  * `ports` blocks TCP and UDP 53 and 853 to the destination zone, the internet, so the gateway and
  * any DNS server on the home network still answer; `addresses` and `addresses-v6` block every port
  * to the encrypted DNS services' addresses, one IP version each; `names` blocks their host names,
- * which the gateway sees now that their lookups go through it.
+ * which the gateway sees now that their lookups go through it; `private-relay` blocks Apple's relay
+ * names, so an iPhone turns iCloud Private Relay off for the network (experimental).
  */
 export function lockDnsBlockPolicy(input: {
   name: string;
@@ -302,6 +304,8 @@ export function lockDnsBlockPolicy(input: {
 }): FirewallPolicyWrite {
   const targets = input.targets ?? lockDnsTargets();
   if (input.part === "names") return { ...domainBlockPolicy({ ...input, domains: targets.hosts }), description: LOCK_DNS_DESCRIPTION };
+  // Apple's relay names, whatever the household's own DNS: Private Relay is never a resolver it set.
+  if (input.part === "private-relay") return { ...domainBlockPolicy({ ...input, domains: [...PRIVATE_RELAY_HOSTS] }), description: LOCK_DNS_DESCRIPTION };
   const sourceFilter = deviceSourceFilter(input, "A Lock DNS policy");
   const common = {
     name: input.name,

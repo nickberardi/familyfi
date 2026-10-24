@@ -494,6 +494,10 @@ model Rule {
   domains          String[]     @default([])
   /// The built-in `countries` rule's ISO 3166-1 alpha-2 codes; empty on every other rule.
   countries        String[]     @default([])
+  /// The built-in `dns` rule also turns off iCloud Private Relay (experimental); false on every other rule.
+  blockPrivateRelay Boolean     @default(false)
+  /// The DNS the built-in `dns` rule left open at its last sync (`LockDnsOpen[]`); empty on every other rule.
+  openDns          Json         @default("[]")
   enabled          Boolean      @default(true)
   mode             RuleMode     @default(always)
   /// A pause or allowance lifts the rule for every group it covers until `pauseUntil`, or until ended.

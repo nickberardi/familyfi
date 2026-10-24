@@ -4,14 +4,13 @@
  */
 import { ENCRYPTED_DNS_SERVICES, encryptedDnsHosts, encryptedDnsSummary } from "./encrypted-dns";
 import type { HouseholdStore } from "./household-store";
-import { LOCK_DNS_PARTS, lockDnsPolicyName, type LockDnsPart } from "./policy-names";
+import { lockDnsParts, lockDnsPolicyName, type LockDnsPart } from "./policy-names";
 import { appliesToAny, appliesToBody, sameAppliesTo, type AppliesTo } from "./rule-editor";
 import type { RuleWrite } from "./rule-writes";
-import type { Rule } from "./rules";
+import type { LockDnsOpen, Rule } from "./rules";
 
 export const LOCK_DNS_COPY = {
   title: "Lock DNS",
-  summary: `Built in · always · ${LOCK_DNS_PARTS.length} UniFi policies`,
   back: "All rules",
   save: "Save",
   unsaved: "Unsaved changes",
@@ -36,6 +35,19 @@ export const LOCK_DNS_COPY = {
     things: "Smart TVs and streaming sticks often insist on Google’s DNS and may stop working with it on.",
     noNetwork: "Pick at least one network.",
   },
+  privateRelay: {
+    title: "iCloud Private Relay",
+    note: "Experimental. Turning it off lets your website rules work in Safari too.",
+    label: "Turn off iCloud Private Relay",
+    body: "iPhones it applies to will say Private Relay is off for this Wi-Fi. Everyone else keeps it.",
+  },
+  open: {
+    title: "Left open",
+    note: "Lock DNS never blocks your own DNS. These stay reachable for everything it applies to.",
+    household: "Household resolver",
+    none: "None. FamilyFi updates this list each time it syncs.",
+    notLookedUp: "Not looked up yet",
+  },
   writes: {
     title: "What FamilyFi will write",
     note: "Applied on the next reconcile. Your own UniFi policies are never touched.",
@@ -48,13 +60,25 @@ const PART_DETAIL: Record<LockDnsPart, string> = {
   addresses: `Blocks ${ENCRYPTED_DNS_SERVICES.length} encrypted DNS services by IPv4 address`,
   "addresses-v6": `Blocks ${ENCRYPTED_DNS_SERVICES.length} encrypted DNS services by IPv6 address`,
   names: `Blocks ${encryptedDnsHosts().length} encrypted DNS host names`,
+  "private-relay": "Turns off iCloud Private Relay",
 };
 
-/** What Lock DNS applies to, saved or being picked. */
-export type LockDnsDraft = AppliesTo;
+/** "Built in · always · 4 UniFi policies", counting Private Relay's while it is on. */
+export function lockDnsSummary(rule: Pick<Rule, "blockPrivateRelay">): string {
+  return `Built in · always · ${lockDnsParts(rule.blockPrivateRelay).length} UniFi policies`;
+}
 
-export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "networkIds">): LockDnsDraft {
-  return { scope: rule.scope, groupIds: [...rule.groupIds], networkIds: [...rule.networkIds] };
+/** Who an entry of the "Left open" list belongs to: "Household resolver", "Emma’s resolver", "Handed out by IoT". */
+export function lockDnsOpenLabel(entry: Pick<LockDnsOpen, "source" | "name">): string {
+  if (entry.source === "household") return LOCK_DNS_COPY.open.household;
+  return entry.source === "group" ? `${entry.name}’s resolver` : `Handed out by ${entry.name}`;
+}
+
+/** What Lock DNS applies to, and whether it turns off iCloud Private Relay, saved or being picked. */
+export type LockDnsDraft = AppliesTo & { blockPrivateRelay: boolean };
+
+export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay">): LockDnsDraft {
+  return { scope: rule.scope, groupIds: [...rule.groupIds], networkIds: [...rule.networkIds], blockPrivateRelay: rule.blockPrivateRelay };
 }
 
 /**
@@ -64,12 +88,12 @@ export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "network
 export function lockDnsWrites(saved: LockDnsDraft, picked: LockDnsDraft): RuleWrite[] {
   // Whole networks with none picked can't be saved, so it previews nothing changing, never a delete.
   const draft = validateLockDnsDraft(picked) ? saved : picked;
-  if (!appliesToAny(saved) && !appliesToAny(draft)) return [];
-  return LOCK_DNS_PARTS.map((part) => {
+  const has = (state: LockDnsDraft, part: LockDnsPart) => appliesToAny(state) && (part !== "private-relay" || state.blockPrivateRelay);
+  return lockDnsParts(saved.blockPrivateRelay || draft.blockPrivateRelay).flatMap((part): RuleWrite[] => {
     const name = lockDnsPolicyName(part);
-    if (!appliesToAny(saved)) return { verb: "NEW", name, detail: PART_DETAIL[part] };
-    if (!appliesToAny(draft)) return { verb: "DELETE", name, detail: "Applies to nothing" };
-    return sameAppliesTo(saved, draft) ? { verb: "KEEP", name, detail: PART_DETAIL[part] } : { verb: "CHANGE", name, detail: "Applies to changed" };
+    if (!has(saved, part)) return has(draft, part) ? [{ verb: "NEW", name, detail: PART_DETAIL[part] }] : [];
+    if (!has(draft, part)) return [{ verb: "DELETE", name, detail: appliesToAny(draft) ? "Private Relay left alone" : "Applies to nothing" }];
+    return sameAppliesTo(saved, draft) ? [{ verb: "KEEP", name, detail: PART_DETAIL[part] }] : [{ verb: "CHANGE", name, detail: "Applies to changed" }];
   });
 }
 
@@ -79,13 +103,16 @@ export function validateLockDnsDraft(draft: LockDnsDraft): string | null {
 }
 
 /** Whether the pick differs from the saved rule. */
-export function lockDnsDirty(rule: Pick<Rule, "scope" | "groupIds" | "networkIds">, draft: LockDnsDraft): boolean {
-  return !sameAppliesTo(fromLockDnsRule(rule), draft);
+export function lockDnsDirty(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay">, draft: LockDnsDraft): boolean {
+  return !sameAppliesTo(fromLockDnsRule(rule), draft) || rule.blockPrivateRelay !== draft.blockPrivateRelay;
 }
 
-/** Saves what Lock DNS applies to; resolves to the store's payload, or undefined when it failed. */
+/** Saves what Lock DNS applies to and its Private Relay switch; resolves to the store's payload, or undefined when it failed. */
 export function saveLockDns(mutate: HouseholdStore["mutate"], rule: Pick<Rule, "id">, draft: LockDnsDraft) {
-  return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${rule.id}`, { method: "PATCH", body: appliesToBody(draft) }), {
+  return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${rule.id}`, {
+      method: "PATCH",
+      body: { ...appliesToBody(draft), blockPrivateRelay: draft.blockPrivateRelay },
+    }), {
     feedback: { notice: "Lock DNS saved. FamilyFi writes it to the gateway next." },
   });
 }

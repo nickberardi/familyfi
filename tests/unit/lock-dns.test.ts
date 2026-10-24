@@ -3,14 +3,14 @@ import { AssignmentState, GroupKind, RuleKind, RuleMode, RuleScope } from "@pris
 import { describe, expect, it, vi } from "vitest";
 import { ENCRYPTED_DNS_SERVICES, encryptedDnsAddresses, encryptedDnsHosts, encryptedDnsSummary } from "@/lib/encrypted-dns";
 import { groupHeaderActions, groupStatus } from "@/lib/group-actions";
-import { lockDnsDirty, lockDnsWrites, validateLockDnsDraft } from "@/lib/lock-dns";
+import { lockDnsDirty, lockDnsOpenLabel, lockDnsSummary, lockDnsWrites, validateLockDnsDraft } from "@/lib/lock-dns";
 import { rulePauseSheetBody } from "@/lib/pause-sheet";
 import { ruleGroupStateLines } from "@/lib/rule-actions";
-import { LOCK_DNS_PARTS, lockDnsPolicyName } from "@/lib/policy-names";
+import { lockDnsParts, lockDnsPolicyName } from "@/lib/policy-names";
 import { ruleMarkSpec, rulesListView } from "@/lib/rule-list";
 import { groupScopedRules, LOCK_DNS_RULE_ID, normalizeDomain, ruleBlocksLabel, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
-import { lockDnsExemptions, setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
+import { lockDnsExemptions, lockDnsExemptionsOf, lockDnsOpenDns, setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
 import { planRulePolicies, rulePolicyWrite, type PlanRule } from "@/server/unifi/plan-rules";
 
 const dnsLookup = vi.hoisted(() => vi.fn());
@@ -53,7 +53,7 @@ describe("Lock DNS policies", () => {
   it("plans one always-on policy per part in each zone, named for the part and zone", () => {
     const policies = plan(planRule(), [device("02:00:00:00:00:01", "kid"), device("02:00:00:00:00:02", "teen", "zone-2")]);
     expect(policies.map((policy) => policy.name).sort()).toEqual(
-      [...LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part)), ...LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part, "IoT"))].sort(),
+      [...lockDnsParts(false).map((part) => lockDnsPolicyName(part)), ...lockDnsParts(false).map((part) => lockDnsPolicyName(part, "IoT"))].sort(),
     );
     expect(policies.map((policy) => policy.key)).toContain(`rule:${LOCK_DNS_RULE_ID}:addresses-v6|zone-2`);
     expect(policies.every((policy) => policy.enabled && !policy.schedule)).toBe(true);
@@ -90,6 +90,23 @@ describe("Lock DNS policies", () => {
     const v6Items = (v6.destination.trafficFilter as { ipAddressFilter: { items: { value: string }[] } }).ipAddressFilter.items;
     expect(v6Items.every((item) => isIP(item.value.split("/")[0]!) === 6)).toBe(true);
     expect(write("names").destination.trafficFilter).toEqual({ type: "DOMAIN", domainFilter: { type: "DOMAINS", domains: encryptedDnsHosts() } });
+  });
+
+  it("turns off iCloud Private Relay as one more policy while its switch is on (experimental)", () => {
+    expect(plan(planRule()).map((policy) => policy.lockDns)).not.toContain("private-relay");
+    const relay = planRulePolicies({
+      destinationZoneId: "ext",
+      zoneNames: { "zone-1": "Internal" },
+      groups: [{ id: "kid", kind: GroupKind.family }],
+      devices: [device("02:00:00:00:00:01", "kid")],
+      rules: [planRule({ groupIds: ["kid"], blockPrivateRelay: true })],
+      // A resolver of the household's own never opens Apple's relay names.
+      lockDnsExemptions: { addresses: [], hosts: ["mask.icloud.com"] },
+    }).policies.find((policy) => policy.lockDns === "private-relay")!;
+    expect(relay.name).toBe("FamilyFi Lock DNS Private Relay");
+    const write = rulePolicyWrite(relay);
+    expect(write.source.trafficFilter).toEqual({ type: "MAC_ADDRESS", macAddressFilter: { macAddresses: ["02:00:00:00:00:01"] } });
+    expect(write.destination.trafficFilter).toEqual({ type: "DOMAIN", domainFilter: { type: "DOMAINS", domains: ["mask-h2.icloud.com", "mask.icloud.com"] } });
   });
 
   it("leaves a group it is allowed for out, and keeps its policies disabled while paused or off", () => {
@@ -165,6 +182,39 @@ describe("Lock DNS leaves the household's own DNS alone", () => {
         addresses: ["1.0.0.3", "1.1.1.3", "2606:4700:4700::1113", "2620:fe::11", "9.9.9.11"].sort(),
         hosts: ["family.cloudflare-dns.com", "missing.example"],
       });
+    } finally {
+      setLockDnsResolverForTests(undefined);
+    }
+  });
+});
+
+describe("the DNS Lock DNS leaves open", () => {
+  it("names each server by where it comes from, for its page", async () => {
+    setLockDnsResolverForTests(async (host) => {
+      if (host === "dns.nextdns.io") return ["45.90.30.0", "45.90.28.0"];
+      throw new Error("no such host");
+    });
+    try {
+      const network = (name: string, servers: string[]) => ({
+        name,
+        enabled: true,
+        ipv4Configuration: { hostIpAddress: "192.168.1.1", prefixLength: 24, dhcpConfiguration: { mode: "SERVER", dnsServerIpAddressesOverride: servers } },
+      });
+      const open = await lockDnsOpenDns({
+        networks: [network("IoT", ["9.9.9.9", "192.168.1.53"]), network("LAN", ["192.168.1.53"])],
+        resolvers: [
+          { source: "household", name: null, url: "https://dns.nextdns.io/abc123" },
+          { source: "group", name: "Emma", url: "https://missing.example/dns-query" },
+          { source: "group", name: "Abby", url: null },
+        ],
+      });
+      // A server on the household's own network needs nothing, so LAN has no entry.
+      expect(open).toEqual([
+        { source: "network", name: "IoT", host: null, addresses: ["9.9.9.9"] },
+        { source: "household", name: null, host: "dns.nextdns.io", addresses: ["45.90.28.0", "45.90.30.0"] },
+        { source: "group", name: "Emma", host: "missing.example", addresses: [] },
+      ]);
+      expect(lockDnsExemptionsOf(open!)).toEqual({ addresses: ["45.90.28.0", "45.90.30.0", "9.9.9.9"], hosts: ["dns.nextdns.io", "missing.example"] });
     } finally {
       setLockDnsResolverForTests(undefined);
     }
@@ -306,6 +356,8 @@ const lockDns: Rule = {
   targetIds: [],
   domains: encryptedDnsHosts(),
   countries: [],
+  blockPrivateRelay: false,
+  openDns: [],
   enabled: true,
   pause: { active: false, until: null, kind: "pause", by: null },
   groupPauses: [],
@@ -348,8 +400,8 @@ describe("Lock DNS on the clients", () => {
   });
 
   it("shows what saving what it applies to writes", () => {
-    const groups = (...groupIds: string[]) => ({ scope: "group" as const, groupIds, networkIds: [] });
-    const networks = (...networkIds: string[]) => ({ scope: "network" as const, groupIds: [], networkIds });
+    const groups = (...groupIds: string[]) => ({ scope: "group" as const, groupIds, networkIds: [], blockPrivateRelay: false });
+    const networks = (...networkIds: string[]) => ({ scope: "network" as const, groupIds: [], networkIds, blockPrivateRelay: false });
     expect(lockDnsWrites(groups(), groups())).toEqual([]);
     expect(lockDnsWrites(groups(), groups("kid")).map((write) => write.verb)).toEqual(["NEW", "NEW", "NEW", "NEW"]);
     expect(lockDnsWrites(groups("kid"), groups("kid")).map((write) => write.verb)).toEqual(["KEEP", "KEEP", "KEEP", "KEEP"]);
@@ -357,11 +409,31 @@ describe("Lock DNS on the clients", () => {
     expect(lockDnsWrites(groups("kid"), networks("lan")).map((write) => write.verb)).toEqual(["CHANGE", "CHANGE", "CHANGE", "CHANGE"]);
     expect(lockDnsWrites(groups("kid"), groups()).map((write) => write.verb)).toEqual(["DELETE", "DELETE", "DELETE", "DELETE"]);
     expect(lockDnsWrites(groups("kid"), networks()).map((write) => write.verb)).toEqual(["KEEP", "KEEP", "KEEP", "KEEP"]);
-    expect(lockDnsWrites(groups(), networks("lan")).map((write) => write.name)).toEqual(LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part)));
+    expect(lockDnsWrites(groups(), networks("lan")).map((write) => write.name)).toEqual(lockDnsParts(false).map((part) => lockDnsPolicyName(part)));
+  });
+
+  it("shows Private Relay's policy coming and going with its switch", () => {
+    const kid = { scope: "group" as const, groupIds: ["kid"], networkIds: [], blockPrivateRelay: false };
+    const relay = { ...kid, blockPrivateRelay: true };
+    const writes = (saved: typeof kid, draft: typeof kid) => lockDnsWrites(saved, draft).map((write) => `${write.verb} ${write.name}`);
+    expect(writes(kid, relay)).toEqual([...lockDnsParts(false).map((part) => `KEEP ${lockDnsPolicyName(part)}`), "NEW FamilyFi Lock DNS Private Relay"]);
+    expect(writes(relay, kid).at(-1)).toBe("DELETE FamilyFi Lock DNS Private Relay");
+    expect(writes(relay, { ...relay, groupIds: ["kid", "teen"] }).at(-1)).toBe("CHANGE FamilyFi Lock DNS Private Relay");
+    // Switched on while it applies to nothing, it writes nothing.
+    expect(writes({ ...kid, groupIds: [] }, { ...relay, groupIds: [] })).toEqual([]);
+    expect(lockDnsDirty(kid, relay)).toBe(true);
+    expect(lockDnsSummary(kid)).toBe("Built in · always · 4 UniFi policies");
+    expect(lockDnsSummary(relay)).toBe("Built in · always · 5 UniFi policies");
+  });
+
+  it("names who each DNS it leaves open belongs to", () => {
+    expect(lockDnsOpenLabel({ source: "household", name: null })).toBe("Household resolver");
+    expect(lockDnsOpenLabel({ source: "group", name: "Emma" })).toBe("Emma’s resolver");
+    expect(lockDnsOpenLabel({ source: "network", name: "IoT" })).toBe("Handed out by IoT");
   });
 
   it("knows when what it applies to differs from the saved rule", () => {
-    const saved = { scope: "group" as const, groupIds: ["kid", "teen"], networkIds: [] };
+    const saved = { scope: "group" as const, groupIds: ["kid", "teen"], networkIds: [], blockPrivateRelay: false };
     expect(lockDnsDirty(saved, { ...saved, groupIds: ["teen", "kid"] })).toBe(false);
     expect(lockDnsDirty(saved, { ...saved, groupIds: ["teen"] })).toBe(true);
     // Networks picked and left behind on the other tab are not a change.

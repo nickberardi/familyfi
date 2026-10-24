@@ -85,10 +85,16 @@ const Config = z
         probeTimeoutMs: z.number().int().positive(),
       }),
       autoUpdate: z.object({ enabled: z.boolean(), days: Days, time: Hhmm }),
-      /** The built-in Lock DNS rule: its switch and what it applies to. An export from before it comes in off. */
+      /** The built-in Lock DNS rule: its switch, what it applies to and its Private Relay switch. An export from before it comes in off. */
       lockDns: z
-        .object({ enabled: z.boolean(), scope: z.enum(RuleScope).default(RuleScope.group), groupIds: z.array(Id), networkIds: z.array(z.string()).default([]) })
-        .default({ enabled: false, scope: RuleScope.group, groupIds: [], networkIds: [] }),
+        .object({
+          enabled: z.boolean(),
+          scope: z.enum(RuleScope).default(RuleScope.group),
+          groupIds: z.array(Id),
+          networkIds: z.array(z.string()).default([]),
+          blockPrivateRelay: z.boolean().default(false),
+        })
+        .default({ enabled: false, scope: RuleScope.group, groupIds: [], networkIds: [], blockPrivateRelay: false }),
     }),
     groups: z.array(
       z.object({
@@ -257,6 +263,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
         scope: lockDns?.scope ?? RuleScope.group,
         groupIds: (lockDns?.groups ?? []).map((link) => link.groupId).sort(),
         networkIds: [...(lockDns?.networkIds ?? [])].sort(),
+        blockPrivateRelay: lockDns?.blockPrivateRelay ?? false,
       },
     },
     groups: groups.map((group) => ({
@@ -684,13 +691,25 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           enabled: lockDns.enabled,
           scope: lockDns.scope,
           networkIds: lockDns.networkIds,
+          blockPrivateRelay: lockDns.blockPrivateRelay,
+          // What it leaves open is the imported household's, worked out at the next sync.
+          openDns: [],
           pauseActive: false,
           pauseUntil: null,
           pauseKind: RuleLiftKind.pause,
           pausedByAccountId: null,
           pausedByName: null,
         },
-        create: { id: LOCK_DNS_RULE_ID, name: "Lock DNS", kind: RuleKind.domain, mode: RuleMode.always, enabled: lockDns.enabled, scope: lockDns.scope, networkIds: lockDns.networkIds },
+        create: {
+          id: LOCK_DNS_RULE_ID,
+          name: "Lock DNS",
+          kind: RuleKind.domain,
+          mode: RuleMode.always,
+          enabled: lockDns.enabled,
+          scope: lockDns.scope,
+          networkIds: lockDns.networkIds,
+          blockPrivateRelay: lockDns.blockPrivateRelay,
+        },
       });
       const lockDnsGroups = lockDns.scope === RuleScope.group ? lockDns.groupIds : [];
       await tx.ruleGroup.createMany({ data: lockDnsGroups.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })) });

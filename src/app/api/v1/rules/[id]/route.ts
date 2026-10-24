@@ -51,8 +51,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
     }
     const builtIn = builtInRule(existing);
     if (builtIn === "dns" || builtIn === "countries") {
-      // Its switch and what it applies to change, and Block countries' countries; its name, kind and schedule are FamilyFi's.
-      const allowed = ["enabled", "scope", "groupIds", "networkIds", ...(builtIn === "countries" ? ["countries"] : [])];
+      // Its switch and what it applies to change, Block countries' countries and Lock DNS's Private Relay switch;
+      // its name, kind and schedule are FamilyFi's.
+      const allowed = ["enabled", "scope", "groupIds", "networkIds", ...(builtIn === "countries" ? ["countries"] : ["blockPrivateRelay"])];
       if (keys.length === 0 || keys.some((key) => !allowed.includes(key))) return builtInRefusal(builtIn);
       try {
         const rule = await saveBuiltInRule(builtIn, patch);
@@ -64,6 +65,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       }
     }
     if (patch.countries !== undefined) return jsonError(400, "invalid_request", "Only Block countries has countries.");
+    if (patch.blockPrivateRelay !== undefined) return jsonError(400, "invalid_request", "Only Lock DNS turns off iCloud Private Relay.");
     if (patch.scope !== undefined && patch.scope !== existing.scope) {
       return jsonError(400, "invalid_request", "A rule's scope can't change. Make a new rule to cover something else.");
     }

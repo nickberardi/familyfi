@@ -35,6 +35,8 @@ function rule(overrides: Partial<Rule>): Rule {
     targetIds: [],
     domains: [],
     countries: [],
+    blockPrivateRelay: false,
+    openDns: [],
     enabled: true,
     pause: { active: false, until: null, kind: "pause", by: null },
     groupPauses: [],

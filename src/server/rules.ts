@@ -1,7 +1,7 @@
 import { GroupKind, Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { z } from "zod";
 import { encryptedDnsHosts } from "@/lib/encrypted-dns";
-import { LOCK_DNS_PARTS, lockDnsPolicyName, rulePolicyNames } from "@/lib/policy-names";
+import { lockDnsParts, lockDnsPolicyName, rulePolicyNames } from "@/lib/policy-names";
 import { isCountryCode, RECOMMENDED_BLOCKED_COUNTRIES } from "@/lib/countries";
 import {
   alwaysWindow,
@@ -14,6 +14,7 @@ import {
   normalizeDomain,
   QUARANTINE_RULE_ID,
   type BuiltInRule,
+  type LockDnsOpen,
 } from "@/lib/rules";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
@@ -69,6 +70,8 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     targetIds: [...rule.targetIds],
     domains: builtIn === "dns" ? encryptedDnsHosts() : [...rule.domains],
     countries: [...rule.countries],
+    blockPrivateRelay: rule.blockPrivateRelay,
+    openDns: builtIn === "dns" ? (rule.openDns as LockDnsOpen[]) : [],
     enabled: quarantine ? quarantineEnforced : rule.enabled,
     pause: publicPause(rule),
     groupPauses: rule.groups
@@ -88,7 +91,7 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     policyNames: quarantine
       ? [quarantinePolicyName("Internal")]
       : builtIn === "dns"
-        ? LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part))
+        ? lockDnsParts(rule.blockPrivateRelay).map((part) => lockDnsPolicyName(part))
         : rulePolicyNames({ ...rule, windows }),
     builtIn,
   };
@@ -186,6 +189,8 @@ export type BuiltInRulePatch = {
   groupIds?: string[];
   networkIds?: string[];
   countries?: string[];
+  /** Lock DNS only: also turn off iCloud Private Relay (experimental). */
+  blockPrivateRelay?: boolean;
 };
 
 /**
@@ -238,6 +243,7 @@ export async function saveBuiltInRule(
         scope,
         networkIds,
         ...(countries ? { countries } : {}),
+        ...(id === LOCK_DNS_RULE_ID && patch.blockPrivateRelay !== undefined ? { blockPrivateRelay: patch.blockPrivateRelay } : {}),
         ...(enabled ? {} : { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null }),
       },
     });
@@ -324,7 +330,7 @@ export const RuleCreateBody = z
   .strict();
 
 export const RuleUpdateBody = z
-  .object({ ...Fields, countries: z.array(z.string()).max(300) })
+  .object({ ...Fields, countries: z.array(z.string()).max(300), blockPrivateRelay: z.boolean() })
   // `scope` changes only on Lock DNS and Block countries; any other rule keeps the one it was made with.
   .omit({ kind: true })
   .partial()
