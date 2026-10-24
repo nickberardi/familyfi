@@ -101,14 +101,14 @@ export function builtInRefusal(which: BuiltInRule = "quarantine"): Response {
     409,
     "rule_built_in",
     which === "countries"
-      ? "Block countries is built in: its countries and groups can change, and it can be switched, paused and allowed, but it can't be renamed, rescheduled or deleted."
+      ? "Block countries is built in: its countries and what it applies to can change, and it can be switched, paused and allowed, but it can't be renamed, rescheduled or deleted."
       : "Quarantine is built in: it can be paused, extended and resumed, but not edited, deleted or allowed.",
   );
 }
 
-/** What editing Lock DNS beyond its groups, or deleting it, answers. */
+/** What editing Lock DNS beyond what it applies to, or deleting it, answers. */
 export function lockDnsRefusal(): Response {
-  return jsonError(409, "rule_built_in", "Lock DNS is built in: it can be switched, paused and allowed, and the groups it covers changed, but nothing else edited, and it cannot be deleted.");
+  return jsonError(409, "rule_built_in", "Lock DNS is built in: it can be switched, paused and allowed, and what it applies to changed, but nothing else edited, and it cannot be deleted.");
 }
 
 /**

@@ -1,10 +1,11 @@
 /**
- * The built-in Lock DNS rule's page, shared by every client: what it blocks, the groups it covers,
- * and what saving them writes to UniFi.
+ * The built-in Lock DNS rule's page, shared by every client: what it blocks, what it applies to
+ * (people and things, or whole networks, as any rule), and what saving that writes to UniFi.
  */
 import { ENCRYPTED_DNS_SERVICES, encryptedDnsHosts, encryptedDnsSummary } from "./encrypted-dns";
 import type { HouseholdStore } from "./household-store";
 import { LOCK_DNS_PARTS, lockDnsPolicyName, type LockDnsPart } from "./policy-names";
+import { appliesToAny, appliesToBody, sameAppliesTo, type AppliesTo } from "./rule-editor";
 import type { RuleWrite } from "./rule-writes";
 import type { Rule } from "./rules";
 
@@ -31,14 +32,13 @@ export const LOCK_DNS_COPY = {
   },
   appliesTo: {
     title: "Applies to",
-    note: "People and things. Category, app and website rules can’t be gotten around for these.",
-    label: "Groups",
+    note: "People and things, or whole networks. Category, app and website rules can’t be gotten around for these.",
     things: "Smart TVs and streaming sticks often insist on Google’s DNS and may stop working with it on.",
   },
   writes: {
     title: "What FamilyFi will write",
     note: "Applied on the next reconcile. Your own UniFi policies are never touched.",
-    none: "Nothing until it covers a group.",
+    none: "Nothing until it applies to something.",
   },
 } as const;
 
@@ -49,35 +49,35 @@ const PART_DETAIL: Record<LockDnsPart, string> = {
   names: `Blocks ${encryptedDnsHosts().length} encrypted DNS host names`,
 };
 
-const sameGroups = (a: readonly string[], b: readonly string[]) => [...a].sort().join() === [...b].sort().join();
+/** What Lock DNS applies to, saved or being picked. */
+export type LockDnsDraft = AppliesTo;
+
+export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "networkIds">): LockDnsDraft {
+  return { scope: rule.scope, groupIds: [...rule.groupIds], networkIds: [...rule.networkIds] };
+}
 
 /**
- * What saving the groups writes, policy by policy: Lock DNS has its policies while it covers a
- * group, and a change of groups changes each of them.
+ * What saving the pick writes, policy by policy: Lock DNS has its policies while it applies to
+ * something, and a change of what it applies to changes each of them.
  */
-export function lockDnsWrites(savedGroupIds: readonly string[], groupIds: readonly string[]): RuleWrite[] {
-  if (savedGroupIds.length === 0 && groupIds.length === 0) return [];
+export function lockDnsWrites(saved: LockDnsDraft, draft: LockDnsDraft): RuleWrite[] {
+  if (!appliesToAny(saved) && !appliesToAny(draft)) return [];
   return LOCK_DNS_PARTS.map((part) => {
     const name = lockDnsPolicyName(part);
-    if (savedGroupIds.length === 0) return { verb: "NEW", name, detail: PART_DETAIL[part] };
-    if (groupIds.length === 0) return { verb: "DELETE", name, detail: "No group left to cover" };
-    return sameGroups(savedGroupIds, groupIds) ? { verb: "KEEP", name, detail: PART_DETAIL[part] } : { verb: "CHANGE", name, detail: "Groups changed" };
+    if (!appliesToAny(saved)) return { verb: "NEW", name, detail: PART_DETAIL[part] };
+    if (!appliesToAny(draft)) return { verb: "DELETE", name, detail: "Applies to nothing" };
+    return sameAppliesTo(saved, draft) ? { verb: "KEEP", name, detail: PART_DETAIL[part] } : { verb: "CHANGE", name, detail: "Applies to changed" };
   });
 }
 
-/** Whether the picked groups differ from the saved ones. */
-export function lockDnsDirty(rule: Pick<Rule, "groupIds">, groupIds: readonly string[]): boolean {
-  return !sameGroups(rule.groupIds, groupIds);
+/** Whether the pick differs from the saved rule. */
+export function lockDnsDirty(rule: Pick<Rule, "scope" | "groupIds" | "networkIds">, draft: LockDnsDraft): boolean {
+  return !sameAppliesTo(fromLockDnsRule(rule), draft);
 }
 
-/** Picks a group, or lets it go. */
-export function toggleLockDnsGroup(groupIds: readonly string[], groupId: string): string[] {
-  return groupIds.includes(groupId) ? groupIds.filter((id) => id !== groupId) : [...groupIds, groupId];
-}
-
-/** Saves the groups Lock DNS covers; resolves to the store's payload, or undefined when it failed. */
-export function saveLockDnsGroups(mutate: HouseholdStore["mutate"], rule: Pick<Rule, "id">, groupIds: string[]) {
-  return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${rule.id}`, { method: "PATCH", body: { groupIds } }), {
+/** Saves what Lock DNS applies to; resolves to the store's payload, or undefined when it failed. */
+export function saveLockDns(mutate: HouseholdStore["mutate"], rule: Pick<Rule, "id">, draft: LockDnsDraft) {
+  return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${rule.id}`, { method: "PATCH", body: appliesToBody(draft) }), {
     feedback: { notice: "Lock DNS saved. FamilyFi writes it to the gateway next." },
   });
 }

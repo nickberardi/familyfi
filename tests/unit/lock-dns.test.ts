@@ -3,7 +3,7 @@ import { AssignmentState, GroupKind, RuleKind, RuleMode, RuleScope } from "@pris
 import { describe, expect, it, vi } from "vitest";
 import { ENCRYPTED_DNS_SERVICES, encryptedDnsAddresses, encryptedDnsHosts, encryptedDnsSummary } from "@/lib/encrypted-dns";
 import { groupHeaderActions, groupStatus } from "@/lib/group-actions";
-import { lockDnsDirty, lockDnsWrites, toggleLockDnsGroup } from "@/lib/lock-dns";
+import { lockDnsDirty, lockDnsWrites } from "@/lib/lock-dns";
 import { rulePauseSheetBody } from "@/lib/pause-sheet";
 import { ruleGroupStateLines } from "@/lib/rule-actions";
 import { LOCK_DNS_PARTS, lockDnsPolicyName } from "@/lib/policy-names";
@@ -337,6 +337,9 @@ describe("Lock DNS on the clients", () => {
     const allowed = { ...lockDns, groupPauses: [{ groupId: "kid", pause: { active: true, until: null, kind: "allow" as const, by: null } }] };
     expect(ruleGroupStateLines(allowed, { kid: "Emma" }, "America/New_York", now)).toEqual(["Allowed for Emma until resumed"]);
     expect(rulePauseSheetBody(lockDns, "pause")).toBe("The groups it covers can use any DNS server until it ends. Their rules and pauses stay as they are.");
+    expect(rulePauseSheetBody({ ...lockDns, scope: "network" }, "pause")).toBe(
+      "Everything on its networks can use any DNS server until it ends. Other rules, and any pause on a group, stay as they are.",
+    );
   });
 
   it("reads as a narrow rule with a shield", () => {
@@ -344,19 +347,24 @@ describe("Lock DNS on the clients", () => {
     expect(ruleBlocksLabel(lockDns, new Map())).toBe("Other DNS servers · everything else stays on");
   });
 
-  it("shows what saving its groups writes", () => {
-    expect(lockDnsWrites([], [])).toEqual([]);
-    expect(lockDnsWrites([], ["kid"]).map((write) => write.verb)).toEqual(["NEW", "NEW", "NEW", "NEW"]);
-    expect(lockDnsWrites(["kid"], ["kid"]).map((write) => write.verb)).toEqual(["KEEP", "KEEP", "KEEP", "KEEP"]);
-    expect(lockDnsWrites(["kid"], ["kid", "teen"]).map((write) => write.detail)).toEqual(Array(4).fill("Groups changed"));
-    expect(lockDnsWrites(["kid"], []).map((write) => write.verb)).toEqual(["DELETE", "DELETE", "DELETE", "DELETE"]);
-    expect(lockDnsWrites([], ["kid"]).map((write) => write.name)).toEqual(LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part)));
+  it("shows what saving what it applies to writes", () => {
+    const groups = (...groupIds: string[]) => ({ scope: "group" as const, groupIds, networkIds: [] });
+    const networks = (...networkIds: string[]) => ({ scope: "network" as const, groupIds: [], networkIds });
+    expect(lockDnsWrites(groups(), groups())).toEqual([]);
+    expect(lockDnsWrites(groups(), groups("kid")).map((write) => write.verb)).toEqual(["NEW", "NEW", "NEW", "NEW"]);
+    expect(lockDnsWrites(groups("kid"), groups("kid")).map((write) => write.verb)).toEqual(["KEEP", "KEEP", "KEEP", "KEEP"]);
+    expect(lockDnsWrites(groups("kid"), groups("kid", "teen")).map((write) => write.detail)).toEqual(Array(4).fill("Applies to changed"));
+    expect(lockDnsWrites(groups("kid"), networks("lan")).map((write) => write.verb)).toEqual(["CHANGE", "CHANGE", "CHANGE", "CHANGE"]);
+    expect(lockDnsWrites(groups("kid"), groups()).map((write) => write.verb)).toEqual(["DELETE", "DELETE", "DELETE", "DELETE"]);
+    expect(lockDnsWrites(groups(), networks("lan")).map((write) => write.name)).toEqual(LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part)));
   });
 
-  it("picks and drops groups, and knows when they differ from the saved ones", () => {
-    expect(toggleLockDnsGroup(["kid"], "teen")).toEqual(["kid", "teen"]);
-    expect(toggleLockDnsGroup(["kid", "teen"], "kid")).toEqual(["teen"]);
-    expect(lockDnsDirty({ groupIds: ["kid", "teen"] }, ["teen", "kid"])).toBe(false);
-    expect(lockDnsDirty({ groupIds: ["kid"] }, ["teen"])).toBe(true);
+  it("knows when what it applies to differs from the saved rule", () => {
+    const saved = { scope: "group" as const, groupIds: ["kid", "teen"], networkIds: [] };
+    expect(lockDnsDirty(saved, { ...saved, groupIds: ["teen", "kid"] })).toBe(false);
+    expect(lockDnsDirty(saved, { ...saved, groupIds: ["teen"] })).toBe(true);
+    // Networks picked and left behind on the other tab are not a change.
+    expect(lockDnsDirty(saved, { ...saved, networkIds: ["lan"] })).toBe(false);
+    expect(lockDnsDirty(saved, { ...saved, scope: "network", networkIds: ["lan"] })).toBe(true);
   });
 });

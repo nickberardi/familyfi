@@ -2,36 +2,39 @@
 
 import { StyleSheet, Text, View } from "react-native";
 
-import { LOCK_DNS_COPY as COPY, lockDnsWrites, toggleLockDnsGroup } from "@/lib/lock-dns";
+import { fromLockDnsRule, LOCK_DNS_COPY as COPY, lockDnsWrites, type LockDnsDraft } from "@/lib/lock-dns";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
-import { Chip, ChipGroup } from "./Chips";
 import { EditorSection } from "./EditorSection";
+import { RuleAppliesTo } from "./RuleAppliesTo";
 import { RuleWritesList } from "./RuleEditorForm";
 import { useUI } from "./UIContext";
 
 /**
- * The built-in Lock DNS rule's page: what it blocks, the groups it covers (all that can change),
- * and what saving them writes. Each client puts it under its own header and Save.
+ * The built-in Lock DNS rule's page: what it blocks, what it applies to (all that can change),
+ * and what saving that writes. Each client puts it under its own header and Save.
  */
 export function LockDnsForm({
   rule,
   groups,
-  groupIds,
-  onChange,
+  networks,
+  draft,
+  edit,
   disabled = false,
 }: {
-  rule: Pick<Rule, "groupIds">;
+  rule: Pick<Rule, "scope" | "groupIds" | "networkIds">;
   groups: Pick<Group, "id" | "name">[];
-  /** The groups picked now, saved or not. */
-  groupIds: string[];
-  onChange: (groupIds: string[]) => void;
+  /** The networks FamilyFi manages (`managedNetworks`), which it can cover whole. */
+  networks: { id: string; name: string }[];
+  /** What it applies to now, saved or not. */
+  draft: LockDnsDraft;
+  edit: (next: (draft: LockDnsDraft) => LockDnsDraft) => void;
   disabled?: boolean;
 }) {
   const ui = useUI();
   const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 20, color: ui.color("ink-2") };
-  const writes = lockDnsWrites(rule.groupIds, groupIds);
+  const writes = lockDnsWrites(fromLockDnsRule(rule), draft);
   return (
     <View style={styles.form}>
       <EditorSection title={COPY.blocks.title} note={COPY.blocks.note}>
@@ -53,22 +56,9 @@ export function LockDnsForm({
         </Text>
       </EditorSection>
 
-      <EditorSection title={COPY.appliesTo.title} note={COPY.appliesTo.note}>
-        <ChipGroup label={COPY.appliesTo.label}>
-          {groups.map((group) => (
-            <Chip
-              key={group.id}
-              on={groupIds.includes(group.id)}
-              onPress={() => onChange(toggleLockDnsGroup(groupIds, group.id))}
-              disabled={disabled}
-              testID={`lock-dns-group-${group.id}`}
-            >
-              {group.name}
-            </Chip>
-          ))}
-        </ChipGroup>
-        <Text style={body}>{COPY.appliesTo.things}</Text>
-      </EditorSection>
+      <RuleAppliesTo draft={draft} groups={groups} networks={networks} edit={edit} note={COPY.appliesTo.note} disabled={disabled} testID="lock-dns">
+        {draft.scope === "group" ? <Text style={body}>{COPY.appliesTo.things}</Text> : null}
+      </RuleAppliesTo>
 
       <EditorSection title={COPY.writes.title} note={COPY.writes.note}>
         {writes.length ? <RuleWritesList writes={writes} /> : <Text style={body}>{COPY.writes.none}</Text>}

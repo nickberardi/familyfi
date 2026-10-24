@@ -242,14 +242,33 @@ export function removeDomain(draft: EditorDraft, domain: string): EditorDraft {
 }
 
 /** Add or drop a group or network from the rule. */
-export function toggleRuleGroup(draft: EditorDraft, groupId: string): EditorDraft {
+/** What a rule applies to: people and things, or whole networks. Lock DNS and Block countries pick it the same way. */
+export type AppliesTo = Pick<EditorDraft, "scope" | "groupIds" | "networkIds">;
+
+export function toggleRuleGroup<T extends AppliesTo>(draft: T, groupId: string): T {
   const on = draft.groupIds.includes(groupId);
   return { ...draft, groupIds: on ? draft.groupIds.filter((id) => id !== groupId) : [...draft.groupIds, groupId] };
 }
 
-export function toggleRuleNetwork(draft: EditorDraft, networkId: string): EditorDraft {
+export function toggleRuleNetwork<T extends AppliesTo>(draft: T, networkId: string): T {
   const on = draft.networkIds.includes(networkId);
   return { ...draft, networkIds: on ? draft.networkIds.filter((id) => id !== networkId) : [...draft.networkIds, networkId] };
+}
+
+/** Whether two picks apply to the same things: the same scope, and the same groups or networks in it. */
+export function sameAppliesTo(a: AppliesTo, b: AppliesTo): boolean {
+  const list = (pick: AppliesTo) => [...(pick.scope === "group" ? pick.groupIds : pick.networkIds)].sort().join();
+  return a.scope === b.scope && list(a) === list(b);
+}
+
+/** Whether a pick applies to anything at all. */
+export function appliesToAny(pick: AppliesTo): boolean {
+  return (pick.scope === "group" ? pick.groupIds : pick.networkIds).length > 0;
+}
+
+/** What a built-in rule's save sends for what it applies to: its scope and that scope's list. */
+export function appliesToBody(pick: AppliesTo): { scope: AppliesTo["scope"]; groupIds?: string[]; networkIds?: string[] } {
+  return pick.scope === "group" ? { scope: "group", groupIds: [...pick.groupIds].sort() } : { scope: "network", networkIds: [...pick.networkIds].sort() };
 }
 
 /** What the editor shows of the draft: its UniFi names, what saving writes, overlapping windows and whether it changed. */

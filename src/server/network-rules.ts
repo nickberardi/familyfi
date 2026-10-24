@@ -1,11 +1,13 @@
-import { RuleScope } from "@prisma/client";
+import { RuleLiftKind, RuleScope } from "@prisma/client";
+import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { prisma } from "./db";
 import { clientForHousehold, connectionIdentity } from "./unifi/connection";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
 
 /**
  * Settings descope: strip unmanaged network ids from network-scoped rules.
- * Rules left with zero managed network ids are deleted (including recorded UniFi policies — D3).
+ * Rules left with zero managed network ids are deleted (including recorded UniFi policies — D3);
+ * Lock DNS and Block countries, which are never deleted, go back to people and things, off.
  * Returns counts for tests / callers.
  */
 export async function pruneNetworkScopedRulesForScope(scope: NetworkScope): Promise<{
@@ -19,6 +21,14 @@ export async function pruneNetworkScopedRulesForScope(scope: NetworkScope): Prom
     const previous = [...new Set(rule.networkIds)].sort();
     const kept = previous.filter((id) => networkInScope(scope, id));
     if (kept.length === previous.length) {
+      continue;
+    }
+    if (kept.length === 0 && (rule.id === LOCK_DNS_RULE_ID || rule.id === COUNTRIES_RULE_ID)) {
+      await prisma().rule.update({
+        where: { id: rule.id },
+        data: { scope: RuleScope.group, networkIds: [], enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
+      });
+      pruned += 1;
       continue;
     }
     if (kept.length === 0) {

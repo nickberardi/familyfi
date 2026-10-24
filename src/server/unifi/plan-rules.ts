@@ -1,6 +1,6 @@
 import { AssignmentState, type GroupKind, type RuleKind, type RuleMode, type RuleScope } from "@prisma/client";
 import { LOCK_DNS_PARTS, lockDnsPolicyName, rulePolicyNames, type LockDnsPart } from "@/lib/policy-names";
-import { LOCK_DNS_RULE_ID } from "@/lib/rules";
+import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { lockDnsTargets, type LockDnsExemptions, type LockDnsTargets } from "./lock-dns";
 import { networkInScope, type NetworkScope } from "./scope";
 import { toUnifiSchedule } from "./schedule-map";
@@ -130,11 +130,12 @@ export function planRulePolicies(input: {
 
     const lockDns = rule.id === LOCK_DNS_RULE_ID;
     if (rule.scope === "network") {
-      if (rule.kind === "internet" || lockDns) continue;
+      if (rule.kind === "internet") continue;
       const inScopeIds = [...new Set(rule.networkIds)].filter((id) => networkInScope(networkScope, id)).sort();
       if (inScopeIds.length === 0) {
         // Desired state still lists unmanaged-only networks → treat as orphan for Sync cleanup.
-        orphanRuleIds.add(rule.id);
+        // A built-in rule is never deleted: it just has no policies.
+        if (rule.id !== LOCK_DNS_RULE_ID && rule.id !== COUNTRIES_RULE_ID) orphanRuleIds.add(rule.id);
         continue;
       }
       // Partial descope: still plan remaining managed nets; caller should prune DB.
@@ -236,10 +237,11 @@ export function rulePolicyWrite(planned: PlannedRulePolicy): FirewallPolicyWrite
     schedule: planned.schedule,
   };
   const network = planned.sourceType === "NETWORK";
+  const source = network ? { networkIds: planned.networkIds } : { macAddresses: planned.macAddresses };
   if (planned.lockDns) {
-    return lockDnsBlockPolicy({ ...common, part: planned.lockDns, macAddresses: planned.macAddresses, targets: planned.lockDnsTargets });
+    return lockDnsBlockPolicy({ ...common, ...source, part: planned.lockDns, targets: planned.lockDnsTargets });
   }
-  if (planned.countries.length > 0) return regionBlockPolicy({ ...common, macAddresses: planned.macAddresses, regions: planned.countries });
+  if (planned.countries.length > 0) return regionBlockPolicy({ ...common, ...source, regions: planned.countries });
   switch (planned.kind) {
     case "internet":
       return internetBlockPolicy({ ...common, macAddresses: planned.macAddresses });

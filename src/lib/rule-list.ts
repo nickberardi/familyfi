@@ -64,7 +64,7 @@ export function ruleAppliesTo(
 ): string[] {
   if (rule.builtIn === "quarantine") return [RULES_COPY.unassigned];
   // Block countries switched on with no groups covers every group.
-  if (rule.builtIn === "countries" && rule.groupIds.length === 0) return [RULES_COPY.everyGroup];
+  if (rule.builtIn === "countries" && rule.scope === "group" && rule.groupIds.length === 0) return [RULES_COPY.everyGroup];
   return rule.scope === "network"
     ? rule.networkIds.map((id) => networks.find((network) => network.id === id)?.name ?? "Network")
     : rule.groupIds.map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group");

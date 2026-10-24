@@ -130,7 +130,11 @@ export function rulePauseSheetTitle(rule: Pick<Rule, "name">, mode: PauseSheetMo
 export function rulePauseSheetBody(rule: Pick<Rule, "groupIds" | "scope"> & Partial<Pick<Rule, "builtIn">>, mode: PauseSheetMode): string {
   if (mode === "extend") return "The rule stays lifted for longer. Resume brings it back sooner.";
   if (rule.builtIn === "quarantine") return "Unassigned devices can reach the internet until it ends. Rules and pauses on groups stay as they are.";
-  if (rule.builtIn === "dns") return "The groups it covers can use any DNS server until it ends. Their rules and pauses stay as they are.";
+  if (rule.builtIn === "dns") {
+    return rule.scope === "network"
+      ? "Everything on its networks can use any DNS server until it ends. Other rules, and any pause on a group, stay as they are."
+      : "The groups it covers can use any DNS server until it ends. Their rules and pauses stay as they are.";
+  }
   const covered =
     rule.scope === "network"
       ? "everything on its networks"

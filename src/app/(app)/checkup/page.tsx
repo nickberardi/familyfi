@@ -9,7 +9,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { NetworkCheckupCard, ProtectionCard } from "@/ui/CheckupContent";
 
 export default function CheckupPage() {
-  const { rules, groups, store, busy } = useAppData();
+  const { rules, groups, unifi, store, busy } = useAppData();
   const [checkup, setCheckup] = useState<CheckupState | null>(null);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
@@ -65,6 +65,7 @@ export default function CheckupPage() {
         <ProtectionCard
           rules={protections}
           groups={groups}
+          networks={unifi?.networks ?? []}
           disabled={busy}
           onToggle={(rule) => void toggleRuleEnabled(store.mutate, rule)}
           onTurnOnAll={() => void turnOnRecommended(store.mutate, rules)}
