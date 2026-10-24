@@ -1201,7 +1201,9 @@ describe("household rules", () => {
         ["Grounded", null],
       ]);
       const [quarantine] = listed.rules;
-      expect(quarantine).toMatchObject({ id: "quarantine", kind: "internet", mode: "always", groupIds: [], enabled: false });
+      expect(quarantine).toMatchObject({ id: "quarantine", kind: "internet", mode: "always", enabled: false });
+      expect(quarantine).not.toHaveProperty("groupIds");
+      expect(quarantine).not.toHaveProperty("groupPauses");
       expect(quarantine!.policyNames).toEqual(["FamilyFi Quarantine Internal Devices"]);
       // A group's own list leaves it out.
       const scoped = (await (await listRules(request(`/api/v1/rules?groupId=${emma.id}`, { auth }))).json()) as { rules: PublicRule[] };

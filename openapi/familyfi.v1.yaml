@@ -3803,7 +3803,7 @@ components:
         groupIds:
           type: array
           items: { type: string }
-          description: The groups the rule covers. Only when scope=group
+          description: The groups the rule covers. Only when scope=group, and never on quarantine
         networkIds:
           type: array
           items: { type: string, format: uuid }
@@ -3840,7 +3840,7 @@ components:
         pause: { $ref: "#/components/schemas/RulePause" }
         groupPauses:
           type: array
-          description: The same lift for one group alone; only the active ones. Only when scope=group.
+          description: The same lift for one group alone; only the active ones. Only when scope=group, and never on quarantine.
           items:
             type: object
             additionalProperties: false
@@ -3863,7 +3863,7 @@ components:
           description: |
             Set on a rule FamilyFi provides; null on the household's own. `quarantine` (id
             `quarantine`) blocks all internet for unassigned devices on managed networks. It covers
-            no group (`groupIds` empty), cannot be edited or deleted (409 `rule_built_in`), and is
+            no group (no `groupIds`), cannot be edited or deleted (409 `rule_built_in`), and is
             paused, extended and resumed like any rule, never allowed. Its `enabled` is the
             household's `quarantineEnforced`; its policies are the quarantine policies.
 
