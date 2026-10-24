@@ -51,13 +51,13 @@ export function fromRule(rule: Rule): EditorDraft {
     useGeneratedName: rule.useGeneratedName,
     kind: rule.kind,
     scope: rule.scope,
-    targetIds: [...rule.targetIds],
-    domains: [...rule.domains],
-    groupIds: [...rule.groupIds],
-    networkIds: [...rule.networkIds],
+    targetIds: [...(rule.targetIds ?? [])],
+    domains: [...(rule.domains ?? [])],
+    groupIds: [...(rule.groupIds ?? [])],
+    networkIds: [...(rule.networkIds ?? [])],
     enabled: rule.enabled,
     mode: rule.mode,
-    windows: rule.windows.map(keyed),
+    windows: (rule.windows ?? []).map(keyed),
   };
 }
 

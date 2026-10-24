@@ -194,7 +194,7 @@ export const UPSTREAM_VERDICT_WORDS: Record<CategoryMarkState, string> = {
 export function categoryRuleWhen(rule: Pick<Rule, "mode" | "windows">): string {
   return rule.mode === "always"
     ? "Always blocked by FamilyFi."
-    : `Blocked ${rule.windows.map((window) => windowTimes(window.start, window.end)).join(" and ")}.`;
+    : `Blocked ${(rule.windows ?? []).map((window) => windowTimes(window.start, window.end)).join(" and ")}.`;
 }
 
 /** The names UniFi gives its DPI categories and applications, keyed `category:<id>` and `app:<id>`. */

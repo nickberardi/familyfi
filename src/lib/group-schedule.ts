@@ -61,8 +61,8 @@ export function groupScheduleRules(group: Pick<Group, "id">, rules: Rule[], cata
  */
 function scheduleTitle(rule: Rule, catalogNames: Map<string, string>): string {
   if (rule.kind === "internet" || rule.kind === "domain") return rule.name;
-  if (rule.targetIds.length > 1) {
-    const blocked = rule.targetIds.map(
+  if ((rule.targetIds ?? []).length > 1) {
+    const blocked = (rule.targetIds ?? []).map(
       (id) =>
         (rule.kind === "category" ? CURATED_CATEGORY_SLOTS.find((slot) => slot.categoryId === id)?.label : undefined) ??
         catalogNames.get(`${rule.kind}:${id}`) ??

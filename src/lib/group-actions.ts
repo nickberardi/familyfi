@@ -66,8 +66,8 @@ function blockingName(rule: Rule, now: Date, timezone: string): string {
     return active[0] ? windowTitle(active[0]) : rule.name;
   }
   if (rule.kind === "category") {
-    const slots = CURATED_CATEGORY_SLOTS.filter((slot) => rule.targetIds.includes(slot.categoryId));
-    if (slots.length === rule.targetIds.length && slots.length > 0) return names(slots.map((slot) => slot.label));
+    const slots = CURATED_CATEGORY_SLOTS.filter((slot) => (rule.targetIds ?? []).includes(slot.categoryId));
+    if (slots.length === (rule.targetIds ?? []).length && slots.length > 0) return names(slots.map((slot) => slot.label));
   }
   return rule.name;
 }

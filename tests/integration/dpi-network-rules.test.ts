@@ -149,7 +149,7 @@ describe("Phase 3 network-scoped DPI", () => {
       rule: { id: string; scope: string; networkIds: string[]; groupIds: string[] };
     };
     expect(createdBody.rule.scope).toBe("network");
-    expect(createdBody.rule.groupIds).toEqual([]);
+    expect(createdBody.rule).not.toHaveProperty("groupIds");
     expect(createdBody.rule.networkIds).toEqual([INTERNAL_NETWORK]);
 
     expect(await runReconcileOnce()).toBe(true);
@@ -317,10 +317,14 @@ describe("Phase 3 network-scoped DPI", () => {
 
       const dns = await patch(auth, "dns", { scope: "network", networkIds: [INTERNAL_NETWORK], enabled: true });
       expect(dns.status).toBe(200);
-      expect(((await dns.json()) as Body).rule).toMatchObject({ scope: "network", groupIds: [], networkIds: [INTERNAL_NETWORK], enabled: true });
+      const onNetworks = ((await dns.json()) as Body).rule;
+      expect(onNetworks).toMatchObject({ scope: "network", networkIds: [INTERNAL_NETWORK], enabled: true });
+      expect(onNetworks).not.toHaveProperty("groupIds");
       // Naming only networks takes that scope, as an app that sends only groups takes them back.
       const countries = await patch(auth, "countries", { networkIds: [INTERNAL_NETWORK], enabled: true });
-      expect(((await countries.json()) as Body).rule).toMatchObject({ scope: "network", groupIds: [], networkIds: [INTERNAL_NETWORK] });
+      const countriesOnNetworks = ((await countries.json()) as Body).rule;
+      expect(countriesOnNetworks).toMatchObject({ scope: "network", networkIds: [INTERNAL_NETWORK] });
+      expect(countriesOnNetworks).not.toHaveProperty("groupIds");
 
       expect(await runReconcileOnce()).toBe(true);
       const lockDns = sources(client, "FamilyFi Lock DNS");
@@ -330,12 +334,18 @@ describe("Phase 3 network-scoped DPI", () => {
 
       // Only managed networks, as for any rule.
       expect(((await (await patch(auth, "dns", { networkIds: [IOT_NETWORK] })).json()) as Body).error?.code).toBe("unmanaged_network");
+      // Sending groups too leaves the rule on networks, so the networks are still checked.
+      const both = await patch(auth, "dns", { groupIds: [emma.id], networkIds: [IOT_NETWORK] });
+      expect(((await both.json()) as Body).error?.code).toBe("unmanaged_network");
       expect(((await (await patch(auth, "countries", { scope: "network", networkIds: [] })).json()) as Body).error?.code).toBe("invalid_networks");
 
       // Back to people and things: switched on with none picked, Lock DNS covers every person.
       const back = (await (await patch(auth, "dns", { scope: "group" })).json()) as Body;
-      expect(back.rule).toMatchObject({ scope: "group", groupIds: [emma.id], networkIds: [] });
-      expect(((await (await patch(auth, "countries", { groupIds: back.rule.groupIds })).json()) as Body).rule).toMatchObject({ scope: "group", networkIds: [] });
+      expect(back.rule).toMatchObject({ scope: "group", groupIds: [emma.id] });
+      expect(back.rule).not.toHaveProperty("networkIds");
+      const countriesBack = ((await (await patch(auth, "countries", { groupIds: back.rule.groupIds })).json()) as Body).rule;
+      expect(countriesBack).toMatchObject({ scope: "group" });
+      expect(countriesBack).not.toHaveProperty("networkIds");
     });
 
     it("leave the household's own DNS alone on whole networks, and keep their networks when switched on", async () => {
@@ -347,7 +357,9 @@ describe("Phase 3 network-scoped DPI", () => {
       const auth = await signedIn();
       await patch(auth, "dns", { scope: "network", networkIds: [INTERNAL_NETWORK] });
       const on = await turnOnRule(request("/api/v1/rules/dns/on", { method: "POST", auth }), { params: Promise.resolve({ id: "dns" }) });
-      expect(((await on.json()) as Body).rule).toMatchObject({ enabled: true, scope: "network", groupIds: [], networkIds: [INTERNAL_NETWORK] });
+      const switchedOn = ((await on.json()) as Body).rule;
+      expect(switchedOn).toMatchObject({ enabled: true, scope: "network", networkIds: [INTERNAL_NETWORK] });
+      expect(switchedOn).not.toHaveProperty("groupIds");
       expect(await runReconcileOnce()).toBe(true);
       const ports = client.state.policies.find((policy) => policy.name === "FamilyFi Lock DNS")!;
       expect(ports.destination.trafficFilter).toMatchObject({

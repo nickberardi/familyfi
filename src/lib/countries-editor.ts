@@ -17,9 +17,9 @@ type SavedCountries = Pick<Rule, "enabled" | "countries" | "scope" | "groupIds" 
 export function fromCountriesRule(rule: SavedCountries, groups: Pick<Group, "id">[]): CountriesDraft {
   return {
     enabled: rule.enabled,
-    countries: [...rule.countries].sort(),
+    countries: [...(rule.countries ?? [])].sort(),
     scope: rule.scope,
-    groupIds: rule.groupIds.length ? [...rule.groupIds].sort() : groups.map((group) => group.id).sort(),
+    groupIds: (rule.groupIds ?? []).length ? [...(rule.groupIds ?? [])].sort() : groups.map((group) => group.id).sort(),
     networkIds: [...rule.networkIds].sort(),
   };
 }

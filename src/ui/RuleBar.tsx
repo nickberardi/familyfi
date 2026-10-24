@@ -10,7 +10,7 @@ import { useUI } from "./UIContext";
 const pct = (minutes: number) => `${((minutes / 1440) * 100).toFixed(3)}%` as const;
 
 /** The rule's windows on a 24-hour bar, any day: the accent for all internet, the rule verdict's tint for anything narrower. */
-export function RuleBar({ rule }: { rule: { kind: Rule["kind"]; mode: Rule["mode"]; windows: Pick<RuleWindow, "start" | "end">[] } }) {
+export function RuleBar({ rule }: { rule: { kind: Rule["kind"]; mode: Rule["mode"]; windows?: Pick<RuleWindow, "start" | "end">[] } }) {
   const ui = useUI();
   const internet = rule.kind === "internet";
   const band = internet

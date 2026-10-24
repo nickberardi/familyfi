@@ -15,6 +15,7 @@ import {
   QUARANTINE_RULE_ID,
   type BuiltInRule,
   type LockDnsOpen,
+  type Rule,
 } from "@/lib/rules";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
@@ -56,36 +57,44 @@ function publicPause(state: LiftColumns) {
  * quarantine (`quarantineEnforced`), which callers pass; `presentRules` reads it for them. Lock DNS
  * shows the encrypted DNS services' host names it blocks as its `domains`.
  */
-export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
+export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean): Rule {
   const windows = [...rule.windows].sort((a, b) => a.position - b.position);
   const builtIn = builtInRule(rule);
   const quarantine = builtIn === "quarantine";
+  const byGroup = rule.scope === RuleScope.group;
+  // A field that doesn't apply to this rule is left out, never sent empty: see docs/api.md (Payloads).
   return {
     id: rule.id,
     name: rule.name,
     kind: rule.kind,
     scope: rule.scope,
-    groupIds: rule.groups.map((link) => link.groupId).sort(),
-    networkIds: [...rule.networkIds],
-    targetIds: [...rule.targetIds],
-    domains: builtIn === "dns" ? encryptedDnsHosts() : [...rule.domains],
-    countries: [...rule.countries],
-    blockPrivateRelay: rule.blockPrivateRelay,
-    openDns: builtIn === "dns" ? (rule.openDns as LockDnsOpen[]) : [],
+    ...(byGroup ? { groupIds: rule.groups.map((link) => link.groupId).sort() } : { networkIds: [...rule.networkIds] }),
+    ...(rule.kind === RuleKind.category || rule.kind === RuleKind.app ? { targetIds: [...rule.targetIds] } : {}),
+    ...(builtIn === "dns" ? { domains: encryptedDnsHosts() } : rule.kind === RuleKind.domain && builtIn !== "countries" ? { domains: [...rule.domains] } : {}),
+    ...(builtIn === "countries" ? { countries: [...rule.countries] } : {}),
+    ...(builtIn === "dns" ? { blockPrivateRelay: rule.blockPrivateRelay, openDns: rule.openDns as LockDnsOpen[] } : {}),
     enabled: quarantine ? quarantineEnforced : rule.enabled,
     pause: publicPause(rule),
-    groupPauses: rule.groups
-      .filter((link) => link.pauseActive)
-      .map((link) => ({ groupId: link.groupId, pause: publicPause(link) }))
-      .sort((a, b) => a.groupId.localeCompare(b.groupId)),
+    ...(byGroup
+      ? {
+          groupPauses: rule.groups
+            .filter((link) => link.pauseActive)
+            .map((link) => ({ groupId: link.groupId, pause: publicPause(link) }))
+            .sort((a, b) => a.groupId.localeCompare(b.groupId)),
+        }
+      : {}),
     mode: rule.mode,
-    windows: windows.map((window) => ({
-      id: window.id,
-      name: window.name,
-      days: [...window.days],
-      start: window.start,
-      end: window.end,
-    })),
+    ...(rule.mode === RuleMode.scheduled
+      ? {
+          windows: windows.map((window) => ({
+            id: window.id,
+            name: window.name,
+            days: [...window.days],
+            start: window.start,
+            end: window.end,
+          })),
+        }
+      : {}),
     useGeneratedName: rule.useGeneratedName,
     /** What UniFi's policy table shows for this rule, one per policy in the Internal zone. */
     policyNames: quarantine
@@ -210,7 +219,8 @@ export async function saveBuiltInRule(
   const countries = id === COUNTRIES_RULE_ID && patch.countries ? normalizeCountries(patch.countries) : undefined;
   const named = patch.scope ?? (patch.networkIds && !patch.groupIds ? RuleScope.network : patch.groupIds && !patch.networkIds ? RuleScope.group : undefined);
   // A new list of networks is checked against the site before the lock, which the site can't be read under.
-  if (patch.networkIds && named === RuleScope.network) {
+  // Unless the patch names groups, it may land on a rule already on networks, so check it then too.
+  if (patch.networkIds && named !== RuleScope.group) {
     const { scope: managed, known } = await networkScope();
     assertManagedNetworkIds(patch.networkIds, managed, known);
   }

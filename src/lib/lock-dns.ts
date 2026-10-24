@@ -66,7 +66,7 @@ const PART_DETAIL: Record<LockDnsPart, string> = {
 
 /** "Built in · always · 4 UniFi policies", counting Private Relay's while it is on. */
 export function lockDnsSummary(rule: Pick<Rule, "blockPrivateRelay">): string {
-  return `Built in · always · ${lockDnsParts(rule.blockPrivateRelay).length} UniFi policies`;
+  return `Built in · always · ${lockDnsParts(rule.blockPrivateRelay ?? false).length} UniFi policies`;
 }
 
 /** Who an entry of the "Left open" list belongs to: "Household resolver", "Emma’s resolver", "Handed out by IoT". */
@@ -79,7 +79,7 @@ export function lockDnsOpenLabel(entry: Pick<LockDnsOpen, "source" | "name">): s
 export type LockDnsDraft = AppliesTo & { blockPrivateRelay: boolean };
 
 export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay">): LockDnsDraft {
-  return { scope: rule.scope, groupIds: [...rule.groupIds], networkIds: [...rule.networkIds], blockPrivateRelay: rule.blockPrivateRelay };
+  return { scope: rule.scope, groupIds: [...rule.groupIds], networkIds: [...rule.networkIds], blockPrivateRelay: rule.blockPrivateRelay ?? false };
 }
 
 /**
@@ -105,7 +105,7 @@ export function validateLockDnsDraft(draft: LockDnsDraft): string | null {
 
 /** Whether the pick differs from the saved rule. */
 export function lockDnsDirty(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay">, draft: LockDnsDraft): boolean {
-  return !sameAppliesTo(fromLockDnsRule(rule), draft) || rule.blockPrivateRelay !== draft.blockPrivateRelay;
+  return !sameAppliesTo(fromLockDnsRule(rule), draft) || (rule.blockPrivateRelay ?? false) !== draft.blockPrivateRelay;
 }
 
 /** Saves what Lock DNS applies to and its Private Relay switch; resolves to the store's payload, or undefined when it failed. */

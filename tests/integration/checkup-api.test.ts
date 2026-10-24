@@ -212,7 +212,7 @@ describe("Block countries", () => {
     expect(list.map((rule) => rule.id)).toEqual(["quarantine", "dns", "countries"]);
     const countries = list[2]!;
     expect(countries).toMatchObject({ builtIn: "countries", enabled: false, groupIds: [], countries: ["CN", "CU", "IR", "KP", "RU", "SY"] });
-    expect(list[0]!.countries).toEqual([]);
+    expect(list[0]).not.toHaveProperty("countries");
   });
 
   it("covers every group when switched on, and blocks their devices by region through one policy", async () => {
@@ -228,7 +228,7 @@ describe("Block countries", () => {
 
     const on = await turnOnRule(request("/api/v1/rules/countries/on", { method: "POST", auth, headers: json, body: "{}" }), { params: Promise.resolve({ id: "countries" }) });
     expect(on.status).toBe(200);
-    expect(((await on.json()) as { rule: Rule }).rule.groupIds.sort()).toEqual([kid.id, things.id].sort());
+    expect(((await on.json()) as { rule: Rule }).rule.groupIds!.sort()).toEqual([kid.id, things.id].sort());
 
     await runReconcileOnce();
     const policies = client.state.policies.filter((policy) => policy.destination?.trafficFilter?.type === "REGION");
@@ -269,7 +269,7 @@ describe("Block countries", () => {
     const add = (name: string) =>
       createGroup(request("/api/v1/groups", { method: "POST", auth, headers: json, body: JSON.stringify({ kind: "things", name }) }));
     const joined = ((await (await add("Printers")).json()) as { group: { id: string } }).group.id;
-    expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds.sort()).toEqual([first.id, second.id, joined].sort());
+    expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds!.sort()).toEqual([first.id, second.id, joined].sort());
 
     expect((await patchCountries(auth, { groupIds: [first.id] })).status).toBe(200);
     await add("Cameras");

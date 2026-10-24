@@ -85,7 +85,7 @@ describe("starting a rule", () => {
     const rule = saved();
     const draft = toggleWindowDay(fromRule(rule), "w1", 5);
     expect(draft.windows[0]!.days).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(rule.windows[0]!.days).toEqual([0, 1, 2, 3, 4]);
+    expect(rule.windows![0]!.days).toEqual([0, 1, 2, 3, 4]);
   });
 });
 

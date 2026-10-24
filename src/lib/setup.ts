@@ -281,9 +281,9 @@ export async function saveSchedules(
  * The suggested rules the household already has, by name, so running setup again brings them up to
  * date rather than making a second rule of the same name.
  */
-export function existingSuggestedRules(rules: readonly { id: string; name: string; groupIds: readonly string[] }[]): CreatedRules {
+export function existingSuggestedRules(rules: readonly { id: string; name: string; groupIds?: readonly string[] }[]): CreatedRules {
   const names = new Set(SCHEDULE_SUGGESTIONS.flatMap((suggestion) => suggestion.rules.map((rule) => rule.name)));
-  return Object.fromEntries(rules.filter((rule) => names.has(rule.name)).map((rule) => [rule.name, { id: rule.id, groupIds: rule.groupIds }]));
+  return Object.fromEntries(rules.filter((rule) => names.has(rule.name)).map((rule) => [rule.name, { id: rule.id, groupIds: rule.groupIds ?? [] }]));
 }
 
 /** Where `/setup` sends a visitor, or null to show setup. */

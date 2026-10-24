@@ -39,7 +39,7 @@ export function rulesListView(rules: Rule[], groups: Group[], scope: string | nu
   const filtered = new Set(rules.filter((rule) => rule.builtIn !== "dns" && rule.builtIn !== "countries").flatMap((rule) => rule.groupIds));
   return {
     scoped,
-    list: scoped ? rules.filter((rule) => rule.groupIds.includes(scoped.id)) : rules,
+    list: scoped ? rules.filter((rule) => (rule.groupIds ?? []).includes(scoped.id)) : rules,
     chips: groups.filter((group) => covered.has(group.id)),
     unruled: groups.filter((group) => !filtered.has(group.id)).map((group) => group.name),
     newHref: scoped ? `/rules/new?group=${scoped.id}` : "/rules/new",
@@ -64,18 +64,18 @@ export function ruleAppliesTo(
 ): string[] {
   if (rule.builtIn === "quarantine") return [RULES_COPY.unassigned];
   // Block countries switched on with no groups covers every group.
-  if (rule.builtIn === "countries" && rule.scope === "group" && rule.groupIds.length === 0) return [RULES_COPY.everyGroup];
+  if (rule.builtIn === "countries" && rule.scope === "group" && (rule.groupIds ?? []).length === 0) return [RULES_COPY.everyGroup];
   return rule.scope === "network"
-    ? rule.networkIds.map((id) => networks.find((network) => network.id === id)?.name ?? "Network")
-    : rule.groupIds.map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group");
+    ? (rule.networkIds ?? []).map((id) => networks.find((network) => network.id === id)?.name ?? "Network")
+    : (rule.groupIds ?? []).map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group");
 }
 
 /** When a rule blocks, a line per window: "Always", or each window's times and days, named when there are several. */
 export function ruleWhenLines(rule: Pick<Rule, "mode" | "windows">): { key: string; times: string; days?: string }[] {
   if (rule.mode === "always") return [{ key: "always", times: "Always" }];
-  return rule.windows.map((window) => ({
+  return (rule.windows ?? []).map((window) => ({
     key: window.id,
-    times: `${rule.windows.length > 1 && window.name ? `${window.name} · ` : ""}${windowTimes(window.start, window.end)}`,
+    times: `${(rule.windows ?? []).length > 1 && window.name ? `${window.name} · ` : ""}${windowTimes(window.start, window.end)}`,
     days: daysLabel(window.days),
   }));
 }
@@ -100,9 +100,9 @@ export function ruleStatus(
   if (paused) return { line: paused, tone: "paused" };
   // Lifted for each group it covers, one by one, the rule blocks no one even inside a window.
   const lifts =
-    rule.scope === "group" && rule.groupIds.length > 0
-      ? rule.groupIds.map((id) =>
-          rule.groupPauses.find((item) => item.groupId === id && ruleLiftedForGroup(rule, id, now)),
+    rule.scope === "group" && (rule.groupIds ?? []).length > 0
+      ? (rule.groupIds ?? []).map((id) =>
+          (rule.groupPauses ?? []).find((item) => item.groupId === id && ruleLiftedForGroup(rule, id, now)),
         )
       : [];
   if (lifts.length && lifts.every(Boolean)) {
@@ -128,7 +128,7 @@ export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pi
   if (rule.builtIn === "countries") return { shape: "round", icon: "globe-simple" };
   const slot =
     rule.kind === "category"
-      ? CURATED_CATEGORY_SLOTS.find((item) => rule.targetIds.includes(item.categoryId))
+      ? CURATED_CATEGORY_SLOTS.find((item) => (rule.targetIds ?? []).includes(item.categoryId))
       : undefined;
   return {
     shape: "round",
@@ -140,9 +140,9 @@ export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pi
 /** The minutes a rule blocks on a 24-hour bar, any day. */
 export function ruleBarBands(rule: {
   mode: Rule["mode"];
-  windows: Pick<RuleWindow, "start" | "end">[];
+  windows?: Pick<RuleWindow, "start" | "end">[];
 }): { from: number; to: number }[] {
-  return rule.mode === "always" ? [{ from: 0, to: 1440 }] : rule.windows.flatMap(windowSegments);
+  return rule.mode === "always" ? [{ from: 0, to: 1440 }] : (rule.windows ?? []).flatMap(windowSegments);
 }
 
 /** The 24-hour bar's labels, evenly spaced. */

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.33.0
+  version: 0.34.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -3791,7 +3791,7 @@ components:
     Rule:
       type: object
       additionalProperties: false
-      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, countries, blockPrivateRelay, openDns, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
+      required: [id, name, kind, scope, enabled, pause, mode, useGeneratedName, policyNames, builtIn]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 60 }
@@ -3803,44 +3803,44 @@ components:
         groupIds:
           type: array
           items: { type: string }
-          description: The groups the rule covers when scope=group; empty for network scope
+          description: The groups the rule covers. Only when scope=group
         networkIds:
           type: array
           items: { type: string, format: uuid }
-          description: Managed UniFi network ids when scope=network; empty for group scope
+          description: Managed UniFi network ids. Only when scope=network
         targetIds:
           type: array
           items: { type: integer }
           maxItems: 100
-          description: DPI ids for category and app rules; empty otherwise
+          description: DPI ids. Only on category and app rules
         domains:
           type: array
           items: { type: string }
           maxItems: 100
-          description: Website domains for domain rules; empty otherwise
+          description: Website domains. Only on domain rules (Lock DNS lists the encrypted DNS services it blocks); not on Block countries
         countries:
           type: array
           items: { type: string, pattern: "^[A-Z]{2}$" }
-          description: ISO 3166-1 alpha-2 codes the built-in Block countries rule blocks; empty on every other rule
+          description: ISO 3166-1 alpha-2 codes the built-in Block countries rule blocks. Only on that rule
         blockPrivateRelay:
           type: boolean
           description: |
             The built-in Lock DNS rule also turns off iCloud Private Relay for what it applies to
             (experimental): one more policy, "FamilyFi Lock DNS Private Relay", blocks Apple's relay
             names `mask.icloud.com` and `mask-h2.icloud.com`, so an iPhone says Private Relay is off
-            for the network. False on every other rule.
+            for the network. Only on that rule.
         openDns:
           type: array
           items: { $ref: "#/components/schemas/LockDnsOpen" }
           description: |
             The DNS the built-in Lock DNS rule left open at its last sync, read-only: the resolvers
             set in FamilyFi with the addresses their names looked up to, and the DNS servers its
-            networks hand out. Empty until it syncs while applying to something, and on every other rule.
+            networks hand out. Empty until it syncs while applying to something. Only on that rule.
         enabled: { type: boolean }
         pause: { $ref: "#/components/schemas/RulePause" }
         groupPauses:
           type: array
-          description: The same lift for one group alone; only the active ones.
+          description: The same lift for one group alone; only the active ones. Only when scope=group.
           items:
             type: object
             additionalProperties: false
@@ -3855,7 +3855,7 @@ components:
         windows:
           type: array
           items: { $ref: "#/components/schemas/RuleWindow" }
-          description: Empty when mode=always
+          description: Only when mode=scheduled
         useGeneratedName: { type: boolean, description: "Name its UniFi policies \"FamilyFi Rule <id>\" instead of after the rule." }
         builtIn:
           type: [string, "null"]

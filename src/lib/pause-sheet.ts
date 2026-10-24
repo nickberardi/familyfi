@@ -138,9 +138,9 @@ export function rulePauseSheetBody(rule: Pick<Rule, "groupIds" | "scope"> & Part
   const covered =
     rule.scope === "network"
       ? "everything on its networks"
-      : rule.groupIds.length === 1
+      : (rule.groupIds ?? []).length === 1
         ? "the group it covers"
-        : `all ${rule.groupIds.length} groups it covers`;
+        : `all ${(rule.groupIds ?? []).length} groups it covers`;
   return `The rule stops blocking for ${covered}. Other rules, and any pause on a group, stay as they are.`;
 }
 

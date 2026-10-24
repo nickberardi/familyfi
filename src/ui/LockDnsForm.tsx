@@ -87,7 +87,7 @@ export function LockDnsForm({
       </EditorSection>
 
       <EditorSection title={COPY.open.title} note={COPY.open.note}>
-        {rule.openDns.length ? (
+        {rule.openDns?.length ? (
           <View role="list" style={styles.items} testID="lock-dns-open">
             {rule.openDns.map((entry, index) => (
               <View key={`${entry.source}-${entry.name}-${entry.host}-${index}`} role="listitem" style={styles.item}>
