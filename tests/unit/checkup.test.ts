@@ -164,12 +164,13 @@ describe("network checkup", () => {
     expect(checkupSummary({ ranAt: "2026-10-22T12:10:00Z", error: null, passed: [], findings: [] }, now)).toBe("No problems · checked just now");
   });
 
-  it("notes in the rule editor when covered devices use a network's own DNS", () => {
+  it("notes in the website rule editor when covered devices use a network's own DNS", () => {
     const state = { findings: [{ id: "dns_override:lan", check: "dns_override" as const, kind: "note" as const, details: { networks: [{ id: LAN, name: "LAN", dnsServers: ["192.0.2.53"] }] }, firstSeenAt: "", lastSeenAt: "", dismissed: false }] };
     const devices = [{ groupId: "g1", networkId: LAN }];
-    const rule = { kind: "category", scope: "group", groupIds: ["g1"], networkIds: [] };
+    const rule = { kind: "domain", scope: "group", groupIds: ["g1"], networkIds: [] };
     expect(outsideDnsNote(rule, devices, state)).toContain("LAN, which hands out 192.0.2.53");
-    expect(outsideDnsNote({ ...rule, kind: "internet" }, devices, state)).toBeNull();
+    // Category and app rules match traffic, not lookups.
+    for (const kind of ["internet", "category", "app"]) expect(outsideDnsNote({ ...rule, kind }, devices, state)).toBeNull();
     expect(outsideDnsNote({ ...rule, groupIds: ["g2"] }, devices, state)).toBeNull();
     expect(outsideDnsNote({ ...rule, scope: "network", groupIds: [], networkIds: [LAN] }, [], state)).not.toBeNull();
     expect(outsideDnsNote(rule, devices, null)).toBeNull();
