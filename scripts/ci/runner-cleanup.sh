@@ -69,7 +69,7 @@ if command -v docker >/dev/null 2>&1 && [ "$others" -eq 0 ]; then
   docker system prune --all --force --volumes >/dev/null || true
 fi
 
-# pnpm's store only grows; setup-node restores it from the Actions cache on every install.
+# pnpm's store only grows; pnpm/action-setup restores it from the Actions cache on every install.
 if [ -n "${npm_config_store_dir:-}" ]; then
   remove_tree "$npm_config_store_dir"
 else

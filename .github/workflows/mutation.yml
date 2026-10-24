@@ -30,15 +30,17 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
             echo "No change under src/ or tests/ in the last seven days, so mutation testing was skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
-      - if: steps.changed.outputs.run == 'true'
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.15.1
+      # Node first: pnpm/action-setup bootstraps with the npm on PATH, and the runner's own
+      # Node has a broken npm since runner 2.338.0.
       - if: steps.changed.outputs.run == 'true'
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: pnpm
+      - if: steps.changed.outputs.run == 'true'
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.15.1
+          cache: true
       - if: steps.changed.outputs.run == 'true'
         uses: actions/setup-python@v7
         with:
