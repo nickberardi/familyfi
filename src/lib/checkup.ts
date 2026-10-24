@@ -399,7 +399,7 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         icon: "speaker-high",
         title: "Some Sonos speakers are wired, some on Wi-Fi",
         seen: `${names(wiredOnes)} ${wiredOnes.length === 1 ? "is" : "are"} wired. ${names(wifiOnes)} ${wifiOnes.length === 1 ? "is" : "are"} on Wi-Fi.`,
-        why: "This is usually fine. Sometimes a wired Sonos makes the network loop, which can drop speakers or knock out the internet for everyone. If your speakers and internet work fine, you can ignore this.",
+        why: "This is usually fine. Sometimes a wired Sonos makes the network loop, which can drop speakers or knock out the internet for everyone. Older speakers like the Play:1 and IKEA Symfonisk are the most likely to cause it. If your speakers and internet work fine, you can ignore this.",
         fix: [
           "Choose all on Wi-Fi or all wired.",
           `All on Wi-Fi: unplug ${wiredOnes.length === 1 ? `${wiredOnes[0]!.name}’s cable` : "the wired speakers’ cables"} and restart ${wiredOnes.length === 1 ? "it" : "them"}.`,
