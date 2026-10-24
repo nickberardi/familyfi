@@ -27,10 +27,10 @@ test("Checkup shows recommended protection, and the mock household's problems ap
   await expect(countries).toContainText("North Korea, Iran, China and 3 more");
   await expect(countries.getByRole("link", { name: "Edit" })).toHaveAttribute("href", "/rules/countries");
 
-  // Check now reads the mock gateway; its friendly household has Sonos wired and on Wi-Fi.
+  // Check now reads the mock gateway; its friendly household has Sonos wired and on Wi-Fi (a note).
   await page.getByTestId("checkup-run").click();
   const network = page.getByTestId("checkup-network");
-  await expect(network.getByText("Sonos is both wired and on Wi-Fi")).toBeVisible();
+  await expect(network.getByText("Some Sonos speakers are wired, some on Wi-Fi")).toBeVisible();
   await expect(network.getByText(/devices? uses? a private Wi-Fi address/)).toBeVisible();
   // A note is never presented as a problem: it is under its own heading and offers "This is intended".
   await expect(network.getByText(/notes · may be on purpose/i)).toBeVisible();

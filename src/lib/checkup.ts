@@ -28,7 +28,7 @@ export type CheckupCheck = (typeof CHECKUP_CHECKS)[number];
 export type CheckupKind = "problem" | "note";
 
 export const CHECK_KIND: Record<CheckupCheck, CheckupKind> = {
-  sonos_mixed: "problem",
+  sonos_mixed: "note",
   private_addresses: "problem",
   wifi_multicast: "problem",
   sonos_mdns: "problem",
@@ -147,7 +147,7 @@ export const PRIVATE_ADDRESS_COPY = {
   cardTitle: "Private Wi-Fi address",
   cardBody: "This device hides its real address on this Wi-Fi, and the address can change. When it does, FamilyFi sees a new, unassigned device and this one loses its group’s rules.",
   howToFix: "How to fix",
-  iphone: { label: "iPhone and iPad:", steps: "Settings → Wi-Fi → (i) next to this network → Private Wi-Fi Address → Fixed." },
+  iphone: { label: "iPhone and iPad:", steps: "Settings → Wi-Fi → (i) next to this network → Private Wi-Fi Address → Off." },
   android: { label: "Android:", steps: "Settings → Wi-Fi → this network → Privacy → Use device MAC." },
 } as const;
 
@@ -324,15 +324,16 @@ export function outsideDnsNetworks(state: Pick<CheckupState, "findings"> | null 
 }
 
 /**
- * The rule editor's note under Applies to: a category, app or website rule covers a group with
- * devices on a network that hands out its own DNS. FamilyFi never refuses the rule; it only says so.
+ * The rule editor's note under Applies to: a website rule covers a group with devices on a network
+ * that hands out its own DNS. Category and app rules match traffic, not lookups, so they get none.
+ * FamilyFi never refuses the rule; it only says so.
  */
 export function outsideDnsNote(
   rule: { kind: string; scope: string; groupIds: string[]; networkIds: string[] },
   devices: { groupId: string | null; networkId: string | null }[],
   state: Pick<CheckupState, "findings"> | null | undefined,
 ): string | null {
-  if (rule.kind === "internet") return null;
+  if (rule.kind !== "domain") return null;
   const outside = outsideDnsNetworks(state);
   if (!outside.size) return null;
   const covered =
@@ -342,7 +343,7 @@ export function outsideDnsNote(
   if (!covered.length) return null;
   const networks = covered.map((id) => outside.get(id)!);
   const servers = namesList([...new Set(networks.flatMap((network) => network.dnsServers))]);
-  return `Some of these devices are on ${namesList(networks.map((network) => network.name))}, which hands out ${servers} for DNS instead of the gateway. This rule only sees their lookups if that server forwards them through the gateway.`;
+  return `Some of these devices are on ${namesList(networks.map((network) => network.name))}, which uses its own DNS server (${servers}). This rule may not block websites for them.`;
 }
 
 /** The open problems, which the nav badge counts. */
@@ -380,7 +381,7 @@ const SONOS_GUIDE = { label: "UniFi’s Sonos guide", href: "https://help.ui.com
 const WIFI_SETTING: Record<string, string> = {
   multicast_to_unicast: "Multicast to Unicast",
   client_isolation: "Client Device Isolation",
-  no_2_4_ghz: "no 2.4 GHz",
+  no_2_4_ghz: "2.4 GHz turned off",
   wpa3_only: "WPA3 only",
 };
 
@@ -396,9 +397,9 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
       const wifiOnes = devices.filter((device) => !device.wired);
       return {
         icon: "speaker-high",
-        title: "Sonos is both wired and on Wi-Fi",
+        title: "Some Sonos speakers are wired, some on Wi-Fi",
         seen: `${names(wiredOnes)} ${wiredOnes.length === 1 ? "is" : "are"} wired. ${names(wifiOnes)} ${wifiOnes.length === 1 ? "is" : "are"} on Wi-Fi.`,
-        why: "A wired Sonos starts its own wireless network for the others, which can loop with your UniFi switches and drop the whole network or make speakers vanish. Speakers on that network can also show up as wired here.",
+        why: "This is usually fine. Sometimes a wired Sonos makes the network loop, which can drop speakers or knock out the internet for everyone. Older speakers like the Play:1 and IKEA Symfonisk are the most likely to cause it. If your speakers and internet work fine, you can ignore this.",
         fix: [
           "Choose all on Wi-Fi or all wired.",
           `All on Wi-Fi: unplug ${wiredOnes.length === 1 ? `${wiredOnes[0]!.name}’s cable` : "the wired speakers’ cables"} and restart ${wiredOnes.length === 1 ? "it" : "them"}.`,
@@ -411,17 +412,17 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
       return {
         icon: "device-mobile",
         title: `${plural(devices.length, "device uses", "devices use")} a private Wi-Fi address`,
-        seen: `${names(devices)}. Their address can change, so they can come back as new, unassigned devices and lose their rules.`,
-        why: "Phones, tablets and watches make up an address for each Wi-Fi network and may change it. FamilyFi knows a device by its address, so a new one is a new device.",
+        seen: `${names(devices)}.`,
+        why: "Phones, tablets and watches can change their Wi-Fi address. When one does, FamilyFi sees a new device, and it loses its rules until you assign it again.",
         fix: [`${PRIVATE_ADDRESS_COPY.iphone.label} ${PRIVATE_ADDRESS_COPY.iphone.steps}`, `${PRIVATE_ADDRESS_COPY.android.label} ${PRIVATE_ADDRESS_COPY.android.steps}`],
         show: { label: "Show on Devices", href: "/devices?private=1" },
       };
     case "wifi_multicast":
       return {
         icon: "wifi-high",
-        title: "Wi-Fi settings that break Sonos",
+        title: "Wi-Fi settings that can break Sonos",
         seen: wifis.map((wifi) => `${wifi.name}: ${(wifi.settings ?? []).map((setting) => WIFI_SETTING[setting] ?? setting).join(" and ")} on`).join(". ") + ".",
-        why: "Sonos asks for both to be off: they stop speakers finding each other and your phones finding the speakers.",
+        why: "Sonos asks for these to be off. With them on, speakers may not group and phones may not find them.",
         fix: [`UniFi Network → Settings → WiFi → ${wifis[0]?.name ?? "your Wi-Fi"} → Advanced → turn off Multicast to Unicast and Client Device Isolation.`],
         guide: SONOS_GUIDE,
       };
@@ -429,27 +430,27 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
       return {
         icon: "speaker-high",
         title: "Phones may not find Sonos",
-        seen: `${names(devices)} ${devices.length === 1 ? "is" : "are"} on another network from your phones, and mDNS is off for ${names(networks)}.`,
-        why: "The Sonos app finds speakers with mDNS, which stays inside one network unless UniFi forwards it.",
-        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS, and the same for the phones’ network.`],
+        seen: `${names(devices)} ${devices.length === 1 ? "is" : "are"} on a different network from your phones.`,
+        why: `The Sonos app only finds speakers on another network when mDNS is on for both networks in UniFi. It’s off for ${names(networks)}.`,
+        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS. Do the same for your phones’ network.`, "If they still can’t connect, check that your firewall lets the two networks talk."],
         guide: SONOS_GUIDE,
       };
     case "casting_mdns":
       return {
         icon: "television",
         title: "Phones can’t see some TVs and printers",
-        seen: `${names(devices)} ${devices.length === 1 ? "is" : "are"} on another network from your phones, and mDNS is off for ${names(networks)}.`,
-        why: "Casting, AirPlay and printing find devices with mDNS, which stays inside one network unless UniFi forwards it. If you keep them apart on purpose, this is fine.",
-        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS.`],
+        seen: `${names(devices)} ${devices.length === 1 ? "is" : "are"} on a different network from your phones.`,
+        why: `Phones can only cast, AirPlay or print to another network when mDNS is on for both networks in UniFi. It’s off for ${names(networks)}. If you keep them apart on purpose, you can ignore this.`,
+        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS.`, "If they still can’t connect, check that your firewall lets the two networks talk."],
       };
     case "dns_override": {
       const network = networks[0];
       const servers = namesList(network?.dnsServers ?? []);
       return {
         icon: "network",
-        title: `The ${network?.name ?? ""} network hands out its own DNS`,
-        seen: `Devices on ${network?.name ?? "it"} are told to use ${servers} for DNS, not the gateway.`,
-        why: `Category, app and website rules only see lookups that pass through the gateway. If ${servers} is a Pi-hole or AdGuard Home that forwards to the gateway, this is fine. Lock DNS would cut DNS off for these devices if that server is outside your home.`,
+        title: `The ${network?.name ?? ""} network uses its own DNS server`,
+        seen: `Devices on ${network?.name ?? "it"} look up websites through ${servers} instead of your gateway.`,
+        why: `Category and app rules still work. Website rules might not, because your gateway doesn’t see those lookups. If ${servers} is a Pi-hole or AdGuard Home, you can ignore this.`,
         fix: [`UniFi Network → Settings → Networks → ${network?.name ?? "the network"} → DHCP DNS Server → Auto.`],
       };
     }
@@ -458,9 +459,9 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
       const settings = (wifi?.settings ?? []).map((setting) => WIFI_SETTING[setting] ?? setting);
       return {
         icon: "house-line",
-        title: `${wifi?.name ?? "A Wi-Fi"} may not suit smart-home devices`,
-        seen: `${wifi?.name ?? "It"} carries Things devices and is ${namesList(settings)}.`,
-        why: "Many plugs, bulbs and cameras can only join 2.4 GHz Wi-Fi with WPA2. If yours are already connected, this is fine.",
+        title: `${wifi?.name ?? "A Wi-Fi"} may not work for smart-home devices`,
+        seen: `${wifi?.name ?? "It"} has Things devices on it, with ${namesList(settings)}.`,
+        why: "Many plugs, bulbs and cameras only connect to 2.4 GHz Wi-Fi using WPA2. If yours are already connected, you can ignore this.",
         fix: [`UniFi Network → Settings → WiFi → ${wifi?.name ?? "the Wi-Fi"} → turn on 2.4 GHz, or use WPA2/WPA3.`],
       };
     }
@@ -469,9 +470,9 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         icon: "network",
         title: networks.length === 1 ? `${networks[0]!.name} isn’t managed by FamilyFi` : `${plural(networks.length, "network", "networks")} aren’t managed by FamilyFi`,
         seen: `${networks.map((network) => `${plural(network.clientCount ?? 0, "device", "devices")} on ${network.name}`).join(", ")} get no rules or quarantine.`,
-        why: "FamilyFi only manages the networks chosen in Settings. A guest or work network is often left out on purpose.",
-        fix: ["FamilyFi → Settings → UniFi → Managed networks."],
-        show: { label: "Open Settings", href: "/settings" },
+        why: "FamilyFi only looks after the networks you pick in Settings. Guest and work networks are often left out on purpose.",
+        fix: ["FamilyFi → Settings → Gateway → Edit connection → pick the networks → Save network selection."],
+        show: { label: "Open Settings", href: "/settings?tab=gateway" },
       };
   }
 }
@@ -537,11 +538,11 @@ export function protectionLine(
   if (rule.builtIn === "quarantine") return CHECKUP_COPY.protection.quarantine.sub;
   if (rule.scope === "network") {
     const where = `everything on ${namesList(rule.networkIds.map((id) => networks.find((network) => network.id === id)?.name ?? "a network"))}`;
-    return rule.builtIn === "dns" ? `Keeps ${where} on your gateway’s DNS` : `Blocks ${countriesSummary(rule.countries)} for ${where}`;
+    return rule.builtIn === "dns" ? `Keeps ${where} off other DNS servers` : `Blocks ${countriesSummary(rule.countries)} for ${where}`;
   }
   const names = namesList(rule.groupIds.map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group"));
   // Switched on with no group, Lock DNS covers every person and Block countries every group.
-  if (rule.builtIn === "dns") return `Keeps ${rule.groupIds.length === 0 ? "every person" : names} on your gateway’s DNS`;
+  if (rule.builtIn === "dns") return `Keeps ${rule.groupIds.length === 0 ? "every person" : names} off other DNS servers`;
   const who = rule.groupIds.length === 0 || rule.groupIds.length === groups.length ? "every group" : names;
   return `Blocks ${countriesSummary(rule.countries)} for ${who}`;
 }

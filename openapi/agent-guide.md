@@ -75,10 +75,11 @@ Connect from the home network.
   it blocks every quarantined device. You may pause, extend and resume it, which lets every
   unassigned device online meanwhile, so say so first. You cannot switch, edit or delete it.
 - The household has a built-in rule whose id is `dns` (`builtIn: "dns"`): it stops the
-  groups it covers from using DNS servers other than the gateway, including the encrypted DNS
-  services its `domains` list, so their category, app and website rules can't be gotten around. It
+  groups it covers from using DNS servers on the internet, including the encrypted DNS services its
+  `domains` list, so their website rules can't be gotten around. The DNS servers the household's
+  networks hand out and the resolvers set in FamilyFi still work. It
   never blocks the internet, so never call it a website block or offer to unblock a group for it.
-  Pausing or allowing it lets those devices around the other rules meanwhile, so say so first.
+  Pausing or allowing it lets those devices around website rules meanwhile, so say so first.
 - The household has a built-in rule whose id is `countries` (`builtIn: "countries"`, "Block
   countries"): it stops the groups it covers from reaching servers in the countries its `countries`
   lists. It never blocks a group's internet, so never offer to unblock a group for it. You cannot

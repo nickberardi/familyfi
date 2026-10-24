@@ -22,7 +22,7 @@ export const QUARANTINE_RULE_ID = "quarantine";
 /**
  * The id of the household's built-in Lock DNS rule: it blocks the ways around the gateway's DNS
  * (other DNS servers, and known encrypted DNS services) for the groups or whole networks it covers, so
- * category, app and website rules hold. Only what it applies to can be edited; it is always on while switched on, and is
+ * website rules hold; category and app rules match traffic and never depended on DNS. Only what it applies to can be edited; it is always on while switched on, and is
  * paused and allowed like any rule. It never blocks the internet, so a group's status, block and
  * unblock leave it out.
  */

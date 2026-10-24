@@ -32,7 +32,7 @@ export const LOCK_DNS_COPY = {
   },
   appliesTo: {
     title: "Applies to",
-    note: "People and things, or whole networks. Category, app and website rules can’t be gotten around for these.",
+    note: "People and things, or whole networks. They can’t get around website rules by using a different DNS server.",
     things: "Smart TVs and streaming sticks often insist on Google’s DNS and may stop working with it on.",
     noNetwork: "Pick at least one network.",
   },

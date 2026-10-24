@@ -5,6 +5,7 @@ import {
   isPrivateMac,
   openProblemCount,
   outsideDnsNote,
+  PRIVATE_ADDRESS_COPY,
   protectionLine,
   protectionTitle,
   recommendedRules,
@@ -142,6 +143,10 @@ describe("network checkup", () => {
     const [finding] = found(run, "unmanaged_networks");
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).title).toBe("Guest isn’t managed by FamilyFi");
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).seen).toBe("3 devices on Guest get no rules or quarantine.");
+    // A Fixed iPhone address is still a private one, so only Off clears the finding.
+    expect(PRIVATE_ADDRESS_COPY.iphone.steps).toMatch(/Private Wi-Fi Address → Off\.$/);
+    // Settings opens on Household; the managed networks are on the Gateway tab.
+    expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).show?.href).toBe("/settings?tab=gateway");
   });
 
   it("changes a finding's subject when what was seen changes, and keeps it when it does not", () => {
@@ -164,12 +169,13 @@ describe("network checkup", () => {
     expect(checkupSummary({ ranAt: "2026-10-22T12:10:00Z", error: null, passed: [], findings: [] }, now)).toBe("No problems · checked just now");
   });
 
-  it("notes in the rule editor when covered devices use a network's own DNS", () => {
+  it("notes in the website rule editor when covered devices use a network's own DNS", () => {
     const state = { findings: [{ id: "dns_override:lan", check: "dns_override" as const, kind: "note" as const, details: { networks: [{ id: LAN, name: "LAN", dnsServers: ["192.0.2.53"] }] }, firstSeenAt: "", lastSeenAt: "", dismissed: false }] };
     const devices = [{ groupId: "g1", networkId: LAN }];
-    const rule = { kind: "category", scope: "group", groupIds: ["g1"], networkIds: [] };
-    expect(outsideDnsNote(rule, devices, state)).toContain("LAN, which hands out 192.0.2.53");
-    expect(outsideDnsNote({ ...rule, kind: "internet" }, devices, state)).toBeNull();
+    const rule = { kind: "domain", scope: "group", groupIds: ["g1"], networkIds: [] };
+    expect(outsideDnsNote(rule, devices, state)).toContain("LAN, which uses its own DNS server (192.0.2.53)");
+    // Category and app rules match traffic, not lookups.
+    for (const kind of ["internet", "category", "app"]) expect(outsideDnsNote({ ...rule, kind }, devices, state)).toBeNull();
     expect(outsideDnsNote({ ...rule, groupIds: ["g2"] }, devices, state)).toBeNull();
     expect(outsideDnsNote({ ...rule, scope: "network", groupIds: [], networkIds: [LAN] }, [], state)).not.toBeNull();
     expect(outsideDnsNote(rule, devices, null)).toBeNull();
@@ -207,12 +213,12 @@ describe("network checkup", () => {
     expect(recommendedRules(rules).map((rule) => rule.id)).toEqual(["quarantine", "dns", "countries"]);
     expect(recommendedRules(rules).map(protectionTitle)).toEqual(["Quarantine", "Lock DNS", "Block countries"]);
     const people = { scope: "group" as const, networkIds: [] };
-    expect(protectionLine({ ...people, builtIn: "dns", countries: [], groupIds: [] }, groups)).toBe("Keeps every person on your gateway’s DNS");
-    expect(protectionLine({ ...people, builtIn: "dns", countries: [], groupIds: ["g1"] }, groups)).toBe("Keeps Mia on your gateway’s DNS");
+    expect(protectionLine({ ...people, builtIn: "dns", countries: [], groupIds: [] }, groups)).toBe("Keeps every person off other DNS servers");
+    expect(protectionLine({ ...people, builtIn: "dns", countries: [], groupIds: ["g1"] }, groups)).toBe("Keeps Mia off other DNS servers");
     expect(protectionLine({ ...people, builtIn: "countries", countries: ["KP"], groupIds: ["g1", "g2"] }, groups)).toBe("Blocks North Korea for every group");
     const networks = [{ id: "n1", name: "Kids Wi-Fi" }];
     const wholeNetworks = { scope: "network" as const, groupIds: [], networkIds: ["n1"] };
-    expect(protectionLine({ ...wholeNetworks, builtIn: "dns", countries: [] }, groups, networks)).toBe("Keeps everything on Kids Wi-Fi on your gateway’s DNS");
+    expect(protectionLine({ ...wholeNetworks, builtIn: "dns", countries: [] }, groups, networks)).toBe("Keeps everything on Kids Wi-Fi off other DNS servers");
     expect(protectionLine({ ...wholeNetworks, builtIn: "countries", countries: ["KP"] }, groups, networks)).toBe("Blocks North Korea for everything on Kids Wi-Fi");
   });
 });
