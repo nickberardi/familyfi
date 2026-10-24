@@ -89,8 +89,8 @@ test.describe("accessibility", () => {
     await expectAccessible(page, `/family/${family!.id}`);
     await expectAccessible(page, `/things/${things!.id}`);
     await expectAccessible(page, `/categories/${categories[0].id}`);
-    const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as { rules: { id: string; windows: unknown[] }[] };
-    const scheduled = rules.find((rule) => rule.windows.length > 1);
+    const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as { rules: { id: string; windows?: unknown[] }[] };
+    const scheduled = rules.find((rule) => (rule.windows?.length ?? 0) > 1);
     expect(scheduled, "the mock household has a rule with two windows").toBeTruthy();
     await expectAccessible(page, `/rules/${scheduled!.id}`);
     const { devices } = (await (await page.request.get("/api/v1/devices")).json()) as { devices: { mac: string }[] };

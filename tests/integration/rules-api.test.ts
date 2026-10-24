@@ -306,7 +306,10 @@ describe("household rules", () => {
       mode: "always",
     });
     expect(created.status).toBe(201);
-    expect(((await created.json()) as { rule: PublicRule }).rule.domains).toEqual(["tiktokcdn.com", "www.tiktok.com"]);
+    const website = ((await created.json()) as { rule: PublicRule }).rule;
+    expect(website.domains).toEqual(["tiktokcdn.com", "www.tiktok.com"]);
+    // Only what describes a website rule, always on, for groups: no targetIds, windows or networkIds.
+    for (const field of ["targetIds", "windows", "networkIds", "countries", "blockPrivateRelay", "openDns"]) expect(website).not.toHaveProperty(field);
     await runReconcileOnce();
     const [policy] = policiesNamed(client, "FamilyFi No TikTok");
     expect(policy?.destination.trafficFilter).toEqual({
@@ -404,7 +407,10 @@ describe("household rules", () => {
 
     const created = await postRule(auth, { name: "Grounded", kind: "internet", groupIds: [emma.id], mode: "always" });
     expect(created.status).toBe(201);
-    expect(((await created.json()) as { rule: PublicRule }).rule.policyNames).toEqual(["FamilyFi Grounded"]);
+    const grounded = ((await created.json()) as { rule: PublicRule }).rule;
+    expect(grounded.policyNames).toEqual(["FamilyFi Grounded"]);
+    expect(grounded).toMatchObject({ groupIds: [emma.id], groupPauses: [] });
+    for (const field of ["targetIds", "domains", "windows", "networkIds"]) expect(grounded).not.toHaveProperty(field);
     await runReconcileOnce();
     const [policy] = policiesNamed(client, "FamilyFi Grounded");
     expect(policy?.enabled).toBe(true);
