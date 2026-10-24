@@ -112,6 +112,22 @@ describe("reusable workflows", () => {
   });
 });
 
+describe("Buildx setup", () => {
+  // v0.32.0's container job lost its moby/buildkit pull to a sibling job on the same daemon:
+  // "failed to lease content: NotFound: lease ... not found".
+  it("tries a BuildKit pull a second time, or pulls none", () => {
+    for (const file of workflows) {
+      for (const step of read(file).split(/^\s+- /m).filter((s) => s.includes("docker/setup-buildx-action"))) {
+        expect(step, file).toMatch(/driver: docker\s*$/m);
+      }
+    }
+    const action = read(".github/actions/setup-buildx/action.yml");
+    expect(action.match(/uses: docker\/setup-buildx-action@/g)).toHaveLength(2);
+    expect(action).toMatch(/id: first\s+uses: docker\/setup-buildx-action@\S+\s+continue-on-error: true/);
+    expect(action).toContain("if: steps.first.outcome == 'failure'");
+  });
+});
+
 describe("scripts/ paths", () => {
   const sources = [
     ...workflows,
