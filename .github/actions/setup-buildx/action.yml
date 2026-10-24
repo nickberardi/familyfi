@@ -1,0 +1,22 @@
+name: Set up Buildx
+description: >
+  docker/setup-buildx-action, tried a second time when its first attempt fails. Several
+  self-hosted agents share one Docker daemon, and pulling moby/buildkit while a sibling job
+  starts can lose the pull's lease ("failed to lease content: NotFound: lease ... not
+  found"). A second pull a little later succeeds. Use it in place of setup-buildx-action.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Buildx (first attempt)
+      id: first
+      uses: docker/setup-buildx-action@v4
+      continue-on-error: true
+    - if: steps.first.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::Setting up Buildx failed; trying again in 45 seconds."
+        sleep 45
+    - name: Set up Buildx (second attempt)
+      if: steps.first.outcome == 'failure'
+      uses: docker/setup-buildx-action@v4
