@@ -17,8 +17,6 @@ import {
   removeDomain,
   removeWindow,
   ruleEditorState,
-  toggleRuleGroup,
-  toggleRuleNetwork,
   toggleWindowDay,
   undoRemoveWindow,
   updateWindow,
@@ -31,8 +29,8 @@ import { MAX_RULE_NAME, MAX_WINDOW_NAME, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 import { CatalogPicker } from "./CatalogPicker";
-import { Chip, ChipGroup } from "./Chips";
 import { EditorSection } from "./EditorSection";
+import { RuleAppliesTo } from "./RuleAppliesTo";
 import { RuleBar } from "./RuleBar";
 import { RuleNameField } from "./RuleNameField";
 import { RuleWindowFrame } from "./RuleWindowFrame";
@@ -217,57 +215,22 @@ export function RuleEditorForm({
         )}
       </EditorSection>
 
-      <EditorSection title={COPY.appliesTo.title} note={COPY.appliesTo.note}>
-        {networks.length ? (
-          <ui.Segmented
-            name={COPY.appliesTo.title}
-            value={draft.scope}
-            segments={[
-              { value: "group", label: COPY.appliesTo.groups, disabled: Boolean(saved) && draft.scope !== "group" },
-              { value: "network", label: COPY.appliesTo.networks, disabled: draft.kind === "internet" || (Boolean(saved) && draft.scope !== "network") },
-            ]}
-            onChange={(scope) => set({ scope: scope as EditorDraft["scope"] })}
-            disabled={disabled}
-            fit
-            testID="rule-scope"
-          />
-        ) : null}
+      <RuleAppliesTo
+        draft={draft}
+        groups={groups}
+        networks={networks}
+        edit={edit}
+        locked={{ group: Boolean(saved) && draft.scope !== "group", network: draft.kind === "internet" || (Boolean(saved) && draft.scope !== "network") }}
+        disabled={disabled}
+        testID="rule"
+      >
         {draft.kind === "internet" ? <Text style={note}>{COPY.appliesTo.internetNote}</Text> : null}
         {outsideDns ? (
           <Text role="note" style={[text(14, 20), styles.overlap, { backgroundColor: ui.color("field-soft"), color: ui.color("ink-2") }]} testID="rule-outside-dns">
             {outsideDns}
           </Text>
         ) : null}
-        {draft.scope === "group" ? (
-          <ChipGroup label={COPY.appliesTo.groupsLabel}>
-            {groups.map((group) => (
-              <Chip
-                key={group.id}
-                on={draft.groupIds.includes(group.id)}
-                onPress={() => edit((current) => toggleRuleGroup(current, group.id))}
-                disabled={disabled}
-                testID={`rule-group-${group.id}`}
-              >
-                {group.name}
-              </Chip>
-            ))}
-          </ChipGroup>
-        ) : (
-          <ChipGroup label={COPY.appliesTo.networksLabel}>
-            {networks.map((network) => (
-              <Chip
-                key={network.id}
-                on={draft.networkIds.includes(network.id)}
-                onPress={() => edit((current) => toggleRuleNetwork(current, network.id))}
-                disabled={disabled}
-                testID={`rule-network-${network.id}`}
-              >
-                {network.name}
-              </Chip>
-            ))}
-          </ChipGroup>
-        )}
-      </EditorSection>
+      </RuleAppliesTo>
 
       <EditorSection title={COPY.writes.title} note={COPY.writes.note}>
         <RuleWritesList writes={state.writes} />

@@ -530,8 +530,16 @@ export function protectionTitle(rule: Pick<Rule, "builtIn">): string {
 }
 
 /** What a protection row says under its name. */
-export function protectionLine(rule: Pick<Rule, "builtIn" | "countries" | "groupIds">, groups: { id: string; name: string }[]): string {
+export function protectionLine(
+  rule: Pick<Rule, "builtIn" | "countries" | "scope" | "groupIds" | "networkIds">,
+  groups: { id: string; name: string }[],
+  networks: { id: string; name: string }[] = [],
+): string {
   if (rule.builtIn === "quarantine") return CHECKUP_COPY.protection.quarantine.sub;
+  if (rule.scope === "network") {
+    const where = `everything on ${namesList(rule.networkIds.map((id) => networks.find((network) => network.id === id)?.name ?? "a network"))}`;
+    return rule.builtIn === "dns" ? `Keeps ${where} off other DNS servers` : `Blocks ${countriesSummary(rule.countries)} for ${where}`;
+  }
   const names = namesList(rule.groupIds.map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group"));
   // Switched on with no group, Lock DNS covers every person and Block countries every group.
   if (rule.builtIn === "dns") return `Keeps ${rule.groupIds.length === 0 ? "every person" : names} off other DNS servers`;

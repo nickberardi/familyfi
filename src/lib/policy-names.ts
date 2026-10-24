@@ -66,9 +66,10 @@ export function clipName(name: string): string {
 /**
  * The parts of the built-in Lock DNS rule, each its own UniFi policy in a zone: DNS ports to the
  * internet, the encrypted DNS services' addresses (one policy per IP version, as UniFi matches
- * addresses of one version at a time), and their host names.
+ * addresses of one version at a time), their host names, and, while it turns off iCloud Private
+ * Relay (experimental), Apple's relay names.
  */
-export const LOCK_DNS_PARTS = ["ports", "addresses", "addresses-v6", "names"] as const;
+export const LOCK_DNS_PARTS = ["ports", "addresses", "addresses-v6", "names", "private-relay"] as const;
 export type LockDnsPart = (typeof LOCK_DNS_PARTS)[number];
 
 const LOCK_DNS_TAILS: Record<LockDnsPart, string> = {
@@ -76,7 +77,13 @@ const LOCK_DNS_TAILS: Record<LockDnsPart, string> = {
   addresses: "Lock DNS services",
   "addresses-v6": "Lock DNS services IPv6",
   names: "Lock DNS names",
+  "private-relay": "Lock DNS Private Relay",
 };
+
+/** The parts Lock DNS has: every part, and Private Relay's only while it turns that off. */
+export function lockDnsParts(blockPrivateRelay: boolean): LockDnsPart[] {
+  return LOCK_DNS_PARTS.filter((part) => blockPrivateRelay || part !== "private-relay");
+}
 
 /** A Lock DNS policy's name, e.g. "FamilyFi Lock DNS services". */
 export function lockDnsPolicyName(part: LockDnsPart, zoneName = "Internal"): string {

@@ -23,7 +23,7 @@ import { APP_VERSION } from "@/lib/version";
 import { ArchiveError, readArchive, writeArchive } from "./archive";
 import { assertEndpoint, ensureConnectionIdentity, removeAccountDevices } from "./connection";
 import { dumpDatabase } from "./database-dump";
-import { assertManagedNetworkIds, ensureCountriesRule, normalizeCountries, RuleInputError, validateRuleShape } from "./rules";
+import { assertManagedNetworkIds, ensureCountriesRule, normalizeCountries, normalizeNetworkIds, RuleInputError, validateRuleShape } from "./rules";
 import { normalizeResolverUrl, ResolverConfigError } from "./upstream/resolver-settings";
 import { customSlugFor } from "./upstream-seed";
 import { prisma } from "./db";
@@ -85,8 +85,16 @@ const Config = z
         probeTimeoutMs: z.number().int().positive(),
       }),
       autoUpdate: z.object({ enabled: z.boolean(), days: Days, time: Hhmm }),
-      /** The built-in Lock DNS rule: its switch and its groups. An export from before it comes in off. */
-      lockDns: z.object({ enabled: z.boolean(), groupIds: z.array(Id) }).default({ enabled: false, groupIds: [] }),
+      /** The built-in Lock DNS rule: its switch, what it applies to and its Private Relay switch. An export from before it comes in off. */
+      lockDns: z
+        .object({
+          enabled: z.boolean(),
+          scope: z.enum(RuleScope).default(RuleScope.group),
+          groupIds: z.array(Id),
+          networkIds: z.array(z.string()).default([]),
+          blockPrivateRelay: z.boolean().default(false),
+        })
+        .default({ enabled: false, scope: RuleScope.group, groupIds: [], networkIds: [], blockPrivateRelay: false }),
     }),
     groups: z.array(
       z.object({
@@ -250,7 +258,13 @@ export async function householdConfig(): Promise<HouseholdConfig> {
         probeTimeoutMs: household.dohProbeTimeoutMs,
       },
       autoUpdate: { enabled: household.updateScheduleEnabled, ...parseWeeklyCron(household.updateSchedule) },
-      lockDns: { enabled: lockDns?.enabled ?? false, groupIds: (lockDns?.groups ?? []).map((link) => link.groupId).sort() },
+      lockDns: {
+        enabled: lockDns?.enabled ?? false,
+        scope: lockDns?.scope ?? RuleScope.group,
+        groupIds: (lockDns?.groups ?? []).map((link) => link.groupId).sort(),
+        networkIds: [...(lockDns?.networkIds ?? [])].sort(),
+        blockPrivateRelay: lockDns?.blockPrivateRelay ?? false,
+      },
     },
     groups: groups.map((group) => ({
       id: group.id,
@@ -389,10 +403,20 @@ export function readExport(upload: Buffer): { manifest: Manifest; config: Househ
 function checkWrites(config: HouseholdConfig): HouseholdConfig {
   const rules = config.rules.map((rule) => {
     try {
-      // The built-in Block countries rule has only its switch, groups and countries to bring.
+      // The built-in Block countries rule has only its switch, what it applies to and its countries to bring.
       if (rule.id === COUNTRIES_RULE_ID) {
-        const fixed = { name: "Block countries", useGeneratedName: false, kind: RuleKind.domain, scope: RuleScope.group, mode: RuleMode.always };
-        return { ...rule, ...fixed, networkIds: [], targetIds: [], domains: [], windows: [], countries: normalizeCountries(rule.countries) };
+        const fixed = { name: "Block countries", useGeneratedName: false, kind: RuleKind.domain, mode: RuleMode.always };
+        const network = rule.scope === RuleScope.network;
+        return {
+          ...rule,
+          ...fixed,
+          groupIds: network ? [] : rule.groupIds,
+          networkIds: network ? normalizeNetworkIds(rule.networkIds) : [],
+          targetIds: [],
+          domains: [],
+          windows: [],
+          countries: normalizeCountries(rule.countries),
+        };
       }
       const shaped = validateRuleShape({ ...rule, windows: rule.windows.map(({ id, name, days, start, end }) => ({ id, name, days, start, end })) });
       const positions = new Map(rule.windows.map((window) => [window.id, window.position]));
@@ -522,7 +546,9 @@ function assertNetworkRules(config: HouseholdConfig, current: Current, gateway: 
     gateway === "imported"
       ? { manageAllNetworks: config.household.unifi.manageAllNetworks, managedNetworkIds: config.household.unifi.managedNetworkIds }
       : { manageAllNetworks: current.unifiManageAllNetworks, managedNetworkIds: current.unifiManagedNetworkIds };
-  for (const rule of config.rules) {
+  const lockDns = config.household.lockDns;
+  const rules = lockDns.scope === RuleScope.network ? [...config.rules, { name: "Lock DNS", ...lockDns }] : config.rules;
+  for (const rule of rules) {
     if (rule.scope !== RuleScope.network) continue;
     try {
       assertManagedNetworkIds(rule.networkIds, scope);
@@ -661,10 +687,32 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       const lockDns = config.household.lockDns;
       await tx.rule.upsert({
         where: { id: LOCK_DNS_RULE_ID },
-        update: { enabled: lockDns.enabled, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
-        create: { id: LOCK_DNS_RULE_ID, name: "Lock DNS", kind: RuleKind.domain, mode: RuleMode.always, enabled: lockDns.enabled },
+        update: {
+          enabled: lockDns.enabled,
+          scope: lockDns.scope,
+          networkIds: lockDns.networkIds,
+          blockPrivateRelay: lockDns.blockPrivateRelay,
+          // What it leaves open is the imported household's, worked out at the next sync.
+          openDns: [],
+          pauseActive: false,
+          pauseUntil: null,
+          pauseKind: RuleLiftKind.pause,
+          pausedByAccountId: null,
+          pausedByName: null,
+        },
+        create: {
+          id: LOCK_DNS_RULE_ID,
+          name: "Lock DNS",
+          kind: RuleKind.domain,
+          mode: RuleMode.always,
+          enabled: lockDns.enabled,
+          scope: lockDns.scope,
+          networkIds: lockDns.networkIds,
+          blockPrivateRelay: lockDns.blockPrivateRelay,
+        },
       });
-      await tx.ruleGroup.createMany({ data: lockDns.groupIds.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })) });
+      const lockDnsGroups = lockDns.scope === RuleScope.group ? lockDns.groupIds : [];
+      await tx.ruleGroup.createMany({ data: lockDnsGroups.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })) });
 
       // An export from before Block countries brings none: the household gets it back, off.
       await ensureCountriesRule(tx);

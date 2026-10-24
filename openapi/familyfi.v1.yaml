@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.32.0
+  version: 0.33.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -1030,17 +1030,23 @@ paths:
       tags: [Rules]
       summary: Update a rule
       description: |
-        Changes any field except `kind` and `scope`. `windows` replaces the whole list:
+        Changes any field except `kind`. `scope` stays the one a rule was made with (400
+        `invalid_request` for another). `windows` replaces the whole list:
         a window sent with its `id` keeps its UniFi policy (renamed or rescheduled in
         place), one without an id is new, and a stored window left out is removed with
         its policy. The built-in quarantine rule takes `enabled` alone, as `/on` and `/off`;
-        any other field answers 409 `rule_built_in`. The built-in Lock DNS rule takes
-        `groupIds` and `enabled` only, and answers 409 `rule_built_in` to any other field.
-        The built-in Block countries rule takes
-        `enabled`, `groupIds` and `countries` (ISO 3166-1 alpha-2 codes UniFi's region filter
-        accepts, at least one; 400 `invalid_countries` otherwise); any other field answers 409
-        `rule_built_in`. Switching it on while it covers no group covers every group. `countries`
-        on any other rule answers 400.
+        any other field answers 409 `rule_built_in`.
+
+        The built-in Lock DNS and Block countries rules take `enabled` and what they apply to,
+        checked as for any rule: `scope` with `groupIds` (people and things) or `networkIds`
+        (whole managed networks, 400 `unmanaged_network` otherwise), and their scope can change.
+        Without `scope`, a patch that names only `groupIds` or only `networkIds` takes that scope,
+        so a client that knows only groups moves the rule back to them. Switched on while it
+        applies to nothing, Lock DNS covers every family group and Block countries every group,
+        unless the same request names its groups. Block countries also takes `countries`
+        (ISO 3166-1 alpha-2 codes UniFi's region filter accepts, at least one; 400
+        `invalid_countries` otherwise), and Lock DNS `blockPrivateRelay` (experimental). Any other
+        field answers 409 `rule_built_in`. `countries` or `blockPrivateRelay` on a rule that isn't built in answers 400.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -3785,7 +3791,7 @@ components:
     Rule:
       type: object
       additionalProperties: false
-      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, countries, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
+      required: [id, name, kind, scope, groupIds, networkIds, targetIds, domains, countries, blockPrivateRelay, openDns, enabled, pause, groupPauses, mode, windows, useGeneratedName, policyNames, builtIn]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 60 }
@@ -3816,6 +3822,20 @@ components:
           type: array
           items: { type: string, pattern: "^[A-Z]{2}$" }
           description: ISO 3166-1 alpha-2 codes the built-in Block countries rule blocks; empty on every other rule
+        blockPrivateRelay:
+          type: boolean
+          description: |
+            The built-in Lock DNS rule also turns off iCloud Private Relay for what it applies to
+            (experimental): one more policy, "FamilyFi Lock DNS Private Relay", blocks Apple's relay
+            names `mask.icloud.com` and `mask-h2.icloud.com`, so an iPhone says Private Relay is off
+            for the network. False on every other rule.
+        openDns:
+          type: array
+          items: { $ref: "#/components/schemas/LockDnsOpen" }
+          description: |
+            The DNS the built-in Lock DNS rule left open at its last sync, read-only: the resolvers
+            set in FamilyFi with the addresses their names looked up to, and the DNS servers its
+            networks hand out. Empty until it syncs while applying to something, and on every other rule.
         enabled: { type: boolean }
         pause: { $ref: "#/components/schemas/RulePause" }
         groupPauses:
@@ -3854,13 +3874,14 @@ components:
             stay reachable. It never blocks the internet, so a group's status, block and unblock leave it out.
             It is always on while `enabled` (`kind` is `domain`, `mode` `always`), starts off with
             no group, and covers every family group when switched on with none (unless the same
-            request names its groups). Only `groupIds`
-            and `enabled` can change, and it cannot be deleted (409 `rule_built_in`); it is paused
-            and allowed, for everyone or one group, like any rule.
+            request names its groups). Only `enabled`, what it applies to (`scope`, `groupIds`,
+            `networkIds`, as for any rule) and `blockPrivateRelay` can change, and it cannot be deleted (409 `rule_built_in`);
+            it is paused and allowed, for everyone or one group, like any rule.
 
-            `countries` (id `countries`, "Block countries") blocks the covered groups' devices from
-            reaching servers in `countries`, through one always-on policy with UniFi's region
-            filter. Only its switch, groups and countries change; it is never deleted. A client
+            `countries` (id `countries`, "Block countries") blocks the covered groups' devices, or
+            everything on its networks, from reaching servers in `countries`, through one always-on
+            policy with UniFi's region filter. Only its switch, what it applies to and its countries
+            change; it is never deleted. A client
             that does not know a value treats the rule as built in and leaves it alone.
         policyNames:
           type: array
@@ -3869,6 +3890,22 @@ components:
             What UniFi's policy table shows for the rule in the Internal zone, one per
             policy: "FamilyFi " and the rule name, then " – " and the window name when it
             has more than one window. Another zone's policy adds " (<zone>)".
+    LockDnsOpen:
+      type: object
+      additionalProperties: false
+      required: [source, name, host, addresses]
+      description: One DNS server Lock DNS leaves open.
+      properties:
+        source:
+          type: string
+          enum: [household, group, network]
+          description: household = the household's resolver; group = a group's resolver override; network = a server a network hands out
+        name: { type: [string, "null"], description: "The group's or network's name; null for the household's resolver" }
+        host: { type: [string, "null"], description: "The resolver's host name; null for an address" }
+        addresses:
+          type: array
+          items: { type: string }
+          description: Its addresses, as last looked up; empty when its name could not be looked up yet
     RuleCreate:
       type: object
       additionalProperties: false
@@ -3917,6 +3954,10 @@ components:
       additionalProperties: false
       properties:
         name: { type: string, minLength: 1, maxLength: 60 }
+        scope:
+          type: string
+          enum: [group, network]
+          description: Changes only on the built-in Lock DNS and Block countries rules; any other rule keeps its own
         groupIds:
           type: array
           items: { type: string }
@@ -3942,6 +3983,9 @@ components:
           minItems: 1
           maxItems: 300
           description: The built-in Block countries rule only
+        blockPrivateRelay:
+          type: boolean
+          description: The built-in Lock DNS rule only; see `Rule.blockPrivateRelay`
         enabled: { type: boolean }
         mode: { type: string, enum: [always, scheduled] }
         windows:

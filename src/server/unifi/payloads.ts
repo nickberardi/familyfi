@@ -1,3 +1,4 @@
+import { PRIVATE_RELAY_HOSTS } from "@/lib/encrypted-dns";
 import type { LockDnsPart } from "@/lib/policy-names";
 import { normalizeMac } from "../mac";
 import { lockDnsTargets, type LockDnsTargets } from "./lock-dns";
@@ -237,6 +238,14 @@ export function dpiAppNetworkBlockPolicy(input: {
   };
 }
 
+/** The covered devices' MACs, or whole managed networks: what a policy that can take either blocks. */
+function deviceSourceFilter(input: { macAddresses?: string[]; networkIds?: string[] }, what: string) {
+  if (input.networkIds) return networkSourceFilter(input.networkIds);
+  const macAddresses = [...new Set((input.macAddresses ?? []).map(normalizeMac))].sort();
+  if (macAddresses.length === 0) throw new Error(`${what} needs at least one MAC address.`);
+  return { type: "MAC_ADDRESS" as const, macAddressFilter: { macAddresses } };
+}
+
 /**
  * Website block (#94): UniFi matches the domains, and their subdomains, by watching DNS
  * lookups, so a device using its own DNS can get around it unless Lock DNS covers it. Source
@@ -254,14 +263,7 @@ export function domainBlockPolicy(input: {
 }): FirewallPolicyWrite {
   const domains = [...new Set(input.domains.map((domain) => domain.trim().toLowerCase()).filter(Boolean))].sort();
   if (domains.length === 0) throw new Error("A website policy needs at least one domain.");
-  let sourceFilter;
-  if (input.networkIds) {
-    sourceFilter = networkSourceFilter(input.networkIds);
-  } else {
-    const macAddresses = [...new Set((input.macAddresses ?? []).map(normalizeMac))].sort();
-    if (macAddresses.length === 0) throw new Error("A website policy needs at least one MAC address.");
-    sourceFilter = { type: "MAC_ADDRESS", macAddressFilter: { macAddresses } };
-  }
+  const sourceFilter = deviceSourceFilter(input, "A website policy");
   return {
     name: input.name,
     description: "FamilyFi managed website block.",
@@ -282,33 +284,36 @@ export function domainBlockPolicy(input: {
 export const DNS_PORTS = [53, 853] as const;
 
 /**
- * One part of the built-in Lock DNS rule for the covered devices' MACs (`LOCK_DNS_PARTS`):
+ * One part of the built-in Lock DNS rule for the covered devices' MACs or whole networks (`LOCK_DNS_PARTS`):
  * `ports` blocks TCP and UDP 53 and 853 to the destination zone, the internet, so the gateway and
  * any DNS server on the home network still answer; `addresses` and `addresses-v6` block every port
  * to the encrypted DNS services' addresses, one IP version each; `names` blocks their host names,
- * which the gateway sees now that their lookups go through it.
+ * which the gateway sees now that their lookups go through it; `private-relay` blocks Apple's relay
+ * names, so an iPhone turns iCloud Private Relay off for the network (experimental).
  */
 export function lockDnsBlockPolicy(input: {
   name: string;
   part: LockDnsPart;
   sourceZoneId: string;
   destinationZoneId: string;
-  macAddresses: string[];
+  macAddresses?: string[];
+  networkIds?: string[];
   enabled?: boolean;
   /** What it blocks, leaving out the household's own DNS. */
   targets?: LockDnsTargets;
 }): FirewallPolicyWrite {
   const targets = input.targets ?? lockDnsTargets();
   if (input.part === "names") return { ...domainBlockPolicy({ ...input, domains: targets.hosts }), description: LOCK_DNS_DESCRIPTION };
-  const macAddresses = [...new Set(input.macAddresses.map(normalizeMac))].sort();
-  if (macAddresses.length === 0) throw new Error("A Lock DNS policy needs at least one MAC address.");
+  // Apple's relay names, whatever the household's own DNS: Private Relay is never a resolver it set.
+  if (input.part === "private-relay") return { ...domainBlockPolicy({ ...input, domains: [...PRIVATE_RELAY_HOSTS] }), description: LOCK_DNS_DESCRIPTION };
+  const sourceFilter = deviceSourceFilter(input, "A Lock DNS policy");
   const common = {
     name: input.name,
     description: LOCK_DNS_DESCRIPTION,
     enabled: input.enabled ?? true,
     loggingEnabled: false,
     action: { type: INTERNET_BLOCK_ACTION },
-    source: { zoneId: input.sourceZoneId, trafficFilter: { type: "MAC_ADDRESS", macAddressFilter: { macAddresses } } },
+    source: { zoneId: input.sourceZoneId, trafficFilter: sourceFilter },
   };
   if (input.part === "ports") {
     const portFilter = { type: "PORTS", matchOpposite: false, items: DNS_PORTS.map((value) => ({ type: "PORT_NUMBER" as const, value })) } as const;
@@ -349,7 +354,7 @@ function addressItems(values: string[]): IpAddressFilter["items"] {
 const LOCK_DNS_DESCRIPTION = "FamilyFi managed Lock DNS: blocks DNS servers other than the gateway.";
 
 /**
- * Block countries: the covered devices' traffic to servers in these regions (ISO 3166-1 alpha-2),
+ * Block countries: the covered devices' (or whole networks') traffic to servers in these regions (ISO 3166-1 alpha-2),
  * which the gateway locates by IP address. Outgoing only; the payload shape follows the Network
  * Integration API's region filter and is not yet proven against a gateway.
  */
@@ -357,14 +362,14 @@ export function regionBlockPolicy(input: {
   name: string;
   sourceZoneId: string;
   destinationZoneId: string;
-  macAddresses: string[];
+  macAddresses?: string[];
+  networkIds?: string[];
   regions: string[];
   enabled?: boolean;
   schedule?: UnifiFirewallSchedule;
 }): FirewallPolicyWrite {
-  const macAddresses = [...new Set(input.macAddresses.map(normalizeMac))].sort();
+  const sourceFilter = deviceSourceFilter(input, "A country policy");
   const regions = [...new Set(input.regions)].sort();
-  if (macAddresses.length === 0) throw new Error("A country policy needs at least one MAC address.");
   if (regions.length === 0) throw new Error("A country policy needs at least one country.");
   return {
     name: input.name,
@@ -373,7 +378,7 @@ export function regionBlockPolicy(input: {
     loggingEnabled: false,
     action: { type: INTERNET_BLOCK_ACTION },
     ipProtocolScope: { ipVersion: "IPV4_AND_IPV6" },
-    source: { zoneId: input.sourceZoneId, trafficFilter: { type: "MAC_ADDRESS", macAddressFilter: { macAddresses } } },
+    source: { zoneId: input.sourceZoneId, trafficFilter: sourceFilter },
     destination: {
       zoneId: input.destinationZoneId,
       trafficFilter: { type: "REGION", regionFilter: { regions } },

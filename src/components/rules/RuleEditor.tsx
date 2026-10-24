@@ -202,7 +202,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
 /** Block countries: its switch, countries and groups. Its name, kind and schedule are FamilyFi's. */
 function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: string | null }) {
   const router = useRouter();
-  const { groups, store, busy } = useAppData();
+  const { groups, unifi, store, busy } = useAppData();
   const [draft, setDraft] = useState<CountriesDraft>(() => fromCountriesRule(saved, groups));
   const [error, setError] = useState("");
   const { href: back, label: backLabel } = ruleEditorBack(returnGroup, groups);
@@ -238,6 +238,7 @@ function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: str
         <CountriesRuleForm
           draft={draft}
           groups={groups}
+          networks={managedNetworksOf(unifi)}
           error={error}
           edit={(next) => {
             setError("");

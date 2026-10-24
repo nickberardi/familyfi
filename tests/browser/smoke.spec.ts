@@ -659,12 +659,15 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
   }
 });
 
-test("Rules: Lock DNS is a built-in rule whose page changes only the groups it covers", { tag: "@desktop" }, async ({ page }) => {
+test("Rules: Lock DNS is a built-in rule whose page changes only what it applies to", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };
   const nick = groups.find((group) => group.name === "Nick");
   expect(nick, "The mock seed must include Nick").toBeTruthy();
   const { rule: seeded } = (await (await page.request.get("/api/v1/rules/dns")).json()) as { rule: { groupIds: string[] } };
+  const { unifi } = (await (await page.request.get("/api/v1/settings/unifi")).json()) as { unifi: { networks: { id: string; name: string }[] } };
+  const network = unifi.networks[0];
+  expect(network, "The mock gateway must have a network").toBeTruthy();
   try {
     await page.goto("/rules");
     const card = page.getByTestId("rule-card-dns");
@@ -679,13 +682,25 @@ test("Rules: Lock DNS is a built-in rule whose page changes only the groups it c
     await expect(page.getByText("Unsaved changes")).toHaveCount(0);
     await page.getByTestId(`lock-dns-group-${nick!.id}`).click();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
-    await expect(page.getByText("Groups changed").first()).toBeVisible();
+    await expect(page.getByText("Applies to changed").first()).toBeVisible();
     await page.getByRole("button", { name: "Save" }).first().click();
     await expect(page).toHaveURL(/\/rules$/);
     const { rule } = (await (await page.request.get("/api/v1/rules/dns")).json()) as { rule: { groupIds: string[] } };
     expect(rule.groupIds).toContain(nick!.id);
+
+    // Whole networks, as for any rule.
+    await page.goto("/rules/dns");
+    await page.getByText("Whole networks", { exact: true }).click();
+    await page.getByRole("button", { name: "Save" }).first().click();
+    await expect(page.getByTestId("lock-dns-error")).toHaveText("Pick at least one network.");
+    await page.getByTestId(`lock-dns-network-${network!.id}`).click();
+    await page.getByRole("button", { name: "Save" }).first().click();
+    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page.getByTestId("rule-card-dns").getByText(network!.name, { exact: true })).toBeVisible();
+    const { rule: onNetworks } = (await (await page.request.get("/api/v1/rules/dns")).json()) as { rule: { scope: string; networkIds: string[] } };
+    expect(onNetworks).toMatchObject({ scope: "network", networkIds: [network!.id] });
   } finally {
-    await page.request.patch("/api/v1/rules/dns", { headers: await csrfHeaders(page), data: { groupIds: seeded.groupIds } });
+    await page.request.patch("/api/v1/rules/dns", { headers: await csrfHeaders(page), data: { scope: "group", groupIds: seeded.groupIds } });
   }
 });
 

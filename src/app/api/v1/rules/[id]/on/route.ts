@@ -3,7 +3,7 @@ import { prisma } from "@/server/db";
 import { withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { switchQuarantineRule } from "@/server/rule-lifts";
-import { builtInRule, isLockDnsRule, isQuarantineRule, presentRule, ruleInclude, saveCountriesRule, setLockDnsEnabled } from "@/server/rules";
+import { builtInRule, isQuarantineRule, presentRule, ruleInclude, saveBuiltInRule } from "@/server/rules";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,15 +14,11 @@ export async function POST(request: Request, ctx: Ctx) {
     const existing = await prisma().rule.findUnique({ where: { id } });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     if (isQuarantineRule(existing)) return switchQuarantineRule(request, session, true);
-    if (isLockDnsRule(existing)) {
-      const rule = await setLockDnsEnabled(true);
-      const change = await enqueueChange("rule");
-      return Response.json({ rule: await presentRule(rule), change });
-    }
-    // Block countries switched on with no groups covers every group.
+    // Lock DNS switched on with nothing picked covers every person, Block countries every group.
+    const builtIn = builtInRule(existing);
     const rule =
-      builtInRule(existing) === "countries"
-        ? await saveCountriesRule({ enabled: true })
+      builtIn === "dns" || builtIn === "countries"
+        ? await saveBuiltInRule(builtIn, { enabled: true })
         : await prisma().rule.update({ where: { id }, data: { enabled: true }, include: ruleInclude });
     const change = await enqueueChange("rule");
     return Response.json({ rule: await presentRule(rule), change });

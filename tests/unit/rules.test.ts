@@ -18,6 +18,8 @@ function rule(partial: Partial<Rule> & Pick<Rule, "id" | "kind" | "targetIds">):
     networkIds: [],
     domains: [],
     countries: [],
+    blockPrivateRelay: false,
+    openDns: [],
     enabled: true,
     pause: { active: false, until: null, kind: "pause", by: null },
     groupPauses: [],

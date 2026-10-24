@@ -1,4 +1,5 @@
-import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, type Household } from "@prisma/client";
+import { isDeepStrictEqual } from "node:util";
+import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, RuleScope, type Household } from "@prisma/client";
 import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
@@ -20,7 +21,7 @@ import { checkupAfterSync } from "./checkup";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
-import { lockDnsExemptions } from "./unifi/lock-dns";
+import { lockDnsExemptionsOf, lockDnsOpenDns } from "./unifi/lock-dns";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
@@ -346,16 +347,29 @@ async function tick(owner: string): Promise<boolean> {
       where: { connectionIdentity: identity, siteId },
     });
     // Lock DNS leaves the household's own DNS alone: the resolvers of the household and of the
-    // groups it covers, looked up only while it covers someone. When that cannot be worked out
-    // this pass, its policies stay as they are.
+    // groups it covers (on whole networks, the groups with a device on them), looked up only while
+    // it covers something. When that cannot be worked out this pass, its policies stay as they are.
     const lockDnsRule = rules.find((rule) => rule.id === LOCK_DNS_RULE_ID);
-    const lockDnsGroups = new Set(lockDnsRule?.groups.map((link) => link.groupId));
-    const lockDnsExempt = lockDnsGroups.size
-      ? await lockDnsExemptions({
+    const lockDnsNetworks = lockDnsRule?.scope === RuleScope.network ? new Set(lockDnsRule.networkIds) : null;
+    const lockDnsGroups = new Set(
+      lockDnsNetworks
+        ? devices.flatMap((device) => (device.groupId && device.networkId && lockDnsNetworks.has(device.networkId) ? [device.groupId] : []))
+        : lockDnsRule?.groups.map((link) => link.groupId),
+    );
+    const lockDnsOpen = (lockDnsNetworks ? lockDnsNetworks.size : lockDnsGroups.size)
+      ? await lockDnsOpenDns({
           networks: networks.filter((network) => networkInScope(scope, network.id)),
-          resolverUrls: [household.dohUrl, ...groups.filter((group) => lockDnsGroups.has(group.id)).map((group) => group.dohOverrideUrl)],
+          resolvers: [
+            { source: "household", name: null, url: household.dohUrl },
+            ...groups.filter((group) => lockDnsGroups.has(group.id)).map((group) => ({ source: "group" as const, name: group.name, url: group.dohOverrideUrl })),
+          ],
         })
-      : undefined;
+      : [];
+    const lockDnsExempt = lockDnsOpen && (lockDnsOpen.length ? lockDnsExemptionsOf(lockDnsOpen) : undefined);
+    // Its page shows what it left open; a pass that could not tell keeps the last answer.
+    // Compared as values: JSONB keeps an object's keys in its own order.
+    if (lockDnsRule && lockDnsOpen && !isDeepStrictEqual(lockDnsRule.openDns, lockDnsOpen))
+      await prisma().rule.update({ where: { id: LOCK_DNS_RULE_ID }, data: { openDns: lockDnsOpen } });
     const rulePlan = planRulePolicies({
       destinationZoneId: external.id,
       zoneNames: Object.fromEntries(zones.map((zone) => [zone.id, zone.name])),

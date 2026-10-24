@@ -73,6 +73,9 @@ describe("the Rules list", () => {
   it("names who a rule covers, groups or networks, even when one is gone", () => {
     expect(ruleAppliesTo(rule({ groupIds: ["g1", "gone"] }), groups, [])).toEqual(["A child", "Deleted group"]);
     expect(ruleAppliesTo(rule({ scope: "network", networkIds: ["n1", "n2"] }), groups, [{ id: "n1", name: "Kids" }])).toEqual(["Kids", "Network"]);
+    // Block countries with no group covers every group, but on whole networks it names them.
+    expect(ruleAppliesTo(rule({ builtIn: "countries", groupIds: [] }), groups, [])).toEqual(["Every group"]);
+    expect(ruleAppliesTo(rule({ builtIn: "countries", scope: "network", groupIds: [], networkIds: ["n1"] }), groups, [{ id: "n1", name: "Kids" }])).toEqual(["Kids"]);
   });
 
   it("says when a rule blocks, naming windows only when there are several", () => {

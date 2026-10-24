@@ -1,7 +1,7 @@
 import { GroupKind, Prisma, RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { z } from "zod";
 import { encryptedDnsHosts } from "@/lib/encrypted-dns";
-import { LOCK_DNS_PARTS, lockDnsPolicyName, rulePolicyNames } from "@/lib/policy-names";
+import { lockDnsParts, lockDnsPolicyName, rulePolicyNames } from "@/lib/policy-names";
 import { isCountryCode, RECOMMENDED_BLOCKED_COUNTRIES } from "@/lib/countries";
 import {
   alwaysWindow,
@@ -14,6 +14,7 @@ import {
   normalizeDomain,
   QUARANTINE_RULE_ID,
   type BuiltInRule,
+  type LockDnsOpen,
 } from "@/lib/rules";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
@@ -69,6 +70,8 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     targetIds: [...rule.targetIds],
     domains: builtIn === "dns" ? encryptedDnsHosts() : [...rule.domains],
     countries: [...rule.countries],
+    blockPrivateRelay: rule.blockPrivateRelay,
+    openDns: builtIn === "dns" ? (rule.openDns as LockDnsOpen[]) : [],
     enabled: quarantine ? quarantineEnforced : rule.enabled,
     pause: publicPause(rule),
     groupPauses: rule.groups
@@ -88,7 +91,7 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean) {
     policyNames: quarantine
       ? [quarantinePolicyName("Internal")]
       : builtIn === "dns"
-        ? LOCK_DNS_PARTS.map((part) => lockDnsPolicyName(part))
+        ? lockDnsParts(rule.blockPrivateRelay).map((part) => lockDnsPolicyName(part))
         : rulePolicyNames({ ...rule, windows }),
     builtIn,
   };
@@ -150,38 +153,6 @@ export async function ensureLockDnsRule(): Promise<void> {
 }
 
 /**
- * Turns Lock DNS on or off. Switched on while it covers no group, it covers every person: things
- * like smart TVs and streaming sticks often insist on their own DNS, so they are left to choose.
- * Turning it off ends its pause, as for any rule.
- */
-export async function setLockDnsEnabled(enabled: boolean, { coverPeople = true } = {}): Promise<RuleWithWindows> {
-  return prisma().$transaction(async (tx) => {
-    const rule = await tx.rule.findUniqueOrThrow({ where: { id: LOCK_DNS_RULE_ID }, include: { groups: true } });
-    if (enabled && coverPeople && rule.groups.length === 0) {
-      const people = await tx.group.findMany({ where: { kind: GroupKind.family }, select: { id: true } });
-      await tx.ruleGroup.createMany({ data: people.map((group) => ({ ruleId: rule.id, groupId: group.id })), skipDuplicates: true });
-    }
-    await tx.rule.update({
-      where: { id: rule.id },
-      data: { enabled, ...(enabled ? {} : { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null }) },
-    });
-    return tx.rule.findUniqueOrThrow({ where: { id: rule.id }, include: ruleInclude });
-  });
-}
-
-/** Sets the groups Lock DNS covers. A group it no longer covers loses its allowance with it. */
-export async function setLockDnsGroups(groupIds: string[]): Promise<RuleWithWindows> {
-  const unique = [...new Set(groupIds)];
-  return prisma().$transaction(async (tx) => {
-    const found = await tx.group.count({ where: { id: { in: unique } } });
-    if (found !== unique.length) throw new RuleInputError(404, "not_found", "Group not found.");
-    await tx.ruleGroup.deleteMany({ where: { ruleId: LOCK_DNS_RULE_ID, groupId: { notIn: unique } } });
-    await tx.ruleGroup.createMany({ data: unique.map((groupId) => ({ ruleId: LOCK_DNS_RULE_ID, groupId })), skipDuplicates: true });
-    return tx.rule.findUniqueOrThrow({ where: { id: LOCK_DNS_RULE_ID }, include: ruleInclude });
-  });
-}
-
-/**
  * The household's built-in Block countries rule, created off beside the household with the
  * recommended countries and no groups: it is a website-kind rule only so that no client meets an
  * unknown kind and nothing counts it as an internet rule; its policies block by region, not domain.
@@ -211,47 +182,86 @@ export function normalizeCountries(raw: string[]): string[] {
   return codes;
 }
 
+/** What Lock DNS and Block countries take: their switch, what they apply to, and Block countries' countries. */
+export type BuiltInRulePatch = {
+  enabled?: boolean;
+  scope?: "group" | "network";
+  groupIds?: string[];
+  networkIds?: string[];
+  countries?: string[];
+  /** Lock DNS only: also turn off iCloud Private Relay (experimental). */
+  blockPrivateRelay?: boolean;
+};
+
 /**
- * Saves the Block countries rule's switch, groups and countries. Switching it on with no groups
- * covers every group, the recommended default. Off ends a pause, as for every rule. Returns null
- * when a group it names does not exist. The caller enqueues the change.
+ * Saves Lock DNS's or Block countries' switch and what it applies to, checked as any rule's are:
+ * people and things, or whole managed networks. A patch that names only groups, or only networks,
+ * takes that scope, so a client that knows only groups moves the rule back to them. Switched on
+ * while it applies to nothing, Lock DNS covers every person (things like smart TVs often insist on
+ * their own DNS) and Block countries every group, unless the same patch names the groups. A group
+ * it stops covering takes its allowance with it. Off ends a pause, as for every rule. The caller
+ * enqueues the change.
  */
-export async function saveCountriesRule(patch: { enabled?: boolean; groupIds?: string[]; countries?: string[] }) {
-  const countries = patch.countries ? normalizeCountries(patch.countries) : undefined;
+export async function saveBuiltInRule(
+  id: typeof LOCK_DNS_RULE_ID | typeof COUNTRIES_RULE_ID,
+  patch: BuiltInRulePatch,
+  networkScope: () => Promise<{ scope: NetworkScope; known?: Set<string> }> = householdNetworkScope,
+): Promise<RuleWithWindows> {
+  const countries = id === COUNTRIES_RULE_ID && patch.countries ? normalizeCountries(patch.countries) : undefined;
+  const named = patch.scope ?? (patch.networkIds && !patch.groupIds ? RuleScope.network : patch.groupIds && !patch.networkIds ? RuleScope.group : undefined);
+  // A new list of networks is checked against the site before the lock, which the site can't be read under.
+  if (patch.networkIds && named === RuleScope.network) {
+    const { scope: managed, known } = await networkScope();
+    assertManagedNetworkIds(patch.networkIds, managed, known);
+  }
   return prisma().$transaction(async (tx) => {
     await lockHousehold(tx);
-    const existing = await tx.rule.findUniqueOrThrow({ where: { id: COUNTRIES_RULE_ID }, include: { groups: true } });
-    const enabled = patch.enabled ?? existing.enabled;
-    let groupIds = patch.groupIds ? [...new Set(patch.groupIds)].sort() : existing.groups.map((link) => link.groupId);
-    if (patch.groupIds) {
-      if (groupIds.length === 0) throw new RuleInputError(400, "invalid_groups", "Pick at least one person or thing the rule applies to.");
+    // What the patch leaves out comes from the rule as it is now, so a concurrent edit of it stands.
+    const rule = await tx.rule.findUniqueOrThrow({ where: { id }, include: { groups: true } });
+    const scope = named ?? rule.scope;
+    // Unchanged networks were valid when saved; switching to networks without naming any is refused.
+    const networkIds =
+      scope === RuleScope.network ? normalizeNetworkIds(patch.networkIds ?? (rule.scope === RuleScope.network ? rule.networkIds : [])) : [];
+    const enabled = patch.enabled ?? rule.enabled;
+    let groupIds: string[] = [];
+    if (scope === RuleScope.group) {
+      groupIds = patch.groupIds ? [...new Set(patch.groupIds)].sort() : rule.scope === RuleScope.group ? rule.groups.map((link) => link.groupId) : [];
+      if (patch.groupIds && groupIds.length === 0 && id === COUNTRIES_RULE_ID) {
+        throw new RuleInputError(400, "invalid_groups", "Pick at least one person or thing the rule applies to.");
+      }
       const found = await tx.group.count({ where: { id: { in: groupIds } } });
       if (found !== groupIds.length) throw new RuleInputError(404, "not_found", "Group not found.");
-    } else if (enabled && groupIds.length === 0) {
-      groupIds = (await tx.group.findMany({ select: { id: true } })).map((group) => group.id);
+      if (enabled && groupIds.length === 0 && !patch.groupIds) {
+        const defaults = await tx.group.findMany({ where: id === LOCK_DNS_RULE_ID ? { kind: GroupKind.family } : {}, select: { id: true } });
+        groupIds = defaults.map((group) => group.id);
+      }
     }
     await tx.rule.update({
-      where: { id: COUNTRIES_RULE_ID },
+      where: { id },
       data: {
         enabled,
+        scope,
+        networkIds,
         ...(countries ? { countries } : {}),
+        ...(id === LOCK_DNS_RULE_ID && patch.blockPrivateRelay !== undefined ? { blockPrivateRelay: patch.blockPrivateRelay } : {}),
         ...(enabled ? {} : { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null }),
       },
     });
-    await tx.ruleGroup.deleteMany({ where: { ruleId: COUNTRIES_RULE_ID, groupId: { notIn: groupIds } } });
-    await tx.ruleGroup.createMany({ data: groupIds.map((groupId) => ({ ruleId: COUNTRIES_RULE_ID, groupId })), skipDuplicates: true });
-    return tx.rule.findUniqueOrThrow({ where: { id: COUNTRIES_RULE_ID }, include: ruleInclude });
+    await tx.ruleGroup.deleteMany({ where: { ruleId: id, groupId: { notIn: groupIds } } });
+    await tx.ruleGroup.createMany({ data: groupIds.map((groupId) => ({ ruleId: id, groupId })), skipDuplicates: true });
+    return tx.rule.findUniqueOrThrow({ where: { id }, include: ruleInclude });
   });
 }
 
 /**
  * A new group joins Block countries when the rule covered every other group, so "every group, Things
- * too" stays true as the household grows. A rule narrowed to some groups is left as it was.
+ * too" stays true as the household grows. A rule narrowed to some groups, or on whole networks, is left
+ * as it was.
  */
 export async function joinCountriesRule(tx: Prisma.TransactionClient, groupId: string): Promise<void> {
   const rule = await tx.rule.findUnique({ where: { id: COUNTRIES_RULE_ID }, include: { groups: true } });
   const groups = await tx.group.count({ where: { id: { not: groupId } } });
-  if (!rule) return;
+  if (!rule || rule.scope === RuleScope.network) return;
   // Switched on with no groups (none existed, or all were deleted) still means every group.
   if (rule.groups.length === 0 ? !rule.enabled : rule.groups.length < groups) return;
   await tx.ruleGroup.createMany({ data: [{ ruleId: COUNTRIES_RULE_ID, groupId }], skipDuplicates: true });
@@ -320,8 +330,9 @@ export const RuleCreateBody = z
   .strict();
 
 export const RuleUpdateBody = z
-  .object({ ...Fields, countries: z.array(z.string()).max(300) })
-  .omit({ kind: true, scope: true })
+  .object({ ...Fields, countries: z.array(z.string()).max(300), blockPrivateRelay: z.boolean() })
+  // `scope` changes only on Lock DNS and Block countries; any other rule keeps the one it was made with.
+  .omit({ kind: true })
   .partial()
   .strict();
 

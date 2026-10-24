@@ -212,8 +212,13 @@ describe("network checkup", () => {
     ] as unknown as Rule[];
     expect(recommendedRules(rules).map((rule) => rule.id)).toEqual(["quarantine", "dns", "countries"]);
     expect(recommendedRules(rules).map(protectionTitle)).toEqual(["Quarantine", "Lock DNS", "Block countries"]);
-    expect(protectionLine({ builtIn: "dns", countries: [], groupIds: [] }, groups)).toBe("Keeps every person off other DNS servers");
-    expect(protectionLine({ builtIn: "dns", countries: [], groupIds: ["g1"] }, groups)).toBe("Keeps Mia off other DNS servers");
-    expect(protectionLine({ builtIn: "countries", countries: ["KP"], groupIds: ["g1", "g2"] }, groups)).toBe("Blocks North Korea for every group");
+    const people = { scope: "group" as const, networkIds: [] };
+    expect(protectionLine({ ...people, builtIn: "dns", countries: [], groupIds: [] }, groups)).toBe("Keeps every person off other DNS servers");
+    expect(protectionLine({ ...people, builtIn: "dns", countries: [], groupIds: ["g1"] }, groups)).toBe("Keeps Mia off other DNS servers");
+    expect(protectionLine({ ...people, builtIn: "countries", countries: ["KP"], groupIds: ["g1", "g2"] }, groups)).toBe("Blocks North Korea for every group");
+    const networks = [{ id: "n1", name: "Kids Wi-Fi" }];
+    const wholeNetworks = { scope: "network" as const, groupIds: [], networkIds: ["n1"] };
+    expect(protectionLine({ ...wholeNetworks, builtIn: "dns", countries: [] }, groups, networks)).toBe("Keeps everything on Kids Wi-Fi off other DNS servers");
+    expect(protectionLine({ ...wholeNetworks, builtIn: "countries", countries: ["KP"] }, groups, networks)).toBe("Blocks North Korea for everything on Kids Wi-Fi");
   });
 });

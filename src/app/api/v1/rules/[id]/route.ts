@@ -1,23 +1,19 @@
-import type { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
-import { builtInRefusal, lockDnsRefusal, switchQuarantineRule } from "@/server/rule-lifts";
+import { builtInRefusal, switchQuarantineRule } from "@/server/rule-lifts";
 import {
   builtInRule,
   householdNetworkScope,
-  isLockDnsRule,
   isQuarantineRule,
   presentRule,
   RuleInputError,
   ruleInclude,
   RuleUpdateBody,
-  saveCountriesRule,
+  saveBuiltInRule,
   saveRule,
-  setLockDnsEnabled,
-  setLockDnsGroups,
   validateRule,
 } from "@/server/rules";
 
@@ -47,19 +43,20 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const existing = await prisma().rule.findUnique({ where: { id }, include: ruleInclude });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     const patch = parsed.data;
+    const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
     if (isQuarantineRule(existing)) {
       // Its switch is all that changes: anything else in the patch is an edit.
-      const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
       if (keys.length !== 1 || patch.enabled === undefined) return builtInRefusal();
       return switchQuarantineRule(request, session, patch.enabled);
     }
-    if (isLockDnsRule(existing)) return patchLockDns(patch);
-    if (builtInRule(existing) === "countries") {
-      // Its switch, groups and countries change; its name, kind and schedule are FamilyFi's.
-      const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
-      if (keys.some((key) => !["enabled", "groupIds", "countries"].includes(key))) return builtInRefusal("countries");
+    const builtIn = builtInRule(existing);
+    if (builtIn === "dns" || builtIn === "countries") {
+      // Its switch and what it applies to change, Block countries' countries and Lock DNS's Private Relay switch;
+      // its name, kind and schedule are FamilyFi's.
+      const allowed = ["enabled", "scope", "groupIds", "networkIds", ...(builtIn === "countries" ? ["countries"] : ["blockPrivateRelay"])];
+      if (keys.length === 0 || keys.some((key) => !allowed.includes(key))) return builtInRefusal(builtIn);
       try {
-        const rule = await saveCountriesRule(patch);
+        const rule = await saveBuiltInRule(builtIn, patch);
         const change = await enqueueChange("rule");
         return Response.json({ rule: await presentRule(rule), change });
       } catch (error) {
@@ -68,6 +65,10 @@ export async function PATCH(request: Request, ctx: Ctx) {
       }
     }
     if (patch.countries !== undefined) return jsonError(400, "invalid_request", "Only Block countries has countries.");
+    if (patch.blockPrivateRelay !== undefined) return jsonError(400, "invalid_request", "Only Lock DNS turns off iCloud Private Relay.");
+    if (patch.scope !== undefined && patch.scope !== existing.scope) {
+      return jsonError(400, "invalid_request", "A rule's scope can't change. Make a new rule to cover something else.");
+    }
     const current = await presentRule(existing);
     try {
       const input = await validateRule(
@@ -131,20 +132,4 @@ export async function DELETE(request: Request, ctx: Ctx) {
     const change = await enqueueChange("rule");
     return Response.json({ change });
   });
-}
-
-/** Lock DNS takes its groups and its switch; anything else in the patch is an edit it refuses. */
-async function patchLockDns(patch: z.infer<typeof RuleUpdateBody>): Promise<Response> {
-  const keys = Object.keys(patch).filter((key) => patch[key as keyof typeof patch] !== undefined);
-  if (keys.length === 0 || keys.some((key) => key !== "groupIds" && key !== "enabled")) return lockDnsRefusal();
-  try {
-    let rule = patch.groupIds ? await setLockDnsGroups(patch.groupIds) : null;
-    // Groups named in the same request are the ones it covers, even none.
-    if (patch.enabled !== undefined) rule = await setLockDnsEnabled(patch.enabled, { coverPeople: !patch.groupIds });
-    const change = await enqueueChange("rule");
-    return Response.json({ rule: await presentRule(rule!), change });
-  } catch (error) {
-    if (error instanceof RuleInputError) return jsonError(error.status, error.code, error.message);
-    throw error;
-  }
 }

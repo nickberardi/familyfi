@@ -1,32 +1,32 @@
 /**
  * The Block countries editor every client shows: the draft it edits, the country search, what it
  * checks before saving, what it sends, and its copy. The rule's name, kind and schedule are
- * FamilyFi's; only its switch, countries and groups change.
+ * FamilyFi's; only its switch, countries and what it applies to change, picked as for any rule.
  */
 import { COUNTRIES, RECOMMENDED_BLOCKED_COUNTRIES, countriesSummary, countryName, type Country } from "./countries";
 import type { HouseholdStore } from "./household-store";
+import { appliesToBody, type AppliesTo } from "./rule-editor";
 import type { Rule } from "./rules";
 import type { Group } from "./types";
 
-export type CountriesDraft = { enabled: boolean; countries: string[]; groupIds: string[] };
+export type CountriesDraft = AppliesTo & { enabled: boolean; countries: string[] };
+
+type SavedCountries = Pick<Rule, "enabled" | "countries" | "scope" | "groupIds" | "networkIds">;
 
 /** The draft for the saved rule. A rule that covers no group yet starts with every group, as switching it on does. */
-export function fromCountriesRule(rule: Pick<Rule, "enabled" | "countries" | "groupIds">, groups: Pick<Group, "id">[]): CountriesDraft {
+export function fromCountriesRule(rule: SavedCountries, groups: Pick<Group, "id">[]): CountriesDraft {
   return {
     enabled: rule.enabled,
     countries: [...rule.countries].sort(),
+    scope: rule.scope,
     groupIds: rule.groupIds.length ? [...rule.groupIds].sort() : groups.map((group) => group.id).sort(),
+    networkIds: [...rule.networkIds].sort(),
   };
 }
 
 export function toggleCountry(draft: CountriesDraft, code: string): CountriesDraft {
   const on = draft.countries.includes(code);
   return { ...draft, countries: on ? draft.countries.filter((item) => item !== code) : [...draft.countries, code].sort() };
-}
-
-export function toggleCountriesGroup(draft: CountriesDraft, groupId: string): CountriesDraft {
-  const on = draft.groupIds.includes(groupId);
-  return { ...draft, groupIds: on ? draft.groupIds.filter((id) => id !== groupId) : [...draft.groupIds, groupId].sort() };
 }
 
 /** Put the list back to the recommended countries. */
@@ -53,23 +53,29 @@ export function pickedCountries(draft: Pick<CountriesDraft, "countries">): Count
 /** Why the draft cannot be saved, or null. */
 export function validateCountriesDraft(draft: CountriesDraft): string | null {
   if (draft.countries.length === 0) return COUNTRIES_EDITOR_COPY.countries.none;
-  if (draft.groupIds.length === 0) return COUNTRIES_EDITOR_COPY.appliesTo.none;
+  if (draft.scope === "group" && draft.groupIds.length === 0) return COUNTRIES_EDITOR_COPY.appliesTo.none;
+  if (draft.scope === "network" && draft.networkIds.length === 0) return COUNTRIES_EDITOR_COPY.appliesTo.noNetwork;
   return null;
 }
 
-export function countriesEditorState(draft: CountriesDraft, saved: Pick<Rule, "enabled" | "countries" | "groupIds">, groups: Pick<Group, "id">[]) {
+export function countriesEditorState(draft: CountriesDraft, saved: SavedCountries, groups: Pick<Group, "id">[]) {
   const before = fromCountriesRule(saved, groups);
   return {
     summary: `${draft.enabled ? "On" : "Off"} · ${countriesSummary(draft.countries)}`,
-    dirty: JSON.stringify(before) !== JSON.stringify(draft),
+    dirty: JSON.stringify(sent(before)) !== JSON.stringify(sent(draft)),
   };
+}
+
+/** What saving sends: the switch, the countries, and what it applies to. */
+function sent(draft: CountriesDraft) {
+  return { enabled: draft.enabled, countries: [...draft.countries].sort(), ...appliesToBody(draft) };
 }
 
 type Mutate = HouseholdStore["mutate"];
 
 /** Save the draft; resolves to the store's payload (with the saved `rule`), or undefined when it failed. */
 export function saveCountriesRule(mutate: Mutate, draft: CountriesDraft, saved: Pick<Rule, "id">) {
-  return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${saved.id}`, { method: "PATCH", body: draft }), {
+  return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${saved.id}`, { method: "PATCH", body: sent(draft) }), {
     feedback: { notice: "Block countries saved. FamilyFi writes it to the gateway next." },
   });
 }
@@ -95,8 +101,8 @@ export const COUNTRIES_EDITOR_COPY = {
   },
   appliesTo: {
     title: "Applies to",
-    note: "Every group, Things too, unless you narrow it. A new group joins while every group is on.",
-    label: "Groups",
+    note: "Every group, Things too, unless you narrow it or pick whole networks. A new group joins while every group is on.",
     none: "Pick at least one person or thing the rule applies to.",
+    noNetwork: "Pick at least one network.",
   },
 } as const;

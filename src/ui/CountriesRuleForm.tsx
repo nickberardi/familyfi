@@ -8,7 +8,6 @@ import {
   resetRecommendedCountries,
   pickedCountries,
   searchCountries,
-  toggleCountriesGroup,
   toggleCountry,
   type CountriesDraft,
 } from "@/lib/countries-editor";
@@ -16,23 +15,27 @@ import type { Group } from "@/lib/types";
 
 import { Chip, ChipGroup } from "./Chips";
 import { EditorSection } from "./EditorSection";
+import { RuleAppliesTo } from "./RuleAppliesTo";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 type Edit = (next: (draft: CountriesDraft) => CountriesDraft) => void;
 
 /**
  * The Block countries editor's form, shared by every client: its switch, the countries it blocks,
- * and the groups it covers. Each client wraps it in its own page or sheet with the save action.
+ * and what it applies to, picked as for any rule. Each client wraps it in its own page or sheet with the save action.
  */
 export function CountriesRuleForm({
   draft,
   groups,
+  networks,
   error,
   disabled = false,
   edit,
 }: {
   draft: CountriesDraft;
   groups: Pick<Group, "id" | "name">[];
+  /** The networks FamilyFi manages (`managedNetworks`), which it can cover whole. */
+  networks: { id: string; name: string }[];
   error: string;
   disabled?: boolean;
   edit: Edit;
@@ -104,21 +107,7 @@ export function CountriesRuleForm({
         </Pressable>
       </EditorSection>
 
-      <EditorSection title={COPY.appliesTo.title} note={COPY.appliesTo.note}>
-        <ChipGroup label={COPY.appliesTo.label}>
-          {groups.map((group) => (
-            <Chip
-              key={group.id}
-              on={draft.groupIds.includes(group.id)}
-              onPress={() => edit((current) => toggleCountriesGroup(current, group.id))}
-              disabled={disabled}
-              testID={`countries-group-${group.id}`}
-            >
-              {group.name}
-            </Chip>
-          ))}
-        </ChipGroup>
-      </EditorSection>
+      <RuleAppliesTo draft={draft} groups={groups} networks={networks} edit={edit} note={COPY.appliesTo.note} disabled={disabled} testID="countries" />
     </View>
   );
 }

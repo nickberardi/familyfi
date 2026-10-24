@@ -28,6 +28,7 @@ import { PRESS_OPACITY, useUI } from "./UIContext";
 export function ProtectionCard({
   rules,
   groups,
+  networks = [],
   disabled = false,
   onToggle,
   onTurnOnAll,
@@ -35,6 +36,8 @@ export function ProtectionCard({
   /** `recommendedRules(...)`. */
   rules: Rule[];
   groups: Pick<Group, "id" | "name">[];
+  /** The site's networks, to name those a protection covers whole. */
+  networks?: { id: string; name: string }[];
   disabled?: boolean;
   onToggle: (rule: Rule) => void;
   onTurnOnAll: () => void;
@@ -49,7 +52,7 @@ export function ProtectionCard({
           <View style={styles.grow}>
             <Text style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>{protectionTitle(rule)}</Text>
             <Text style={[styles.body, { fontFamily: ui.font, color: ui.color("ink-3") }]}>
-              {protectionLine(rule, groups)}
+              {protectionLine(rule, groups, networks)}
             </Text>
             {rule.builtIn !== "quarantine" ? (
               <ui.Link href={ruleHref(rule)} testID={`checkup-edit-${rule.id}`}>

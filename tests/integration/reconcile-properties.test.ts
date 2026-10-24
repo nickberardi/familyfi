@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { AssignmentState, FamilyRole, GroupKind, RuleKind, RuleMode } from "@prisma/client";
-import { LOCK_DNS_PARTS } from "@/lib/policy-names";
+import { lockDnsParts } from "@/lib/policy-names";
 import { LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
@@ -392,7 +392,7 @@ async function checkGateway(client: Client, admin: Map<string, string>) {
     // rule, unless no one is left and the policy is disabled.
     for (const rule of rules.filter((rule) => rule.groups.some((link) => link.groupId === group.id))) {
       // Lock DNS has one policy for each of its parts instead.
-      const keys = rule.id === LOCK_DNS_RULE_ID ? [...LOCK_DNS_PARTS] : rule.mode === RuleMode.always ? ["always"] : rule.windows.map((window) => window.id);
+      const keys = rule.id === LOCK_DNS_RULE_ID ? lockDnsParts(rule.blockPrivateRelay) : rule.mode === RuleMode.always ? ["always"] : rule.windows.map((window) => window.id);
       for (const key of keys) {
         const found = ourRules.filter(({ row }) => row.ruleId === rule.id && row.windowKey === key && row.zoneId === device.zoneId);
         if (rule.systemGroupId && !rule.enabled) {

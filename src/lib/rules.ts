@@ -21,8 +21,8 @@ export const QUARANTINE_RULE_ID = "quarantine";
 /**
 /**
  * The id of the household's built-in Lock DNS rule: it blocks the ways around the gateway's DNS
- * (other DNS servers, and known encrypted DNS services) for the groups it covers, so website rules
- * hold; category and app rules match traffic and never depended on DNS. Only its groups can be edited; it is always on while switched on, and is
+ * (other DNS servers, and known encrypted DNS services) for the groups or whole networks it covers, so
+ * website rules hold; category and app rules match traffic and never depended on DNS. Only what it applies to can be edited; it is always on while switched on, and is
  * paused and allowed like any rule. It never blocks the internet, so a group's status, block and
  * unblock leave it out.
  */
@@ -30,7 +30,8 @@ export const LOCK_DNS_RULE_ID = "dns";
 
 /**
  * The id of the household's built-in Block countries rule: one of the recommended protections. It
- * blocks its groups' traffic to a list of countries, always. Its groups and countries can be edited;
+ * blocks its groups' or networks' traffic to a list of countries, always. What it applies to and its
+ * countries can be edited;
  * its name, kind and schedule cannot, and it cannot be deleted.
  */
 export const COUNTRIES_RULE_ID = "countries";
@@ -49,6 +50,10 @@ export type Rule = {
   domains: string[];
   /** The Block countries rule's ISO 3166-1 alpha-2 codes; empty on every other rule. */
   countries: string[];
+  /** The Lock DNS rule also turns off iCloud Private Relay (experimental); false on every other rule. */
+  blockPrivateRelay: boolean;
+  /** The DNS Lock DNS left open at its last sync; empty on every other rule. */
+  openDns: LockDnsOpen[];
   enabled: boolean;
   /** A pause or allowance lifts the rule for every group it covers until `until`, or until ended. */
   pause: RulePause;
@@ -60,6 +65,19 @@ export type Rule = {
   policyNames: string[];
   /** Set on a rule FamilyFi provides, which cannot be deleted or renamed; null on the household's own. */
   builtIn: BuiltInRule | null;
+};
+
+/**
+ * One DNS server Lock DNS leaves open: a resolver set in FamilyFi (the household's, or a group's
+ * override) with the addresses its name looked up to, or a server a network hands out.
+ */
+export type LockDnsOpen = {
+  source: "household" | "group" | "network";
+  /** The group's or network's name; null for the household's resolver. */
+  name: string | null;
+  /** The resolver's host name; null for an address. */
+  host: string | null;
+  addresses: string[];
 };
 
 export const MAX_RULE_NAME = 60;

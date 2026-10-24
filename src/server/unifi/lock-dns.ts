@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { encryptedDnsAddresses, encryptedDnsHosts } from "@/lib/encrypted-dns";
 import { unifiMockEnabled } from "../env";
+import type { LockDnsOpen } from "@/lib/rules";
 import type { NetworkDetails } from "./types";
 
 /**
@@ -97,6 +98,9 @@ function hostOf(url: string): string | null {
   }
 }
 
+/** A resolver set in FamilyFi: the household's, or a group's override. */
+export type LockDnsResolver = { source: "household" | "group"; name: string | null; url: string | null };
+
 /**
  * The household's own DNS, from the managed networks' DHCP settings and the resolvers set in
  * FamilyFi; null while a gateway network's details could not be read this pass, since planning
@@ -106,6 +110,30 @@ export async function lockDnsExemptions(input: {
   networks: Pick<NetworkDetails, "enabled" | "detailsUnread" | "ipv4Configuration">[];
   resolverUrls: (string | null)[];
 }): Promise<LockDnsExemptions | null> {
+  const open = await lockDnsOpenDns({
+    networks: input.networks.map((network) => ({ ...network, name: "" })),
+    resolvers: input.resolverUrls.map((url) => ({ source: "household", name: null, url })),
+  });
+  return open && lockDnsExemptionsOf(open);
+}
+
+/** What the open DNS leaves out of Lock DNS: every address, and every resolver's name. */
+export function lockDnsExemptionsOf(open: LockDnsOpen[]): LockDnsExemptions {
+  return {
+    addresses: [...new Set(open.flatMap((entry) => entry.addresses))].sort(),
+    hosts: [...new Set(open.flatMap((entry) => (entry.host ? [entry.host] : [])))].sort(),
+  };
+}
+
+/**
+ * The DNS Lock DNS leaves open, each named by where it comes from: a resolver set in FamilyFi
+ * with the addresses its name looks up to, and each server a managed network hands out by DHCP,
+ * unless on the household's own networks; null while a network's details could not be read.
+ */
+export async function lockDnsOpenDns(input: {
+  networks: Pick<NetworkDetails, "name" | "enabled" | "detailsUnread" | "ipv4Configuration">[];
+  resolvers: LockDnsResolver[];
+}): Promise<LockDnsOpen[] | null> {
   if (input.networks.some((network) => network.enabled && network.detailsUnread)) return null;
   // A server on one of the household's own networks, like a Pi-hole, is never on the internet to block.
   const local = new BlockList();
@@ -113,15 +141,30 @@ export async function lockDnsExemptions(input: {
     const ipv4 = network.ipv4Configuration;
     if (ipv4 && isIP(ipv4.hostIpAddress) === 4) local.addSubnet(ipv4.hostIpAddress, ipv4.prefixLength, "ipv4");
   }
+  const open: LockDnsOpen[] = [];
   // Only a network's own DHCP server hands these out, as upstream discovery reads them.
-  const addresses = input.networks
-    .filter((network) => network.enabled && network.ipv4Configuration?.dhcpConfiguration?.mode === "SERVER")
-    .flatMap((network) => network.ipv4Configuration?.dhcpConfiguration?.dnsServerIpAddressesOverride ?? [])
-    .filter((address) => isIP(address) && !local.check(address, isIP(address) === 4 ? "ipv4" : "ipv6"));
-  const named = [...new Set(input.resolverUrls.flatMap((url) => (url ? [hostOf(url)] : [])))].filter((host): host is string => Boolean(host));
-  addresses.push(...named.filter((host) => isIP(host)));
-  const hosts = named.filter((host) => !isIP(host));
+  for (const network of input.networks) {
+    if (!network.enabled || network.ipv4Configuration?.dhcpConfiguration?.mode !== "SERVER") continue;
+    const addresses = (network.ipv4Configuration.dhcpConfiguration.dnsServerIpAddressesOverride ?? []).filter(
+      (address) => isIP(address) && !local.check(address, isIP(address) === 4 ? "ipv4" : "ipv6"),
+    );
+    if (addresses.length) open.push({ source: "network", name: network.name, host: null, addresses: [...new Set(addresses)].sort() });
+  }
+  const resolvers = input.resolvers.flatMap((resolver) => {
+    const host = resolver.url ? hostOf(resolver.url) : null;
+    return host ? [{ ...resolver, host }] : [];
+  });
   // Looked up together, so the pass waits at most one lookup's timeout however many there are.
-  for (const found of await Promise.all(hosts.map(addressesOf))) addresses.push(...found);
-  return { addresses: [...new Set(addresses.filter((address) => isIP(address)))].sort(), hosts: hosts.sort() };
+  // Each name once, though the household and a group share it.
+  const lookups = new Map(resolvers.map((resolver) => [resolver.host, isIP(resolver.host) ? Promise.resolve([resolver.host]) : addressesOf(resolver.host)]));
+  for (const resolver of resolvers) {
+    const found = await lookups.get(resolver.host)!;
+    open.push({
+      source: resolver.source,
+      name: resolver.name,
+      host: isIP(resolver.host) ? null : resolver.host,
+      addresses: [...new Set(found.filter((address) => isIP(address)))].sort(),
+    });
+  }
+  return open;
 }

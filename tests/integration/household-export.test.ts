@@ -90,7 +90,7 @@ async function buildHousehold() {
   await seedDevice({ mac: "02:00:00:00:00:01", groupId: child.id });
   await seedDevice({ mac: "02:00:00:00:00:02", groupId: things.id });
   await seedDevice({ mac: "02:00:00:00:00:03" });
-  await prisma().rule.update({ where: { id: "dns" }, data: { enabled: true, groups: { create: { groupId: child.id } } } });
+  await prisma().rule.update({ where: { id: "dns" }, data: { enabled: true, blockPrivateRelay: true, groups: { create: { groupId: child.id } } } });
   await ensureUpstreamCategories();
   const seeded = await prisma().upstreamCategory.findFirstOrThrow({ where: { source: "seed" }, include: { domains: true }, orderBy: { slug: "asc" } });
   await prisma().upstreamCategory.update({ where: { id: seeded.id }, data: { enabled: false, disabledAt: new Date() } });
@@ -148,7 +148,7 @@ describe("household export", () => {
     for (const secret of ["Ciphertext", "AuthTag", "abcd", "tokenHash", "edgeToken", "instancePrivateKey"]) expect(text).not.toContain(secret);
     const before = await householdConfig();
     expect(JSON.parse(text)).toEqual(JSON.parse(JSON.stringify(before)));
-    expect(before.household.lockDns).toEqual({ enabled: true, groupIds: [built.child.id] });
+    expect(before.household.lockDns).toEqual({ enabled: true, scope: "group", groupIds: [built.child.id], networkIds: [], blockPrivateRelay: true });
     expect(before.rules.map((rule) => rule.id)).not.toContain("dns");
 
     // Undo most of it, as a mistake would, then restore.
@@ -420,6 +420,16 @@ describe("household export", () => {
     const kept = await importRequest(auth, "preview", network);
     expect(kept.status).toBe(400);
     expect(((await kept.json()) as { error: { message: string } }).error.message).toMatch(/Guest Wi-Fi.*Unmanaged network id: there/);
+
+    // Lock DNS on whole networks is checked the same way.
+    const lockDns = edited((config) => {
+      config.household.unifi.manageAllNetworks = false;
+      config.household.unifi.managedNetworkIds = ["there"];
+      config.household.lockDns = { enabled: true, scope: "network", groupIds: [], networkIds: ["there"], blockPrivateRelay: false };
+    });
+    const refused = await importRequest(auth, "preview", lockDns);
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: { message: string } }).error.message).toMatch(/Lock DNS.*Unmanaged network id: there/);
   });
 
   it("leaves out a database dump that would make the export too large to import back", async () => {
