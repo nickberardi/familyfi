@@ -44,23 +44,29 @@ export type Rule = {
   name: string;
   kind: RuleKind;
   scope: "group" | "network";
-  groupIds: string[];
-  networkIds: string[];
-  targetIds: number[];
-  domains: string[];
-  /** The Block countries rule's ISO 3166-1 alpha-2 codes; empty on every other rule. */
-  countries: string[];
-  /** The Lock DNS rule also turns off iCloud Private Relay (experimental); false on every other rule. */
-  blockPrivateRelay: boolean;
-  /** The DNS Lock DNS left open at its last sync; empty on every other rule. */
-  openDns: LockDnsOpen[];
+  // Fields that apply to some rules only are left out of the others, never sent empty.
+  /** The groups it covers; only when scope is group. */
+  groupIds?: string[];
+  /** The managed networks it covers; only when scope is network. */
+  networkIds?: string[];
+  /** DPI ids; only on category and app rules. */
+  targetIds?: number[];
+  /** Websites; only on website rules (Lock DNS lists the encrypted DNS services it blocks). */
+  domains?: string[];
+  /** The Block countries rule's ISO 3166-1 alpha-2 codes; only on that rule. */
+  countries?: string[];
+  /** The Lock DNS rule also turns off iCloud Private Relay (experimental); only on that rule. */
+  blockPrivateRelay?: boolean;
+  /** The DNS Lock DNS left open at its last sync; only on that rule. */
+  openDns?: LockDnsOpen[];
   enabled: boolean;
   /** A pause or allowance lifts the rule for every group it covers until `until`, or until ended. */
   pause: RulePause;
-  /** The same lift for one group alone; only the active ones. */
-  groupPauses: { groupId: string; pause: RulePause }[];
+  /** The same lift for one group alone; only the active ones, and only when scope is group. */
+  groupPauses?: { groupId: string; pause: RulePause }[];
   mode: "always" | "scheduled";
-  windows: (RuleWindow & { id: string })[];
+  /** Only when mode is scheduled. */
+  windows?: (RuleWindow & { id: string })[];
   useGeneratedName: boolean;
   policyNames: string[];
   /** Set on a rule FamilyFi provides, which cannot be deleted or renamed; null on the household's own. */
@@ -132,7 +138,7 @@ export function catalogLabel(kind: "category" | "app", id: number, names: Readon
 
 /** The rules that block something for the group. Lock DNS, which blocks only the ways around its DNS, is not one. */
 export function groupScopedRules(rules: Rule[], groupId: string): Rule[] {
-  return rules.filter((rule) => rule.scope === "group" && rule.builtIn !== "dns" && rule.groupIds.includes(groupId));
+  return rules.filter((rule) => rule.scope === "group" && rule.builtIn !== "dns" && (rule.groupIds ?? []).includes(groupId));
 }
 
 /** The group's internet rules, oldest first. */
@@ -148,7 +154,7 @@ export function categoryRuleForSlot(rules: Rule[], groupId: string, categoryId: 
 
 /** Every one of the group's category rules that blocks `categoryId`, oldest first. */
 export function categoryRulesForSlot(rules: Rule[], groupId: string, categoryId: number): Rule[] {
-  return groupScopedRules(rules, groupId).filter((rule) => rule.kind === "category" && rule.targetIds.includes(categoryId));
+  return groupScopedRules(rules, groupId).filter((rule) => rule.kind === "category" && (rule.targetIds ?? []).includes(categoryId));
 }
 
 export function appRulesForGroup(rules: Rule[], groupId: string): Rule[] {
@@ -161,14 +167,14 @@ export function parentFacingRuleLabel(
   catalogNames: Map<string, string>,
 ): string {
   if (rule.kind === "category") {
-    const slot = CURATED_CATEGORY_SLOTS.find((s) => rule.targetIds.includes(s.categoryId));
+    const slot = CURATED_CATEGORY_SLOTS.find((s) => (rule.targetIds ?? []).includes(s.categoryId));
     if (slot) return slot.label;
   }
-  const key = `${rule.kind}:${rule.targetIds.join(",")}`;
+  const key = `${rule.kind}:${(rule.targetIds ?? []).join(",")}`;
   const named = catalogNames.get(key);
   if (named) return named;
-  if (rule.targetIds.length === 1) {
-    const single = catalogNames.get(`${rule.kind}:${rule.targetIds[0]}`);
+  if ((rule.targetIds ?? []).length === 1) {
+    const single = catalogNames.get(`${rule.kind}:${(rule.targetIds ?? [])[0]}`);
     if (single) return single;
   }
   return rule.kind === "category" ? "Category" : rule.kind === "app" ? "App" : rule.name;
@@ -208,12 +214,12 @@ export function rulePaused(rule: Pick<Rule, "pause">, now: Date): boolean {
 
 /** Whether the rule is lifted for this group alone at `now`. */
 export function ruleLiftedForGroup(rule: Pick<Rule, "groupPauses">, groupId: string, now: Date): boolean {
-  return rule.groupPauses.some((item) => item.groupId === groupId && lifting(item.pause, now));
+  return (rule.groupPauses ?? []).some((item) => item.groupId === groupId && lifting(item.pause, now));
 }
 
 /** The rule's pause or allowance for this group alone, while it lifts the rule; null otherwise. */
 export function groupLift(rule: Pick<Rule, "groupPauses">, groupId: string, now: Date): RulePause | null {
-  return rule.groupPauses.find((item) => item.groupId === groupId && lifting(item.pause, now))?.pause ?? null;
+  return (rule.groupPauses ?? []).find((item) => item.groupId === groupId && lifting(item.pause, now))?.pause ?? null;
 }
 
 /**
@@ -240,7 +246,7 @@ export function internetWindowsForGroup(rules: Rule[], groupId: string, now: Dat
 
 /** One rule's windows, each with the rule it came from. An always-on rule is one window with no end. */
 export function ruleInternetWindows(rule: Pick<Rule, "name" | "mode" | "windows">): InternetWindow[] {
-  return rule.mode === "always" ? [alwaysWindow(rule.name)] : rule.windows.map((window) => ({ ...window, ruleName: rule.name }));
+  return rule.mode === "always" ? [alwaysWindow(rule.name)] : (rule.windows ?? []).map((window) => ({ ...window, ruleName: rule.name }));
 }
 
 /** An always-on internet rule as a window: all day, every day, never ending. */
@@ -258,10 +264,10 @@ export function ruleBlocksLabel(
   if (rule.builtIn === "countries") return `${countriesSummary(rule.countries ?? [])} · everything else stays on`;
   if (rule.kind === "internet") return "All internet · every device";
   if (rule.kind === "domain") {
-    const shown = rule.domains.slice(0, 2).join(", ") + (rule.domains.length > 2 ? "…" : "");
-    return `${rule.domains.length} ${rule.domains.length === 1 ? "website" : "websites"} · ${shown}`;
+    const shown = (rule.domains ?? []).slice(0, 2).join(", ") + ((rule.domains ?? []).length > 2 ? "…" : "");
+    return `${(rule.domains ?? []).length} ${(rule.domains ?? []).length === 1 ? "website" : "websites"} · ${shown}`;
   }
-  const names = rule.targetIds.map((id) => {
+  const names = (rule.targetIds ?? []).map((id) => {
     const slot = rule.kind === "category" ? CURATED_CATEGORY_SLOTS.find((item) => item.categoryId === id) : undefined;
     return slot?.label ?? catalogNames.get(`${rule.kind}:${id}`) ?? (rule.kind === "category" ? "Category" : "App");
   });
@@ -271,7 +277,7 @@ export function ruleBlocksLabel(
 /** A rule's bands on a day that is `weekday`, in minutes after midnight. */
 export function ruleDayBands(rule: Pick<Rule, "mode" | "windows">, weekday: number): { from: number; to: number; window: RuleWindow }[] {
   if (rule.mode === "always") return [{ from: 0, to: 1440, window: { name: "Always", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "00:00" } }];
-  return rule.windows.flatMap((window) => windowDayBands(window, weekday).map((band) => ({ from: band.from, to: band.to, window })));
+  return (rule.windows ?? []).flatMap((window) => windowDayBands(window, weekday).map((band) => ({ from: band.from, to: band.to, window })));
 }
 
 /** A window's shape on a 24-hour bar, whatever the day: one band, or two across midnight. */

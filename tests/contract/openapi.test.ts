@@ -34,8 +34,9 @@ describe("openapi contract", () => {
 
   it("marks every response field required unless the server sometimes leaves it out", () => {
     // Clients are generated from this document (familyfi#124): a field missing from `required`
-    // is typed as possibly absent. The server sends an empty value as `null`, so only fields
-    // it really omits belong here. Integration tests check every response against these schemas.
+    // is typed as possibly absent. A field that applies to only some objects of a type is left
+    // out of the others (docs/api.md); one that applies but is empty is `null`. Only fields the
+    // server really omits belong here. Integration tests check every response against these schemas.
     const sometimesOmitted = [
       "Health.revision", // only when the database answered
       "Health.error", // only when degraded by configuration
@@ -49,6 +50,15 @@ describe("openapi contract", () => {
       "CheckupFinding.details.networks.clientCount", // only for networks FamilyFi doesn't manage
       "CheckupFinding.details.networks.dnsServers", // only for a network's own DNS
       "CheckupFinding.details.wifis", // only for a check about Wi-Fi
+      "Rule.groupIds", // only when scope is group
+      "Rule.groupPauses", // only when scope is group
+      "Rule.networkIds", // only when scope is network
+      "Rule.targetIds", // only on category and app rules
+      "Rule.domains", // only on website rules
+      "Rule.windows", // only when mode is scheduled
+      "Rule.countries", // only on Block countries
+      "Rule.blockPrivateRelay", // only on Lock DNS
+      "Rule.openDns", // only on Lock DNS
     ];
     type Schema = Record<string, unknown> & {
       $ref?: string;

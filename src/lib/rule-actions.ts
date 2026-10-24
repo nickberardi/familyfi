@@ -43,7 +43,7 @@ export function ruleGroupStateLines(
   timezone: string,
   now: Date,
 ): string[] {
-  return rule.groupPauses
+  return (rule.groupPauses ?? [])
     .filter((item) => rulePaused({ pause: item.pause }, now))
     .map((item) => {
       // A group's allowance on a rule is its unblock; Lock DNS never blocked the group, so it is allowed.

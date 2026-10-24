@@ -52,7 +52,7 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
 
   /** UniFi has no category for it, so FamilyFi can only block its websites. */
   const websitesOnly = state.kind === "category" && state.categoryId === null && !state.rule;
-  const shared = (state.rule?.groupIds.length ?? 0) > 1;
+  const shared = (state.rule?.groupIds?.length ?? 0) > 1;
   const body = on
     ? `Its own policy, its own controls — scoped to ${state.name} only. Everything else stays on.${
         shared ? ` Turning it off turns “${state.rule!.name}” off for every group it covers.` : ""
@@ -78,7 +78,7 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
     heading,
     body: websitesOnly ? websitesNote : body,
     /** A scheduled rule's windows, one line each. */
-    windows: state.rule?.mode === "scheduled" ? state.rule.windows.map((window) => `${window.name ? `${window.name} · ` : ""}${windowTimes(window.start, window.end)} · ${daysLabel(window.days)}`) : [],
+    windows: state.rule?.mode === "scheduled" ? (state.rule.windows ?? []).map((window) => `${window.name ? `${window.name} · ` : ""}${windowTimes(window.start, window.end)} · ${daysLabel(window.days)}`) : [],
     action,
     actionLabel: websitesOnly ? "Block its websites" : owned ? "Turn off" : "Create policy",
     /** The link to the rule editor, under the button. */

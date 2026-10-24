@@ -284,14 +284,14 @@ export type CategoryMarkState = "rule" | "blocked" | "partial" | "open" | "unkno
  * of the two failures.
  */
 export function ruleActivelyBlocking(
-  rule: { enabled: boolean; mode: "always" | "scheduled"; windows: RuleWindowSpec[] } | undefined,
+  rule: { enabled: boolean; mode: "always" | "scheduled"; windows?: RuleWindowSpec[] } | undefined,
   timezone: string,
   now = new Date(),
 ): boolean {
   if (!rule?.enabled) return false;
   if (rule.mode === "always") return true;
   try {
-    return rule.windows.some((window) => isWindowActive(window, now, timezone));
+    return (rule.windows ?? []).some((window) => isWindowActive(window, now, timezone));
   } catch {
     return false;
   }
