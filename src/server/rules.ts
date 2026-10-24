@@ -61,8 +61,9 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean): 
   const windows = [...rule.windows].sort((a, b) => a.position - b.position);
   const builtIn = builtInRule(rule);
   const quarantine = builtIn === "quarantine";
-  const byGroup = rule.scope === RuleScope.group;
-  // A field that doesn't apply to this rule is left out, never sent empty: see docs/api.md (Payloads).
+  // Quarantine covers unassigned devices, never a group, so it has neither groups nor group lifts.
+  const byGroup = rule.scope === RuleScope.group && !quarantine;
+  // A field that doesn't apply to this rule is left out, never sent empty (docs/api.md).
   return {
     id: rule.id,
     name: rule.name,

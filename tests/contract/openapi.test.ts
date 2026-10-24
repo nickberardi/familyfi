@@ -50,11 +50,11 @@ describe("openapi contract", () => {
       "CheckupFinding.details.networks.clientCount", // only for networks FamilyFi doesn't manage
       "CheckupFinding.details.networks.dnsServers", // only for a network's own DNS
       "CheckupFinding.details.wifis", // only for a check about Wi-Fi
-      "Rule.groupIds", // only when scope is group
-      "Rule.groupPauses", // only when scope is group
+      "Rule.groupIds", // only when scope is group, never on quarantine
+      "Rule.groupPauses", // only when scope is group, never on quarantine
       "Rule.networkIds", // only when scope is network
       "Rule.targetIds", // only on category and app rules
-      "Rule.domains", // only on website rules
+      "Rule.domains", // only on website rules other than Block countries
       "Rule.windows", // only when mode is scheduled
       "Rule.countries", // only on Block countries
       "Rule.blockPrivateRelay", // only on Lock DNS
