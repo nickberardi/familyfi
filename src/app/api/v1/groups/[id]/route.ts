@@ -1,13 +1,13 @@
 import { FamilyRole } from "@prisma/client";
 import { z } from "zod";
-import { AssignmentState } from "@prisma/client";
+import { AssignmentState, RuleLiftKind } from "@prisma/client";
 import { enqueueChange } from "@/server/changes";
 import { groupInclude, publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
-import { LOCK_DNS_RULE_ID } from "@/lib/rules";
+import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 
 const Update = z.object({
   name: z.string().min(1).optional(),
@@ -65,9 +65,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
     });
     // A rule that covered only this group goes with it. Delete its recorded UniFi
     // policies before the Rule rows cascade (D3). Rules shared with other groups stay, and
-    // so does Lock DNS: it is built in, and only loses the group.
+    // so do Lock DNS and Block countries: they are built in, and only lose the group.
     const rules = await prisma().rule.findMany({
-      where: { scope: "group", id: { not: LOCK_DNS_RULE_ID }, groups: { some: { groupId: id }, every: { groupId: id } } },
+      where: { scope: "group", id: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, groups: { some: { groupId: id }, every: { groupId: id } } },
       include: { policies: true },
     });
     const household = await prisma().household.findUnique({ where: { id: "default" } });
@@ -93,6 +93,14 @@ export async function DELETE(request: Request, ctx: Ctx) {
     await prisma().rulePolicy.deleteMany({ where: { ruleId: { in: rules.map((r) => r.id) } } });
     await prisma().rule.deleteMany({ where: { id: { in: rules.map((r) => r.id) } } });
     await prisma().group.delete({ where: { id } });
+    // Block countries on with no group means every group, so it keeps going when the last group goes. While other
+    // groups are left it can't cover none of them, so it turns off, as it does when it loses its last network.
+    if (await prisma().group.count()) {
+      await prisma().rule.updateMany({
+        where: { id: COUNTRIES_RULE_ID, scope: "group", groups: { none: {} } },
+        data: { enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
+      });
+    }
     const change = await enqueueChange("group");
     return Response.json({ ok: true, change });
   });

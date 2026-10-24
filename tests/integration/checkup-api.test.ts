@@ -10,6 +10,7 @@ import { GET as getCheckup } from "@/app/api/v1/checkup/route";
 import { POST as runCheckup } from "@/app/api/v1/checkup/run/route";
 import { PATCH as patchFinding } from "@/app/api/v1/checkup/findings/[id]/route";
 import { POST as createGroup } from "@/app/api/v1/groups/route";
+import { DELETE as deleteGroup } from "@/app/api/v1/groups/[id]/route";
 import { POST as unblockGroup } from "@/app/api/v1/groups/[id]/unblock/route";
 import { GET as listRules } from "@/app/api/v1/rules/route";
 import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
@@ -291,6 +292,25 @@ describe("Block countries", () => {
     const created = await createGroup(request("/api/v1/groups", { method: "POST", auth, headers: json, body: JSON.stringify({ kind: "things", name: "TV" }) }));
     const id = ((await created.json()) as { group: { id: string } }).group.id;
     expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds).toEqual([id]);
+  });
+
+  it("stays when the groups it covers are deleted, off while other groups are left", async () => {
+    const auth = await signedIn();
+    const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV" } });
+    const games = await prisma().group.create({ data: { kind: GroupKind.things, name: "Games" } });
+    const remove = (id: string) => deleteGroup(request(`/api/v1/groups/${id}`, { method: "DELETE", auth }), { params: Promise.resolve({ id }) });
+    expect((await patchCountries(auth, { enabled: true, groupIds: [tv.id] })).status).toBe(200);
+    await runReconcileOnce();
+    expect((await remove(tv.id)).status).toBe(200);
+    const countries = async () => (await rules(auth)).find((rule) => rule.id === "countries");
+    expect(await countries()).toMatchObject({ enabled: false, groupIds: [] });
+    await runReconcileOnce();
+    expect(client.state.policies.filter((policy) => policy.destination?.trafficFilter?.type === "REGION")).toEqual([]);
+
+    // Covering the last group, it stays on, which means every group, and takes in the next one.
+    expect((await patchCountries(auth, { enabled: true, groupIds: [games.id] })).status).toBe(200);
+    expect((await remove(games.id)).status).toBe(200);
+    expect(await countries()).toMatchObject({ enabled: true, groupIds: [] });
   });
 
   it("never makes a group blocked, so an unblock leaves it alone", async () => {
