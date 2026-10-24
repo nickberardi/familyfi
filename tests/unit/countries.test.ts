@@ -22,7 +22,8 @@ describe("countries", () => {
 
   it("edits a Block countries draft", () => {
     const groups = [{ id: "a" }, { id: "b" }];
-    const saved = { enabled: false, countries: ["RU", "KP"], scope: "group" as const, groupIds: [], networkIds: [] };
+    // As the server sends it: a group rule carries no networkIds.
+    const saved = { enabled: false, countries: ["RU", "KP"], scope: "group" as const, groupIds: [] };
     const draft = fromCountriesRule(saved, groups);
     // A rule that covers no group yet starts with every group, as switching it on does.
     expect(draft).toEqual({ enabled: false, countries: ["KP", "RU"], scope: "group", groupIds: ["a", "b"], networkIds: [] });
@@ -44,7 +45,8 @@ describe("countries", () => {
     expect(countriesEditorState(draft, saved, groups).dirty).toBe(true);
     // The other scope's picks are kept while editing, and never count as a change.
     expect(countriesEditorState({ ...fromCountriesRule(saved, groups), networkIds: ["lan"] }, saved, groups).dirty).toBe(false);
-    const onNetworks = { ...saved, scope: "network" as const, groupIds: [], networkIds: ["lan"] };
+    // A rule on networks carries no groupIds.
+    const onNetworks = { enabled: true, countries: ["KP"], scope: "network" as const, networkIds: ["lan"] };
     expect(fromCountriesRule(onNetworks, groups)).toMatchObject({ scope: "network", networkIds: ["lan"] });
   });
 

@@ -33,10 +33,10 @@ export type RulesListView = {
 
 export function rulesListView(rules: Rule[], groups: Group[], scope: string | null | undefined): RulesListView {
   const scoped = scope ? groups.find((group) => group.id === scope) : undefined;
-  const covered = new Set(rules.flatMap((rule) => rule.groupIds));
+  const covered = new Set(rules.flatMap((rule) => rule.groupIds ?? []));
   // Lock DNS and Block countries block nothing of a group's own: a group only they cover is still
   // online and unfiltered.
-  const filtered = new Set(rules.filter((rule) => rule.builtIn !== "dns" && rule.builtIn !== "countries").flatMap((rule) => rule.groupIds));
+  const filtered = new Set(rules.filter((rule) => rule.builtIn !== "dns" && rule.builtIn !== "countries").flatMap((rule) => rule.groupIds ?? []));
   return {
     scoped,
     list: scoped ? rules.filter((rule) => (rule.groupIds ?? []).includes(scoped.id)) : rules,

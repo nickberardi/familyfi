@@ -3,7 +3,7 @@ import { AssignmentState, GroupKind, RuleKind, RuleMode, RuleScope } from "@pris
 import { describe, expect, it, vi } from "vitest";
 import { ENCRYPTED_DNS_SERVICES, encryptedDnsAddresses, encryptedDnsHosts, encryptedDnsSummary } from "@/lib/encrypted-dns";
 import { groupHeaderActions, groupStatus } from "@/lib/group-actions";
-import { lockDnsDirty, lockDnsOpenLabel, lockDnsSummary, lockDnsWrites, validateLockDnsDraft } from "@/lib/lock-dns";
+import { fromLockDnsRule, lockDnsDirty, lockDnsOpenLabel, lockDnsSummary, lockDnsWrites, validateLockDnsDraft } from "@/lib/lock-dns";
 import { rulePauseSheetBody } from "@/lib/pause-sheet";
 import { ruleGroupStateLines } from "@/lib/rule-actions";
 import { lockDnsParts, lockDnsPolicyName } from "@/lib/policy-names";
@@ -424,6 +424,18 @@ describe("Lock DNS on the clients", () => {
     expect(lockDnsDirty(kid, relay)).toBe(true);
     expect(lockDnsSummary(kid)).toBe("Built in · always · 4 UniFi policies");
     expect(lockDnsSummary(relay)).toBe("Built in · always · 5 UniFi policies");
+  });
+
+  it("reads the rule as the server sends it, without the other scope's list or the switch", () => {
+    // Lock DNS on people carries no networkIds; on networks, no groupIds. blockPrivateRelay is only on Lock DNS.
+    expect(fromLockDnsRule({ scope: "group", groupIds: ["kid"] })).toEqual({ scope: "group", groupIds: ["kid"], networkIds: [], blockPrivateRelay: false });
+    expect(fromLockDnsRule({ scope: "network", networkIds: ["lan"], blockPrivateRelay: true })).toEqual({
+      scope: "network",
+      groupIds: [],
+      networkIds: ["lan"],
+      blockPrivateRelay: true,
+    });
+    expect(lockDnsDirty({ scope: "group", groupIds: ["kid"] }, { scope: "group", groupIds: ["kid"], networkIds: [], blockPrivateRelay: false })).toBe(false);
   });
 
   it("names who each DNS it leaves open belongs to", () => {
