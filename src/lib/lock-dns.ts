@@ -79,7 +79,7 @@ export function lockDnsOpenLabel(entry: Pick<LockDnsOpen, "source" | "name">): s
 export type LockDnsDraft = AppliesTo & { blockPrivateRelay: boolean };
 
 export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay">): LockDnsDraft {
-  return { scope: rule.scope, groupIds: [...rule.groupIds], networkIds: [...rule.networkIds], blockPrivateRelay: rule.blockPrivateRelay ?? false };
+  return { scope: rule.scope, groupIds: [...(rule.groupIds ?? [])], networkIds: [...(rule.networkIds ?? [])], blockPrivateRelay: rule.blockPrivateRelay ?? false };
 }
 
 /**
