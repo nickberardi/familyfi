@@ -432,7 +432,7 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         title: "Phones may not find Sonos",
         seen: `${names(devices)} ${devices.length === 1 ? "is" : "are"} on another network from your phones, and mDNS is off for ${names(networks)}.`,
         why: "The Sonos app finds speakers with mDNS, which stays inside one network unless UniFi forwards it.",
-        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS, and the same for the phones’ network.`],
+        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS, and the same for the phones’ network. Both networks also need to be able to reach each other.`],
         guide: SONOS_GUIDE,
       };
     case "casting_mdns":
@@ -441,7 +441,7 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         title: "Phones can’t see some TVs and printers",
         seen: `${names(devices)} ${devices.length === 1 ? "is" : "are"} on another network from your phones, and mDNS is off for ${names(networks)}.`,
         why: "Casting, AirPlay and printing find devices with mDNS, which stays inside one network unless UniFi forwards it. If you keep them apart on purpose, this is fine.",
-        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS.`],
+        fix: [`UniFi Network → Settings → Networks → ${networks[0]?.name ?? "the network"} → turn on mDNS. Both networks also need to be able to reach each other.`],
       };
     case "dns_override": {
       const network = networks[0];
@@ -471,8 +471,8 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         title: networks.length === 1 ? `${networks[0]!.name} isn’t managed by FamilyFi` : `${plural(networks.length, "network", "networks")} aren’t managed by FamilyFi`,
         seen: `${networks.map((network) => `${plural(network.clientCount ?? 0, "device", "devices")} on ${network.name}`).join(", ")} get no rules or quarantine.`,
         why: "FamilyFi only manages the networks chosen in Settings. A guest or work network is often left out on purpose.",
-        fix: ["FamilyFi → Settings → UniFi → Managed networks."],
-        show: { label: "Open Settings", href: "/settings" },
+        fix: ["FamilyFi → Settings → Gateway → Edit connection → pick the networks → Save network selection."],
+        show: { label: "Open Settings", href: "/settings?tab=gateway" },
       };
   }
 }
@@ -534,7 +534,7 @@ export function protectionLine(rule: Pick<Rule, "builtIn" | "countries" | "group
   if (rule.builtIn === "quarantine") return CHECKUP_COPY.protection.quarantine.sub;
   const names = namesList(rule.groupIds.map((id) => groups.find((group) => group.id === id)?.name ?? "Deleted group"));
   // Switched on with no group, Lock DNS covers every person and Block countries every group.
-  if (rule.builtIn === "dns") return `Keeps ${rule.groupIds.length === 0 ? "every person" : names} on your gateway’s DNS`;
+  if (rule.builtIn === "dns") return `Keeps ${rule.groupIds.length === 0 ? "every person" : names} off other DNS servers`;
   const who = rule.groupIds.length === 0 || rule.groupIds.length === groups.length ? "every group" : names;
   return `Blocks ${countriesSummary(rule.countries)} for ${who}`;
 }

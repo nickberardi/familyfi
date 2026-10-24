@@ -142,6 +142,8 @@ describe("network checkup", () => {
     const [finding] = found(run, "unmanaged_networks");
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).title).toBe("Guest isn’t managed by FamilyFi");
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).seen).toBe("3 devices on Guest get no rules or quarantine.");
+    // Settings opens on Household; the managed networks are on the Gateway tab.
+    expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).show?.href).toBe("/settings?tab=gateway");
   });
 
   it("changes a finding's subject when what was seen changes, and keeps it when it does not", () => {
@@ -207,8 +209,8 @@ describe("network checkup", () => {
     ] as unknown as Rule[];
     expect(recommendedRules(rules).map((rule) => rule.id)).toEqual(["quarantine", "dns", "countries"]);
     expect(recommendedRules(rules).map(protectionTitle)).toEqual(["Quarantine", "Lock DNS", "Block countries"]);
-    expect(protectionLine({ builtIn: "dns", countries: [], groupIds: [] }, groups)).toBe("Keeps every person on your gateway’s DNS");
-    expect(protectionLine({ builtIn: "dns", countries: [], groupIds: ["g1"] }, groups)).toBe("Keeps Mia on your gateway’s DNS");
+    expect(protectionLine({ builtIn: "dns", countries: [], groupIds: [] }, groups)).toBe("Keeps every person off other DNS servers");
+    expect(protectionLine({ builtIn: "dns", countries: [], groupIds: ["g1"] }, groups)).toBe("Keeps Mia off other DNS servers");
     expect(protectionLine({ builtIn: "countries", countries: ["KP"], groupIds: ["g1", "g2"] }, groups)).toBe("Blocks North Korea for every group");
   });
 });
