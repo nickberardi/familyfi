@@ -1093,6 +1093,17 @@
         "rules",
         "unifi"
       ]
+    },
+    "tests/unit/cloudflared-probe.test.ts": {
+      "categories": [
+        "pairing",
+        "runtime"
+      ]
+    },
+    "tests/unit/runtime-exit.test.ts": {
+      "categories": [
+        "runtime"
+      ]
     }
   }
 }
