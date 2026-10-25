@@ -137,11 +137,26 @@ async function releaseLock(owner: string) {
   });
 }
 
+/** Another owner took the lock while this pass ran: it stops before its next gateway write. */
+class LockLostError extends Error {}
+
 async function tick(owner: string): Promise<boolean> {
   if (!(await acquireLock(owner))) return false;
-  // Held for the whole pass, however long the gateway takes; a failed renewal is retried on the next beat.
-  const renewal = setInterval(() => void acquireLock(owner).catch(() => undefined), lockRenewMs);
+  // Held for the whole pass, however long the gateway takes. A renewal that fails to reach the
+  // database is retried on the next beat; one that finds another owner holding it ends the pass.
+  let lost = false;
+  let renewing: Promise<void> = Promise.resolve();
+  const renewal = setInterval(() => {
+    renewing = acquireLock(owner)
+      .then((held) => {
+        if (!held) lost = true;
+      })
+      .catch(() => undefined);
+  }, lockRenewMs);
   unrefTimer(renewal);
+  const stillHeld = () => {
+    if (lost) throw new LockLostError("Another sync took over before this one finished.");
+  };
   try {
   const now = new Date();
   // A group's own pause ends: its built-in block rule is switched off, and its policies go.
@@ -243,9 +258,12 @@ async function tick(owner: string): Promise<boolean> {
         accessPointName,
         manufacturer: recordedManufacturer(mac, existing?.manufacturer ?? null),
       };
+      // Upserted and updated by MAC, so a device deleted or imported since the read above
+      // neither fails the pass nor is written twice.
       if (!existing) {
-        await prisma().device.create({
-          data: {
+        await prisma().device.upsert({
+          where: { mac },
+          create: {
             mac,
             ...observed,
             assignment: AssignmentState.quarantined,
@@ -253,6 +271,7 @@ async function tick(owner: string): Promise<boolean> {
             presenceOnline: true,
             presenceCheckedAt: now,
           },
+          update: { ...observed, lastSeenAt: now, presenceOnline: true, presenceCheckedAt: now },
         });
         continue;
       }
@@ -261,7 +280,7 @@ async function tick(owner: string): Promise<boolean> {
       const changed = Object.entries(observed).filter(
         ([field, value]) => value !== undefined && !isDeepStrictEqual(value, existing[field as keyof typeof observed]),
       );
-      if (changed.length) await prisma().device.update({ where: { mac }, data: Object.fromEntries(changed) });
+      if (changed.length) await prisma().device.updateMany({ where: { mac }, data: Object.fromEntries(changed) });
     }
     await prisma().device.updateMany({
       where: { mac: { in: seenMacs } },
@@ -305,6 +324,7 @@ async function tick(owner: string): Promise<boolean> {
     const errors: string[] = [];
 
     for (const planned of desired) {
+      stillHeld();
       const write = internetBlockPolicy({
         name: planned.name,
         sourceZoneId: planned.zoneId,
@@ -346,6 +366,7 @@ async function tick(owner: string): Promise<boolean> {
     }
 
     for (const row of appPolicies) {
+      stillHeld();
       const key = plannedKey(row.ownerScope, row.groupId, row.zoneId);
       if (desiredKeys.has(key)) continue;
       const owner = row.ownerScope === PolicyOwnerScope.quarantine ? "quarantine" : `group:${row.groupId}`;
@@ -435,6 +456,7 @@ async function tick(owner: string): Promise<boolean> {
     const desiredRuleKeys = new Set(desiredRules.map((item) => item.key));
 
     for (const planned of desiredRules) {
+      stillHeld();
       const write = rulePolicyWrite(planned);
       const fingerprint = policyFingerprint(write);
       const existing = rulePolicies.find(
@@ -469,6 +491,7 @@ async function tick(owner: string): Promise<boolean> {
     }
 
     for (const row of rulePolicies) {
+      stillHeld();
       const key = plannedRuleKey(row.ruleId, row.windowKey, row.zoneId);
       if (desiredRuleKeys.has(key)) continue;
       if (retainRuleIds.has(row.ruleId) && !goneFromGateway(row.unifiPolicyId, onGateway)) continue;
@@ -498,7 +521,7 @@ async function tick(owner: string): Promise<boolean> {
       }
     }
 
-    const orphanErrors = await removeOrphanedPolicies(client, siteId, identity, onGateway);
+    const orphanErrors = await removeOrphanedPolicies(client, siteId, identity, onGateway, stillHeld);
     failed += orphanErrors.length;
     errors.push(...orphanErrors);
 
@@ -544,6 +567,8 @@ async function tick(owner: string): Promise<boolean> {
       where: { id: run.id },
       data: { status: ChangeStatus.failed, finishedAt: new Date(), error: message },
     });
+    // Not the gateway's fault, and the pass that took over settles the pending changes.
+    if (error instanceof LockLostError) return true;
     await prisma().household.update({
       where: { id: "default" },
       data: { connectionStatus: "error", connectionError: message },
@@ -560,6 +585,8 @@ async function tick(owner: string): Promise<boolean> {
   return true;
   } finally {
     clearInterval(renewal);
+    // A renewal still in flight would otherwise take the lock back after it is released.
+    await renewing;
     await releaseLock(owner);
   }
 }
@@ -845,6 +872,7 @@ async function removeOrphanedPolicies(
   siteId: string,
   identity: string,
   onGateway: Set<string>,
+  stillHeld: () => void,
 ): Promise<string[]> {
   const scope = { connectionIdentity: identity, siteId };
   const [appPolicies, rulePolicies, creations] = await Promise.all([
@@ -859,6 +887,7 @@ async function removeOrphanedPolicies(
   for (const creation of creations) {
     const policyId = creation.unifiPolicyId!;
     if (recorded.has(policyId)) continue;
+    stillHeld();
     try {
       await deleteFromGateway(client, siteId, policyId, onGateway);
       // Gone from the gateway and from the records: no longer evidence of anything.
