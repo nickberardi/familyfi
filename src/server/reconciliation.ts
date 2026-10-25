@@ -28,6 +28,8 @@ import { unrefTimer } from "./unref-timer";
 
 const INTERVAL_MS = 30_000;
 const LOCK_MS = 25_000;
+// Only the latest run is ever read; a week of history is kept for diagnosis.
+const SYNC_HISTORY_MS = 7 * 24 * 60 * 60 * 1000;
 
 let queued = false;
 let pumping = false;
@@ -526,6 +528,10 @@ async function tick(owner: string): Promise<boolean> {
       data: { status: ChangeStatus.failed, error: message, syncRunId: run.id },
     });
   }
+  // A run every interval adds up to a million rows a year; the change results they settled keep their outcome.
+  await prisma().syncRun.deleteMany({
+    where: { id: { not: run.id }, startedAt: { lt: new Date(now.getTime() - SYNC_HISTORY_MS) } },
+  });
   return true;
   } finally {
     await releaseLock(owner);

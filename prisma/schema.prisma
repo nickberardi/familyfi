@@ -429,6 +429,8 @@ model SyncRun {
   finishedAt        DateTime? @db.Timestamptz(3)
   error             String?
   changes           ChangeResult[]
+
+  @@index([startedAt])
 }
 
 model ChangeResult {
@@ -449,6 +451,9 @@ model ChangeResult {
   actorDevice       PairedDevice? @relation("changeActorDevice", fields: [actorDeviceId], references: [id], onDelete: SetNull)
 
   @@index([actorAccountId, updatedAt])
+  @@index([updatedAt])
+  @@index([status])
+  @@index([syncRunId])
 }
 
 model ReconciliationLock {
