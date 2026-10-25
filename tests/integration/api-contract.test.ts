@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
@@ -249,11 +249,15 @@ describe("v1 API contracts", () => {
       data: { ...owned, ruleId: rule.id, windowKey: rule.windows[0]!.id, unifiPolicyId: "pol-bedtime", lastError: "UniFi PUT failed: 400" },
     });
 
+    // Counted, never loaded: every open page and phone polls this.
+    const loadApp = vi.spyOn(prisma().appPolicy, "findMany");
     const sync = await getSync(request("/api/v1/sync", { auth }));
     expect(sync.status).toBe(200);
     const body = (await sync.json()) as { appPolicyCount: number; failingCount: number };
     expect(body.appPolicyCount).toBe(2);
     expect(body.failingCount).toBe(1);
+    expect(loadApp).not.toHaveBeenCalled();
+    loadApp.mockRestore();
   });
 
   it("keeps the lost connection's error on the sync page while the next sweep runs", async () => {

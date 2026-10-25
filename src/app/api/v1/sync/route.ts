@@ -11,19 +11,21 @@ export async function GET(request: Request) {
   return withSession(request, async () => {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const scope = deviceScope(household);
-    const [run, appPolicies, rulePolicies, changeRows, coverage, checkupProblems] = await Promise.all([
+    // Every policy FamilyFi owns: pause and quarantine policies, and one per rule window. Counted, not
+    // loaded: every open page and phone polls this.
+    const live = { unifiPolicyId: { not: null } };
+    const failing = { lastError: { not: null } };
+    const [run, liveCounts, errorCounts, changeRows, coverage, checkupProblems] = await Promise.all([
       prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } }),
-      prisma().appPolicy.findMany(),
-      prisma().rulePolicy.findMany(),
+      Promise.all([prisma().appPolicy.count({ where: live }), prisma().rulePolicy.count({ where: live })]),
+      Promise.all([prisma().appPolicy.count({ where: failing }), prisma().rulePolicy.count({ where: failing })]),
       prisma().changeResult.findMany({ orderBy: { updatedAt: "desc" }, take: 30 }),
       storedCoverage({ now: new Date(), deviceInScope: (networkId) => networkInScope(scope, networkId) }),
       checkupProblemCount(),
     ]);
     const { issues } = coverage;
     const writeIssues = issues.filter(isWriteFailure);
-    // Every policy FamilyFi owns: pause and quarantine policies, and one per rule window.
-    const owned = [...appPolicies, ...rulePolicies];
-    const policyErrors = owned.filter((policy) => policy.lastError).length;
+    const policyErrors = errorCounts[0] + errorCounts[1];
     const failingCount = policyErrors + writeIssues.length;
     const staleNoMembers =
       failingCount === 0 &&
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
     return Response.json({
       revision: household.revision,
       connectionStatus: household.connectionStatus,
-      appPolicyCount: owned.filter((policy) => policy.unifiPolicyId).length,
+      appPolicyCount: liveCounts[0] + liveCounts[1],
       failingCount,
       issues,
       lastRun: run
