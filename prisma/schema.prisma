@@ -418,6 +418,9 @@ model PolicyOperation {
   status             String                @default("pending")
   createdAt          DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@index([unifiPolicyId])
+  @@index([connectionIdentity, siteId, intent, status])
 }
 
 model SyncRun {

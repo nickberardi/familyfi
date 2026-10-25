@@ -31,7 +31,7 @@ const INTERVAL_MS = 30_000;
 // one pass of many gateway writes, each allowed 15 seconds, can last minutes.
 let lockMs = 25_000;
 let lockRenewMs = 8_000;
-// Only the latest run is ever read; a week of history is kept for diagnosis.
+// Only the latest run is ever read; a week of sync and policy-write history is kept for diagnosis.
 const SYNC_HISTORY_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
@@ -587,6 +587,11 @@ async function tick(owner: string): Promise<boolean> {
   await prisma().syncRun.deleteMany({
     where: { id: { not: run.id }, startedAt: { lt: new Date(now.getTime() - SYNC_HISTORY_MS) } },
   });
+  // Creates that failed, never finished or whose policy is gone prove nothing; applied ones are
+  // the evidence the ownership guard reads, and stay.
+  await prisma().policyOperation.deleteMany({
+    where: { status: { not: "applied" }, updatedAt: { lt: new Date(now.getTime() - SYNC_HISTORY_MS) } },
+  });
   return true;
   } finally {
     clearInterval(renewal);
@@ -669,21 +674,7 @@ async function applyDesiredPolicy(
     }
   }
 
-  const operation = await prisma().policyOperation.create({
-    data: {
-      intent: PolicyOperationIntent.create,
-      connectionIdentity: identity,
-      siteId,
-      payloadFingerprint: fingerprint,
-      status: "pending",
-    },
-  });
-  const created = await client.createPolicy(siteId, write);
-  onGateway.add(created.id);
-  await prisma().policyOperation.update({
-    where: { id: operation.id },
-    data: { status: "applied", unifiPolicyId: created.id },
-  });
+  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway);
   if (appPolicyId) {
     await prisma().appPolicy.update({
       where: { id: appPolicyId },
@@ -792,21 +783,7 @@ async function applyDesiredRulePolicy(
     }
   }
 
-  const operation = await prisma().policyOperation.create({
-    data: {
-      intent: PolicyOperationIntent.create,
-      connectionIdentity: identity,
-      siteId,
-      payloadFingerprint: fingerprint,
-      status: "pending",
-    },
-  });
-  const created = await client.createPolicy(siteId, write);
-  onGateway.add(created.id);
-  await prisma().policyOperation.update({
-    where: { id: operation.id },
-    data: { status: "applied", unifiPolicyId: created.id },
-  });
+  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway);
   if (existing) {
     await prisma().rulePolicy.update({
       where: { id: existing.id },
@@ -836,6 +813,46 @@ async function applyDesiredRulePolicy(
       observedFingerprint: fingerprint,
     },
   });
+}
+
+/**
+ * Creates a policy and records the creation, which is the evidence it is ours. A create the
+ * gateway refused is marked failed, so a policy it keeps refusing leaves no open operation behind;
+ * one whose answer was lost stays pending until the history is pruned.
+ */
+async function createOwnedPolicy(
+  client: UnifiClient,
+  siteId: string,
+  identity: string,
+  write: FirewallPolicyWrite,
+  fingerprint: string,
+  onGateway: Set<string>,
+) {
+  const operation = await prisma().policyOperation.create({
+    data: {
+      intent: PolicyOperationIntent.create,
+      connectionIdentity: identity,
+      siteId,
+      payloadFingerprint: fingerprint,
+      status: "pending",
+    },
+  });
+  let created: Awaited<ReturnType<UnifiClient["createPolicy"]>>;
+  try {
+    created = await client.createPolicy(siteId, write);
+  } catch (error) {
+    // Only a refusal is known to have created nothing; a lost answer stays pending.
+    if (error instanceof UnifiHttpError) {
+      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed" } });
+    }
+    throw error;
+  }
+  onGateway.add(created.id);
+  await prisma().policyOperation.update({
+    where: { id: operation.id },
+    data: { status: "applied", unifiPolicyId: created.id },
+  });
+  return created;
 }
 
 export function startReconciliation() {
