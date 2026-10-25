@@ -152,6 +152,9 @@ model Household {
   checkupError           String?
   /// Checks the last run could not make (a read failed), so they are neither passed nor found.
   checkupSkipped         String[]  @default([])
+  /// When the last sync pass checked every device's presence. A device offline since an earlier
+  /// pass is not written again, so this, not its own `presenceCheckedAt`, says it is still current.
+  presenceCheckedAt      DateTime? @db.Timestamptz(3)
   connectionStatus       String    @default("unconfigured")
   connectionError        String?
   displayName            String    @default("FamilyFi household")

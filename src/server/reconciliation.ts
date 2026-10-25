@@ -291,8 +291,10 @@ async function tick(owner: string): Promise<boolean> {
       where: { mac: { in: seenMacs } },
       data: { lastSeenAt: now, presenceOnline: true, presenceCheckedAt: now },
     });
+    // Only devices going offline now: one already offline stays as it was, and the household's
+    // presenceCheckedAt below says it was checked.
     await prisma().device.updateMany({
-      where: { mac: { notIn: [...observedMacs] } },
+      where: { mac: { notIn: [...observedMacs] }, OR: [{ presenceOnline: true }, { presenceOnline: null }] },
       data: {
         presenceOnline: false,
         presenceCheckedAt: now,
@@ -301,6 +303,7 @@ async function tick(owner: string): Promise<boolean> {
         accessPointName: null,
       },
     });
+    await prisma().household.update({ where: { id: "default" }, data: { presenceCheckedAt: now } });
 
     const [groups, devices, appPolicies, quarantinePauses] = await Promise.all([
       prisma().group.findMany(),

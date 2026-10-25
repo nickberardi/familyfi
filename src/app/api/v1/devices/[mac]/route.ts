@@ -19,7 +19,7 @@ export async function GET(request: Request, ctx: Ctx) {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const device = await prisma().device.findUnique({ where: { mac } });
     if (!device) return jsonError(404, "not_found", "Device not found.");
-    return Response.json({ device: publicDevice(device, deviceScope(household)) });
+    return Response.json({ device: publicDevice(device, deviceScope(household), new Date(), household.presenceCheckedAt) });
   });
 }
 

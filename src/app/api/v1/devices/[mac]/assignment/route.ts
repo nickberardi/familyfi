@@ -41,6 +41,6 @@ export async function PUT(request: Request, ctx: Ctx) {
     });
     const change = await enqueueChange("assignment", mac);
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    return Response.json({ device: publicDevice(device, deviceScope(household)), change });
+    return Response.json({ device: publicDevice(device, deviceScope(household), new Date(), household.presenceCheckedAt), change });
   });
 }
