@@ -418,6 +418,11 @@
         "unifi"
       ]
     },
+    "tests/unit/dpi-catalog.test.ts": {
+      "categories": [
+        "unifi"
+      ]
+    },
     "tests/unit/unifi-host.test.ts": {
       "categories": [
         "unifi"

@@ -1,7 +1,8 @@
 import { prisma } from "@/server/db";
 import { withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { clientForHousehold } from "@/server/unifi/connection";
+import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
+import { dpiCatalog } from "@/server/unifi/dpi-catalog";
 import { CURATED_CATEGORY_CANDIDATES, CURATED_MAP_STATUS } from "@/server/unifi/curated-categories";
 import { UnifiConfigError } from "@/server/unifi/errors";
 
@@ -15,7 +16,8 @@ export async function GET(request: Request) {
       const client = clientForHousehold(household);
       const url = new URL(request.url);
       const filter = url.searchParams.get("filter") ?? undefined;
-      const categories = await client.listDpiCategories(filter);
+      // A filtered search asks the gateway; the whole catalog is shared.
+      const categories = filter ? await client.listDpiCategories(filter) : await dpiCatalog(connectionIdentity(household), "categories", client);
       return Response.json({
         categories,
         curated: {
