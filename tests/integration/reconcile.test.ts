@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AssignmentState, FamilyRole, GroupKind } from "@prisma/client";
 import { UnifiHttpError } from "@/server/unifi/errors";
 import { prisma } from "@/server/db";
+import { publicDevice } from "@/server/devices";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import {
   ADMIN_POLICY_ID,
@@ -101,6 +102,27 @@ describe("reconciliation against mocked UniFi", () => {
     const reconnected = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
     expect(reconnected.presenceOnline).toBe(true);
     expect(reconnected.connectedAt?.toISOString()).toBe("2026-09-27T23:42:00.000Z");
+  });
+
+  it("leaves a device that stays offline alone, and records the check on the household", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    client.state.clients.shift();
+    await runReconcileOnce();
+    const offline = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    const firstSweep = (await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).presenceCheckedAt!;
+
+    await runReconcileOnce();
+
+    const still = await prisma().device.findUniqueOrThrow({ where: { mac: "02:00:00:00:00:01" } });
+    expect(still.updatedAt).toEqual(offline.updatedAt);
+    expect(still.presenceCheckedAt).toEqual(offline.presenceCheckedAt);
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    expect(household.presenceCheckedAt!.getTime()).toBeGreaterThan(firstSweep.getTime());
+    const shown = publicDevice(still, undefined, new Date(), household.presenceCheckedAt);
+    expect(shown.presence).toBe("offline");
+    expect(shown.presenceCheckedAt).toBe(household.presenceCheckedAt!.toISOString());
   });
 
   it("preserves the last observation when the client read fails and tolerates an unknown access point", async () => {

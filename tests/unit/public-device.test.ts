@@ -20,6 +20,7 @@ function row(overrides: Partial<Parameters<typeof publicDevice>[0]> = {}): Param
     connectionType: null,
     accessPointName: null,
     manufacturer: null,
+    createdAt: new Date("2026-09-01T00:00:00.000Z"),
     ...overrides,
   };
 }
@@ -33,6 +34,20 @@ describe("public device observation", () => {
     const old = new Date(NOW.getTime() - 90_001);
     expect(publicDevice(row({ presenceOnline: true, presenceCheckedAt: old }), undefined, NOW).presence).toBe("stale_online");
     expect(publicDevice(row({ presenceOnline: false, presenceCheckedAt: old }), undefined, NOW).presence).toBe("stale_offline");
+  });
+
+  it("reads an offline device as checked by the household's last sweep, which does not rewrite it", () => {
+    const old = new Date(NOW.getTime() - 60 * 60_000);
+    const swept = new Date(NOW.getTime() - 10_000);
+    const offline = publicDevice(row({ presenceOnline: false, presenceCheckedAt: old }), undefined, NOW, swept);
+    expect(offline.presence).toBe("offline");
+    expect(offline.presenceCheckedAt).toBe(swept.toISOString());
+    // A sweep older than the device's own check, or from before the device existed, says nothing new.
+    expect(publicDevice(row({ presenceOnline: false, presenceCheckedAt: swept }), undefined, NOW, old).presenceCheckedAt).toBe(swept.toISOString());
+    const added = publicDevice(row({ presenceOnline: false, presenceCheckedAt: old, createdAt: NOW }), undefined, NOW, swept);
+    expect(added.presence).toBe("stale_offline");
+    // Never checked stays unknown.
+    expect(publicDevice(row(), undefined, NOW, swept).presence).toBe("unknown");
   });
 
   it("returns the manufacturer recorded at sync without consulting the registry", () => {

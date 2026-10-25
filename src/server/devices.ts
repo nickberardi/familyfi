@@ -27,12 +27,16 @@ export function publicDevice(
     connectionType: string | null;
     accessPointName: string | null;
     manufacturer: string | null;
+    createdAt: Date;
   },
   scope?: NetworkScope,
   now = new Date(),
+  /** `Household.presenceCheckedAt`: the last pass checked every device that existed then. */
+  sweptAt: Date | null = null,
 ) {
   const inScope = scope ? networkInScope(scope, device.networkId) : true;
-  const checkedAt = device.presenceCheckedAt;
+  const swept = sweptAt && device.presenceCheckedAt && device.createdAt <= sweptAt && sweptAt > device.presenceCheckedAt;
+  const checkedAt = swept ? sweptAt : device.presenceCheckedAt;
   const stale = checkedAt && now.getTime() - checkedAt.getTime() > 90_000;
   const presence = device.presenceOnline === null || !checkedAt
     ? "unknown"

@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       orderBy: { mac: "asc" },
     });
     return Response.json({
-      devices: devices.map((device) => publicDevice(device, deviceScope(household))),
+      devices: devices.map((device) => publicDevice(device, deviceScope(household), new Date(), household.presenceCheckedAt)),
     });
   });
 }
