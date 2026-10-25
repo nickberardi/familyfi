@@ -75,11 +75,15 @@ export async function storedCoverage(input: {
   policyScope?: { connectionIdentity: string; siteId: string };
 }): Promise<{ issues: CoverageIssue[] }> {
   const { prisma } = await import("./db");
+  // Only the columns coverage reads, and only assigned devices: every status poll runs this.
   const [groups, devices, rules, rulePolicies] = await Promise.all([
-    prisma().group.findMany(),
-    prisma().device.findMany(),
-    prisma().rule.findMany({ include: { groups: true } }),
-    prisma().rulePolicy.findMany({ where: input.policyScope }),
+    prisma().group.findMany({ select: { id: true, name: true } }),
+    prisma().device.findMany({
+      where: { assignment: AssignmentState.assigned, groupId: { not: null } },
+      select: { groupId: true, assignment: true, zoneId: true, networkId: true },
+    }),
+    prisma().rule.findMany({ select: { id: true, enabled: true, groups: { select: { groupId: true } } } }),
+    prisma().rulePolicy.findMany({ where: input.policyScope, select: { ruleId: true, unifiPolicyId: true, lastError: true } }),
   ]);
   const ruleGroups = new Map(rules.map((rule) => [rule.id, rule.groups.map((link) => link.groupId)]));
   const ruled = new Set(rules.filter((rule) => rule.enabled).flatMap((rule) => ruleGroups.get(rule.id) ?? []));
