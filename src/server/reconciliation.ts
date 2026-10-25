@@ -145,13 +145,18 @@ async function tick(owner: string): Promise<boolean> {
   // Held for the whole pass, however long the gateway takes. A renewal that fails to reach the
   // database is retried on the next beat; one that finds another owner holding it ends the pass.
   let lost = false;
-  let renewing: Promise<void> = Promise.resolve();
+  let renewing: Promise<void> | null = null;
   const renewal = setInterval(() => {
+    // One renewal at a time, so the one awaited below is the only one left to land.
+    if (renewing) return;
     renewing = acquireLock(owner)
       .then((held) => {
         if (!held) lost = true;
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        renewing = null;
+      });
   }, lockRenewMs);
   unrefTimer(renewal);
   const stillHeld = () => {
