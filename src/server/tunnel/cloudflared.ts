@@ -12,16 +12,34 @@ function childEnv(home: string, extra: Record<string, string> = {}): NodeJS.Proc
 /** Where the Docker image installs the pinned binary; elsewhere (dev) it comes from PATH. */
 const IMAGE_BINARY = "/usr/local/bin/cloudflared";
 
-export function findCloudflared(): { bin: string; version: string } | null {
+/** How long a failed search is trusted before looking again, so installing cloudflared needs no restart. */
+const MISSING_TTL_MS = 60_000;
+
+type Found = { bin: string; version: string };
+const globalForCloudflared = globalThis as unknown as {
+  familyfiCloudflared?: Map<string, { found: Found | null; at: number }>;
+};
+
+export function findCloudflared(): Found | null {
   // The public demo never opens a tunnel from its host: Remote access reads as unavailable there.
   if (demoModeEnabled()) return null;
   // CLOUDFLARED_BIN is test-only: it points integration tests at a stand-in binary.
   const candidates = [process.env.CLOUDFLARED_BIN, IMAGE_BINARY, "cloudflared"].filter((bin): bin is string => Boolean(bin));
+  // Each state read asks, and `--version` is a blocking child process: remember the answer per candidate list.
+  const cache = (globalForCloudflared.familyfiCloudflared ??= new Map());
+  const key = candidates.join("\0");
+  const cached = cache.get(key);
+  if (cached && (cached.found || Date.now() - cached.at < MISSING_TTL_MS)) return cached.found;
+  let found: Found | null = null;
   for (const bin of candidates) {
     const probe = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 5000, env: childEnv(tmpdir()) });
-    if (probe.status === 0) return { bin, version: (probe.stdout || probe.stderr).trim().split("\n")[0] };
+    if (probe.status === 0) {
+      found = { bin, version: (probe.stdout || probe.stderr).trim().split("\n")[0] };
+      break;
+    }
   }
-  return null;
+  cache.set(key, { found, at: Date.now() });
+  return found;
 }
 
 const QUICK_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { exitCode } from "./exit-code.mjs";
 import { inMemoryDatabase } from "./mode.mjs";
 import { applyDatabaseUrl } from "./print-database-url.mjs";
 import { ensureSecrets } from "./ensure-secrets.mjs";
@@ -24,10 +25,7 @@ if (!command) {
 function exec(command, args, env = process.env) {
   const child = spawn(command, args, { stdio: "inherit", env, shell: false });
   process.on("SIGTERM", () => child.kill("SIGTERM"));
-  child.on("exit", (code, signal) => {
-    if (signal) process.kill(process.pid, signal);
-    process.exit(code ?? 1);
-  });
+  child.on("exit", (code, signal) => process.exit(exitCode(code, signal)));
 }
 
 if (inMemoryDatabase() && !process.env.FAMILYFI_DATABASE_SERVED) {
