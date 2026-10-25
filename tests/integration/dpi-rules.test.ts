@@ -19,6 +19,7 @@ import {
 } from "../helpers/db";
 import { fixtureUnifiClient, policyMacs } from "../helpers/unifi-world";
 import { CURATED_CATEGORY_CANDIDATES } from "@/server/unifi/curated-categories";
+import { getSharedDevMockClient } from "@/server/unifi/dev-mock";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
@@ -59,6 +60,27 @@ describe("Phase 2 DPI rules", () => {
         )
       ).status,
     ).toBe(401);
+  });
+
+  it("reads the whole catalog from the gateway once, and a filtered search every time", async () => {
+    const auth = await signedIn();
+    await prisma().household.update({
+      where: { id: "default" },
+      data: { unifiKeyCiphertext: Buffer.from("x"), unifiKeyIv: Buffer.from("y"), unifiKeyAuthTag: Buffer.from("z") },
+    });
+    process.env.FAMILYFI_MODE = "dev";
+    const gateway = getSharedDevMockClient();
+    const reads = () => gateway.calls.filter((call) => call.path === "/v1/dpi/applications").length;
+
+    const first = await listApplications(request("/api/v1/dpi/applications", { auth }));
+    const second = await listApplications(request("/api/v1/dpi/applications", { auth }));
+    expect(first.status).toBe(200);
+    expect(await second.json()).toEqual(await first.json());
+    expect(reads()).toBe(1);
+
+    await listApplications(request("/api/v1/dpi/applications?filter=Fixture", { auth }));
+    await listApplications(request("/api/v1/dpi/applications?filter=Fixture", { auth }));
+    expect(reads()).toBe(3);
   });
 
   it("lists mock DPI catalog and creates a category rule for an adult", async () => {

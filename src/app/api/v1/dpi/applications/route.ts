@@ -1,7 +1,8 @@
 import { prisma } from "@/server/db";
 import { withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { clientForHousehold } from "@/server/unifi/connection";
+import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
+import { dpiCatalog } from "@/server/unifi/dpi-catalog";
 import { UnifiConfigError } from "@/server/unifi/errors";
 
 export async function GET(request: Request) {
@@ -14,7 +15,8 @@ export async function GET(request: Request) {
       const client = clientForHousehold(household);
       const url = new URL(request.url);
       const filter = url.searchParams.get("filter") ?? undefined;
-      const applications = await client.listDpiApplications(filter);
+      // A filtered search asks the gateway; the whole catalog is shared.
+      const applications = filter ? await client.listDpiApplications(filter) : await dpiCatalog(connectionIdentity(household), "applications", client);
       return Response.json({ applications });
     } catch (error) {
       if (error instanceof UnifiConfigError) {
