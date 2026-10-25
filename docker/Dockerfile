@@ -10,7 +10,7 @@ COPY scripts/runtime/print-database-url.mjs scripts/runtime/mode.mjs ./scripts/r
 RUN pnpm install --frozen-lockfile \
   && cp -r "$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" /prisma-client
 
-FROM node:26-bookworm-slim AS deps
+FROM node:26-bookworm-slim AS deps-base
 WORKDIR /app
 # Prisma's install script picks the schema engine (`prisma migrate deploy` at start) by the
 # OpenSSL it finds. Without the runner's OpenSSL here it fetches the 1.1 engine, and every start
@@ -22,12 +22,23 @@ RUN npm install -g pnpm@10.15.1
 COPY package.json pnpm-lock.yaml prisma.config.ts ./
 COPY prisma ./prisma
 COPY scripts/runtime/print-database-url.mjs scripts/runtime/mode.mjs ./scripts/runtime/
-# Dependencies' own install scripts run here, for this architecture; this package's
-# postinstall (prisma generate) does not, and the client comes from the stage above. The
-# build stage copies the full package.json back over this one.
-RUN npm pkg delete scripts.postinstall && pnpm install --frozen-lockfile
+# Dependencies' own install scripts run in the stages below, for this architecture; this
+# package's postinstall (prisma generate) does not, and the client comes from the stage above.
+# The build stage copies the full package.json back over this one.
+RUN npm pkg delete scripts.postinstall
 COPY --from=prisma-client /prisma-client /tmp/prisma-client
-RUN client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
+
+# Everything the build needs.
+FROM deps-base AS deps
+RUN pnpm install --frozen-lockfile \
+  && client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
+  && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
+
+# What the image runs beside the standalone build: production dependencies only, among them the
+# Prisma CLI for `migrate deploy` and PGlite for the in-memory database (scripts/runtime).
+FROM deps-base AS runtime-deps
+RUN pnpm install --frozen-lockfile --prod \
+  && client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
   && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
 
 FROM deps AS build
@@ -73,23 +84,25 @@ RUN case "${TARGETARCH}" in \
   esac \
   && echo "${sum}  /usr/local/bin/cloudflared" | sha256sum -c - \
   && /usr/local/bin/cloudflared --version
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/prisma.config.ts ./prisma.config.ts
-COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/scripts/runtime ./scripts/runtime
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
-COPY --from=build /app/openapi ./openapi
-# Read from disk during sync, never imported into a route bundle (src/server/mac-vendor.ts).
-COPY --from=build /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite
-COPY --from=build /app/.env.example ./.env.example
-COPY scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh /app/scripts/runtime/pre-update-backup.sh \
-  && groupadd --system familyfi \
+# The app runs as familyfi and owns its files from the copy on: a `chown -R` afterwards would
+# store every file a second time in a layer of its own.
+RUN groupadd --system familyfi \
   && useradd --system --gid familyfi --home-dir /app familyfi \
+  && chown familyfi:familyfi /app \
   && mkdir -p /var/lib/familyfi/data /var/lib/familyfi/updater \
-  && chown -R familyfi:familyfi /app /var/lib/familyfi
+  && chown -R familyfi:familyfi /var/lib/familyfi
+COPY --from=runtime-deps --chown=familyfi:familyfi /app/node_modules ./node_modules
+COPY --from=build --chown=familyfi:familyfi /app/package.json ./package.json
+COPY --from=build --chown=familyfi:familyfi /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build --chown=familyfi:familyfi /app/prisma ./prisma
+COPY --from=build --chown=familyfi:familyfi /app/scripts/runtime ./scripts/runtime
+COPY --from=build --chown=familyfi:familyfi /app/.next/standalone ./
+COPY --from=build --chown=familyfi:familyfi /app/.next/static ./.next/static
+COPY --from=build --chown=familyfi:familyfi /app/public ./public
+COPY --from=build --chown=familyfi:familyfi /app/openapi ./openapi
+# Read from disk during sync, never imported into a route bundle (src/server/mac-vendor.ts).
+COPY --from=build --chown=familyfi:familyfi /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite
+COPY --from=build --chown=familyfi:familyfi /app/.env.example ./.env.example
+COPY --chown=familyfi:familyfi --chmod=755 scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
