@@ -14,6 +14,7 @@ import {
   runReconcileOnce,
   setAutoReconcileForTests,
   setReconcileClientForTests,
+  setReconcileLockForTests,
   startReconciliation,
 } from "@/server/reconciliation";
 import { UnifiHttpError } from "@/server/unifi/errors";
@@ -93,6 +94,7 @@ describe("reconciler paths", () => {
   afterEach(() => {
     setReconcileClientForTests(undefined);
     setAutoReconcileForTests(false);
+    setReconcileLockForTests(undefined);
     vi.restoreAllMocks();
   });
 
@@ -666,6 +668,28 @@ describe("reconciler paths", () => {
       expect(await prisma().syncRun.count()).toBe(0);
 
       await settled();
+      expect((await lastRun()).status).toBe(ChangeStatus.applied);
+    });
+
+    it("keeps the lock through a pass that outlasts it, so no second pass starts", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      setReconcileLockForTests({ lockMs: 400, renewMs: 100 });
+      const listPolicies = client.listPolicies.bind(client);
+      let release!: () => void;
+      const slow = new Promise<void>((resolve) => (release = resolve));
+      vi.spyOn(client, "listPolicies").mockImplementationOnce(async (siteId) => {
+        await slow;
+        return listPolicies(siteId);
+      });
+
+      const first = runReconcileOnce();
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      expect(await runReconcileOnce()).toBe(false);
+      release();
+
+      expect(await first).toBe(true);
+      expect(await prisma().syncRun.count()).toBe(1);
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
     });
 

@@ -27,12 +27,20 @@ import type { FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
 
 const INTERVAL_MS = 30_000;
-const LOCK_MS = 25_000;
+// The lock outlives a stalled process by this much, and a running pass renews it well before then:
+// one pass of many gateway writes, each allowed 15 seconds, can last minutes.
+let lockMs = 25_000;
+let lockRenewMs = 8_000;
 // Only the latest run is ever read; a week of history is kept for diagnosis.
 const SYNC_HISTORY_MS = 7 * 24 * 60 * 60 * 1000;
 
-let queued = false;
-let pumping = false;
+/**
+ * One background queue per process. The route handlers and instrumentation are bundled as
+ * separate copies of this module, and each copy starting its own queue let a mutation start a
+ * second pump beside the timer's.
+ */
+const queue: { queued: boolean; pumping: boolean } = ((globalThis as { familyfiReconcileQueue?: { queued: boolean; pumping: boolean } })
+  .familyfiReconcileQueue ??= { queued: false, pumping: false });
 let autoReconcile = true;
 let testClient: UnifiClient | undefined;
 let registrantWarning = false;
@@ -61,9 +69,14 @@ export function setAutoReconcileForTests(enabled: boolean) {
   autoReconcile = enabled;
 }
 
+export function setReconcileLockForTests(timing?: { lockMs: number; renewMs: number }) {
+  lockMs = timing?.lockMs ?? 25_000;
+  lockRenewMs = timing?.renewMs ?? 8_000;
+}
+
 export function requestReconcile() {
   if (!autoReconcile) return;
-  queued = true;
+  queue.queued = true;
   void pump();
 }
 
@@ -74,32 +87,32 @@ export async function runReconcileOnce(): Promise<boolean> {
 }
 
 async function pump() {
-  if (pumping) return;
-  pumping = true;
+  if (queue.pumping) return;
+  queue.pumping = true;
   try {
-    while (queued) {
-      queued = false;
+    while (queue.queued) {
+      queue.queued = false;
       const owner = `${process.pid}:${randomToken(8)}`;
       try {
         const ran = await tick(owner);
         if (!ran) {
-          queued = true;
+          queue.queued = true;
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch {
-        queued = true;
+        queue.queued = true;
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   } finally {
-    pumping = false;
-    if (queued) void pump();
+    queue.pumping = false;
+    if (queue.queued) void pump();
   }
 }
 
 async function acquireLock(owner: string): Promise<boolean> {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + LOCK_MS);
+  const expiresAt = new Date(now.getTime() + lockMs);
   const existing = await prisma().reconciliationLock.findUnique({ where: { id: "global" } });
   if (!existing) {
     try {
@@ -126,6 +139,9 @@ async function releaseLock(owner: string) {
 
 async function tick(owner: string): Promise<boolean> {
   if (!(await acquireLock(owner))) return false;
+  // Held for the whole pass, however long the gateway takes; a failed renewal is retried on the next beat.
+  const renewal = setInterval(() => void acquireLock(owner).catch(() => undefined), lockRenewMs);
+  unrefTimer(renewal);
   try {
   const now = new Date();
   // A group's own pause ends: its built-in block rule is switched off, and its policies go.
@@ -534,6 +550,7 @@ async function tick(owner: string): Promise<boolean> {
   });
   return true;
   } finally {
+    clearInterval(renewal);
     await releaseLock(owner);
   }
 }
