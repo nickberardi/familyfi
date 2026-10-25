@@ -141,6 +141,31 @@ describe("reconciler paths", () => {
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
     });
 
+    it("drops sync runs older than a week and keeps the changes they settled", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      const day = 24 * 60 * 60 * 1000;
+      const old = await prisma().syncRun.create({
+        data: { requestedRevision: 1, status: ChangeStatus.applied, startedAt: new Date(Date.now() - 8 * day) },
+      });
+      const recent = await prisma().syncRun.create({
+        data: { requestedRevision: 1, status: ChangeStatus.applied, startedAt: new Date(Date.now() - 6 * day) },
+      });
+      const change = await prisma().changeResult.create({
+        data: { requestedRevision: 1, scope: "group", status: ChangeStatus.applied, syncRunId: old.id },
+      });
+
+      await runReconcileOnce();
+
+      const runs = (await prisma().syncRun.findMany()).map((run) => run.id);
+      expect(runs).not.toContain(old.id);
+      expect(runs).toContain(recent.id);
+      expect(runs).toHaveLength(2);
+      const kept = await prisma().changeResult.findUniqueOrThrow({ where: { id: change.id } });
+      expect(kept.status).toBe(ChangeStatus.applied);
+      expect(kept.syncRunId).toBeNull();
+    });
+
     it("reports a partial run when a group's only device has no firewall zone", async () => {
       const client = fixtureUnifiClient();
       setReconcileClientForTests(client);
