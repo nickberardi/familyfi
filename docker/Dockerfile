@@ -104,5 +104,7 @@ COPY --from=build --chown=familyfi:familyfi /app/openapi ./openapi
 COPY --from=build --chown=familyfi:familyfi /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite
 COPY --from=build --chown=familyfi:familyfi /app/.env.example ./.env.example
 COPY --chown=familyfi:familyfi --chmod=755 scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
+# Watchtower's pre-update hook (docker-compose.yml), executable whatever the checkout's file modes.
+RUN chmod 755 /app/scripts/runtime/pre-update-backup.sh
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

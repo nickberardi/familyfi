@@ -177,19 +177,38 @@ describe("reconciler paths", () => {
       client.state.clients = client.state.clients.map((row) =>
         row.macAddress === MAC ? { ...row, name: "Renamed tablet" } : row,
       );
-      const update = vi.spyOn(prisma().device, "update");
+      const updateMany = vi.spyOn(prisma().device, "updateMany");
       const upsert = vi.spyOn(prisma().device, "upsert");
 
       await runReconcileOnce();
 
       expect(upsert).not.toHaveBeenCalled();
-      expect(update).toHaveBeenCalledTimes(1);
-      expect(update.mock.calls[0]![0]).toEqual({ where: { mac: MAC }, data: { hostname: "Renamed tablet" } });
+      const perDevice = updateMany.mock.calls.filter(([args]) => typeof args?.where?.mac === "string");
+      expect(perDevice).toEqual([[{ where: { mac: MAC }, data: { hostname: "Renamed tablet" } }]]);
       const after = await prisma().device.findUniqueOrThrow({ where: { mac: MAC } });
       expect(after.hostname).toBe("Renamed tablet");
       expect(after.ip).toBe(first.ipAddress ?? before.ip);
       expect(after.lastSeenAt!.getTime()).toBeGreaterThan(before.lastSeenAt!.getTime());
       expect(after.presenceOnline).toBe(true);
+    });
+
+    it("carries on when a device is deleted while the pass reads it", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+      client.state.clients = client.state.clients.map((row) => (row.macAddress === MAC ? { ...row, name: "Renamed" } : row));
+      const findMany = prisma().device.findMany.bind(prisma().device);
+      vi.spyOn(prisma().device, "findMany").mockImplementationOnce((async (args: Parameters<typeof findMany>[0]) => {
+        const rows = await findMany(args);
+        await prisma().device.delete({ where: { mac: MAC } });
+        return rows;
+      }) as unknown as typeof findMany);
+
+      await runReconcileOnce();
+
+      expect((await lastRun()).status).not.toBe(ChangeStatus.failed);
+      const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+      expect(household.connectionStatus).not.toBe("error");
     });
 
     it("reports a partial run when a group's only device has no firewall zone", async () => {
@@ -717,6 +736,39 @@ describe("reconciler paths", () => {
       expect(await first).toBe(true);
       expect(await prisma().syncRun.count()).toBe(1);
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
+    });
+
+    it("stops before its next gateway write once another owner holds the lock", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      setReconcileLockForTests({ lockMs: 400, renewMs: 100 });
+      const listPolicies = client.listPolicies.bind(client);
+      let release!: () => void;
+      const slow = new Promise<void>((resolve) => (release = resolve));
+      vi.spyOn(client, "listPolicies").mockImplementationOnce(async (siteId) => {
+        await slow;
+        return listPolicies(siteId);
+      });
+
+      const pass = runReconcileOnce();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      // As if this process had stalled and another one took over.
+      await prisma().reconciliationLock.update({
+        where: { id: "global" },
+        data: { owner: "other", expiresAt: new Date(Date.now() + 60_000) },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const before = client.calls.length;
+      release();
+
+      expect(await pass).toBe(true);
+      expect(client.calls.slice(before).some((call) => call.method !== "GET")).toBe(false);
+      const run = await lastRun();
+      expect(run.status).toBe(ChangeStatus.failed);
+      expect(run.error).toMatch(/Another sync took over/);
+      const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+      expect(household.connectionStatus).not.toBe("error");
+      expect((await prisma().reconciliationLock.findUniqueOrThrow({ where: { id: "global" } })).owner).toBe("other");
     });
 
     it("starts with a pass straight away and schedules the next ones", async () => {

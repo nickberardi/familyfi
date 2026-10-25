@@ -7,6 +7,7 @@ import { enqueueChange } from "./changes";
 import { pruneNetworkScopedRulesForScope } from "./network-rules";
 import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type PublicUnifiNetwork } from "./unifi/scope";
 import { loadNetworkDetails } from "./unifi/networks";
+import { forgetDpiCatalogs } from "./unifi/dpi-catalog";
 import { recentSiteNetworks, rememberSiteNetworks } from "./unifi/network-cache";
 import type { Household } from "@prisma/client";
 
@@ -123,6 +124,8 @@ export async function saveUnifiConnection(input: {
     },
   });
   rememberSiteNetworks(nextIdentity, probed.networks);
+  // A new key or gateway behind the same address may know other apps.
+  forgetDpiCatalogs();
   await pruneNetworkScopedRulesForScope(scope);
   return enqueueChange("unifi");
 }
