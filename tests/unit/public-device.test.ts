@@ -46,6 +46,8 @@ describe("public device observation", () => {
     expect(publicDevice(row({ presenceOnline: false, presenceCheckedAt: swept }), undefined, NOW, old).presenceCheckedAt).toBe(swept.toISOString());
     const added = publicDevice(row({ presenceOnline: false, presenceCheckedAt: old, createdAt: NOW }), undefined, NOW, swept);
     expect(added.presence).toBe("stale_offline");
+    // The sweep skips only devices already offline: an online one read before a later pass keeps its own check.
+    expect(publicDevice(row({ presenceOnline: true, presenceCheckedAt: old }), undefined, NOW, swept).presence).toBe("stale_online");
     // Never checked stays unknown.
     expect(publicDevice(row(), undefined, NOW, swept).presence).toBe("unknown");
   });

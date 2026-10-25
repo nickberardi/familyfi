@@ -202,8 +202,8 @@ scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag
   `origin/$BASE_REF` shallowly, the way CI runs them, so local callers pass `origin/main`.
 - **`runtime/`:** `with-env.mjs` loads `.env`, builds `DATABASE_URL`, generates missing secrets
   and prepares the database before running a command, preloading `forwarded-for.mjs` so the server
-  appends the address that connected to `X-Forwarded-For`. It and `memory-database.mjs` exit as their command did, and a command ended by a
-  signal as 128 + its number (`exit-code.mjs`), so a server killed outright reads 137 or 143, never 1. `package.json`, the Makefile, Prisma's
-  config, Playwright and the container's `docker-entrypoint.sh` all start through it. The
+  appends the address that connected to `X-Forwarded-For`. It and `memory-database.mjs` exit as
+  their command did, and a command ended by a signal as 128 + its number (`exit-code.mjs`), so a
+  server killed outright reads 137 or 143, never 1. `package.json`, the Makefile, Prisma's config, Playwright and the container's `docker-entrypoint.sh` all start through it. The
   Dockerfile copies this folder and nothing else from `scripts/`, and `ci/check-image.sh` fails
   an image that carries `ci/`.
