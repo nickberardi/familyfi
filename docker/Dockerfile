@@ -34,10 +34,17 @@ RUN pnpm install --frozen-lockfile \
   && client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
   && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
 
-# What the image runs beside the standalone build: production dependencies only, among them the
-# Prisma CLI for `migrate deploy` and PGlite for the in-memory database (scripts/runtime).
+# What the image runs beside the standalone build, which already carries every file the server
+# loads (next, react and the rest): only the Prisma CLI for `migrate deploy`, the client it is
+# generated beside, and PGlite for the in-memory database (scripts/runtime). Narrowing the
+# dependencies keeps the lockfile's versions for these; next, its compilers and the packages the
+# build compiles in stay out of the image.
 FROM deps-base AS runtime-deps
-RUN pnpm install --frozen-lockfile --prod \
+RUN node -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); \
+    const keep = ["prisma", "@prisma/client", "@electric-sql/pglite"]; \
+    pkg.dependencies = Object.fromEntries(keep.map((name) => [name, pkg.dependencies[name]])); \
+    delete pkg.devDependencies; fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));' \
+  && pnpm install --prod --no-frozen-lockfile --prefer-offline \
   && client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
   && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
 
@@ -105,6 +112,6 @@ COPY --from=build --chown=familyfi:familyfi /app/src/server/mac-registrants.sqli
 COPY --from=build --chown=familyfi:familyfi /app/.env.example ./.env.example
 COPY --chown=familyfi:familyfi --chmod=755 scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
 # Watchtower's pre-update hook (docker-compose.yml), executable whatever the checkout's file modes.
-RUN chmod 755 /app/scripts/runtime/pre-update-backup.sh
+COPY --chown=familyfi:familyfi --chmod=755 scripts/runtime/pre-update-backup.sh /app/scripts/runtime/pre-update-backup.sh
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
