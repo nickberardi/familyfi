@@ -29,4 +29,10 @@ if ! grep -qE '^/?app/scripts/runtime/with-env.mjs$' "$tmp/files"; then
   exit 1
 fi
 
+# The standalone build carries what the server loads; the build's compilers stay out (#283).
+if grep -E '(^|/)node_modules/\.pnpm/@next\+swc-' "$tmp/files"; then
+  echo "image contains Next.js's build compilers; runtime-deps installs only the Prisma CLI and PGlite" >&2
+  exit 1
+fi
+
 echo "image hygiene ok"

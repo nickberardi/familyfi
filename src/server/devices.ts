@@ -35,7 +35,7 @@ export function publicDevice(
   sweptAt: Date | null = null,
 ) {
   const inScope = scope ? networkInScope(scope, device.networkId) : true;
-  const swept = sweptAt && device.presenceCheckedAt && device.createdAt <= sweptAt && sweptAt > device.presenceCheckedAt;
+  const swept = sweptAt && device.presenceOnline === false && device.presenceCheckedAt && device.createdAt <= sweptAt && sweptAt > device.presenceCheckedAt;
   const checkedAt = swept ? sweptAt : device.presenceCheckedAt;
   const stale = checkedAt && now.getTime() - checkedAt.getTime() > 90_000;
   const presence = device.presenceOnline === null || !checkedAt

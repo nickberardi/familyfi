@@ -36,14 +36,20 @@ RUN pnpm install --frozen-lockfile \
 
 # What the image runs beside the standalone build, which already carries every file the server
 # loads (next, react and the rest): only the Prisma CLI for `migrate deploy`, the client it is
-# generated beside, and PGlite for the in-memory database (scripts/runtime). Narrowing the
-# dependencies keeps the lockfile's versions for these; next, its compilers and the packages the
-# build compiles in stay out of the image.
+# generated beside, and PGlite for the in-memory database (scripts/runtime). Next, its compilers
+# and the packages the build compiles in stay out of the image. Each is pinned to the version the
+# lockfile resolved, so the narrowed install cannot drift from the client generated above.
 FROM deps-base AS runtime-deps
 RUN node -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); \
+    const lock = fs.readFileSync("pnpm-lock.yaml", "utf8"); \
+    const locked = (name) => { const quoted = name.includes("@") ? `'"'"'${name}'"'"'` : name; \
+      const at = lock.indexOf(`\n      ${quoted}:\n        specifier: `); \
+      if (at < 0) throw new Error(`${name} is not in the lockfile`); \
+      return lock.slice(at).match(/\n        version: ([^(\s]+)/)[1]; }; \
     const keep = ["prisma", "@prisma/client", "@electric-sql/pglite"]; \
-    pkg.dependencies = Object.fromEntries(keep.map((name) => [name, pkg.dependencies[name]])); \
-    delete pkg.devDependencies; fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));' \
+    pkg.dependencies = Object.fromEntries(keep.map((name) => [name, locked(name)])); \
+    delete pkg.devDependencies; fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2)); \
+    console.log(pkg.dependencies);' \
   && pnpm install --prod --no-frozen-lockfile --prefer-offline \
   && client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
   && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
