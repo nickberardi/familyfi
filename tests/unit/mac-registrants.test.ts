@@ -77,7 +77,7 @@ describe("MAC registrant database", () => {
     );
     expect(importers).toEqual(["src/server/reconciliation.ts"]);
     expect(readFileSync(path.join(root, "docker/Dockerfile"), "utf8")).toContain(
-      "COPY --from=build /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite",
+      "COPY --from=build --chown=familyfi:familyfi /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite",
     );
   });
 });
