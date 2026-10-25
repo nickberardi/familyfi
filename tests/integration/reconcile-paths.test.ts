@@ -422,6 +422,41 @@ describe("reconciler paths", () => {
       expect(client.state.policies.some((item) => item.id === created.unifiPolicyId)).toBe(true);
     });
 
+    it("marks each refused create failed, so a policy the gateway keeps refusing leaves no open operation", async () => {
+      const client = fixtureUnifiClient();
+      client.createError = gatewayError(400, "POST");
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+      await runReconcileOnce();
+
+      const operations = await prisma().policyOperation.findMany();
+      expect(operations.length).toBeGreaterThan(0);
+      expect(operations.every((operation) => operation.status === "failed")).toBe(true);
+    });
+
+    it("drops policy-write history older than a week, but never an applied creation", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+      const { policy } = await quarantined(client);
+      const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+      const scope = { connectionIdentity: policy.connectionIdentity, siteId: policy.siteId, intent: "create" as const };
+      const stale = await Promise.all(
+        ["failed", "removed", "pending"].map((status) => prisma().policyOperation.create({ data: { ...scope, status } })),
+      );
+      const recent = await prisma().policyOperation.create({ data: { ...scope, status: "failed" } });
+      await prisma().$executeRaw`UPDATE "PolicyOperation" SET "updatedAt" = ${old}`;
+      await prisma().policyOperation.update({ where: { id: recent.id }, data: { status: "failed" } });
+
+      await runReconcileOnce();
+
+      const left = await prisma().policyOperation.findMany();
+      for (const row of stale) expect(left.some((operation) => operation.id === row.id)).toBe(false);
+      expect(left.some((operation) => operation.id === recent.id)).toBe(true);
+      const applied = left.filter((operation) => operation.status === "applied");
+      expect(applied.some((operation) => operation.unifiPolicyId === policy.unifiPolicyId)).toBe(true);
+    });
+
     it("drops a record whose create failed once no device needs quarantining", async () => {
       const client = fixtureUnifiClient();
       client.createError = gatewayError(500, "POST");
