@@ -168,6 +168,30 @@ describe("reconciler paths", () => {
       expect(kept.syncRunId).toBeNull();
     });
 
+    it("rewrites only the devices whose details changed, and marks every listed one seen", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+      const before = await prisma().device.findUniqueOrThrow({ where: { mac: MAC } });
+      const first = client.state.clients.find((row) => row.macAddress === MAC)!;
+      client.state.clients = client.state.clients.map((row) =>
+        row.macAddress === MAC ? { ...row, name: "Renamed tablet" } : row,
+      );
+      const update = vi.spyOn(prisma().device, "update");
+      const upsert = vi.spyOn(prisma().device, "upsert");
+
+      await runReconcileOnce();
+
+      expect(upsert).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalledTimes(1);
+      expect(update.mock.calls[0]![0]).toEqual({ where: { mac: MAC }, data: { hostname: "Renamed tablet" } });
+      const after = await prisma().device.findUniqueOrThrow({ where: { mac: MAC } });
+      expect(after.hostname).toBe("Renamed tablet");
+      expect(after.ip).toBe(first.ipAddress ?? before.ip);
+      expect(after.lastSeenAt!.getTime()).toBeGreaterThan(before.lastSeenAt!.getTime());
+      expect(after.presenceOnline).toBe(true);
+    });
+
     it("reports a partial run when a group's only device has no firewall zone", async () => {
       const client = fixtureUnifiClient();
       setReconcileClientForTests(client);
@@ -450,6 +474,8 @@ describe("reconciler paths", () => {
       const kept = await prisma().rulePolicy.findUniqueOrThrow({ where: { id: rulePolicy.id } });
       expect(kept.unifiPolicyId).toBe(rulePolicy.unifiPolicyId);
       expect(kept.observedFingerprint).toBe(rulePolicy.desiredFingerprint);
+      // Nor does it rewrite the record.
+      expect(kept.updatedAt).toEqual(rulePolicy.updatedAt);
     });
 
     it("records a failed create on a new rule policy, then creates it on the next pass", async () => {

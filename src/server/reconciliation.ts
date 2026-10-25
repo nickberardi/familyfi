@@ -203,15 +203,23 @@ async function tick(owner: string): Promise<boolean> {
       managedNetworkIds: household.unifiManagedNetworkIds,
     };
 
+    // One read for every listed client, and writes only for what changed: a pass over hundreds of
+    // clients used to be two round trips and a full row rewrite for each.
     const observedMacs = new Set<string>();
+    const listed = new Map<string, (typeof clients)[number]>();
     for (const clientRow of clients) {
       if (!clientRow.macAddress) continue;
       const mac = normalizeMac(clientRow.macAddress);
       observedMacs.add(mac);
+      listed.set(mac, clientRow);
+    }
+    const known = new Map(
+      (await prisma().device.findMany({ where: { mac: { in: [...listed.keys()] } } })).map((device) => [device.mac, device]),
+    );
+    const seenMacs: string[] = [];
+    for (const [mac, clientRow] of listed) {
       const mapped = mappingByMac.get(mac);
-      const existing = await prisma().device.findUnique({ where: { mac } });
-      const zoneId = mapped?.sourceZoneId ?? existing?.zoneId ?? null;
-      const networkId = mapped?.networkId ?? existing?.networkId ?? null;
+      const existing = known.get(mac);
       const seenOnManagedNetwork = networkInScope(scope, mapped?.networkId ?? null);
       if (!existing && !seenOnManagedNetwork) continue;
       const connectionType = ["WIRED", "WIRELESS", "VPN", "TELEPORT"].includes(clientRow.type)
@@ -225,39 +233,40 @@ async function tick(owner: string): Promise<boolean> {
           ? existing?.accessPointName ?? null
           : accessPoints.get(clientRow.uplinkDeviceId) ?? null
         : null;
-      const manufacturer = recordedManufacturer(mac, existing?.manufacturer ?? null);
-      await prisma().device.upsert({
-        where: { mac },
-        create: {
-          mac,
-          hostname: clientRow.name,
-          ip: clientRow.ipAddress,
-          networkId,
-          zoneId,
-          assignment: AssignmentState.quarantined,
-          lastSeenAt: now,
-          presenceOnline: true,
-          presenceCheckedAt: now,
-          connectedAt,
-          connectionType,
-          accessPointName,
-          manufacturer,
-        },
-        update: {
-          hostname: clientRow.name,
-          ip: clientRow.ipAddress,
-          networkId: mapped?.networkId ?? existing?.networkId ?? null,
-          zoneId: mapped?.sourceZoneId ?? existing?.zoneId ?? null,
-          lastSeenAt: now,
-          presenceOnline: true,
-          presenceCheckedAt: now,
-          connectedAt,
-          connectionType,
-          accessPointName,
-          manufacturer,
-        },
-      });
+      const observed = {
+        hostname: clientRow.name,
+        ip: clientRow.ipAddress,
+        networkId: mapped?.networkId ?? existing?.networkId ?? null,
+        zoneId: mapped?.sourceZoneId ?? existing?.zoneId ?? null,
+        connectedAt,
+        connectionType,
+        accessPointName,
+        manufacturer: recordedManufacturer(mac, existing?.manufacturer ?? null),
+      };
+      if (!existing) {
+        await prisma().device.create({
+          data: {
+            mac,
+            ...observed,
+            assignment: AssignmentState.quarantined,
+            lastSeenAt: now,
+            presenceOnline: true,
+            presenceCheckedAt: now,
+          },
+        });
+        continue;
+      }
+      seenMacs.push(mac);
+      // A field the gateway left out (undefined) keeps what is stored, as Prisma reads it.
+      const changed = Object.entries(observed).filter(
+        ([field, value]) => value !== undefined && !isDeepStrictEqual(value, existing[field as keyof typeof observed]),
+      );
+      if (changed.length) await prisma().device.update({ where: { mac }, data: Object.fromEntries(changed) });
     }
+    await prisma().device.updateMany({
+      where: { mac: { in: seenMacs } },
+      data: { lastSeenAt: now, presenceOnline: true, presenceCheckedAt: now },
+    });
     await prisma().device.updateMany({
       where: { mac: { notIn: [...observedMacs] } },
       data: {
@@ -568,6 +577,7 @@ async function applyDesiredPolicy(
         id: string;
         unifiPolicyId: string | null;
         desiredFingerprint: string;
+        observedFingerprint: string | null;
         lastError: string | null;
       }
     | undefined,
@@ -585,10 +595,13 @@ async function applyDesiredPolicy(
     existing.desiredFingerprint === fingerprint &&
     !existing.lastError
   ) {
-    await prisma().appPolicy.update({
-      where: { id: existing.id },
-      data: { desiredRevision: revision, observedFingerprint: fingerprint, lastError: null },
-    });
+    // Recorded once when it was last confirmed, not rewritten every pass.
+    if (existing.observedFingerprint !== fingerprint) {
+      await prisma().appPolicy.update({
+        where: { id: existing.id },
+        data: { desiredRevision: revision, observedFingerprint: fingerprint },
+      });
+    }
     return;
   }
   if (unifiPolicyId && onGateway.has(unifiPolicyId)) {
@@ -684,6 +697,7 @@ async function applyDesiredRulePolicy(
         id: string;
         unifiPolicyId: string | null;
         desiredFingerprint: string;
+        observedFingerprint: string | null;
         lastError: string | null;
       }
     | undefined,
@@ -699,10 +713,13 @@ async function applyDesiredRulePolicy(
     existing.desiredFingerprint === fingerprint &&
     !existing.lastError
   ) {
-    await prisma().rulePolicy.update({
-      where: { id: existing.id },
-      data: { desiredRevision: revision, observedFingerprint: fingerprint, lastError: null },
-    });
+    // Recorded once when it was last confirmed, not rewritten every pass.
+    if (existing.observedFingerprint !== fingerprint) {
+      await prisma().rulePolicy.update({
+        where: { id: existing.id },
+        data: { desiredRevision: revision, observedFingerprint: fingerprint },
+      });
+    }
     return;
   }
   if (unifiPolicyId && onGateway.has(unifiPolicyId)) {
