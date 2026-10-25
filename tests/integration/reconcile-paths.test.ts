@@ -497,6 +497,22 @@ describe("reconciler paths", () => {
       expect(kept.updatedAt).toEqual(rulePolicy.updatedAt);
     });
 
+    it("confirms an unchanged policy recorded without its observed fingerprint, writing nothing to the gateway", async () => {
+      const client = fixtureUnifiClient();
+      await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: true } });
+      const { rulePolicy } = await groupWithRule(client);
+      const quarantine = await prisma().appPolicy.findFirstOrThrow({ where: { ownerScope: "quarantine" } });
+      await prisma().rulePolicy.update({ where: { id: rulePolicy.id }, data: { observedFingerprint: null } });
+      await prisma().appPolicy.update({ where: { id: quarantine.id }, data: { observedFingerprint: null } });
+      const writes = client.calls.length;
+
+      await runReconcileOnce();
+
+      expect(client.calls.slice(writes).some((call) => call.method !== "GET")).toBe(false);
+      expect((await prisma().rulePolicy.findUniqueOrThrow({ where: { id: rulePolicy.id } })).observedFingerprint).toBe(rulePolicy.desiredFingerprint);
+      expect((await prisma().appPolicy.findUniqueOrThrow({ where: { id: quarantine.id } })).observedFingerprint).toBe(quarantine.desiredFingerprint);
+    });
+
     it("records a failed create on a new rule policy, then creates it on the next pass", async () => {
       const client = fixtureUnifiClient();
       const { group } = await groupWithPolicy(client);
@@ -700,6 +716,17 @@ describe("reconciler paths", () => {
       expect((await lastRun()).status).toBe(ChangeStatus.applied);
     });
 
+    it("retries a pass that failed before it started", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      vi.spyOn(prisma().reconciliationLock, "findUnique").mockRejectedValueOnce(new Error("database restarting"));
+
+      setAutoReconcileForTests(true);
+      requestReconcile();
+      await settled();
+      expect((await lastRun()).status).toBe(ChangeStatus.applied);
+    });
+
     it("waits for another owner's lock to expire, then runs", async () => {
       const client = fixtureUnifiClient();
       setReconcileClientForTests(client);
@@ -729,7 +756,10 @@ describe("reconciler paths", () => {
       });
 
       const first = runReconcileOnce();
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      // One renewal cannot reach the database; the next ones keep the lock.
+      vi.spyOn(prisma().reconciliationLock, "findUnique").mockRejectedValueOnce(new Error("database restarting"));
+      await new Promise((resolve) => setTimeout(resolve, 950));
       expect(await runReconcileOnce()).toBe(false);
       release();
 
