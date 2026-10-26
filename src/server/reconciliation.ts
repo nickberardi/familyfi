@@ -34,6 +34,9 @@ let lockMs = 25_000;
 let lockRenewMs = 8_000;
 // Only the latest run is ever read; a week of sync and policy-write history is kept for diagnosis.
 const SYNC_HISTORY_MS = 7 * 24 * 60 * 60 * 1000;
+// A create whose answer was lost has had its policy listed by then if it made one; a gateway that
+// keeps answering 5xx would otherwise leave a pending row every pass for a week.
+const LOST_CREATE_GRACE_MS = 10 * 60 * 1000;
 
 /**
  * One background queue per process. The route handlers and instrumentation are bundled as
@@ -220,7 +223,7 @@ async function tick(owner: string): Promise<boolean> {
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
     // Before planning, so a policy a lost create made is claimed and the orphan sweep removes it.
     await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
-      abandonBefore: new Date(now.getTime() - SYNC_HISTORY_MS),
+      abandonBefore: new Date(now.getTime() - LOST_CREATE_GRACE_MS),
     });
     let accessPoints: Map<string, string> | null = null;
     try {
@@ -598,7 +601,7 @@ async function tick(owner: string): Promise<boolean> {
       data: { status: ChangeStatus.failed, finishedAt: new Date(), error: message },
     });
     // Not the gateway's fault, and the pass that took over settles the pending changes.
-    if (error instanceof LockLostError) return true;
+    if (error instanceof LockLostError || lost) return true;
     await prisma().household.update({
       where: { id: "default" },
       data: { connectionStatus: "error", connectionError: message },

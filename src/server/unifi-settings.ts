@@ -81,7 +81,8 @@ async function removePreviousTargetPolicies(household: Household, identity: stri
   const applied = { ...scope, intent: PolicyOperationIntent.create, status: "applied" as const };
   const client = clientForHousehold(household);
   // A create there whose answer was lost may have made a policy too; nothing looks there later.
-  await settleLostCreates(scope, await client.listPolicies(siteId), { abandonBefore: new Date(8.64e15) });
+  const pending = await prisma().policyOperation.count({ where: { ...scope, intent: PolicyOperationIntent.create, status: "pending" } });
+  if (pending > 0) await settleLostCreates(scope, await client.listPolicies(siteId), { abandonBefore: new Date(8.64e15) });
   const [appPolicies, rulePolicies, creations] = await Promise.all([
     prisma().appPolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
     prisma().rulePolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),

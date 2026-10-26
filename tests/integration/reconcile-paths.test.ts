@@ -464,7 +464,7 @@ describe("reconciler paths", () => {
 
       const left = await prisma().policyOperation.findMany();
       for (const row of stale) expect(left.some((operation) => operation.id === row.id)).toBe(false);
-      // A week-old create that found no policy made nothing; it is kept as failed for another week.
+      // A create that found no policy in time made nothing; it is kept as failed for a week.
       expect(left.find((operation) => operation.id === unmatched.id)?.status).toBe("failed");
       expect(left.some((operation) => operation.id === recent.id)).toBe(true);
       const applied = left.filter((operation) => operation.status === "applied");
