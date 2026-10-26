@@ -1036,6 +1036,12 @@
         "repository"
       ]
     },
+    "tests/unit/compose-database.test.ts": {
+      "categories": [
+        "runtime",
+        "repository"
+      ]
+    },
     "tests/unit/archive.test.ts": {
       "categories": [
         "settings"
