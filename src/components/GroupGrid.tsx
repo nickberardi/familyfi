@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { request } from "@/lib/api";
-import { loadCatalogNames, loadUpstreamCategories, type CatalogNames } from "@/lib/category-marks";
+import { readCatalogNames, loadUpstreamCategories, type CatalogNames } from "@/lib/category-marks";
 import { groupPageSummary, groupPageTitle } from "@/lib/group-page";
 import { householdTimezone } from "@/lib/household-state";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
@@ -17,14 +17,14 @@ import { PauseSheet } from "./PauseSheet";
 
 /**
  * DPI catalog names, read once and shared by every page that shows marks: the full app list is
- * large and changes only with the console. A read that brought nothing is tried again next time.
+ * large and changes only with the console. A read that failed or brought nothing is tried again next time.
  */
 let sharedNames: Promise<CatalogNames> | null = null;
 let lastNames: CatalogNames = new Map();
 
 function catalogNames(): Promise<CatalogNames> {
-  sharedNames ??= loadCatalogNames(request).then((names) => {
-    if (names.size === 0) sharedNames = null;
+  sharedNames ??= readCatalogNames(request).then(({ names, complete }) => {
+    if (!complete || names.size === 0) sharedNames = null;
     else lastNames = names;
     return names;
   });

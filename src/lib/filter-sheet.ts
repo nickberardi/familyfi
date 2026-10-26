@@ -148,6 +148,7 @@ export function addAppCopy(group: Pick<Group, "name">) {
     cancel: "Cancel",
     create: "Create policy",
     loadFailed: "Could not load the DPI catalog.",
+    createFailed: "Could not block the app.",
   } as const;
 }
 

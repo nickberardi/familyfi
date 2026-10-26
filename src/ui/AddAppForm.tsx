@@ -68,8 +68,13 @@ export function AddAppForm({
     setBusy(true);
     setError("");
     const id = Number(appId);
-    await createAppRule(mutate, group, catalog.find((item) => item.id === id), id, mode);
+    const result = await createAppRule(mutate, group, catalog.find((item) => item.id === id), id, mode);
     setBusy(false);
+    // A write the server refused leaves the form open, saying so.
+    if (result === undefined) {
+      setError(copy.createFailed);
+      return;
+    }
     onCreated?.();
     onDone();
   }

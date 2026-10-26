@@ -208,21 +208,26 @@ export type CatalogNames = Map<string, string>;
 export async function loadFilterCatalog(
   request: ApiRequest,
 ): Promise<{ catalogNames: CatalogNames; upstreamCategories: UpstreamCategoryRow[] }> {
-  const [catalogNames, upstreamCategories] = await Promise.all([loadCatalogNames(request), loadUpstreamCategories(request)]);
-  return { catalogNames, upstreamCategories };
+  const [catalogNames, upstreamCategories] = await Promise.all([readCatalogNames(request), loadUpstreamCategories(request)]);
+  return { catalogNames: catalogNames.names, upstreamCategories };
 }
 
-/** The DPI catalog's names alone: they change only with the console, unlike the verdicts. */
-export async function loadCatalogNames(request: ApiRequest): Promise<CatalogNames> {
+/**
+ * The DPI catalog's names alone, which change only with the console, unlike the verdicts; and
+ * whether both lists were read, so a cache can keep only a whole one.
+ */
+export async function readCatalogNames(request: ApiRequest): Promise<{ names: CatalogNames; complete: boolean }> {
   type Item = { id: number | string; name: string };
+  let complete = true;
+  const missing = <T>(empty: T) => () => ((complete = false), empty);
   const [categories, applications] = await Promise.all([
-    request<{ categories: Item[] }>("/api/v1/dpi/categories").catch(() => ({ categories: [] as Item[] })),
-    request<{ applications: Item[] }>("/api/v1/dpi/applications").catch(() => ({ applications: [] as Item[] })),
+    request<{ categories: Item[] }>("/api/v1/dpi/categories").catch(missing({ categories: [] as Item[] })),
+    request<{ applications: Item[] }>("/api/v1/dpi/applications").catch(missing({ applications: [] as Item[] })),
   ]);
-  const catalogNames: CatalogNames = new Map();
-  for (const item of categories.categories) catalogNames.set(`category:${item.id}`, item.name);
-  for (const item of applications.applications) catalogNames.set(`app:${item.id}`, item.name);
-  return catalogNames;
+  const names: CatalogNames = new Map();
+  for (const item of categories.categories) names.set(`category:${item.id}`, item.name);
+  for (const item of applications.applications) names.set(`app:${item.id}`, item.name);
+  return { names, complete };
 }
 
 /** The resolver's categories with every measured verdict; empty when they cannot be read. */

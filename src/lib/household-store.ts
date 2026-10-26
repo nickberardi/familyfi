@@ -365,8 +365,7 @@ export function createHouseholdStore(deps: {
       // One refresh at a time: a slow server gets no second request stacked behind the first.
       let inFlight = false;
       let doneAt = Number.NEGATIVE_INFINITY;
-      const run = async (load: () => Promise<void>) => {
-        if (inFlight) return;
+      const track = async (load: () => Promise<void>) => {
         inFlight = true;
         try {
           await load();
@@ -374,6 +373,9 @@ export function createHouseholdStore(deps: {
           inFlight = false;
           doneAt = Date.now();
         }
+      };
+      const run = async (load: () => Promise<void>) => {
+        if (!inFlight) await track(load);
       };
       const tick = () => {
         if (visibility?.hidden()) return;
@@ -387,7 +389,7 @@ export function createHouseholdStore(deps: {
       const unsubscribe = visibility?.subscribe(() => {
         if (visibility.hidden()) return;
         if (!inFlight && !state.stale && Date.now() - doneAt < interval) return;
-        void reload();
+        void track(reload);
       });
       return () => {
         clearInterval(timer);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardMarks, categoryRuleWhen, fitCardMarks, marksRoom, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, type CategorySlotState } from "@/lib/category-marks";
+import { cardMarks, categoryRuleWhen, fitCardMarks, marksRoom, categorySheet, categorySlotStates, loadFilterCatalog, moreMarkLabels, readCatalogNames, type CategorySlotState } from "@/lib/category-marks";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
@@ -98,5 +98,13 @@ describe("category marks", () => {
     expect(catalogNames.get("category:4")).toBe("Video Streaming");
     expect(catalogNames.get("app:9")).toBe("Fixture App");
     expect(upstreamCategories).toEqual([]);
+  });
+
+  it("says whether both catalog lists were read, so a half-read catalog is never kept", async () => {
+    const lists: Record<string, unknown> = { "/api/v1/dpi/categories": { categories: [{ id: 4, name: "Video Streaming" }] } };
+    const request = (async (path: string) => (path in lists ? lists[path] : Promise.reject(new Error("down")))) as never;
+    expect(await readCatalogNames(request)).toMatchObject({ complete: false });
+    lists["/api/v1/dpi/applications"] = { applications: [] };
+    expect(await readCatalogNames(request)).toMatchObject({ complete: true });
   });
 });

@@ -494,6 +494,35 @@ describe("household store", () => {
     expect(server.calls).toHaveLength(loaded);
   });
 
+  it("counts a reload on showing the tab as a refresh, so a quick second return sends nothing", async () => {
+    vi.useFakeTimers();
+    let hidden = false;
+    let onChange = () => {};
+    const server = fakeServer(reads(() => childGroup()));
+    const store = createHouseholdStore({
+      request: server.request,
+      visibility: { hidden: () => hidden, subscribe: (callback) => ((onChange = callback), () => {}) },
+    });
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(10);
+    const loaded = server.calls.length;
+    hidden = true;
+    onChange();
+    await vi.advanceTimersByTimeAsync(5000);
+    hidden = false;
+    onChange();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(server.calls).toHaveLength(2 * loaded);
+    hidden = true;
+    onChange();
+    await vi.advanceTimersByTimeAsync(100);
+    hidden = false;
+    onChange();
+    await vi.advanceTimersByTimeAsync(10);
+    stop();
+    expect(server.calls).toHaveLength(2 * loaded);
+  });
+
   it("reloads in full when shown again, even while a tick is still waiting on the server", async () => {
     vi.useFakeTimers();
     let hidden = false;

@@ -1026,6 +1026,18 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const onSheet = page.getByRole("dialog");
   await expect(onSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
   await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeVisible();
+  // A change the server refuses leaves the sheet open, saying why.
+  await page.route("**/api/v1/rules/*/off", (route) =>
+    route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "conflict", message: "The rule changed elsewhere." } }),
+    }),
+  );
+  await onSheet.getByRole("button", { name: "Turn off" }).click();
+  await expect(onSheet.getByText("The rule changed elsewhere.")).toBeVisible();
+  await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeEnabled();
+  await page.unroute("**/api/v1/rules/*/off");
   const off = page.waitForResponse(
     (response) => response.request().method() === "POST" && /\/api\/v1\/rules\/[^/]+\/off/.test(response.url()),
   );
@@ -1035,6 +1047,25 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
 
   // GroupDetail: App + present
   await expect(page.getByRole("button", { name: "Add app filter" })).toBeVisible();
+  // Adding an app the server refuses keeps the form open, saying so.
+  await page.getByRole("button", { name: "Add app filter" }).click();
+  const picker = page.getByLabel("DPI application");
+  await expect(picker.locator("option")).not.toHaveCount(1);
+  await picker.selectOption({ index: 1 });
+  await page.route("**/api/v1/rules", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: { code: "conflict", message: "The rule changed elsewhere." } }),
+        })
+      : route.fallback(),
+  );
+  await page.getByTestId("add-app-create").click();
+  await expect(page.getByTestId("add-app-form").getByText("Could not block the app.")).toBeVisible();
+  await page.unroute("**/api/v1/rules");
+  await page.getByTestId("add-app-cancel").click();
+  await expect(page.getByTestId("add-app-form")).toHaveCount(0);
   // No Category +
   await expect(page.getByRole("button", { name: "Add category filter" })).toHaveCount(0);
 
