@@ -157,7 +157,7 @@ async function releaseLock(owner: string) {
 }
 
 /** Another owner took the lock while this pass ran: it stops before its next gateway write. */
-class LockLostError extends Error {}
+export class LockLostError extends Error {}
 
 /**
  * Keeps a lock just taken for as long as its work runs, however long the gateway takes. A renewal
