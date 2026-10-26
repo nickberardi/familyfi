@@ -211,6 +211,11 @@ async function tick(owner: string): Promise<boolean> {
     const client = syncClient(household);
     const identity = connectionIdentity(household);
     const siteId = household.unifiSiteId;
+    // Read alongside the rest; its failure only costs the access points' names.
+    const siteDevicesRead = client.listSiteDevices(siteId).then(
+      (devices) => ({ devices }),
+      (error: unknown) => ({ error }),
+    );
     const [zones, networks, clients, gatewayPolicies] = await Promise.all([
       client.listZones(siteId),
       loadNetworkDetails(client, siteId),
@@ -227,15 +232,11 @@ async function tick(owner: string): Promise<boolean> {
     await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
       abandonBefore: new Date(now.getTime() - LOST_CREATE_GRACE_MS),
     });
+    const [siteDevices, networkClientIds] = await Promise.all([siteDevicesRead, loadNetworkClientIds(client, siteId, networks)]);
     let accessPoints: Map<string, string> | null = null;
-    try {
-      const siteDevices = await client.listSiteDevices(siteId);
-      accessPoints = new Map(siteDevices.map((device) => [device.id, device.name]));
-    } catch (error) {
-      // Presence remains useful if UniFi cannot name the access points on this pass.
-      console.warn("UniFi access point lookup failed:", error);
-    }
-    const networkClientIds = await loadNetworkClientIds(client, siteId, networks);
+    if ("devices" in siteDevices) accessPoints = new Map(siteDevices.devices.map((device) => [device.id, device.name]));
+    // Presence remains useful if UniFi cannot name the access points on this pass.
+    else console.warn("UniFi access point lookup failed:", siteDevices.error);
     const mappings = mapClientsToZones({ clients, networks, zones, networkClientIds });
     const mappingByMac = new Map(
       mappings.filter((item) => item.macAddress).map((item) => [item.macAddress, item]),

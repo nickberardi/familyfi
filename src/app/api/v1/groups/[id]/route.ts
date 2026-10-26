@@ -6,7 +6,9 @@ import { groupInclude, publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
+import { mapLimited } from "@/lib/concurrency";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
+import { GATEWAY_CONCURRENCY } from "@/server/unifi/networks";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 
 const Update = z.object({
@@ -75,17 +77,19 @@ export async function DELETE(request: Request, ctx: Ctx) {
       try {
         const client = clientForHousehold(household);
         const identity = connectionIdentity(household);
-        for (const rule of rules) {
-          for (const policy of rule.policies) {
-            if (policy.connectionIdentity !== identity || policy.siteId !== household.unifiSiteId) continue;
-            if (!policy.unifiPolicyId) continue;
-            try {
-              await client.deletePolicy(household.unifiSiteId, policy.unifiPolicyId);
-            } catch {
-              // Ownership cleared with Rule cascade; Sync may surface leftovers.
-            }
+        const siteId = household.unifiSiteId;
+        const ids = rules
+          .flatMap((rule) => rule.policies)
+          .filter((policy) => policy.connectionIdentity === identity && policy.siteId === siteId && policy.unifiPolicyId)
+          .map((policy) => policy.unifiPolicyId!);
+        // A few at a time, so a group with many rule windows does not hold the request for each in turn.
+        await mapLimited(ids, GATEWAY_CONCURRENCY, async (unifiPolicyId) => {
+          try {
+            await client.deletePolicy(siteId, unifiPolicyId);
+          } catch {
+            // Its applied creation record outlives the rule, so the next pass's orphan sweep deletes it.
           }
-        }
+        });
       } catch {
         // Proceed with desired-state delete.
       }

@@ -29,6 +29,7 @@ import { DELETE as deleteRule, GET as getRule, PATCH as patchRule } from "@/app/
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import type { Rule } from "@/lib/rules";
+import { getSharedDevMockClient, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
 import { setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
 import type { FirewallPolicy } from "@/server/unifi/types";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
@@ -168,6 +169,8 @@ describe("household rules", () => {
 
   afterEach(() => {
     setReconcileClientForTests(undefined);
+    delete process.env.FAMILYFI_MODE;
+    resetDevMockClientForTests();
   });
 
   it("schedules several no-internet windows for several groups, one policy per window", async () => {
@@ -201,6 +204,49 @@ describe("household rules", () => {
       ["FamilyFi School days – Bedtime (IoT)", { startTime: "22:00", stopTime: "06:00" }, ["02:00:00:00:00:02"]],
     ]);
     expect((await readGroup(auth, emma.id)).internetRuleIds).toEqual([rule.id]);
+  });
+
+  it("deletes a rule's or a group's gateway policies a few at a time, not one after another", async () => {
+    const auth = await signedIn();
+    const emma = await child();
+    const sister = await prisma().group.create({ data: { kind: GroupKind.family, name: "Ava", familyRole: FamilyRole.child } });
+    await seedDevice({ mac: "02:00:00:00:00:02", groupId: sister.id, zoneId: INTERNAL_ZONE, assignment: AssignmentState.assigned });
+    const windows = ["06:00", "09:00", "12:00"].map((start, index) => ({ name: `W${index}`, days: EVERY_DAY, start, end: `${String(index * 3 + 7).padStart(2, "0")}:00` }));
+    const both = await ruleOf(await postRule(auth, { name: "Both", kind: "internet", groupIds: [emma.id, sister.id], mode: "scheduled", windows }));
+    await ruleOf(await postRule(auth, { name: "Hers", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows }));
+    await runReconcileOnce();
+
+    // In test mode the routes reach the console through the shared mock, once a key is stored;
+    // each delete is held so overlap shows.
+    process.env.FAMILYFI_MODE = "test";
+    await prisma().household.update({
+      where: { id: "default" },
+      data: { unifiKeyCiphertext: Buffer.from([1]), unifiKeyIv: Buffer.from([1]), unifiKeyAuthTag: Buffer.from([1]) },
+    });
+    const gateway = getSharedDevMockClient();
+    const deleted: string[] = [];
+    let inFlight = 0;
+    let peak = 0;
+    gateway.deletePolicy = async (_siteId: string, id: string) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((done) => setTimeout(done, 10));
+      inFlight -= 1;
+      deleted.push(id);
+    };
+    const bothIds = (await prisma().rulePolicy.findMany({ where: { ruleId: both.id } })).map((policy) => policy.unifiPolicyId);
+    expect(bothIds).toHaveLength(6);
+    await deleteRule(request(`/api/v1/rules/${both.id}`, { method: "DELETE", auth }), { params: Promise.resolve({ id: both.id }) });
+    expect(deleted.sort()).toEqual([...bothIds].sort());
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+
+    deleted.length = 0;
+    peak = 0;
+    expect(await prisma().rulePolicy.count()).toBe(3);
+    await deleteGroup(request(`/api/v1/groups/${emma.id}`, { method: "DELETE", auth }), { params: Promise.resolve({ id: emma.id }) });
+    expect(deleted).toHaveLength(3);
+    expect(peak).toBeGreaterThan(1);
   });
 
   it("renames a rule's policies in place and adds and removes windows by id (#101)", async () => {

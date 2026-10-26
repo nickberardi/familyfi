@@ -66,6 +66,31 @@ describe("network loading", () => {
     const clients = await loadNetworkClientIds(client, "site", networks);
     expect(clients.get(first.id)).toEqual(new Set());
   });
+  it("reads networks' details and client references a few at a time, in order", async () => {
+    const networks = Array.from({ length: 7 }, (_, index) => ({ id: `net-${index}`, name: `N${index}`, default: false, enabled: true, management: "GATEWAY", vlanId: index }));
+    const client = new MockUnifiClient(createMockUnifiState({ networks }));
+    let inFlight = 0;
+    let peak = 0;
+    const held = async <T>(value: T) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((done) => setTimeout(done, 5));
+      inFlight -= 1;
+      return value;
+    };
+    const getNetwork = client.getNetwork.bind(client);
+    client.getNetwork = async (siteId, id) => held(await getNetwork(siteId, id));
+    const details = await loadNetworkDetails(client, "site");
+    expect(details.map((network) => network.id)).toEqual(networks.map((network) => network.id));
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+
+    peak = 0;
+    client.getNetworkReferences = async () => held({ referenceResources: [] });
+    expect([...(await loadNetworkClientIds(client, "site", details)).keys()]).toEqual(networks.map((network) => network.id));
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+  });
 });
 
 describe("pagination", () => {
