@@ -3,11 +3,15 @@
 import { SETTINGS_COPY as COPY } from "@/lib/settings-copy";
 
 /** The web's Admin chip: a checkbox and its word, accented while on. */
-export function AdminControl({ on, onPress }: { name: string; on: boolean; onPress: () => void; disabled?: boolean; testID?: string }) {
+export function AdminControl({ name, on, onPress, disabled, testID }: { name: string; on: boolean; onPress: () => void; disabled?: boolean; testID?: string }) {
   return (
     <button
       type="button"
-      className="flex flex-none items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[14px] font-semibold"
+      aria-label={`${name} ${COPY.admin.toLowerCase()}`}
+      aria-pressed={on}
+      disabled={disabled}
+      data-testid={testID}
+      className="flex flex-none items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[14px] font-semibold disabled:opacity-40"
       style={{
         borderColor: on ? "var(--ff-accent-line)" : "var(--ff-control-line)",
         background: on ? "var(--ff-accent-wash)" : "var(--ff-ink-on-fill)",

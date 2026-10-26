@@ -283,6 +283,7 @@ test("the Update page installs through the updater and keeps its schedule", { ta
   // On the web each is a real anchor, so Enter and copy-link work.
   await expect(notes.getByRole("link", { name: "pull #250" })).toHaveAttribute("href", "https://github.com/nickberardi/familyfi/pull/250");
   await expect(notes.getByRole("link", { name: "@nickberardi" })).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.accept());
   await install.click();
   await expect(page.getByTestId("update-run").first()).toContainText("Installing v0.6.0");
   await expect(install).toBeDisabled();
@@ -356,6 +357,28 @@ async function addGroup(page: Page, kind: "family" | "things", fill: (dialog: Lo
   await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
   return ((await response.json()) as { group: { id: string } }).group.id;
 }
+
+test("removing an adult's admin access asks first, and declining changes nothing", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const writes: string[] = [];
+  await page.route("**/api/v1/accounts/**", (route) => {
+    if (route.request().method() === "GET") return route.continue();
+    writes.push(route.request().method());
+    return route.abort();
+  });
+  await page.goto("/settings");
+  const admin = page.getByTestId("settings-household").locator("[data-testid^='settings-admin-'][aria-pressed='true']").first();
+  await expect(admin).toBeVisible();
+  let asked = "";
+  page.once("dialog", (dialog) => {
+    asked = dialog.message();
+    void dialog.dismiss();
+  });
+  await admin.click();
+  await expect.poll(() => asked).toMatch(/admin/i);
+  await expect(admin).toHaveAttribute("aria-pressed", "true");
+  expect(writes).toEqual([]);
+});
 
 test("add person opens a sheet over Family, and the new person can be edited", async ({ page }) => {
   await signIn(page);

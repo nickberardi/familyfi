@@ -811,6 +811,11 @@
         "settings"
       ]
     },
+    "tests/browser/smoke.spec.ts > removing an adult's admin access asks first, and declining changes nothing": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/browser/smoke.spec.ts > add person opens a sheet over Family, and the new person can be edited": {
       "categories": [
         "groups"
