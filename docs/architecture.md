@@ -180,6 +180,8 @@ Timed pause and allowance expiry are the only clock-driven writes; membership an
 
 Discovery and quarantine only include clients whose UniFi **network (VLAN)** is in the household allowlist (`manageAllNetworks` or `managedNetworkIds`). New devices on other VLANs are not ingested and are not added to quarantine policies. Assigned devices that roam off a managed network are left out of FamilyFi policies until they return. UniFi still applies a MAC policy to every VLAN that shares that **firewall zone**; pick networks whose zones match what you want to enforce.
 
+An unassigned device the gateway has not listed for 30 days is forgotten on the next pass, so phones that rotate their private address do not grow the device list (and every poll of it) forever; if it comes back it is discovered again, quarantined. A device in a group is never forgotten.
+
 Days identify the local weekday a window starts. Windows are half-open. Evaluation uses the household IANA timezone and local wall time, including both occurrences of a repeated DST time. UniFi uses the console clock for native schedules; household timezone vs console timezone must be aligned or documented.
 
 ## Reconciliation

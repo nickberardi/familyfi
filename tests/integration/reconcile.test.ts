@@ -126,6 +126,25 @@ describe("reconciliation against mocked UniFi", () => {
     expect(shown.presenceCheckedAt).toBe(household.presenceCheckedAt!.toISOString());
   });
 
+  it("forgets an unassigned device unseen for a month, never one in a group", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    const group = await prisma().group.create({ data: { kind: GroupKind.things, name: "TVs" } });
+    const longAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    const lately = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    await prisma().device.createMany({
+      data: [
+        { mac: "02:00:00:00:0f:01", assignment: AssignmentState.quarantined, lastSeenAt: longAgo },
+        { mac: "02:00:00:00:0f:02", assignment: AssignmentState.quarantined, lastSeenAt: null, createdAt: longAgo },
+        { mac: "02:00:00:00:0f:03", assignment: AssignmentState.quarantined, lastSeenAt: lately },
+        { mac: "02:00:00:00:0f:04", assignment: AssignmentState.assigned, groupId: group.id, lastSeenAt: longAgo },
+      ],
+    });
+    await runReconcileOnce();
+    const left = await prisma().device.findMany({ where: { mac: { startsWith: "02:00:00:00:0f:" } }, orderBy: { mac: "asc" } });
+    expect(left.map((device) => device.mac)).toEqual(["02:00:00:00:0f:03", "02:00:00:00:0f:04"]);
+  });
+
   it("preserves the last observation when the client read fails and tolerates an unknown access point", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
