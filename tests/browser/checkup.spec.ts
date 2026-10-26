@@ -74,3 +74,31 @@ test("Devices points out private Wi-Fi addresses and shows only them on request"
   await page.getByText("Galaxy S24").click();
   await expect(page.getByTestId("private-address-card")).toContainText("Private Wi-Fi address");
 });
+
+test("Checkup lists a leftover FamilyFi policy and removes it only after the administrator confirms", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/checkup");
+  await page.getByTestId("checkup-run").click();
+
+  // The mock gateway carries "FamilyFi Rogue Prefix", which no FamilyFi record claims.
+  const leftover = page.getByTestId("checkup-finding-leftover_policies");
+  await expect(leftover).toContainText("An old FamilyFi policy is still on your gateway");
+  const rogue = leftover.getByRole("checkbox", { name: "FamilyFi Rogue Prefix" });
+  await expect(rogue).toHaveAttribute("aria-checked", "true");
+
+  // Unticked, there is nothing to remove; ticked again, Remove asks first and Cancel changes nothing.
+  await rogue.click();
+  await expect(page.getByTestId("checkup-remove-policies")).toHaveAttribute("aria-disabled", "true");
+  await rogue.click();
+  await page.getByTestId("checkup-remove-policies").click();
+  const dialog = page.getByRole("dialog", { name: "Remove 1 policy from your gateway?" });
+  await expect(dialog).toContainText("FamilyFi Rogue Prefix");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(leftover).toBeVisible();
+
+  await page.getByTestId("checkup-remove-policies").click();
+  await page.getByTestId("checkup-confirm-remove").click();
+  await expect(page.getByRole("status")).toContainText("Removed 1 policy from your gateway.");
+  await expect(leftover).toHaveCount(0);
+});

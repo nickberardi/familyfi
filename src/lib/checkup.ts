@@ -92,6 +92,11 @@ export type CheckupPolicy = {
   /** The devices it names; null when it names a whole network or zone instead. */
   devices: number | null;
   scheduled: boolean;
+  /**
+   * What FamilyFi's own policy of the same name is for (a rule, Quarantine or a group), when it
+   * has one: this is an old copy FamilyFi lost track of. Left out otherwise.
+   */
+  copyOf?: string;
 };
 
 export type CheckupInputs = {
@@ -369,6 +374,11 @@ const POLICY_WHAT: Record<CheckupPolicyBlocks, string> = {
 export function leftoverPolicyLine(policy: Pick<CheckupPolicy, "blocks" | "what" | "devices" | "scheduled">): string {
   const who = policy.devices === null ? "" : ` for ${plural(policy.devices, "device", "devices")}`;
   return `${policy.blocks ? "Blocks" : "Allows"} ${POLICY_WHAT[policy.what]}${who}, ${policy.scheduled ? "on a schedule" : "always"}`;
+}
+
+/** The line under a leftover that is an old copy of one of FamilyFi's own, or null. */
+export function leftoverCopyNote(policy: Pick<CheckupPolicy, "copyOf">): string | null {
+  return policy.copyOf ? `FamilyFi already has a newer copy of this for ${policy.copyOf}. This old one keeps blocking even when you pause or allow it.` : null;
 }
 
 /** The managed networks whose DHCP hands out their own DNS server, by id, for the rule editor's note. */
@@ -673,7 +683,7 @@ export const CHECKUP_COPY = {
     readOnly: "FamilyFi only reads these settings. The one thing it removes is a leftover FamilyFi policy, and only when you ask.",
     leftover: {
       remove: (count: number) => (count === 1 ? "Remove 1 from gateway" : `Remove ${count} from gateway`),
-      keep: "Keep them",
+      keep: (count: number) => (count === 1 ? "Keep it" : "Keep them"),
       on: "On",
       off: "Off",
       confirmTitle: (count: number) => (count === 1 ? "Remove 1 policy from your gateway?" : `Remove ${count} policies from your gateway?`),
