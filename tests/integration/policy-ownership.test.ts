@@ -3,6 +3,7 @@ import { PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleKind, type Househo
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { PUT as putUnifiSettings } from "@/app/api/v1/settings/unifi/route";
 import { prisma } from "@/server/db";
+import { setReconcileLockForTests } from "@/server/reconciliation";
 import { saveUnifiConnection } from "@/server/unifi-settings";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "@/server/unifi/connection";
 import {
@@ -312,6 +313,24 @@ describe("switching to another gateway", () => {
     const saved = await save({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET, forgetPrevious: true });
     expect(saved.status).toBe(200);
     expect((await household()).unifiBaseUrl).toBe(NEW_TARGET);
+  });
+
+  it("stops before moving the household when its hold on the lock lapses mid-cleanup", async () => {
+    const { identity } = await recordedRulePolicy();
+    setReconcileLockForTests({ lockMs: 150, renewMs: 400 });
+    const gateway = getSharedDevMockClient();
+    const remove = gateway.deletePolicy.bind(gateway);
+    vi.spyOn(gateway, "deletePolicy").mockImplementation(async (siteId, policyId) => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      return remove(siteId, policyId);
+    });
+    try {
+      await expect(saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET, forgetPrevious: true })).rejects.toThrow(/took over/);
+    } finally {
+      setReconcileLockForTests();
+    }
+    expect((await household()).unifiBaseUrl).toBe(DEV_MOCK_BASE_URL);
+    expect(await prisma().rulePolicy.count({ where: { connectionIdentity: identity } })).toBe(1);
   });
 
   it("refuses a network choice the new site doesn't have before touching the old one", async () => {
