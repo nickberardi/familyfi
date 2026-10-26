@@ -134,7 +134,8 @@ export const DRIFT_NOTE_MS = 7 * 24 * 60 * 60_000;
 async function readDrift(now = new Date()): Promise<CheckupDrift[]> {
   const where = { driftSeenAt: { gte: new Date(now.getTime() - DRIFT_NOTE_MS) } };
   const [appPolicies, rulePolicies] = await Promise.all([
-    prisma().appPolicy.findMany({ where, select: { gatewayDrift: true, driftSeenAt: true, lastError: true } }),
+    // Quarantine's policies are the only ones FamilyFi plans as app policies.
+    prisma().appPolicy.findMany({ where: { ...where, ownerScope: "quarantine" }, select: { gatewayDrift: true, driftSeenAt: true, lastError: true } }),
     prisma().rulePolicy.findMany({
       where,
       select: { gatewayDrift: true, driftSeenAt: true, lastError: true, rule: { select: { id: true, name: true, systemGroup: { select: { id: true, name: true, kind: true } } } } },
