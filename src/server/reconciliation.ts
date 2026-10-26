@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, RuleScope, type Household } from "@prisma/client";
+import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleScope, type Household } from "@prisma/client";
 import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
@@ -10,6 +10,7 @@ import { macRegistrants } from "./mac-vendor";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
 import { withPolicyOwnership } from "./unifi/policy-ownership";
+import { settleLostCreates } from "./unifi/lost-creates";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
@@ -23,7 +24,7 @@ import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
 import { lockDnsExemptionsOf, lockDnsOpenDns } from "./unifi/lock-dns";
 import type { UnifiClient } from "./unifi/client";
-import type { FirewallPolicy, FirewallPolicyWrite } from "./unifi/types";
+import type { FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
 
 const INTERVAL_MS = 30_000;
@@ -217,7 +218,10 @@ async function tick(owner: string): Promise<boolean> {
     // What the gateway holds right now, kept current as this pass creates and deletes, so a
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
-    await settleLostCreates(identity, siteId, gatewayPolicies, now);
+    // Before planning, so a policy a lost create made is claimed and the orphan sweep removes it.
+    await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
+      abandonBefore: new Date(now.getTime() - SYNC_HISTORY_MS),
+    });
     let accessPoints: Map<string, string> | null = null;
     try {
       const siteDevices = await client.listSiteDevices(siteId);
@@ -604,6 +608,8 @@ async function tick(owner: string): Promise<boolean> {
       data: { status: ChangeStatus.failed, error: message, syncRunId: run.id },
     });
   }
+  // The pass that took over prunes; this one may no longer hold the lock.
+  if (lost) return true;
   // A run every interval adds up to a million rows a year; the change results they settled keep their outcome.
   await prisma().syncRun.deleteMany({
     where: { id: { not: run.id }, startedAt: { lt: new Date(now.getTime() - SYNC_HISTORY_MS) } },
@@ -855,6 +861,7 @@ async function createOwnedPolicy(
       connectionIdentity: identity,
       siteId,
       payloadFingerprint: fingerprint,
+      payload: write as Prisma.InputJsonValue,
       status: "pending",
     },
   });
@@ -875,46 +882,6 @@ async function createOwnedPolicy(
     data: { status: "applied", unifiPolicyId: created.id },
   });
   return created;
-}
-
-/**
- * Finds the policies that creates whose answer was lost made. A pending create is matched to a
- * policy on the gateway that no record claims and that carries exactly the payload it sent; that
- * policy is recorded as the create's, and the orphan sweep removes it like any other unclaimed
- * one. Never by name alone: the evidence is our own creation record plus the whole payload. A
- * create still unmatched after the history window made nothing, and is marked failed.
- */
-async function settleLostCreates(identity: string, siteId: string, gatewayPolicies: FirewallPolicy[], now: Date) {
-  const scope = { connectionIdentity: identity, siteId };
-  const pending = await prisma().policyOperation.findMany({
-    where: { ...scope, intent: PolicyOperationIntent.create, status: "pending" },
-    orderBy: { createdAt: "asc" },
-  });
-  if (pending.length === 0) return;
-  const [appPolicies, rulePolicies, creations] = await Promise.all([
-    prisma().appPolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
-    prisma().rulePolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
-    prisma().policyOperation.findMany({
-      where: { ...scope, intent: PolicyOperationIntent.create, status: "applied" },
-      select: { unifiPolicyId: true },
-    }),
-  ]);
-  const claimed = new Set([...appPolicies, ...rulePolicies, ...creations].map((row) => row.unifiPolicyId));
-  const unclaimed = gatewayPolicies.filter((policy) => !claimed.has(policy.id));
-  for (const operation of pending) {
-    const match = operation.payloadFingerprint
-      ? unclaimed.find((policy) => !claimed.has(policy.id) && policyFingerprint(policy) === operation.payloadFingerprint)
-      : undefined;
-    if (match) {
-      claimed.add(match.id);
-      await prisma().policyOperation.update({
-        where: { id: operation.id },
-        data: { status: "applied", unifiPolicyId: match.id },
-      });
-    } else if (operation.createdAt.getTime() < now.getTime() - SYNC_HISTORY_MS) {
-      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed" } });
-    }
-  }
 }
 
 export function startReconciliation() {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PolicyOperationIntent, PolicyOwnerScope, RuleKind, type Household } from "@prisma/client";
+import { PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleKind, type Household } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { saveUnifiConnection } from "@/server/unifi-settings";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "@/server/unifi/connection";
@@ -212,7 +212,7 @@ describe("switching to another gateway", () => {
     resetDevMockClientForTests();
   });
 
-  it("removes every policy FamilyFi owns on the old one, even one already deleted there", async () => {
+  it("removes every policy FamilyFi owns on the old one, even one already deleted there or made by a lost create", async () => {
     const current = await household();
     const scope = ownershipScope(current);
     const siteId = current.unifiSiteId!;
@@ -224,6 +224,12 @@ describe("switching to another gateway", () => {
     const orphan = await gateway.createPolicy(siteId, blockPolicy("Left by a failed delete"));
     await prisma().policyOperation.create({
       data: { intent: PolicyOperationIntent.create, connectionIdentity: scope.connectionIdentity, siteId, unifiPolicyId: orphan.id, status: "applied" },
+    });
+    // A create there whose answer was lost.
+    const lostWrite = blockPolicy("Lost answer");
+    const lost = await gateway.createPolicy(siteId, lostWrite);
+    await prisma().policyOperation.create({
+      data: { intent: PolicyOperationIntent.create, connectionIdentity: scope.connectionIdentity, siteId, payload: lostWrite as Prisma.InputJsonValue, status: "pending" },
     });
     // Someone already removed this quarantine policy on the console.
     const gone = await gateway.createPolicy(siteId, blockPolicy("Quarantine"));
@@ -237,6 +243,7 @@ describe("switching to another gateway", () => {
     const ids = (await gateway.listPolicies(siteId)).map((policy) => policy.id);
     expect(ids).not.toContain(forRule.id);
     expect(ids).not.toContain(orphan.id);
+    expect(ids).not.toContain(lost.id);
     expect(ids).toContain(DEV_MOCK_ADMIN_POLICY_ID);
     expect(await prisma().rulePolicy.count({ where: { connectionIdentity: scope.connectionIdentity } })).toBe(0);
     expect(await prisma().appPolicy.count({ where: { connectionIdentity: scope.connectionIdentity } })).toBe(0);

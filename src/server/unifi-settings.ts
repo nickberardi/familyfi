@@ -8,6 +8,7 @@ import { pruneNetworkScopedRulesForScope } from "./network-rules";
 import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type PublicUnifiNetwork } from "./unifi/scope";
 import { loadNetworkDetails } from "./unifi/networks";
 import { forgetDpiCatalogs } from "./unifi/dpi-catalog";
+import { settleLostCreates } from "./unifi/lost-creates";
 import { recentSiteNetworks, rememberSiteNetworks } from "./unifi/network-cache";
 import { PolicyOperationIntent, type Household } from "@prisma/client";
 
@@ -69,7 +70,7 @@ export async function listSiteNetworks(household: Household, options: { fresh?: 
 
 /**
  * Deletes every policy FamilyFi owns on the console and site it is leaving: quarantine and rule
- * policies, and any it created that no record points at any more. Nothing sweeps that console
+ * policies, any it created that no record points at any more, and any a lost create made. Nothing sweeps that console
  * once the household points elsewhere, so whatever stays there keeps enforcing. One someone
  * already deleted there counts as removed. The records go only after the gateway deletes, since
  * they are what lets the guarded client delete at all.
@@ -78,13 +79,15 @@ async function removePreviousTargetPolicies(household: Household, identity: stri
   const siteId = household.unifiSiteId!;
   const scope = { connectionIdentity: identity, siteId };
   const applied = { ...scope, intent: PolicyOperationIntent.create, status: "applied" as const };
+  const client = clientForHousehold(household);
+  // A create there whose answer was lost may have made a policy too; nothing looks there later.
+  await settleLostCreates(scope, await client.listPolicies(siteId), { abandonBefore: new Date(8.64e15) });
   const [appPolicies, rulePolicies, creations] = await Promise.all([
     prisma().appPolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
     prisma().rulePolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
     prisma().policyOperation.findMany({ where: applied, select: { unifiPolicyId: true } }),
   ]);
   const owned = new Set([...appPolicies, ...rulePolicies, ...creations].flatMap((row) => row.unifiPolicyId ?? []));
-  const client = clientForHousehold(household);
   for (const policyId of owned) {
     try {
       await client.deletePolicy(siteId, policyId);

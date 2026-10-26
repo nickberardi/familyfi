@@ -5,7 +5,6 @@ import { prisma } from "@/server/db";
 import { publicDevice } from "@/server/devices";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { connectionIdentity } from "@/server/unifi/connection";
-import { policyFingerprint } from "@/server/unifi/fingerprint";
 import {
   ADMIN_POLICY_ID,
   INTERNAL_NETWORK,
@@ -440,6 +439,14 @@ describe("reconciliation against mocked UniFi", () => {
     await runReconcileOnce();
     const leftBehind = client.state.policies.filter((policy) => !before.has(policy.id));
     expect(leftBehind.length).toBeGreaterThan(0);
+    // The gateway answers in its own key order, lists MACs its own way and fills in defaults.
+    client.state.policies = client.state.policies.map((policy) => {
+      if (before.has(policy.id)) return policy;
+      const reordered = Object.fromEntries(Object.entries(policy).reverse()) as typeof policy;
+      const macs = reordered.source.trafficFilter?.macAddressFilter?.macAddresses;
+      if (macs) macs.reverse();
+      return { ...reordered, connectionStateType: "ALL" } as typeof policy;
+    });
 
     client.throwAfterCreate = false;
     await runReconcileOnce();
@@ -467,7 +474,7 @@ describe("reconciliation against mocked UniFi", () => {
         ...scope,
         intent: "create",
         status: "pending",
-        payloadFingerprint: policyFingerprint({ ...admin, name: `FamilyFi ${admin.name}` }),
+        payload: JSON.parse(JSON.stringify({ ...admin, id: undefined, name: `FamilyFi ${admin.name}` })),
       },
     });
 
