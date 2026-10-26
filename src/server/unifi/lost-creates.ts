@@ -1,4 +1,4 @@
-import { PolicyOperationIntent } from "@prisma/client";
+import { PolicyOperationIntent, Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import type { OwnershipScope } from "./policy-ownership";
 import type { FirewallPolicy } from "./types";
@@ -34,19 +34,20 @@ export function carriesWrite(actual: unknown, expected: unknown): boolean {
  * policy on the gateway that no record claims and that carries the whole write it sent; that
  * policy is recorded as the create's, so the orphan sweep removes it like any other unclaimed
  * one. Never by name alone: the evidence is our own creation record plus the whole payload. A
- * create still unmatched and older than `abandonBefore` made nothing, and is marked failed.
+ * create still unmatched and older than `abandonBefore` made nothing, and is marked failed. Returns
+ * the policies matched, which a pass about to create the same write records instead.
  */
 export async function settleLostCreates(
   scope: OwnershipScope & { siteId: string },
   gatewayPolicies: FirewallPolicy[],
   options: { abandonBefore: Date },
-): Promise<void> {
+): Promise<FirewallPolicy[]> {
   const where = { connectionIdentity: scope.connectionIdentity, siteId: scope.siteId };
   const pending = await prisma().policyOperation.findMany({
     where: { ...where, intent: PolicyOperationIntent.create, status: "pending" },
     orderBy: { createdAt: "asc" },
   });
-  if (pending.length === 0) return;
+  if (pending.length === 0) return [];
   const [appPolicies, rulePolicies, creations] = await Promise.all([
     prisma().appPolicy.findMany({ where, select: { unifiPolicyId: true } }),
     prisma().rulePolicy.findMany({ where, select: { unifiPolicyId: true } }),
@@ -57,18 +58,21 @@ export async function settleLostCreates(
   ]);
   const claimed = new Set([...appPolicies, ...rulePolicies, ...creations].map((row) => row.unifiPolicyId));
   const unclaimed = gatewayPolicies.filter((policy) => !claimed.has(policy.id));
+  const matched: FirewallPolicy[] = [];
   for (const operation of pending) {
     const match = operation.payload
       ? unclaimed.find((policy) => !claimed.has(policy.id) && carriesWrite(policy, operation.payload))
       : undefined;
     if (match) {
       claimed.add(match.id);
+      matched.push(match);
       await prisma().policyOperation.update({
         where: { id: operation.id },
-        data: { status: "applied", unifiPolicyId: match.id },
+        data: { status: "applied", unifiPolicyId: match.id, payload: Prisma.DbNull },
       });
     } else if (operation.createdAt < options.abandonBefore) {
-      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed" } });
+      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed", payload: Prisma.DbNull } });
     }
   }
+  return matched;
 }

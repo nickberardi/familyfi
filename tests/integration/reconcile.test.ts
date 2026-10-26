@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AssignmentState, FamilyRole, GroupKind } from "@prisma/client";
+import { AssignmentState, FamilyRole, GroupKind, Prisma } from "@prisma/client";
 import { UnifiHttpError } from "@/server/unifi/errors";
 import { prisma } from "@/server/db";
 import { publicDevice } from "@/server/devices";
@@ -431,7 +431,7 @@ describe("reconciliation against mocked UniFi", () => {
     expect(client.state.policies.some((policy) => policy.id === ADMIN_POLICY_ID)).toBe(true);
   });
 
-  it("finds and removes the policy an interrupted create left, so no duplicate stays", async () => {
+  it("takes over the policy an interrupted create left, so no duplicate stays", async () => {
     const client = fixtureUnifiClient();
     const before = new Set(client.state.policies.map((policy) => policy.id));
     client.throwAfterCreate = true;
@@ -452,13 +452,33 @@ describe("reconciliation against mocked UniFi", () => {
     await runReconcileOnce();
 
     const ids = new Set(client.state.policies.map((policy) => policy.id));
-    for (const policy of leftBehind) expect(ids.has(policy.id)).toBe(false);
+    for (const policy of leftBehind) expect(ids.has(policy.id)).toBe(true);
     const recorded = await prisma().appPolicy.findMany();
     expect(client.state.policies.filter((policy) => !before.has(policy.id)).map((policy) => policy.id).sort()).toEqual(
       recorded.map((policy) => policy.unifiPolicyId).sort(),
     );
     expect(await prisma().policyOperation.count({ where: { status: "pending" } })).toBe(0);
+    expect(await prisma().policyOperation.count({ where: { payload: { not: Prisma.DbNull } } })).toBe(0);
     expect(ids.has(ADMIN_POLICY_ID)).toBe(true);
+  });
+
+  it("keeps enforcing with the policy an interrupted create left when the gateway refuses the next create", async () => {
+    const client = fixtureUnifiClient();
+    const before = new Set(client.state.policies.map((policy) => policy.id));
+    client.throwAfterCreate = true;
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const leftBehind = client.state.policies.filter((policy) => !before.has(policy.id)).map((policy) => policy.id);
+    expect(leftBehind.length).toBeGreaterThan(0);
+
+    client.throwAfterCreate = false;
+    client.createError = new UnifiHttpError(400, "POST", "/v1/sites/x/firewall/policies", "refused");
+    await runReconcileOnce();
+
+    const ids = client.state.policies.map((policy) => policy.id);
+    for (const id of leftBehind) expect(ids).toContain(id);
+    const recorded = (await prisma().appPolicy.findMany()).map((policy) => policy.unifiPolicyId);
+    expect(recorded.sort()).toEqual([...leftBehind].sort());
   });
 
   it("never takes a policy for a lost create's unless it carries exactly that payload", async () => {
