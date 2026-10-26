@@ -443,6 +443,12 @@
         "sync"
       ]
     },
+    "tests/unit/lost-creates.test.ts": {
+      "categories": [
+        "unifi",
+        "sync"
+      ]
+    },
     "tests/unit/unifi.test.ts": {
       "categories": [
         "unifi",

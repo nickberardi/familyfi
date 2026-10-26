@@ -417,6 +417,8 @@ model PolicyOperation {
   connectionIdentity String
   siteId             String
   payloadFingerprint String?
+  /// The write a create sent, matched against the gateway's policies when its answer was lost.
+  payload            Json?
   unifiPolicyId      String?
   status             String                @default("pending")
   createdAt          DateTime              @default(now()) @db.Timestamptz(3)
