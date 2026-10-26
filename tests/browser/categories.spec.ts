@@ -91,6 +91,7 @@ test("a custom category is created report-only and can be deleted", { tag: "@des
   await page.getByText(label, { exact: true }).click();
   // Custom categories say so, and are the only ones that offer deletion.
   await expect(page.getByText(/Custom category — report-only/i)).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Delete category" }).click();
 
   await expect(page.getByRole("heading", { name: "Categories" })).toBeVisible();
