@@ -76,12 +76,18 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
+        with:
+          # SOURCE_DATE_EPOCH below reads when the Dockerfile or lockfile last changed.
+          fetch-depth: 0
       - uses: ./.github/actions/runner-cleanup
       - name: Platform pair
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
           echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          # Every file's time is clamped to this (rewrite-timestamp below), so a layer whose files
+          # did not change has the digest it had, and an update does not download it again.
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct -- docker/Dockerfile pnpm-lock.yaml)" >> "$GITHUB_ENV"
       - if: matrix.platform == 'linux/arm64' && runner.arch != 'ARM64'
         uses: docker/setup-qemu-action@v4
         with:
@@ -106,7 +112,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: APP_VERSION=${{ env.APP_VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true,rewrite-timestamp=true
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
       - name: Export digest

@@ -1,11 +1,12 @@
 #!/bin/sh
-# Fresh-container smoke: special-character DB password, health, login, persist restart.
+# Fresh-container smoke: special-character DB password, health, login, persist restart, demo mode.
 set -eu
 
 image="${FAMILYFI_IMAGE:-familyfi:ci}"
 network="familyfi-smoke-$$"
 db="familyfi-smoke-db-$$"
 app="familyfi-smoke-app-$$"
+demo="familyfi-smoke-demo-$$"
 password='p@ss/w:rd'
 admin_password="ci-recovery-password"
 session_secret="ci-only-session-secret-32chars!!"
@@ -16,7 +17,7 @@ login_body="$(mktemp "${TMPDIR:-/tmp}/familyfi-smoke-login.XXXXXX")"
 
 cleanup() {
   rm -f "$login_body"
-  docker rm -f "$app" "$db" >/dev/null 2>&1 || true
+  docker rm -f "$app" "$db" "$demo" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -97,6 +98,36 @@ fi
 # Remote access needs the pinned cloudflared the image ships.
 docker exec "$app" /usr/local/bin/cloudflared --version >/dev/null || {
   echo "cloudflared is missing from the image" >&2
+  exit 1
+}
+
+# Demo mode is the one start on the in-memory database, the only runtime use of PGlite.
+docker rm -f "$app" >/dev/null
+docker run -d --name "$demo" -p "${host_port}:7001" \
+  -e NODE_ENV=production \
+  -e FAMILYFI_MODE=demo \
+  -e FAMILYFI_DEFAULT_PASSWORD="$admin_password" \
+  -e FAMILYFI_SESSION_SECRET="$session_secret" \
+  -e FAMILYFI_ENCRYPTION_KEY="$encryption_key" \
+  "$image" >/dev/null
+ok=0
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+  if curl -sf "http://127.0.0.1:${host_port}/api/v1/health" | grep -q '"status":"ok"'; then
+    ok=1
+    break
+  fi
+  sleep 2
+done
+if [ "$ok" -ne 1 ]; then
+  echo "demo health check failed" >&2
+  docker logs "$demo" >&2 || true
+  exit 1
+fi
+curl -sf -o /dev/null -X POST "http://127.0.0.1:${host_port}/api/v1/auth/login" \
+  -H 'content-type: application/json' \
+  -d "{\"username\":\"admin\",\"password\":\"${admin_password}\",\"client\":\"browser\"}" || {
+  echo "demo sign-in failed" >&2
+  docker logs "$demo" >&2 || true
   exit 1
 }
 
