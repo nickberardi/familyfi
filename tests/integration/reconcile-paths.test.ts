@@ -793,7 +793,7 @@ describe("reconciler paths", () => {
       const first = runReconcileOnce();
       await new Promise((resolve) => setTimeout(resolve, 50));
       // One renewal cannot reach the database; the next ones keep the lock.
-      vi.spyOn(prisma().reconciliationLock, "findUnique").mockRejectedValueOnce(new Error("database restarting"));
+      vi.spyOn(prisma().reconciliationLock, "updateMany").mockRejectedValueOnce(new Error("database restarting"));
       await new Promise((resolve) => setTimeout(resolve, 950));
       expect(await runReconcileOnce()).toBe(false);
       release();
@@ -834,6 +834,67 @@ describe("reconciler paths", () => {
       const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
       expect(household.connectionStatus).not.toBe("error");
       expect((await prisma().reconciliationLock.findUniqueOrThrow({ where: { id: "global" } })).owner).toBe("other");
+    });
+
+    it("never takes back a lock another owner took and released while its renewals failed", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      setReconcileLockForTests({ lockMs: 400, renewMs: 100 });
+      const listPolicies = client.listPolicies.bind(client);
+      let release!: () => void;
+      const slow = new Promise<void>((resolve) => (release = resolve));
+      vi.spyOn(client, "listPolicies").mockImplementationOnce(async (siteId) => {
+        await slow;
+        return listPolicies(siteId);
+      });
+
+      const pass = runReconcileOnce();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Another process ran a whole pass in the gap and released the lock, which keeps its owner.
+      await prisma().reconciliationLock.update({
+        where: { id: "global" },
+        data: { owner: "other", expiresAt: new Date(0) },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const before = client.calls.length;
+      release();
+
+      expect(await pass).toBe(true);
+      expect(client.calls.slice(before).some((call) => call.method !== "GET")).toBe(false);
+      expect((await lastRun()).error).toMatch(/Another sync took over/);
+      expect((await prisma().reconciliationLock.findUniqueOrThrow({ where: { id: "global" } })).owner).toBe("other");
+    });
+
+    it("leaves pending changes for the pass that took over when the lock goes after the last write", async () => {
+      const client = fixtureUnifiClient();
+      setReconcileClientForTests(client);
+      setReconcileLockForTests({ lockMs: 400, renewMs: 100 });
+      const group = await createFamilyGroup("Betsy");
+      await seedDevice({ mac: MAC, groupId: group.id, assignment: AssignmentState.assigned });
+      await pauseGroup(group.id);
+      await prisma().changeResult.create({
+        data: { scope: "group", status: ChangeStatus.pending, requestedRevision: 0 },
+      });
+      // The pass's own coverage read is its last step before settling; the lock goes meanwhile.
+      const coverage = prisma().device.findMany.bind(prisma().device);
+      let taken = false;
+      vi.spyOn(prisma().device, "findMany").mockImplementation((async (...args: Parameters<typeof coverage>) => {
+        if (!taken && client.calls.some((call) => call.method === "POST")) {
+          taken = true;
+          await prisma().reconciliationLock.update({
+            where: { id: "global" },
+            data: { owner: "other", expiresAt: new Date(Date.now() + 60_000) },
+          });
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        return coverage(...args);
+      }) as unknown as typeof coverage);
+
+      expect(await runReconcileOnce()).toBe(true);
+      expect(taken).toBe(true);
+      expect((await lastRun()).status).toBe(ChangeStatus.failed);
+      const pending = await prisma().changeResult.findFirstOrThrow({});
+      expect(pending.status).toBe(ChangeStatus.pending);
     });
 
     it("starts with a pass straight away and schedules the next ones", async () => {

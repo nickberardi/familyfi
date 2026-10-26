@@ -130,6 +130,19 @@ async function acquireLock(owner: string): Promise<boolean> {
   return updated.count === 1;
 }
 
+/**
+ * Extends the lock this owner still holds. Never takes one that lapsed: another pass may have
+ * taken and released it meanwhile, and that pass's writes overlapped this one's.
+ */
+async function renewLock(owner: string): Promise<boolean> {
+  const now = new Date();
+  const renewed = await prisma().reconciliationLock.updateMany({
+    where: { id: "global", owner, expiresAt: { gt: now } },
+    data: { expiresAt: new Date(now.getTime() + lockMs) },
+  });
+  return renewed.count === 1;
+}
+
 async function releaseLock(owner: string) {
   await prisma().reconciliationLock.updateMany({
     where: { id: "global", owner },
@@ -143,17 +156,18 @@ class LockLostError extends Error {}
 async function tick(owner: string): Promise<boolean> {
   if (!(await acquireLock(owner))) return false;
   // Held for the whole pass, however long the gateway takes. A renewal that fails to reach the
-  // database is retried on the next beat; one that finds another owner holding it ends the pass.
+  // database is retried on the next beat; one that finds the lock no longer this pass's ends it.
+  // Best-effort: the flag is read between gateway writes, so one already in flight still finishes.
   let lost = false;
   let renewing: Promise<void> | null = null;
   const renewal = setInterval(() => {
     // One renewal at a time, so the one awaited below is the only one left to land.
     if (renewing) return;
-    renewing = acquireLock(owner)
+    renewing = renewLock(owner)
       .then((held) => {
         if (!held) lost = true;
       })
-      .catch(() => undefined)
+      .catch((error) => console.warn("Reconcile lock renewal failed:", error))
       .finally(() => {
         renewing = null;
       });
@@ -544,6 +558,8 @@ async function tick(owner: string): Promise<boolean> {
     }
 
     const status = failed === 0 ? ChangeStatus.applied : ChangeStatus.partial;
+    // The pass that took over settles the pending changes against what it wrote.
+    stillHeld();
     await prisma().syncRun.update({
       where: { id: run.id },
       data: {
@@ -568,6 +584,7 @@ async function tick(owner: string): Promise<boolean> {
       },
     });
     // The checkup reads what this pass read, at most once an interval; it never fails the pass.
+    stillHeld();
     await checkupAfterSync(household, client, { zones, networks, clients, networkClientIds });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
