@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { request } from "@/lib/api";
 import {
   CHECKUP_COPY as COPY,
+  leftoverRemovalNotice,
   loadCheckup,
   recommendedRules,
   removeLeftoverPolicies,
@@ -78,13 +79,7 @@ export default function CheckupPage() {
     setRemoving(true);
     await write(async () => {
       const result = await removeLeftoverPolicies(request, policies.map((policy) => policy.id));
-      const text = COPY.network.leftover;
-      const said = [
-        result.removed.length ? text.removed(result.removed.length) : "",
-        result.skipped.length ? text.skipped(result.skipped.length) : "",
-        result.failed.length ? text.failed(result.failed.length) : "",
-      ];
-      setNotice(said.filter(Boolean).join(" "));
+      setNotice(leftoverRemovalNotice(result));
       return result.checkup;
     });
     setRemoving(false);

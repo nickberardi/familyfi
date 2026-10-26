@@ -6,6 +6,7 @@ import {
   isPrivateMac,
   knownCheckupMessage,
   leftoverCopyNote,
+  leftoverRemovalNotice,
   leftoverPolicyLine,
   openProblemCount,
   outsideDnsNote,
@@ -94,6 +95,14 @@ describe("network checkup", () => {
     expect(leftoverCopyNote({ copyOf: "Bedtime", enabled: false, blocks: true })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one is off, so it does nothing now.");
     expect(leftoverCopyNote({ copyOf: "Bedtime", enabled: true, blocks: false })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one still lets traffic through.");
     expect(leftoverCopyNote({ enabled: true, blocks: true })).toBeNull();
+  });
+
+  it("says what a leftover removal did, leaving out what didn't happen", () => {
+    expect(leftoverRemovalNotice({ removed: ["a", "b"], skipped: [], failed: [] })).toBe("Removed 2 policies from your gateway.");
+    expect(leftoverRemovalNotice({ removed: ["a"], skipped: ["b"], failed: ["c", "d"] })).toBe(
+      "Removed 1 policy from your gateway. 1 policy was left alone because it changed since the last check. 2 policies could not be removed. Try again in a minute.",
+    );
+    expect(leftoverRemovalNotice({ removed: [], skipped: [], failed: [] })).toBe("");
   });
 
   it("finds Sonos wired and on Wi-Fi, and only then", () => {

@@ -607,6 +607,18 @@ export type LeftoverRemoval = {
   failed: string[];
 };
 
+/** What a removal did, in one line for the page to show: removed, then left alone, then failed. */
+export function leftoverRemovalNotice(result: Pick<LeftoverRemoval, "removed" | "skipped" | "failed">): string {
+  const text = CHECKUP_COPY.network.leftover;
+  return [
+    result.removed.length ? text.removed(result.removed.length) : "",
+    result.skipped.length ? text.skipped(result.skipped.length) : "",
+    result.failed.length ? text.failed(result.failed.length) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /** Remove leftover FamilyFi policies the administrator ticked and confirmed. */
 export async function removeLeftoverPolicies(request: ApiRequest, policyIds: string[]): Promise<LeftoverRemoval> {
   return request<LeftoverRemoval>("/api/v1/checkup/leftover-policies/remove", { method: "POST", body: { policyIds } });
