@@ -7,6 +7,7 @@ import {
   CHECKUP_COPY as COPY,
   checkupCopy,
   checkupSections,
+  knownCheck,
   knownCheckupMessage,
   checkupSummary,
   leftoverCopyNote,
@@ -112,7 +113,8 @@ export function NetworkCheckupCard({
   const [showPassed, setShowPassed] = useState(false);
   const [showDismissed, setShowDismissed] = useState(false);
   const sections = checkupSections(checkup ?? { findings: [] });
-  const passed = checkup?.passed ?? [];
+  // A check newer than this build has no name here: leave it out.
+  const passed = (checkup?.passed ?? []).filter((check) => knownCheck(check));
   const body = [styles.body, { fontFamily: ui.font }];
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="checkup-network">

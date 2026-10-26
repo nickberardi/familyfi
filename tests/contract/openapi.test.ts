@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
+import { CHECKUP_CHECKS } from "@/lib/checkup";
 
 describe("openapi contract", () => {
   const spec = YAML.parse(
@@ -107,5 +108,11 @@ describe("openapi contract", () => {
     }
 
     expect([...optional].sort()).toEqual([...sometimesOmitted].sort());
+  });
+
+  it("lists every Checkup check the server runs, as a list that may grow", () => {
+    const schema = spec.components.schemas.CheckupCheck as { enum?: string[]; "x-extensible-enum"?: string[] };
+    expect(schema.enum).toBeUndefined();
+    expect(schema["x-extensible-enum"]).toEqual([...CHECKUP_CHECKS]);
   });
 });

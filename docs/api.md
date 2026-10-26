@@ -256,8 +256,8 @@ The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-m
 
 A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions, and each pin carries the one it was taken at. The `OpenAPI` workflow's job summary names the old and new version as a reminder to re-pin `familyfi-mobile`'s `vendor/familyfi` submodule and regenerate its types; it posts nothing outside this repository.
 
+Run the check locally with `make test-api-version`, or against any ref with `node scripts/ci/check-openapi-version.mjs <ref>`.
+
 ### Values that grow
 
 A list the server is expected to extend, such as `CheckupCheck`, is declared with `x-extensible-enum` instead of `enum`, so adding a value is a minor version and not a breaking change. A client must accept a value it does not know. Where such a value is shown to the user, the object also carries a `Message`: a `key` (for example `checkup.leftover_policies`) that the client looks up in its own localized copy, and `text`, a short English line. A client with no copy for the key shows `text` and adds its own note that a newer app shows more. Clients keep their copy and localization; the server's `text` is only the fallback.
-
-Run the check locally with `make test-api-version`, or against any ref with `node scripts/ci/check-openapi-version.mjs <ref>`.

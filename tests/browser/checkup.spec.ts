@@ -111,7 +111,8 @@ test("a finding from a check this app does not know shows the server's English l
   // Answer as a newer server would, with one check this build has no copy for.
   await page.route("**/api/v1/checkup", async (route) => {
     const response = await route.fetch();
-    const body = (await response.json()) as { checkup: { findings: { id: string; check: string; message: object }[] } };
+    const body = (await response.json()) as { checkup: { findings: { id: string; check: string; message: object }[]; passed: string[] } };
+    body.checkup.passed.push("another_newer_check");
     body.checkup.findings.unshift({ ...body.checkup.findings[0], id: "a_newer_check:x", check: "a_newer_check", message: { key: "checkup.a_newer_check", text: "Something new to look at" } });
     await route.fulfill({ response, json: body });
   });
@@ -120,4 +121,9 @@ test("a finding from a check this app does not know shows the server's English l
   await expect(row).toContainText("Something new to look at");
   await expect(row).toContainText("Update the FamilyFi app to see more and act on this.");
   await expect(row.getByTestId("checkup-dismiss-a_newer_check:x")).toBeVisible();
+  // A newer check that passed has no name here, so it is neither listed nor counted.
+  const passed = page.getByTestId("checkup-passed");
+  const count = Number((await passed.innerText()).match(/\d+/)![0]);
+  await passed.click();
+  await expect(page.getByText(/^✓ /)).toHaveCount(count);
 });
