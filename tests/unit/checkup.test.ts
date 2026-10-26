@@ -3,6 +3,7 @@ import {
   checkupCopy,
   checkupMessage,
   checkupSummary,
+  driftRows,
   isPrivateMac,
   knownCheckupMessage,
   leftoverCopyNote,
@@ -17,6 +18,7 @@ import {
   runChecks,
   turnOnRecommended,
   type CheckupDevice,
+  type CheckupDrift,
   type CheckupInputs,
   type CheckupNetwork,
   type CheckupPolicy,
@@ -66,6 +68,7 @@ const inputs = (over: Partial<CheckupInputs> = {}): CheckupInputs => ({
   networks: [network({ id: LAN, name: "LAN" }), network({ id: IOT, name: "IoT" })],
   wifis: [],
   unrecordedPolicies: [],
+  drift: [],
   ...over,
 });
 
@@ -76,7 +79,7 @@ describe("network checkup", () => {
     const run = runChecks(inputs());
     expect(run.findings).toEqual([]);
     expect(run.skipped).toEqual([]);
-    expect(run.passed).toHaveLength(9);
+    expect(run.passed).toHaveLength(10);
   });
 
   it("finds leftover policies by FamilyFi's prefix only, and skips the check when policies could not be read", () => {
@@ -95,6 +98,53 @@ describe("network checkup", () => {
     expect(leftoverCopyNote({ copyOf: "Bedtime", enabled: false, blocks: true })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one is off, so it does nothing now.");
     expect(leftoverCopyNote({ copyOf: "Bedtime", enabled: true, blocks: false })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one still lets traffic through.");
     expect(leftoverCopyNote({ enabled: true, blocks: true })).toBeNull();
+  });
+
+  it("notes a FamilyFi rule changed in UniFi, one per rule, and says whether FamilyFi changed it back", () => {
+    const drift = (over: Partial<CheckupDrift>): CheckupDrift => ({ rule: { id: "bedtime", name: "Bedtime" }, changes: [], seenAt: "2026-10-26T10:00:00.000Z", putBack: true, ...over });
+    const run = runChecks(
+      inputs({
+        drift: [
+          drift({ changes: [{ field: "devices", familyfi: ["iPad", "iPhone"], gateway: ["iPhone"] }] }),
+          drift({ changes: [{ field: "switch", familyfi: true, gateway: false }, { field: "devices", familyfi: ["Switch"], gateway: [] }], seenAt: "2026-10-26T11:00:00.000Z", putBack: false }),
+          drift({ rule: { id: "pause", name: "Cassie’s Internet Pause" }, group: { id: "g1", name: "Cassie", kind: "family" }, changes: [{ field: "other" }] }),
+        ],
+      }),
+    );
+    const notes = found(run, "gateway_drift");
+    expect(notes.map((note) => note.key)).toEqual(["gateway_drift:bedtime", "gateway_drift:pause"]);
+    const bedtime = notes[0]!.details.drift!;
+    // Both window policies together: the switch first, the devices of both, the latest time, not yet put back.
+    expect(bedtime).toEqual({
+      rule: { id: "bedtime", name: "Bedtime" },
+      changes: [{ field: "switch", familyfi: true, gateway: false }, { field: "devices", familyfi: ["iPad", "iPhone", "Switch"], gateway: ["iPhone"] }],
+      seenAt: "2026-10-26T11:00:00.000Z",
+      putBack: false,
+    });
+    expect(notes[0]!.subject).toBe("2026-10-26T11:00:00.000Z");
+    expect(driftRows(bedtime)).toEqual([
+      { label: "Switch", familyfi: "On", gateway: "Off" },
+      { label: "Devices", familyfi: "iPad, iPhone and Switch", gateway: "iPhone" },
+    ]);
+    const copy = checkupCopy({ check: "gateway_drift", details: { drift: bedtime } });
+    expect(copy.title).toBe("Bedtime was changed in UniFi");
+    expect(copy.seen).toBe("Someone changed Bedtime in the UniFi console. FamilyFi hasn’t been able to change it back yet, so your gateway is doing what UniFi says.");
+    expect(copy.show).toEqual({ label: "Edit Bedtime", href: "/rules/bedtime" });
+    expect(checkupCopy({ check: "gateway_drift", details: { drift: { ...bedtime, putBack: true } } }).seen).toBe("Someone changed Bedtime in the UniFi console. FamilyFi changed it back to how you set it.");
+    // A group's pause opens the group; Quarantine opens Devices.
+    expect(checkupCopy({ check: "gateway_drift", details: notes[1]!.details }).show).toEqual({ label: "Open Cassie", href: "/family/g1" });
+    expect(checkupCopy({ check: "gateway_drift", details: { drift: drift({ rule: { id: "quarantine", name: "Quarantine" } }) } }).show).toEqual({ label: "Open Devices", href: "/devices" });
+    expect(driftRows(notes[1]!.details.drift!)).toEqual([{ label: "What it blocks", familyfi: "As you set it", gateway: "Changed" }]);
+    // Long lists name only the devices that differ.
+    const many = ["A", "B", "C", "D", "E"];
+    expect(driftRows({ changes: [{ field: "devices", familyfi: many, gateway: ["A", "B", "C", "F"] }] })).toEqual([
+      { label: "Devices", familyfi: "With D and E; Without F", gateway: "With F; Without D and E" },
+    ]);
+    expect(driftRows({ changes: [{ field: "schedule", familyfi: "always", gateway: "scheduled" }, { field: "name", familyfi: "FamilyFi Bedtime", gateway: "Bed" }] })).toEqual([
+      { label: "When", familyfi: "Always", gateway: "On a schedule" },
+      { label: "Name", familyfi: "FamilyFi Bedtime", gateway: "Bed" },
+    ]);
+    expect(runChecks(inputs()).passed).toContain("gateway_drift");
   });
 
   it("says what a leftover removal did, leaving out what didn't happen", () => {

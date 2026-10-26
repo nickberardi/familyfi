@@ -406,6 +406,10 @@ model AppPolicy {
   observedEnabled     Boolean?
   observedFingerprint String?
   lastError           String?
+  /// What someone last changed on this policy in the UniFi console, which sync put back
+  /// (`GatewayDriftChange[]`); cleared when FamilyFi's own version changes.
+  gatewayDrift        Json?
+  driftSeenAt         DateTime?        @db.Timestamptz(3)
   createdAt           DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime         @updatedAt @db.Timestamptz(3)
 }
@@ -585,6 +589,10 @@ model RulePolicy {
   observedEnabled     Boolean?
   observedFingerprint String?
   lastError           String?
+  /// What someone last changed on this policy in the UniFi console, which sync put back
+  /// (`GatewayDriftChange[]`); cleared when FamilyFi's own version changes.
+  gatewayDrift        Json?
+  driftSeenAt         DateTime? @db.Timestamptz(3)
   createdAt           DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
 

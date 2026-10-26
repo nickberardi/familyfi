@@ -288,6 +288,76 @@ describe("reconciliation against mocked UniFi", () => {
     expect(run?.status).toBe("applied");
   });
 
+  it("puts back a policy someone changed on the console, and records what they changed", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const [recorded] = await prisma().appPolicy.findMany();
+    const onGateway = client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!;
+    const macs = [...policyMacs(onGateway)].sort();
+    const enabled = onGateway.enabled;
+    onGateway.enabled = !enabled;
+    onGateway.source.trafficFilter!.macAddressFilter!.macAddresses = macs.slice(1);
+
+    await runReconcileOnce();
+    const restored = client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!;
+    expect(restored.enabled).toBe(enabled);
+    expect([...policyMacs(restored)].sort()).toEqual(macs);
+    const row = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    expect(row.gatewayDrift).toEqual([
+      { field: "switch", familyfi: enabled, gateway: !enabled },
+      { field: "devices", familyfi: macs, gateway: macs.slice(1) },
+    ]);
+    expect(row.driftSeenAt).toBeInstanceOf(Date);
+    expect(row.lastError).toBeNull();
+
+    // Put back, so the next pass writes nothing and keeps what it recorded.
+    const writes = client.calls.length;
+    await runReconcileOnce();
+    expect(client.calls.slice(writes).some((call) => call.method === "PUT")).toBe(false);
+    expect((await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } })).gatewayDrift).toEqual(row.gatewayDrift);
+  });
+
+  it("keeps what the console changed while putting it back fails", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const [recorded] = await prisma().appPolicy.findMany();
+    const onGateway = client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!;
+    const enabled = onGateway.enabled;
+    onGateway.enabled = !enabled;
+    vi.spyOn(client, "updatePolicy").mockRejectedValueOnce(new Error("gateway busy"));
+
+    await runReconcileOnce();
+    const row = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    expect(row.lastError).toBe("gateway busy");
+    expect(row.gatewayDrift).toEqual([{ field: "switch", familyfi: enabled, gateway: !enabled }]);
+
+    await runReconcileOnce();
+    const repaired = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    expect(repaired.lastError).toBeNull();
+    expect(repaired.gatewayDrift).toEqual(row.gatewayDrift);
+    expect(client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!.enabled).toBe(enabled);
+  });
+
+  it("forgets what the console changed once FamilyFi changes the policy itself", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const [recorded] = await prisma().appPolicy.findMany();
+    const onGateway = client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!;
+    onGateway.name = "Renamed in UniFi";
+    await runReconcileOnce();
+    expect((await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } })).gatewayDrift).not.toBeNull();
+
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: !household.quarantineEnforced } });
+    await runReconcileOnce();
+    const row = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    expect(row.gatewayDrift).toBeNull();
+    expect(row.driftSeenAt).toBeNull();
+  });
+
   it("clears a stale record whose policy is already gone from the gateway", async () => {
     const mac = "02:00:00:00:00:01";
     const client = fixtureUnifiClient();

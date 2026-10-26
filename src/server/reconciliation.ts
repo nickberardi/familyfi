@@ -11,6 +11,7 @@ import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
 import { expireDeleteConfirmations, withPolicyOwnership } from "./unifi/policy-ownership";
 import { reclaims, settleLostCreates } from "./unifi/lost-creates";
+import { gatewayDrift } from "./unifi/drift";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
@@ -18,7 +19,7 @@ import { internetBlockPolicy, toPolicyUpdate } from "./unifi/payloads";
 import { networkInScope, publicUnifiNetwork } from "./unifi/scope";
 import { rememberSiteNetworks } from "./unifi/network-cache";
 import { recordQuarantineObservation } from "./quarantine";
-import { checkupAfterSync } from "./checkup";
+import { checkupAfterSync, recordDriftFindings } from "./checkup";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
@@ -269,6 +270,8 @@ async function tick(owner: string): Promise<boolean> {
     // What the gateway holds right now, kept current as this pass creates and deletes, so a
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
+    // Each policy as the gateway holds it, to notice one someone changed on the console.
+    const gatewayCopies = new Map(gatewayPolicies.map((policy) => [policy.id, policy]));
     // No leftover removal runs while this pass holds the lock, so a confirmation one left behind
     // stands for nothing: this pass can never delete a policy on its strength.
     await expireDeleteConfirmations();
@@ -426,7 +429,7 @@ async function tick(owner: string): Promise<boolean> {
           plannedKey(row.ownerScope, row.groupId, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, adopted);
+        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, gatewayCopies, adopted);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -551,7 +554,7 @@ async function tick(owner: string): Promise<boolean> {
         (row) => plannedRuleKey(row.ruleId, row.windowKey, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredRulePolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, adopted);
+        await applyDesiredRulePolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, gatewayCopies, adopted);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -649,8 +652,10 @@ async function tick(owner: string): Promise<boolean> {
         syncRunId: run.id,
       },
     });
-    // The checkup reads what this pass read, at most once an interval; it never fails the pass.
+    // What this pass found changed on the console shows now; neither step fails the pass.
     stillHeld();
+    await recordDriftFindings();
+    // The checkup reads what this pass read, at most once an interval.
     await checkupAfterSync(household, client, { zones, networks, clients, networkClientIds });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -686,6 +691,27 @@ async function tick(owner: string): Promise<boolean> {
   }
 }
 
+/**
+ * What someone changed on a policy FamilyFi last confirmed as `fingerprint`, as the data to record,
+ * or null when the gateway's copy still carries FamilyFi's write. A policy FamilyFi has not yet
+ * confirmed, or whose last write failed, differs because of FamilyFi, not the console.
+ */
+function consoleDrift(
+  existing: { desiredFingerprint: string; observedFingerprint: string | null; lastError: string | null },
+  copy: FirewallPolicy | undefined,
+  write: FirewallPolicyWrite,
+  fingerprint: string,
+): { gatewayDrift: Prisma.InputJsonValue; driftSeenAt: Date } | null {
+  if (!copy || existing.observedFingerprint !== fingerprint || existing.desiredFingerprint !== fingerprint || existing.lastError) return null;
+  const changes = gatewayDrift(copy, write);
+  return changes.length ? { gatewayDrift: changes as Prisma.InputJsonValue, driftSeenAt: new Date() } : null;
+}
+
+/** FamilyFi changed the policy itself: what the console changed before no longer compares. */
+function driftCleared(existing: { desiredFingerprint: string } | undefined, fingerprint: string) {
+  return existing && existing.desiredFingerprint !== fingerprint ? { gatewayDrift: Prisma.DbNull, driftSeenAt: null } : {};
+}
+
 async function applyDesiredPolicy(
   client: UnifiClient,
   siteId: string,
@@ -704,6 +730,7 @@ async function applyDesiredPolicy(
       }
     | undefined,
   onGateway: Set<string>,
+  gatewayCopies: Map<string, FirewallPolicy>,
   adopted: FirewallPolicy[],
 ) {
   const scope = planned.ownerScope === "group" ? PolicyOwnerScope.group : PolicyOwnerScope.quarantine;
@@ -718,14 +745,19 @@ async function applyDesiredPolicy(
     existing.desiredFingerprint === fingerprint &&
     !existing.lastError
   ) {
-    // Recorded once when it was last confirmed, not rewritten every pass.
-    if (existing.observedFingerprint !== fingerprint) {
-      await prisma().appPolicy.update({
-        where: { id: existing.id },
-        data: { desiredRevision: revision, observedFingerprint: fingerprint },
-      });
+    const drift = consoleDrift(existing, gatewayCopies.get(unifiPolicyId), write, fingerprint);
+    if (!drift) {
+      // Recorded once when it was last confirmed, not rewritten every pass.
+      if (existing.observedFingerprint !== fingerprint) {
+        await prisma().appPolicy.update({
+          where: { id: existing.id },
+          data: { desiredRevision: revision, observedFingerprint: fingerprint },
+        });
+      }
+      return;
     }
-    return;
+    // Changed on the console: say what changed, then put FamilyFi's version back below.
+    await prisma().appPolicy.update({ where: { id: existing.id }, data: drift });
   }
   if (unifiPolicyId && onGateway.has(unifiPolicyId)) {
     try {
@@ -738,6 +770,7 @@ async function applyDesiredPolicy(
         observedEnabled: updated.enabled,
         observedFingerprint: fingerprint,
         lastError: null as string | null,
+        ...driftCleared(existing, fingerprint),
       };
       if (appPolicyId) {
         await prisma().appPolicy.update({ where: { id: appPolicyId }, data: observed });
@@ -771,6 +804,7 @@ async function applyDesiredPolicy(
         observedEnabled: created.enabled,
         observedFingerprint: fingerprint,
         lastError: null,
+        ...driftCleared(existing, fingerprint),
       },
     });
     return;
@@ -811,6 +845,7 @@ async function applyDesiredRulePolicy(
       }
     | undefined,
   onGateway: Set<string>,
+  gatewayCopies: Map<string, FirewallPolicy>,
   adopted: FirewallPolicy[],
 ) {
   const unifiPolicyId = existing?.unifiPolicyId;
@@ -823,14 +858,19 @@ async function applyDesiredRulePolicy(
     existing.desiredFingerprint === fingerprint &&
     !existing.lastError
   ) {
-    // Recorded once when it was last confirmed, not rewritten every pass.
-    if (existing.observedFingerprint !== fingerprint) {
-      await prisma().rulePolicy.update({
-        where: { id: existing.id },
-        data: { desiredRevision: revision, observedFingerprint: fingerprint },
-      });
+    const drift = consoleDrift(existing, gatewayCopies.get(unifiPolicyId), write, fingerprint);
+    if (!drift) {
+      // Recorded once when it was last confirmed, not rewritten every pass.
+      if (existing.observedFingerprint !== fingerprint) {
+        await prisma().rulePolicy.update({
+          where: { id: existing.id },
+          data: { desiredRevision: revision, observedFingerprint: fingerprint },
+        });
+      }
+      return;
     }
-    return;
+    // Changed on the console: say what changed, then put FamilyFi's version back below.
+    await prisma().rulePolicy.update({ where: { id: existing.id }, data: drift });
   }
   if (unifiPolicyId && onGateway.has(unifiPolicyId)) {
     try {
@@ -848,6 +888,7 @@ async function applyDesiredRulePolicy(
         observedEnabled: updated.enabled,
         observedFingerprint: fingerprint,
         lastError: null as string | null,
+        ...driftCleared(existing, fingerprint),
       };
       if (existing) {
         await prisma().rulePolicy.update({ where: { id: existing.id }, data: observed });
@@ -881,6 +922,7 @@ async function applyDesiredRulePolicy(
         observedEnabled: created.enabled,
         observedFingerprint: fingerprint,
         lastError: null,
+        ...driftCleared(existing, fingerprint),
       },
     });
     return;

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.37.0
+  version: 0.38.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -4251,13 +4251,17 @@ components:
         text: { type: string, description: "The message in short English, for a client without copy for `key`." }
     CheckupCheck:
       type: string
-      x-extensible-enum: [leftover_policies, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
+      x-extensible-enum: [leftover_policies, gateway_drift, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
       description: |
         One check. New checks are added over time without a breaking change: a client that does not
         know a value shows the finding's `message` and asks to update the app, and ignores the value
         in `passed`.
         leftover_policies: firewall policies on the gateway named with FamilyFi's prefix that no
         FamilyFi record claims; `POST /api/v1/checkup/leftover-policies/remove` removes them.
+        gateway_drift (a note): someone changed one of FamilyFi's own policies in the UniFi
+        console; sync changes it back on its own, and `details.drift` says what was changed. While
+        changing it back fails, `POST /api/v1/sync/retry` tries again. One finding per rule; it goes
+        a week after the change was last seen, or when FamilyFi changes the rule itself.
         sonos_mixed: Sonos players both wired and on Wi-Fi. private_addresses: devices using a
         private (randomised) Wi-Fi address. wifi_multicast: the Wi-Fi carrying Sonos has Multicast
         to Unicast or Client Device Isolation on. sonos_mdns, casting_mdns: speakers, or TVs and
@@ -4334,6 +4338,56 @@ components:
                   devices: { type: [integer, "null"], minimum: 0, description: "The devices it names; null when it names a whole network or zone" }
                   scheduled: { type: boolean, description: Whether it applies only on a schedule }
                   copyOf: { type: string, description: "What FamilyFi's own policy of the same name is for (a rule's name, Quarantine or a group's name): this one is an old copy FamilyFi lost track of. Present only then." }
+            drift:
+              type: object
+              additionalProperties: false
+              description: For `gateway_drift`, the rule someone changed in UniFi and what they changed.
+              required: [rule, changes, seenAt, putBack]
+              properties:
+                rule:
+                  type: object
+                  additionalProperties: false
+                  required: [id, name]
+                  description: The rule; the built-in `quarantine` rule for Quarantine.
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                group:
+                  type: object
+                  additionalProperties: false
+                  required: [id, name, kind]
+                  description: The group whose pause the rule is. Present only for a group's pause.
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    kind: { type: string, enum: [family, things] }
+                changes:
+                  type: array
+                  description: |
+                    What differed, FamilyFi's value beside the gateway's. `switch`: whether it is on.
+                    `devices`: the devices it blocks, by name. `schedule`: `always` or `scheduled`, and
+                    on the gateway also `different` (another schedule). `name`: the policy's name.
+                    `other`: anything else, such as what it blocks; it carries no values.
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [field]
+                    properties:
+                      field: { type: string, x-extensible-enum: [switch, devices, schedule, name, other], description: "New fields may be added; a client that does not know one can skip its row." }
+                      familyfi:
+                        description: Present for every field but `other`.
+                        oneOf:
+                          - { type: boolean }
+                          - { type: string }
+                          - { type: array, items: { type: string } }
+                      gateway:
+                        description: Present for every field but `other`.
+                        oneOf:
+                          - { type: boolean }
+                          - { type: string }
+                          - { type: array, items: { type: string } }
+                seenAt: { type: string, format: date-time, description: When sync last found it changed }
+                putBack: { type: boolean, description: "Whether FamilyFi has changed it back; false while that fails" }
         firstSeenAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
         dismissed:

@@ -9,14 +9,17 @@
  */
 import type { ApiRequest } from "./api-client";
 import { countriesSummary } from "./countries";
+import { groupHref } from "./device-detail";
 import { deviceKindLabel } from "./display";
 import { FAMILYFI_POLICY_PREFIX } from "./policy-names";
 import type { HouseholdStore } from "./household-store";
 import type { IconName } from "./icons";
+import { ruleHref } from "./rule-list";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID, type Rule } from "./rules";
 
 export const CHECKUP_CHECKS = [
   "leftover_policies",
+  "gateway_drift",
   "sonos_mixed",
   "private_addresses",
   "wifi_multicast",
@@ -31,6 +34,7 @@ export type CheckupKind = "problem" | "note";
 
 export const CHECK_KIND: Record<CheckupCheck, CheckupKind> = {
   leftover_policies: "problem",
+  gateway_drift: "note",
   sonos_mixed: "note",
   private_addresses: "problem",
   wifi_multicast: "problem",
@@ -99,6 +103,56 @@ export type CheckupPolicy = {
   copyOf?: string;
 };
 
+/** One thing someone changed on a FamilyFi policy in the UniFi console. */
+export type CheckupDriftChange =
+  | { field: "switch"; familyfi: boolean; gateway: boolean }
+  /** The devices it blocks, by name. */
+  | { field: "devices"; familyfi: string[]; gateway: string[] }
+  | { field: "schedule"; familyfi: "always" | "scheduled"; gateway: "always" | "scheduled" | "different" }
+  | { field: "name"; familyfi: string; gateway: string }
+  /** Anything else: what it blocks, or how. */
+  | { field: "other" };
+
+/** A rule whose policy someone changed in the UniFi console, and what they changed. */
+export type CheckupDrift = {
+  rule: CheckupRef;
+  /** The group whose pause the rule is, for a group's pause. */
+  group?: CheckupRef & { kind: "family" | "things" };
+  changes: CheckupDriftChange[];
+  /** When sync last found it changed. */
+  seenAt: string;
+  /** Whether FamilyFi has put its own version back; false while writing it back fails. */
+  putBack: boolean;
+};
+
+const DRIFT_FIELDS: CheckupDriftChange["field"][] = ["switch", "devices", "schedule", "name", "other"];
+
+/** One finding per rule: its policies' changes together, the latest time, and put back only when all are. */
+export function driftByRule(drifts: CheckupDrift[]): CheckupDrift[] {
+  const byRule = new Map<string, CheckupDrift>();
+  for (const drift of drifts) {
+    const seen = byRule.get(drift.rule.id);
+    if (!seen) {
+      byRule.set(drift.rule.id, { ...drift, changes: [...drift.changes] });
+      continue;
+    }
+    for (const change of drift.changes) {
+      const index = seen.changes.findIndex((item) => item.field === change.field);
+      if (index < 0) seen.changes.push(change);
+      else if (change.field === "devices") {
+        const known = seen.changes[index] as Extract<CheckupDriftChange, { field: "devices" }>;
+        const union = (a: string[], b: string[]) => [...new Set([...a, ...b])].sort((x, y) => x.localeCompare(y));
+        seen.changes[index] = { field: "devices", familyfi: union(known.familyfi, change.familyfi), gateway: union(known.gateway, change.gateway) };
+      }
+    }
+    if (drift.seenAt > seen.seenAt) seen.seenAt = drift.seenAt;
+    seen.putBack &&= drift.putBack;
+  }
+  return [...byRule.values()]
+    .map((drift) => ({ ...drift, changes: drift.changes.sort((a, b) => DRIFT_FIELDS.indexOf(a.field) - DRIFT_FIELDS.indexOf(b.field)) }))
+    .sort((a, b) => a.rule.name.localeCompare(b.rule.name));
+}
+
 export type CheckupInputs = {
   devices: CheckupDevice[];
   networks: CheckupNetwork[];
@@ -109,6 +163,8 @@ export type CheckupInputs = {
    * the policies could not be read. Only those named with FamilyFi's prefix are leftovers.
    */
   unrecordedPolicies: CheckupPolicy[] | null;
+  /** FamilyFi's own policies someone changed in the UniFi console, one entry per policy. */
+  drift: CheckupDrift[];
 };
 
 export type CheckupRef = { id: string; name: string };
@@ -119,6 +175,7 @@ export type CheckupDetails = {
   networks?: (CheckupRef & { dnsServers?: string[]; clientCount?: number })[];
   wifis?: (CheckupRef & { settings: string[] })[];
   policies?: CheckupPolicy[];
+  drift?: CheckupDrift;
 };
 
 export type CheckupResult = {
@@ -224,6 +281,8 @@ export function runChecks(inputs: CheckupInputs): CheckupRun {
       leftovers.length ? [{ key: "leftover_policies", check: "leftover_policies", details: { policies: leftovers }, subject: ids(leftovers.map((policy) => policy.id)) }] : [],
     );
   }
+
+  add("gateway_drift", gatewayDriftFindings(inputs.drift));
 
   // Sonos wired and on Wi-Fi.
   const sonos = inputs.devices.filter(isSonos);
@@ -358,6 +417,14 @@ export function runChecks(inputs: CheckupInputs): CheckupRun {
   );
 
   return { findings, passed, skipped };
+}
+
+/**
+ * The `gateway_drift` findings, one per rule, which sync also records on its own after every pass.
+ * A new change shows again even after the last one was dismissed.
+ */
+export function gatewayDriftFindings(drifts: CheckupDrift[]): CheckupResult[] {
+  return driftByRule(drifts).map((drift) => ({ key: `gateway_drift:${drift.rule.id}`, check: "gateway_drift", details: { drift }, subject: drift.seenAt }));
 }
 
 /**
@@ -497,6 +564,21 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         fix: ["Tick the ones you don’t want and remove them. FamilyFi removes only the ones you tick."],
       };
     }
+    case "gateway_drift": {
+      const drift = finding.details.drift;
+      const name = drift?.rule.name ?? "A rule";
+      const href = !drift ? "/rules" : drift.group ? groupHref(drift.group) : ruleHref(drift.rule.id === QUARANTINE_RULE_ID ? { id: drift.rule.id, builtIn: "quarantine" } : drift.rule);
+      return {
+        icon: "arrows-clockwise",
+        title: `${name} was changed in UniFi`,
+        seen: drift?.putBack === false
+          ? `Someone changed ${name} in the UniFi console. FamilyFi hasn’t been able to change it back yet, so your gateway is doing what UniFi says.`
+          : `Someone changed ${name} in the UniFi console. FamilyFi changed it back to how you set it.`,
+        why: `FamilyFi keeps its rules on your gateway the way you set them in FamilyFi, so changes made in UniFi don’t last.`,
+        fix: [`Change ${name} in FamilyFi instead of in UniFi.`],
+        show: { label: drift?.group ? `Open ${drift.group.name}` : drift?.rule.id === QUARANTINE_RULE_ID ? "Open Devices" : `Edit ${name}`, href },
+      };
+    }
     case "sonos_mixed": {
       const wiredOnes = devices.filter((device) => device.wired);
       const wifiOnes = devices.filter((device) => !device.wired);
@@ -580,6 +662,35 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         show: { label: "Open Settings", href: "/settings?tab=gateway" },
       };
   }
+}
+
+/**
+ * The rows of a changed-in-UniFi note: what FamilyFi has, and what was on the gateway. Short lists
+ * are named in full; longer ones name only the devices that differ.
+ */
+export function driftRows(drift: Pick<CheckupDrift, "changes">): { label: string; familyfi: string; gateway: string }[] {
+  const text = CHECKUP_COPY.network.drift;
+  return drift.changes.map((change) => {
+    switch (change.field) {
+      case "switch":
+        return { label: text.switch, familyfi: change.familyfi ? text.on : text.off, gateway: change.gateway ? text.on : text.off };
+      case "devices": {
+        const list = (names: string[]) => (names.length ? namesList(names) : text.noDevices);
+        if (change.familyfi.length <= 3 && change.gateway.length <= 3) return { label: text.devices, familyfi: list(change.familyfi), gateway: list(change.gateway) };
+        const missing = change.familyfi.filter((name) => !change.gateway.includes(name));
+        const extra = change.gateway.filter((name) => !change.familyfi.includes(name));
+        const side = (included: string[], left: string[]) =>
+          [included.length ? text.with(namesList(included)) : null, left.length ? text.without(namesList(left)) : null].filter(Boolean).join("; ");
+        return { label: text.devices, familyfi: side(missing, extra), gateway: side(extra, missing) };
+      }
+      case "schedule":
+        return { label: text.schedule, familyfi: text.schedules[change.familyfi], gateway: text.schedules[change.gateway] };
+      case "name":
+        return { label: text.name, familyfi: change.familyfi, gateway: change.gateway };
+      case "other":
+        return { label: text.other, familyfi: text.asSet, gateway: text.changed };
+    }
+  });
 }
 
 /** The network checkup as the server last saw it. */
@@ -722,6 +833,26 @@ export const CHECKUP_COPY = {
     restore: "Show again",
     error: "The last check could not finish:",
     readOnly: "FamilyFi only reads these settings. The one thing it removes is a leftover FamilyFi policy, and only when you ask.",
+    drift: {
+      inFamilyFi: "In FamilyFi",
+      wasOnGateway: "Was on the gateway",
+      onGateway: "On the gateway",
+      putBack: "Put it back",
+      putting: "FamilyFi is changing it back on your gateway.",
+      switch: "Switch",
+      on: "On",
+      off: "Off",
+      devices: "Devices",
+      noDevices: "No devices",
+      with: (names: string) => `With ${names}`,
+      without: (names: string) => `Without ${names}`,
+      schedule: "When",
+      schedules: { always: "Always", scheduled: "On a schedule", different: "A different schedule" },
+      name: "Name",
+      other: "What it blocks",
+      asSet: "As you set it",
+      changed: "Changed",
+    },
     leftover: {
       remove: (count: number) => (count === 1 ? "Remove 1 from gateway" : `Remove ${count} from gateway`),
       keep: (count: number) => (count === 1 ? "Keep it" : "Keep them"),
@@ -738,6 +869,7 @@ export const CHECKUP_COPY = {
   },
   checkNames: {
     leftover_policies: "Old FamilyFi policies on the gateway",
+    gateway_drift: "FamilyFi’s rules not changed in UniFi",
     sonos_mixed: "Sonos wired and on Wi-Fi",
     private_addresses: "Private Wi-Fi addresses",
     wifi_multicast: "Wi-Fi settings for Sonos",
