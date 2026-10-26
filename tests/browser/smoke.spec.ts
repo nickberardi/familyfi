@@ -992,11 +992,32 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
       (method === "PATCH" && /\/api\/v1\/rules\/[^/]+$/.test(url))
     );
   });
+  // The store reloads once the change lands; the sheet asks for nothing of its own.
+  let fullReads = 0;
+  let catalogReads = 0;
+  page.on("request", (sent) => {
+    const path = new URL(sent.url()).pathname;
+    if (path === "/api/v1/accounts") fullReads += 1;
+    if (path === "/api/v1/dpi/applications") catalogReads += 1;
+  });
+  const settled = page.waitForResponse(
+    async (response) => /\/api\/v1\/changes\//.test(response.url()) && ((await response.json()) as { change?: { status?: string } }).change?.status !== "pending",
+  );
   await offSheet.getByRole("button", { name: "Create policy" }).click();
   expect((await create).ok()).toBeTruthy();
 
   // The mark now stands for the rule.
   await expect(marks.getByRole("button", { name: /Video blocked by FamilyFi/i })).toBeVisible();
+  await settled;
+  await page.waitForLoadState("networkidle");
+  expect(fullReads).toBe(1);
+
+  // The group's page, reached from the card, reuses the app catalog this page read.
+  await card.getByRole("link", { name: /^Details/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/family/${child!.id}$`));
+  await expect(page.getByTestId(`filter-marks-${child!.id}`)).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(catalogReads).toBe(0);
 
   // On the group's page, the mark opens the sheet: On → Turn off
   await page.goto(`/family/${child!.id}`);

@@ -208,16 +208,27 @@ export type CatalogNames = Map<string, string>;
 export async function loadFilterCatalog(
   request: ApiRequest,
 ): Promise<{ catalogNames: CatalogNames; upstreamCategories: UpstreamCategoryRow[] }> {
+  const [catalogNames, upstreamCategories] = await Promise.all([loadCatalogNames(request), loadUpstreamCategories(request)]);
+  return { catalogNames, upstreamCategories };
+}
+
+/** The DPI catalog's names alone: they change only with the console, unlike the verdicts. */
+export async function loadCatalogNames(request: ApiRequest): Promise<CatalogNames> {
   type Item = { id: number | string; name: string };
-  const [categories, applications, upstream] = await Promise.all([
+  const [categories, applications] = await Promise.all([
     request<{ categories: Item[] }>("/api/v1/dpi/categories").catch(() => ({ categories: [] as Item[] })),
     request<{ applications: Item[] }>("/api/v1/dpi/applications").catch(() => ({ applications: [] as Item[] })),
-    request<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({
-      categories: [] as UpstreamCategoryRow[],
-    })),
   ]);
   const catalogNames: CatalogNames = new Map();
   for (const item of categories.categories) catalogNames.set(`category:${item.id}`, item.name);
   for (const item of applications.applications) catalogNames.set(`app:${item.id}`, item.name);
-  return { catalogNames, upstreamCategories: upstream.categories };
+  return catalogNames;
+}
+
+/** The resolver's categories with every measured verdict; empty when they cannot be read. */
+export async function loadUpstreamCategories(request: ApiRequest): Promise<UpstreamCategoryRow[]> {
+  const upstream = await request<{ categories: UpstreamCategoryRow[] }>("/api/v1/upstream/categories").catch(() => ({
+    categories: [] as UpstreamCategoryRow[],
+  }));
+  return upstream.categories;
 }

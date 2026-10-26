@@ -19,14 +19,12 @@ export function FilterSheet({
   group,
   state,
   onClose,
-  onChanged,
 }: {
   group: Group;
   state: FilterSheetState;
   onClose: () => void;
-  onChanged: () => void;
 }) {
-  const { mutate } = useAppData();
+  const { mutate, store } = useAppData();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const copy = filterSheetCopy(group, state);
@@ -37,8 +35,12 @@ export function FilterSheet({
     setBusy(true);
     setError("");
     try {
-      await applyFilterAction(mutate, group, state, copy.action);
-      onChanged();
+      // The store reloads once the change lands. A write it refused stays open, saying why.
+      const result = await applyFilterAction(mutate, group, state, copy.action);
+      if (result === undefined) {
+        setError(store.getState().error || "Could not change the rule.");
+        return;
+      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change the rule.");

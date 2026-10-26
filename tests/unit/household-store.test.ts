@@ -464,6 +464,36 @@ describe("household store", () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
+  it("asks for the session alongside the rest, not before it", async () => {
+    const routes = reads(() => childGroup());
+    const { store, server } = setup({ ...routes, "GET /api/v1/auth/session": () => new Promise<Reply>(() => {}) });
+    void store.reload();
+    await Promise.resolve();
+    expect(server.calls.map((call) => call.path)).toEqual(expect.arrayContaining(["/api/v1/auth/session", "/api/v1/groups", "/api/v1/accounts"]));
+  });
+
+  it("sends nothing when shown again soon after a refresh finished", async () => {
+    vi.useFakeTimers();
+    let hidden = false;
+    let onChange = () => {};
+    const server = fakeServer(reads(() => childGroup()));
+    const store = createHouseholdStore({
+      request: server.request,
+      visibility: { hidden: () => hidden, subscribe: (callback) => ((onChange = callback), () => {}) },
+    });
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(10);
+    const loaded = server.calls.length;
+    hidden = true;
+    onChange();
+    await vi.advanceTimersByTimeAsync(300);
+    hidden = false;
+    onChange();
+    await vi.advanceTimersByTimeAsync(10);
+    stop();
+    expect(server.calls).toHaveLength(loaded);
+  });
+
   it("reloads in full when shown again, even while a tick is still waiting on the server", async () => {
     vi.useFakeTimers();
     let hidden = false;
@@ -517,7 +547,9 @@ describe("household store", () => {
     });
     const stop = store.startRefreshing(1000, 60_000);
     await vi.advanceTimersByTimeAsync(5000);
-    expect(server.calls).toHaveLength(1);
+    // The first load's reads, all sent at once, and nothing after them while the session waits.
+    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(1);
+    expect(server.calls).toHaveLength(8);
     release();
     await vi.advanceTimersByTimeAsync(10);
     stop();

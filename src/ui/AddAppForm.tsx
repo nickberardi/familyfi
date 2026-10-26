@@ -29,7 +29,8 @@ export function AddAppForm({
   mutate: HouseholdStore["mutate"];
   /** False while the household is stale, so nothing is sent. */
   enabled?: boolean;
-  onCreated: () => void;
+  /** After the rule is saved; the store reloads on its own once the change lands. */
+  onCreated?: () => void;
   onDone: () => void;
 }) {
   const ui = useUI();
@@ -69,7 +70,7 @@ export function AddAppForm({
     const id = Number(appId);
     await createAppRule(mutate, group, catalog.find((item) => item.id === id), id, mode);
     setBusy(false);
-    onCreated();
+    onCreated?.();
     onDone();
   }
 

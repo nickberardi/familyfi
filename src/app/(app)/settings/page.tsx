@@ -20,6 +20,7 @@ import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
 import { useGatewayHealth } from "@/ui/use-gateway-health";
 import { useUpdateCheck } from "@/ui/use-update-check";
 import { useUpdateSettings } from "@/ui/use-update-settings";
+import { forgetCatalogNames } from "@/components/GroupGrid";
 
 const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
@@ -115,6 +116,8 @@ function Settings() {
         });
         setPasting(false);
         setApiKey("");
+        // Another console has its own DPI catalog.
+        forgetCatalogNames();
         return result;
       });
     } catch (error) {

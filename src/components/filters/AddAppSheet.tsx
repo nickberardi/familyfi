@@ -11,7 +11,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import type { Group } from "@/lib/types";
 import { AddAppForm } from "@/ui/AddAppForm";
 
-export function AddAppSheet({ group, onClose, onCreated }: { group: Group; onClose: () => void; onCreated: () => void }) {
+export function AddAppSheet({ group, onClose }: { group: Group; onClose: () => void }) {
   const { store } = useAppData();
   return (
     <div
@@ -27,7 +27,7 @@ export function AddAppSheet({ group, onClose, onCreated }: { group: Group; onClo
         style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <AddAppForm group={group} request={request} mutate={store.mutate} onCreated={onCreated} onDone={onClose} />
+        <AddAppForm group={group} request={request} mutate={store.mutate} onDone={onClose} />
       </div>
     </div>
   );

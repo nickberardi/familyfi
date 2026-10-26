@@ -23,7 +23,7 @@ export function RulesList({ searchParams }: { searchParams: Promise<{ group?: st
   const [sheet, setSheet] = useState<{ rule: Rule; mode: "pause" | "extend" } | null>(null);
   const timezone = household?.timezone ?? "America/New_York";
   const now = new Date();
-  const { catalogNames } = useFilterCatalog();
+  const { catalogNames } = useFilterCatalog({ upstream: false });
   const { scoped, list, chips, unruled, newHref } = rulesListView(rules, groups, scope);
   const networks = unifi?.networks ?? [];
 
