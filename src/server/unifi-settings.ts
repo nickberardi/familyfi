@@ -1,7 +1,7 @@
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
 import { unifiMockEnabled } from "./env";
-import { UnifiConfigError, UnifiHttpError } from "./unifi/errors";
+import { PreviousTargetError, UnifiConfigError, UnifiHttpError } from "./unifi/errors";
 import { clientForHousehold, connectionIdentity, probeClient } from "./unifi/connection";
 import { enqueueChange } from "./changes";
 import { pruneNetworkScopedRulesForScope } from "./network-rules";
@@ -10,7 +10,8 @@ import { loadNetworkDetails } from "./unifi/networks";
 import { forgetDpiCatalogs } from "./unifi/dpi-catalog";
 import { settleLostCreates } from "./unifi/lost-creates";
 import { recentSiteNetworks, rememberSiteNetworks } from "./unifi/network-cache";
-import { PolicyOperationIntent, type Household } from "@prisma/client";
+import { PolicyOperationIntent, Prisma, type Household } from "@prisma/client";
+import { withReconcileLock } from "./reconciliation";
 
 async function probeWithClient(client: ReturnType<typeof probeClient>, siteId?: string) {
   const [info, sites] = await Promise.all([client.getInfo(), client.listSites()]);
@@ -96,10 +97,21 @@ async function removePreviousTargetPolicies(household: Household, identity: stri
       if (!(error instanceof UnifiHttpError && error.status === 404)) throw error;
     }
   }
+  await forgetPreviousTarget(identity, siteId);
+}
+
+/**
+ * Drops every record of the console and site the household is leaving. After a cleanup, nothing
+ * is left there to record; when the operator forgets an unreachable one, whatever FamilyFi made
+ * there stays, and FamilyFi no longer claims it.
+ */
+async function forgetPreviousTarget(identity: string, siteId: string) {
+  const creations = { connectionIdentity: identity, siteId, intent: PolicyOperationIntent.create };
   await prisma().$transaction([
     prisma().appPolicy.deleteMany({ where: { connectionIdentity: identity } }),
     prisma().rulePolicy.deleteMany({ where: { connectionIdentity: identity } }),
-    prisma().policyOperation.updateMany({ where: applied, data: { status: "removed" } }),
+    prisma().policyOperation.updateMany({ where: { ...creations, status: "applied" }, data: { status: "removed" } }),
+    prisma().policyOperation.updateMany({ where: { ...creations, status: "pending" }, data: { status: "failed", payload: Prisma.DbNull } }),
   ]);
 }
 
@@ -111,28 +123,48 @@ export async function saveUnifiConnection(input: {
   tlsInsecure?: boolean;
   manageAllNetworks?: boolean;
   managedNetworkIds?: string[];
+  /** Switch even when the console being left can't be cleaned up, leaving its policies there. */
+  forgetPrevious?: boolean;
 }) {
   const probed = await testUnifiConnection(input);
+  const nextIdentity = input.consoleId
+    ? `cloud:${input.consoleId}:${probed.site.id}`
+    : `local:${input.baseUrl}:${probed.site.id}`;
+  // No pass may write to the console being left, or record a policy there, while it is cleaned up
+  // and the household moves.
+  const scope = await withReconcileLock(() => switchUnifiTarget(input, probed, nextIdentity), {
+    busy: () => new UnifiConfigError("A sync with the gateway is still running. Try saving again in a minute."),
+  });
+  rememberSiteNetworks(nextIdentity, probed.networks);
+  // A new key or gateway behind the same address may know other apps.
+  forgetDpiCatalogs();
+  await pruneNetworkScopedRulesForScope(scope);
+  return enqueueChange("unifi");
+}
+
+async function switchUnifiTarget(
+  input: Parameters<typeof saveUnifiConnection>[0],
+  probed: Awaited<ReturnType<typeof testUnifiConnection>>,
+  nextIdentity: string,
+): Promise<NetworkScope> {
   const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
   const scopedInput =
     unifiMockEnabled() && input.manageAllNetworks === undefined && input.managedNetworkIds === undefined
       ? { ...input, manageAllNetworks: true }
       : input;
-  const nextIdentity = input.consoleId
-    ? `cloud:${input.consoleId}:${probed.site.id}`
-    : `local:${input.baseUrl}:${probed.site.id}`;
+  // A choice the new site can't honour is refused before anything on the old one is touched.
+  const known = new Set(probed.networks.map((network) => network.id));
+  const scope = resolveAndValidateScope(scopedInput, household, known);
   const previous = household.unifiSiteId ? connectionIdentity(household) : null;
   if (previous && previous !== nextIdentity && household.unifiKeyCiphertext) {
     try {
       await removePreviousTargetPolicies(household, previous);
-    } catch {
-      throw new UnifiConfigError(
-        "Could not remove FamilyFi policies from the previous UniFi target. The existing connection was left unchanged.",
-      );
+    } catch (error) {
+      console.warn("Could not remove FamilyFi policies from the previous UniFi target:", error);
+      if (!input.forgetPrevious) throw new PreviousTargetError();
+      await forgetPreviousTarget(previous, household.unifiSiteId!);
     }
   }
-  const known = new Set(probed.networks.map((network) => network.id));
-  const scope = resolveAndValidateScope(scopedInput, household, known);
   const secret = encryptSecret(input.apiKey);
   await prisma().household.update({
     where: { id: "default" },
@@ -152,11 +184,7 @@ export async function saveUnifiConnection(input: {
       connectionError: null,
     },
   });
-  rememberSiteNetworks(nextIdentity, probed.networks);
-  // A new key or gateway behind the same address may know other apps.
-  forgetDpiCatalogs();
-  await pruneNetworkScopedRulesForScope(scope);
-  return enqueueChange("unifi");
+  return scope;
 }
 
 export async function saveManagedNetworks(input: { manageAllNetworks?: boolean; managedNetworkIds?: string[] }) {
