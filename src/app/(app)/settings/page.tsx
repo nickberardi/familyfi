@@ -113,15 +113,20 @@ function Settings() {
     try {
       const body = { apiKey, ...targetBody(), manageAllNetworks: manageAll, managedNetworkIds: managedIds, ...(forgetPrevious ? { forgetPrevious } : {}) };
       void mutate(async () => {
-        const result = await api<{ change: { changeId: string } }>("/api/v1/settings/unifi", {
-          method: "PUT",
-          body: JSON.stringify(body),
-        });
-        setPasting(false);
-        setApiKey("");
-        // Another console has its own DPI catalog.
-        forgetCatalogNames();
-        return result;
+        try {
+          const result = await api<{ change: { changeId: string } }>("/api/v1/settings/unifi", {
+            method: "PUT",
+            body: JSON.stringify(body),
+          });
+          setPasting(false);
+          setApiKey("");
+          // Another console has its own DPI catalog.
+          forgetCatalogNames();
+          return result;
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "previous_gateway_unreachable") setOfferForget(true);
+          throw error;
+        }
       });
     } catch (error) {
       setProbe(error instanceof Error ? error.message : "Could not save UniFi settings.");
