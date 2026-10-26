@@ -6,6 +6,7 @@ import {
   CHECKUP_COPY as COPY,
   leftoverRemovalNotice,
   loadCheckup,
+  putBackNow,
   recommendedRules,
   removeLeftoverPolicies,
   runCheckupNow,
@@ -16,7 +17,6 @@ import {
   type CheckupState,
 } from "@/lib/checkup";
 import { toggleRuleEnabled } from "@/lib/group-writes";
-import { reconcileNow } from "@/lib/sync-writes";
 import { PageHeader } from "@/components/PageHeader";
 import { SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { useAppData } from "@/components/AppDataProvider";
@@ -31,6 +31,7 @@ export default function CheckupPage() {
   // The leftover policies waiting on the administrator's confirmation.
   const [confirming, setConfirming] = useState<CheckupPolicy[] | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [puttingBack, setPuttingBack] = useState(false);
   // The checkup is page-owned, not in the provider, like Categories.
   const loadGen = useRef(0);
 
@@ -89,10 +90,13 @@ export default function CheckupPage() {
 
   /** A rule changed in UniFi that sync could not change back: sync now, then show how it went. */
   async function putBack() {
-    setError("");
-    setNotice(COPY.network.drift.putting);
-    await reconcileNow(store.mutate);
-    await load();
+    setPuttingBack(true);
+    await write(async () => {
+      const result = await putBackNow(request);
+      setNotice(result.notice);
+      return result.checkup;
+    });
+    setPuttingBack(false);
   }
 
   const protections = recommendedRules(rules);
@@ -121,6 +125,7 @@ export default function CheckupPage() {
         <NetworkCheckupCard
           checkup={checkup}
           checking={checking}
+          disabled={puttingBack}
           onCheckNow={() => void checkNow()}
           onDismiss={(finding: CheckupFinding, dismissed: boolean) => void write(() => setCheckupDismissed(request, finding.id, dismissed))}
           onRemovePolicies={askToRemove}
