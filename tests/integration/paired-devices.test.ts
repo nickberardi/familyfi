@@ -171,6 +171,40 @@ describe("/paired/devices", () => {
     expect((await list(auth, "?status=active")).map((device) => device.id)).toEqual([kept.device.id]);
   });
 
+  it("revokes a phone re-paired under a revoked one with the phone above them both, even once the revoked records are cleared", async () => {
+    const auth = await admin();
+    const endpointId = (await homeRoute()).id;
+    const pairFrom = async (parent: Claim, displayName: string) =>
+      (await (await claimInvite(await issuedInvite(await invitePhoneRequest(bearer(parent.token), { endpointId, displayName })), displayName)).json()) as Claim;
+    const top = await pairPhone(auth);
+    const middle = await pairFrom(top, "Middle");
+    const bottom = await pairFrom(middle, "Bottom");
+    expect((await revoke(middle.device.id, auth)).status).toBe(200);
+    // Bottom went with it; re-paired from the browser, it takes its old place under the revoked middle.
+    const repaired = (await (await claimInvite(await issuedInvite(await invitePhoneRequest(auth, { endpointId, displayName: "Bottom", replacesDeviceId: bottom.device.id })), "Bottom")).json()) as Claim;
+    expect((await removeRevoked(request("/api/v1/paired/devices?status=revoked", { method: "DELETE", auth }))).status).toBe(200);
+    expect((await list(auth)).find((device) => device.id === repaired.device.id)?.parentDeviceId).toBe(top.device.id);
+
+    expect((await revoke(top.device.id, auth)).status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(repaired.token) }))).status).toBe(401);
+  });
+
+  it("revokes a phone re-paired under a revoked one with the phone above them both", async () => {
+    const auth = await admin();
+    const endpointId = (await homeRoute()).id;
+    const pairFrom = async (parent: Claim, displayName: string) =>
+      (await (await claimInvite(await issuedInvite(await invitePhoneRequest(bearer(parent.token), { endpointId, displayName })), displayName)).json()) as Claim;
+    const top = await pairPhone(auth);
+    const middle = await pairFrom(top, "Middle");
+    const bottom = await pairFrom(middle, "Bottom");
+    expect((await revoke(middle.device.id, auth)).status).toBe(200);
+    const repaired = (await (await claimInvite(await issuedInvite(await invitePhoneRequest(auth, { endpointId, displayName: "Bottom", replacesDeviceId: bottom.device.id })), "Bottom")).json()) as Claim;
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(repaired.token) }))).status).toBe(200);
+
+    expect((await revoke(top.device.id, auth)).status).toBe(200);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(repaired.token) }))).status).toBe(401);
+  });
+
   it("keeps a phone it re-pairs, which takes the old record's place", async () => {
     const auth = await admin();
     const phone = await pairPhone(auth);

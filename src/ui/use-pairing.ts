@@ -29,7 +29,7 @@ export function usePairing({
   onPaired: () => void;
 }) {
   const [name, setName] = useState(replacing?.displayName ?? pairingSheetCopy().defaultName);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [accountId, setAccountId] = useState("");
   const [issued, setIssued] = useState<IssuedPairing | null>(null);
   const [state, setState] = useState<PairingState | null>(null);
@@ -47,10 +47,8 @@ export function usePairing({
     void request<{ accounts: Account[] }>("/api/v1/accounts")
       .then(({ accounts: all }) => {
         if (!live) return;
-        const allowed = pairingAccounts(all);
-        setAccounts(allowed);
+        setAccounts(pairingAccounts(all));
         setAccountId((current) => current || defaultPairingAccount(all, username));
-        if (!allowed.length) setError(pairingSheetCopy().noAccounts);
       })
       // Without them the code cannot be shown, so say why.
       .catch((caught: unknown) => {
@@ -115,7 +113,9 @@ export function usePairing({
     route,
     name,
     setName,
-    accounts,
+    accounts: accounts ?? [],
+    /** Loaded, and no adult a phone may sign in as: the sheet says how to make one instead of offering a menu. */
+    noAccounts: accounts?.length === 0,
     accountId,
     setAccountId,
     issued,

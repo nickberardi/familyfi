@@ -131,14 +131,20 @@ async function revokeCompanions(id: string, db: Db, now: Date) {
   const seen = new Set(parents);
   while (parents.length) {
     await db.pairing.updateMany({ where: { parentDeviceId: { in: parents }, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
-    const companions = await db.pairedDevice.findMany({ where: { parentDeviceId: { in: parents }, revokedAt: null }, select: { id: true } });
+    // Revoked records are walked too: a phone re-paired under one still descends from its ancestors.
+    const companions = await db.pairedDevice.findMany({ where: { parentDeviceId: { in: parents } }, select: { id: true } });
     const ids = companions.map((companion) => companion.id).filter((companion) => !seen.has(companion));
-    if (!ids.length) return;
     for (const companion of ids) seen.add(companion);
     await db.session.updateMany({ where: { deviceId: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
-    await db.pairedDevice.updateMany({ where: { id: { in: ids } }, data: { revokedAt: now } });
+    await db.pairedDevice.updateMany({ where: { id: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
     parents = ids;
   }
+}
+
+/** Hands what a device paired to the device that paired it, so deleting its record keeps them under their ancestors. */
+async function detachDevice(id: string, db: Db) {
+  const device = await db.pairedDevice.findUnique({ where: { id }, select: { parentDeviceId: true } });
+  if (device) await db.pairedDevice.updateMany({ where: { parentDeviceId: id }, data: { parentDeviceId: device.parentDeviceId } });
 }
 
 /**
@@ -161,6 +167,7 @@ export async function revokeDevice(id: string, db: Db = prisma() as unknown as D
 export async function removeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {
   await db.session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
   await revokeCompanions(id, db, now);
+  await detachDevice(id, db);
   const removed = await db.pairedDevice.deleteMany({ where: { id } });
   return removed.count === 1;
 }
@@ -179,6 +186,11 @@ export async function removeAccountDevices(accountId: string, db: Db = prisma() 
 
 /** Deletes every revoked phone's record; the live-test harness alone can leave hundreds. */
 export async function removeRevokedDevices(): Promise<number> {
-  const removed = await prisma().pairedDevice.deleteMany({ where: { revokedAt: { not: null } } });
-  return removed.count;
+  return prisma().$transaction(async (db) => {
+    const revoked = await db.pairedDevice.findMany({ where: { revokedAt: { not: null } }, select: { id: true } });
+    // One at a time, so a chain of revoked records hands its devices up to the nearest one that stays.
+    for (const device of revoked) await detachDevice(device.id, db);
+    const removed = await db.pairedDevice.deleteMany({ where: { id: { in: revoked.map((device) => device.id) } } });
+    return removed.count;
+  });
 }
