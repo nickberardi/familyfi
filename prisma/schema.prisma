@@ -426,6 +426,7 @@ model PolicyOperation {
 
   @@index([unifiPolicyId])
   @@index([connectionIdentity, siteId, intent, status])
+  @@index([status, updatedAt])
 }
 
 model SyncRun {

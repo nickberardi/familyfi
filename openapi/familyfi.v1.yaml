@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.34.0
+  version: 0.35.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -580,6 +580,11 @@ paths:
       summary: Validate and save UniFi credentials or managed networks
       description: |
         Probes UniFi before saving a new key. Failure preserves the previous key.
+        Saving a different console or site first removes FamilyFi's policies from the
+        one it is leaving. When that fails (the old gateway is unreachable or refuses),
+        nothing is saved and the answer is 409 `previous_gateway_unreachable`; sending
+        the same request with `forgetPrevious: true` then switches anyway, leaving any
+        FamilyFi policies on the old gateway in place and no longer claimed.
         After a key exists, PUT may send only manageAllNetworks / managedNetworkIds.
         Discovery and quarantine only watch those UniFi networks (VLANs).
         manageAllNetworks true watches every network on the site.
@@ -608,6 +613,8 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /api/v1/settings/unifi/test:
     post:
@@ -3722,6 +3729,9 @@ components:
         managedNetworkIds:
           type: array
           items: { type: string }
+        forgetPrevious:
+          type: boolean
+          description: With a new key for a different console or site, switch even when FamilyFi's policies can't be removed from the old one; they stay there.
 
     DpiCatalogItem:
       type: object

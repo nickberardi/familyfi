@@ -195,7 +195,7 @@ FamilyFi another way.
 
 ## Database modes
 
-`make docker-up` and `make docker-dev-up` use `docker/docker-compose.yml`, which starts the app and PostgreSQL together. The database uses a named volume and is not published on the host. The app container is pointed at the `db` service.
+`make docker-up` and `make docker-dev-up` use `docker/docker-compose.yml`, which starts the app and PostgreSQL together. The database uses a named volume and is published on the host's loopback address only (`127.0.0.1`, port `POSTGRES_PORT`), for tools on that machine; the rest of the network cannot reach it. The app container is pointed at the `db` service.
 
 - `DB_MODE=bundled` (default): the app expects Compose-managed PostgreSQL (`DB_HOST=db` in that stack).
 - `DB_MODE=external`: the app uses `DB_HOST` and related settings for a server you already run (CI, container smoke, or `make setup` / `make db-dev`).

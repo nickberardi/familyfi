@@ -21,6 +21,19 @@ export class UnifiConfigError extends Error {
   }
 }
 
+/**
+ * Saving a different console or site could not remove FamilyFi's policies from the one it is
+ * leaving. Nothing was saved; the operator may save again choosing to forget that one.
+ */
+export class PreviousTargetError extends UnifiConfigError {
+  constructor() {
+    super(
+      "FamilyFi couldn't reach the old gateway to remove its rules from it, so the connection was left unchanged. Forget the old gateway to switch anyway; any FamilyFi rules still on it stay there.",
+    );
+    this.name = "PreviousTargetError";
+  }
+}
+
 export class UnifiTimeoutError extends Error {
   constructor(method: string, path: string) {
     super(`UniFi ${method} ${path} timed out`);

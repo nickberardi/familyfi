@@ -87,6 +87,8 @@ export const SETTINGS_COPY = {
   gateway: "Gateway",
   timezone: "Timezone",
   saveTimezone: "Save timezone",
+  /** Saves a new gateway again when the old one couldn't be reached, leaving its rules there. */
+  forgetOldGateway: "Forget it and switch",
   editConnection: "Edit connection",
   /** Where a client that cannot change the gateway sends the household instead. */
   gatewayOnWeb: "Manage the gateway connection and networks in FamilyFi’s web Settings.",

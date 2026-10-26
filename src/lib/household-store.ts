@@ -136,6 +136,9 @@ export function createHouseholdStore(deps: {
   /** When the last full reload started, so the timer knows when the next is due. */
   let fullLoadAt = Number.NEGATIVE_INFINITY;
   let busyCount = 0;
+  /** A write's result or a load was set aside while writes were in flight: read the truth once they end. */
+  let reloadAfterWrites = false;
+  let loadsInFlight = 0;
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const set = (patch: Partial<HouseholdState>) => {
@@ -191,6 +194,7 @@ export function createHouseholdStore(deps: {
   async function reload(): Promise<void> {
     const gen = ++loadGen;
     fullLoadAt = Date.now();
+    loadsInFlight += 1;
     try {
       // All at once: a signed-out session answers 401 on every one of them anyway.
       const [session, groups, devices, rules, sync, unifi, household, accounts] = await Promise.all([
@@ -204,6 +208,11 @@ export function createHouseholdStore(deps: {
         request<{ accounts: Account[] }>("/api/v1/accounts"),
       ]);
       if (gen !== loadGen) return;
+      // A write in flight shows its optimistic change; what this read says waits until it ends.
+      if (busyCount > 0) {
+        reloadAfterWrites = true;
+        return;
+      }
       set({
         status: "ready",
         loaded: true,
@@ -220,12 +229,15 @@ export function createHouseholdStore(deps: {
     } catch (error) {
       if (gen !== loadGen) return;
       failed(error);
+    } finally {
+      loadsInFlight -= 1;
     }
   }
 
   /** Rereads only what changes without a write. A full reload or a write started meanwhile wins. */
   async function refreshLive(): Promise<void> {
     const gen = loadGen;
+    loadsInFlight += 1;
     try {
       const [groups, devices, rules, sync] = await Promise.all([
         request<{ groups: Group[] }>("/api/v1/groups"),
@@ -234,6 +246,10 @@ export function createHouseholdStore(deps: {
         request<SyncStatus>("/api/v1/sync"),
       ]);
       if (gen !== loadGen) return;
+      if (busyCount > 0) {
+        reloadAfterWrites = true;
+        return;
+      }
       set({
         groups: shared("groups", groups.groups),
         devices: shared("devices", devices.devices),
@@ -244,6 +260,8 @@ export function createHouseholdStore(deps: {
     } catch (error) {
       if (gen !== loadGen) return;
       failed(error);
+    } finally {
+      loadsInFlight -= 1;
     }
   }
 
@@ -257,6 +275,10 @@ export function createHouseholdStore(deps: {
     if (groupId && state.busyGroupIds.includes(groupId)) return undefined;
     const previous = lists();
     const token = beginMutate(gate);
+    // A load already on its way read the household before this write: set it aside, and read
+    // again once the writes end.
+    loadGen += 1;
+    if (loadsInFlight > 0) reloadAfterWrites = true;
     busyCount += 1;
     set({
       error: "",
@@ -271,7 +293,11 @@ export function createHouseholdStore(deps: {
         set({ groups: next.groups, devices: next.devices });
       }
       const result = asMutationPayload(await run(request));
-      if (!canCommitMutate(gate, token)) return result;
+      // A newer write owns what is shown; this one's result arrives with the reload once both end.
+      if (!canCommitMutate(gate, token)) {
+        reloadAfterWrites = true;
+        return result;
+      }
       loadGen += 1;
       followGen += 1;
       const followToken = followGen;
@@ -302,8 +328,9 @@ export function createHouseholdStore(deps: {
       if (result.change?.changeId) {
         void follow(request, result.change.changeId)
           .then(async (change) => {
-            if (followToken !== followGen) return;
+            // A change the gateway refused is reported even after a newer write, so it is never lost.
             if (change.status === "failed") set({ error: change.error ?? "That change did not apply." });
+            else if (followToken !== followGen) return;
             else if (change.status === "partial") set({ notice: change.error ?? "Reconcile finished with issues." });
             else if (change.status === "pending") set({ notice: change.error ?? "Still applying." });
             // Keep the change's own notice, and its Undo, once the gateway has it.
@@ -320,15 +347,17 @@ export function createHouseholdStore(deps: {
       }
       return result;
     } catch (error) {
+      const lostConnection = offlineGuard && error instanceof TransportError;
+      const message = lostConnection ? offlineGuard.maybeNotSent : error instanceof Error ? error.message : "Request failed.";
       if (canCommitMutate(gate, token)) {
-        const lostConnection = offlineGuard && error instanceof TransportError;
-        set({
-          groups: previous.groups,
-          devices: previous.devices,
-          error: lostConnection ? offlineGuard.maybeNotSent : error instanceof Error ? error.message : "Request failed.",
-        });
+        set({ groups: previous.groups, devices: previous.devices, error: message });
         // Whether a write that lost its connection landed is unknown: read the truth, never retry it.
         if (lostConnection) void reload();
+      } else {
+        // A newer write's optimistic change is on top of this one: say it failed, and let the
+        // reload once both end undo it.
+        set({ error: message });
+        reloadAfterWrites = true;
       }
       return undefined;
     } finally {
@@ -337,6 +366,10 @@ export function createHouseholdStore(deps: {
         busy: busyCount > 0,
         ...(groupId ? { busyGroupIds: state.busyGroupIds.filter((id) => id !== groupId) } : {}),
       });
+      if (busyCount === 0 && reloadAfterWrites) {
+        reloadAfterWrites = false;
+        void reload();
+      }
     }
   }
 

@@ -10,7 +10,7 @@ import { macRegistrants } from "./mac-vendor";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
 import { withPolicyOwnership } from "./unifi/policy-ownership";
-import { settleLostCreates } from "./unifi/lost-creates";
+import { reclaims, settleLostCreates } from "./unifi/lost-creates";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
@@ -24,7 +24,7 @@ import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
 import { lockDnsExemptionsOf, lockDnsOpenDns } from "./unifi/lock-dns";
 import type { UnifiClient } from "./unifi/client";
-import type { FirewallPolicyWrite } from "./unifi/types";
+import type { FirewallPolicy, FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
 
 const INTERVAL_MS = 30_000;
@@ -159,15 +159,16 @@ async function releaseLock(owner: string) {
 /** Another owner took the lock while this pass ran: it stops before its next gateway write. */
 class LockLostError extends Error {}
 
-async function tick(owner: string): Promise<boolean> {
-  if (!(await acquireLock(owner))) return false;
-  // Held for the whole pass, however long the gateway takes. A renewal that fails to reach the
-  // database is retried on the next beat; one that finds the lock no longer this pass's ends it.
-  // Best-effort: the flag is read between gateway writes, so one already in flight still finishes.
+/**
+ * Keeps a lock just taken for as long as its work runs, however long the gateway takes. A renewal
+ * that fails to reach the database is retried on the next beat; one that finds the lock no longer
+ * this owner's marks it lost. `release` stops renewing and lets the lock go.
+ */
+function holdLock(owner: string) {
   let lost = false;
   let renewing: Promise<void> | null = null;
   const renewal = setInterval(() => {
-    // One renewal at a time, so the one awaited below is the only one left to land.
+    // One renewal at a time, so the one awaited on release is the only one left to land.
     if (renewing) return;
     renewing = renewLock(owner)
       .then((held) => {
@@ -179,8 +180,48 @@ async function tick(owner: string): Promise<boolean> {
       });
   }, lockRenewMs);
   unrefTimer(renewal);
+  return {
+    lost: () => lost,
+    async release() {
+      clearInterval(renewal);
+      // A renewal still in flight would otherwise take the lock back after it is released.
+      await renewing;
+      await releaseLock(owner);
+    },
+  };
+}
+
+/**
+ * Runs `work` holding the reconcile lock, so no pass writes to the gateway or its policy records
+ * meanwhile. Waits up to `waitMs` for a running pass to finish, then gives up with `busy`.
+ * `stillHeld` throws once the lock has lapsed, so the work stops before its next write.
+ */
+export async function withReconcileLock<T>(
+  work: (stillHeld: () => void) => Promise<T>,
+  options: { waitMs?: number; busy: () => Error },
+): Promise<T> {
+  const owner = `save:${randomToken(9)}`;
+  const deadline = Date.now() + (options.waitMs ?? 60_000);
+  while (!(await acquireLock(owner))) {
+    if (Date.now() >= deadline) throw options.busy();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const lock = holdLock(owner);
+  try {
+    return await work(() => {
+      if (lock.lost()) throw new LockLostError("A sync took over before the save finished.");
+    });
+  } finally {
+    await lock.release();
+  }
+}
+
+async function tick(owner: string): Promise<boolean> {
+  if (!(await acquireLock(owner))) return false;
+  // Best-effort: the flag is read between gateway writes, so one already in flight still finishes.
+  const lock = holdLock(owner);
   const stillHeld = () => {
-    if (lost) throw new LockLostError("Another sync took over before this one finished.");
+    if (lock.lost()) throw new LockLostError("Another sync took over before this one finished.");
   };
   try {
   const now = new Date();
@@ -229,7 +270,8 @@ async function tick(owner: string): Promise<boolean> {
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
     // Before planning, so a policy a lost create made is claimed and the orphan sweep removes it.
-    await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
+    // Policies lost creates made: one this pass would create again is taken back instead.
+    const adopted = await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
       abandonBefore: new Date(now.getTime() - LOST_CREATE_GRACE_MS),
     });
     const [siteDevices, networkClientIds] = await Promise.all([siteDevicesRead, loadNetworkClientIds(client, siteId, networks)]);
@@ -381,7 +423,7 @@ async function tick(owner: string): Promise<boolean> {
           plannedKey(row.ownerScope, row.groupId, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
+        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, adopted);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -506,7 +548,7 @@ async function tick(owner: string): Promise<boolean> {
         (row) => plannedRuleKey(row.ruleId, row.windowKey, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredRulePolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
+        await applyDesiredRulePolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, adopted);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -614,7 +656,7 @@ async function tick(owner: string): Promise<boolean> {
       data: { status: ChangeStatus.failed, finishedAt: new Date(), error: message },
     });
     // Not the gateway's fault, and the pass that took over settles the pending changes.
-    if (error instanceof LockLostError || lost) return true;
+    if (error instanceof LockLostError || lock.lost()) return true;
     await prisma().household.update({
       where: { id: "default" },
       data: { connectionStatus: "error", connectionError: message },
@@ -625,7 +667,7 @@ async function tick(owner: string): Promise<boolean> {
     });
   }
   // The pass that took over prunes; this one may no longer hold the lock.
-  if (lost) return true;
+  if (lock.lost()) return true;
   // A run every interval adds up to a million rows a year; the change results they settled keep their outcome.
   await prisma().syncRun.deleteMany({
     where: { id: { not: run.id }, startedAt: { lt: new Date(now.getTime() - SYNC_HISTORY_MS) } },
@@ -637,10 +679,7 @@ async function tick(owner: string): Promise<boolean> {
   });
   return true;
   } finally {
-    clearInterval(renewal);
-    // A renewal still in flight would otherwise take the lock back after it is released.
-    await renewing;
-    await releaseLock(owner);
+    await lock.release();
   }
 }
 
@@ -662,6 +701,7 @@ async function applyDesiredPolicy(
       }
     | undefined,
   onGateway: Set<string>,
+  adopted: FirewallPolicy[],
 ) {
   const scope = planned.ownerScope === "group" ? PolicyOwnerScope.group : PolicyOwnerScope.quarantine;
   const appPolicyId = existing?.id;
@@ -717,7 +757,7 @@ async function applyDesiredPolicy(
     }
   }
 
-  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway);
+  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway, adopted);
   if (appPolicyId) {
     await prisma().appPolicy.update({
       where: { id: appPolicyId },
@@ -768,6 +808,7 @@ async function applyDesiredRulePolicy(
       }
     | undefined,
   onGateway: Set<string>,
+  adopted: FirewallPolicy[],
 ) {
   const unifiPolicyId = existing?.unifiPolicyId;
   // Unchanged and still on the gateway: nothing to write. A policy removed on the console
@@ -826,7 +867,7 @@ async function applyDesiredRulePolicy(
     }
   }
 
-  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway);
+  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway, adopted);
   if (existing) {
     await prisma().rulePolicy.update({
       where: { id: existing.id },
@@ -870,7 +911,12 @@ async function createOwnedPolicy(
   write: FirewallPolicyWrite,
   fingerprint: string,
   onGateway: Set<string>,
+  adopted: FirewallPolicy[],
 ) {
+  // A lost create already made this very policy: record it rather than make a second, which
+  // would leave the sweep deleting the one that works if this create failed.
+  const reclaimed = adopted.findIndex((policy) => reclaims(policy, write));
+  if (reclaimed >= 0) return adopted.splice(reclaimed, 1)[0];
   const operation = await prisma().policyOperation.create({
     data: {
       intent: PolicyOperationIntent.create,
@@ -888,14 +934,14 @@ async function createOwnedPolicy(
     // Only a refusal is known to have created nothing. A lost answer, or a 5xx a proxy may have
     // sent after the gateway committed the create, stays pending.
     if (error instanceof UnifiHttpError && error.status >= 400 && error.status < 500) {
-      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed" } });
+      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed", payload: Prisma.DbNull } });
     }
     throw error;
   }
   onGateway.add(created.id);
   await prisma().policyOperation.update({
     where: { id: operation.id },
-    data: { status: "applied", unifiPolicyId: created.id },
+    data: { status: "applied", unifiPolicyId: created.id, payload: Prisma.DbNull },
   });
   return created;
 }

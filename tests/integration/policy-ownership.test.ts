@@ -1,6 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleKind, type Household } from "@prisma/client";
+import { POST as login } from "@/app/api/v1/auth/login/route";
+import { PUT as putUnifiSettings } from "@/app/api/v1/settings/unifi/route";
 import { prisma } from "@/server/db";
+import { setReconcileLockForTests } from "@/server/reconciliation";
 import { saveUnifiConnection } from "@/server/unifi-settings";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "@/server/unifi/connection";
 import {
@@ -11,11 +14,12 @@ import {
   getSharedDevMockClient,
   resetDevMockClientForTests,
 } from "@/server/unifi/dev-mock";
-import { PolicyOwnershipError } from "@/server/unifi/errors";
+import { PolicyOwnershipError, PreviousTargetError, UnifiHttpError } from "@/server/unifi/errors";
 import { internetBlockPolicy } from "@/server/unifi/payloads";
 import { withPolicyOwnership } from "@/server/unifi/policy-ownership";
 import type { FirewallPolicy } from "@/server/unifi/types";
 import { INTERNAL_ZONE, SITE_ID, configureConnectedHousehold, resetDatabase } from "../helpers/db";
+import { authFromLogin, request } from "../helpers/http";
 import { fixtureUnifiClient } from "../helpers/unifi-world";
 
 const EXTERNAL_ZONE = "33333333-3333-4333-8333-333333333399";
@@ -207,6 +211,7 @@ describe("switching to another gateway", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (previous === undefined) delete process.env.FAMILYFI_MODE;
     else process.env.FAMILYFI_MODE = previous;
     resetDevMockClientForTests();
@@ -249,5 +254,114 @@ describe("switching to another gateway", () => {
     expect(await prisma().appPolicy.count({ where: { connectionIdentity: scope.connectionIdentity } })).toBe(0);
     expect((await prisma().policyOperation.findFirstOrThrow({ where: { unifiPolicyId: orphan.id } })).status).toBe("removed");
     expect((await household()).unifiBaseUrl).toBe("https://10.0.0.2/proxy/network/integration");
+  });
+
+  const NEW_TARGET = "https://10.0.0.2/proxy/network/integration";
+
+  async function recordedRulePolicy() {
+    const current = await household();
+    const siteId = current.unifiSiteId!;
+    const policy = await getSharedDevMockClient().createPolicy(siteId, blockPolicy("Bedtime"));
+    const rule = await prisma().rule.create({ data: { name: "Bedtime", kind: RuleKind.internet } });
+    await prisma().rulePolicy.create({
+      data: { connectionIdentity: connectionIdentity(current), siteId, zoneId: INTERNAL_ZONE, desiredFingerprint: "test", desiredRevision: 1, ruleId: rule.id, unifiPolicyId: policy.id },
+    });
+    return { policy, identity: connectionIdentity(current), siteId };
+  }
+
+  it("leaves everything as it was when the old gateway can't be reached, until asked to forget it", async () => {
+    const { policy, identity, siteId } = await recordedRulePolicy();
+    const lostWrite = blockPolicy("Lost answer");
+    const pending = await prisma().policyOperation.create({
+      data: { intent: PolicyOperationIntent.create, connectionIdentity: identity, siteId, payload: lostWrite as Prisma.InputJsonValue, status: "pending" },
+    });
+    const gateway = getSharedDevMockClient();
+    vi.spyOn(gateway, "deletePolicy").mockRejectedValue(new UnifiHttpError(503, "DELETE", "/v1/sites/x/firewall/policies/y", "unreachable"));
+
+    await expect(saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET })).rejects.toBeInstanceOf(PreviousTargetError);
+    expect((await household()).unifiBaseUrl).toBe(DEV_MOCK_BASE_URL);
+    expect(await prisma().rulePolicy.count({ where: { connectionIdentity: identity } })).toBe(1);
+
+    await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET, forgetPrevious: true });
+    expect((await household()).unifiBaseUrl).toBe(NEW_TARGET);
+    expect(await prisma().rulePolicy.count({ where: { connectionIdentity: identity } })).toBe(0);
+    expect((await prisma().policyOperation.findUniqueOrThrow({ where: { id: pending.id } })).status).toBe("failed");
+    // Forgotten, not deleted: it stays on the console FamilyFi left.
+    vi.restoreAllMocks();
+    expect((await gateway.listPolicies(siteId)).map((item) => item.id)).toContain(policy.id);
+  });
+
+  it("answers previous_gateway_unreachable over the API, and switches when told to forget the old gateway", async () => {
+    await recordedRulePolicy();
+    vi.spyOn(getSharedDevMockClient(), "deletePolicy").mockRejectedValue(new UnifiHttpError(503, "DELETE", "/v1/sites/x/firewall/policies/y", "unreachable"));
+    const auth = authFromLogin(
+      await login(
+        request("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password", client: "browser" }),
+        }),
+      ),
+    );
+    const save = (body: object) =>
+      putUnifiSettings(request("/api/v1/settings/unifi", { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
+
+    const refused = await save({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error.code).toBe("previous_gateway_unreachable");
+
+    const saved = await save({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET, forgetPrevious: true });
+    expect(saved.status).toBe(200);
+    expect((await household()).unifiBaseUrl).toBe(NEW_TARGET);
+  });
+
+  it("stops before moving the household when its hold on the lock lapses mid-cleanup", async () => {
+    const { identity } = await recordedRulePolicy();
+    setReconcileLockForTests({ lockMs: 150, renewMs: 400 });
+    const gateway = getSharedDevMockClient();
+    const remove = gateway.deletePolicy.bind(gateway);
+    vi.spyOn(gateway, "deletePolicy").mockImplementation(async (siteId, policyId) => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      return remove(siteId, policyId);
+    });
+    try {
+      await expect(saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET, forgetPrevious: true })).rejects.toThrow(/took over/);
+    } finally {
+      setReconcileLockForTests();
+    }
+    expect((await household()).unifiBaseUrl).toBe(DEV_MOCK_BASE_URL);
+    expect(await prisma().rulePolicy.count({ where: { connectionIdentity: identity } })).toBe(1);
+  });
+
+  it("refuses a network choice the new site doesn't have before touching the old one", async () => {
+    const { policy, identity, siteId } = await recordedRulePolicy();
+
+    await expect(
+      saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET, manageAllNetworks: false, managedNetworkIds: ["no-such-network"] }),
+    ).rejects.toThrow(/Unknown UniFi network/);
+
+    expect((await getSharedDevMockClient().listPolicies(siteId)).map((item) => item.id)).toContain(policy.id);
+    expect(await prisma().rulePolicy.count({ where: { connectionIdentity: identity } })).toBe(1);
+    expect((await household()).unifiBaseUrl).toBe(DEV_MOCK_BASE_URL);
+  });
+
+  it("waits for a running sync to let go of the lock before cleaning up the old gateway", async () => {
+    const { policy, siteId } = await recordedRulePolicy();
+    await prisma().reconciliationLock.upsert({
+      where: { id: "global" },
+      create: { id: "global", owner: "a running pass", expiresAt: new Date(Date.now() + 60_000) },
+      update: { owner: "a running pass", expiresAt: new Date(Date.now() + 60_000) },
+    });
+
+    const saving = saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect((await getSharedDevMockClient().listPolicies(siteId)).map((item) => item.id)).toContain(policy.id);
+    expect((await household()).unifiBaseUrl).toBe(DEV_MOCK_BASE_URL);
+
+    await prisma().reconciliationLock.update({ where: { id: "global" }, data: { expiresAt: new Date(0) } });
+    await saving;
+    expect((await getSharedDevMockClient().listPolicies(siteId)).map((item) => item.id)).not.toContain(policy.id);
+    expect((await household()).unifiBaseUrl).toBe(NEW_TARGET);
+    expect((await prisma().reconciliationLock.findUniqueOrThrow({ where: { id: "global" } })).expiresAt.getTime()).toBe(0);
   });
 });

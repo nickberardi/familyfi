@@ -283,6 +283,7 @@ test("the Update page installs through the updater and keeps its schedule", { ta
   // On the web each is a real anchor, so Enter and copy-link work.
   await expect(notes.getByRole("link", { name: "pull #250" })).toHaveAttribute("href", "https://github.com/nickberardi/familyfi/pull/250");
   await expect(notes.getByRole("link", { name: "@nickberardi" })).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.accept());
   await install.click();
   await expect(page.getByTestId("update-run").first()).toContainText("Installing v0.6.0");
   await expect(install).toBeDisabled();
@@ -356,6 +357,55 @@ async function addGroup(page: Page, kind: "family" | "things", fill: (dialog: Lo
   await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
   return ((await response.json()) as { group: { id: string } }).group.id;
 }
+
+test("removing an adult's admin access asks first, and declining changes nothing", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const writes: string[] = [];
+  await page.route("**/api/v1/accounts/**", (route) => {
+    if (route.request().method() === "GET") return route.continue();
+    writes.push(route.request().method());
+    return route.abort();
+  });
+  await page.goto("/settings");
+  const admin = page.getByTestId("settings-household").locator("[data-testid^='settings-admin-'][aria-pressed='true']").first();
+  await expect(admin).toBeVisible();
+  let asked = "";
+  page.once("dialog", (dialog) => {
+    asked = dialog.message();
+    void dialog.dismiss();
+  });
+  await admin.click();
+  await expect.poll(() => asked).toMatch(/admin/i);
+  await expect(admin).toHaveAttribute("aria-pressed", "true");
+  expect(writes).toEqual([]);
+});
+
+test("a new key the old gateway can't be cleaned up for offers to forget it and switch", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const sent: Record<string, unknown>[] = [];
+  await page.route("**/api/v1/settings/unifi", async (route) => {
+    if (route.request().method() !== "PUT") return route.continue();
+    sent.push(route.request().postDataJSON() as Record<string, unknown>);
+    const message =
+      sent.length === 1
+        ? { status: 409, code: "previous_gateway_unreachable", message: "FamilyFi couldn't reach the old gateway to remove its rules from it." }
+        : { status: 400, code: "unifi_invalid", message: "Stopped here by the test." };
+    await route.fulfill({ status: message.status, contentType: "application/json", body: JSON.stringify({ error: { code: message.code, message: message.message } }) });
+  });
+  await page.goto("/settings?tab=gateway");
+  await page.getByRole("button", { name: "Replace key" }).click();
+  await page.getByPlaceholder("Paste the key from your UniFi console").fill("a-new-unifi-key");
+  const forget = page.getByRole("button", { name: "Forget it and switch" });
+  await expect(forget).toHaveCount(0);
+  await page.getByRole("button", { name: "Save and test" }).click();
+  await expect(page.getByText("couldn't reach the old gateway", { exact: false }).filter({ visible: true }).first()).toBeVisible();
+  await expect(forget).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("forget-old-gateway.png") });
+  await forget.click();
+  await expect.poll(() => sent.length).toBe(2);
+  expect(sent[0]?.forgetPrevious).toBeUndefined();
+  expect(sent[1]?.forgetPrevious).toBe(true);
+});
 
 test("add person opens a sheet over Family, and the new person can be edited", async ({ page }) => {
   await signIn(page);

@@ -355,6 +355,105 @@ describe("household store", () => {
     expect(store.getState().groups[0]?.access).toBe("available");
   });
 
+  it("reports an older write's failure after a newer one took over, and reads the truth once both end", async () => {
+    let failFirst: () => void = () => {};
+    const { store, server } = setup({
+      ...reads(() => childGroup()),
+      "POST /api/v1/groups/a/rules/internet/pause": () =>
+        new Promise((resolve) => {
+          failFirst = () => resolve({ status: 409, json: { error: { message: "The first write was refused." } } });
+        }),
+      "POST /api/v1/groups/b/rules/internet/pause": () => ({ json: {} }),
+    });
+    await store.reload();
+    const paused = (lists: { groups: Group[]; devices: [] }) => ({ ...lists, groups: lists.groups.map((group) => ({ ...group, access: "paused" as const })) });
+    const first = store.mutate((send) => send("/api/v1/groups/a/rules/internet/pause", { method: "POST" }), { optimistic: paused as never });
+    await flush();
+    await store.mutate((send) => send("/api/v1/groups/b/rules/internet/pause", { method: "POST" }));
+    const loadsBefore = server.calls.filter((call) => call.path === "/api/v1/auth/session").length;
+    failFirst();
+    await first;
+    expect(store.getState().error).toBe("The first write was refused.");
+    await flush();
+    await flush();
+    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(loadsBefore + 1);
+    expect(store.getState().groups[0]?.access).toBe("available");
+  });
+
+  it("reads the truth once overlapping writes end, so an older write's result is not lost", async () => {
+    let current = childGroup();
+    let releaseFirst: () => void = () => {};
+    const { store, server } = setup({
+      ...reads(() => current),
+      "POST /api/v1/groups/a/rules/internet/pause": () =>
+        new Promise((resolve) => {
+          releaseFirst = () => {
+            current = childGroup({ access: "paused" });
+            resolve({ json: {} });
+          };
+        }),
+      "POST /api/v1/groups/b/rules/internet/resume": () => ({ json: {} }),
+    });
+    await store.reload();
+    const first = store.mutate((send) => send("/api/v1/groups/a/rules/internet/pause", { method: "POST" }));
+    await flush();
+    await store.mutate((send) => send("/api/v1/groups/b/rules/internet/resume", { method: "POST" }));
+    const loadsBefore = server.calls.filter((call) => call.path === "/api/v1/auth/session").length;
+    releaseFirst();
+    await first;
+    await flush();
+    await flush();
+    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(loadsBefore + 1);
+    expect(store.getState().groups[0]?.access).toBe("paused");
+  });
+
+  it("reports a change the gateway refused even after a newer write", async () => {
+    let refuse: (outcome: { status: string; error: string | null }) => void = () => {};
+    const server = fakeServer({
+      ...reads(() => childGroup()),
+      "POST /api/v1/groups/a/rules/internet/pause": () => ({ json: { change: { changeId: "change-a" } } }),
+      "POST /api/v1/groups/b/rules/internet/pause": () => ({ json: {} }),
+    });
+    const waitForChange = vi.fn(
+      (_send: ApiRequest, id: string) =>
+        id === "change-a" ? new Promise<{ status: string; error: string | null }>((resolve) => (refuse = resolve)) : Promise.resolve({ status: "applied", error: null }),
+    );
+    const store = createHouseholdStore({ request: server.request, waitForChange: waitForChange as never });
+    await store.reload();
+    await store.mutate((send) => send("/api/v1/groups/a/rules/internet/pause", { method: "POST" }));
+    await store.mutate((send) => send("/api/v1/groups/b/rules/internet/pause", { method: "POST" }));
+    refuse({ status: "failed", error: "The gateway refused the first change." });
+    await flush();
+    expect(store.getState().error).toBe("The gateway refused the first change.");
+  });
+
+  it("keeps a write's optimistic change when a refresh that started before it comes back", async () => {
+    let answerRefresh: () => void = () => {};
+    let slow = false;
+    const routes = reads(() => childGroup());
+    const { store } = setup({
+      ...routes,
+      "GET /api/v1/groups": (body) =>
+        slow
+          ? new Promise((resolve) => {
+              answerRefresh = () => resolve({ json: { groups: [childGroup()] } });
+            })
+          : routes["GET /api/v1/groups"]!(body),
+      "POST /api/v1/groups/group-child/rules/internet/pause": () => new Promise(() => {}),
+    });
+    await store.reload();
+    slow = true;
+    const stop = store.startRefreshing(60_000, 60_000);
+    await flush();
+    void store.mutate((send) => send("/api/v1/groups/group-child/rules/internet/pause", { method: "POST" }), {
+      optimistic: (lists) => ({ ...lists, groups: lists.groups.map((group) => ({ ...group, access: "paused" as const })) }),
+    });
+    answerRefresh();
+    await flush();
+    stop();
+    expect(store.getState().groups[0]?.access).toBe("paused");
+  });
+
   it("dismisses a notice after 6 s, or 12 s with an Undo, and keeps an error", async () => {
     vi.useFakeTimers();
     const { store } = setup({ ...reads(() => childGroup()), "POST /api/v1/groups/group-child/rules/internet/pause": () => ({ json: {} }) });

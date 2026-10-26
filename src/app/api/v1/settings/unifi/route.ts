@@ -3,7 +3,7 @@ import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { listSiteNetworks, publicUnifiSettings, saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
-import { UnifiConfigError } from "@/server/unifi/errors";
+import { PreviousTargetError, UnifiConfigError } from "@/server/unifi/errors";
 import { demoLocked } from "@/server/demo";
 
 const UnifiBody = z
@@ -15,6 +15,7 @@ const UnifiBody = z
     tlsInsecure: z.boolean().optional(),
     manageAllNetworks: z.boolean().optional(),
     managedNetworkIds: z.array(z.string().min(1)).optional(),
+    forgetPrevious: z.boolean().optional(),
   })
   .refine((value) => !value.baseUrl || !value.consoleId, {
     message: "Provide baseUrl or consoleId, not both.",
@@ -61,6 +62,7 @@ export async function PUT(request: Request) {
             tlsInsecure: parsed.data.tlsInsecure,
             manageAllNetworks: parsed.data.manageAllNetworks,
             managedNetworkIds: parsed.data.managedNetworkIds,
+            forgetPrevious: parsed.data.forgetPrevious,
           })
         : await saveManagedNetworks({
             manageAllNetworks: parsed.data.manageAllNetworks,
@@ -75,6 +77,7 @@ export async function PUT(request: Request) {
       }
       return Response.json({ unifi: publicUnifiSettings(household, networks), change });
     } catch (error) {
+      if (error instanceof PreviousTargetError) return jsonError(409, "previous_gateway_unreachable", error.message);
       const message = error instanceof UnifiConfigError || error instanceof Error ? error.message : "UniFi probe failed.";
       return jsonError(400, "unifi_invalid", message);
     }

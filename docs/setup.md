@@ -31,7 +31,7 @@ The app reads no UniFi settings from the environment; the UniFi key lives in Set
 | --- | --- | --- |
 | `DB_MODE` | `bundled` | `bundled` (app + PostgreSQL via `docker/docker-compose.yml`), `external` (use `DB_HOST`), or `memory` (an in-memory database, `dev` and `test` only; `demo` always uses it). |
 | `DB_HOST` | `127.0.0.1` | PostgreSQL's host for `external`. |
-| `POSTGRES_PORT` | `5432` (`5433` in memory) | PostgreSQL's port. In Compose it is only the host's published port; the app container always uses 5432. |
+| `POSTGRES_PORT` | `5432` (`5433` in memory) | PostgreSQL's port. In Compose it is only the host's published port, bound to `127.0.0.1`; the app container always uses 5432. |
 | `POSTGRES_DB`, `POSTGRES_USER` | `familyfi` | Database and user. |
 | `POSTGRES_PASSWORD` | none | Required, except in memory. |
 | `DB_SSL_MODE`, `DB_SSL_ROOT_CERT` | off | Optional TLS for external PostgreSQL (`require`, `verify-full`, …). |

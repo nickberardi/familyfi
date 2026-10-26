@@ -4,6 +4,7 @@ import { TextField, TimeField, TogglePill } from "@/components/ui/Controls";
 import { DayPicker } from "@/components/ui/DayPicker";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
+import { confirmLine } from "@/lib/pair-device";
 
 import type { UI } from "./UIContext";
 
@@ -72,7 +73,8 @@ export const defaultUI: UI = {
       {children}
     </NextLink>
   ),
-  confirm: () => Promise.resolve(true),
+  // The browser's own dialog, as Pair asks: one line, and nothing happens unless it is accepted.
+  confirm: (request) => Promise.resolve(window.confirm(confirmLine(request))),
   copyText: async (value) => {
     await navigator.clipboard?.writeText(value);
   },
