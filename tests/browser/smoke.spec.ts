@@ -317,7 +317,8 @@ test("Settings opens on Household and keeps the chosen tab in its address", { ta
   await signIn(page);
   await page.goto("/settings");
   const tabs = page.getByRole("group", { name: "Settings sections" });
-  await expect(page.getByTestId("settings-household")).toBeVisible();
+  // The page itself: while the first load settles, a hidden copy of it can sit outside the shell.
+  await expect(page.getByRole("region", { name: "Page content" }).getByTestId("settings-household")).toBeVisible();
   await expect(page.getByTestId("settings-gateway")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Backup" })).toHaveCount(0);
 
