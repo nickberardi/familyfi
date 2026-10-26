@@ -1,7 +1,7 @@
 import { PolicyOperationIntent, Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import type { OwnershipScope } from "./policy-ownership";
-import type { FirewallPolicy } from "./types";
+import type { FirewallPolicy, FirewallPolicyWrite } from "./types";
 
 /**
  * Whether `actual` holds everything `expected` sent. The gateway answers with its own key order,
@@ -27,6 +27,15 @@ export function carriesWrite(actual: unknown, expected: unknown): boolean {
     );
   }
   return actual === expected;
+}
+
+/**
+ * Whether a policy a lost create made can stand for `write` as it is. Every field the write sets
+ * must match, and a write with no schedule takes only a policy with none: a window's policy left
+ * by a lost create must never stand for the always-on policy its rule now wants.
+ */
+export function reclaims(policy: FirewallPolicy, write: FirewallPolicyWrite): boolean {
+  return carriesWrite(policy, { ...JSON.parse(JSON.stringify(write)), schedule: write.schedule ?? null });
 }
 
 /**

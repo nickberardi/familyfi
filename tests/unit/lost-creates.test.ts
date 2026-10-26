@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { carriesWrite } from "@/server/unifi/lost-creates";
+import { carriesWrite, reclaims } from "@/server/unifi/lost-creates";
 import { internetBlockPolicy } from "@/server/unifi/payloads";
+import type { FirewallPolicy } from "@/server/unifi/types";
 
 const write = internetBlockPolicy({
   name: "FamilyFi Bedtime",
@@ -37,5 +38,20 @@ describe("carriesWrite", () => {
       macAddresses: ["02:00:00:00:00:01"],
     });
     expect(carriesWrite(oneMac, write)).toBe(false);
+  });
+});
+
+describe("reclaims", () => {
+  const schedule = { mode: "EVERY_DAY", timeFilter: { from: "21:00", to: "07:00" } } as unknown as NonNullable<typeof write.schedule>;
+  const listed = (extra: Partial<FirewallPolicy> = {}) => ({ ...write, id: "p1", ...extra }) as FirewallPolicy;
+
+  it("takes a lost create's policy that carries the whole write", () => {
+    expect(reclaims(listed(), write)).toBe(true);
+    expect(reclaims(listed({ schedule }), { ...write, schedule })).toBe(true);
+  });
+
+  it("never takes a window's policy for an always-on write, whose write leaves the schedule out", () => {
+    expect(carriesWrite({ ...write, schedule, id: "p1" }, write)).toBe(true);
+    expect(reclaims(listed({ schedule }), write)).toBe(false);
   });
 });
