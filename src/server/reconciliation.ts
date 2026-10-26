@@ -157,15 +157,16 @@ async function releaseLock(owner: string) {
 /** Another owner took the lock while this pass ran: it stops before its next gateway write. */
 class LockLostError extends Error {}
 
-async function tick(owner: string): Promise<boolean> {
-  if (!(await acquireLock(owner))) return false;
-  // Held for the whole pass, however long the gateway takes. A renewal that fails to reach the
-  // database is retried on the next beat; one that finds the lock no longer this pass's ends it.
-  // Best-effort: the flag is read between gateway writes, so one already in flight still finishes.
+/**
+ * Keeps a lock just taken for as long as its work runs, however long the gateway takes. A renewal
+ * that fails to reach the database is retried on the next beat; one that finds the lock no longer
+ * this owner's marks it lost. `release` stops renewing and lets the lock go.
+ */
+function holdLock(owner: string) {
   let lost = false;
   let renewing: Promise<void> | null = null;
   const renewal = setInterval(() => {
-    // One renewal at a time, so the one awaited below is the only one left to land.
+    // One renewal at a time, so the one awaited on release is the only one left to land.
     if (renewing) return;
     renewing = renewLock(owner)
       .then((held) => {
@@ -177,8 +178,42 @@ async function tick(owner: string): Promise<boolean> {
       });
   }, lockRenewMs);
   unrefTimer(renewal);
+  return {
+    lost: () => lost,
+    async release() {
+      clearInterval(renewal);
+      // A renewal still in flight would otherwise take the lock back after it is released.
+      await renewing;
+      await releaseLock(owner);
+    },
+  };
+}
+
+/**
+ * Runs `work` holding the reconcile lock, so no pass writes to the gateway or its policy records
+ * meanwhile. Waits up to `waitMs` for a running pass to finish, then gives up with `busy`.
+ */
+export async function withReconcileLock<T>(work: () => Promise<T>, options: { waitMs?: number; busy: () => Error }): Promise<T> {
+  const owner = `save:${randomToken(9)}`;
+  const deadline = Date.now() + (options.waitMs ?? 60_000);
+  while (!(await acquireLock(owner))) {
+    if (Date.now() >= deadline) throw options.busy();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const lock = holdLock(owner);
+  try {
+    return await work();
+  } finally {
+    await lock.release();
+  }
+}
+
+async function tick(owner: string): Promise<boolean> {
+  if (!(await acquireLock(owner))) return false;
+  // Best-effort: the flag is read between gateway writes, so one already in flight still finishes.
+  const lock = holdLock(owner);
   const stillHeld = () => {
-    if (lost) throw new LockLostError("Another sync took over before this one finished.");
+    if (lock.lost()) throw new LockLostError("Another sync took over before this one finished.");
   };
   try {
   const now = new Date();
@@ -602,7 +637,7 @@ async function tick(owner: string): Promise<boolean> {
       data: { status: ChangeStatus.failed, finishedAt: new Date(), error: message },
     });
     // Not the gateway's fault, and the pass that took over settles the pending changes.
-    if (error instanceof LockLostError || lost) return true;
+    if (error instanceof LockLostError || lock.lost()) return true;
     await prisma().household.update({
       where: { id: "default" },
       data: { connectionStatus: "error", connectionError: message },
@@ -613,7 +648,7 @@ async function tick(owner: string): Promise<boolean> {
     });
   }
   // The pass that took over prunes; this one may no longer hold the lock.
-  if (lost) return true;
+  if (lock.lost()) return true;
   // A run every interval adds up to a million rows a year; the change results they settled keep their outcome.
   await prisma().syncRun.deleteMany({
     where: { id: { not: run.id }, startedAt: { lt: new Date(now.getTime() - SYNC_HISTORY_MS) } },
@@ -625,10 +660,7 @@ async function tick(owner: string): Promise<boolean> {
   });
   return true;
   } finally {
-    clearInterval(renewal);
-    // A renewal still in flight would otherwise take the lock back after it is released.
-    await renewing;
-    await releaseLock(owner);
+    await lock.release();
   }
 }
 

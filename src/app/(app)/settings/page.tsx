@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, request } from "@/lib/api";
+import { ApiError, api, request } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
@@ -48,6 +48,8 @@ function Settings() {
   const [managedIds, setManagedIds] = useState<string[]>([]);
   const [probe, setProbe] = useState("");
   const [pasting, setPasting] = useState(false);
+  // The old gateway couldn't be cleaned up: offer to save again forgetting it.
+  const [offerForget, setOfferForget] = useState(false);
   const [editingGateway, setEditingGateway] = useState(false);
   const [loginFor, setLoginFor] = useState<Group | null>(null);
   const [loginUser, setLoginUser] = useState("");
@@ -104,18 +106,24 @@ function Settings() {
     }
   }
 
-  function saveKey() {
+  function saveKey(forgetPrevious = false) {
     setProbe("");
+    setOfferForget(false);
     try {
-      const body = { apiKey, ...targetBody(), manageAllNetworks: manageAll, managedNetworkIds: managedIds };
+      const body = { apiKey, ...targetBody(), manageAllNetworks: manageAll, managedNetworkIds: managedIds, ...(forgetPrevious ? { forgetPrevious } : {}) };
       void mutate(async () => {
-        const result = await api<{ change: { changeId: string } }>("/api/v1/settings/unifi", {
-          method: "PUT",
-          body: JSON.stringify(body),
-        });
-        setPasting(false);
-        setApiKey("");
-        return result;
+        try {
+          const result = await api<{ change: { changeId: string } }>("/api/v1/settings/unifi", {
+            method: "PUT",
+            body: JSON.stringify(body),
+          });
+          setPasting(false);
+          setApiKey("");
+          return result;
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "previous_gateway_unreachable") setOfferForget(true);
+          throw error;
+        }
       });
     } catch (error) {
       setProbe(error instanceof Error ? error.message : "Could not save UniFi settings.");
@@ -266,7 +274,10 @@ function Settings() {
                     type="password"
                     autoComplete="off"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      setOfferForget(false);
+                    }}
                     placeholder="Paste the key from your UniFi console"
                   />
                   <p
@@ -282,10 +293,19 @@ function Settings() {
                       type="button"
                       disabled={apiKey.length < 8}
                       className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
-                      onClick={saveKey}
+                      onClick={() => saveKey()}
                     >
                       Save and test
                     </button>
+                    {offerForget ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-danger)]"
+                        onClick={() => saveKey(true)}
+                      >
+                        {SETTINGS_COPY.forgetOldGateway}
+                      </button>
+                    ) : null}
                     {unifi?.configured ? (
                       <button
                         type="button"
@@ -293,6 +313,7 @@ function Settings() {
                         onClick={() => {
                           setPasting(false);
                           setApiKey("");
+                          setOfferForget(false);
                         }}
                       >
                         Cancel

@@ -816,6 +816,11 @@
         "settings"
       ]
     },
+    "tests/browser/smoke.spec.ts > a new key the old gateway can't be cleaned up for offers to forget it and switch": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/browser/smoke.spec.ts > add person opens a sheet over Family, and the new person can be edited": {
       "categories": [
         "groups"
