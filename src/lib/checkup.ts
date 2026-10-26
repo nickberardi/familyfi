@@ -132,13 +132,13 @@ export type CheckupResult = {
 
 export type CheckupRun = { findings: CheckupResult[]; passed: CheckupCheck[]; skipped: CheckupCheck[] };
 
-/** A finding as `GET /checkup` returns it. */
 /**
  * What a finding says, as a key a client looks up in its own (localized) copy, and a short English
  * line for a client that has no copy for the key. A new check thereby reaches every app version.
  */
 export type CheckupMessage = { key: string; text: string };
 
+/** A finding as `GET /checkup` returns it. */
 export type CheckupFinding = {
   id: string;
   check: CheckupCheck;
@@ -462,7 +462,6 @@ const WIFI_SETTING: Record<string, string> = {
   wpa3_only: "WPA3 only",
 };
 
-/** The words for a finding: what was seen, why it matters and how to change it. */
 /** Whether this build knows a check. The API adds checks over time. */
 export function knownCheck(check: string): check is CheckupCheck {
   return (CHECKUP_CHECKS as readonly string[]).includes(check);
@@ -480,6 +479,7 @@ export function knownCheckupMessage(message: Pick<CheckupMessage, "key">): boole
   return message.key.startsWith(MESSAGE_KEY_PREFIX) && knownCheck(message.key.slice(MESSAGE_KEY_PREFIX.length));
 }
 
+/** The words for a finding: what was seen, why it matters and how to change it. */
 export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">): CheckupCopy {
   const devices = finding.details.devices ?? [];
   const networks = finding.details.networks ?? [];

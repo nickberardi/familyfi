@@ -4240,7 +4240,7 @@ components:
         the object the message belongs to, and shows `text`, a short English line, only when it has no
         copy for the key: then the message is newer than the client, which says so and suggests an update.
       properties:
-        key: { type: string, description: "Dotted, e.g. `checkup.leftover_policies`. New keys appear as the server learns new things to say." }
+        key: { type: string, description: "Dotted, e.g. `checkup.leftover_policies`: a finding's key is `checkup.` and its check. New keys appear as the server learns new things to say." }
         text: { type: string, description: "The message in short English, for a client without copy for `key`." }
     CheckupCheck:
       type: string
