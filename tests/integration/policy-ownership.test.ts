@@ -8,6 +8,7 @@ import {
   DEV_MOCK_API_KEY,
   DEV_MOCK_BASE_URL,
   DEV_MOCK_ROGUE_POLICY_ID,
+  getSharedDevMockClient,
   resetDevMockClientForTests,
 } from "@/server/unifi/dev-mock";
 import { PolicyOwnershipError } from "@/server/unifi/errors";
@@ -192,5 +193,54 @@ describe("clientForHousehold", () => {
     expect(connectionIdentity(current)).toBeTruthy();
     const client = clientForHousehold(current);
     await expect(client.deletePolicy(current.unifiSiteId!, DEV_MOCK_ADMIN_POLICY_ID)).rejects.toThrow(PolicyOwnershipError);
+  });
+});
+
+describe("switching to another gateway", () => {
+  const previous = process.env.FAMILYFI_MODE;
+
+  beforeEach(async () => {
+    process.env.FAMILYFI_MODE = "dev";
+    resetDevMockClientForTests();
+    await resetDatabase();
+    await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+  });
+
+  afterEach(() => {
+    if (previous === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = previous;
+    resetDevMockClientForTests();
+  });
+
+  it("removes every policy FamilyFi owns on the old one, even one already deleted there", async () => {
+    const current = await household();
+    const scope = ownershipScope(current);
+    const siteId = current.unifiSiteId!;
+    const gateway = getSharedDevMockClient();
+    const onRecord = { connectionIdentity: scope.connectionIdentity, siteId, zoneId: INTERNAL_ZONE, desiredFingerprint: "test", desiredRevision: 1 };
+    const forRule = await gateway.createPolicy(siteId, blockPolicy("Bedtime"));
+    const rule = await prisma().rule.create({ data: { name: "Bedtime", kind: RuleKind.internet } });
+    await prisma().rulePolicy.create({ data: { ...onRecord, ruleId: rule.id, unifiPolicyId: forRule.id } });
+    const orphan = await gateway.createPolicy(siteId, blockPolicy("Left by a failed delete"));
+    await prisma().policyOperation.create({
+      data: { intent: PolicyOperationIntent.create, connectionIdentity: scope.connectionIdentity, siteId, unifiPolicyId: orphan.id, status: "applied" },
+    });
+    // Someone already removed this quarantine policy on the console.
+    const gone = await gateway.createPolicy(siteId, blockPolicy("Quarantine"));
+    await prisma().appPolicy.create({
+      data: { ...onRecord, unifiPolicyId: gone.id, ownerScope: PolicyOwnerScope.quarantine, ipVersion: "dual" },
+    });
+    await gateway.deletePolicy(siteId, gone.id);
+
+    await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: "https://10.0.0.2/proxy/network/integration" });
+
+    const ids = (await gateway.listPolicies(siteId)).map((policy) => policy.id);
+    expect(ids).not.toContain(forRule.id);
+    expect(ids).not.toContain(orphan.id);
+    expect(ids).toContain(DEV_MOCK_ADMIN_POLICY_ID);
+    expect(await prisma().rulePolicy.count({ where: { connectionIdentity: scope.connectionIdentity } })).toBe(0);
+    expect(await prisma().appPolicy.count({ where: { connectionIdentity: scope.connectionIdentity } })).toBe(0);
+    expect((await prisma().policyOperation.findFirstOrThrow({ where: { unifiPolicyId: orphan.id } })).status).toBe("removed");
+    expect((await household()).unifiBaseUrl).toBe("https://10.0.0.2/proxy/network/integration");
   });
 });

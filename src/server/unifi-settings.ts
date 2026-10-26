@@ -1,7 +1,7 @@
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
 import { unifiMockEnabled } from "./env";
-import { UnifiConfigError } from "./unifi/errors";
+import { UnifiConfigError, UnifiHttpError } from "./unifi/errors";
 import { clientForHousehold, connectionIdentity, probeClient } from "./unifi/connection";
 import { enqueueChange } from "./changes";
 import { pruneNetworkScopedRulesForScope } from "./network-rules";
@@ -9,7 +9,7 @@ import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type Public
 import { loadNetworkDetails } from "./unifi/networks";
 import { forgetDpiCatalogs } from "./unifi/dpi-catalog";
 import { recentSiteNetworks, rememberSiteNetworks } from "./unifi/network-cache";
-import type { Household } from "@prisma/client";
+import { PolicyOperationIntent, type Household } from "@prisma/client";
 
 async function probeWithClient(client: ReturnType<typeof probeClient>, siteId?: string) {
   const [info, sites] = await Promise.all([client.getInfo(), client.listSites()]);
@@ -67,6 +67,38 @@ export async function listSiteNetworks(household: Household, options: { fresh?: 
   return networks;
 }
 
+/**
+ * Deletes every policy FamilyFi owns on the console and site it is leaving: quarantine and rule
+ * policies, and any it created that no record points at any more. Nothing sweeps that console
+ * once the household points elsewhere, so whatever stays there keeps enforcing. One someone
+ * already deleted there counts as removed. The records go only after the gateway deletes, since
+ * they are what lets the guarded client delete at all.
+ */
+async function removePreviousTargetPolicies(household: Household, identity: string) {
+  const siteId = household.unifiSiteId!;
+  const scope = { connectionIdentity: identity, siteId };
+  const applied = { ...scope, intent: PolicyOperationIntent.create, status: "applied" as const };
+  const [appPolicies, rulePolicies, creations] = await Promise.all([
+    prisma().appPolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
+    prisma().rulePolicy.findMany({ where: scope, select: { unifiPolicyId: true } }),
+    prisma().policyOperation.findMany({ where: applied, select: { unifiPolicyId: true } }),
+  ]);
+  const owned = new Set([...appPolicies, ...rulePolicies, ...creations].flatMap((row) => row.unifiPolicyId ?? []));
+  const client = clientForHousehold(household);
+  for (const policyId of owned) {
+    try {
+      await client.deletePolicy(siteId, policyId);
+    } catch (error) {
+      if (!(error instanceof UnifiHttpError && error.status === 404)) throw error;
+    }
+  }
+  await prisma().$transaction([
+    prisma().appPolicy.deleteMany({ where: { connectionIdentity: identity } }),
+    prisma().rulePolicy.deleteMany({ where: { connectionIdentity: identity } }),
+    prisma().policyOperation.updateMany({ where: applied, data: { status: "removed" } }),
+  ]);
+}
+
 export async function saveUnifiConnection(input: {
   apiKey: string;
   baseUrl?: string;
@@ -88,14 +120,7 @@ export async function saveUnifiConnection(input: {
   const previous = household.unifiSiteId ? connectionIdentity(household) : null;
   if (previous && previous !== nextIdentity && household.unifiKeyCiphertext) {
     try {
-      const oldClient = clientForHousehold(household);
-      const owned = await prisma().appPolicy.findMany({
-        where: { connectionIdentity: previous, siteId: household.unifiSiteId ?? undefined },
-      });
-      for (const policy of owned) {
-        if (policy.unifiPolicyId) await oldClient.deletePolicy(household.unifiSiteId!, policy.unifiPolicyId);
-      }
-      await prisma().appPolicy.deleteMany({ where: { connectionIdentity: previous } });
+      await removePreviousTargetPolicies(household, previous);
     } catch {
       throw new UnifiConfigError(
         "Could not remove FamilyFi policies from the previous UniFi target. The existing connection was left unchanged.",
