@@ -666,11 +666,12 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
 
 /**
  * The rows of a changed-in-UniFi note: what FamilyFi has, and what was on the gateway. Short lists
- * are named in full; longer ones name only the devices that differ.
+ * are named in full; longer ones name only the devices that differ. A field newer than this build
+ * has no row.
  */
 export function driftRows(drift: Pick<CheckupDrift, "changes">): { label: string; familyfi: string; gateway: string }[] {
   const text = CHECKUP_COPY.network.drift;
-  return drift.changes.map((change) => {
+  return drift.changes.filter((change) => DRIFT_FIELDS.includes(change.field)).map((change) => {
     switch (change.field) {
       case "switch":
         return { label: text.switch, familyfi: change.familyfi ? text.on : text.off, gateway: change.gateway ? text.on : text.off };

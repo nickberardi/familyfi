@@ -144,6 +144,10 @@ describe("network checkup", () => {
       { label: "When", familyfi: "Always", gateway: "On a schedule" },
       { label: "Name", familyfi: "FamilyFi Bedtime", gateway: "Bed" },
     ]);
+    // A field a newer server adds has no row here, rather than breaking the note.
+    expect(driftRows({ changes: [{ field: "future" } as unknown as CheckupDrift["changes"][number], { field: "other" }] })).toEqual([
+      { label: "What it blocks", familyfi: "As you set it", gateway: "Changed" },
+    ]);
     expect(runChecks(inputs()).passed).toContain("gateway_drift");
   });
 

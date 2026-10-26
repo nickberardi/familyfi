@@ -699,15 +699,25 @@ async function tick(owner: string): Promise<boolean> {
  * confirmed, or whose last write failed, differs because of FamilyFi, not the console.
  */
 function consoleDrift(
-  existing: { desiredFingerprint: string; observedFingerprint: string | null; lastError: string | null },
+  existing: { desiredFingerprint: string; observedFingerprint: string | null; lastError: string | null; gatewayDrift: Prisma.JsonValue; driftSeenAt: Date | null },
   copy: FirewallPolicy | undefined,
   write: FirewallPolicyWrite,
   fingerprint: string,
+  now = new Date(),
 ): { gatewayDrift: Prisma.InputJsonValue; driftSeenAt: Date } | null {
   if (!copy || existing.observedFingerprint !== fingerprint || existing.desiredFingerprint !== fingerprint || existing.lastError) return null;
   const changes = gatewayDrift(copy, write);
-  return changes.length ? { gatewayDrift: changes as Prisma.InputJsonValue, driftSeenAt: new Date() } : null;
+  if (!changes.length) return null;
+  // The same change back again soon after FamilyFi wrote it back looks like the gateway itself
+  // rewriting it: still write it back, but keep the note's time, so a dismissal holds.
+  const repeat =
+    existing.driftSeenAt !== null && now.getTime() - existing.driftSeenAt.getTime() < DRIFT_REPEAT_MS && isDeepStrictEqual(existing.gatewayDrift, JSON.parse(JSON.stringify(changes)));
+  if (repeat) console.warn("A FamilyFi policy changed back the same way again soon after FamilyFi wrote it back:", changes);
+  return { gatewayDrift: changes as Prisma.InputJsonValue, driftSeenAt: repeat ? existing.driftSeenAt! : now };
 }
+
+/** How soon the same console change seen again counts as the gateway's own doing, not a person's. */
+const DRIFT_REPEAT_MS = 10 * 60_000;
 
 /** FamilyFi changed the policy itself: what the console changed before no longer compares. */
 function driftCleared(existing: { desiredFingerprint: string } | undefined, fingerprint: string) {
@@ -729,6 +739,8 @@ async function applyDesiredPolicy(
         desiredFingerprint: string;
         observedFingerprint: string | null;
         lastError: string | null;
+        gatewayDrift: Prisma.JsonValue;
+        driftSeenAt: Date | null;
       }
     | undefined,
   onGateway: Set<string>,
@@ -844,6 +856,8 @@ async function applyDesiredRulePolicy(
         desiredFingerprint: string;
         observedFingerprint: string | null;
         lastError: string | null;
+        gatewayDrift: Prisma.JsonValue;
+        driftSeenAt: Date | null;
       }
     | undefined,
   onGateway: Set<string>,
