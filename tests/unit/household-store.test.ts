@@ -707,6 +707,18 @@ describe("household store on the web (no offline guard)", () => {
     expect(store.canControl()).toBe(true);
   });
 
+  it("takes back the first load's error once a load works", async () => {
+    let down = true;
+    const routes = reads(() => childGroup());
+    const { store } = setup({ ...routes, "GET /api/v1/groups": () => (down ? offline() : routes["GET /api/v1/groups"]!(undefined)) });
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "loading", stale: true, unreachable: true, error: "Can't reach FamilyFi." });
+
+    down = false;
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "ready", stale: false, unreachable: false, error: "" });
+  });
+
   it("reports a refused session as signed out, without an error to show", async () => {
     const { store } = setup({ ...reads(() => childGroup()), "GET /api/v1/auth/session": () => ({ status: 401, json: { error: { message: "Sign in." } } }) });
     await store.reload();

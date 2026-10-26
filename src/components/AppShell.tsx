@@ -255,10 +255,59 @@ function SidebarFooter({ onAbout }: { onAbout: () => void }) {
   );
 }
 
+const CONNECTION_COPY = {
+  stale: "Can't reach FamilyFi. What you see may be out of date.",
+  unloaded: "Couldn't load your household",
+  retry: "Try again",
+  updates: "Check for updates",
+};
+
+/**
+ * Pages that work without the household, and so never wait for it: Settings, where an update that
+ * fixes a failing read is installed, and the API reference.
+ */
+const OWN_DATA_PAGES = ["/settings", "/reference"];
+
+/** Says the household shown may be out of date, until a refresh reaches FamilyFi again. */
+function StaleBanner({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div
+      role="status"
+      data-testid="stale-banner"
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-[var(--ff-danger-fill)] px-4 py-2 text-center text-[14px] leading-5 text-[var(--ff-ink)]"
+    >
+      <span>{CONNECTION_COPY.stale}</span>
+      <RetryButton onRetry={onRetry} />
+    </div>
+  );
+}
+
+/** In place of a page when the household has never loaded: nothing to show, and why. */
+function LoadFailed({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return (
+    <div role="alert" data-testid="load-failed" className="flex flex-col items-center gap-1 px-6 py-16 text-center text-[14px] leading-5">
+      <p className="m-0 text-[16px] font-semibold text-[var(--ff-ink)]">{CONNECTION_COPY.unloaded}</p>
+      {error ? <p className="m-0 text-[var(--ff-muted)]">{error}</p> : null}
+      <RetryButton onRetry={onRetry} />
+      <Link href="/settings?tab=maintenance" className="text-[var(--ff-muted)] underline-offset-2 hover:underline">
+        {CONNECTION_COPY.updates}
+      </Link>
+    </div>
+  );
+}
+
+function RetryButton({ onRetry }: { onRetry: () => void }) {
+  return (
+    <button type="button" onClick={onRetry} className="font-semibold text-[var(--ff-danger)] underline-offset-2 hover:underline">
+      {CONNECTION_COPY.retry}
+    </button>
+  );
+}
+
 export function AppShell({ children, demo = false }: { children: React.ReactNode; demo?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, devices, sync, store, mutate, loading, error, notice, noticeAction, busy, dismissFeedback } = useAppData();
+  const { session, devices, sync, store, mutate, loading, stale, signedOut, error, notice, noticeAction, busy, dismissFeedback, reload } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const railNav = useRef<HTMLElement>(null);
@@ -334,7 +383,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
           >
             <div className="pointer-events-auto">
               <Toast
-                error={error}
+                error={loading && stale ? "" : error}
                 notice={notice}
                 actionLabel={noticeAction?.label}
                 onAction={() => {
@@ -347,8 +396,15 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               />
             </div>
           </div>
-          {loading ? <p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">Loading household…</p> : null}
-          {children}
+          {stale && !loading ? <StaleBanner onRetry={() => void reload()} /> : null}
+          {/* A page shows the household once it has loaded, never an empty one standing in for it. */}
+          {!loading || OWN_DATA_PAGES.some((page) => isActive(pathname, page)) ? (
+            children
+          ) : stale && !signedOut ? (
+            <LoadFailed error={error} onRetry={() => void reload()} />
+          ) : (
+            <p className="px-6 py-4 text-[14px] text-[var(--ff-muted)]">Loading household…</p>
+          )}
         </div>
         {navOpen ? (
           <>

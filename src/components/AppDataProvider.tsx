@@ -21,7 +21,12 @@ type AppData = {
   unifi: UnifiSettings | null;
   household: HouseholdPublic | null;
   accounts: Account[];
+  /** The household has not loaded yet; pages wait for it rather than show it empty. */
   loading: boolean;
+  /** The last refresh failed, so what is shown may be out of date. */
+  stale: boolean;
+  /** The server refused the session; the page is on its way to sign-in. */
+  signedOut: boolean;
   error: string;
   notice: string;
   noticeAction: NoticeAction | null;
@@ -78,7 +83,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       unifi: state.unifi,
       household: state.household,
       accounts: state.accounts,
-      loading: !state.loaded,
+      // Until a load has worked, whether or not one has failed: an empty household isn't the household.
+      loading: state.status !== "ready",
+      stale: state.stale,
+      signedOut: state.status === "signedOut",
       error: state.error,
       notice: state.notice,
       noticeAction: state.noticeAction,

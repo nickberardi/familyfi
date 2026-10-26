@@ -13,11 +13,15 @@
  *   check-migration-upgrade.mjs --latest     the newest release only
  *   check-migration-upgrade.mjs --from v0.5.0  (or just `v0.5.0`) that release only
  *
+ * Each release's filled database is also dumped and restored over a database already at this
+ * checkout with scripts/runtime/restore-database.sh, the way docs/operations.md restores a backup,
+ * and the restored database must then upgrade the same way.
+ *
  * Releases whose prisma/migrations are identical build identical databases, so each
  * distinct set is upgraded once and the releases that share it are reported with it.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -114,6 +118,29 @@ function prisma(work, url, name, schema, migrations, args) {
     encoding: "utf8",
   });
 }
+
+/**
+ * Runs a PostgreSQL client tool against `url`. pg_dump and pg_restore must be the server's major
+ * version, so under scripts/test.py (FAMILYFI_TEST_POSTGRES_CONTAINER) they run in the server's
+ * own container, reaching it on its loopback; otherwise the machine's own are used.
+ */
+function postgresTool(command, url, args, { input, env = {} } = {}) {
+  const container = process.env.FAMILYFI_TEST_POSTGRES_CONTAINER;
+  let run;
+  if (container) {
+    const inside = new URL(url);
+    inside.hostname = "127.0.0.1";
+    inside.port = "5432";
+    const vars = Object.entries({ ...env, DATABASE_URL: inside.toString() }).flatMap(([key, value]) => ["--env", `${key}=${value}`]);
+    run = spawnSync("docker", ["exec", "--interactive", ...vars, container, command, ...args], { input, encoding: "utf8" });
+  } else {
+    run = spawnSync(command, args, { input, encoding: "utf8", env: { ...process.env, ...env, DATABASE_URL: url } });
+  }
+  return run.error ? { status: 1, stdout: "", stderr: `${command}: ${run.error.message}` } : run;
+}
+
+/** A file path the tools in postgresTool can write and read. */
+const toolPath = (work, file) => (process.env.FAMILYFI_TEST_POSTGRES_CONTAINER ? `/tmp/${file}` : path.join(work, file));
 
 async function tables(client) {
   const { rows } = await client.query(
@@ -247,26 +274,63 @@ async function fillEveryTable(client) {
   return [...inserted.values()].reduce((sum, ids) => sum + ids.length, 0);
 }
 
+/** Creates a scratch database and returns its URL. */
+async function createScratch(server, base, name) {
+  await dropScratch(server, name);
+  await server.query(`CREATE DATABASE ${name}`);
+  const scratch = new URL(base);
+  scratch.pathname = `/${name}`;
+  return scratch.toString();
+}
+
+const step = (what, result) => {
+  if (result.status !== 0) throw new Error(`${what} failed:\n${result.stdout}${result.stderr}`);
+};
+
+/**
+ * Applies this checkout's migrations to the database at `url`, then fails if any table has fewer
+ * rows than `before` or the database differs from prisma/schema.prisma.
+ */
+async function upgradeAndCheck(work, url, label, before) {
+  const schema = path.join(root, "prisma/schema.prisma");
+  const migrations = path.join(root, "prisma/migrations");
+  step("Applying the current migrations", prisma(work, url, `${label}-current`, schema, migrations, ["migrate", "deploy"]));
+
+  const upgraded = new pg.Client({ connectionString: url });
+  await upgraded.connect();
+  const after = await rowCounts(upgraded);
+  await upgraded.end();
+  const lost = Object.entries(before)
+    .filter(([table, count]) => table in after && after[table] < count)
+    .map(([table, count]) => `${table} ${count} → ${after[table]}`);
+  const total = (counts) => Object.values(counts).reduce((sum, count) => sum + count, 0);
+  if (lost.length || total(after) < total(before)) {
+    throw new Error(`Rows were lost: ${lost.join(", ") || `${total(before)} → ${total(after)} in all`}.`);
+  }
+
+  const drift = prisma(work, url, `${label}-diff`, schema, migrations, [
+    "migrate", "diff", "--from-config-datasource", "--to-schema", schema, "--exit-code",
+  ]);
+  if (drift.status !== 0) {
+    throw new Error(`The upgraded database does not match prisma/schema.prisma:\n${drift.stdout}${drift.stderr}`);
+  }
+}
+
 /**
  * Builds `release`'s database in its own scratch database, fills it, upgrades it to this
- * checkout, and checks the result. Throws with the release in the message on any failure.
+ * checkout, and checks the result. Then restores a dump of the filled database over a database
+ * at this checkout and checks that it upgrades the same way. Throws on any failure.
  */
 async function upgradeFrom(release, server, base, work) {
   const name = scratchDatabaseName(release);
-  const scratch = new URL(base);
-  scratch.pathname = `/${name}`;
-  const url = scratch.toString();
-  const step = (what, result) => {
-    if (result.status !== 0) throw new Error(`${what} failed:\n${result.stdout}${result.stderr}`);
-  };
+  const restoredName = `${name}_restored`;
 
   const releaseDir = path.join(work, release, "prisma");
   mkdirSync(path.join(work, release));
   execFileSync("sh", ["-c", `git archive ${release} prisma | tar -x -C "${path.join(work, release)}"`], { cwd: root });
 
-  await dropScratch(server, name);
-  await server.query(`CREATE DATABASE ${name}`);
   try {
+    const url = await createScratch(server, base, name);
     step(
       `Building the ${release} database`,
       prisma(work, url, `${release}-release`, path.join(releaseDir, "schema.prisma"), path.join(releaseDir, "migrations"), ["migrate", "deploy"]),
@@ -288,31 +352,27 @@ async function upgradeFrom(release, server, base, work) {
       await client.end();
     }
 
-    const schema = path.join(root, "prisma/schema.prisma");
-    const migrations = path.join(root, "prisma/migrations");
-    step("Applying the current migrations", prisma(work, url, `${release}-current`, schema, migrations, ["migrate", "deploy"]));
+    const dump = toolPath(work, `${name}.dump`);
+    step(`Dumping the ${release} database`, postgresTool("sh", url, ["-c", 'pg_dump --format=custom --no-owner --file "$0" "$DATABASE_URL"', dump]));
 
-    const upgraded = new pg.Client({ connectionString: url });
-    await upgraded.connect();
-    const after = await rowCounts(upgraded);
-    await upgraded.end();
-    const lost = Object.entries(before)
-      .filter(([table, count]) => table in after && after[table] < count)
-      .map(([table, count]) => `${table} ${count} → ${after[table]}`);
-    const total = (counts) => Object.values(counts).reduce((sum, count) => sum + count, 0);
-    if (lost.length || total(after) < total(before)) {
-      throw new Error(`Rows were lost: ${lost.join(", ") || `${total(before)} → ${total(after)} in all`}.`);
-    }
+    await upgradeAndCheck(work, url, release, before);
 
-    const drift = prisma(work, url, `${release}-diff`, schema, migrations, [
-      "migrate", "diff", "--from-config-datasource", "--to-schema", schema, "--exit-code",
-    ]);
-    if (drift.status !== 0) {
-      throw new Error(`The upgraded database does not match prisma/schema.prisma:\n${drift.stdout}${drift.stderr}`);
+    // A backup taken before an update, restored once the new release has already migrated.
+    const restored = await createScratch(server, base, restoredName);
+    step("Building the current database", prisma(work, restored, `${release}-head`, path.join(root, "prisma/schema.prisma"), path.join(root, "prisma/migrations"), ["migrate", "deploy"]));
+    step(
+      `Restoring the ${release} dump over it`,
+      postgresTool("sh", restored, ["-s", "--", dump], { input: readFileSync(path.join(root, "scripts/runtime/restore-database.sh"), "utf8") }),
+    );
+    try {
+      await upgradeAndCheck(work, restored, `${release}-restored`, before);
+    } catch (error) {
+      throw new Error(`After restoring its dump over the current database: ${error instanceof Error ? error.message : error}`);
     }
     return { filled, tables: Object.keys(before).length };
   } finally {
     await dropScratch(server, name);
+    await dropScratch(server, restoredName);
   }
 }
 
@@ -357,7 +417,7 @@ async function main() {
       try {
         const { filled, tables: count } = await upgradeFrom(release, server, base, work);
         const seconds = ((Date.now() - at) / 1000).toFixed(1);
-        console.log(`✓ ${release}: ${filled} rows in ${count} tables upgraded, no rows lost, schema matches (${seconds}s).`);
+        console.log(`✓ ${release}: ${filled} rows in ${count} tables upgraded, and restored over the current database, no rows lost, schema matches (${seconds}s).`);
         for (const tag of same) console.log(`✓ ${tag}: same migrations as ${release}.`);
       } catch (error) {
         throw new Error(`✗ Upgrading from ${release} failed. ${error instanceof Error ? error.message : error}`);

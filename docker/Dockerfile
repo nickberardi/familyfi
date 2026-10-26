@@ -81,8 +81,9 @@ ENV PORT=7001
 ENV HOSTNAME=0.0.0.0
 # Prisma engines need OpenSSL present to pick the right binary (avoids openssl-1.1.x warn), and
 # pg_dump is for the backup before an update and for export (scripts/runtime/pre-update-backup.sh,
-# src/server/database-dump.ts). It must be the server's major version, PostgreSQL 18, which Debian
-# bookworm does not ship, so it comes from the PostgreSQL project's repository, its key hash-checked.
+# src/server/database-dump.ts), pg_restore and psql for restoring one (restore-database.sh). They
+# must be the server's major version, PostgreSQL 18, which Debian bookworm does not ship, so they
+# come from the PostgreSQL project's repository, its key hash-checked.
 # The logs and backups apt and dpkg leave say when the image was built; without them the same
 # packages make the same layer, and an update need not download it again.
 ADD https://www.postgresql.org/media/keys/ACCC4CF8.asc /etc/apt/keyrings/pgdg.asc
@@ -131,7 +132,9 @@ COPY --from=build --chown=familyfi:familyfi /app/openapi ./openapi
 COPY --from=build --chown=familyfi:familyfi /app/src/server/mac-registrants.sqlite ./src/server/mac-registrants.sqlite
 COPY --from=build --chown=familyfi:familyfi /app/.env.example ./.env.example
 COPY --chown=familyfi:familyfi --chmod=755 scripts/runtime/docker-entrypoint.sh /app/docker-entrypoint.sh
-# Watchtower's pre-update hook (docker-compose.yml), executable whatever the checkout's file modes.
-COPY --chown=familyfi:familyfi --chmod=755 scripts/runtime/pre-update-backup.sh /app/scripts/runtime/pre-update-backup.sh
+# Watchtower's pre-update hook (docker-compose.yml), the restore operators run (docs/operations.md)
+# and the entrypoint's help when a migration fails, executable whatever the checkout's file modes.
+COPY --chown=familyfi:familyfi --chmod=755 scripts/runtime/pre-update-backup.sh scripts/runtime/restore-database.sh \
+  scripts/runtime/migration-failed.sh /app/scripts/runtime/
 EXPOSE 7001
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

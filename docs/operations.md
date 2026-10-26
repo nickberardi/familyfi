@@ -18,15 +18,21 @@ Import reads `config.json`, says what it will do, then replaces the household wi
 
 The next sync rebuilds the gateway's policies. Those this install created are removed by their creation records, as always; a policy another install created stays (FamilyFi never deletes a policy it cannot prove it made), so moving to a new install on the same gateway leaves the old install's FamilyFi policies for the operator to delete in UniFi. The import preview says when that applies.
 
-For an exact copy instead (sessions, pairings, history and all), restore `database.dump` into the same or a newer release with the same `FAMILYFI_ENCRYPTION_KEY`, with FamilyFi stopped:
+For an exact copy instead (sessions, pairings, history and all), restore `database.dump` with the same `FAMILYFI_ENCRYPTION_KEY`, with FamilyFi stopped. From the folder with `docker-compose.yml`:
 
 ```bash
-docker compose -f docker/docker-compose.yml stop app
-docker compose -f docker/docker-compose.yml exec -T db pg_restore --clean --if-exists --no-owner -U familyfi -d familyfi < database.dump
-docker compose -f docker/docker-compose.yml start app
+docker compose stop app
+docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app - < database.dump
+docker compose up -d app
 ```
 
-The backups the updater takes before each install (`/var/lib/familyfi/data/backups/*.dump`, on the app volume) restore the same way.
+[`restore-database.sh`](../scripts/runtime/restore-database.sh) replaces the database whole: it checks the file is a dump, refuses while anything else is connected, then empties the database and loads the dump in one transaction, so a dump that fails to load changes nothing. The next start migrates the restored database to the release that runs it, like any upgrade, so a dump from an older release restores into a newer one. Restore it into the release that wrote it or a newer one, never an older one. Don't restore with `pg_restore --clean` into the existing database: it leaves behind the tables newer migrations added, and the next start fails on them.
+
+The backups the updater takes before each install (`/var/lib/familyfi/data/backups/familyfi-v<version>-<time>.dump`, on the app volume) restore the same way, by their path in place of `-`:
+
+```bash
+docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app /var/lib/familyfi/data/backups/familyfi-v0.34.0-20261026T000000Z.dump
+```
 
 ## Remote access and pairing
 
@@ -230,9 +236,20 @@ Release images run `prisma migrate deploy` on start. Local `make dev` does the s
 
 The migration history starts from one baseline, `prisma/migrations/00000000000000_baseline`, which replaced the prereleases' 33 migrations ([#153](https://github.com/nickberardi/familyfi/issues/153)). Databases built by a prerelease (v0.1.0 to v0.17.0) are not upgraded: `migrate deploy` fails on them because their tables already exist. Such a household starts over with an empty database: stop FamilyFi, remove the PostgreSQL volume (`familyfi-postgres_data` by default; keep the app data volume and `.env`, which hold `FAMILYFI_ENCRYPTION_KEY`), start the new release and set FamilyFi up again. With `DB_MODE=external`, drop and recreate the database instead. A development database (`familyfi-dev-postgres_data`) starts over the same way: `make dev` fails at `migrate deploy` until it does.
 
-From the first release on the baseline (v0.22.3), a household may skip releases: any of them upgrades straight to the newest. CI proves it on every push by filling a database built by each supported release and upgrading it (`pnpm db-upgrade`); until that release is tagged there is nothing to upgrade from. The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/ci/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
+From the first release on the baseline (v0.22.3), a household may skip releases: any of them upgrades straight to the newest. CI proves it on every push by filling a database built by each supported release and upgrading it, and by restoring a dump of it over a database already at the new release with `restore-database.sh` and upgrading that (`pnpm db-upgrade`); until that release is tagged there is nothing to upgrade from. The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/ci/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
 
 Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose interpolates `POSTGRES_*` for the database service and passes `DB_*` and `POSTGRES_*` into the app container, which reaches PostgreSQL on port 5432 inside the Compose network. The app generates `FAMILYFI_DEFAULT_PASSWORD`, `FAMILYFI_SESSION_SECRET` and `FAMILYFI_ENCRYPTION_KEY` on first boot and keeps them in `/var/lib/familyfi/data/.env` on its volume; it does not read the host's `.env`.
+
+### When an update fails
+
+When a release's migrations fail, FamilyFi doesn't start, and every restart fails the same way. The gateway keeps the rules it already has meanwhile ([outages](#outages)). `docker compose logs app` shows Prisma's error and, below it, the failed migration and the steps back with the newest backup filled in ([`migration-failed.sh`](../scripts/runtime/migration-failed.sh)). From the folder with `docker-compose.yml`:
+
+1. `docker compose stop app`
+2. Restore the backup the updater took before installing this release, while this release's image is still the one Compose runs (older images have no restore script): `docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app /var/lib/familyfi/data/backups/familyfi-v<version>-<time>.dump`. `docker compose run --rm --no-deps --entrypoint ls app /var/lib/familyfi/data/backups` lists them.
+3. Add `FAMILYFI_IMAGE=ghcr.io/nickberardi/familyfi:v<version>` to `.env`, the version in the backup's name.
+4. `docker compose up -d app`
+
+A pinned version also holds back automatic updates (Maintenance reports **not installed**). Remove the line, or set it back to `latest`, once a release fixes the failure. Report the failure with the log. Without a backup, restore your own copy of the database and run the release it came from. `prisma migrate resolve` is only for someone who has found and fixed the cause by hand; it marks the migration done or rolled back and changes nothing else.
 
 ## Releases
 

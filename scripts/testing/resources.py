@@ -178,6 +178,8 @@ class Resources:
             time.sleep(1)
         published = self.command(["docker", "port", name, "5432/tcp"], timeout=30, idle=0).split()[0]
         env["POSTGRES_PORT"] = published.rsplit(":", 1)[1]
+        # PostgreSQL's own client tools, the server's version, for checks that dump and restore (db-upgrade).
+        env["FAMILYFI_TEST_POSTGRES_CONTAINER"] = name
         return env
 
     def memory_database(self, platform, env, log):

@@ -428,6 +428,8 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   const editHeading = page.getByRole("heading", { name: "Edit" });
   // Measured on the page, not the viewport: Save may scroll into view on a phone.
   const pageY = () => editHeading.evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
+  // The page's own reads (the category catalog above the form on a phone) have landed first.
+  await page.waitForLoadState("networkidle");
   const yBefore = await pageY();
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();

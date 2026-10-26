@@ -1,4 +1,4 @@
-import { ApiError, waitForChange as pollChange, type ApiRequest } from "./api-client";
+import { ApiError, TransportError, waitForChange as pollChange, type ApiRequest } from "./api-client";
 import { CSRF_COOKIE, CSRF_HEADER } from "./constants";
 
 export { ApiError };
@@ -14,7 +14,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (method !== "GET" && method !== "HEAD") headers.set(CSRF_HEADER, csrfToken());
   if (init.body !== undefined && !headers.has("content-type")) headers.set("content-type", "application/json");
-  const response = await fetch(path, { ...init, headers, credentials: "same-origin" });
+  let response: Response;
+  try {
+    response = await fetch(path, { ...init, headers, credentials: "same-origin" });
+  } catch (error) {
+    // No response at all: the server is down or restarting, or the network is.
+    throw new TransportError(error);
+  }
   let json: { error?: { code?: string; message?: string } } | null = null;
   try {
     json = (await response.json()) as { error?: { code?: string; message?: string } };
