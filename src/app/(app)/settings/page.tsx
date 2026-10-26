@@ -397,6 +397,8 @@ function Maintenance() {
         {/* An import restores the update schedule too, so its card rereads it with the household. */}
         <BackupCard
           onImported={() => {
+            // An import can bring another console, with a catalog of its own.
+            forgetCatalogNames();
             reload();
             return reloadHousehold();
           }}
