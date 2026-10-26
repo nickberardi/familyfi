@@ -3,7 +3,7 @@
  * Wi-Fi networks, never writes to the gateway, keeps a dismissal while the finding is about the same
  * thing, and Block countries is a built-in rule enforced through UniFi's region filter.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getCheckup } from "@/app/api/v1/checkup/route";
@@ -86,6 +86,7 @@ describe("network checkup", () => {
 
   afterEach(() => {
     setReconcileClientForTests(undefined);
+    vi.restoreAllMocks();
   });
 
   it("runs after a sync, from what it read and the Wi-Fi networks, and writes nothing to the gateway", async () => {
@@ -97,7 +98,7 @@ describe("network checkup", () => {
     expect(state.error).toBeNull();
     expect(checks(state)).toEqual(["leftover_policies", "private_addresses", "wifi_multicast", "sonos_mdns", "sonos_mixed", "casting_mdns", "dns_override"]);
     // Nothing is in a Things group yet, so no Wi-Fi carries smart-home devices.
-    expect(state.passed).toEqual(["smart_home_wifi", "unmanaged_networks"]);
+    expect(state.passed).toEqual(["gateway_drift", "smart_home_wifi", "unmanaged_networks"]);
     const privates = state.findings.find((finding) => finding.check === "private_addresses")!;
     expect(privates.details.devices?.map((device) => device.name)).toEqual(["Galaxy S24", "Melinda's iPhone"]);
     // Every finding carries its words, for an app too old to know its check.
@@ -187,6 +188,47 @@ describe("network checkup", () => {
     const state = await checkup(auth);
     expect(checks(state)).not.toContain("wifi_multicast");
     expect(state.passed).toContain("wifi_multicast");
+  });
+
+  it("notes a FamilyFi policy changed in UniFi after the next sync, and whether it was changed back", async () => {
+    const auth = await signedIn();
+    await runReconcileOnce();
+    const [recorded] = await prisma().appPolicy.findMany();
+    const onGateway = () => client.state.policies.find((policy) => policy.id === recorded!.unifiPolicyId)!;
+    const enabled = onGateway().enabled;
+    onGateway().enabled = !enabled;
+    vi.spyOn(client, "updatePolicy").mockRejectedValueOnce(new Error("gateway busy"));
+
+    // Within the checkup's interval: sync records the note on its own.
+    await runReconcileOnce();
+    let note = (await checkup(auth)).findings.find((finding) => finding.check === "gateway_drift")!;
+    expect(note).toMatchObject({ id: "gateway_drift:quarantine", kind: "note", message: { key: "checkup.gateway_drift", text: "Quarantine was changed in UniFi" } });
+    expect(note.details.drift).toMatchObject({ rule: { id: "quarantine", name: "Quarantine" }, changes: [{ field: "switch", familyfi: enabled, gateway: !enabled }], putBack: false });
+    expect(await problems(auth)).toBe(4);
+
+    await runReconcileOnce();
+    note = (await checkup(auth)).findings.find((finding) => finding.check === "gateway_drift")!;
+    expect(note.details.drift?.putBack).toBe(true);
+    expect(onGateway().enabled).toBe(enabled);
+    // A full checkup keeps it too.
+    await checkNow(auth);
+    expect(checks(await checkup(auth))).toContain("gateway_drift");
+
+    // Dismissed, it stays dismissed until UniFi changes it again.
+    expect((await dismiss(auth, note.id, true)).status).toBe(200);
+    await runReconcileOnce();
+    expect((await checkup(auth)).findings.find((finding) => finding.id === note.id)?.dismissed).toBe(true);
+    onGateway().name = "Renamed in UniFi";
+    await runReconcileOnce();
+    const again = (await checkup(auth)).findings.find((finding) => finding.id === note.id)!;
+    expect(again.dismissed).toBe(false);
+    expect(again.details.drift?.changes).toEqual([{ field: "name", familyfi: expect.any(String), gateway: "Renamed in UniFi" }]);
+
+    // FamilyFi changing the policy itself ends the note.
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: !household.quarantineEnforced } });
+    await runReconcileOnce();
+    expect(checks(await checkup(auth))).not.toContain("gateway_drift");
   });
 
   it("answers 409 on Check now before UniFi is set up", async () => {

@@ -10,6 +10,7 @@ import {
   knownCheck,
   knownCheckupMessage,
   checkupSummary,
+  driftRows,
   leftoverCopyNote,
   leftoverPolicyLine,
   protectionLine,
@@ -89,7 +90,8 @@ export function ProtectionCard({
  * Checkup's second card: what the network checkup found, problems first, then notes that may be on
  * purpose, then the checks that passed. FamilyFi only reads; each finding says how to change it. The
  * one exception is leftover FamilyFi policies, which `onRemovePolicies` removes once its caller has
- * had the administrator confirm; without it the card only lists them.
+ * had the administrator confirm; without it the card only lists them. A FamilyFi rule changed in
+ * UniFi that sync could not change back offers `onPutBack`, which asks for a sync now.
  */
 export function NetworkCheckupCard({
   checkup,
@@ -99,6 +101,7 @@ export function NetworkCheckupCard({
   onCheckNow,
   onDismiss,
   onRemovePolicies,
+  onPutBack,
 }: {
   checkup: CheckupState | null;
   checking?: boolean;
@@ -108,6 +111,8 @@ export function NetworkCheckupCard({
   onDismiss: (finding: CheckupFinding, dismissed: boolean) => void;
   /** Ask the administrator to confirm, then remove these leftover policies. */
   onRemovePolicies?: (policyIds: string[]) => void;
+  /** Sync now, to put back a rule changed in UniFi. */
+  onPutBack?: () => void;
 }) {
   const ui = useUI();
   const [showPassed, setShowPassed] = useState(false);
@@ -138,12 +143,12 @@ export function NetworkCheckupCard({
       ))}
       {sections.notes.length ? <SubHead>{COPY.network.notes(sections.notes.length)}</SubHead> : null}
       {sections.notes.map((finding) => (
-        <FindingRow key={finding.id} finding={finding} disabled={disabled} onDismiss={onDismiss} />
+        <FindingRow key={finding.id} finding={finding} disabled={disabled} onDismiss={onDismiss} onPutBack={onPutBack} />
       ))}
       {sections.dismissed.length ? (
         <>
           <Fold icon="x" label={COPY.network.dismissedCount(sections.dismissed.length)} open={showDismissed} onPress={() => setShowDismissed(!showDismissed)} testID="checkup-dismissed" />
-          {showDismissed ? sections.dismissed.map((finding) => <FindingRow key={finding.id} finding={finding} disabled={disabled} onDismiss={onDismiss} onRemovePolicies={onRemovePolicies} />) : null}
+          {showDismissed ? sections.dismissed.map((finding) => <FindingRow key={finding.id} finding={finding} disabled={disabled} onDismiss={onDismiss} onRemovePolicies={onRemovePolicies} onPutBack={onPutBack} />) : null}
         </>
       ) : null}
       {passed.length ? (
@@ -171,16 +176,19 @@ function FindingRow({
   disabled,
   onDismiss,
   onRemovePolicies,
+  onPutBack,
 }: {
   finding: CheckupFinding;
   initiallyOpen?: boolean;
   disabled: boolean;
   onDismiss: (finding: CheckupFinding, dismissed: boolean) => void;
   onRemovePolicies?: (policyIds: string[]) => void;
+  onPutBack?: () => void;
 }) {
   const ui = useUI();
   const [open, setOpen] = useState(initiallyOpen);
   if (finding.check === "leftover_policies") return <LeftoverRow finding={finding} disabled={disabled} onDismiss={onDismiss} onRemovePolicies={onRemovePolicies} />;
+  if (finding.check === "gateway_drift" && finding.details.drift) return <DriftRow finding={finding} disabled={disabled} onDismiss={onDismiss} onPutBack={onPutBack} />;
   const note = finding.kind === "note";
   const body = [styles.body, { fontFamily: ui.font }];
   const action = [styles.action, { fontFamily: ui.font, color: ui.color("accent") }];
@@ -327,6 +335,75 @@ function LeftoverRow({
   );
 }
 
+/**
+ * A FamilyFi rule someone changed in UniFi: what FamilyFi has beside what was on the gateway. Sync
+ * changes it back on its own; Put it back shows only while that keeps failing.
+ */
+function DriftRow({
+  finding,
+  disabled,
+  onDismiss,
+  onPutBack,
+}: {
+  finding: CheckupFinding;
+  disabled: boolean;
+  onDismiss: (finding: CheckupFinding, dismissed: boolean) => void;
+  onPutBack?: () => void;
+}) {
+  const ui = useUI();
+  const copy = checkupCopy(finding);
+  const drift = finding.details.drift!;
+  const text = COPY.network.drift;
+  const body = [styles.body, { fontFamily: ui.font }];
+  const failing = !drift.putBack;
+  const cell = (value: string, changed = false) => <Text style={[body, styles.cell, { color: ui.color(changed ? "paused" : "ink-2") }, changed && styles.strong]}>{value}</Text>;
+  return (
+    <Row icon={copy.icon} tone={finding.dismissed || !failing ? "muted" : "paused"} testID={`checkup-finding-${finding.id}`}>
+      <View style={styles.grow}>
+        <Text style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>{copy.title}</Text>
+        <Text style={[body, { color: ui.color("ink-2") }]}>{copy.seen}</Text>
+        <Text style={[body, styles.gap, { color: ui.color("ink-3") }]}>{copy.why}</Text>
+        <View style={[styles.policies, { borderColor: ui.color("hairline-card") }]} testID={`checkup-drift-${finding.id}`}>
+          <View style={[styles.driftRow, { backgroundColor: ui.color("field-soft") }]}>
+            <Text style={[body, styles.driftLabel]} />
+            {cell(text.inFamilyFi)}
+            {cell(failing ? text.onGateway : text.wasOnGateway)}
+          </View>
+          {driftRows(drift).map((row) => (
+            <View key={row.label} style={[styles.driftRow, { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
+              <Text style={[body, styles.driftLabel, styles.strong, { color: ui.color("ink") }]}>{row.label}</Text>
+              {cell(row.familyfi)}
+              {cell(row.gateway, true)}
+            </View>
+          ))}
+        </View>
+        <View style={[styles.actions, styles.leftoverActions]}>
+          {failing && onPutBack ? (
+            <Pressable
+              role="button"
+              aria-disabled={disabled}
+              disabled={disabled}
+              onPress={onPutBack}
+              testID={`checkup-put-back-${finding.id}`}
+              style={({ pressed }) => [styles.solid, { backgroundColor: ui.color("accent") }, disabled && { opacity: 0.5 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+            >
+              <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-on-fill") }]}>{text.putBack}</Text>
+            </Pressable>
+          ) : null}
+          {copy.show ? (
+            <ui.Link href={copy.show.href}>
+              <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("accent") }]}>{copy.show.label}</Text>
+            </ui.Link>
+          ) : null}
+          <Pressable role="button" aria-disabled={disabled} disabled={disabled} onPress={() => onDismiss(finding, !finding.dismissed)} testID={`checkup-dismiss-${finding.id}`}>
+            <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{finding.dismissed ? COPY.network.restore : COPY.network.dismiss}</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Row>
+  );
+}
+
 function CardHead({ title, sub, trailing }: { title: string; sub?: string; trailing?: ReactNode }) {
   const ui = useUI();
   return (
@@ -406,5 +483,9 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "600" },
   copyNote: { marginTop: 2 },
   leftoverActions: { marginTop: 12 },
+  driftRow: { flexDirection: "row", gap: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  driftLabel: { width: 72, flexShrink: 0 },
+  cell: { flex: 1, minWidth: 0 },
+  solid: { minHeight: 36, paddingHorizontal: 14, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   danger: { minHeight: 36, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });

@@ -16,6 +16,7 @@ import {
   type CheckupState,
 } from "@/lib/checkup";
 import { toggleRuleEnabled } from "@/lib/group-writes";
+import { reconcileNow } from "@/lib/sync-writes";
 import { PageHeader } from "@/components/PageHeader";
 import { SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { useAppData } from "@/components/AppDataProvider";
@@ -86,6 +87,14 @@ export default function CheckupPage() {
     setConfirming(null);
   }
 
+  /** A rule changed in UniFi that sync could not change back: sync now, then show how it went. */
+  async function putBack() {
+    setError("");
+    setNotice(COPY.network.drift.putting);
+    await reconcileNow(store.mutate);
+    await load();
+  }
+
   const protections = recommendedRules(rules);
   return (
     <>
@@ -115,6 +124,7 @@ export default function CheckupPage() {
           onCheckNow={() => void checkNow()}
           onDismiss={(finding: CheckupFinding, dismissed: boolean) => void write(() => setCheckupDismissed(request, finding.id, dismissed))}
           onRemovePolicies={askToRemove}
+          onPutBack={() => void putBack()}
         />
       </div>
       {confirming ? <ConfirmRemove policies={confirming} busy={removing} onCancel={() => setConfirming(null)} onConfirm={() => void remove(confirming)} /> : null}

@@ -449,6 +449,12 @@
         "sync"
       ]
     },
+    "tests/unit/gateway-drift.test.ts": {
+      "categories": [
+        "unifi",
+        "sync"
+      ]
+    },
     "tests/unit/unifi.test.ts": {
       "categories": [
         "unifi",

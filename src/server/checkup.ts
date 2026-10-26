@@ -3,16 +3,22 @@ import {
   CHECK_KIND,
   CHECKUP_CHECKS,
   checkupMessage,
+  gatewayDriftFindings,
   knownCheck,
   openProblemCount,
   runChecks,
   type CheckupCheck,
   type CheckupDetails,
+  type CheckupDrift,
+  type CheckupDriftChange,
+  type CheckupResult,
   type CheckupInputs,
   type CheckupState,
   type CheckupWifi,
 } from "@/lib/checkup";
+import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { prisma } from "./db";
+import type { GatewayDriftChange } from "./unifi/drift";
 import { normalizeMac } from "./mac";
 import type { UnifiClient } from "./unifi/client";
 import { checkupPolicy, recordedPurposes, unrecordedPolicies } from "./leftover-policies";
@@ -76,16 +82,7 @@ async function checkup(household: Household, client: UnifiClient, preload?: Chec
   const run = runChecks(inputs);
   await prisma().$transaction(async (tx) => {
     const stored = new Map((await tx.checkupFinding.findMany({ select: { key: true, subject: true } })).map((row) => [row.key, row.subject]));
-    for (const finding of run.findings) {
-      const details = finding.details as Prisma.InputJsonValue;
-      // A dismissal lasts until the first change: one that changes back stays shown.
-      const changed = stored.has(finding.key) && stored.get(finding.key) !== finding.subject;
-      await tx.checkupFinding.upsert({
-        where: { key: finding.key },
-        create: { key: finding.key, check: finding.check, details, subject: finding.subject, firstSeenAt: now, lastSeenAt: now },
-        update: { details, subject: finding.subject, lastSeenAt: now, ...(changed ? { dismissedAt: null, dismissedSubject: null } : {}) },
-      });
-    }
+    for (const finding of run.findings) await upsertFinding(tx, finding, stored, now);
     // A finding no longer seen goes, except for a check that could not look this time.
     await tx.checkupFinding.deleteMany({
       where: { key: { notIn: run.findings.map((finding) => finding.key) }, check: { notIn: run.skipped } },
@@ -126,7 +123,69 @@ async function readInputs(household: Household, client: UnifiClient, siteId: str
     })),
     wifis: await readWifis(client, siteId, fallbackNetwork),
     unrecordedPolicies: await readUnrecordedPolicies(household, client, siteId, zones),
+    drift: await readDrift(),
   };
+}
+
+/** How long a changed-in-UniFi note stays after sync last found the change. */
+export const DRIFT_NOTE_MS = 7 * 24 * 60 * 60_000;
+
+/** FamilyFi's policies someone changed in the UniFi console lately, as sync recorded them. */
+async function readDrift(now = new Date()): Promise<CheckupDrift[]> {
+  const where = { driftSeenAt: { gte: new Date(now.getTime() - DRIFT_NOTE_MS) } };
+  const [appPolicies, rulePolicies] = await Promise.all([
+    prisma().appPolicy.findMany({ where, select: { gatewayDrift: true, driftSeenAt: true, lastError: true } }),
+    prisma().rulePolicy.findMany({
+      where,
+      select: { gatewayDrift: true, driftSeenAt: true, lastError: true, rule: { select: { id: true, name: true, systemGroup: { select: { id: true, name: true, kind: true } } } } },
+    }),
+  ]);
+  if (!appPolicies.length && !rulePolicies.length) return [];
+  const names = new Map((await prisma().device.findMany({ select: { mac: true, hostname: true } })).map((device) => [normalizeMac(device.mac), device.hostname?.trim() || device.mac]));
+  const named = (macs: string[]) => macs.map((mac) => names.get(normalizeMac(mac)) ?? mac).sort((a, b) => a.localeCompare(b));
+  const drift = (row: { gatewayDrift: Prisma.JsonValue; driftSeenAt: Date | null; lastError: string | null }) => ({
+    changes: (row.gatewayDrift as GatewayDriftChange[]).map((change): CheckupDriftChange =>
+      change.field === "devices" ? { field: "devices", familyfi: named(change.familyfi), gateway: named(change.gateway) } : change,
+    ),
+    seenAt: row.driftSeenAt!.toISOString(),
+    putBack: row.lastError === null,
+  });
+  return [
+    ...appPolicies.map((row) => ({ rule: { id: QUARANTINE_RULE_ID, name: "Quarantine" }, ...drift(row) })),
+    ...rulePolicies.map((row) => ({
+      rule: { id: row.rule.id, name: row.rule.name },
+      ...(row.rule.systemGroup ? { group: row.rule.systemGroup } : {}),
+      ...drift(row),
+    })),
+  ];
+}
+
+/**
+ * After a sync pass, between full checkups: the changed-in-UniFi notes as the pass left them, so one
+ * shows, or says FamilyFi put it back, without waiting for the next checkup. Never fails the pass.
+ */
+export async function recordDriftFindings(now = new Date()): Promise<void> {
+  try {
+    const findings = gatewayDriftFindings(await readDrift(now));
+    await prisma().$transaction(async (tx) => {
+      const stored = new Map((await tx.checkupFinding.findMany({ where: { check: "gateway_drift" }, select: { key: true, subject: true } })).map((row) => [row.key, row.subject]));
+      for (const finding of findings) await upsertFinding(tx, finding, stored, now);
+      await tx.checkupFinding.deleteMany({ where: { check: "gateway_drift", key: { notIn: findings.map((finding) => finding.key) } } });
+    });
+  } catch (error) {
+    console.warn("Changed-in-UniFi notes could not be recorded:", error);
+  }
+}
+
+async function upsertFinding(tx: Prisma.TransactionClient, finding: CheckupResult, stored: Map<string, string>, now: Date) {
+  const details = finding.details as Prisma.InputJsonValue;
+  // A dismissal lasts until the first change: one that changes back stays shown.
+  const changed = stored.has(finding.key) && stored.get(finding.key) !== finding.subject;
+  await tx.checkupFinding.upsert({
+    where: { key: finding.key },
+    create: { key: finding.key, check: finding.check, details, subject: finding.subject, firstSeenAt: now, lastSeenAt: now },
+    update: { details, subject: finding.subject, lastSeenAt: now, ...(changed ? { dismissedAt: null, dismissedSubject: null } : {}) },
+  });
 }
 
 /**
