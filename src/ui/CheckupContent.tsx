@@ -267,7 +267,7 @@ function LeftoverRow({
                 role="checkbox"
                 aria-checked={on}
                 aria-label={policy.name}
-                disabled={!onRemovePolicies}
+                disabled={disabled || !onRemovePolicies}
                 onPress={() => toggle(policy.id)}
                 testID={`checkup-policy-${policy.id}`}
                 style={({ pressed }) => [styles.policy, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }, pressed && { opacity: PRESS_OPACITY }]}
