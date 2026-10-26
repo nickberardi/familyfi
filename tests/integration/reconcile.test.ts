@@ -4,6 +4,8 @@ import { UnifiHttpError } from "@/server/unifi/errors";
 import { prisma } from "@/server/db";
 import { publicDevice } from "@/server/devices";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
+import { connectionIdentity } from "@/server/unifi/connection";
+import { policyFingerprint } from "@/server/unifi/fingerprint";
 import {
   ADMIN_POLICY_ID,
   INTERNAL_NETWORK,
@@ -428,5 +430,50 @@ describe("reconciliation against mocked UniFi", () => {
     const ops = await prisma().policyOperation.findMany();
     expect(ops.some((op) => op.status === "pending")).toBe(true);
     expect(client.state.policies.some((policy) => policy.id === ADMIN_POLICY_ID)).toBe(true);
+  });
+
+  it("finds and removes the policy an interrupted create left, so no duplicate stays", async () => {
+    const client = fixtureUnifiClient();
+    const before = new Set(client.state.policies.map((policy) => policy.id));
+    client.throwAfterCreate = true;
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const leftBehind = client.state.policies.filter((policy) => !before.has(policy.id));
+    expect(leftBehind.length).toBeGreaterThan(0);
+
+    client.throwAfterCreate = false;
+    await runReconcileOnce();
+
+    const ids = new Set(client.state.policies.map((policy) => policy.id));
+    for (const policy of leftBehind) expect(ids.has(policy.id)).toBe(false);
+    const recorded = await prisma().appPolicy.findMany();
+    expect(client.state.policies.filter((policy) => !before.has(policy.id)).map((policy) => policy.id).sort()).toEqual(
+      recorded.map((policy) => policy.unifiPolicyId).sort(),
+    );
+    expect(await prisma().policyOperation.count({ where: { status: "pending" } })).toBe(0);
+    expect(ids.has(ADMIN_POLICY_ID)).toBe(true);
+  });
+
+  it("never takes a policy for a lost create's unless it carries exactly that payload", async () => {
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const scope = { connectionIdentity: connectionIdentity(household), siteId: household.unifiSiteId! };
+    const admin = client.state.policies.find((policy) => policy.id === ADMIN_POLICY_ID)!;
+    // A lost create of the administrator's policy renamed: same everything but the name.
+    const pending = await prisma().policyOperation.create({
+      data: {
+        ...scope,
+        intent: "create",
+        status: "pending",
+        payloadFingerprint: policyFingerprint({ ...admin, name: `FamilyFi ${admin.name}` }),
+      },
+    });
+
+    await runReconcileOnce();
+
+    expect(client.state.policies.some((policy) => policy.id === ADMIN_POLICY_ID)).toBe(true);
+    expect((await prisma().policyOperation.findUniqueOrThrow({ where: { id: pending.id } })).status).toBe("pending");
   });
 });

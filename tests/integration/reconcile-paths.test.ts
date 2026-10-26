@@ -434,7 +434,18 @@ describe("reconciler paths", () => {
       expect(operations.every((operation) => operation.status === "failed")).toBe(true);
     });
 
-    it("drops policy-write history older than a week, but never an applied creation", async () => {
+    it("keeps a create pending when a proxy answers 5xx, since the gateway may have made it", async () => {
+      const client = fixtureUnifiClient();
+      client.createError = gatewayError(502, "POST");
+      setReconcileClientForTests(client);
+      await runReconcileOnce();
+
+      const operations = await prisma().policyOperation.findMany();
+      expect(operations.length).toBeGreaterThan(0);
+      expect(operations.every((operation) => operation.status === "pending")).toBe(true);
+    });
+
+    it("drops policy-write history older than a week, but never an applied creation or a pending one", async () => {
       const client = fixtureUnifiClient();
       setReconcileClientForTests(client);
       await runReconcileOnce();
@@ -442,16 +453,19 @@ describe("reconciler paths", () => {
       const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
       const scope = { connectionIdentity: policy.connectionIdentity, siteId: policy.siteId, intent: "create" as const };
       const stale = await Promise.all(
-        ["failed", "removed", "pending"].map((status) => prisma().policyOperation.create({ data: { ...scope, status } })),
+        ["failed", "removed"].map((status) => prisma().policyOperation.create({ data: { ...scope, status } })),
       );
+      const unmatched = await prisma().policyOperation.create({ data: { ...scope, status: "pending", payloadFingerprint: "nothing" } });
       const recent = await prisma().policyOperation.create({ data: { ...scope, status: "failed" } });
-      await prisma().$executeRaw`UPDATE "PolicyOperation" SET "updatedAt" = ${old}`;
+      await prisma().$executeRaw`UPDATE "PolicyOperation" SET "updatedAt" = ${old}, "createdAt" = ${old}`;
       await prisma().policyOperation.update({ where: { id: recent.id }, data: { status: "failed" } });
 
       await runReconcileOnce();
 
       const left = await prisma().policyOperation.findMany();
       for (const row of stale) expect(left.some((operation) => operation.id === row.id)).toBe(false);
+      // A week-old create that found no policy made nothing; it is kept as failed for another week.
+      expect(left.find((operation) => operation.id === unmatched.id)?.status).toBe("failed");
       expect(left.some((operation) => operation.id === recent.id)).toBe(true);
       const applied = left.filter((operation) => operation.status === "applied");
       expect(applied.some((operation) => operation.unifiPolicyId === policy.unifiPolicyId)).toBe(true);
