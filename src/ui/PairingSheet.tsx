@@ -76,7 +76,17 @@ export function PairingBody({ pairing }: { pairing: Pairing }) {
           <Text style={[text(14, 21, "muted"), styles.routeLine]}>{copy.routeNote}</Text>
         </View>
         <PairingNameField label={copy.phone} value={pairing.name} onChange={pairing.setName} />
-        <PairingAccountField label={copy.signsInAs} accounts={pairing.accounts} value={pairing.accountId} onChange={pairing.setAccountId} />
+        {pairing.noAccounts ? (
+          // The link sits on its own line: a link inside running text does not lay out on every platform.
+          <View role="status" style={[styles.note, { backgroundColor: ui.color("note-fill") }]} testID="pairing-no-accounts">
+            <Text style={text(14, 21, "ink")}>{copy.noAccounts}</Text>
+            <ui.Link href="/settings">
+              <Text style={[text(14, 21, "accent"), styles.bold]}>{copy.noAccountsLink}</Text>
+            </ui.Link>
+          </View>
+        ) : (
+          <PairingAccountField label={copy.signsInAs} accounts={pairing.accounts} value={pairing.accountId} onChange={pairing.setAccountId} />
+        )}
         {error}
       </View>
     );
@@ -162,6 +172,7 @@ const styles = StyleSheet.create({
   qr: { alignSelf: "center" },
   veil: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" },
   center: { textAlign: "center" },
+  note: { gap: 6, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
   claimed: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, overflow: "hidden" },
   button: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
 });

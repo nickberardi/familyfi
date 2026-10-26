@@ -119,6 +119,21 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     await expect(card.getByTestId("remote-status")).toHaveText("Not reached", { timeout: 10_000 });
     await expect(card.getByTestId("remote-detail")).toContainText("FamilyFi could not resolve");
 
+    // A household whose only administrator is the recovery admin is told how to add one, with no menu to pick from.
+    await page.route("**/api/v1/accounts", async (route) => {
+      const { accounts } = (await (await route.fetch()).json()) as { accounts: { kind: string }[] };
+      await route.fulfill({ json: { accounts: accounts.filter((account) => account.kind === "recovery") } });
+    });
+    await page.getByRole("button", { name: "Pair a phone" }).click();
+    const noAdmins = page.getByRole("dialog", { name: "Pair a phone" });
+    await expect(noAdmins.getByTestId("pairing-no-accounts")).toContainText("never as the built-in admin");
+    await expect(noAdmins.getByTestId("pairing-no-accounts").getByRole("link", { name: "Open Settings" })).toHaveAttribute("href", "/settings");
+    await expect(noAdmins.getByTestId("pairing-account")).toHaveCount(0);
+    await expect(noAdmins.getByTestId("pairing-show")).toBeDisabled();
+    await shot(page, "pair-no-admins");
+    await noAdmins.getByTestId("pairing-cancel").click();
+    await page.unroute("**/api/v1/accounts");
+
     await page.getByRole("button", { name: "Pair a phone" }).click();
     const pairSheet = page.getByRole("dialog", { name: "Pair a phone" });
     await expect(pairSheet.getByTestId("pairing-route")).toContainText(url);

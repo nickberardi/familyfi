@@ -181,7 +181,8 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     claimedLine: `Paired ${claimedName ?? ""} ✓`,
     issueFailed: "Could not create a pairing code.",
     accountsFailed: "Could not load the administrators a phone can sign in as.",
-    noAccounts: "A phone signs in as an adult with administrator access, never as the built-in admin. Add one under Accounts first.",
+    noAccounts: "A phone signs in as an adult with administrator access, never as the built-in admin. Give an adult admin access under Settings › Household, then pair this phone.",
+    noAccountsLink: "Open Settings",
     copy: "Copy",
     copied: "Copied",
   };
