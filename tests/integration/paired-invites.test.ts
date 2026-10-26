@@ -8,7 +8,8 @@ import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
 import { DELETE as cancelInvite, GET as inviteStatus } from "@/app/api/v1/paired/invites/[id]/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
-import { bearer, claimInvite, claimWatchRequest, homeRoute, invitePhoneRequest, issuedInvite, pairPhone, type Claim } from "../helpers/pairing";
+import { bearer, claimInvite, claimWatchRequest, homeRoute, invitePhoneRequest, issuedInvite, pairPhone, PAIRING_ADMIN, pairingAdminAuth, type Claim } from "../helpers/pairing";
+import { POST as refresh } from "@/app/api/v1/auth/refresh/route";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const json = { "content-type": "application/json" };
@@ -36,12 +37,12 @@ describe("POST /paired/invites", () => {
     const claim = await pairPhone(await admin());
     expect(claim).not.toHaveProperty("deviceCredential");
     expect(claim.device).toMatchObject({ client: "phone", scope: "full" });
-    expect(claim.session.username).toBe("admin");
+    expect(claim.session.username).toBe(PAIRING_ADMIN.username);
     expect(claim.connection?.endpoint?.url).toBe("https://familyfi.local");
     expect(claim.connection?.manifest.signature).toBeTruthy();
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(claim.token) }))).status).toBe(200);
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: claim.device.id } });
-    expect(device.accountId).toBe((await prisma().account.findUniqueOrThrow({ where: { username: "admin" } })).id);
+    expect(device.accountId).toBe((await prisma().account.findUniqueOrThrow({ where: { username: PAIRING_ADMIN.username } })).id);
   });
 
   it("names a phone what the administrator typed when inviting it, not what the phone calls itself", async () => {
@@ -134,7 +135,7 @@ describe("POST /paired/invites", () => {
     const watch = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
     expect(await errorCode(await claimWatchRequest(bearer(watch.token)))).toBe("watch_scope");
 
-    const agentInvite = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "agent", displayName: "Agent", scope: "full" }) })));
+    const agentInvite = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: await pairingAdminAuth(), headers: json, body: JSON.stringify({ client: "agent", displayName: "Agent", scope: "full" }) })));
     const agent = (await (await claimInvite(agentInvite, "Agent")).json()) as Claim;
     expect(await errorCode(await claimWatchRequest(bearer(agent.token)))).toBe("agent_scope");
   });
@@ -167,5 +168,32 @@ describe("POST /paired/invites", () => {
     expect(refused.status).toBe(403);
     expect(await errorCode(refused)).toBe("invalid_pairing");
     expect(await prisma().pairedDevice.count({ where: { accountId: parent.id } })).toBe(0);
+  });
+
+  it("pairs nothing as the recovery admin, and voids what was left from before", async () => {
+    const auth = await admin();
+    const recovery = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
+    const route = await homeRoute();
+    const refused = await invitePhoneRequest(auth, { endpointId: route.id, accountId: recovery.id });
+    expect(refused.status).toBe(400);
+    expect(await errorCode(refused)).toBe("personal_account_required");
+    // Asking for no account means the one signed in, which is the recovery admin here.
+    const unnamed = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "phone", displayName: "iPhone", endpointId: route.id }) }));
+    expect(await errorCode(unnamed)).toBe("personal_account_required");
+    expect(await prisma().pairing.count()).toBe(0);
+
+    // A phone paired as the recovery admin before the rule: its invite, Watch, session and refresh are all refused.
+    const phone = await pairPhone(auth);
+    await prisma().pairing.updateMany({ data: { accountId: recovery.id } });
+    await prisma().pairedDevice.updateMany({ data: { accountId: recovery.id } });
+    await prisma().session.updateMany({ where: { deviceId: phone.device.id }, data: { accountId: recovery.id, username: "admin" } });
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(phone.token) }))).status).toBe(401);
+    const renewed = await refresh(request("/api/v1/auth/refresh", { method: "POST", headers: json, body: JSON.stringify({ refreshToken: phone.refreshToken }) }));
+    expect(renewed.status).toBe(403);
+
+    const leftover = await issuedInvite(await invitePhoneRequest(auth, { endpointId: route.id, displayName: "Spare" }));
+    await prisma().pairing.update({ where: { id: leftover.id }, data: { accountId: recovery.id } });
+    expect((await claimInvite(leftover, "Spare")).status).toBe(403);
+    expect(await prisma().pairedDevice.count({ where: { accountId: recovery.id } })).toBe(1);
   });
 });

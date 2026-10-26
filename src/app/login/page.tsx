@@ -1,19 +1,22 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignInForm } from "@/components/SignInForm";
 import { Logo } from "@/components/ui/Logo";
 import { appVersionLabel } from "@/lib/version";
 import { DEMO_SIGN_IN_NOTE, DEMO_USERNAME } from "@/lib/demo";
+import { isHomeAddress } from "@/lib/setup";
 import { demoModeEnabled, recoveryPassword } from "@/server/env";
 import { householdHasGateway } from "@/server/setup-entry";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  // A new install signs its first admin in through setup, which hands over the admin password.
+  // A new install signs its first admin in through setup, which hands over the admin password, but
+  // only at a home network address (`setupRedirect`); anywhere else the form asks for it instead.
   // If the database cannot answer, the form still shows, so sign-in reports the problem.
   const demo = demoModeEnabled();
   const configured = demo || (await householdHasGateway().catch(() => true));
-  if (!configured) redirect("/setup");
+  if (!configured && isHomeAddress((await headers()).get("host"))) redirect("/setup");
   // The public demo shows its one shared login to every visitor; settings and passwords are locked there.
   // Without a password the form stays empty, so sign-in reports the problem as it does elsewhere.
   const demoPassword = demo ? demoSignInPassword() : "";

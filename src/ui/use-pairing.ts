@@ -47,8 +47,10 @@ export function usePairing({
     void request<{ accounts: Account[] }>("/api/v1/accounts")
       .then(({ accounts: all }) => {
         if (!live) return;
-        setAccounts(pairingAccounts(all));
+        const allowed = pairingAccounts(all);
+        setAccounts(allowed);
         setAccountId((current) => current || defaultPairingAccount(all, username));
+        if (!allowed.length) setError(pairingSheetCopy().noAccounts);
       })
       // Without them the code cannot be shown, so say why.
       .catch((caught: unknown) => {

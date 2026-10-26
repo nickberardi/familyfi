@@ -51,7 +51,6 @@ export async function ensureRecoveryAccount() {
     update: {
       kind: AccountKind.recovery,
       isAdmin: true,
-      passwordHash: null,
       displayName: "Recovery admin",
     },
     create: {
@@ -61,6 +60,23 @@ export async function ensureRecoveryAccount() {
       isAdmin: true,
     },
   });
+}
+
+/**
+ * Run at startup, after `ensureRecoveryAccount`: when the recovery password is no longer the one
+ * this install last started with, every session signed in with the old one ends. The account keeps
+ * a hash of the password it last saw for this; sign-in still compares with the password itself.
+ */
+export async function settleRecoveryPassword(): Promise<boolean> {
+  const account = await prisma().account.findUniqueOrThrow({ where: { username: RECOVERY_USERNAME } });
+  const password = recoveryPassword();
+  if (account.passwordHash && (await verifyPassword(account.passwordHash, password))) return false;
+  const changed = account.passwordHash !== null;
+  await prisma().$transaction([
+    prisma().account.update({ where: { id: account.id }, data: { passwordHash: await hashPassword(password) } }),
+    ...(changed ? [prisma().session.updateMany({ where: { accountId: account.id, revokedAt: null }, data: { revokedAt: new Date() } })] : []),
+  ]);
+  return changed;
 }
 
 export async function ensureHousehold() {
@@ -147,6 +163,14 @@ async function recordAttempt(input: {
  */
 export function isAdministratorAccount(account: Pick<Account, "kind" | "isAdmin"> | null | undefined): boolean {
   return account?.kind === AccountKind.recovery || account?.isAdmin === true;
+}
+
+/**
+ * Whether a paired device may act as this account: a personal administrator. The recovery account is
+ * for getting back in from a browser at home, so no phone, Watch or agent ever acts as it.
+ */
+export function mayPairAs<T extends Pick<Account, "kind" | "isAdmin">>(account: T | null | undefined): account is T {
+  return account?.kind === AccountKind.personal && account.isAdmin;
 }
 
 export async function authenticate(usernameRaw: string, password: string, ip: string) {
@@ -265,8 +289,8 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
     grace = true;
   }
   if (session.revokedAt || session.kind !== SessionKind.bearer || !session.refreshExpiresAt || session.refreshExpiresAt <= now || !session.device || session.device.revokedAt) return INVALID_REFRESH;
-  // A device acting as an adult who is no longer an administrator has no sign-in to renew.
-  if (session.account && !isAdministratorAccount(session.account)) return INVALID_REFRESH;
+  // A device acting as an adult who is no longer an administrator, or as the recovery account, has no sign-in to renew.
+  if (!mayPairAs(session.account)) return INVALID_REFRESH;
   // Remote access is for the household's phones; an agent renews from the home network or not at all.
   if (options.tunnelled && session.device.client === PairedDeviceClient.agent) return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
@@ -313,6 +337,8 @@ export async function readSessionFromRequest(request: Request) {
   if (presented.bearer && session.kind !== SessionKind.bearer) return null;
   // Only administrators use FamilyFi; demotion ends their sessions, and this refuses any left over.
   if (session.account && !isAdministratorAccount(session.account)) return null;
+  // No paired device acts as the recovery account; one left over from before that rule is refused.
+  if (session.device && !mayPairAs(session.account)) return null;
   if (session.device && (!session.device.lastSeenAt || session.device.lastSeenAt < new Date(Date.now() - 15 * 60 * 1000))) {
     await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date() } });
   }

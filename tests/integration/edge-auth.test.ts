@@ -1,6 +1,5 @@
 import { createPublicKey, verify } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as identity } from "@/app/api/v1/connection/identity/route";
 import { GET as listEndpoints, POST as createEndpoint } from "@/app/api/v1/connection/endpoints/route";
 import { PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
@@ -10,11 +9,10 @@ import { POST as claimPairing } from "@/app/api/v1/paired/invites/[id]/claim/rou
 import { GET as connection } from "@/app/api/v1/connection/route";
 import { PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
 import { prisma } from "@/server/db";
-import { authFromLogin, request, type SessionAuth } from "../helpers/http";
-import { issuedInvite as issuedPairing } from "../helpers/pairing";
+import { request, type SessionAuth } from "../helpers/http";
+import { issuedInvite as issuedPairing, pairingAdminAuth } from "../helpers/pairing";
 import { resetDatabase } from "../helpers/db";
 
-const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const TOKEN = { clientId: "0123456789abcdef0123456789abcdef.access", clientSecret: "s3cr3t-0123456789abcdef0123456789abcdef0123456789abcdef" };
 const ROTATED = { clientId: TOKEN.clientId, clientSecret: "r0tated-fedcba9876543210fedcba9876543210fedcba9876543210" };
 
@@ -28,12 +26,8 @@ function json(auth: SessionAuth, method: string, body?: unknown): RequestInit & 
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
-async function adminAuth() {
-  const response = await login(
-    request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }) }),
-  );
-  return authFromLogin(response);
-}
+/** A personal administrator, since no device pairs as the recovery admin. */
+const adminAuth = pairingAdminAuth;
 
 async function addRoute(auth: SessionAuth, body: Record<string, unknown>) {
   const response = await createEndpoint(request("/api/v1/connection/endpoints", json(auth, "POST", { trustMode: "system", ...body })));

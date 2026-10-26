@@ -26,7 +26,7 @@ import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
 import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
-import { claimInvite, issuedInvite } from "../helpers/pairing";
+import { claimInvite, decodePairingCode, issuedInvite } from "../helpers/pairing";
 import { TEST_ORIGIN } from "../helpers/test-env";
 
 const json = { "content-type": "application/json" };
@@ -272,12 +272,18 @@ describe("paired agents", () => {
     expect((await openapi(request("/openapi", { auth: bearer(claimed.token) }))).status).toBe(200);
   });
 
-  it("acts as the recovery account when that account paired it", async () => {
+  it("is never connected as the recovery account", async () => {
     const recovery = authFromLogin(await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD }) })));
-    const issued = await issuedInvite(await agentPairing(recovery, "readOnly"));
-    const response = await claim(issued);
-    expect(response.status).toBe(200);
-    expect(((await response.json()) as Claimed).session.username).toBe("admin");
+    const refused = await agentPairing(recovery, "readOnly");
+    expect(refused.status).toBe(403);
+    expect(await errorCode(refused)).toBe("personal_account_required");
+    expect(await prisma().pairing.count()).toBe(0);
+
+    // An invite left over from before the rule cannot be claimed either.
+    const account = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
+    const left = await inviteAgent({ createdByAccountId: account.id, displayName: "Claude Code", scope: DeviceScope.readOnly, url: TEST_ORIGIN });
+    expect((await claim(decodePairingCode(left.code))).status).toBe(403);
+    expect(await prisma().pairedDevice.count()).toBe(0);
   });
 
   it("is never an administrator: the admin guard refuses it even on a path its scope reaches", async () => {

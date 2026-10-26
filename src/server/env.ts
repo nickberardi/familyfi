@@ -14,7 +14,6 @@ export class ConfigurationError extends Error {
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
   FAMILYFI_DEFAULT_PASSWORD: z.string().min(12),
-  FAMILYFI_SESSION_SECRET: z.string().min(32),
   FAMILYFI_ENCRYPTION_KEY: z.string().min(1),
   DB_MODE: z.enum(["bundled", "external", "memory"]).default("bundled"),
   DB_HOST: z.string().default("127.0.0.1"),
@@ -110,7 +109,6 @@ let cached: AppEnv | undefined;
 
 const ISSUE_BY_FIELD: Record<string, string> = {
   FAMILYFI_DEFAULT_PASSWORD: "FAMILYFI_DEFAULT_PASSWORD must be at least 12 characters.",
-  FAMILYFI_SESSION_SECRET: "FAMILYFI_SESSION_SECRET must be at least 32 characters.",
   FAMILYFI_ENCRYPTION_KEY: "FAMILYFI_ENCRYPTION_KEY must be 32 bytes as 64 hex characters (or base64).",
   POSTGRES_PASSWORD: "POSTGRES_PASSWORD must be set.",
   DB_MODE: "DB_MODE must be bundled, external or memory.",
@@ -133,7 +131,6 @@ function settingsFrom(source: Record<string, string | undefined>) {
   const settings = {
     NODE_ENV: source.NODE_ENV,
     FAMILYFI_DEFAULT_PASSWORD: read(source, "FAMILYFI_DEFAULT_PASSWORD"),
-    FAMILYFI_SESSION_SECRET: read(source, "FAMILYFI_SESSION_SECRET"),
     FAMILYFI_ENCRYPTION_KEY: read(source, "FAMILYFI_ENCRYPTION_KEY"),
     DB_MODE: read(source, "DB_MODE") || "bundled",
     DB_HOST: read(source, "DB_HOST"),

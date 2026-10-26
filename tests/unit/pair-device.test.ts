@@ -157,7 +157,15 @@ describe("pair device", () => {
     expect(phoneLines(watch, new Date(), "Kitchen iPhone").origin).toBe("Paired automatically from Kitchen iPhone");
   });
 
-  it("offers a phone only administrators to sign in as, the one signed in here first", () => {
+  it("names the phone a phone or agent was paired from, which revoking takes it with", () => {
+    const paired = phone({ client: "agent", scope: "readOnly", pairedVia: null });
+    expect(phoneLines(paired, new Date(), "Kitchen iPhone").dates).toMatch(/^Paired .+ from Kitchen iPhone/);
+    expect(phoneLines(paired).dates).not.toContain(" from ");
+    const watch = phone({ client: "watch", scope: "rulesOnly", pairedVia: null });
+    expect(phoneLines(watch, new Date(), "Kitchen iPhone").dates).not.toContain(" from ");
+  });
+
+  it("offers a phone only personal administrators to sign in as, the one signed in here first", () => {
     const account = (over: Partial<Account>): Account => ({
       id: "a1", username: "admin", displayName: "An adult", kind: "personal", isAdmin: true, groupId: null, recovery: false, ...over,
     });
@@ -166,9 +174,11 @@ describe("pair device", () => {
       account({ id: "recovery", username: "recovery", kind: "recovery", isAdmin: false, recovery: true }),
       account({ id: "admin", username: "admin" }),
     ];
-    expect(pairingAccounts(accounts).map((each) => each.id)).toEqual(["recovery", "admin"]);
+    // No device acts as the recovery admin, even when it is the one signed in here.
+    expect(pairingAccounts(accounts).map((each) => each.id)).toEqual(["admin"]);
     expect(defaultPairingAccount(accounts, "admin")).toBe("admin");
-    expect(defaultPairingAccount(accounts, "member")).toBe("recovery");
+    expect(defaultPairingAccount(accounts, "member")).toBe("admin");
+    expect(defaultPairingAccount(accounts, "recovery")).toBe("admin");
     expect(defaultPairingAccount([], "admin")).toBe("");
   });
 });

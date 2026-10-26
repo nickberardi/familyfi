@@ -13,7 +13,7 @@ import { DELETE as revokeDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { GET as listDevices } from "@/app/api/v1/paired/devices/route";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
-import { bearer, claimWatchRequest, pairPhone } from "../helpers/pairing";
+import { bearer, claimWatchRequest, pairPhone, PAIRING_ADMIN } from "../helpers/pairing";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const json = { "content-type": "application/json" };
@@ -157,7 +157,7 @@ describe("refresh tokens for paired devices", () => {
 
     await resetDatabase();
     const rotatedPassword = await phoneLogin();
-    const account = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
+    const account = await prisma().account.findUniqueOrThrow({ where: { username: PAIRING_ADMIN.username } });
     await revokeAccountSessions(account.id);
     expect((await refreshWith(rotatedPassword.refreshToken)).status).toBe(403);
   });

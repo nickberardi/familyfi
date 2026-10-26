@@ -144,7 +144,8 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
     }`,
     via: phone.pairedVia ? { url: phone.pairedVia.url, transport: transportLabel(phone.pairedVia.transport) } : null,
     origin: origin(phone, parentName),
-    dates: `Paired ${pairedDate(phone.enrolledAt)}${ends ? ` · expires ${pairedDate(ends)}` : ""}`,
+    // A phone or agent another phone paired goes when that phone is revoked; a Watch says so in its origin.
+    dates: `Paired ${pairedDate(phone.enrolledAt)}${parentName && phone.client !== "watch" ? ` from ${parentName}` : ""}${ends ? ` · expires ${pairedDate(ends)}` : ""}`,
     expired: !phone.revokedAt && phone.sessions.length === 0,
   };
 }
@@ -180,6 +181,7 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     claimedLine: `Paired ${claimedName ?? ""} ✓`,
     issueFailed: "Could not create a pairing code.",
     accountsFailed: "Could not load the administrators a phone can sign in as.",
+    noAccounts: "A phone signs in as an adult with administrator access, never as the built-in admin. Add one under Accounts first.",
     copy: "Copy",
     copied: "Copied",
   };
@@ -195,11 +197,11 @@ export function pairingExpired(issued: { expiresAt: string } | null, state: Pick
 }
 
 /**
- * The adults a phone may sign in as: administrators (and the recovery account), since only
- * administrators have paired phones.
+ * The adults a phone may sign in as: personal administrators, since only administrators have paired
+ * phones and none acts as the recovery account.
  */
 export function pairingAccounts(accounts: readonly Account[]): Account[] {
-  return accounts.filter((account) => account.isAdmin || account.kind === "recovery");
+  return accounts.filter((account) => account.isAdmin && account.kind !== "recovery");
 }
 
 /** The adult a new phone signs in as by default: the one signed in here, else the first who may. */
@@ -210,7 +212,7 @@ export function defaultPairingAccount(accounts: readonly Account[], username: st
 
 type Send = <T>(path: string, init?: { method?: string; body?: unknown }) => Promise<T>;
 
-/** Sign a paired device out now; it must pair again. Revoking a phone revokes its Watches too. */
+/** Sign a paired device out now; it must pair again. Revoking a phone revokes everything paired from it too. */
 export function revokePhone(send: Send, phone: Pick<PairedPhone, "id">) {
   return send(`/api/v1/paired/devices/${encodeURIComponent(phone.id)}`, { method: "DELETE" });
 }

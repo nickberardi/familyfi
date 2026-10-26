@@ -7,6 +7,7 @@ import {
   saveMembers,
   saveSchedules,
   setupCta,
+  isHomeAddress,
   setupRedirect,
   setupStepError,
   suggestionApplies,
@@ -212,14 +213,26 @@ describe("saving schedules", () => {
 
 describe("opening setup", () => {
   it("is open before sign-in until the household has a gateway, then needs a signed-in admin", () => {
-    expect(setupRedirect({ demo: false, configured: false, signedIn: false })).toBeNull();
-    expect(setupRedirect({ demo: false, configured: false, signedIn: true })).toBeNull();
-    expect(setupRedirect({ demo: false, configured: true, signedIn: false })).toBe("/login");
-    expect(setupRedirect({ demo: false, configured: true, signedIn: true })).toBeNull();
+    expect(setupRedirect({ demo: false, configured: false, signedIn: false, homeAddress: true })).toBeNull();
+    expect(setupRedirect({ demo: false, configured: false, signedIn: true, homeAddress: true })).toBeNull();
+    expect(setupRedirect({ demo: false, configured: true, signedIn: false, homeAddress: true })).toBe("/login");
+    expect(setupRedirect({ demo: false, configured: true, signedIn: true, homeAddress: true })).toBeNull();
+  });
+
+  it("hands over the admin password only at a home network address", () => {
+    // A website pointing its own name at FamilyFi gets the sign-in page instead.
+    expect(setupRedirect({ demo: false, configured: false, signedIn: false, homeAddress: false })).toBe("/login");
+    expect(setupRedirect({ demo: false, configured: false, signedIn: true, homeAddress: false })).toBeNull();
+    for (const host of ["192.168.1.20:7001", "10.0.0.5", "[fd00::5]:7001", "localhost:3000", "nas", "nas:7001", "familyfi.local", "familyfi.home.arpa", "box.lan:7001", "NAS.LOCAL."]) {
+      expect(isHomeAddress(host), host).toBe(true);
+    }
+    for (const host of ["evil.example.com", "familyfi.example.com:7001", "192.168.1.20.nip.io", "", null]) {
+      expect(isHomeAddress(host), String(host)).toBe(false);
+    }
   });
 
   it("never opens in the demo, whose gateway is locked", () => {
-    expect(setupRedirect({ demo: true, configured: true, signedIn: false })).toBe("/family");
-    expect(setupRedirect({ demo: true, configured: true, signedIn: true })).toBe("/family");
+    expect(setupRedirect({ demo: true, configured: true, signedIn: false, homeAddress: true })).toBe("/family");
+    expect(setupRedirect({ demo: true, configured: true, signedIn: true, homeAddress: true })).toBe("/family");
   });
 });

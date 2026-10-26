@@ -17,6 +17,7 @@ import { DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, getSharedDevMockClient, resetDevMo
 import { forgetSiteNetworks } from "@/server/unifi/network-cache";
 import type { GatewayHealth, UnifiSettings } from "@/lib/types";
 import { resetDatabase } from "../helpers/db";
+import { pairingAdmin } from "../helpers/pairing";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -71,7 +72,8 @@ describe("gateway health and the console's polled load", () => {
 
   it("gives the gateway's readings only to a session, and to no Watch or agent", async () => {
     expect((await getHealth(request("/api/v1/health?gateway=true"))).status).toBe(401);
-    const account = await prisma().account.findFirstOrThrow({ where: { isAdmin: true } });
+    // No device acts as the recovery admin, so these act as a personal administrator.
+    const account = await pairingAdmin();
     for (const [client, scope] of [
       [PairedDeviceClient.watch, DeviceScope.rulesOnly],
       [PairedDeviceClient.agent, DeviceScope.full],

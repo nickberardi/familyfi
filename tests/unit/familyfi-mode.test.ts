@@ -19,7 +19,6 @@ import { buildDatabaseUrl as runtimeDatabaseUrl } from "../../scripts/runtime/pr
 
 const secrets = {
   FAMILYFI_DEFAULT_PASSWORD: "recovery-pass",
-  FAMILYFI_SESSION_SECRET: "abcdefghijklmnopqrstuvwxyz012345",
   FAMILYFI_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 };
 const realDatabase = { DB_MODE: "external", DB_HOST: "db.example", POSTGRES_PORT: "5432", POSTGRES_PASSWORD: "db-pass", DB_SSL_MODE: "require", DB_SSL_ROOT_CERT: "/certs/ca.pem" };
@@ -93,7 +92,7 @@ describe("FAMILYFI_MODE", () => {
     expect(runtimeEnvIssues({ ...secrets, FAMILYFI_MODE: "demo" })).toEqual([]);
     expect(runtimeEnvIssues({ ...secrets, FAMILYFI_MODE: "dev", DB_MODE: "memory" })).toEqual([]);
     expect(() => loadEnv({ FAMILYFI_MODE: "demo" })).toThrow(ConfigurationError);
-    expect(runtimeEnvIssues({ FAMILYFI_MODE: "demo" })).toHaveLength(3);
+    expect(runtimeEnvIssues({ FAMILYFI_MODE: "demo" })).toHaveLength(2);
   });
 
   it("reads the same in the startup scripts as in the app", () => {

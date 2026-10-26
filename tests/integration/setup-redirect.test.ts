@@ -8,9 +8,11 @@ import { resetDatabase } from "../helpers/db";
  * Setup is open before sign-in only until the household has a gateway.
  */
 let sessionCookie: string | undefined;
+let host = "192.168.1.10:7001";
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => (sessionCookie ? { value: sessionCookie } : undefined) }),
+  headers: async () => new Headers({ host }),
 }));
 // The pages' client components draw with React Native primitives; only what the pages hand them matters here.
 vi.mock("@/components/setup/SetupFlow", () => ({ SetupFlow: () => null }));
@@ -78,11 +80,21 @@ describe("setup before sign-in", () => {
   beforeEach(async () => {
     await resetDatabase();
     sessionCookie = undefined;
+    host = "192.168.1.10:7001";
   });
 
   it("hands a new install the admin password, and sign-in sends it to setup", async () => {
     expect(await visit(SetupPage)).toMatchObject({ props: { signedIn: false, password: recoveryPassword() } });
     expect(await visit(LoginPage)).toBe("/setup");
+  });
+
+  it("hands the password over only at a home network address, and sign-in asks for it elsewhere", async () => {
+    // A website that points its own name at FamilyFi, so a page in this browser could read setup.
+    host = "familyfi.attacker.example";
+    expect(await visit(SetupPage)).toBe("/login");
+    expect(typeof (await visit(LoginPage))).toBe("object");
+    host = "familyfi.local";
+    expect(await visit(SetupPage)).toMatchObject({ props: { password: recoveryPassword() } });
   });
 
   it("closes once a gateway key is saved, and never carries the password again", async () => {

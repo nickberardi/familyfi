@@ -13,15 +13,24 @@ test.describe.configure({ mode: "serial" });
 
 type Route = { id: string; url: string; kind: string; transport: string; enabled: boolean };
 
-async function signIn(page: Page) {
+/** Signs in as the recovery admin, or as the seed household's own administrator, `nick`, whose password is the same. */
+async function signIn(page: Page, username = "admin") {
   test.skip(!password, "FAMILYFI_DEFAULT_PASSWORD is required for browser tests");
-  const login = await page.request.post("/api/v1/auth/login", { data: { username: "admin", password, client: "browser" } });
+  const login = await page.request.post("/api/v1/auth/login", { data: { username, password, client: "browser" } });
   expect(login.ok()).toBe(true);
 }
 
 async function csrf(page: Page): Promise<Record<string, string>> {
   const value = (await page.context().cookies()).find((cookie) => cookie.name === "familyfi_csrf")?.value ?? "";
   return { "x-csrf-token": value, "content-type": "application/json" };
+}
+
+/** The seed household's personal administrator, whom an invite made here names: no phone signs in as the recovery admin. */
+async function pairingAccountId(page: Page): Promise<string> {
+  const { accounts } = (await (await page.request.get("/api/v1/accounts")).json()) as { accounts: { id: string; kind: string; isAdmin: boolean }[] };
+  const account = accounts.find((candidate) => candidate.isAdmin && candidate.kind === "personal");
+  expect(account, "the seed household has a personal administrator").toBeTruthy();
+  return account!.id;
 }
 
 type PairingPayload = { version: number; url: string; code: string; fingerprint: string; pin?: string; access?: { clientId: string; clientSecret: string } };
@@ -269,7 +278,7 @@ test("lists every saved Tailscale route and removes them, turning remote access 
     expect((await routes(page)).map((route) => route.url)).not.toContain(second);
 
     // A pairing code still waiting on the published route keeps it, and says why.
-    invite = ((await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: published, displayName: "Waiting phone" } })).json()) as { invite: { id: string } }).invite.id;
+    invite = ((await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: published, displayName: "Waiting phone", accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string } }).invite.id;
     await saved.getByRole("button", { name: "Remove" }).click();
     await expect(card.getByRole("alert")).toHaveText("A pairing code for this route is still active. Cancel it or wait for it to expire.");
     await expect(saved).toHaveCount(1);
@@ -398,7 +407,7 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
 
   async function pairAndRevoke(name: string) {
-    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: route, displayName: name } })).json()) as { invite: { id: string; code: string } };
+    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
     const claimed = (await (await page.request.post(`/api/v1/paired/invites/${invite.id}/claim`, { data: { token: decodePairingCode(invite.code).token, deviceName: name } })).json()) as { device: { id: string } };
     await page.request.delete(`/api/v1/paired/devices/${claimed.device.id}`, { headers });
   }
@@ -450,7 +459,7 @@ test("re-pairs an active phone without revoking it first", { tag: "@desktop" }, 
   const devices = async () => ((await (await page.request.get("/api/v1/paired/devices")).json()) as { devices: Device[] }).devices;
 
   try {
-    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: route, displayName: name } })).json()) as { invite: { id: string; code: string } };
+    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "phone", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
     const old = (await (await page.request.post(`/api/v1/paired/invites/${invite.id}/claim`, { data: { token: decodePairingCode(invite.code).token, deviceName: name } })).json()) as { device: { id: string }; token: string };
     const bearer = { authorization: `Bearer ${old.token}` };
     const watch = (await (
@@ -572,8 +581,19 @@ test("links the App Store badge and opens Google Play's closed beta steps in a m
   await expect(dialog).toBeHidden();
 });
 
-test("Home access suggests this address, saves a home network address, and agents connect there", { tag: "@desktop" }, async ({ page }) => {
+test("asks the recovery admin to sign in as themselves to connect an agent", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
+  await page.goto("/pair");
+  await page.getByRole("button", { name: "Connect an agent" }).click();
+  const sheet = page.getByRole("dialog", { name: "Connect an agent" });
+  await expect(sheet.getByTestId("agent-recovery-note")).toContainText("Sign in as yourself to connect an agent.");
+  await expect(sheet.getByRole("button", { name: "Show prompt" })).toBeDisabled();
+  await shot(page, "agent-recovery");
+});
+
+test("Home access suggests this address, saves a home network address, and agents connect there", { tag: "@desktop" }, async ({ page }) => {
+  // An agent acts as whoever connects it, never the recovery admin.
+  await signIn(page, "nick");
   const home = "http://192.168.1.10:7001";
   try {
     await page.request.put("/api/v1/connection/home", { headers: await csrf(page), data: { url: null } });
@@ -612,7 +632,7 @@ test("Home access suggests this address, saves a home network address, and agent
 });
 
 test("Home access warns, and agent codes are still issued, when FamilyFi was opened at a public address and none is saved", { tag: "@desktop" }, async ({ page }) => {
-  await signIn(page);
+  await signIn(page, "nick");
   // Stands in for a browser that reached FamilyFi through an authenticating proxy on a public name.
   await page.route("**/api/v1/connection/home", (route) =>
     route.request().method() === "GET"

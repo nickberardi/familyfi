@@ -1,5 +1,5 @@
 import { ConnectionTrustMode, DeviceScope, PairedDeviceClient, SessionKind, type Account, type Pairing } from "@prisma/client";
-import { bearerSessionData, isAdministratorAccount, toPublicSession } from "./auth";
+import { bearerSessionData, mayPairAs, toPublicSession } from "./auth";
 import { ensureConnectionIdentity, instanceFingerprint, publicEndpoint, removeDevice, signedEndpointManifest } from "./connection";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -18,6 +18,9 @@ import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
  *   home network address, or the address it was made at when none is set, and nothing for remote
  *   access. The agent acts as whoever made it.
  * - A Watch is invited and claimed at once by its phone, its parent; it acts as the phone's account.
+ *
+ * An invite a paired phone makes names that phone as the new device's parent, as a Watch's does:
+ * revoking a phone revokes everything paired from it. No device ever acts as the recovery account.
  */
 
 const PHONE_INVITE_TTL_MS = 5 * 60 * 1000;
@@ -34,7 +37,7 @@ export function inviteStatus(invite: { claimedAt: Date | null; expiresAt: Date }
 }
 
 /** A phone invite, over the published route the phone pairs through. */
-export async function invitePhone(input: { endpointId: string; displayName: string; accountId: string; createdByAccountId: string; replacesDeviceId?: string | null }) {
+export async function invitePhone(input: { endpointId: string; displayName: string; accountId: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null }) {
   const token = randomToken();
   const invite = await prisma().pairing.create({
     data: {
@@ -44,6 +47,7 @@ export async function invitePhone(input: { endpointId: string; displayName: stri
       displayName: input.displayName,
       accountId: input.accountId,
       createdByAccountId: input.createdByAccountId,
+      parentDeviceId: input.parentDeviceId ?? null,
       replacesDeviceId: input.replacesDeviceId ?? null,
       tokenHash: sha256(token),
       expiresAt: new Date(Date.now() + PHONE_INVITE_TTL_MS),
@@ -70,7 +74,7 @@ export async function invitePhone(input: { endpointId: string; displayName: stri
  * An agent invite. It has no route: the code carries `url`, the address the adult made it from, which
  * is on the home network because browser sign-in is. It never carries a pin or an Access token.
  */
-export async function inviteAgent(input: { url: string; displayName: string; scope: DeviceScope; createdByAccountId: string }) {
+export async function inviteAgent(input: { url: string; displayName: string; scope: DeviceScope; createdByAccountId: string; parentDeviceId?: string | null }) {
   if (!isValidScope(PairedDeviceClient.agent, input.scope)) throw new Error(`An agent cannot hold the ${input.scope} scope.`);
   const token = randomToken();
   const invite = await prisma().pairing.create({
@@ -80,6 +84,7 @@ export async function inviteAgent(input: { url: string; displayName: string; sco
       displayName: input.displayName,
       accountId: input.createdByAccountId,
       createdByAccountId: input.createdByAccountId,
+      parentDeviceId: input.parentDeviceId ?? null,
       tokenHash: sha256(token),
       expiresAt: new Date(Date.now() + AGENT_INVITE_TTL_MS),
     },
@@ -111,6 +116,9 @@ async function join(db: Db, input: {
       await db.pairedDevice.update({ where: { id: previous.id }, data: { revokedAt: now, clientId: null } });
     }
   }
+  // A re-paired phone takes the old one's place, under whatever paired it, even when the old phone made
+  // the invite: a phone is never paired from the record it replaces, so revoking that record spares it.
+  const parentDeviceId = replaces ? ((await db.pairedDevice.findUnique({ where: { id: replaces } }))?.parentDeviceId ?? null) : invite.parentDeviceId;
   const device = await db.pairedDevice.create({
     data: {
       displayName: input.displayName,
@@ -118,14 +126,14 @@ async function join(db: Db, input: {
       scope: invite.scope,
       clientId: input.clientId ?? null,
       accountId: account.id,
-      parentDeviceId: invite.parentDeviceId,
+      parentDeviceId,
       lastSeenAt: now,
     },
   });
   await db.pairing.update({ where: { id: invite.id }, data: { claimedDeviceId: device.id } });
   if (replaces) {
-    // The new phone keeps the old one's companions when it acts as the same account: its Watch is
-    // still its to manage. A Watch acting as another account is revoked with the old phone below.
+    // The new phone keeps what the old one paired when it acts as the same account: its Watch is
+    // still its to manage. Anything acting as another account is revoked with the old phone below.
     await db.pairedDevice.updateMany({ where: { parentDeviceId: replaces, accountId: account.id }, data: { parentDeviceId: device.id } });
     await removeDevice(replaces, db, now);
   }
@@ -159,8 +167,9 @@ export async function claimInvite(input: { id: string; token: string; displayNam
   if (!invite || invite.client === PairedDeviceClient.watch || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
   if (invite.client === PairedDeviceClient.phone && !invite.endpoint) return null;
   const account = invite.account;
-  // Only administrators have paired devices: an invite for an adult who has since lost that is void.
-  if (!account || !isAdministratorAccount(account)) return null;
+  // Only administrators' own accounts have paired devices: an invite for an adult who has since lost
+  // that, or one made before the recovery account was refused, is void.
+  if (!mayPairAs(account)) return null;
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });

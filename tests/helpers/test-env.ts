@@ -46,7 +46,6 @@ export function applyIntegrationEnv() {
   delete process.env.FAMILYFI_MODE;
   process.env.POSTGRES_DB = TEST_POSTGRES_DB;
   process.env.FAMILYFI_DEFAULT_PASSWORD ||= "ci-recovery-password";
-  process.env.FAMILYFI_SESSION_SECRET ||= "ci-only-session-secret-32chars!!";
   process.env.FAMILYFI_ENCRYPTION_KEY ||=
     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
   if (!process.env.POSTGRES_PASSWORD) {
