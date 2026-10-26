@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   checkupCopy,
+  checkupMessage,
   checkupSummary,
   isPrivateMac,
+  knownCheckupMessage,
   leftoverCopyNote,
   leftoverPolicyLine,
   openProblemCount,
@@ -21,6 +23,8 @@ import {
 } from "@/lib/checkup";
 import type { HouseholdStore } from "@/lib/household-store";
 import type { Rule } from "@/lib/rules";
+
+const message = { key: "checkup.dns_override", text: "" };
 
 const LAN = "lan";
 const IOT = "iot";
@@ -179,6 +183,14 @@ describe("network checkup", () => {
     expect(found(more, "private_addresses")[0]?.subject).not.toBe(found(one, "private_addresses")[0]?.subject);
   });
 
+  it("words every finding for a client that does not know its check", () => {
+    const finding = { check: "dns_override" as const, details: { networks: [{ id: LAN, name: "LAN", dnsServers: ["192.0.2.53"] }] } };
+    expect(checkupMessage(finding)).toEqual({ key: "checkup.dns_override", text: checkupCopy(finding).title });
+    expect(knownCheckupMessage(checkupMessage(finding))).toBe(true);
+    expect(knownCheckupMessage({ key: "checkup.a_check_from_a_newer_server" })).toBe(false);
+    expect(knownCheckupMessage({ key: "dns_override" })).toBe(false);
+  });
+
   it("counts open problems for the badge, never notes or dismissed ones", () => {
     expect(openProblemCount([{ kind: "problem", dismissed: false }, { kind: "problem", dismissed: true }, { kind: "note", dismissed: false }])).toBe(1);
   });
@@ -186,13 +198,13 @@ describe("network checkup", () => {
   it("sums up the last run", () => {
     const now = new Date("2026-10-22T12:10:00Z");
     expect(checkupSummary(null, now)).toBe("Not checked yet");
-    const finding = (kind: "problem" | "note") => ({ id: kind, check: "dns_override" as const, kind, details: {}, firstSeenAt: "", lastSeenAt: "", dismissed: false });
+    const finding = (kind: "problem" | "note") => ({ id: kind, check: "dns_override" as const, kind, details: {}, message, firstSeenAt: "", lastSeenAt: "", dismissed: false });
     expect(checkupSummary({ ranAt: "2026-10-22T12:06:00Z", error: null, passed: [], findings: [finding("problem"), finding("note")] }, now)).toBe("1 problem · 1 note · checked 4 minutes ago");
     expect(checkupSummary({ ranAt: "2026-10-22T12:10:00Z", error: null, passed: [], findings: [] }, now)).toBe("No problems · checked just now");
   });
 
   it("notes in the website rule editor when covered devices use a network's own DNS", () => {
-    const state = { findings: [{ id: "dns_override:lan", check: "dns_override" as const, kind: "note" as const, details: { networks: [{ id: LAN, name: "LAN", dnsServers: ["192.0.2.53"] }] }, firstSeenAt: "", lastSeenAt: "", dismissed: false }] };
+    const state = { findings: [{ id: "dns_override:lan", check: "dns_override" as const, kind: "note" as const, details: { networks: [{ id: LAN, name: "LAN", dnsServers: ["192.0.2.53"] }] }, message, firstSeenAt: "", lastSeenAt: "", dismissed: false }] };
     const devices = [{ groupId: "g1", networkId: LAN }];
     const rule = { kind: "domain", scope: "group", groupIds: ["g1"], networkIds: [] };
     expect(outsideDnsNote(rule, devices, state)).toContain("LAN, which uses its own DNS server (192.0.2.53)");

@@ -16,7 +16,7 @@ import { GET as listRules } from "@/app/api/v1/rules/route";
 import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
 import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { GET as getSync } from "@/app/api/v1/sync/route";
-import type { CheckupState } from "@/lib/checkup";
+import { checkupMessage, type CheckupState } from "@/lib/checkup";
 import type { Rule } from "@/lib/rules";
 import { prisma } from "@/server/db";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
@@ -100,6 +100,9 @@ describe("network checkup", () => {
     expect(state.passed).toEqual(["smart_home_wifi", "unmanaged_networks"]);
     const privates = state.findings.find((finding) => finding.check === "private_addresses")!;
     expect(privates.details.devices?.map((device) => device.name)).toEqual(["Galaxy S24", "Melinda's iPhone"]);
+    // Every finding carries its words, for an app too old to know its check.
+    expect(privates.message).toEqual(checkupMessage(privates));
+    expect(privates.message.key).toBe("checkup.private_addresses");
     // Sonos wired and on Wi-Fi, DNS and casting are notes, which the badge never counts. The fixture
     // gateway carries one policy named like FamilyFi's that no record claims: a leftover.
     expect(await problems(auth)).toBe(4);

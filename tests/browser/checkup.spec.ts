@@ -102,3 +102,22 @@ test("Checkup lists a leftover FamilyFi policy and removes it only after the adm
   await expect(page.getByRole("status")).toContainText("Removed 1 policy from your gateway.");
   await expect(leftover).toHaveCount(0);
 });
+
+test("a finding from a check this app does not know shows the server's English line and asks to update", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/checkup");
+  await page.getByTestId("checkup-run").click();
+  await expect(page.locator('[data-testid^="checkup-finding-"]').first()).toBeVisible();
+  // Answer as a newer server would, with one check this build has no copy for.
+  await page.route("**/api/v1/checkup", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { checkup: { findings: { id: string; check: string; message: object }[] } };
+    body.checkup.findings.unshift({ ...body.checkup.findings[0], id: "a_newer_check:x", check: "a_newer_check", message: { key: "checkup.a_newer_check", text: "Something new to look at" } });
+    await route.fulfill({ response, json: body });
+  });
+  await page.reload();
+  const row = page.getByTestId("checkup-finding-a_newer_check:x");
+  await expect(row).toContainText("Something new to look at");
+  await expect(row).toContainText("Update the FamilyFi app to see more and act on this.");
+  await expect(row.getByTestId("checkup-dismiss-a_newer_check:x")).toBeVisible();
+});

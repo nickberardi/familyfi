@@ -133,11 +133,18 @@ export type CheckupResult = {
 export type CheckupRun = { findings: CheckupResult[]; passed: CheckupCheck[]; skipped: CheckupCheck[] };
 
 /** A finding as `GET /checkup` returns it. */
+/**
+ * What a finding says, as a key a client looks up in its own (localized) copy, and a short English
+ * line for a client that has no copy for the key. A new check thereby reaches every app version.
+ */
+export type CheckupMessage = { key: string; text: string };
+
 export type CheckupFinding = {
   id: string;
   check: CheckupCheck;
   kind: CheckupKind;
   details: CheckupDetails;
+  message: CheckupMessage;
   firstSeenAt: string;
   lastSeenAt: string;
   dismissed: boolean;
@@ -456,6 +463,23 @@ const WIFI_SETTING: Record<string, string> = {
 };
 
 /** The words for a finding: what was seen, why it matters and how to change it. */
+/** Whether this build knows a check. The API adds checks over time. */
+export function knownCheck(check: string): check is CheckupCheck {
+  return (CHECKUP_CHECKS as readonly string[]).includes(check);
+}
+
+const MESSAGE_KEY_PREFIX = "checkup.";
+
+/** The finding's `message`: `checkup.<check>`, and its title in English. */
+export function checkupMessage(finding: Pick<CheckupFinding, "check" | "details">): CheckupMessage {
+  return { key: `${MESSAGE_KEY_PREFIX}${finding.check}`, text: checkupCopy(finding).title };
+}
+
+/** Whether this build has copy for a message key; when it does not, the client shows the message's `text`. */
+export function knownCheckupMessage(message: Pick<CheckupMessage, "key">): boolean {
+  return message.key.startsWith(MESSAGE_KEY_PREFIX) && knownCheck(message.key.slice(MESSAGE_KEY_PREFIX.length));
+}
+
 export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">): CheckupCopy {
   const devices = finding.details.devices ?? [];
   const networks = finding.details.networks ?? [];
@@ -673,6 +697,7 @@ export const CHECKUP_COPY = {
     checkNow: "Check now",
     checking: "Checking…",
     never: "Not checked yet",
+    unknown: "Update the FamilyFi app to see more and act on this.",
     problems: (count: number) => plural(count, "problem", "problems"),
     notes: (count: number) => `${plural(count, "note", "notes")} · may be on purpose`,
     passed: (count: number) => `${plural(count, "check", "checks")} passed`,

@@ -4231,11 +4231,24 @@ components:
           type: integer
           minimum: 0
           description: Open problems the network checkup found (not notes, not dismissed), for a badge.
+    Message:
+      type: object
+      additionalProperties: false
+      required: [key, text]
+      description: |
+        Something to tell the user. A client looks `key` up in its own localized copy, filling it from
+        the object the message belongs to, and shows `text`, a short English line, only when it has no
+        copy for the key: then the message is newer than the client, which says so and suggests an update.
+      properties:
+        key: { type: string, description: "Dotted, e.g. `checkup.leftover_policies`. New keys appear as the server learns new things to say." }
+        text: { type: string, description: "The message in short English, for a client without copy for `key`." }
     CheckupCheck:
       type: string
-      enum: [leftover_policies, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
+      x-extensible-enum: [leftover_policies, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
       description: |
-        One check. A client that does not know a value shows the finding by its kind alone.
+        One check. New checks are added over time without a breaking change: a client that does not
+        know a value shows the finding's `message` and asks to update the app, and ignores the value
+        in `passed`.
         leftover_policies: firewall policies on the gateway named with FamilyFi's prefix that no
         FamilyFi record claims; `POST /api/v1/checkup/leftover-policies/remove` removes them.
         sonos_mixed: Sonos players both wired and on Wi-Fi. private_addresses: devices using a
@@ -4248,10 +4261,11 @@ components:
     CheckupFinding:
       type: object
       additionalProperties: false
-      required: [id, check, kind, details, firstSeenAt, lastSeenAt, dismissed]
+      required: [id, check, kind, details, message, firstSeenAt, lastSeenAt, dismissed]
       properties:
         id: { type: string, description: "The check and what it is about, e.g. `dns_override:<network id>`" }
         check: { $ref: "#/components/schemas/CheckupCheck" }
+        message: { $ref: "#/components/schemas/Message" }
         kind:
           type: string
           enum: [problem, note]
