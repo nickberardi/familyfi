@@ -9,7 +9,6 @@ app="familyfi-smoke-app-$$"
 demo="familyfi-smoke-demo-$$"
 password='p@ss/w:rd'
 admin_password="ci-recovery-password"
-session_secret="ci-only-session-secret-32chars!!"
 encryption_key="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 host_port="${SMOKE_PORT:-7011}"
 # The self-hosted runners share /tmp under different users, so a fixed path can belong to another.
@@ -43,7 +42,6 @@ run_app() {
   docker run -d --name "$app" --network "$network" -p "${host_port}:7001" \
     -e NODE_ENV=production \
     -e FAMILYFI_DEFAULT_PASSWORD="$admin_password" \
-    -e FAMILYFI_SESSION_SECRET="$session_secret" \
     -e FAMILYFI_ENCRYPTION_KEY="$encryption_key" \
     -e DB_MODE=external \
     -e DB_HOST="$db" \
@@ -107,7 +105,6 @@ docker run -d --name "$demo" -p "${host_port}:7001" \
   -e NODE_ENV=production \
   -e FAMILYFI_MODE=demo \
   -e FAMILYFI_DEFAULT_PASSWORD="$admin_password" \
-  -e FAMILYFI_SESSION_SECRET="$session_secret" \
   -e FAMILYFI_ENCRYPTION_KEY="$encryption_key" \
   "$image" >/dev/null
 ok=0

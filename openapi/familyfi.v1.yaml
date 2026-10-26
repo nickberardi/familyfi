@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.36.0
+  version: 0.37.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2663,7 +2663,14 @@ paths:
         a single-use `code`; the device claims it at `POST /paired/invites/{id}/claim`, which signs
         it in. Pairing is the authentication: the invite names the account the device acts as —
         for a phone, `accountId` (default: whoever makes it), which must be an administrator (400
-        `administrator_account_required` otherwise); for an agent, whoever makes it.
+        `administrator_account_required` otherwise); for an agent, whoever makes it. No device
+        acts as the recovery account: a phone invite for it answers 400 `personal_account_required`,
+        and an agent invite made while signed in as it 403 `personal_account_required`.
+
+        An invite a paired phone makes names that phone as the device's `parentDeviceId`.
+        Revoking or removing a device revokes everything paired from it, and everything those
+        paired in turn, and cancels the invites they left waiting. A phone that re-pairs another
+        takes the replaced record's place instead, keeping its parent.
 
         With `?claim=true` a signed-in paired phone invites its Watch and claims it in one
         transaction, and the response is the claim: the phone hands the Watch its tokens and
@@ -3612,7 +3619,7 @@ components:
           properties:
             username: { type: string }
             displayName: { type: string }
-        parentDeviceId: { type: [string, "null"], description: "The device that vouched for this one: a Watch's phone." }
+        parentDeviceId: { type: [string, "null"], description: "The paired device whose invite this one joined with: a Watch's phone, or the phone that paired a phone or agent. Revoking it revokes this device." }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
         revokedAt: { type: [string, "null"], format: date-time }

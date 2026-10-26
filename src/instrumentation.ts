@@ -18,7 +18,7 @@ export async function register() {
   const retired = unifiMockWarning();
   if (retired) console.warn(retired);
   const { startUpdateCheck } = await import("./server/update-check");
-  const { ensureHousehold, ensureRecoveryAccount } = await import("./server/auth");
+  const { ensureHousehold, ensureRecoveryAccount, settleRecoveryPassword } = await import("./server/auth");
   const { ensureUpstreamCategories } = await import("./server/upstream-seed");
   const { startReconciliation } = await import("./server/reconciliation");
   const { startUnifiRequestLog } = await import("./server/unifi/request-meter");
@@ -26,6 +26,7 @@ export async function register() {
   const { startAutoUpdate } = await import("./server/updater");
   try {
     await ensureRecoveryAccount();
+    if (await settleRecoveryPassword()) console.log("The recovery admin password changed, so its sessions were signed out.");
     await ensureHousehold();
     await ensureUpstreamCategories();
     if (settings.FAMILYFI_MODE !== "prod") {

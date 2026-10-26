@@ -168,12 +168,20 @@ Pairing is the authentication: an invite names the account the device acts as, a
 signs the device in, with no password and no device credential. An administrator invites a phone
 with a five-minute, single-use QR for an enabled route and chooses which administrator it signs in
 as (only administrators have paired phones: an invite for any other account is refused, 400
-`administrator_account_required`);
+`administrator_account_required`, and the recovery account is refused too, 400
+`personal_account_required`);
 the phone claims it, verifies the instance identity, and is signed in, with its route and signed
 manifest in the claim. The phone is called the name the administrator gave its invite; the claim's
 `deviceName` names only an agent. Bearer sessions are tied to that paired phone. Revoking the phone
 invalidates every one of its sessions, and its Watches', and requires a new invite. Sign-in with a password is for
 browsers only.
+
+No device acts as the recovery account. An agent acts as whoever connects it, so connecting one
+while signed in as `admin` is refused (403 `personal_account_required`), and an invite, Watch, bearer or refresh
+left over for the recovery account is refused too. An invite a paired phone makes records that
+phone as the new device's `parentDeviceId`; revoking or removing a device revokes everything paired
+from it, recursively, and cancels the invites they left waiting. A re-paired phone takes the old
+record's place and keeps its parent.
 
 A paired device's bearer lasts one hour. Its claim also returns a `refreshToken`, which the device trades at `POST /api/v1/auth/refresh` for a new bearer and a new
 refresh token, before or after the bearer expires. The refresh token lasts 90 days from its last

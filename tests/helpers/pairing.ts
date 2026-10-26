@@ -1,10 +1,12 @@
-import { ConnectionTransport } from "@prisma/client";
+import { AccountKind, ConnectionTransport } from "@prisma/client";
 import { expect } from "vitest";
 import { POST as invite } from "@/app/api/v1/paired/invites/route";
 import { POST as claimRoute } from "@/app/api/v1/paired/invites/[id]/claim/route";
+import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import type { PairingPayload } from "@/server/pairing-code";
-import { request, type SessionAuth } from "./http";
+import { POST as login } from "@/app/api/v1/auth/login/route";
+import { authFromLogin, request, type SessionAuth } from "./http";
 
 /** What a device reads out of an invite code: the decoded payload, and the claim's invite id and token. */
 export function decodePairingCode(code: string): { payload: PairingPayload; inviteId: string; token: string } {
@@ -42,7 +44,27 @@ export async function homeRoute(url = "https://familyfi.local") {
   return prisma().connectionEndpoint.upsert({ where: { url }, update: { enabled: true }, create: { url, transport: ConnectionTransport.lan } });
 }
 
-export function invitePhoneRequest(auth: SessionAuth, body: Record<string, unknown>, headers: Record<string, string> = {}) {
+/** Who a device pairs as unless a test says otherwise: a personal administrator, since none pairs as the recovery admin. */
+export const PAIRING_ADMIN = { username: "household-admin", password: "household-password-1", displayName: "Household admin" };
+
+export async function pairingAdmin() {
+  const existing = await prisma().account.findUnique({ where: { username: PAIRING_ADMIN.username } });
+  if (existing) return existing;
+  return prisma().account.create({
+    data: { username: PAIRING_ADMIN.username, displayName: PAIRING_ADMIN.displayName, kind: AccountKind.personal, isAdmin: true, passwordHash: await hashPassword(PAIRING_ADMIN.password) },
+  });
+}
+
+/** A browser session for {@link PAIRING_ADMIN}: agents act as whoever connects them, so they connect from here. */
+export async function pairingAdminAuth(): Promise<SessionAuth> {
+  await pairingAdmin();
+  return authFromLogin(
+    await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: PAIRING_ADMIN.username, password: PAIRING_ADMIN.password, client: "browser" }) })),
+  );
+}
+
+export async function invitePhoneRequest(auth: SessionAuth, body: Record<string, unknown>, headers: Record<string, string> = {}) {
+  if (!("accountId" in body)) body = { ...body, accountId: (await pairingAdmin()).id };
   return invite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ client: "phone", displayName: "iPhone", ...body }) }));
 }
 

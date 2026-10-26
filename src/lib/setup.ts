@@ -287,10 +287,31 @@ export function existingSuggestedRules(rules: readonly { id: string; name: strin
 }
 
 /** Where `/setup` sends a visitor, or null to show setup. */
-export function setupRedirect(entry: { demo: boolean; configured: boolean; signedIn: boolean }): "/family" | "/login" | null {
+export function setupRedirect(entry: { demo: boolean; configured: boolean; signedIn: boolean; homeAddress: boolean }): "/family" | "/login" | null {
   // The demo's gateway and networks are locked, so there is nothing to set up.
   if (entry.demo) return "/family";
   // Before the household has a gateway, setup is open: it is how the first admin signs in.
   if (entry.configured && !entry.signedIn) return "/login";
+  // It hands over the admin password, so only at an address on the home network: a website that
+  // points its own name at FamilyFi (DNS rebinding) gets the sign-in page, which asks for it instead.
+  if (!entry.signedIn && !entry.homeAddress) return "/login";
   return null;
+}
+
+/** Name endings only a home network resolves. */
+const HOME_SUFFIXES = [".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain"];
+
+/**
+ * Whether a request's Host names FamilyFi the way a home network does: an IP address, `localhost`,
+ * a single-label name such as `nas`, or a home-only name ending such as `.local`. A public DNS name
+ * may be anyone's, pointed at FamilyFi from a page in this browser.
+ */
+export function isHomeAddress(host: string | null | undefined): boolean {
+  if (!host) return false;
+  const name = (host.startsWith("[") ? host.slice(1, host.indexOf("]")) : host.replace(/:\d+$/, "")).toLowerCase().replace(/\.$/, "");
+  if (!name) return false;
+  if (name.includes(":")) return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(name)) return true;
+  if (name === "localhost" || !name.includes(".")) return true;
+  return HOME_SUFFIXES.some((suffix) => name.endsWith(suffix));
 }

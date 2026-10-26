@@ -144,7 +144,6 @@ class Resources:
         """Fresh test-only secrets per environment; nothing is read from or written to .env."""
         values = self.secrets.setdefault(platform, {
             "FAMILYFI_DEFAULT_PASSWORD": secrets.token_urlsafe(18),
-            "FAMILYFI_SESSION_SECRET": secrets.token_hex(16),
             "FAMILYFI_ENCRYPTION_KEY": secrets.token_hex(32),
             "POSTGRES_PASSWORD": secrets.token_urlsafe(18)})
         env = {**self.env, **values, "DB_MODE": "external", "DB_HOST": "127.0.0.1",

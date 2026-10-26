@@ -12,7 +12,6 @@ Copy `.env.example` to `.env` and set what you need. This is every setting Famil
 | --- | --- | --- |
 | `FAMILYFI_MODE` | `prod` | `prod`, `dev`, `test` or `demo`; see [Modes](#modes). |
 | `FAMILYFI_DEFAULT_PASSWORD` | generated | Password for username `admin`. Generated on first setup if missing. Printed in the server log at every startup. Change it in `.env` to pick your own; the new value is used on the next `admin` sign-in. |
-| `FAMILYFI_SESSION_SECRET` | generated | Binds cookie sessions. Generated on first setup if missing or invalid; never rotated automatically afterward. |
 | `FAMILYFI_ENCRYPTION_KEY` | generated | Encrypts the UniFi API key at rest. Generated on first setup if missing or invalid. Back this up with the database; rotating it makes a stored UniFi key unreadable. |
 | `FAMILYFI_DEMO_URL` | none | `demo` only. The demo's public HTTPS origin, published as the phones' route ([demo mode](operations.md#demo-mode)). |
 | `FAMILYFI_REMOTE_ACCESS_PORT` | `7002` | The remote access port: the phone-only gateway, published by the Compose file, for a route the household runs (a port forward, reverse proxy, Tailscale or its own tunnel) to point at. It closes every connection unanswered until Remote access publishes such a route (see [Remote access with a sidecar container](#remote-access-with-a-sidecar-container)). |

@@ -19,22 +19,14 @@ import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tu
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { authFromLogin, request, type SessionAuth } from "../helpers/http";
-import { issuedInvite as issuedPairing } from "../helpers/pairing";
+import { request, type SessionAuth } from "../helpers/http";
+import { issuedInvite as issuedPairing, PAIRING_ADMIN, pairingAdminAuth } from "../helpers/pairing";
 import { resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
-async function adminAuth() {
-  const response = await login(
-    request("/api/v1/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }),
-    }),
-  );
-  return authFromLogin(response);
-}
+/** A personal administrator: a phone pairs as the one who invites it unless told otherwise, and never as the recovery admin. */
+const adminAuth = pairingAdminAuth;
 
 describe("companion connection API", () => {
   beforeEach(async () => {
@@ -103,7 +95,7 @@ describe("companion connection API", () => {
     // Pairing is the sign-in: no password, no device credential.
     expect(claimed).not.toHaveProperty("deviceCredential");
     expect(claimed.device).toMatchObject({ client: "phone", scope: "full" });
-    expect(claimed.session.username).toBe("admin");
+    expect(claimed.session.username).toBe(PAIRING_ADMIN.username);
     expect(claimed.connection.endpoint.url).toBe("https://familyfi.local");
     expect(claimed.connection.manifest.signature).toBeTruthy();
 

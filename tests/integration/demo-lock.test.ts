@@ -33,6 +33,7 @@ import { ensureDemoRoute } from "@/server/demo";
 import { DEV_MOCK_ROGUE_POLICY_ID } from "@/server/unifi/dev-mock";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
+import { pairingAdmin } from "../helpers/pairing";
 
 /**
  * In demo mode every visitor shares one household, so its configuration is locked: the gateway,
@@ -138,7 +139,9 @@ describe("demo mode", () => {
     // reads as on rather than as a route nothing has come in through.
     const tunnel = ((await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: { status: string; reachability: unknown } }).tunnel;
     expect(tunnel).toMatchObject({ status: "running", reachability: null });
-    const invite = await createInvite(write(auth, "/api/v1/paired/invites", "POST", { client: "phone", endpointId: route.id, displayName: "Reviewer iPhone" }));
+    // The demo's shared login is the recovery admin, so its phones pair as a personal administrator.
+    const accountId = (await pairingAdmin()).id;
+    const invite = await createInvite(write(auth, "/api/v1/paired/invites", "POST", { client: "phone", endpointId: route.id, accountId, displayName: "Reviewer iPhone" }));
     expect(invite.status).toBe(201);
   });
 });

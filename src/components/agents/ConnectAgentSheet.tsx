@@ -7,6 +7,7 @@ import { homeAddress, type HomeAccess } from "@/lib/connection-routes";
 import { countdown } from "@/lib/connection-routes";
 import { CopyRow } from "@/components/ui/CopyRow";
 import { Segmented } from "@/components/ui/Segmented";
+import { useAppData } from "@/components/AppDataProvider";
 import { usePairingCode } from "@/components/pair/pairing-code-session";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 
@@ -15,6 +16,8 @@ import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/component
  * carries a single-use pairing code; closing the sheet or making a new one cancels a code nobody claimed.
  */
 export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => void; onConnected: () => void }) {
+  // An agent acts as whoever connects it, and nothing acts as the built-in admin.
+  const recovery = useAppData().session?.kind === "recovery";
   const [name, setName] = useState("AI agent");
   const [scope, setScope] = useState<"full" | "readOnly">("full");
   const { issued, state, expired, claimed, remaining, error, busy, generate } = usePairingCode({
@@ -38,6 +41,13 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
     </p>
   ) : null;
 
+  const recoveryNote = recovery ? (
+    <p data-testid="agent-recovery-note" role="status" className="rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5 text-[14px]">
+      <span className="font-semibold">Sign in as yourself to connect an agent.</span> An agent acts as the adult who connects it, and nothing
+      acts as the built-in admin. Sign out, then sign in with your own administrator account.
+    </p>
+  ) : null;
+
   const errorLine = error ? (
     <p role="alert" className="text-[14px] font-semibold text-[var(--ff-danger)]">
       {error}
@@ -55,7 +65,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
             <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>
               Cancel
             </button>
-            <button type="button" className={PRIMARY_BUTTON} disabled={busy || !name.trim()} onClick={() => void generate()}>
+            <button type="button" className={PRIMARY_BUTTON} disabled={busy || recovery || !name.trim()} onClick={() => void generate()}>
               Show prompt
             </button>
           </>
@@ -73,7 +83,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
           <p className="mt-1.5 font-normal">{AGENT_SCOPES.find((option) => option.value === scope)?.detail}</p>
           <p className="mt-1.5 font-normal">No agent can change accounts, gateway settings, remote access or paired devices.</p>
         </div>
-        {warning}
+        {recoveryNote ?? warning}
         {errorLine}
       </SheetFrame>
     );

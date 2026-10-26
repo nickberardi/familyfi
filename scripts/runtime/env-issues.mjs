@@ -7,10 +7,6 @@ export function envIssues(env = process.env) {
   if (password.length < 12) {
     issues.push("FAMILYFI_DEFAULT_PASSWORD must be at least 12 characters.");
   }
-  const session = env.FAMILYFI_SESSION_SECRET ?? "";
-  if (session.length < 32) {
-    issues.push("FAMILYFI_SESSION_SECRET must be at least 32 characters.");
-  }
   const key = env.FAMILYFI_ENCRYPTION_KEY ?? "";
   const hex = /^[0-9a-fA-F]{64}$/.test(key);
   const b64 = Buffer.from(key, "base64").length === 32 && key.length >= 44;

@@ -121,17 +121,28 @@ export function isUniqueViolation(error: unknown): boolean {
 
 type Db = Parameters<Parameters<ReturnType<typeof prisma>["$transaction"]>[0]>[0];
 
-/** Ends the sessions of a device's companions (a phone's Watches) and revokes them: they belong to it. */
+/**
+ * Revokes everything paired from a device, and everything paired from those in turn: a phone's
+ * Watches, and the phones and agents its invites paired. Their sessions end, and invites they made
+ * that are still waiting are cancelled, so nothing paired from a revoked device outlives it.
+ */
 async function revokeCompanions(id: string, db: Db, now: Date) {
-  const companions = await db.pairedDevice.findMany({ where: { parentDeviceId: id, revokedAt: null }, select: { id: true } });
-  if (!companions.length) return;
-  const ids = companions.map((companion) => companion.id);
-  await db.session.updateMany({ where: { deviceId: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
-  await db.pairedDevice.updateMany({ where: { id: { in: ids } }, data: { revokedAt: now } });
+  let parents = [id];
+  const seen = new Set(parents);
+  while (parents.length) {
+    await db.pairing.updateMany({ where: { parentDeviceId: { in: parents }, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
+    const companions = await db.pairedDevice.findMany({ where: { parentDeviceId: { in: parents }, revokedAt: null }, select: { id: true } });
+    const ids = companions.map((companion) => companion.id).filter((companion) => !seen.has(companion));
+    if (!ids.length) return;
+    for (const companion of ids) seen.add(companion);
+    await db.session.updateMany({ where: { deviceId: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
+    await db.pairedDevice.updateMany({ where: { id: { in: ids } }, data: { revokedAt: now } });
+    parents = ids;
+  }
 }
 
 /**
- * Revokes a paired device and ends its sessions; a phone's Watches go with it. Resolves false when
+ * Revokes a paired device and ends its sessions; everything paired from it goes with it. Resolves false when
  * there is no such device still active.
  */
 export async function revokeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {
@@ -143,8 +154,8 @@ export async function revokeDevice(id: string, db: Db = prisma() as unknown as D
 }
 
 /**
- * Deletes a paired device's record for good, signing out anything it still had; a phone's Watches
- * are revoked with it. Sessions, pairings and change history keep their rows with the device
+ * Deletes a paired device's record for good, signing out anything it still had; everything paired
+ * from it is revoked with it. Sessions, pairings and change history keep their rows with the device
  * reference cleared, so the Sync log still shows what changed, just not from which device.
  */
 export async function removeDevice(id: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<boolean> {

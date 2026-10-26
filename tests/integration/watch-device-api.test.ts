@@ -26,6 +26,7 @@ import { POST as resumeRule } from "@/app/api/v1/rules/[id]/resume/route";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
+import { pairingAdmin } from "../helpers/pairing";
 
 const watchId = "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1";
 type Auth = { cookie: string; csrf: string; token?: string };
@@ -33,7 +34,7 @@ type Enrollment = { deviceId: string; token: string; expiresAt: string; refreshT
 type Claimed = { invite: { status: string }; device: { id: string; client: string; scope: string }; session: { expiresAt: string }; token: string; refreshToken: string; refreshExpiresAt: string; connection?: { manifest: unknown } };
 
 async function pairedPhone() {
-  const account = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
+  const account = await pairingAdmin();
   const device = await prisma().pairedDevice.create({
     data: { displayName: "Parent's iPhone", accountId: account.id },
   });

@@ -7,7 +7,7 @@ import { GET as listAccounts, POST as createAccount } from "@/app/api/v1/account
 import { DELETE as deleteAccount, PUT as updateAccount } from "@/app/api/v1/accounts/[id]/route";
 import { PUT as setPassword } from "@/app/api/v1/accounts/[id]/password/route";
 import { GET as getHealth } from "@/app/api/v1/health/route";
-import { authenticate, hashPassword } from "@/server/auth";
+import { authenticate, hashPassword, settleRecoveryPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { publicAccount } from "@/server/accounts";
 import { refreshUpdateCheck } from "@/server/update-check";
@@ -291,6 +291,24 @@ describe("auth and accounts API", () => {
     // Demoted behind the API's back: its session is still on record, but no longer honoured.
     await prisma().account.update({ where: { username: "sam" }, data: { isAdmin: false } });
     expect((await session(request("/api/v1/auth/session", { auth: sam! }))).status).toBe(401);
+  });
+
+  it("signs the recovery admin out everywhere when its password changes, and only then", async () => {
+    expect(await settleRecoveryPassword()).toBe(false);
+    const { auth } = await browserLogin("admin", PASSWORD);
+    // A restart with the same password keeps the session.
+    expect(await settleRecoveryPassword()).toBe(false);
+    expect((await session(request("/api/v1/auth/session", { auth: auth! }))).status).toBe(200);
+
+    process.env.FAMILYFI_DEFAULT_PASSWORD = "a-new-recovery-password";
+    try {
+      expect(await settleRecoveryPassword()).toBe(true);
+      expect((await session(request("/api/v1/auth/session", { auth: auth! }))).status).toBe(401);
+      expect((await browserLogin("admin", "a-new-recovery-password")).auth).toBeTruthy();
+      expect(await settleRecoveryPassword()).toBe(false);
+    } finally {
+      process.env.FAMILYFI_DEFAULT_PASSWORD = PASSWORD;
+    }
   });
 });
 
