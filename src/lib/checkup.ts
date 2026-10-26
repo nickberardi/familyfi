@@ -685,7 +685,7 @@ export function driftRows(drift: Pick<CheckupDrift, "changes">): { label: string
         return { label: text.devices, familyfi: side(missing, extra), gateway: side(extra, missing) };
       }
       case "schedule":
-        return { label: text.schedule, familyfi: text.schedules[change.familyfi], gateway: text.schedules[change.gateway] };
+        return { label: text.schedule, familyfi: text.schedules[change.familyfi] ?? text.changed, gateway: text.schedules[change.gateway] ?? text.changed };
       case "name":
         return { label: text.name, familyfi: change.familyfi, gateway: change.gateway };
       case "other":
