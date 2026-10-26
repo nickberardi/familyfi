@@ -188,6 +188,21 @@ describe("leftover FamilyFi policies", () => {
     expect((await prisma().policyOperation.findFirstOrThrow({ where: { unifiPolicyId: "stale-confirmation" } })).status).toBe("failed");
   });
 
+  it("never lets a sync pass, or a confirmation older than its removal, delete on a confirmation's strength", async () => {
+    const scope = ownershipScope(await prisma().household.findUniqueOrThrow({ where: { id: "default" } }));
+    const guarded = withPolicyOwnership(client, scope);
+    const confirmation = { intent: PolicyOperationIntent.delete, status: "confirmed", connectionIdentity: scope.connectionIdentity, siteId: SITE_ID, unifiPolicyId: DEV_MOCK_ROGUE_POLICY_ID };
+    // Older than any removal lasts.
+    await prisma().policyOperation.create({ data: { ...confirmation, createdAt: new Date(Date.now() - 3 * 60_000) } });
+    await expect(guarded.deletePolicy(SITE_ID, DEV_MOCK_ROGUE_POLICY_ID)).rejects.toThrow(PolicyOwnershipError);
+    // Fresh, but left behind: the next sync pass fails it before it writes anything.
+    const fresh = await prisma().policyOperation.create({ data: confirmation });
+    await runReconcileOnce();
+    expect((await prisma().policyOperation.findUniqueOrThrow({ where: { id: fresh.id } })).status).toBe("failed");
+    await expect(guarded.deletePolicy(SITE_ID, DEV_MOCK_ROGUE_POLICY_ID)).rejects.toThrow(PolicyOwnershipError);
+    expect(onGateway(client, DEV_MOCK_ROGUE_POLICY_ID)).toBe(true);
+  });
+
   it("answers 400 without policies and 409 before UniFi is set up", async () => {
     const auth = await signedIn();
     expect((await remove(auth, { policyIds: [] })).status).toBe(400);

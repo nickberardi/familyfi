@@ -6,7 +6,7 @@ import { ownershipScope } from "./unifi/connection";
 import { UnifiHttpError } from "./unifi/errors";
 import { carriesWrite } from "./unifi/lost-creates";
 import { selectExternalZone } from "./unifi/mapping";
-import type { OwnershipScope } from "./unifi/policy-ownership";
+import { expireDeleteConfirmations, type OwnershipScope } from "./unifi/policy-ownership";
 import type { FirewallPolicy, FirewallZone } from "./unifi/types";
 
 /**
@@ -95,9 +95,8 @@ export type LeftoverRemovalResult = { removed: string[]; skipped: string[]; fail
 export async function removeLeftoverPolicies(household: Household, client: UnifiClient, policyIds: string[], stillHeld: () => void): Promise<LeftoverRemovalResult> {
   const siteId = household.unifiSiteId!;
   const scope = { connectionIdentity: ownershipScope(household).connectionIdentity, siteId };
-  // A confirmation an earlier removal left behind (it stopped between recording and deleting) no
-  // longer stands: only the one this call records may allow a delete.
-  await prisma().policyOperation.updateMany({ where: { ...scope, intent: PolicyOperationIntent.delete, status: "confirmed" }, data: { status: "failed" } });
+  // A confirmation an earlier removal left behind no longer stands: only the ones this call records may.
+  await expireDeleteConfirmations();
   const leftovers = new Map(leftoverPolicies(await unrecordedPolicies(scope, await client.listPolicies(siteId))).map((policy) => [policy.id, policy]));
   const removed: string[] = [];
   const skipped: string[] = [];

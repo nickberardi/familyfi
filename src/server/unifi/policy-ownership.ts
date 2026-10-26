@@ -22,15 +22,29 @@ export async function policyOnRecord(scope: OwnershipScope, siteId: string, poli
   return appPolicies + rulePolicies + creations > 0;
 }
 
+/** How long an administrator's confirmation to remove a leftover stands: the removal that recorded it. */
+export const DELETE_CONFIRMATION_MS = 2 * 60_000;
+
 /**
- * Whether an administrator confirmed removing this policy from Checkup's leftover list: a
- * `PolicyOperation` with intent `delete` and status `confirmed` names it. It allows that one delete
- * and nothing else; the policy is still not FamilyFi's, so it is never updated.
+ * Whether an administrator just confirmed removing this policy from Checkup's leftover list: a
+ * `PolicyOperation` with intent `delete` and status `confirmed`, recorded in the last two minutes,
+ * names it. It allows that one delete and nothing else; the policy is still not FamilyFi's, so it
+ * is never updated. The removal holds the reconcile lock and settles the row before releasing it,
+ * and every sync pass fails any row left behind before it writes (`expireDeleteConfirmations`).
  */
-export async function deleteConfirmed(scope: OwnershipScope, siteId: string, policyId: string): Promise<boolean> {
+export async function deleteConfirmed(scope: OwnershipScope, siteId: string, policyId: string, now = new Date()): Promise<boolean> {
   if (!scope.siteId || siteId !== scope.siteId) return false;
   const where = { unifiPolicyId: policyId, connectionIdentity: scope.connectionIdentity, siteId };
-  return (await prisma().policyOperation.count({ where: { ...where, intent: PolicyOperationIntent.delete, status: "confirmed" } })) > 0;
+  const since = new Date(now.getTime() - DELETE_CONFIRMATION_MS);
+  return (await prisma().policyOperation.count({ where: { ...where, intent: PolicyOperationIntent.delete, status: "confirmed", createdAt: { gte: since } } })) > 0;
+}
+
+/**
+ * Fails every confirmation a removal left behind (it stopped between recording it and deleting).
+ * Called with the reconcile lock held, when no removal can be running, so none of them stands.
+ */
+export async function expireDeleteConfirmations(): Promise<void> {
+  await prisma().policyOperation.updateMany({ where: { intent: PolicyOperationIntent.delete, status: "confirmed" }, data: { status: "failed" } });
 }
 
 /**

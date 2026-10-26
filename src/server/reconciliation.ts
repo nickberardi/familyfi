@@ -9,7 +9,7 @@ import { normalizeMac } from "./mac";
 import { macRegistrants } from "./mac-vendor";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
-import { withPolicyOwnership } from "./unifi/policy-ownership";
+import { expireDeleteConfirmations, withPolicyOwnership } from "./unifi/policy-ownership";
 import { reclaims, settleLostCreates } from "./unifi/lost-creates";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
@@ -262,6 +262,9 @@ async function tick(owner: string): Promise<boolean> {
     // What the gateway holds right now, kept current as this pass creates and deletes, so a
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
+    // No leftover removal runs while this pass holds the lock, so a confirmation one left behind
+    // stands for nothing: this pass can never delete a policy on its strength.
+    await expireDeleteConfirmations();
     // Before planning, so a policy a lost create made is claimed and the orphan sweep removes it.
     // Policies lost creates made: one this pass would create again is taken back instead.
     const adopted = await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
