@@ -85,8 +85,11 @@ describe("network checkup", () => {
     expect(leftoverPolicyLine({ blocks: false, what: "traffic", devices: null, scheduled: false })).toBe("Allows some traffic, always");
     expect(runChecks(inputs({ unrecordedPolicies: [policy("c", "Kids bedtime")] })).passed).toContain("leftover_policies");
     expect(runChecks(inputs({ unrecordedPolicies: null })).skipped).toEqual(["leftover_policies"]);
-    expect(leftoverCopyNote({ copyOf: "Bedtime" })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one keeps blocking even when you pause or allow it.");
-    expect(leftoverCopyNote({})).toBeNull();
+    expect(leftoverCopyNote({ copyOf: "Bedtime", enabled: true, blocks: true })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one keeps blocking even when you pause or allow it.");
+    // An old copy that is off, or allows, blocks nothing: the note never says it does.
+    expect(leftoverCopyNote({ copyOf: "Bedtime", enabled: false, blocks: true })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one is off, so it does nothing now.");
+    expect(leftoverCopyNote({ copyOf: "Bedtime", enabled: true, blocks: false })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one still lets traffic through.");
+    expect(leftoverCopyNote({ enabled: true, blocks: true })).toBeNull();
   });
 
   it("finds Sonos wired and on Wi-Fi, and only then", () => {

@@ -377,8 +377,10 @@ export function leftoverPolicyLine(policy: Pick<CheckupPolicy, "blocks" | "what"
 }
 
 /** The line under a leftover that is an old copy of one of FamilyFi's own, or null. */
-export function leftoverCopyNote(policy: Pick<CheckupPolicy, "copyOf">): string | null {
-  return policy.copyOf ? `FamilyFi already has a newer copy of this for ${policy.copyOf}. This old one keeps blocking even when you pause or allow it.` : null;
+export function leftoverCopyNote(policy: Pick<CheckupPolicy, "copyOf" | "enabled" | "blocks">): string | null {
+  if (!policy.copyOf) return null;
+  const effect = !policy.enabled ? "This old one is off, so it does nothing now." : policy.blocks ? "This old one keeps blocking even when you pause or allow it." : "This old one still lets traffic through.";
+  return `FamilyFi already has a newer copy of this for ${policy.copyOf}. ${effect}`;
 }
 
 /** The managed networks whose DHCP hands out their own DNS server, by id, for the rule editor's note. */
@@ -577,6 +579,8 @@ export type LeftoverRemoval = {
   removed: string[];
   /** The policies left alone: gone already, renamed, or now one of FamilyFi's own. */
   skipped: string[];
+  /** The policies the gateway would not delete. */
+  failed: string[];
 };
 
 /** Remove leftover FamilyFi policies the administrator ticked and confirmed. */
@@ -692,6 +696,7 @@ export const CHECKUP_COPY = {
       cancel: "Cancel",
       removed: (count: number) => (count === 1 ? "Removed 1 policy from your gateway." : `Removed ${count} policies from your gateway.`),
       skipped: (count: number) => `${plural(count, "policy was", "policies were")} left alone because ${count === 1 ? "it" : "they"} changed since the last check.`,
+      failed: (count: number) => `${plural(count, "policy", "policies")} could not be removed. Try again in a minute.`,
     },
   },
   checkNames: {

@@ -2382,8 +2382,9 @@ paths:
         Removes the leftover policies an administrator ticked and confirmed on Checkup. Each id is
         checked against the gateway again first: one that is gone, no longer named with FamilyFi's
         prefix, or now claimed by a FamilyFi record is skipped, never deleted. Then the checkup runs
-        again. Administrators only: no paired agent or Watch. 409 `unifi_not_configured` before UniFi
-        is set up.
+        again. Administrators only: no paired agent or Watch. 403 `demo_locked` in the demo. 409
+        `unifi_not_configured` before UniFi is set up, and `sync_running` when a sync pass holds the
+        gateway for more than 20 seconds.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { $ref: "#/components/parameters/CsrfToken" }
@@ -2409,11 +2410,12 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [checkup, removed, skipped]
+                required: [checkup, removed, skipped, failed]
                 properties:
                   checkup: { $ref: "#/components/schemas/CheckupState" }
                   removed: { type: array, items: { type: string }, description: The policies deleted from the gateway }
-                  skipped: { type: array, items: { type: string }, description: The policies left alone }
+                  skipped: { type: array, items: { type: string }, description: "The policies left alone: gone, renamed or now FamilyFi's own" }
+                  failed: { type: array, items: { type: string }, description: The policies the gateway would not delete }
         "400":
           $ref: "#/components/responses/Error"
         "401":

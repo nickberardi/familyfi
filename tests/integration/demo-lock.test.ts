@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
+import { POST as removeLeftovers } from "@/app/api/v1/checkup/leftover-policies/remove/route";
 import { POST as createAccount } from "@/app/api/v1/accounts/route";
 import { DELETE as deleteAccount, PUT as updateAccount } from "@/app/api/v1/accounts/[id]/route";
 import { PUT as setPassword } from "@/app/api/v1/accounts/[id]/password/route";
@@ -29,6 +30,7 @@ import { PUT as setUpdateSchedule } from "@/app/api/v1/settings/update/schedule/
 import { DELETE as clearResolver, PUT as setResolver } from "@/app/api/v1/upstream/resolver/route";
 import { prisma } from "@/server/db";
 import { ensureDemoRoute } from "@/server/demo";
+import { DEV_MOCK_ROGUE_POLICY_ID } from "@/server/unifi/dev-mock";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -98,6 +100,7 @@ describe("demo mode", () => {
       await installUpdate(write(auth, "/api/v1/settings/update/install", "POST")),
       await exportHousehold(request("/api/v1/settings/export", { auth })),
       await importHousehold(write(auth, "/api/v1/settings/import?mode=apply", "POST")),
+      await removeLeftovers(write(auth, "/api/v1/checkup/leftover-policies/remove", "POST", { policyIds: [DEV_MOCK_ROGUE_POLICY_ID] })),
       // The built-in quarantine rule's switch is the household's quarantine setting.
       await turnOnRule(write(auth, "/api/v1/rules/quarantine/on", "POST"), params({ id: "quarantine" })),
       await turnOffRule(write(auth, "/api/v1/rules/quarantine/off", "POST"), params({ id: "quarantine" })),

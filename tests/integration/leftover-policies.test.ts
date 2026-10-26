@@ -102,6 +102,7 @@ describe("leftover FamilyFi policies", () => {
     const result = (await response.json()) as LeftoverRemoval;
     expect(result.removed).toEqual([DEV_MOCK_ROGUE_POLICY_ID]);
     expect(result.skipped).toEqual([]);
+    expect(result.failed).toEqual([]);
     expect(onGateway(client, DEV_MOCK_ROGUE_POLICY_ID)).toBe(false);
     expect(leftoverIds(result.checkup)).toEqual([]);
     expect(result.checkup.passed).toContain("leftover_policies");
@@ -123,6 +124,25 @@ describe("leftover FamilyFi policies", () => {
     expect(result.skipped).toEqual([DEV_MOCK_ADMIN_POLICY_ID, ours, DEV_MOCK_ROGUE_POLICY_ID, "no-such-policy"]);
     expect(deletes(client).length).toBe(before);
     expect(await prisma().policyOperation.count({ where: { intent: PolicyOperationIntent.delete } })).toBe(0);
+  });
+
+  it("removes only the ticked leftovers, and reports one the gateway would not delete", async () => {
+    const auth = await signedIn();
+    await runReconcileOnce();
+    const rogue = client.state.policies.find((policy) => policy.id === DEV_MOCK_ROGUE_POLICY_ID)!;
+    for (const [id, name] of [["leftover-kept", "FamilyFi Kept"], ["leftover-stuck", "FamilyFi Stuck"]]) client.state.policies.push({ ...rogue, id, name });
+    const deleteOne = client.deletePolicy.bind(client);
+    client.deletePolicy = async (siteId, policyId) => {
+      if (policyId === "leftover-stuck") throw new Error("gateway busy");
+      return deleteOne(siteId, policyId);
+    };
+    const result = (await (await remove(auth, { policyIds: [DEV_MOCK_ROGUE_POLICY_ID, "leftover-stuck"] })).json()) as LeftoverRemoval;
+    expect(result).toMatchObject({ removed: [DEV_MOCK_ROGUE_POLICY_ID], skipped: [], failed: ["leftover-stuck"] });
+    // The unticked one was never sent a delete, and both left are still listed.
+    expect(deletes(client).some((call) => call.path.endsWith("leftover-kept"))).toBe(false);
+    expect(leftoverIds(result.checkup)).toEqual(["leftover-kept", "leftover-stuck"]);
+    const stuck = await prisma().policyOperation.findFirstOrThrow({ where: { intent: PolicyOperationIntent.delete, unifiPolicyId: "leftover-stuck" } });
+    expect(stuck.status).toBe("failed");
   });
 
   it("does not list a policy a pending create may have made", async () => {
@@ -151,8 +171,21 @@ describe("leftover FamilyFi policies", () => {
     await expect(guarded.deletePolicy(SITE_ID, DEV_MOCK_ADMIN_POLICY_ID)).rejects.toThrow(PolicyOwnershipError);
     // Another console or site's confirmation counts for nothing here.
     await expect(withPolicyOwnership(client, { ...scope, connectionIdentity: "local:elsewhere" }).deletePolicy(SITE_ID, rogue.id)).rejects.toThrow(PolicyOwnershipError);
+    await expect(withPolicyOwnership(client, { ...scope, siteId: "another-site" }).deletePolicy("another-site", rogue.id)).rejects.toThrow(PolicyOwnershipError);
     await guarded.deletePolicy(SITE_ID, rogue.id);
     expect(onGateway(client, rogue.id)).toBe(false);
+  });
+
+  it("lets a confirmation an earlier removal left behind allow nothing once another removal starts", async () => {
+    const auth = await signedIn();
+    await runReconcileOnce();
+    const scope = ownershipScope(await prisma().household.findUniqueOrThrow({ where: { id: "default" } }));
+    // A removal that stopped between recording its confirmation and deleting.
+    await prisma().policyOperation.create({
+      data: { intent: PolicyOperationIntent.delete, status: "confirmed", connectionIdentity: scope.connectionIdentity, siteId: SITE_ID, unifiPolicyId: "stale-confirmation" },
+    });
+    await remove(auth, { policyIds: ["no-such-policy"] });
+    expect((await prisma().policyOperation.findFirstOrThrow({ where: { unifiPolicyId: "stale-confirmation" } })).status).toBe("failed");
   });
 
   it("answers 400 without policies and 409 before UniFi is set up", async () => {
