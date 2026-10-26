@@ -78,7 +78,12 @@ export default function CheckupPage() {
     setRemoving(true);
     await write(async () => {
       const result = await removeLeftoverPolicies(request, policies.map((policy) => policy.id));
-      const said = [result.removed.length ? COPY.network.leftover.removed(result.removed.length) : "", result.skipped.length ? COPY.network.leftover.skipped(result.skipped.length) : ""];
+      const text = COPY.network.leftover;
+      const said = [
+        result.removed.length ? text.removed(result.removed.length) : "",
+        result.skipped.length ? text.skipped(result.skipped.length) : "",
+        result.failed.length ? text.failed(result.failed.length) : "",
+      ];
       setNotice(said.filter(Boolean).join(" "));
       return result.checkup;
     });

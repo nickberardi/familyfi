@@ -83,21 +83,27 @@ export function checkupPolicy(policy: FirewallPolicy, zones: FirewallZone[], cop
   };
 }
 
-export type LeftoverRemovalResult = { removed: string[]; skipped: string[] };
+export type LeftoverRemovalResult = { removed: string[]; skipped: string[]; failed: string[] };
 
 /**
  * Deletes the leftover policies an administrator confirmed. Each id is checked again against the
  * gateway as it is now: still there, still named like FamilyFi's, still claimed by no record.
  * Anything else is skipped, never deleted. The confirmation is recorded first, so the ownership
- * guard on `client` lets this delete, and only this one, through.
+ * guard on `client` lets this delete, and only this one, through. The caller holds the reconcile
+ * lock, so no pass records or creates a policy meanwhile.
  */
-export async function removeLeftoverPolicies(household: Household, client: UnifiClient, policyIds: string[]): Promise<LeftoverRemovalResult> {
+export async function removeLeftoverPolicies(household: Household, client: UnifiClient, policyIds: string[], stillHeld: () => void): Promise<LeftoverRemovalResult> {
   const siteId = household.unifiSiteId!;
   const scope = { connectionIdentity: ownershipScope(household).connectionIdentity, siteId };
+  // A confirmation an earlier removal left behind (it stopped between recording and deleting) no
+  // longer stands: only the one this call records may allow a delete.
+  await prisma().policyOperation.updateMany({ where: { ...scope, intent: PolicyOperationIntent.delete, status: "confirmed" }, data: { status: "failed" } });
   const leftovers = new Map(leftoverPolicies(await unrecordedPolicies(scope, await client.listPolicies(siteId))).map((policy) => [policy.id, policy]));
   const removed: string[] = [];
   const skipped: string[] = [];
+  const failed: string[] = [];
   for (const policyId of new Set(policyIds)) {
+    stillHeld();
     const policy = leftovers.get(policyId);
     if (!policy) {
       skipped.push(policyId);
@@ -110,13 +116,15 @@ export async function removeLeftoverPolicies(household: Household, client: Unifi
       await client.deletePolicy(siteId, policyId);
     } catch (error) {
       if (!(error instanceof UnifiHttpError && error.status === 404)) {
+        console.warn(`Leftover policy ${policyId} could not be removed:`, error);
         await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed" } });
-        throw error;
+        failed.push(policyId);
+        continue;
       }
     }
     // Gone: no longer a confirmation, so nothing can use it to delete again, and sync prunes it.
     await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "removed" } });
     removed.push(policyId);
   }
-  return { removed, skipped };
+  return { removed, skipped, failed };
 }
