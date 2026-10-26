@@ -10,7 +10,7 @@ import { macRegistrants } from "./mac-vendor";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
 import { withPolicyOwnership } from "./unifi/policy-ownership";
-import { carriesWrite, settleLostCreates } from "./unifi/lost-creates";
+import { reclaims, settleLostCreates } from "./unifi/lost-creates";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
@@ -902,7 +902,7 @@ async function createOwnedPolicy(
 ) {
   // A lost create already made this very policy: record it rather than make a second, which
   // would leave the sweep deleting the one that works if this create failed.
-  const reclaimed = adopted.findIndex((policy) => carriesWrite(policy, JSON.parse(JSON.stringify(write))));
+  const reclaimed = adopted.findIndex((policy) => reclaims(policy, write));
   if (reclaimed >= 0) return adopted.splice(reclaimed, 1)[0];
   const operation = await prisma().policyOperation.create({
     data: {
