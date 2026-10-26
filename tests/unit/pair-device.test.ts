@@ -66,7 +66,7 @@ describe("pair device", () => {
   });
 
   it("asks before revoking or removing, in the web's words", () => {
-    expect(confirmLine(revokeConfirm(phone()))).toBe("Revoke A phone? It is signed out now and must be paired again. The Watches it set up stop working too.");
+    expect(confirmLine(revokeConfirm(phone()))).toBe("Revoke A phone? It is signed out now and must be paired again. Any Watch, phone or agent it paired stops working too.");
     expect(confirmLine(revokeConfirm(phone({ client: "watch", displayName: "A Watch" })))).toBe("Revoke A Watch? It is signed out now and must be paired again.");
     expect(confirmLine(removeConfirm(phone()))).toBe("Remove A phone from the list? This can't be undone; setup would be needed again.");
     expect(confirmLine(removeAllConfirm(3))).toBe("Remove all 3 revoked devices from the list? This can't be undone.");

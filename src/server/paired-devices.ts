@@ -5,7 +5,7 @@ type Viewer = Parameters<typeof isAdministrator>[0];
 
 /**
  * Which paired devices a caller may see and manage: an administrator sees them all; a paired device
- * sees itself and the companions it vouched for, such as a phone's Watch. Anyone else sees none.
+ * sees itself and the devices it paired: a phone's Watches, and the phones and agents its invites paired. Anyone else sees none.
  */
 export function visibleDevices(session: Viewer): Prisma.PairedDeviceWhereInput | null {
   if (isAdministrator(session)) return {};
