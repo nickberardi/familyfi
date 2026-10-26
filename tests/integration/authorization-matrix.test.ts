@@ -35,12 +35,15 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
  *   access without a paired phone. Its headers go through the phone gateway's own
  *   `tunnelHeaders`, so the cookie is stripped and `x-familyfi-via: tunnel` is stamped
  *   exactly as they would be in production.
+ * - `tunnel-bearer`: the same browser's session token sent as a bearer through the tunnel,
+ *   which keeps `Authorization`. A browser's session counts only from its cookie, so it fares
+ *   no better than `tunnel`.
  * - `agent:full`, `agent:readOnly` and `watch:rulesOnly`: a paired device on the home network,
  *   signed in as the administrator, with that scope. Its scope bounds it, not the account.
  */
 const DEVICES = ["agent:full", "agent:readOnly", "watch:rulesOnly"] as const;
 type Device = (typeof DEVICES)[number];
-const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel", ...DEVICES] as const;
+const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel", "tunnel-bearer", ...DEVICES] as const;
 type Caller = (typeof CALLERS)[number];
 
 type Outcome = "allowed" | "401" | "403";
@@ -66,13 +69,14 @@ function isDevice(caller: Caller): caller is Device {
 }
 
 const EXPECTED: Record<Access, Record<Person, Outcome>> = {
-  public: { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "allowed" },
-  "home-network": { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
-  session: { anonymous: "401", member: "401", administrator: "allowed", recovery: "allowed", tunnel: "401" },
-  administrator: { anonymous: "401", member: "401", administrator: "allowed", recovery: "allowed", tunnel: "401" },
-  csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403" },
-  "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
-  "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403" },
+  public: { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "allowed", "tunnel-bearer": "allowed" },
+  "home-network": { anonymous: "allowed", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403", "tunnel-bearer": "403" },
+  session: { anonymous: "401", member: "401", administrator: "allowed", recovery: "allowed", tunnel: "401", "tunnel-bearer": "401" },
+  administrator: { anonymous: "401", member: "401", administrator: "allowed", recovery: "allowed", tunnel: "401", "tunnel-bearer": "401" },
+  // A bearer needs no CSRF token, so sign-out answers it; it signs out no browser session (auth-api.test.ts).
+  csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403", "tunnel-bearer": "allowed" },
+  "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
+  "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
 };
 
 /**
@@ -257,7 +261,7 @@ const devices: Partial<Record<Device, string>> = {};
 
 async function signedIn(accountId: string, username: string) {
   const issued = await createSession({ accountId, username, kind: SessionKind.cookie });
-  return { cookie: `${SESSION_COOKIE}=${issued.raw}; ${CSRF_COOKIE}=${issued.csrf}`, csrf: issued.csrf };
+  return { cookie: `${SESSION_COOKIE}=${issued.raw}; ${CSRF_COOKIE}=${issued.csrf}`, csrf: issued.csrf, token: issued.raw };
 }
 
 /** A fresh request per cell: sign-out revokes the session it is sent with. */
@@ -274,11 +278,14 @@ async function requestAs(caller: Caller, route: Route): Promise<Request> {
     const issued = await createSession({ accountId: accounts.administrator!, username: "matrix-admin", kind: SessionKind.bearer, deviceId: devices[caller] });
     return request(url, { ...init, auth: { cookie: "", csrf: "", token: issued.raw } });
   }
-  const account = caller === "tunnel" ? accounts.administrator! : accounts[caller]!;
+  const viaTunnel = caller === "tunnel" || caller === "tunnel-bearer";
+  const account = viaTunnel ? accounts.administrator! : accounts[caller]!;
   const username = (await prisma().account.findUniqueOrThrow({ where: { id: account } })).username;
-  const lan = request(url, { ...init, auth: await signedIn(account, username) });
-  if (caller !== "tunnel") return lan;
+  const browser = await signedIn(account, username);
+  const lan = request(url, { ...init, auth: { cookie: browser.cookie, csrf: browser.csrf } });
+  if (!viaTunnel) return lan;
   const incoming = Object.fromEntries(lan.headers.entries());
+  if (caller === "tunnel-bearer") incoming.authorization = `Bearer ${browser.token}`;
   return new Request(lan.url, { ...init, headers: tunnelHeaders(incoming) as Record<string, string> });
 }
 

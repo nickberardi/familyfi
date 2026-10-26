@@ -2,7 +2,7 @@
 
 The web UI and native clients use `/api/v1`. The source of truth is [`openapi/familyfi.v1.yaml`](../openapi/familyfi.v1.yaml). Mutations that enqueue reconciliation return a `change` object (`changeId` + `revision`); poll `GET /api/v1/changes/{id}` for that action. Consult the endpoint schema: authentication, pairing and other operations that do not enqueue reconciliation have their own response shapes. Global last-sync success is not proof that your change applied.
 
-Browser mutations after login send `X-CSRF-Token` matching the `familyfi_csrf` cookie. Native clients send `Authorization: Bearer`.
+Browser mutations after login send `X-CSRF-Token` matching the `familyfi_csrf` cookie. Native clients send `Authorization: Bearer`. A browser's session counts only from its cookie: its token sent as a bearer is unauthenticated, so remote access, which strips cookies, never admits a browser session.
 
 A response field is `required` in the document only when every object of its type has it. A field that applies to some of them only, by kind, scope, mode or built-in rule (a rule's `targetIds`, `windows` or `countries`), is optional and left out where it doesn't apply, never sent empty or as a placeholder, so a payload carries only what describes that object and doesn't grow with every feature. A list that applies but has nothing in it is `[]` (Block countries covering no group yet has `groupIds: []`), and any other field that applies but has no value is `null`; neither is left out. Every optional response field is listed, with when it is sent, in [`tests/contract/openapi.test.ts`](../tests/contract/openapi.test.ts), which fails when a response schema leaves any other field optional.
 

@@ -12,7 +12,8 @@ import { prisma } from "@/server/db";
 import { publicAccount } from "@/server/accounts";
 import { refreshUpdateCheck } from "@/server/update-check";
 import { APP_VERSION } from "@/lib/version";
-import { CSRF_HEADER, LOGIN_MAX_FAILURES } from "@/lib/constants";
+import { CSRF_HEADER, LOGIN_MAX_FAILURES, SESSION_COOKIE } from "@/lib/constants";
+import { cookieValue } from "@/lib/cookie";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 import { bearer, pairPhone } from "../helpers/pairing";
@@ -111,6 +112,17 @@ describe("auth and accounts API", () => {
     const accounts = (await listed.json()) as { accounts: ReturnType<typeof publicAccount>[] };
     expect(accounts.accounts.some((row) => row.username === "admin" && row.recovery)).toBe(true);
     expect(JSON.stringify(accounts)).not.toContain("passwordHash");
+  });
+
+  it("refuses a browser's session token sent as a bearer, which the tunnel would pass", async () => {
+    const { auth } = await browserLogin();
+    const token = cookieValue(auth!.cookie, SESSION_COOKIE)!;
+    const asBearer = await session(request("/api/v1/auth/session", { auth: { cookie: "", csrf: "", token } }));
+    expect(asBearer.status).toBe(401);
+    // Nor can it sign that browser out.
+    expect((await logout(request("/api/v1/auth/logout", { method: "POST", auth: { cookie: "", csrf: "", token } }))).status).toBe(200);
+    const asCookie = await session(request("/api/v1/auth/session", { auth: auth! }));
+    expect(asCookie.status).toBe(200);
   });
 
   it("refuses a phone's password sign-in: phones join by pairing", async () => {
