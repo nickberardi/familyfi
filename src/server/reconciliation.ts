@@ -10,7 +10,7 @@ import { macRegistrants } from "./mac-vendor";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "./unifi/connection";
 import { withPolicyOwnership } from "./unifi/policy-ownership";
-import { settleLostCreates } from "./unifi/lost-creates";
+import { carriesWrite, settleLostCreates } from "./unifi/lost-creates";
 import { UnifiHttpError } from "./unifi/errors";
 import { policyFingerprint } from "./unifi/fingerprint";
 import { mapClientsToZones, selectExternalZone } from "./unifi/mapping";
@@ -24,7 +24,7 @@ import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
 import { lockDnsExemptionsOf, lockDnsOpenDns } from "./unifi/lock-dns";
 import type { UnifiClient } from "./unifi/client";
-import type { FirewallPolicyWrite } from "./unifi/types";
+import type { FirewallPolicy, FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
 
 const INTERVAL_MS = 30_000;
@@ -222,7 +222,8 @@ async function tick(owner: string): Promise<boolean> {
     // policy someone removed on the console is noticed even when nothing else changed.
     const onGateway = new Set(gatewayPolicies.map((policy) => policy.id));
     // Before planning, so a policy a lost create made is claimed and the orphan sweep removes it.
-    await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
+    // Policies lost creates made: one this pass would create again is taken back instead.
+    const adopted = await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
       abandonBefore: new Date(now.getTime() - LOST_CREATE_GRACE_MS),
     });
     let accessPoints: Map<string, string> | null = null;
@@ -368,7 +369,7 @@ async function tick(owner: string): Promise<boolean> {
           plannedKey(row.ownerScope, row.groupId, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
+        await applyDesiredPolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, adopted);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -493,7 +494,7 @@ async function tick(owner: string): Promise<boolean> {
         (row) => plannedRuleKey(row.ruleId, row.windowKey, row.zoneId) === planned.key && row.connectionIdentity === identity,
       );
       try {
-        await applyDesiredRulePolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway);
+        await applyDesiredRulePolicy(client, siteId, identity, revision, planned, write, fingerprint, existing, onGateway, adopted);
       } catch (error) {
         failed += 1;
         errors.push(error instanceof Error ? error.message : String(error));
@@ -649,6 +650,7 @@ async function applyDesiredPolicy(
       }
     | undefined,
   onGateway: Set<string>,
+  adopted: FirewallPolicy[],
 ) {
   const scope = planned.ownerScope === "group" ? PolicyOwnerScope.group : PolicyOwnerScope.quarantine;
   const appPolicyId = existing?.id;
@@ -704,7 +706,7 @@ async function applyDesiredPolicy(
     }
   }
 
-  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway);
+  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway, adopted);
   if (appPolicyId) {
     await prisma().appPolicy.update({
       where: { id: appPolicyId },
@@ -755,6 +757,7 @@ async function applyDesiredRulePolicy(
       }
     | undefined,
   onGateway: Set<string>,
+  adopted: FirewallPolicy[],
 ) {
   const unifiPolicyId = existing?.unifiPolicyId;
   // Unchanged and still on the gateway: nothing to write. A policy removed on the console
@@ -813,7 +816,7 @@ async function applyDesiredRulePolicy(
     }
   }
 
-  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway);
+  const created = await createOwnedPolicy(client, siteId, identity, write, fingerprint, onGateway, adopted);
   if (existing) {
     await prisma().rulePolicy.update({
       where: { id: existing.id },
@@ -857,7 +860,12 @@ async function createOwnedPolicy(
   write: FirewallPolicyWrite,
   fingerprint: string,
   onGateway: Set<string>,
+  adopted: FirewallPolicy[],
 ) {
+  // A lost create already made this very policy: record it rather than make a second, which
+  // would leave the sweep deleting the one that works if this create failed.
+  const reclaimed = adopted.findIndex((policy) => carriesWrite(policy, JSON.parse(JSON.stringify(write))));
+  if (reclaimed >= 0) return adopted.splice(reclaimed, 1)[0];
   const operation = await prisma().policyOperation.create({
     data: {
       intent: PolicyOperationIntent.create,
@@ -875,14 +883,14 @@ async function createOwnedPolicy(
     // Only a refusal is known to have created nothing. A lost answer, or a 5xx a proxy may have
     // sent after the gateway committed the create, stays pending.
     if (error instanceof UnifiHttpError && error.status >= 400 && error.status < 500) {
-      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed" } });
+      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed", payload: Prisma.DbNull } });
     }
     throw error;
   }
   onGateway.add(created.id);
   await prisma().policyOperation.update({
     where: { id: operation.id },
-    data: { status: "applied", unifiPolicyId: created.id },
+    data: { status: "applied", unifiPolicyId: created.id, payload: Prisma.DbNull },
   });
   return created;
 }
