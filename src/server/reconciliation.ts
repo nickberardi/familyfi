@@ -436,7 +436,7 @@ async function tick(owner: string): Promise<boolean> {
         if (existing) {
           await prisma().appPolicy.update({
             where: { id: existing.id },
-            data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision },
+            data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision, ...driftCleared(existing, fingerprint) },
           });
         } else {
           await prisma().appPolicy.create({
@@ -561,7 +561,7 @@ async function tick(owner: string): Promise<boolean> {
         if (existing) {
           await prisma().rulePolicy.update({
             where: { id: existing.id },
-            data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision },
+            data: { lastError: errors[errors.length - 1], desiredFingerprint: fingerprint, desiredRevision: revision, ...driftCleared(existing, fingerprint) },
           });
         } else {
           await prisma().rulePolicy.create({
@@ -626,6 +626,10 @@ async function tick(owner: string): Promise<boolean> {
       errors.push(issue.message);
     }
 
+    // What this pass found changed on the console shows before its changes settle, so a client
+    // waiting on one reads the note as this pass left it. It never fails the pass.
+    await recordDriftFindings();
+
     const status = failed === 0 ? ChangeStatus.applied : ChangeStatus.partial;
     // The pass that took over settles the pending changes against what it wrote.
     stillHeld();
@@ -652,10 +656,8 @@ async function tick(owner: string): Promise<boolean> {
         syncRunId: run.id,
       },
     });
-    // What this pass found changed on the console shows now; neither step fails the pass.
+    // The checkup reads what this pass read, at most once an interval; it never fails the pass.
     stillHeld();
-    await recordDriftFindings();
-    // The checkup reads what this pass read, at most once an interval.
     await checkupAfterSync(household, client, { zones, networks, clients, networkClientIds });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

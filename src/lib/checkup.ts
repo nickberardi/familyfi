@@ -7,7 +7,7 @@
  * when it may be by design: a note says what FamilyFi sees and what it means for FamilyFi's rules,
  * never that it is wrong.
  */
-import type { ApiRequest } from "./api-client";
+import { waitForChange, type ApiRequest } from "./api-client";
 import { countriesSummary } from "./countries";
 import { groupHref } from "./device-detail";
 import { deviceKindLabel } from "./display";
@@ -703,6 +703,19 @@ export async function runCheckupNow(request: ApiRequest): Promise<CheckupState> 
   return (await request<{ checkup: CheckupState }>("/api/v1/checkup/run", { method: "POST", body: {} })).checkup;
 }
 
+/**
+ * Put it back: a sync pass now, waited for, then the checkup as that pass left it and what to tell
+ * the administrator. The pass writes back every rule changed in UniFi, not only the one pressed.
+ */
+export async function putBackNow(request: ApiRequest): Promise<{ checkup: CheckupState; notice: string }> {
+  const { change } = await request<{ change: { changeId: string } }>("/api/v1/sync/retry", { method: "POST", body: {} });
+  const outcome = await waitForChange(request, change.changeId);
+  const checkup = await loadCheckup(request);
+  const failing = checkup.findings.some((finding) => finding.check === "gateway_drift" && finding.details.drift?.putBack === false);
+  const text = CHECKUP_COPY.network.drift;
+  return { checkup, notice: outcome.status === "pending" ? text.stillPutting : failing ? text.putBackFailed : text.putBackDone };
+}
+
 /** Dismiss a finding, or say a note is intended; `false` shows it again. */
 export async function setCheckupDismissed(request: ApiRequest, id: string, dismissed: boolean): Promise<CheckupState> {
   return (await request<{ checkup: CheckupState }>(`/api/v1/checkup/findings/${encodeURIComponent(id)}`, { method: "PATCH", body: { dismissed } })).checkup;
@@ -838,7 +851,9 @@ export const CHECKUP_COPY = {
       wasOnGateway: "Was on the gateway",
       onGateway: "On the gateway",
       putBack: "Put it back",
-      putting: "FamilyFi is changing it back on your gateway.",
+      putBackDone: "FamilyFi changed it back on your gateway.",
+      putBackFailed: "FamilyFi still couldn’t change it back. Check that your gateway is online, then try again.",
+      stillPutting: "FamilyFi is still changing it back. Check again in a minute.",
       switch: "Switch",
       on: "On",
       off: "Off",

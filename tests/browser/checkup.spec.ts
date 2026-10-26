@@ -127,3 +127,49 @@ test("a finding from a check this app does not know shows the server's English l
   await passed.click();
   await expect(page.getByText(/^✓ /)).toHaveCount(count);
 });
+
+test("a rule changed in UniFi shows what changed, and Put it back only while FamilyFi cannot change it back", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  // Answer as the server does once sync found Bedtime changed in UniFi and could not yet change it back.
+  let putBack = false;
+  await page.route("**/api/v1/checkup", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { checkup: { findings: object[] } };
+    const drift = {
+      rule: { id: "bedtime", name: "Bedtime" },
+      changes: [
+        { field: "switch", familyfi: true, gateway: false },
+        { field: "devices", familyfi: ["Cassie's iPad", "Nintendo Switch"], gateway: ["Nintendo Switch"] },
+      ],
+      seenAt: "2026-10-26T20:10:00.000Z",
+      putBack,
+    };
+    body.checkup.findings.push({
+      id: "gateway_drift:bedtime",
+      check: "gateway_drift",
+      kind: "note",
+      details: { drift },
+      message: { key: "checkup.gateway_drift", text: "Bedtime was changed in UniFi" },
+      firstSeenAt: drift.seenAt,
+      lastSeenAt: drift.seenAt,
+      dismissed: false,
+    });
+    await route.fulfill({ response, json: body });
+  });
+  await page.goto("/checkup");
+  const note = page.getByTestId("checkup-finding-gateway_drift:bedtime");
+  await expect(note).toContainText("Bedtime was changed in UniFi");
+  await expect(note).toContainText("hasn’t been able to change it back yet");
+  const table = note.getByTestId("checkup-drift-gateway_drift:bedtime");
+  await expect(table).toContainText("On the gateway");
+  await expect(table).toContainText("Cassie's iPad and Nintendo Switch");
+  await expect(note.getByRole("link", { name: "Edit Bedtime" })).toHaveAttribute("href", "/rules/bedtime");
+
+  // Put it back waits for a sync pass, then shows the checkup that pass left.
+  putBack = true;
+  await note.getByTestId("checkup-put-back-gateway_drift:bedtime").click();
+  await expect(page.getByRole("status")).toHaveText("FamilyFi changed it back on your gateway.");
+  await expect(note).toContainText("FamilyFi changed it back to how you set it.");
+  await expect(table).toContainText("Was on the gateway");
+  await expect(note.getByTestId("checkup-put-back-gateway_drift:bedtime")).toHaveCount(0);
+});

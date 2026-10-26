@@ -4,6 +4,7 @@ import { UnifiHttpError } from "@/server/unifi/errors";
 import { prisma } from "@/server/db";
 import { publicDevice } from "@/server/devices";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
+import { checkupState } from "@/server/checkup";
 import { connectionIdentity } from "@/server/unifi/connection";
 import {
   ADMIN_POLICY_ID,
@@ -318,6 +319,31 @@ describe("reconciliation against mocked UniFi", () => {
     expect((await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } })).gatewayDrift).toEqual(row.gatewayDrift);
   });
 
+  it("puts back a rule's window policy someone made always-on, and notes it on Checkup by rule", async () => {
+    const mac = "02:00:00:00:00:01";
+    const client = fixtureUnifiClient();
+    setReconcileClientForTests(client);
+    await runReconcileOnce();
+    const group = await createFamilyGroup();
+    await prisma().device.update({ where: { mac }, data: { groupId: group.id, assignment: AssignmentState.assigned } });
+    await runReconcileOnce();
+    const recorded = await prisma().rulePolicy.findFirstOrThrow({ include: { rule: true } });
+    const onGateway = client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!;
+    const schedule = onGateway.schedule;
+    expect(schedule).toBeTruthy();
+    // A pass that changed nothing on the console leaves the window's policy alone.
+    expect((await prisma().rulePolicy.findUniqueOrThrow({ where: { id: recorded.id } })).gatewayDrift).toBeNull();
+    onGateway.schedule = null;
+
+    await runReconcileOnce();
+    expect(client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!.schedule).toEqual(schedule);
+    expect((await prisma().rulePolicy.findUniqueOrThrow({ where: { id: recorded.id } })).gatewayDrift).toEqual([{ field: "schedule", familyfi: "scheduled", gateway: "always" }]);
+    const note = (await checkupState()).findings.find((finding) => finding.check === "gateway_drift")!;
+    expect(note.id).toBe(`gateway_drift:${recorded.ruleId}`);
+    expect(note.details.drift).toMatchObject({ rule: { id: recorded.ruleId, name: recorded.rule.name }, putBack: true });
+    expect(note.details.drift).not.toHaveProperty("group");
+  });
+
   it("keeps what the console changed while putting it back fails", async () => {
     const client = fixtureUnifiClient();
     setReconcileClientForTests(client);
@@ -352,8 +378,11 @@ describe("reconciliation against mocked UniFi", () => {
 
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: !household.quarantineEnforced } });
+    // Even when FamilyFi's own write fails: what it wants now is no longer what the console changed.
+    vi.spyOn(client, "updatePolicy").mockRejectedValueOnce(new Error("gateway busy"));
     await runReconcileOnce();
     const row = await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } });
+    expect(row.lastError).toBe("gateway busy");
     expect(row.gatewayDrift).toBeNull();
     expect(row.driftSeenAt).toBeNull();
   });
