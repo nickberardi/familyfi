@@ -76,7 +76,7 @@ export async function listSiteNetworks(household: Household, options: { fresh?: 
  * already deleted there counts as removed. The records go only after the gateway deletes, since
  * they are what lets the guarded client delete at all.
  */
-async function removePreviousTargetPolicies(household: Household, identity: string) {
+async function removePreviousTargetPolicies(household: Household, identity: string, stillHeld: () => void) {
   const siteId = household.unifiSiteId!;
   const scope = { connectionIdentity: identity, siteId };
   const applied = { ...scope, intent: PolicyOperationIntent.create, status: "applied" as const };
@@ -91,12 +91,14 @@ async function removePreviousTargetPolicies(household: Household, identity: stri
   ]);
   const owned = new Set([...appPolicies, ...rulePolicies, ...creations].flatMap((row) => row.unifiPolicyId ?? []));
   for (const policyId of owned) {
+    stillHeld();
     try {
       await client.deletePolicy(siteId, policyId);
     } catch (error) {
       if (!(error instanceof UnifiHttpError && error.status === 404)) throw error;
     }
   }
+  stillHeld();
   await forgetPreviousTarget(identity, siteId);
 }
 
@@ -132,7 +134,7 @@ export async function saveUnifiConnection(input: {
     : `local:${input.baseUrl}:${probed.site.id}`;
   // No pass may write to the console being left, or record a policy there, while it is cleaned up
   // and the household moves.
-  const scope = await withReconcileLock(() => switchUnifiTarget(input, probed, nextIdentity), {
+  const scope = await withReconcileLock((stillHeld) => switchUnifiTarget(input, probed, nextIdentity, stillHeld), {
     busy: () => new UnifiConfigError("A sync with the gateway is still running. Try saving again in a minute."),
   });
   rememberSiteNetworks(nextIdentity, probed.networks);
@@ -146,6 +148,7 @@ async function switchUnifiTarget(
   input: Parameters<typeof saveUnifiConnection>[0],
   probed: Awaited<ReturnType<typeof testUnifiConnection>>,
   nextIdentity: string,
+  stillHeld: () => void,
 ): Promise<NetworkScope> {
   const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
   const scopedInput =
@@ -158,13 +161,17 @@ async function switchUnifiTarget(
   const previous = household.unifiSiteId ? connectionIdentity(household) : null;
   if (previous && previous !== nextIdentity && household.unifiKeyCiphertext) {
     try {
-      await removePreviousTargetPolicies(household, previous);
+      await removePreviousTargetPolicies(household, previous, stillHeld);
     } catch (error) {
+      // A lost lock is not the old gateway's fault, and never a reason to forget it.
+      stillHeld();
       console.warn("Could not remove FamilyFi policies from the previous UniFi target:", error);
       if (!input.forgetPrevious) throw new PreviousTargetError();
       await forgetPreviousTarget(previous, household.unifiSiteId!);
     }
   }
+  // A cleanup slow enough to lose the lock stops here, before the household moves.
+  stillHeld();
   const secret = encryptSecret(input.apiKey);
   await prisma().household.update({
     where: { id: "default" },

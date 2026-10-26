@@ -192,8 +192,12 @@ function holdLock(owner: string) {
 /**
  * Runs `work` holding the reconcile lock, so no pass writes to the gateway or its policy records
  * meanwhile. Waits up to `waitMs` for a running pass to finish, then gives up with `busy`.
+ * `stillHeld` throws once the lock has lapsed, so the work stops before its next write.
  */
-export async function withReconcileLock<T>(work: () => Promise<T>, options: { waitMs?: number; busy: () => Error }): Promise<T> {
+export async function withReconcileLock<T>(
+  work: (stillHeld: () => void) => Promise<T>,
+  options: { waitMs?: number; busy: () => Error },
+): Promise<T> {
   const owner = `save:${randomToken(9)}`;
   const deadline = Date.now() + (options.waitMs ?? 60_000);
   while (!(await acquireLock(owner))) {
@@ -202,7 +206,9 @@ export async function withReconcileLock<T>(work: () => Promise<T>, options: { wa
   }
   const lock = holdLock(owner);
   try {
-    return await work();
+    return await work(() => {
+      if (lock.lost()) throw new LockLostError("A sync took over before the save finished.");
+    });
   } finally {
     await lock.release();
   }
