@@ -57,6 +57,7 @@ const inputs = (over: Partial<CheckupInputs> = {}): CheckupInputs => ({
   devices: [],
   networks: [network({ id: LAN, name: "LAN" }), network({ id: IOT, name: "IoT" })],
   wifis: [],
+  unrecordedPolicies: [],
   ...over,
 });
 
@@ -67,7 +68,7 @@ describe("network checkup", () => {
     const run = runChecks(inputs());
     expect(run.findings).toEqual([]);
     expect(run.skipped).toEqual([]);
-    expect(run.passed).toHaveLength(8);
+    expect(run.passed).toHaveLength(9);
   });
 
   it("finds Sonos wired and on Wi-Fi, and only then", () => {

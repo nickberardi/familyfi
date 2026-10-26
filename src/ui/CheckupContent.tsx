@@ -8,6 +8,7 @@ import {
   checkupCopy,
   checkupSections,
   checkupSummary,
+  leftoverPolicyLine,
   protectionLine,
   protectionTitle,
   type CheckupFinding,
@@ -83,7 +84,9 @@ export function ProtectionCard({
 
 /**
  * Checkup's second card: what the network checkup found, problems first, then notes that may be on
- * purpose, then the checks that passed. FamilyFi only reads; each finding says how to change it.
+ * purpose, then the checks that passed. FamilyFi only reads; each finding says how to change it. The
+ * one exception is leftover FamilyFi policies, which `onRemovePolicies` removes once its caller has
+ * had the administrator confirm; without it the card only lists them.
  */
 export function NetworkCheckupCard({
   checkup,
@@ -92,6 +95,7 @@ export function NetworkCheckupCard({
   now,
   onCheckNow,
   onDismiss,
+  onRemovePolicies,
 }: {
   checkup: CheckupState | null;
   checking?: boolean;
@@ -99,6 +103,8 @@ export function NetworkCheckupCard({
   now?: Date;
   onCheckNow: () => void;
   onDismiss: (finding: CheckupFinding, dismissed: boolean) => void;
+  /** Ask the administrator to confirm, then remove these leftover policies. */
+  onRemovePolicies?: (policyIds: string[]) => void;
 }) {
   const ui = useUI();
   const [showPassed, setShowPassed] = useState(false);
@@ -124,7 +130,7 @@ export function NetworkCheckupCard({
       ) : null}
       {sections.problems.length ? <SubHead>{COPY.network.problems(sections.problems.length)}</SubHead> : null}
       {sections.problems.map((finding, index) => (
-        <FindingRow key={finding.id} finding={finding} initiallyOpen={index === 0} disabled={disabled} onDismiss={onDismiss} />
+        <FindingRow key={finding.id} finding={finding} initiallyOpen={index === 0} disabled={disabled} onDismiss={onDismiss} onRemovePolicies={onRemovePolicies} />
       ))}
       {sections.notes.length ? <SubHead>{COPY.network.notes(sections.notes.length)}</SubHead> : null}
       {sections.notes.map((finding) => (
@@ -133,7 +139,7 @@ export function NetworkCheckupCard({
       {sections.dismissed.length ? (
         <>
           <Fold icon="x" label={COPY.network.dismissedCount(sections.dismissed.length)} open={showDismissed} onPress={() => setShowDismissed(!showDismissed)} testID="checkup-dismissed" />
-          {showDismissed ? sections.dismissed.map((finding) => <FindingRow key={finding.id} finding={finding} disabled={disabled} onDismiss={onDismiss} />) : null}
+          {showDismissed ? sections.dismissed.map((finding) => <FindingRow key={finding.id} finding={finding} disabled={disabled} onDismiss={onDismiss} onRemovePolicies={onRemovePolicies} />) : null}
         </>
       ) : null}
       {passed.length ? (
@@ -160,14 +166,17 @@ function FindingRow({
   initiallyOpen = false,
   disabled,
   onDismiss,
+  onRemovePolicies,
 }: {
   finding: CheckupFinding;
   initiallyOpen?: boolean;
   disabled: boolean;
   onDismiss: (finding: CheckupFinding, dismissed: boolean) => void;
+  onRemovePolicies?: (policyIds: string[]) => void;
 }) {
   const ui = useUI();
   const [open, setOpen] = useState(initiallyOpen);
+  if (finding.check === "leftover_policies") return <LeftoverRow finding={finding} disabled={disabled} onDismiss={onDismiss} onRemovePolicies={onRemovePolicies} />;
   const copy = checkupCopy(finding);
   const note = finding.kind === "note";
   const body = [styles.body, { fontFamily: ui.font }];
@@ -209,6 +218,88 @@ function FindingRow({
             <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>
               {finding.dismissed ? COPY.network.restore : note ? COPY.network.intended : COPY.network.dismiss}
             </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Row>
+  );
+}
+
+/** Leftover FamilyFi policies: each with a tick, all ticked to start, and Remove for the ticked ones. */
+function LeftoverRow({
+  finding,
+  disabled,
+  onDismiss,
+  onRemovePolicies,
+}: {
+  finding: CheckupFinding;
+  disabled: boolean;
+  onDismiss: (finding: CheckupFinding, dismissed: boolean) => void;
+  onRemovePolicies?: (policyIds: string[]) => void;
+}) {
+  const ui = useUI();
+  const copy = checkupCopy(finding);
+  const policies = finding.details.policies ?? [];
+  const [unticked, setUnticked] = useState<Set<string>>(new Set());
+  const ticked = policies.filter((policy) => !unticked.has(policy.id)).map((policy) => policy.id);
+  const body = [styles.body, { fontFamily: ui.font }];
+  const text = COPY.network.leftover;
+  const toggle = (id: string) => {
+    const next = new Set(unticked);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setUnticked(next);
+  };
+  const removeOff = disabled || ticked.length === 0;
+  return (
+    <Row icon={copy.icon} tone={finding.dismissed ? "muted" : "paused"} testID={`checkup-finding-${finding.id}`}>
+      <View style={styles.grow}>
+        <Text style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>{copy.title}</Text>
+        <Text style={[body, { color: ui.color("ink-2") }]}>{copy.seen}</Text>
+        <Text style={[body, styles.gap, { color: ui.color("ink-3") }]}>{copy.why}</Text>
+        <View style={[styles.policies, { borderColor: ui.color("hairline-card") }]}>
+          {policies.map((policy, index) => {
+            const on = !unticked.has(policy.id);
+            return (
+              <Pressable
+                key={policy.id}
+                role="checkbox"
+                aria-checked={on}
+                aria-label={policy.name}
+                disabled={!onRemovePolicies}
+                onPress={() => toggle(policy.id)}
+                testID={`checkup-policy-${policy.id}`}
+                style={({ pressed }) => [styles.policy, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }, pressed && { opacity: PRESS_OPACITY }]}
+              >
+                {onRemovePolicies ? (
+                  <View aria-hidden style={[styles.tick, on ? { backgroundColor: ui.color("accent") } : { borderWidth: 1.5, borderColor: ui.color("line") }]}>
+                    {on ? <Text style={[styles.tickMark, { color: ui.color("ink-on-fill") }]}>✓</Text> : null}
+                  </View>
+                ) : null}
+                <View style={styles.grow}>
+                  <Text style={[body, styles.strong, { color: ui.color("ink") }]}>{policy.name}</Text>
+                  <Text style={[body, { color: ui.color("ink-3") }]}>{leftoverPolicyLine(policy)}</Text>
+                </View>
+                <Text style={[body, styles.strong, { color: ui.color(policy.enabled ? "paused" : "ink-3") }]}>{policy.enabled ? text.on : text.off}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={[styles.actions, styles.leftoverActions]}>
+          {onRemovePolicies ? (
+            <Pressable
+              role="button"
+              aria-disabled={removeOff}
+              disabled={removeOff}
+              onPress={() => onRemovePolicies(ticked)}
+              testID="checkup-remove-policies"
+              style={({ pressed }) => [styles.danger, { borderColor: ui.color("danger") }, removeOff && { opacity: 0.5 }, pressed && !removeOff && { opacity: PRESS_OPACITY }]}
+            >
+              <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("danger") }]}>{text.remove(ticked.length)}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable role="button" aria-disabled={disabled} disabled={disabled} onPress={() => onDismiss(finding, !finding.dismissed)} testID={`checkup-dismiss-${finding.id}`}>
+            <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{finding.dismissed ? COPY.network.restore : text.keep}</Text>
           </Pressable>
         </View>
       </View>
@@ -288,4 +379,11 @@ const styles = StyleSheet.create({
   fold: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1 },
   passedList: { gap: 4, paddingHorizontal: 16, paddingBottom: 12 },
   readOnly: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1 },
+  policies: { marginTop: 10, borderRadius: 9, borderWidth: 1, overflow: "hidden" },
+  policy: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  tick: { marginTop: 1, width: 18, height: 18, borderRadius: 5, alignItems: "center", justifyContent: "center" },
+  tickMark: { fontSize: 12, lineHeight: 14, fontWeight: "700" },
+  strong: { fontWeight: "600" },
+  leftoverActions: { marginTop: 12 },
+  danger: { minHeight: 36, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });

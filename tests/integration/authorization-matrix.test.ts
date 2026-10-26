@@ -161,6 +161,7 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/checkup": { access: "session", devices: READERS },
   "POST /api/v1/checkup/run": { access: "session", devices: CONTROLLERS },
   "PATCH /api/v1/checkup/findings/{id}": { access: "session", devices: CONTROLLERS },
+  "POST /api/v1/checkup/leftover-policies/remove": { access: "administrator" },
   "GET /api/v1/dpi/applications": { access: "session", devices: READERS },
   "GET /api/v1/dpi/categories": { access: "session", devices: READERS },
   "GET /api/v1/groups": { access: "session", devices: READERS_AND_WATCH },
