@@ -149,7 +149,7 @@ What to run before a pull request, the rules tests follow, and what CI checks ar
 | `make test-mutation` | `check mutation`: mutation testing of the enforcement code; a report, never a gate |
 | `make db-migrate` | Apply migrations to the development database |
 | `make db-drift` | `check db-drift`: migrate a fresh database and fail where `schema.prisma` differs from it |
-| `make db-upgrade` | `check db-upgrade`: upgrade a filled database from every supported release; fail on an error, lost rows or drift, naming the release. `pnpm db-upgrade --from <tag>` or `--latest` runs one start point against the development database while you iterate |
+| `make db-upgrade` | `check db-upgrade`: upgrade a filled database from every supported release; fail on an error, lost rows or drift, naming the release. `pnpm db-upgrade --from <tag>` or `--latest` runs one start point against the development database while you iterate (with PostgreSQL 18's client tools on the machine) |
 | `make lint` / `make typecheck` | `check lint` / `check typecheck` |
 | `make build` | Production build |
 | `make docker-build` | Build `familyfi:dev` |

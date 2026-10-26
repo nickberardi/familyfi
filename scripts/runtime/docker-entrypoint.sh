@@ -34,6 +34,9 @@ until node scripts/runtime/wait-for-db.mjs; do
   sleep 2
 done
 
-./node_modules/.bin/prisma migrate deploy
+if ! ./node_modules/.bin/prisma migrate deploy; then
+  scripts/runtime/migration-failed.sh >&2
+  exit 1
+fi
 export SKIP_DB_PREPARE=1
 exec node scripts/runtime/with-env.mjs node server.js

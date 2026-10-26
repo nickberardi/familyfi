@@ -140,6 +140,8 @@ export function createHouseholdStore(deps: {
   let reloadAfterWrites = false;
   let loadsInFlight = 0;
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Why the first load failed, shown until a load works. */
+  let loadFailure = "";
 
   const set = (patch: Partial<HouseholdState>) => {
     // Nothing new: keep the state object, so no subscriber renders again.
@@ -184,12 +186,17 @@ export function createHouseholdStore(deps: {
       set({ loaded: true, stale: true, unreachable: error instanceof TransportError, error: state.error || offlineGuard.stale });
     } else {
       // The first load says why it failed; a later refresh keeps the page as it is.
-      set({ loaded: true, stale: true, unreachable: error instanceof TransportError, ...(state.loaded ? {} : { error: error instanceof Error ? error.message : "Request failed." }) });
+      if (!state.loaded) loadFailure = error instanceof Error ? error.message : "Request failed.";
+      set({ loaded: true, stale: true, unreachable: error instanceof TransportError, ...(state.loaded ? {} : { error: loadFailure }) });
     }
   }
 
-  // Reaching the server again answers any message about not reaching it.
-  const reached = () => ({ stale: false, unreachable: false, ...(connectionMessages.has(state.error) ? { error: "" } : {}) });
+  // Reaching the server again answers any message about not reaching it, and why the first load failed.
+  const reached = () => {
+    const answered = connectionMessages.has(state.error) || (loadFailure !== "" && state.error === loadFailure);
+    loadFailure = "";
+    return { stale: false, unreachable: false, ...(answered ? { error: "" } : {}) };
+  };
 
   async function reload(): Promise<void> {
     const gen = ++loadGen;

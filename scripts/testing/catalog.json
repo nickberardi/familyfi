@@ -741,6 +741,11 @@
         "navigation"
       ]
     },
+    "tests/browser/connection.spec.ts": {
+      "categories": [
+        "navigation"
+      ]
+    },
     "tests/browser/accessibility.spec.ts": {
       "categories": [
         "accessibility"
@@ -1123,6 +1128,11 @@
       ]
     },
     "tests/unit/runtime-exit.test.ts": {
+      "categories": [
+        "runtime"
+      ]
+    },
+    "tests/unit/migration-failed.test.ts": {
       "categories": [
         "runtime"
       ]
