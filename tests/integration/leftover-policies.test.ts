@@ -11,7 +11,7 @@ import { POST as removeLeftovers } from "@/app/api/v1/checkup/leftover-policies/
 import type { CheckupState, LeftoverRemoval } from "@/lib/checkup";
 import { runCheckup } from "@/server/checkup";
 import { prisma } from "@/server/db";
-import { runReconcileOnce, setReconcileClientForTests, syncClient } from "@/server/reconciliation";
+import { runReconcileOnce, setReconcileClientForTests, syncClient, withReconcileLock } from "@/server/reconciliation";
 import { ownershipScope } from "@/server/unifi/connection";
 import { DEV_MOCK_ADMIN_POLICY_ID, DEV_MOCK_ROGUE_POLICY_ID, createFixtureUnifiClient } from "@/server/unifi/dev-mock";
 import { PolicyOwnershipError } from "@/server/unifi/errors";
@@ -201,6 +201,24 @@ describe("leftover FamilyFi policies", () => {
     expect((await prisma().policyOperation.findUniqueOrThrow({ where: { id: fresh.id } })).status).toBe("failed");
     await expect(guarded.deletePolicy(SITE_ID, DEV_MOCK_ROGUE_POLICY_ID)).rejects.toThrow(PolicyOwnershipError);
     expect(onGateway(client, DEV_MOCK_ROGUE_POLICY_ID)).toBe(true);
+  });
+
+  it("waits for a sync pass to let go of the gateway before it checks or deletes anything", async () => {
+    const auth = await signedIn();
+    await runReconcileOnce();
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    const held = withReconcileLock(() => released, { busy: () => new Error("lock busy") });
+    // Held now: the removal has to wait for it.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const removal = remove(auth, { policyIds: [DEV_MOCK_ROGUE_POLICY_ID] });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(deletes(client).some((call) => call.path.endsWith(DEV_MOCK_ROGUE_POLICY_ID))).toBe(false);
+    expect(await prisma().policyOperation.count({ where: { intent: PolicyOperationIntent.delete } })).toBe(0);
+    release();
+    await held;
+    const result = (await (await removal).json()) as LeftoverRemoval;
+    expect(result.removed).toEqual([DEV_MOCK_ROGUE_POLICY_ID]);
   });
 
   it("answers 400 without policies and 409 before UniFi is set up", async () => {

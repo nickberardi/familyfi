@@ -111,6 +111,13 @@ export async function removeLeftoverPolicies(household: Household, client: Unifi
     const operation = await prisma().policyOperation.create({
       data: { intent: PolicyOperationIntent.delete, status: "confirmed", unifiPolicyId: policyId, payload: { name: policy.name }, ...scope },
     });
+    // A pass that took over would not have seen this confirmation to fail it: stop before deleting.
+    try {
+      stillHeld();
+    } catch (error) {
+      await prisma().policyOperation.update({ where: { id: operation.id }, data: { status: "failed" } });
+      throw error;
+    }
     try {
       await client.deletePolicy(siteId, policyId);
     } catch (error) {
