@@ -67,8 +67,12 @@ COPY . .
 # has not caught up yet. Other builds keep package.json's.
 ARG APP_VERSION
 RUN if [ -n "$APP_VERSION" ]; then npm pkg set "version=$APP_VERSION"; fi
-# Not `pnpm build`, which generates the client again under emulation.
-RUN pnpm exec next build
+# Not `pnpm build`, which generates the client again under emulation. The server's own trace
+# carries the musl builds of sharp and argon2, which can never load on this Debian image.
+RUN pnpm exec next build \
+  && rm -rf .next/standalone/node_modules/.pnpm/@img+sharp-*linuxmusl* \
+    .next/standalone/node_modules/.pnpm/@node-rs+argon2-*musl* \
+  && find .next/standalone/node_modules -xtype l -delete
 
 FROM node:26-bookworm-slim AS runner
 WORKDIR /app

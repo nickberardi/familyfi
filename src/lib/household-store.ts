@@ -358,14 +358,15 @@ export function createHouseholdStore(deps: {
     /**
      * Loads now, then every `interval` refreshes what changes on its own, with a full reload
      * every `fullInterval` (or whenever the view is stale), until the returned function stops
-     * it. While hidden it sends nothing, and reloads in full when shown again, unless a refresh
-     * finished within `interval`.
+     * it. While hidden it sends nothing; shown again, it refreshes as a tick would, unless a
+     * refresh finished within `interval`.
      */
     startRefreshing(interval = REFRESH_MS, fullInterval = FULL_REFRESH_MS): () => void {
       // One refresh at a time: a slow server gets no second request stacked behind the first.
       let inFlight = false;
       let doneAt = Number.NEGATIVE_INFINITY;
-      const track = async (load: () => Promise<void>) => {
+      const run = async (load: () => Promise<void>) => {
+        if (inFlight) return;
         inFlight = true;
         try {
           await load();
@@ -374,9 +375,6 @@ export function createHouseholdStore(deps: {
           doneAt = Date.now();
         }
       };
-      const run = async (load: () => Promise<void>) => {
-        if (!inFlight) await track(load);
-      };
       const tick = () => {
         if (visibility?.hidden()) return;
         const full = !state.loaded || state.stale || Date.now() - fullLoadAt >= fullInterval;
@@ -384,12 +382,12 @@ export function createHouseholdStore(deps: {
       };
       void run(reload);
       const timer = setInterval(tick, interval);
-      // Shown again: everything, even past a tick still in flight, which the reload supersedes;
-      // nothing when a refresh finished within the interval, so flipping between tabs costs nothing.
+      // Shown again: a tick now, refreshing what is stale through the same guard; nothing when a
+      // refresh finished within the interval, so flipping between tabs costs nothing.
       const unsubscribe = visibility?.subscribe(() => {
         if (visibility.hidden()) return;
-        if (!inFlight && !state.stale && Date.now() - doneAt < interval) return;
-        void track(reload);
+        if (!state.stale && Date.now() - doneAt < interval) return;
+        tick();
       });
       return () => {
         clearInterval(timer);

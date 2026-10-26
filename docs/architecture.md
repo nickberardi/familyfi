@@ -77,9 +77,10 @@ The [household store](../src/lib/household-store.ts), through the browser's
 [AppDataProvider](../src/components/AppDataProvider.tsx), reads the session, groups, devices,
 rules, sync, gateway settings, household settings and accounts together. Every 15 seconds it rereads
 what changes most on its own (groups, devices, rules and sync). Everything is reread every five
-minutes, when the tab is shown again unless a refresh finished within the last 15 seconds, after a
-write's change is followed and whenever a refresh failed, so the gateway's status and quarantine observation, which reconcile updates, can trail by up
-to five minutes on a page left open. A read that brings nothing new keeps the previous references and
+minutes, after a write's change is followed and whenever a refresh failed, so the gateway's status
+and quarantine observation, which reconcile updates, can trail by up to five minutes on a page left
+open. Showing the tab again runs the next refresh at once, unless one finished within the last 15
+seconds. A read that brings nothing new keeps the previous references and
 notifies no one, so pages do not render again. A hidden tab (or, natively, a backgrounded app passing
 its own `Visibility`) sends nothing. Generation checks discard superseded reads. An unauthorized session redirects to login.
 Initial read errors are shown; periodic refresh failures retain the previous data and mark it

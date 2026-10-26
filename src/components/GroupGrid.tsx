@@ -21,9 +21,13 @@ import { PauseSheet } from "./PauseSheet";
  */
 let sharedNames: Promise<CatalogNames> | null = null;
 let lastNames: CatalogNames = new Map();
+/** Counts forgets, so a read that started before one is never kept after it. */
+let generation = 0;
 
 function catalogNames(): Promise<CatalogNames> {
+  const started = generation;
   sharedNames ??= readCatalogNames(request).then(({ names, complete }) => {
+    if (started !== generation) return names;
     if (!complete || names.size === 0) sharedNames = null;
     else lastNames = names;
     return names;
@@ -31,8 +35,9 @@ function catalogNames(): Promise<CatalogNames> {
   return sharedNames;
 }
 
-/** Drops the shared names, so the next page reads them again (tests, and a change of console). */
+/** Drops the shared names, so the next page reads them again after a change of console. */
 export function forgetCatalogNames() {
+  generation += 1;
   sharedNames = null;
   lastNames = new Map();
 }

@@ -458,8 +458,10 @@ describe("household store", () => {
     hidden = false;
     onChange();
     await vi.advanceTimersByTimeAsync(10);
-    // Shown again, it reads everything, not only what the timer would have.
-    expect(server.calls.slice(loaded).map((call) => call.path)).toContain("/api/v1/auth/session");
+    // Shown again, it refreshes at once what the timer would have, and no more.
+    const caught = server.calls.slice(loaded).map((call) => call.path);
+    expect(caught).toContain("/api/v1/groups");
+    expect(caught).not.toContain("/api/v1/auth/session");
     stop();
     expect(unsubscribe).toHaveBeenCalled();
   });
@@ -494,7 +496,7 @@ describe("household store", () => {
     expect(server.calls).toHaveLength(loaded);
   });
 
-  it("counts a reload on showing the tab as a refresh, so a quick second return sends nothing", async () => {
+  it("counts a refresh on showing the tab, so a quick second return sends nothing", async () => {
     vi.useFakeTimers();
     let hidden = false;
     let onChange = () => {};
@@ -512,7 +514,8 @@ describe("household store", () => {
     hidden = false;
     onChange();
     await vi.advanceTimersByTimeAsync(10);
-    expect(server.calls).toHaveLength(2 * loaded);
+    const returned = server.calls.length;
+    expect(returned).toBeGreaterThan(loaded);
     hidden = true;
     onChange();
     await vi.advanceTimersByTimeAsync(100);
@@ -520,10 +523,10 @@ describe("household store", () => {
     onChange();
     await vi.advanceTimersByTimeAsync(10);
     stop();
-    expect(server.calls).toHaveLength(2 * loaded);
+    expect(server.calls).toHaveLength(returned);
   });
 
-  it("reloads in full when shown again, even while a tick is still waiting on the server", async () => {
+  it("sends nothing more when shown again while a tick is still waiting on the server", async () => {
     vi.useFakeTimers();
     let hidden = false;
     let onChange = () => {};
@@ -541,11 +544,11 @@ describe("household store", () => {
     hidden = true;
     onChange();
     hidden = false;
-    const sessions = server.calls.filter((call) => call.path === "/api/v1/auth/session").length;
+    const sent = server.calls.length;
     onChange();
     await vi.advanceTimersByTimeAsync(10);
     stop();
-    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(sessions + 1);
+    expect(server.calls).toHaveLength(sent);
   });
 
   it("reloads in full on the next tick after a refresh failed", async () => {
