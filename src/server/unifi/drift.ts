@@ -44,12 +44,10 @@ export function gatewayDrift(actual: FirewallPolicy, write: FirewallPolicyWrite)
     });
   }
   if (actual.name !== write.name) changes.push({ field: "name", familyfi: write.name, gateway: actual.name });
-  // Everything else the write sets: what it blocks, where, and how.
-  const rest: Record<string, unknown> = JSON.parse(JSON.stringify(write));
-  delete rest.enabled;
-  delete rest.schedule;
-  delete rest.name;
-  if (wanted) delete (rest.source as { trafficFilter: Record<string, unknown> }).trafficFilter.macAddressFilter;
+  // The rest of what FamilyFi's fingerprint covers: what it blocks, where, and how. A description
+  // or logging switch FamilyFi never compares is never drift.
+  const rest = JSON.parse(JSON.stringify({ action: write.action, ipProtocolScope: write.ipProtocolScope, source: write.source, destination: write.destination }));
+  if (wanted) delete rest.source.trafficFilter.macAddressFilter;
   if (!carriesWrite(actual, rest)) changes.push({ field: "other" });
   return changes;
 }

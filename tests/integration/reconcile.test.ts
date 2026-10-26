@@ -317,6 +317,15 @@ describe("reconciliation against mocked UniFi", () => {
     await runReconcileOnce();
     expect(client.calls.slice(writes).some((call) => call.method === "PUT")).toBe(false);
     expect((await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } })).gatewayDrift).toEqual(row.gatewayDrift);
+
+    // The same change again straight away is written back too, but keeps the note's time, so a
+    // gateway that rewrites it itself cannot bring a dismissed note back every pass.
+    client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!.enabled = !enabled;
+    client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!.source.trafficFilter!.macAddressFilter!.macAddresses = macs.slice(1);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await runReconcileOnce();
+    expect(client.state.policies.find((policy) => policy.id === recorded.unifiPolicyId)!.enabled).toBe(enabled);
+    expect((await prisma().appPolicy.findUniqueOrThrow({ where: { id: recorded.id } })).driftSeenAt).toEqual(row.driftSeenAt);
   });
 
   it("puts back a rule's window policy someone made always-on, and notes it on Checkup by rule", async () => {

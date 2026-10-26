@@ -35,5 +35,7 @@ describe("gateway drift", () => {
   it("counts anything else the write sets as other", () => {
     expect(gatewayDrift(onGateway({ action: { type: "ALLOW" } as FirewallPolicy["action"] }), write)).toEqual([{ field: "other" }]);
     expect(gatewayDrift(onGateway({ destination: { zoneId: "elsewhere" } }), write)).toEqual([{ field: "other" }]);
+    // Not what FamilyFi compares: a description or logging switch is never drift.
+    expect(gatewayDrift(onGateway({ description: "edited", loggingEnabled: true }), write)).toEqual([]);
   });
 });
