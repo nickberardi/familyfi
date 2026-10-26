@@ -44,7 +44,7 @@ export async function PATCH(request: Request, context: Ctx) {
 
 /**
  * Revoke a paired device: an administrator, the device itself, or the phone that vouched for it.
- * Revoking a phone revokes its Watches. `?remove=true` (administrator only) deletes the record.
+ * Revoking a device revokes everything paired from it: a phone's Watches, and the phones and agents its invites paired, in turn. `?remove=true` (administrator only) deletes the record.
  */
 export async function DELETE(request: Request, context: Ctx) {
   return withMutation(request, async (session) => {

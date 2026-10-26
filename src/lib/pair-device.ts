@@ -100,10 +100,10 @@ export function publishedRoute(tunnel: Pick<RemoteAccess, "endpointId"> | null, 
   return routes?.find((route) => route.id === tunnel?.endpointId && route.enabled) ?? null;
 }
 
-/** Revoking a phone also revokes the Watches it set up. */
+/** Revoking a phone also revokes the Watches, phones and agents it paired. */
 export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & { client?: PairedPhone["client"] }) {
-  const watches = phone.client === "phone" ? " The Watches it set up stop working too." : "";
-  return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${watches}`, confirmLabel: PAIR_COPY.revoke };
+  const paired = phone.client === "phone" ? " Any Watch, phone or agent it paired stops working too." : "";
+  return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
 }
 
 export function removeConfirm(phone: Pick<PairedPhone, "displayName">) {

@@ -113,7 +113,8 @@ const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly
  * or paired device (auth-api.test.ts), so `session` and `administrator` admit the same people. The
  * split remains for paired devices and the tunnel: `administrator` also refuses every non-phone
  * device. A phone's `?claim=true` invite for its Watch is checked inside `POST /paired/invites`
- * (paired-invites.test.ts), not here.
+ * (paired-invites.test.ts), not here; so is the refusal of an agent invite, or a phone invite acting as
+ * the recovery account (agent-pairing.test.ts, paired-invites.test.ts).
  */
 
 /**
