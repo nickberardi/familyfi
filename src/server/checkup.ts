@@ -2,6 +2,8 @@ import type { Household, Prisma } from "@prisma/client";
 import {
   CHECK_KIND,
   CHECKUP_CHECKS,
+  checkupMessage,
+  knownCheck,
   openProblemCount,
   runChecks,
   type CheckupCheck,
@@ -171,7 +173,6 @@ async function readWifis(client: UnifiClient, siteId: string, defaultNetworkId: 
 
 type FindingRow = { key: string; check: string; details: Prisma.JsonValue; subject: string; firstSeenAt: Date; lastSeenAt: Date; dismissedAt: Date | null; dismissedSubject: string | null };
 
-const known = (check: string): check is CheckupCheck => (CHECKUP_CHECKS as readonly string[]).includes(check);
 /** A dismissal holds only while the finding is about what was dismissed. */
 const dismissed = (row: Pick<FindingRow, "dismissedAt" | "dismissedSubject" | "subject">) => row.dismissedAt !== null && row.dismissedSubject === row.subject;
 
@@ -182,12 +183,13 @@ export async function checkupState(): Promise<CheckupState> {
     prisma().checkupFinding.findMany({ orderBy: { key: "asc" } }),
   ]);
   const findings = rows
-    .filter((row) => known(row.check))
+    .filter((row) => knownCheck(row.check))
     .map((row) => ({
       id: row.key,
       check: row.check as CheckupCheck,
       kind: CHECK_KIND[row.check as CheckupCheck],
       details: row.details as CheckupDetails,
+      message: checkupMessage({ check: row.check as CheckupCheck, details: row.details as CheckupDetails }),
       firstSeenAt: row.firstSeenAt.toISOString(),
       lastSeenAt: row.lastSeenAt.toISOString(),
       dismissed: dismissed(row),
@@ -203,7 +205,7 @@ export async function checkupState(): Promise<CheckupState> {
 /** The open problems, for the nav badge on `GET /sync`. */
 export async function checkupProblemCount(): Promise<number> {
   const rows = await prisma().checkupFinding.findMany({ select: { check: true, subject: true, dismissedAt: true, dismissedSubject: true } });
-  return openProblemCount(rows.filter((row) => known(row.check)).map((row) => ({ kind: CHECK_KIND[row.check as CheckupCheck], dismissed: dismissed(row) })));
+  return openProblemCount(rows.filter((row) => knownCheck(row.check)).map((row) => ({ kind: CHECK_KIND[row.check as CheckupCheck], dismissed: dismissed(row) })));
 }
 
 /** Dismiss a finding, or show it again. Returns false when there is no such finding. */

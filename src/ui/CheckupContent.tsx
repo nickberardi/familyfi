@@ -7,6 +7,7 @@ import {
   CHECKUP_COPY as COPY,
   checkupCopy,
   checkupSections,
+  knownCheckupMessage,
   checkupSummary,
   leftoverCopyNote,
   leftoverPolicyLine,
@@ -178,10 +179,29 @@ function FindingRow({
   const ui = useUI();
   const [open, setOpen] = useState(initiallyOpen);
   if (finding.check === "leftover_policies") return <LeftoverRow finding={finding} disabled={disabled} onDismiss={onDismiss} onRemovePolicies={onRemovePolicies} />;
-  const copy = checkupCopy(finding);
   const note = finding.kind === "note";
   const body = [styles.body, { fontFamily: ui.font }];
   const action = [styles.action, { fontFamily: ui.font, color: ui.color("accent") }];
+  const dismiss = (
+    <Pressable role="button" aria-disabled={disabled} disabled={disabled} onPress={() => onDismiss(finding, !finding.dismissed)} testID={`checkup-dismiss-${finding.id}`}>
+      <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>
+        {finding.dismissed ? COPY.network.restore : note ? COPY.network.intended : COPY.network.dismiss}
+      </Text>
+    </Pressable>
+  );
+  // A check newer than this build has no copy here: the server's English line, and a nudge to update.
+  if (!knownCheckupMessage(finding.message)) {
+    return (
+      <Row icon="warning" tone={note || finding.dismissed ? "muted" : "paused"} testID={`checkup-finding-${finding.id}`}>
+        <View style={styles.grow}>
+          <Text style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>{finding.message.text}</Text>
+          <Text style={[body, { color: ui.color("ink-3") }]}>{COPY.network.unknown}</Text>
+          <View style={styles.actions}>{dismiss}</View>
+        </View>
+      </Row>
+    );
+  }
+  const copy = checkupCopy(finding);
   return (
     <Row icon={copy.icon} tone={note || finding.dismissed ? "muted" : "paused"} testID={`checkup-finding-${finding.id}`}>
       <View style={styles.grow}>
@@ -215,11 +235,7 @@ function FindingRow({
               <Text style={action}>{copy.show.label}</Text>
             </ui.Link>
           ) : null}
-          <Pressable role="button" aria-disabled={disabled} disabled={disabled} onPress={() => onDismiss(finding, !finding.dismissed)} testID={`checkup-dismiss-${finding.id}`}>
-            <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>
-              {finding.dismissed ? COPY.network.restore : note ? COPY.network.intended : COPY.network.dismiss}
-            </Text>
-          </Pressable>
+          {dismiss}
         </View>
       </View>
     </Row>
