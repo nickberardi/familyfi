@@ -3,6 +3,8 @@ import {
   checkupCopy,
   checkupSummary,
   isPrivateMac,
+  leftoverCopyNote,
+  leftoverPolicyLine,
   openProblemCount,
   outsideDnsNote,
   PRIVATE_ADDRESS_COPY,
@@ -14,6 +16,7 @@ import {
   type CheckupDevice,
   type CheckupInputs,
   type CheckupNetwork,
+  type CheckupPolicy,
   type CheckupWifi,
 } from "@/lib/checkup";
 import type { HouseholdStore } from "@/lib/household-store";
@@ -69,6 +72,21 @@ describe("network checkup", () => {
     expect(run.findings).toEqual([]);
     expect(run.skipped).toEqual([]);
     expect(run.passed).toHaveLength(9);
+  });
+
+  it("finds leftover policies by FamilyFi's prefix only, and skips the check when policies could not be read", () => {
+    const policy = (id: string, name: string): CheckupPolicy => ({ id, name, enabled: true, blocks: true, what: "internet", devices: 3, scheduled: true });
+    const run = runChecks(inputs({ unrecordedPolicies: [policy("b", "FamilyFi Gaming"), policy("c", "Kids bedtime"), policy("a", "FamilyFi Bedtime"), policy("d", "familyfi lower")] }));
+    const [finding] = found(run, "leftover_policies");
+    expect(finding?.details.policies?.map((item) => item.name)).toEqual(["FamilyFi Bedtime", "FamilyFi Gaming"]);
+    expect(finding?.subject).toBe("a,b");
+    expect(checkupCopy({ check: "leftover_policies", details: finding!.details }).title).toBe("2 old FamilyFi policies are still on your gateway");
+    expect(leftoverPolicyLine(policy("a", "FamilyFi Bedtime"))).toBe("Blocks all internet for 3 devices, on a schedule");
+    expect(leftoverPolicyLine({ blocks: false, what: "traffic", devices: null, scheduled: false })).toBe("Allows some traffic, always");
+    expect(runChecks(inputs({ unrecordedPolicies: [policy("c", "Kids bedtime")] })).passed).toContain("leftover_policies");
+    expect(runChecks(inputs({ unrecordedPolicies: null })).skipped).toEqual(["leftover_policies"]);
+    expect(leftoverCopyNote({ copyOf: "Bedtime" })).toBe("FamilyFi already has a newer copy of this for Bedtime. This old one keeps blocking even when you pause or allow it.");
+    expect(leftoverCopyNote({})).toBeNull();
   });
 
   it("finds Sonos wired and on Wi-Fi, and only then", () => {

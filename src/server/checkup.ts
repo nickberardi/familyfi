@@ -13,7 +13,7 @@ import {
 import { prisma } from "./db";
 import { normalizeMac } from "./mac";
 import type { UnifiClient } from "./unifi/client";
-import { checkupPolicy, unrecordedPolicies } from "./leftover-policies";
+import { checkupPolicy, recordedPurposes, unrecordedPolicies } from "./leftover-policies";
 import { clientForHousehold, ownershipScope } from "./unifi/connection";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { networkInScope } from "./unifi/scope";
@@ -134,7 +134,9 @@ async function readInputs(household: Household, client: UnifiClient, siteId: str
 async function readUnrecordedPolicies(household: Household, client: UnifiClient, siteId: string, zones: FirewallZone[]): Promise<CheckupPolicy[] | null> {
   try {
     const scope = { connectionIdentity: ownershipScope(household).connectionIdentity, siteId };
-    return (await unrecordedPolicies(scope, await client.listPolicies(siteId))).map((policy) => checkupPolicy(policy, zones));
+    const policies = await client.listPolicies(siteId);
+    const purposes = await recordedPurposes(scope, policies);
+    return (await unrecordedPolicies(scope, policies)).map((policy) => checkupPolicy(policy, zones, purposes.get(policy.name)));
   } catch (error) {
     console.warn("Firewall policies could not be read for the checkup:", error);
     return null;

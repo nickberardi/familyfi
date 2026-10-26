@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.35.0
+  version: 0.36.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -2373,6 +2373,55 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/v1/checkup/leftover-policies/remove:
+    post:
+      operationId: removeLeftoverPolicies
+      tags: [Checkup]
+      summary: Remove leftover FamilyFi policies
+      description: |
+        Removes the leftover policies an administrator ticked and confirmed on Checkup. Each id is
+        checked against the gateway again first: one that is gone, no longer named with FamilyFi's
+        prefix, or now claimed by a FamilyFi record is skipped, never deleted. Then the checkup runs
+        again. Administrators only: no paired agent or Watch. 409 `unifi_not_configured` before UniFi
+        is set up.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [policyIds]
+              properties:
+                policyIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [checkup, removed, skipped]
+                properties:
+                  checkup: { $ref: "#/components/schemas/CheckupState" }
+                  removed: { type: array, items: { type: string }, description: The policies deleted from the gateway }
+                  skipped: { type: array, items: { type: string }, description: The policies left alone }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/connection/identity:
     get:
       operationId: getConnectionIdentity
@@ -4182,9 +4231,11 @@ components:
           description: Open problems the network checkup found (not notes, not dismissed), for a badge.
     CheckupCheck:
       type: string
-      enum: [sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
+      enum: [leftover_policies, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
       description: |
         One check. A client that does not know a value shows the finding by its kind alone.
+        leftover_policies: firewall policies on the gateway named with FamilyFi's prefix that no
+        FamilyFi record claims; `POST /api/v1/checkup/leftover-policies/remove` removes them.
         sonos_mixed: Sonos players both wired and on Wi-Fi. private_addresses: devices using a
         private (randomised) Wi-Fi address. wifi_multicast: the Wi-Fi carrying Sonos has Multicast
         to Unicast or Client Device Isolation on. sonos_mdns, casting_mdns: speakers, or TVs and
@@ -4241,6 +4292,25 @@ components:
                   settings:
                     type: array
                     items: { type: string, enum: [multicast_to_unicast, client_isolation, no_2_4_ghz, wpa3_only] }
+            policies:
+              type: array
+              description: Leftover policies, for `leftover_policies`.
+              items:
+                type: object
+                additionalProperties: false
+                required: [id, name, enabled, blocks, what, devices, scheduled]
+                properties:
+                  id: { type: string, description: The UniFi policy id }
+                  name: { type: string }
+                  enabled: { type: boolean, description: "Whether it is on, and so still enforcing, on the gateway" }
+                  blocks: { type: boolean, description: "False for a policy that allows rather than blocks" }
+                  what:
+                    type: string
+                    enum: [internet, categories, apps, websites, countries, traffic]
+                    description: What it matches; `traffic` is anything else.
+                  devices: { type: [integer, "null"], minimum: 0, description: "The devices it names; null when it names a whole network or zone" }
+                  scheduled: { type: boolean, description: Whether it applies only on a schedule }
+                  copyOf: { type: string, description: "What FamilyFi's own policy of the same name is for (a rule's name, Quarantine or a group's name): this one is an old copy FamilyFi lost track of. Present only then." }
         firstSeenAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
         dismissed:

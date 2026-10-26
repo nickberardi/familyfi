@@ -8,6 +8,7 @@ import {
   checkupCopy,
   checkupSections,
   checkupSummary,
+  leftoverCopyNote,
   leftoverPolicyLine,
   protectionLine,
   protectionTitle,
@@ -279,6 +280,7 @@ function LeftoverRow({
                 <View style={styles.grow}>
                   <Text style={[body, styles.strong, { color: ui.color("ink") }]}>{policy.name}</Text>
                   <Text style={[body, { color: ui.color("ink-3") }]}>{leftoverPolicyLine(policy)}</Text>
+                  {leftoverCopyNote(policy) ? <Text style={[body, styles.copyNote, { color: ui.color(policy.enabled ? "paused" : "ink-3") }]}>{leftoverCopyNote(policy)}</Text> : null}
                 </View>
                 <Text style={[body, styles.strong, { color: ui.color(policy.enabled ? "paused" : "ink-3") }]}>{policy.enabled ? text.on : text.off}</Text>
               </Pressable>
@@ -299,7 +301,7 @@ function LeftoverRow({
             </Pressable>
           ) : null}
           <Pressable role="button" aria-disabled={disabled} disabled={disabled} onPress={() => onDismiss(finding, !finding.dismissed)} testID={`checkup-dismiss-${finding.id}`}>
-            <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{finding.dismissed ? COPY.network.restore : text.keep}</Text>
+            <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{finding.dismissed ? COPY.network.restore : text.keep(policies.length)}</Text>
           </Pressable>
         </View>
       </View>
@@ -384,6 +386,7 @@ const styles = StyleSheet.create({
   tick: { marginTop: 1, width: 18, height: 18, borderRadius: 5, alignItems: "center", justifyContent: "center" },
   tickMark: { fontSize: 12, lineHeight: 14, fontWeight: "700" },
   strong: { fontWeight: "600" },
+  copyNote: { marginTop: 2 },
   leftoverActions: { marginTop: 12 },
   danger: { minHeight: 36, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });

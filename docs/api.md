@@ -93,9 +93,10 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET | `/api/v1/sync` | Revision, last run, app-owned policy counts, recent changes, and `checkupProblems` for the Checkup badge |
 | POST | `/api/v1/sync/retry` | Enqueue another run |
 | GET | `/api/v1/changes/{id}` | Per-action status |
-| GET | `/api/v1/checkup` | The network checkup's last findings (problems, then notes that may be on purpose) and the checks that passed. Sync runs it at most hourly from what it already read plus the Wi-Fi networks; it only reads the gateway |
+| GET | `/api/v1/checkup` | The network checkup's last findings (problems, then notes that may be on purpose) and the checks that passed. Sync runs it at most hourly from what it already read plus the Wi-Fi networks and firewall policies; it only reads the gateway |
 | POST | `/api/v1/checkup/run` | Check now; 409 `unifi_not_configured` before UniFi is set up |
 | PATCH | `/api/v1/checkup/findings/{id}` | `{ "dismissed": true }` dismisses a problem or marks a note intended until what it is about changes; `false` shows it again |
+| POST | `/api/v1/checkup/leftover-policies/remove` | Administrators only. `{ "policyIds": [...] }` removes leftover policies (`leftover_policies`: named with FamilyFi's prefix, claimed by no FamilyFi record) the administrator ticked and confirmed. Each is checked against the gateway again first; one that is gone, renamed or now FamilyFi's is in `skipped`, never deleted. Returns `{ checkup, removed, skipped }` |
 | GET/POST | `/api/v1/upstream/categories` | Domain-list categories with their domains and last verdict, including each check's per-domain results. **No `change` object** — see below |
 | GET/PATCH/DELETE | `/api/v1/upstream/categories/{id}` | `domains` is the whole *active* list and replaces what is stored. A built-in category cannot be renamed or deleted |
 | POST | `/api/v1/upstream/categories/{id}/check` | Check one category now; 200 even when the resolver was unreachable |

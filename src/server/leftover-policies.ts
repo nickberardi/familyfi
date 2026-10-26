@@ -44,8 +44,30 @@ const BLOCKS: Record<string, CheckupPolicyBlocks> = {
   REGION: "countries",
 };
 
-/** A policy as Checkup describes it. */
-export function checkupPolicy(policy: FirewallPolicy, zones: FirewallZone[]): CheckupPolicy {
+/**
+ * What each of FamilyFi's recorded policies on the gateway is for, by policy name: the rule's name,
+ * Quarantine, or the group's name. A leftover with one of these names is an old copy.
+ */
+export async function recordedPurposes(scope: OwnershipScope & { siteId: string }, gatewayPolicies: FirewallPolicy[]): Promise<Map<string, string>> {
+  const where = { connectionIdentity: scope.connectionIdentity, siteId: scope.siteId };
+  const [appPolicies, rulePolicies] = await Promise.all([
+    prisma().appPolicy.findMany({ where, select: { unifiPolicyId: true, ownerScope: true, group: { select: { name: true } } } }),
+    prisma().rulePolicy.findMany({ where, select: { unifiPolicyId: true, rule: { select: { name: true } } } }),
+  ]);
+  const purpose = new Map<string | null, string>([
+    ...appPolicies.map((row) => [row.unifiPolicyId, row.ownerScope === "quarantine" ? "Quarantine" : (row.group?.name ?? "a group")] as const),
+    ...rulePolicies.map((row) => [row.unifiPolicyId, row.rule.name] as const),
+  ]);
+  const byName = new Map<string, string>();
+  for (const policy of gatewayPolicies) {
+    const label = purpose.get(policy.id);
+    if (label) byName.set(policy.name, label);
+  }
+  return byName;
+}
+
+/** A policy as Checkup describes it; `copyOf` names what FamilyFi's own policy of the same name is for. */
+export function checkupPolicy(policy: FirewallPolicy, zones: FirewallZone[], copyOf?: string): CheckupPolicy {
   const filter = policy.destination?.trafficFilter;
   const internet = !filter && policy.destination?.zoneId === selectExternalZone(zones)?.id;
   const macs = policy.source?.trafficFilter?.macAddressFilter?.macAddresses;
@@ -57,6 +79,7 @@ export function checkupPolicy(policy: FirewallPolicy, zones: FirewallZone[]): Ch
     what: internet ? "internet" : (filter && BLOCKS[filter.type]) || "traffic",
     devices: macs ? macs.length : null,
     scheduled: Boolean(policy.schedule),
+    ...(copyOf ? { copyOf } : {}),
   };
 }
 
