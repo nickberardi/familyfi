@@ -10,11 +10,13 @@
 import type { ApiRequest } from "./api-client";
 import { countriesSummary } from "./countries";
 import { deviceKindLabel } from "./display";
+import { FAMILYFI_POLICY_PREFIX } from "./policy-names";
 import type { HouseholdStore } from "./household-store";
 import type { IconName } from "./icons";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID, type Rule } from "./rules";
 
 export const CHECKUP_CHECKS = [
+  "leftover_policies",
   "sonos_mixed",
   "private_addresses",
   "wifi_multicast",
@@ -28,6 +30,7 @@ export type CheckupCheck = (typeof CHECKUP_CHECKS)[number];
 export type CheckupKind = "problem" | "note";
 
 export const CHECK_KIND: Record<CheckupCheck, CheckupKind> = {
+  leftover_policies: "problem",
   sonos_mixed: "note",
   private_addresses: "problem",
   wifi_multicast: "problem",
@@ -75,11 +78,32 @@ export type CheckupWifi = {
   clientIsolationEnabled: boolean;
 };
 
+/** What a gateway policy blocks, in a parent's words. */
+export type CheckupPolicyBlocks = "internet" | "categories" | "apps" | "websites" | "countries" | "traffic";
+
+/** A firewall policy on the gateway that FamilyFi has no record of, as the checks read it. */
+export type CheckupPolicy = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** False for a policy that allows rather than blocks. */
+  blocks: boolean;
+  what: CheckupPolicyBlocks;
+  /** The devices it names; null when it names a whole network or zone instead. */
+  devices: number | null;
+  scheduled: boolean;
+};
+
 export type CheckupInputs = {
   devices: CheckupDevice[];
   networks: CheckupNetwork[];
   /** Null when the Wi-Fi networks could not be read, so the Wi-Fi checks did not run. */
   wifis: CheckupWifi[] | null;
+  /**
+   * The gateway's own policies that no FamilyFi record claims, administrators' included; null when
+   * the policies could not be read. Only those named with FamilyFi's prefix are leftovers.
+   */
+  unrecordedPolicies: CheckupPolicy[] | null;
 };
 
 export type CheckupRef = { id: string; name: string };
@@ -89,6 +113,7 @@ export type CheckupDetails = {
   devices?: { mac: string; name: string; wired?: boolean }[];
   networks?: (CheckupRef & { dnsServers?: string[]; clientCount?: number })[];
   wifis?: (CheckupRef & { settings: string[] })[];
+  policies?: CheckupPolicy[];
 };
 
 export type CheckupResult = {
@@ -177,6 +202,16 @@ export function runChecks(inputs: CheckupInputs): CheckupRun {
     else passed.push(check);
   };
   const deviceRefs = (devices: CheckupDevice[]) => byName(devices.map((device) => ({ mac: device.mac, name: deviceName(device) })));
+
+  // Policies named like FamilyFi's that no rule of this household's uses: left by an earlier setup.
+  if (inputs.unrecordedPolicies === null) skipped.push("leftover_policies");
+  else {
+    const leftovers = leftoverPolicies(inputs.unrecordedPolicies);
+    add(
+      "leftover_policies",
+      leftovers.length ? [{ key: "leftover_policies", check: "leftover_policies", details: { policies: leftovers }, subject: ids(leftovers.map((policy) => policy.id)) }] : [],
+    );
+  }
 
   // Sonos wired and on Wi-Fi.
   const sonos = inputs.devices.filter(isSonos);
@@ -313,6 +348,29 @@ export function runChecks(inputs: CheckupInputs): CheckupRun {
   return { findings, passed, skipped };
 }
 
+/**
+ * The unrecorded policies Checkup offers to remove: named with FamilyFi's prefix. The name only picks
+ * what to show; FamilyFi deletes one only after an administrator ticks it and confirms.
+ */
+export function leftoverPolicies<T extends { name: string }>(policies: T[]): T[] {
+  return byName(policies.filter((policy) => policy.name.startsWith(FAMILYFI_POLICY_PREFIX)));
+}
+
+const POLICY_WHAT: Record<CheckupPolicyBlocks, string> = {
+  internet: "all internet",
+  categories: "categories",
+  apps: "apps",
+  websites: "websites",
+  countries: "countries",
+  traffic: "some traffic",
+};
+
+/** "Blocks all internet for 4 devices, on a schedule", under a leftover policy's name. */
+export function leftoverPolicyLine(policy: Pick<CheckupPolicy, "blocks" | "what" | "devices" | "scheduled">): string {
+  const who = policy.devices === null ? "" : ` for ${plural(policy.devices, "device", "devices")}`;
+  return `${policy.blocks ? "Blocks" : "Allows"} ${POLICY_WHAT[policy.what]}${who}, ${policy.scheduled ? "on a schedule" : "always"}`;
+}
+
 /** The managed networks whose DHCP hands out their own DNS server, by id, for the rule editor's note. */
 export function outsideDnsNetworks(state: Pick<CheckupState, "findings"> | null | undefined): Map<string, { name: string; dnsServers: string[] }> {
   const map = new Map<string, { name: string; dnsServers: string[] }>();
@@ -392,6 +450,17 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
   const wifis = finding.details.wifis ?? [];
   const names = (items: { name: string }[]) => namesList(items.map((item) => item.name));
   switch (finding.check) {
+    case "leftover_policies": {
+      const policies = finding.details.policies ?? [];
+      const one = policies.length === 1;
+      return {
+        icon: "warning",
+        title: one ? "An old FamilyFi policy is still on your gateway" : `${policies.length} old FamilyFi policies are still on your gateway`,
+        seen: one ? "It has a FamilyFi name, but none of your rules use it." : "They have FamilyFi names, but none of your rules use them.",
+        why: `${one ? "It is" : "They are"} probably left over from an earlier FamilyFi setup. FamilyFi doesn’t change ${one ? "it" : "them"} on its own, so ${one ? "if it’s on, it" : "any that are on"} can still block devices.`,
+        fix: ["Tick the ones you don’t want and remove them. FamilyFi removes only the ones you tick."],
+      };
+    }
     case "sonos_mixed": {
       const wiredOnes = devices.filter((device) => device.wired);
       const wifiOnes = devices.filter((device) => !device.wired);
@@ -492,6 +561,19 @@ export async function setCheckupDismissed(request: ApiRequest, id: string, dismi
   return (await request<{ checkup: CheckupState }>(`/api/v1/checkup/findings/${encodeURIComponent(id)}`, { method: "PATCH", body: { dismissed } })).checkup;
 }
 
+export type LeftoverRemoval = {
+  checkup: CheckupState;
+  /** The policies deleted from the gateway. */
+  removed: string[];
+  /** The policies left alone: gone already, renamed, or now one of FamilyFi's own. */
+  skipped: string[];
+};
+
+/** Remove leftover FamilyFi policies the administrator ticked and confirmed. */
+export async function removeLeftoverPolicies(request: ApiRequest, policyIds: string[]): Promise<LeftoverRemoval> {
+  return request<LeftoverRemoval>("/api/v1/checkup/leftover-policies/remove", { method: "POST", body: { policyIds } });
+}
+
 /** The open findings by kind, and the dismissed ones, in the order the card shows them. */
 export function checkupSections(state: Pick<CheckupState, "findings">) {
   const open = state.findings.filter((finding) => !finding.dismissed);
@@ -588,9 +670,22 @@ export const CHECKUP_COPY = {
     intended: "This is intended",
     restore: "Show again",
     error: "The last check could not finish:",
-    readOnly: "FamilyFi only reads these settings. It never changes your UniFi network for you.",
+    readOnly: "FamilyFi only reads these settings. The one thing it removes is a leftover FamilyFi policy, and only when you ask.",
+    leftover: {
+      remove: (count: number) => (count === 1 ? "Remove 1 from gateway" : `Remove ${count} from gateway`),
+      keep: "Keep them",
+      on: "On",
+      off: "Off",
+      confirmTitle: (count: number) => (count === 1 ? "Remove 1 policy from your gateway?" : `Remove ${count} policies from your gateway?`),
+      confirmBody: "Devices they block get their internet back. Your FamilyFi rules don’t change. This can’t be undone.",
+      confirm: (count: number) => `Remove ${count}`,
+      cancel: "Cancel",
+      removed: (count: number) => (count === 1 ? "Removed 1 policy from your gateway." : `Removed ${count} policies from your gateway.`),
+      skipped: (count: number) => `${plural(count, "policy was", "policies were")} left alone because ${count === 1 ? "it" : "they"} changed since the last check.`,
+    },
   },
   checkNames: {
+    leftover_policies: "Old FamilyFi policies on the gateway",
     sonos_mixed: "Sonos wired and on Wi-Fi",
     private_addresses: "Private Wi-Fi addresses",
     wifi_multicast: "Wi-Fi settings for Sonos",

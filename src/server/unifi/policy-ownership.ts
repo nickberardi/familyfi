@@ -23,16 +23,31 @@ export async function policyOnRecord(scope: OwnershipScope, siteId: string, poli
 }
 
 /**
+ * Whether an administrator confirmed removing this policy from Checkup's leftover list: a
+ * `PolicyOperation` with intent `delete` and status `confirmed` names it. It allows that one delete
+ * and nothing else; the policy is still not FamilyFi's, so it is never updated.
+ */
+export async function deleteConfirmed(scope: OwnershipScope, siteId: string, policyId: string): Promise<boolean> {
+  if (!scope.siteId || siteId !== scope.siteId) return false;
+  const where = { unifiPolicyId: policyId, connectionIdentity: scope.connectionIdentity, siteId };
+  return (await prisma().policyOperation.count({ where: { ...where, intent: PolicyOperationIntent.delete, status: "confirmed" } })) > 0;
+}
+
+/**
  * The client every FamilyFi write goes through. Updating or deleting a policy that is not
  * on record throws `PolicyOwnershipError` before any request is sent, whichever code path
- * supplied the id; everything else passes straight through to `client`.
+ * supplied the id, except deleting one an administrator confirmed (`deleteConfirmed`);
+ * everything else passes straight through to `client`.
  */
 export function withPolicyOwnership(
   client: UnifiClient,
   scope: OwnershipScope,
 ): UnifiClient {
   const assertOnRecord = async (action: "update" | "delete", siteId: string, policyId: string) => {
-    if (!(await policyOnRecord(scope, siteId, policyId))) throw new PolicyOwnershipError(action, policyId);
+    if (await policyOnRecord(scope, siteId, policyId)) return;
+    // The one exception: a leftover an administrator ticked and confirmed in Checkup.
+    if (action === "delete" && (await deleteConfirmed(scope, siteId, policyId))) return;
+    throw new PolicyOwnershipError(action, policyId);
   };
   const guarded: Pick<UnifiClient, "updatePolicy" | "deletePolicy"> = {
     async updatePolicy(siteId, policyId, body) {

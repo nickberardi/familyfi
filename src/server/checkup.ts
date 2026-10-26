@@ -13,16 +13,19 @@ import {
 import { prisma } from "./db";
 import { normalizeMac } from "./mac";
 import type { UnifiClient } from "./unifi/client";
-import { clientForHousehold } from "./unifi/connection";
+import { checkupPolicy, unrecordedPolicies } from "./leftover-policies";
+import { clientForHousehold, ownershipScope } from "./unifi/connection";
 import { loadNetworkClientIds, loadNetworkDetails } from "./unifi/networks";
 import { networkInScope } from "./unifi/scope";
 import { mapClientsToZones } from "./unifi/mapping";
 import type { ClientOverview, FirewallZone, NetworkDetails } from "./unifi/types";
+import type { CheckupPolicy } from "@/lib/checkup";
 
 /**
  * The network checkup (`src/lib/checkup.ts` holds the checks): it reads what sync already read, plus
- * the Wi-Fi networks, and stores what it found as `CheckupFinding` rows. It only reads; nothing it
- * finds changes the gateway. Sync runs it at most once an interval, and Check now runs it at once.
+ * the Wi-Fi networks and the firewall policies, and stores what it found as `CheckupFinding` rows. It
+ * only reads; nothing it finds changes the gateway, and only an administrator removes a leftover
+ * policy it lists (`src/server/leftover-policies.ts`). Sync runs it at most once an interval, and Check now runs it at once.
  */
 export const CHECKUP_INTERVAL_MS = 60 * 60_000;
 
@@ -120,7 +123,22 @@ async function readInputs(household: Household, client: UnifiClient, siteId: str
       clientCount: onNetwork.get(network.id) ?? 0,
     })),
     wifis: await readWifis(client, siteId, fallbackNetwork),
+    unrecordedPolicies: await readUnrecordedPolicies(household, client, siteId, zones),
   };
+}
+
+/**
+ * The gateway's policies no FamilyFi record claims, read now rather than from the sync pass, whose
+ * list is from before it created and removed its own. Null when UniFi would not list them.
+ */
+async function readUnrecordedPolicies(household: Household, client: UnifiClient, siteId: string, zones: FirewallZone[]): Promise<CheckupPolicy[] | null> {
+  try {
+    const scope = { connectionIdentity: ownershipScope(household).connectionIdentity, siteId };
+    return (await unrecordedPolicies(scope, await client.listPolicies(siteId))).map((policy) => checkupPolicy(policy, zones));
+  } catch (error) {
+    console.warn("Firewall policies could not be read for the checkup:", error);
+    return null;
+  }
 }
 
 /** The Wi-Fi networks with their details, or null when UniFi would not list them (an older console). */
