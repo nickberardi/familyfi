@@ -285,27 +285,32 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
   return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
 }
 
-/** The session token a request carries: its bearer, or else its session cookie. */
-async function presentedToken(request: Request): Promise<string | undefined> {
+/** The session token a request carries, and whether it came as a bearer: its bearer, or else its session cookie. */
+async function presentedToken(request: Request): Promise<{ raw: string; bearer: boolean } | undefined> {
   const header = request.headers.get("authorization");
-  if (header?.toLowerCase().startsWith("bearer ")) return header.slice(7).trim();
-  const raw = cookieValue(request.headers.get("cookie"), SESSION_COOKIE);
-  if (raw) return raw;
-  try {
-    return (await cookies()).get(SESSION_COOKIE)?.value;
-  } catch {
-    return undefined;
+  if (header?.toLowerCase().startsWith("bearer ")) return { raw: header.slice(7).trim(), bearer: true };
+  let raw = cookieValue(request.headers.get("cookie"), SESSION_COOKIE);
+  if (!raw) {
+    try {
+      raw = (await cookies()).get(SESSION_COOKIE)?.value;
+    } catch {
+      raw = undefined;
+    }
   }
+  return raw ? { raw, bearer: false } : undefined;
 }
 
 export async function readSessionFromRequest(request: Request) {
-  const raw = await presentedToken(request);
-  if (!raw) return null;
+  const presented = await presentedToken(request);
+  if (!presented) return null;
+  const { raw } = presented;
   const session = await prisma().session.findUnique({
     where: { tokenHash: sha256(raw) },
     include: { account: true, device: true },
   });
   if (!session || session.revokedAt || session.expiresAt <= new Date() || (session.kind === SessionKind.bearer && (!session.device || session.device.revokedAt))) return null;
+  // A browser's session lives in its cookie. Sent as a bearer it would pass the tunnel, which strips cookies only.
+  if (presented.bearer && session.kind !== SessionKind.bearer) return null;
   // Only administrators use FamilyFi; demotion ends their sessions, and this refuses any left over.
   if (session.account && !isAdministratorAccount(session.account)) return null;
   if (session.device && (!session.device.lastSeenAt || session.device.lastSeenAt < new Date(Date.now() - 15 * 60 * 1000))) {
@@ -384,8 +389,11 @@ export async function requireCsrf(request: Request) {
  * refresh token lives on the same row and must end with it.
  */
 export async function revokeSession(request: Request) {
-  const raw = await presentedToken(request);
-  if (raw) await prisma().session.updateMany({ where: { tokenHash: sha256(raw), revokedAt: null }, data: { revokedAt: new Date() } });
+  const presented = await presentedToken(request);
+  if (!presented) return;
+  // As for reading one: a browser's session is signed out only through its cookie.
+  const kind = presented.bearer ? { kind: SessionKind.bearer } : {};
+  await prisma().session.updateMany({ where: { tokenHash: sha256(presented.raw), revokedAt: null, ...kind }, data: { revokedAt: new Date() } });
 }
 
 export async function revokeAccountSessions(accountId: string) {
