@@ -5,7 +5,7 @@ import { demoLocked } from "@/server/demo";
 import { readJson, withAdmin } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { removeLeftoverPolicies } from "@/server/leftover-policies";
-import { syncClient, withReconcileLock } from "@/server/reconciliation";
+import { LockLostError, syncClient, withReconcileLock } from "@/server/reconciliation";
 
 class SyncRunning extends Error {}
 
@@ -39,7 +39,11 @@ export async function POST(request: Request) {
         busy: () => new SyncRunning(),
       });
     } catch (error) {
-      if (error instanceof SyncRunning) return jsonError(409, "sync_running", "A sync with the gateway is still running. Try again in a minute.");
+      // Waiting, or overtaken partway: a sync pass has the gateway. Nothing more is deleted.
+      if (error instanceof SyncRunning || error instanceof LockLostError) {
+        await runCheckup(household, client).catch(() => undefined);
+        return jsonError(409, "sync_running", "A sync with the gateway is still running. Check again in a minute.");
+      }
       throw error;
     }
     await runCheckup(household, client);
