@@ -7,6 +7,7 @@
  * response shape to guess.
  */
 
+import { mapLimited } from "@/lib/concurrency";
 import {
   RCODE_NXDOMAIN,
   RCODE_NOERROR,
@@ -169,22 +170,8 @@ export function wireResolver(ask: (domain: string, type: number) => Promise<DnsR
 }
 
 /** Resolves `domains` with at most `concurrency` requests in flight, input order kept. */
-export async function probeDomains(
-  domains: string[],
-  resolve: DohResolver,
-  concurrency: number,
-): Promise<DomainProbe[]> {
-  const results = new Array<DomainProbe>(domains.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.max(1, Math.min(concurrency, domains.length)) }, async () => {
-    for (;;) {
-      const index = next++;
-      if (index >= domains.length) return;
-      results[index] = await resolve(domains[index]!);
-    }
-  });
-  await Promise.all(workers);
-  return results;
+export function probeDomains(domains: string[], resolve: DohResolver, concurrency: number): Promise<DomainProbe[]> {
+  return mapLimited(domains, concurrency, resolve);
 }
 
 export { TYPE_A, TYPE_AAAA };

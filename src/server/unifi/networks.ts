@@ -1,18 +1,20 @@
+import { mapLimited } from "@/lib/concurrency";
 import type { UnifiClient } from "./client";
 import type { NetworkDetails } from "./types";
+
+/** Requests kept in flight to one console at once: enough to overlap round trips, few enough to spare it. */
+export const GATEWAY_CONCURRENCY = 4;
 
 /** Every network with its details; a network whose details cannot be read keeps its overview. */
 export async function loadNetworkDetails(client: UnifiClient, siteId: string): Promise<NetworkDetails[]> {
   const overviews = await client.listNetworks(siteId);
-  const details: NetworkDetails[] = [];
-  for (const overview of overviews) {
+  return mapLimited(overviews, GATEWAY_CONCURRENCY, async (overview) => {
     try {
-      details.push(await client.getNetwork(siteId, overview.id));
+      return await client.getNetwork(siteId, overview.id);
     } catch {
-      details.push({ ...overview, detailsUnread: true });
+      return { ...overview, detailsUnread: true };
     }
-  }
-  return details;
+  });
 }
 
 /** The client ids each network references, by network id; empty for a network that cannot be read. */
@@ -21,8 +23,7 @@ export async function loadNetworkClientIds(
   siteId: string,
   networks: NetworkDetails[],
 ): Promise<Map<string, Set<string>>> {
-  const map = new Map<string, Set<string>>();
-  for (const network of networks) {
+  const entries = await mapLimited(networks, GATEWAY_CONCURRENCY, async (network) => {
     try {
       const refs = await client.getNetworkReferences(siteId, network.id);
       const ids = new Set<string>();
@@ -30,10 +31,10 @@ export async function loadNetworkClientIds(
         if (resource.resourceType !== "CLIENT") continue;
         for (const ref of resource.references ?? []) ids.add(ref.referenceId);
       }
-      map.set(network.id, ids);
+      return [network.id, ids] as const;
     } catch {
-      map.set(network.id, new Set());
+      return [network.id, new Set<string>()] as const;
     }
-  }
-  return map;
+  });
+  return new Map(entries);
 }

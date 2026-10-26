@@ -42,7 +42,6 @@ export function GroupCard({
   catalogNames,
   upstreamCategories,
   onSheet,
-  onRulesChanged,
 }: {
   group: Group;
   href: string;
@@ -52,7 +51,6 @@ export function GroupCard({
   upstreamCategories: UpstreamCategoryRow[];
   /** Opens the group's block or unblock sheet. */
   onSheet: (target: GroupSheetTarget) => void;
-  onRulesChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [more, setMore] = useState(false);
@@ -122,7 +120,7 @@ export function GroupCard({
       ) : null}
 
       {sheet ? (
-        <FilterSheet group={group} state={sheet} onClose={() => setSheet(null)} onChanged={onRulesChanged} />
+        <FilterSheet group={group} state={sheet} onClose={() => setSheet(null)} />
       ) : null}
     </GroupCardFrame>
   );

@@ -31,7 +31,6 @@ export function GroupFilterMarks({
   upstreamCategories,
   timezone,
   showAppAdd,
-  onRulesChanged,
 }: {
   group: Group;
   rules: Rule[];
@@ -45,7 +44,6 @@ export function GroupFilterMarks({
   timezone: string;
   /** The + tile is a member-page action only, never the family-list card (A5). */
   showAppAdd?: boolean;
-  onRulesChanged: () => void;
 }) {
   const [sheet, setSheet] = useState<FilterSheetState | null>(null);
   const [addApp, setAddApp] = useState(false);
@@ -93,15 +91,10 @@ export function GroupFilterMarks({
       </div>
 
       {sheet ? (
-        <FilterSheet
-          group={group}
-          state={sheet}
-          onClose={() => setSheet(null)}
-          onChanged={onRulesChanged}
-        />
+        <FilterSheet group={group} state={sheet} onClose={() => setSheet(null)} />
       ) : null}
       {addApp ? (
-        <AddAppSheet group={group} onClose={() => setAddApp(false)} onCreated={onRulesChanged} />
+        <AddAppSheet group={group} onClose={() => setAddApp(false)} />
       ) : null}
     </>
   );

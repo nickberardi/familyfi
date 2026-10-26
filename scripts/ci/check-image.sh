@@ -35,4 +35,15 @@ if grep -E '(^|/)node_modules/\.pnpm/@next\+swc-' "$tmp/files"; then
   exit 1
 fi
 
+# Nor what the server never loads (#291): musl binaries Debian cannot run, TypeScript, and the
+# PGlite that only `prisma dev` uses beside the one the app does.
+if grep -E '(^|/)node_modules/\.pnpm/(@img\+sharp-[^/]*linuxmusl|@node-rs\+argon2-[^/]*musl|typescript@|@electric-sql\+pglite-(socket|tools)@)' "$tmp/files"; then
+  echo "image contains packages the server never loads; see runtime-deps and the build stage in docker/Dockerfile" >&2
+  exit 1
+fi
+if [ "$(grep -oE '(^|/)node_modules/\.pnpm/@electric-sql\+pglite@[^/]+/' "$tmp/files" | sort -u | wc -l)" -gt 1 ]; then
+  echo "image contains more than one PGlite" >&2
+  exit 1
+fi
+
 echo "image hygiene ok"

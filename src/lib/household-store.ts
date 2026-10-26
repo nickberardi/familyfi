@@ -196,8 +196,9 @@ export function createHouseholdStore(deps: {
     fullLoadAt = Date.now();
     loadsInFlight += 1;
     try {
-      const { session } = await request<{ session: Session }>("/api/v1/auth/session");
-      const [groups, devices, rules, sync, unifi, household, accounts] = await Promise.all([
+      // All at once: a signed-out session answers 401 on every one of them anyway.
+      const [session, groups, devices, rules, sync, unifi, household, accounts] = await Promise.all([
+        request<{ session: Session }>("/api/v1/auth/session").then((body) => body.session),
         request<{ groups: Group[] }>("/api/v1/groups"),
         request<{ devices: Device[] }>("/api/v1/devices"),
         request<{ rules: Rule[] }>("/api/v1/rules"),
@@ -390,11 +391,13 @@ export function createHouseholdStore(deps: {
     /**
      * Loads now, then every `interval` refreshes what changes on its own, with a full reload
      * every `fullInterval` (or whenever the view is stale), until the returned function stops
-     * it. While hidden it sends nothing, and reloads in full as soon as it is shown again.
+     * it. While hidden it sends nothing; shown again, it refreshes as a tick would, unless a
+     * refresh finished within `interval`.
      */
     startRefreshing(interval = REFRESH_MS, fullInterval = FULL_REFRESH_MS): () => void {
       // One refresh at a time: a slow server gets no second request stacked behind the first.
       let inFlight = false;
+      let doneAt = Number.NEGATIVE_INFINITY;
       const run = async (load: () => Promise<void>) => {
         if (inFlight) return;
         inFlight = true;
@@ -402,6 +405,7 @@ export function createHouseholdStore(deps: {
           await load();
         } finally {
           inFlight = false;
+          doneAt = Date.now();
         }
       };
       const tick = () => {
@@ -411,9 +415,12 @@ export function createHouseholdStore(deps: {
       };
       void run(reload);
       const timer = setInterval(tick, interval);
-      // Shown again: everything, even past a tick still in flight, which the reload supersedes.
+      // Shown again: a tick now, refreshing what is stale through the same guard; nothing when a
+      // refresh finished within the interval, so flipping between tabs costs nothing.
       const unsubscribe = visibility?.subscribe(() => {
-        if (!visibility.hidden()) void reload();
+        if (visibility.hidden()) return;
+        if (!state.stale && Date.now() - doneAt < interval) return;
+        tick();
       });
       return () => {
         clearInterval(timer);

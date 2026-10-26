@@ -189,7 +189,6 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
               upstreamCategories={upstreamCategories}
               timezone={timezone}
               showAppAdd
-              onRulesChanged={() => void reload()}
             />
           </section>
         </div>

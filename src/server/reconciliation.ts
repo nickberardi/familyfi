@@ -34,6 +34,8 @@ let lockMs = 25_000;
 let lockRenewMs = 8_000;
 // Only the latest run is ever read; a week of sync and policy-write history is kept for diagnosis.
 const SYNC_HISTORY_MS = 7 * 24 * 60 * 60 * 1000;
+/** How long an unassigned device may go unseen before a pass forgets it. */
+const UNASSIGNED_DEVICE_MS = 30 * 24 * 60 * 60 * 1000;
 // A create whose answer was lost has had its policy listed by then if it made one; a gateway that
 // keeps answering 5xx would otherwise leave a pending row every pass for a week.
 const LOST_CREATE_GRACE_MS = 10 * 60 * 1000;
@@ -250,6 +252,11 @@ async function tick(owner: string): Promise<boolean> {
     const client = syncClient(household);
     const identity = connectionIdentity(household);
     const siteId = household.unifiSiteId;
+    // Read alongside the rest; its failure only costs the access points' names.
+    const siteDevicesRead = client.listSiteDevices(siteId).then(
+      (devices) => ({ devices }),
+      (error: unknown) => ({ error }),
+    );
     const [zones, networks, clients, gatewayPolicies] = await Promise.all([
       client.listZones(siteId),
       loadNetworkDetails(client, siteId),
@@ -267,15 +274,11 @@ async function tick(owner: string): Promise<boolean> {
     const adopted = await settleLostCreates({ connectionIdentity: identity, siteId }, gatewayPolicies, {
       abandonBefore: new Date(now.getTime() - LOST_CREATE_GRACE_MS),
     });
+    const [siteDevices, networkClientIds] = await Promise.all([siteDevicesRead, loadNetworkClientIds(client, siteId, networks)]);
     let accessPoints: Map<string, string> | null = null;
-    try {
-      const siteDevices = await client.listSiteDevices(siteId);
-      accessPoints = new Map(siteDevices.map((device) => [device.id, device.name]));
-    } catch (error) {
-      // Presence remains useful if UniFi cannot name the access points on this pass.
-      console.warn("UniFi access point lookup failed:", error);
-    }
-    const networkClientIds = await loadNetworkClientIds(client, siteId, networks);
+    if ("devices" in siteDevices) accessPoints = new Map(siteDevices.devices.map((device) => [device.id, device.name]));
+    // Presence remains useful if UniFi cannot name the access points on this pass.
+    else console.warn("UniFi access point lookup failed:", siteDevices.error);
     const mappings = mapClientsToZones({ clients, networks, zones, networkClientIds });
     const mappingByMac = new Map(
       mappings.filter((item) => item.macAddress).map((item) => [item.macAddress, item]),
@@ -368,6 +371,16 @@ async function tick(owner: string): Promise<boolean> {
       },
     });
     await prisma().household.update({ where: { id: "default" }, data: { presenceCheckedAt: now } });
+    // An unassigned device unseen for a month is forgotten, so rotating private addresses do not grow
+    // the list forever; one that comes back is discovered again. A device in a group stays.
+    const forgetBefore = new Date(now.getTime() - UNASSIGNED_DEVICE_MS);
+    await prisma().device.deleteMany({
+      where: {
+        assignment: AssignmentState.quarantined,
+        mac: { notIn: [...observedMacs] },
+        OR: [{ lastSeenAt: { lt: forgetBefore } }, { lastSeenAt: null, createdAt: { lt: forgetBefore } }],
+      },
+    });
 
     const [groups, devices, appPolicies, quarantinePauses] = await Promise.all([
       prisma().group.findMany(),

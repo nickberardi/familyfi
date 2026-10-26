@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { request } from "@/lib/api";
-import { loadFilterCatalog, type CatalogNames } from "@/lib/category-marks";
+import { readCatalogNames, loadUpstreamCategories, type CatalogNames } from "@/lib/category-marks";
 import { groupPageSummary, groupPageTitle } from "@/lib/group-page";
 import { householdTimezone } from "@/lib/household-state";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
@@ -15,21 +15,58 @@ import { PageHeader } from "./PageHeader";
 import { NewGroupSheet } from "./NewGroupSheet";
 import { PauseSheet } from "./PauseSheet";
 
-/** DPI catalog names and upstream verdicts: what a card's marks need beyond the household. */
-export function useFilterCatalog() {
-  const [catalog, setCatalog] = useState<{ catalogNames: CatalogNames; upstreamCategories: UpstreamCategoryRow[] }>({
-    catalogNames: new Map(),
-    upstreamCategories: [],
+/**
+ * DPI catalog names, read once and shared by every page that shows marks: the full app list is
+ * large and changes only with the console. A read that failed or brought nothing is tried again next time.
+ */
+let sharedNames: Promise<CatalogNames> | null = null;
+let lastNames: CatalogNames = new Map();
+/** Counts forgets, so a read that started before one is never kept after it. */
+let generation = 0;
+
+function catalogNames(): Promise<CatalogNames> {
+  const started = generation;
+  sharedNames ??= readCatalogNames(request).then(({ names, complete }) => {
+    if (started !== generation) return names;
+    if (!complete || names.size === 0) sharedNames = null;
+    else lastNames = names;
+    return names;
   });
+  return sharedNames;
+}
+
+/** Drops the shared names, so the next page reads them again after a change of console. */
+export function forgetCatalogNames() {
+  generation += 1;
+  sharedNames = null;
+  lastNames = new Map();
+}
+
+/**
+ * DPI catalog names and, unless `upstream` is false, upstream verdicts: what a card's marks need
+ * beyond the household. The verdicts are read on every visit, since probes and edits change them.
+ */
+export function useFilterCatalog({ upstream = true }: { upstream?: boolean } = {}) {
+  const [catalog, setCatalog] = useState<{ catalogNames: CatalogNames; upstreamCategories: UpstreamCategoryRow[] }>(() => ({
+    catalogNames: lastNames,
+    upstreamCategories: [],
+  }));
   useEffect(() => {
-    const handle = window.setTimeout(() => void loadFilterCatalog(request).then(setCatalog), 0);
-    return () => window.clearTimeout(handle);
-  }, []);
+    let current = true;
+    const handle = window.setTimeout(() => {
+      void catalogNames().then((names) => current && setCatalog((now) => (now.catalogNames === names ? now : { ...now, catalogNames: names })));
+      if (upstream) void loadUpstreamCategories(request).then((rows) => current && setCatalog((now) => ({ ...now, upstreamCategories: rows })));
+    }, 0);
+    return () => {
+      current = false;
+      window.clearTimeout(handle);
+    };
+  }, [upstream]);
   return catalog;
 }
 
 export function GroupGrid({ kind }: { kind: "family" | "things" }) {
-  const { groups, rules, household, reload } = useAppData();
+  const { groups, rules, household } = useAppData();
   const [sheet, setSheet] = useState<{ group: Group; target: GroupSheetTarget } | null>(null);
   const [adding, setAdding] = useState(false);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
@@ -60,7 +97,6 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
               catalogNames={catalogNames}
               upstreamCategories={upstreamCategories}
               onSheet={(target) => setSheet({ group, target })}
-              onRulesChanged={() => void reload()}
             />
           ))
         )}

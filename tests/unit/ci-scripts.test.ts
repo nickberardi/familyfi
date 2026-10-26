@@ -77,6 +77,16 @@ describe("the release version", () => {
     expect(workflow).toContain("build-args: APP_VERSION=${{ env.APP_VERSION }}");
   });
 
+  it("builds layers that keep their digests while their files do not change, on both release paths", () => {
+    const epoch = "git log -1 --format=%ct -- docker/Dockerfile pnpm-lock.yaml";
+    const script = read("scripts/release.sh");
+    expect(script).toContain(`SOURCE_DATE_EPOCH="$(${epoch})"`);
+    expect(script).toContain("--output type=registry,rewrite-timestamp=true");
+    const workflow = read(".github/workflows/release.yml");
+    expect(workflow).toContain(`echo "SOURCE_DATE_EPOCH=$(${epoch})" >> "$GITHUB_ENV"`);
+    expect(workflow).toMatch(/outputs: type=image,.*,rewrite-timestamp=true$/m);
+  });
+
   it("opens a PR bringing main's package.json up to a newer stable tag", () => {
     const job = read(".github/workflows/release.yml").split(/^  version-pr:$/m)[1];
     expect(job).toBeDefined();

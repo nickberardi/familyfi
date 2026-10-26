@@ -140,7 +140,11 @@ if [[ -z "$prerelease" ]]; then
     tags+=(--tag "$image:$major.$minor" --tag "$image:latest")
   fi
 fi
-if ((push)); then output=(--push); else output=(--output type=cacheonly); fi
+# As release.yml: file times clamped to when the Dockerfile or lockfile last changed, so unchanged
+# layers keep their digests and an update downloads only what changed.
+SOURCE_DATE_EPOCH="$(git log -1 --format=%ct -- docker/Dockerfile pnpm-lock.yaml)"
+export SOURCE_DATE_EPOCH
+if ((push)); then output=(--output type=registry,rewrite-timestamp=true); else output=(--output type=cacheonly); fi
 docker buildx create --name "$builder" --driver docker-container >/dev/null
 echo "==> build ${tags[*]//--tag /}"
 docker buildx build --builder "$builder" --file docker/Dockerfile \

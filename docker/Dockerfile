@@ -19,26 +19,26 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10.15.1
-COPY package.json pnpm-lock.yaml prisma.config.ts ./
-COPY prisma ./prisma
-COPY scripts/runtime/print-database-url.mjs scripts/runtime/mode.mjs ./scripts/runtime/
-# Dependencies' own install scripts run in the stages below, for this architecture; this
-# package's postinstall (prisma generate) does not, and the client comes from the stage above.
-# The build stage copies the full package.json back over this one.
+# Only the manifest and lockfile: a schema change must not install every dependency again, nor
+# change the layers an update downloads. Dependencies' own install scripts run in the stages
+# below, for this architecture; this package's postinstall (prisma generate) does not, and the
+# client comes from the stage above. The build stage copies the full package.json back over this one.
+COPY package.json pnpm-lock.yaml ./
 RUN npm pkg delete scripts.postinstall
-COPY --from=prisma-client /prisma-client /tmp/prisma-client
 
-# Everything the build needs.
+# Everything the build needs, with the client generated from the schema.
 FROM deps-base AS deps
-RUN pnpm install --frozen-lockfile \
-  && client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
+RUN pnpm install --frozen-lockfile
+COPY --from=prisma-client /prisma-client /tmp/prisma-client
+RUN client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
   && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
 
 # What the image runs beside the standalone build, which already carries every file the server
-# loads (next, react and the rest): only the Prisma CLI for `migrate deploy`, the client it is
-# generated beside, and PGlite for the in-memory database (scripts/runtime). Next, its compilers
-# and the packages the build compiles in stay out of the image. Each is pinned to the version the
-# lockfile resolved, so the narrowed install cannot drift from the client generated above.
+# loads (next, react, the Prisma client and the rest): only the Prisma CLI for `migrate deploy`
+# and PGlite for the in-memory database (scripts/runtime). Each is pinned to the version the
+# lockfile resolved. What the CLI pulls in but `migrate deploy` never loads goes too: `prisma
+# dev`'s own PGlite and its companions, and TypeScript, which it reads only for `--version`; and
+# pnpm's record of the install, which holds its time and which nothing at runtime reads.
 FROM deps-base AS runtime-deps
 RUN node -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); \
     const lock = fs.readFileSync("pnpm-lock.yaml", "utf8"); \
@@ -46,13 +46,19 @@ RUN node -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync("p
       const at = lock.indexOf(`\n      ${quoted}:\n        specifier: `); \
       if (at < 0) throw new Error(`${name} is not in the lockfile`); \
       return lock.slice(at).match(/\n        version: ([^(\s]+)/)[1]; }; \
-    const keep = ["prisma", "@prisma/client", "@electric-sql/pglite"]; \
+    const keep = ["prisma", "@electric-sql/pglite"]; \
     pkg.dependencies = Object.fromEntries(keep.map((name) => [name, locked(name)])); \
     delete pkg.devDependencies; fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2)); \
     console.log(pkg.dependencies);' \
   && pnpm install --prod --no-frozen-lockfile --prefer-offline \
-  && client="$(node -p "require('path').join(require.resolve('@prisma/client/package.json'), '../../../.prisma/client')")" \
-  && mkdir -p "$client" && cp -r /tmp/prisma-client/. "$client" && rm -rf /tmp/prisma-client
+  && pglite="$(readlink -f node_modules/@electric-sql/pglite)" \
+  && for dir in node_modules/.pnpm/@electric-sql+pglite@*; do \
+    case "$pglite" in "$PWD/$dir"/*) ;; *) rm -rf "$dir" ;; esac; \
+  done \
+  && rm -rf node_modules/.pnpm/@electric-sql+pglite-socket@* node_modules/.pnpm/@electric-sql+pglite-tools@* \
+    node_modules/.pnpm/typescript@* \
+  && find node_modules -xtype l -delete \
+  && rm -f node_modules/.modules.yaml node_modules/.pnpm-workspace-state-v1.json
 
 FROM deps AS build
 COPY . .
@@ -61,8 +67,12 @@ COPY . .
 # has not caught up yet. Other builds keep package.json's.
 ARG APP_VERSION
 RUN if [ -n "$APP_VERSION" ]; then npm pkg set "version=$APP_VERSION"; fi
-# Not `pnpm build`, which generates the client again under emulation.
-RUN pnpm exec next build
+# Not `pnpm build`, which generates the client again under emulation. The server's own trace
+# carries the musl builds of sharp and argon2, which can never load on this Debian image.
+RUN pnpm exec next build \
+  && rm -rf .next/standalone/node_modules/.pnpm/@img+sharp-*linuxmusl* \
+    .next/standalone/node_modules/.pnpm/@node-rs+argon2-*musl* \
+  && find .next/standalone/node_modules -xtype l -delete
 
 FROM node:26-bookworm-slim AS runner
 WORKDIR /app
@@ -73,6 +83,8 @@ ENV HOSTNAME=0.0.0.0
 # pg_dump is for the backup before an update and for export (scripts/runtime/pre-update-backup.sh,
 # src/server/database-dump.ts). It must be the server's major version, PostgreSQL 18, which Debian
 # bookworm does not ship, so it comes from the PostgreSQL project's repository, its key hash-checked.
+# The logs and backups apt and dpkg leave say when the image was built; without them the same
+# packages make the same layer, and an update need not download it again.
 ADD https://www.postgresql.org/media/keys/ACCC4CF8.asc /etc/apt/keyrings/pgdg.asc
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates gosu \
@@ -83,6 +95,8 @@ RUN apt-get update \
   && apt-get update \
   && apt-get install -y --no-install-recommends postgresql-client-18 \
   && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /var/log/apt/* /var/log/dpkg.log /var/log/alternatives.log /var/cache/debconf/*-old \
+    /var/lib/dpkg/*-old /var/cache/ldconfig/aux-cache \
   && pg_dump --version
 # cloudflared for Remote access. Pinned and hash-checked at build time; FamilyFi never
 # downloads it at runtime. scripts/update-cloudflared.sh bumps the version and both hashes

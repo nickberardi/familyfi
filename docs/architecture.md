@@ -74,12 +74,13 @@ scheduling, starts update checking, and resumes configured remote access. These 
 responsibilities; visiting a page is not what starts enforcement.
 
 The [household store](../src/lib/household-store.ts), through the browser's
-[AppDataProvider](../src/components/AppDataProvider.tsx), reads the session first, then groups,
-devices, rules, sync, gateway settings, household settings and accounts. Every 15 seconds it rereads
+[AppDataProvider](../src/components/AppDataProvider.tsx), reads the session, groups, devices,
+rules, sync, gateway settings, household settings and accounts together. Every 15 seconds it rereads
 what changes most on its own (groups, devices, rules and sync). Everything is reread every five
-minutes, when the tab is shown again, after a write's change is followed and whenever a refresh
-failed, so the gateway's status and quarantine observation, which reconcile updates, can trail by up
-to five minutes on a page left open. A read that brings nothing new keeps the previous references and
+minutes, after a write's change is followed and whenever a refresh failed, so the gateway's status
+and quarantine observation, which reconcile updates, can trail by up to five minutes on a page left
+open. Showing the tab again runs the next refresh at once, unless one finished within the last 15
+seconds. A read that brings nothing new keeps the previous references and
 notifies no one, so pages do not render again. A hidden tab (or, natively, a backgrounded app passing
 its own `Visibility`) sends nothing. Generation checks discard superseded reads. An unauthorized session redirects to login.
 Initial read errors are shown; periodic refresh failures retain the previous data and mark it
@@ -179,6 +180,8 @@ Lock DNS is the second built-in rule, `lock-dns`: an ordinary `Rule` row created
 Timed pause and allowance expiry are the only clock-driven writes; membership and quarantine still go through reconciliation.
 
 Discovery and quarantine only include clients whose UniFi **network (VLAN)** is in the household allowlist (`manageAllNetworks` or `managedNetworkIds`). New devices on other VLANs are not ingested and are not added to quarantine policies. Assigned devices that roam off a managed network are left out of FamilyFi policies until they return. UniFi still applies a MAC policy to every VLAN that shares that **firewall zone**; pick networks whose zones match what you want to enforce.
+
+An unassigned device the gateway has not listed for 30 days is forgotten on the next pass, so phones that rotate their private address do not grow the device list (and every poll of it) forever; if it comes back it is discovered again, quarantined. A device in a group is never forgotten.
 
 Days identify the local weekday a window starts. Windows are half-open. Evaluation uses the household IANA timezone and local wall time, including both occurrences of a repeated DST time. UniFi uses the console clock for native schedules; household timezone vs console timezone must be aligned or documented.
 

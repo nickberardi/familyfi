@@ -2,7 +2,9 @@ import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
+import { mapLimited } from "@/lib/concurrency";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
+import { GATEWAY_CONCURRENCY } from "@/server/unifi/networks";
 import { builtInRefusal, switchQuarantineRule } from "@/server/rule-lifts";
 import {
   builtInRule,
@@ -114,15 +116,18 @@ export async function DELETE(request: Request, ctx: Ctx) {
       try {
         const client = clientForHousehold(household);
         const identity = connectionIdentity(household);
-        for (const policy of existing.policies) {
-          if (policy.connectionIdentity !== identity || policy.siteId !== household.unifiSiteId) continue;
-          if (!policy.unifiPolicyId) continue;
+        const siteId = household.unifiSiteId;
+        const ids = existing.policies
+          .filter((policy) => policy.connectionIdentity === identity && policy.siteId === siteId && policy.unifiPolicyId)
+          .map((policy) => policy.unifiPolicyId!);
+        // A few at a time, so a rule of many windows does not hold the request for each in turn.
+        await mapLimited(ids, GATEWAY_CONCURRENCY, async (unifiPolicyId) => {
           try {
-            await client.deletePolicy(household.unifiSiteId, policy.unifiPolicyId);
+            await client.deletePolicy(siteId, unifiPolicyId);
           } catch {
-            // Reconcile will retry if the ownership row remains; proceed to clear desired state.
+            // Its applied creation record outlives the rule, so the next pass's orphan sweep deletes it.
           }
-        }
+        });
       } catch {
         // Desired-state delete still proceeds; Sync will surface connection errors.
       }

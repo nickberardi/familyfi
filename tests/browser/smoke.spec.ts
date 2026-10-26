@@ -1042,11 +1042,32 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
       (method === "PATCH" && /\/api\/v1\/rules\/[^/]+$/.test(url))
     );
   });
+  // The store reloads once the change lands; the sheet asks for nothing of its own.
+  let fullReads = 0;
+  let catalogReads = 0;
+  page.on("request", (sent) => {
+    const path = new URL(sent.url()).pathname;
+    if (path === "/api/v1/accounts") fullReads += 1;
+    if (path === "/api/v1/dpi/applications") catalogReads += 1;
+  });
+  const settled = page.waitForResponse(
+    async (response) => /\/api\/v1\/changes\//.test(response.url()) && ((await response.json()) as { change?: { status?: string } }).change?.status !== "pending",
+  );
   await offSheet.getByRole("button", { name: "Create policy" }).click();
   expect((await create).ok()).toBeTruthy();
 
   // The mark now stands for the rule.
   await expect(marks.getByRole("button", { name: /Video blocked by FamilyFi/i })).toBeVisible();
+  await settled;
+  await page.waitForLoadState("networkidle");
+  expect(fullReads).toBe(1);
+
+  // The group's page, reached from the card, reuses the app catalog this page read.
+  await card.getByRole("link", { name: /^Details/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/family/${child!.id}$`));
+  await expect(page.getByTestId(`filter-marks-${child!.id}`)).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(catalogReads).toBe(0);
 
   // On the group's page, the mark opens the sheet: On → Turn off
   await page.goto(`/family/${child!.id}`);
@@ -1055,6 +1076,18 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const onSheet = page.getByRole("dialog");
   await expect(onSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
   await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeVisible();
+  // A change the server refuses leaves the sheet open, saying why.
+  await page.route("**/api/v1/rules/*/off", (route) =>
+    route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "conflict", message: "The rule changed elsewhere." } }),
+    }),
+  );
+  await onSheet.getByRole("button", { name: "Turn off" }).click();
+  await expect(onSheet.getByText("The rule changed elsewhere.")).toBeVisible();
+  await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeEnabled();
+  await page.unroute("**/api/v1/rules/*/off");
   const off = page.waitForResponse(
     (response) => response.request().method() === "POST" && /\/api\/v1\/rules\/[^/]+\/off/.test(response.url()),
   );
@@ -1064,6 +1097,25 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
 
   // GroupDetail: App + present
   await expect(page.getByRole("button", { name: "Add app filter" })).toBeVisible();
+  // Adding an app the server refuses keeps the form open, saying so.
+  await page.getByRole("button", { name: "Add app filter" }).click();
+  const picker = page.getByLabel("DPI application");
+  await expect(picker.locator("option")).not.toHaveCount(1);
+  await picker.selectOption({ index: 1 });
+  await page.route("**/api/v1/rules", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: { code: "conflict", message: "The rule changed elsewhere." } }),
+        })
+      : route.fallback(),
+  );
+  await page.getByTestId("add-app-create").click();
+  await expect(page.getByTestId("add-app-form").getByText("Could not block the app.")).toBeVisible();
+  await page.unroute("**/api/v1/rules");
+  await page.getByTestId("add-app-cancel").click();
+  await expect(page.getByTestId("add-app-form")).toHaveCount(0);
   // No Category +
   await expect(page.getByRole("button", { name: "Add category filter" })).toHaveCount(0);
 
