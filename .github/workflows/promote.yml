@@ -1,0 +1,72 @@
+name: Promote
+
+# Every release starts as a Pre-release, on :next (release.yml). When a release stops being a
+# Pre-release (its label set to None or Latest on GitHub), this moves :latest and :X.Y to the image
+# the Release workflow built for it. Nothing is rebuilt: the image is the one its notes name by
+# digest, which households on :next have already run. It may be behind the newest Pre-release,
+# never behind a release :latest already has (scripts/ci/promote-plan.mjs).
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release to promote, such as v0.38.0
+        required: true
+        type: string
+
+# One promotion at a time, so two never race for :latest.
+concurrency:
+  group: promote-latest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  promote:
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - name: Image to promote
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          # curl and jq rather than the GitHub CLI, which a self-hosted runner need not have.
+          api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
+          releases="$RUNNER_TEMP/releases.json"
+          echo '[]' > "$releases"
+          for page in $(seq 1 50); do
+            rows="$(api "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100&page=$page")"
+            jq -s 'add' "$releases" - <<< "$rows" > "$releases.next" && mv "$releases.next" "$releases"
+            [ "$(jq length <<< "$rows")" -eq 100 ] || break
+          done
+          node scripts/ci/promote-plan.mjs "$TAG" "$GITHUB_REPOSITORY" < "$releases" >> "$GITHUB_OUTPUT"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+      # imagetools needs no BuildKit container, so nothing is pulled.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Move :latest and :${{ steps.plan.outputs.minor }}
+        run: |
+          image="$(echo "$REGISTRY_IMAGE" | tr '[:upper:]' '[:lower:]')"
+          docker buildx imagetools create \
+            --tag "$image:latest" --tag "$image:${{ steps.plan.outputs.minor }}" \
+            "$image@${{ steps.plan.outputs.digest }}"
+          echo "::notice::$image:latest and :${{ steps.plan.outputs.minor }} are now $TAG (${{ steps.plan.outputs.digest }})."

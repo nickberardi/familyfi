@@ -39,6 +39,9 @@ services:
       FAMILYFI_REMOTE_ACCESS_PORT: ${FAMILYFI_REMOTE_ACCESS_PORT:-7002}
       # Reverse proxies in front of the web port whose X-Forwarded-For sign-in throttling believes (docs/setup.md).
       FAMILYFI_TRUSTED_PROXIES: ${FAMILYFI_TRUSTED_PROXIES:-}
+      # The image above, so the update check offers the releases of its track: `:next` every release,
+      # any other tag only releases promoted to `:latest` (docs/setup.md).
+      FAMILYFI_IMAGE: ${FAMILYFI_IMAGE:-ghcr.io/nickberardi/familyfi:latest}
     labels:
       # Watchtower updates this container and no other, after backing up the database. A failed
       # backup exits 75, which makes Watchtower skip the update.

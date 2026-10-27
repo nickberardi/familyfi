@@ -9,22 +9,23 @@
 # Options:
 #   --tag vX.Y.Z    the release to publish; must start with v, and must not exist on GitHub yet
 #                   unless --force
-#   --force         allow a tag that already exists, if it is HEAD: rebuild and push its images,
-#                   overwriting them on GHCR, and create the GitHub Release only if it is missing;
-#                   :X.Y and :latest move only if it is the newest release without a `-`
+#   --force         allow a tag that already exists, if it is HEAD: rebuild and push its image,
+#                   create the GitHub Release if it is missing, and name the new image in its notes;
+#                   :next moves only if it is the newest tag
 #   --skip-ci       don't run the checks and tests (ci.yml's verify job, and container.yml) first
 #   --no-push       build only: no GHCR login, no push, no GitHub Release
 #   --allow-dirty   allow uncommitted changes in the working tree (the build uses them)
 #   -h, --help      print this help
 #
 # Steps, as in release.yml: HEAD must be on origin/main; CI passes; one buildx build for
-# linux/amd64 and linux/arm64 pushes ghcr.io/<owner>/familyfi:X.Y.Z, :X.Y and :latest (the
-# last two only for a tag without a pre-release `-`); then a GitHub Release with generated
-# notes, which creates the tag on GitHub at HEAD, marked a pre-release below 1.0. The
-# architecture this machine isn't is built under emulation, which takes a while.
+# linux/amd64 and linux/arm64 pushes ghcr.io/<owner>/familyfi:build and, for the newest tag,
+# :next; then a Pre-release with generated notes that name the image by digest, which creates
+# the tag on GitHub at HEAD. Making it a full release later moves :latest and :X.Y to that
+# image (.github/workflows/promote.yml); this script never does. The architecture this machine
+# isn't is built under emulation, which takes a while.
 #
 # The image reports the tag's version, whatever package.json says (docker/Dockerfile).
-# Creating the tag starts release.yml, which finds this version's images on GHCR and skips
+# Creating the tag starts release.yml, which finds the image its notes name on GHCR and skips
 # the build; when main's package.json is behind the tag, it opens a PR bringing it up.
 #
 # GHCR credentials: GHCR_TOKEN from the environment or a gitignored .release.env, otherwise
@@ -52,7 +53,6 @@ die() { echo "release: $*" >&2; exit 1; }
 [[ -n "$tag" ]] || { echo "release: --tag is required" >&2; exit 2; }
 [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$ ]] ||
   die "$tag is not vMAJOR.MINOR.PATCH[-PRERELEASE] (release.yml triggers on v*)"
-major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}" prerelease="${BASH_REMATCH[4]}"
 version="${tag#v}"
 
 if [[ -f .release.env ]]; then
@@ -71,9 +71,10 @@ if [[ -n "$remote_commit" ]]; then
   ((force)) || die "$tag already exists on GitHub (pass --force to rebuild it)"
   [[ "$remote_commit" == "$(git rev-parse HEAD)" ]] ||
     die "$tag on GitHub is $remote_commit, not HEAD (git switch --detach $tag)"
-  newest=$(git ls-remote --tags --refs --sort=-v:refname origin 'v*' | sed 's#.*refs/tags/##' |
-    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
 fi
+# As release.yml: a fix to an older line (v0.39.1 while :next has v0.40.0) leaves :next alone.
+newest=$( { git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/##'; echo "$tag"; } |
+  node scripts/ci/newest-tag.mjs)
 if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
   [[ "$(git rev-parse "$tag^{commit}")" == "$(git rev-parse HEAD)" ]] || die "local tag $tag is not HEAD"
 fi
@@ -130,15 +131,13 @@ if ((push)); then
   unset token
 fi
 
-# The ghcr and manifest jobs, as one multi-platform build.
-tags=(--tag "$image:$version")
-if [[ -z "$prerelease" ]]; then
-  if [[ -n "$remote_commit" && "$tag" != "$newest" ]]; then
-    # Rebuilding an older release must not move households on :latest back to it.
-    echo "==> $tag is not the newest release ($newest); :$major.$minor and :latest are left as they are"
-  else
-    tags+=(--tag "$image:$major.$minor" --tag "$image:latest")
-  fi
+# The ghcr and manifest jobs, as one multi-platform build. :build is the tag every build is
+# published under; the Release's notes keep this build's digest after the next one moves it.
+tags=(--tag "$image:build")
+if [[ "$tag" == "$newest" ]]; then
+  tags+=(--tag "$image:next")
+else
+  echo "==> $tag is older than $newest; :next is left as it is"
 fi
 # As release.yml: file times clamped to when the Dockerfile or lockfile last changed, so unchanged
 # layers keep their digests and an update downloads only what changed.
@@ -153,6 +152,7 @@ docker buildx build --builder "$builder" --file docker/Dockerfile \
   --label "org.opencontainers.image.version=$version" \
   --build-arg "APP_VERSION=$version" \
   --label "org.opencontainers.image.revision=$sha" \
+  --metadata-file "$docker_config/build.json" \
   "${tags[@]}" "${output[@]}" .
 
 if ((!push)); then
@@ -160,20 +160,23 @@ if ((!push)); then
   exit 0
 fi
 
-# The GitHub Release step. Creating it creates the tag at HEAD.
+digest=$(node -p 'require(process.argv[1])["containerimage.digest"]' "$docker_config/build.json")
+[[ "$digest" == sha256:* ]] || die "the build reported no image digest"
+image_ref="$image@$digest"
+notes="Image: \`$image_ref\` (linux/amd64 and linux/arm64). Every release is on \`:next\` first; making it a full release moves \`:latest\` to it.
+
+Licensed under the Business Source License 1.1. See LICENSE and docs/licensing.md."
+
+# The GitHub Release step, always a Pre-release. Creating it creates the tag at HEAD.
 if ((force)) && gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
-  echo "published $image:$version; GitHub Release $tag already exists and is unchanged"
+  # Name the rebuilt image, keeping the rest of the notes.
+  rest=$(gh release view "$tag" --repo "$repo" --json body --jq .body |
+    sed -e '/^Image: `ghcr\.io\//d' -e '/^Licensed under the Business Source License/d' | sed '/./,$!d')
+  gh release edit "$tag" --repo "$repo" --notes "$notes"$'\n\n'"$rest" >/dev/null
+  echo "published $image_ref; GitHub Release $tag now names it"
   exit 0
 fi
 echo "==> GitHub Release $tag"
-# Below 1.0 every release is a pre-release (docs/operations.md, Releases), as is a tag with a `-`.
-flags=()
-if [[ "$major" == 0 || -n "$prerelease" ]]; then flags+=(--prerelease); fi
-gh release create "$tag" --repo "$repo" --target "$sha" --title "$tag" ${flags[@]+"${flags[@]}"} --generate-notes --notes "$(cat <<EOF
-Image: \`ghcr.io/$repo:$version\` (linux/amd64 and linux/arm64).
-
-Licensed under the Business Source License 1.1. See LICENSE and docs/licensing.md.
-EOF
-)"
+gh release create "$tag" --repo "$repo" --target "$sha" --title "$tag" --prerelease --generate-notes --notes "$notes"
 git fetch --quiet origin "refs/tags/$tag:refs/tags/$tag"
-echo "published $tag: $image:$version"
+echo "published $tag: $image_ref"

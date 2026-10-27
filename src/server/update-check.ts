@@ -39,25 +39,35 @@ class GitHubHttpError extends Error {
   }
 }
 
-function releaseIsApplicable(release: GitHubRelease, includePrereleases: boolean): Semver | null {
+/**
+ * Which releases a household is offered, from the tag of the image it runs (`FAMILYFI_IMAGE`,
+ * which Compose passes in). `:next` follows every release, pre-releases included; any other tag,
+ * a digest pin or no image at all follows `:latest`, which only releases that are not marked
+ * Pre-release on GitHub reach (.github/workflows/promote.yml).
+ */
+export type UpdateTrack = "latest" | "next";
+
+export function updateTrack(image: string | undefined = process.env.FAMILYFI_IMAGE): UpdateTrack {
+  const name = (image ?? "").trim().split("@")[0].split("/").at(-1) ?? "";
+  const colon = name.lastIndexOf(":");
+  return colon >= 0 && name.slice(colon + 1) === "next" ? "next" : "latest";
+}
+
+function releaseIsApplicable(release: GitHubRelease, track: UpdateTrack): Semver | null {
   if (release.draft === true || typeof release.tag_name !== "string") return null;
   const version = parseSemver(release.tag_name);
   if (!version) return null;
-  if (!includePrereleases && (release.prerelease === true || version.prerelease.length > 0)) return null;
+  if (track === "latest" && release.prerelease === true) return null;
   return version;
 }
 
 export function selectLatestRelease(
   releases: GitHubRelease[],
-  currentVersion: string,
+  track: UpdateTrack,
 ): { version: string; tag: string } | null {
-  const current = parseSemver(currentVersion);
-  if (!current) throw new Error("FamilyFi version is not valid SemVer.");
-  const stableOne = parseSemver("1.0.0")!;
-  const includePrereleases = compareSemver(current, stableOne) < 0;
   let latest: { version: Semver; tag: string } | null = null;
   for (const release of releases) {
-    const version = releaseIsApplicable(release, includePrereleases);
+    const version = releaseIsApplicable(release, track);
     if (!version || typeof release.tag_name !== "string") continue;
     if (!latest || compareSemver(version, latest.version) > 0) {
       latest = { version, tag: release.tag_name };
@@ -134,7 +144,7 @@ export function createUpdateChecker(): UpdateChecker {
       const timeout = setTimeout(() => controller.abort(), UPDATE_CHECK_TIMEOUT_MS);
       try {
         const releases = await fetchReleases(fetchImpl, controller.signal);
-        const latest = selectLatestRelease(releases, APP_VERSION);
+        const latest = selectLatestRelease(releases, updateTrack());
         const current = parseSemver(APP_VERSION);
         if (!current) throw new Error("FamilyFi version is not valid SemVer.");
         const checkedAt = now().toISOString();

@@ -69,4 +69,11 @@ describe("the updater in docker-compose.yml", () => {
     expect(app.environment?.FAMILYFI_REMOTE_ACCESS_PORT).toBe("${FAMILYFI_REMOTE_ACCESS_PORT:-7002}");
     expect(app.ports).toContain("${FAMILYFI_REMOTE_ACCESS_PORT:-7002}:${FAMILYFI_REMOTE_ACCESS_PORT:-7002}");
   });
+
+  it("tells the app the image it runs, so its update check follows that image's track", () => {
+    // Watchtower pulls the tag the app runs; the update check must offer releases of the same tag.
+    const { app } = compose.services;
+    expect(app.environment?.FAMILYFI_IMAGE).toBe(app.image);
+    expect(app.image).toBe("${FAMILYFI_IMAGE:-ghcr.io/nickberardi/familyfi:latest}");
+  });
 });

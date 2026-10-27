@@ -4,6 +4,7 @@ import {
   createUpdateChecker,
   parseSemver,
   selectLatestRelease,
+  updateTrack,
 } from "@/server/update-check";
 import { APP_VERSION } from "@/lib/version";
 
@@ -20,21 +21,49 @@ describe("GitHub release update check", () => {
     expect(parseSemver("not-a-release")).toBeNull();
   });
 
-  it("uses published prereleases before 1.0 and stable releases at 1.0 or later", () => {
+  it("offers the latest track only releases not marked Pre-release, and the next track every release", () => {
     const releases = [
-      { tag_name: "v1.0.0", draft: true },
-      { tag_name: "v1.2.0-beta.1", prerelease: true },
-      { tag_name: "v1.1.0" },
+      { tag_name: "v1.3.0", draft: true },
+      { tag_name: "v1.2.0", prerelease: true },
+      { tag_name: "v1.1.0", prerelease: false },
+      { tag_name: "v1.0.0" },
       { tag_name: "preview", prerelease: false },
     ];
-    expect(selectLatestRelease(releases, "0.9.0")).toEqual({ version: "1.2.0-beta.1", tag: "v1.2.0-beta.1" });
-    expect(selectLatestRelease(releases, "1.0.0")).toEqual({ version: "1.1.0", tag: "v1.1.0" });
+    expect(selectLatestRelease(releases, "latest")).toEqual({ version: "1.1.0", tag: "v1.1.0" });
+    expect(selectLatestRelease(releases, "next")).toEqual({ version: "1.2.0", tag: "v1.2.0" });
+    // Before 1.0 too: a household on :latest is not offered a build only :next has.
+    expect(selectLatestRelease([{ tag_name: "v0.38.0", prerelease: true }], "latest")).toBeNull();
+  });
+
+  it("reads the track from the tag of the image the household runs", () => {
+    expect(updateTrack("ghcr.io/nickberardi/familyfi:next")).toBe("next");
+    expect(updateTrack(" ghcr.io/nickberardi/familyfi:next ")).toBe("next");
+    expect(updateTrack("ghcr.io/nickberardi/familyfi:latest")).toBe("latest");
+    expect(updateTrack("ghcr.io/nickberardi/familyfi:0.38")).toBe("latest");
+    expect(updateTrack("ghcr.io/nickberardi/familyfi@sha256:" + "a".repeat(64))).toBe("latest");
+    expect(updateTrack("registry.local:5000/familyfi")).toBe("latest");
+    expect(updateTrack("registry.local:5000/familyfi:next")).toBe("next");
+    expect(updateTrack("")).toBe("latest");
+    expect(updateTrack(undefined)).toBe("latest");
+  });
+
+  it("checks the track FAMILYFI_IMAGE names", async () => {
+    const releases = [{ tag_name: "v999.0.0", prerelease: true }];
+    vi.stubEnv("FAMILYFI_IMAGE", "ghcr.io/nickberardi/familyfi:next");
+    try {
+      const next = await createUpdateChecker().refresh({ fetchImpl: vi.fn(async () => jsonResponse(releases)) });
+      expect(next).toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    const latest = await createUpdateChecker().refresh({ fetchImpl: vi.fn(async () => jsonResponse(releases)) });
+    expect(latest).toMatchObject({ status: "ok", available: false, latestVersion: null });
   });
 
   it("reports a newer release with its canonical GitHub URL", async () => {
     const checker = createUpdateChecker();
     const snapshot = await checker.refresh({
-      fetchImpl: vi.fn(async () => jsonResponse([{ tag_name: "v999.0.0", prerelease: true }])),
+      fetchImpl: vi.fn(async () => jsonResponse([{ tag_name: "v999.0.0", prerelease: false }])),
       now: () => new Date("2026-09-22T12:00:00.000Z"),
     });
     expect(snapshot).toMatchObject({
@@ -139,7 +168,7 @@ describe("GitHub release update check", () => {
     const firstPage = Array.from({ length: 100 }, () => ({ tag_name: "v0.1.0", prerelease: true }));
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse(firstPage))
-      .mockResolvedValueOnce(jsonResponse([{ tag_name: "v999.0.0", prerelease: true }]));
+      .mockResolvedValueOnce(jsonResponse([{ tag_name: "v999.0.0", prerelease: false }]));
     const snapshot = await checker.refresh({ fetchImpl });
     expect(snapshot).toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
