@@ -47,7 +47,7 @@ if [ -n "$backup" ]; then
   echo "  1. docker compose stop app"
   echo "  2. docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app $backup"
   # Releases are published by digest; each one's notes name its image (release.yml).
-  echo "  3. Add FAMILYFI_IMAGE=$image@sha256:<digest> to .env, the image the notes of"
+  echo "  3. Add FAMILYFI_IMAGE=$image@sha256:<digest> to .env, or the image named in the notes of"
   if [ -n "$previous" ]; then
     echo "     https://github.com/nickberardi/familyfi/releases/tag/v$previous name"
   else
