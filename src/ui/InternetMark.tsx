@@ -7,6 +7,7 @@ import { internetMarkLook } from "@/lib/internet-zone";
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Group } from "@/lib/types";
 
+import { MarkTextBreak } from "./CategoryMarks";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /** All internet as one mark in a closed card's row, shared by every client: Off, Paused, On or No rule. */
@@ -38,7 +39,10 @@ export function InternetMark({
           <ui.Icon name="globe-simple" size={18} color={ui.color(look.ink)} />
         </View>
       </View>
-      <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, color: ui.color("ink-2") }}>Internet</Text>
+      <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, color: ui.color("ink-2") }}>
+        Internet
+        <MarkTextBreak />
+      </Text>
       <Text style={{ fontFamily: ui.font, fontSize: 9, lineHeight: 13.5, fontWeight: "600", color: ui.color(look.wordInk) }}>{look.word}</Text>
     </Pressable>
   );

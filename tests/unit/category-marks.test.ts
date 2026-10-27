@@ -83,7 +83,7 @@ describe("category marks", () => {
   });
 
   it("says what More does, and when a rule blocks", () => {
-    expect(moreMarkLabels(false, 9, 5)).toEqual({ accessibilityLabel: "Show all 9 categories", badge: "+5", word: "More" });
+    expect(moreMarkLabels(false, 9, 5)).toEqual({ accessibilityLabel: "5 more, show all 9 categories", badge: "+5", word: "More" });
     expect(moreMarkLabels(true, 9, 5)).toMatchObject({ badge: "–", word: "Fewer" });
     expect(categoryRuleWhen({ mode: "always", windows: [] })).toBe("Always blocked by FamilyFi.");
   });

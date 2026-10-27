@@ -550,7 +550,7 @@ test("device assignment updates immediately", { tag: "@desktop" }, async ({ page
 test("device identity opens readable connection details", async ({ page }) => {
   await signIn(page);
   await page.goto("/devices");
-  const link = page.getByRole("link", { name: /^View details for / }).first();
+  const link = page.locator('a[href^="/devices/"]').first();
   await expect(link).toBeVisible();
   await link.click();
   await expect(page).toHaveURL(/\/devices\/[^/]+$/);
@@ -930,7 +930,7 @@ test("cards show every household category; one UniFi cannot block offers a Websi
   const marks = page.getByTestId(`filter-marks-${kid!.id}`);
   const card = page.locator("article").filter({ has: marks });
   // Not just the five UniFi categories: AI, Dating, Gambling and Adult are there too.
-  await marks.getByRole("button", { name: /^Show all \d+ categories$/ }).click();
+  await marks.getByRole("button", { name: /^\d+ more, show all \d+ categories$/ }).click();
   for (const name of ["AI", "Dating", "Gambling", "Adult", "Video"]) {
     await expect(marks.getByRole("button", { name: new RegExp(`^${name} `) })).toBeVisible();
   }

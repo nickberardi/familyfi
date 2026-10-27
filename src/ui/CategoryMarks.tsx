@@ -5,7 +5,7 @@
  * control never reads as a device-wide one.
  */
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { CategorySlotState } from "@/lib/category-marks";
 import { MARK_WIDTH, moreMarkLabels } from "@/lib/category-marks";
@@ -31,6 +31,15 @@ export function useMarkColors(state: CategoryMarkState) {
   return { fill: ui.color(tokenOf(fill)), ink: ui.color(tokenOf(ink)) };
 }
 
+/**
+ * A space between a mark's lines of text, on the web, where they are separate elements: without it
+ * the page's text runs them together ("SocialOpen"), so assistive tech cannot match what it shows
+ * to the mark's name. Zero-size, so it never moves the centred words.
+ */
+export function MarkTextBreak() {
+  return Platform.OS === "web" ? <Text style={styles.break}> </Text> : null;
+}
+
 /** A 34px mark with its label and state word beneath. */
 export function MarkButton({
   label,
@@ -54,7 +63,10 @@ export function MarkButton({
     <Pressable role="button" aria-label={categoryMarkLabel(label, state)} onPress={onPress} testID={testID} style={styles.mark}>
       <View style={[styles.circle, { backgroundColor: fill }]}>{children}</View>
       {/* Wraps across words in the 52px column, as the web's label does, rather than cutting off. */}
-      <Text style={[small, styles.label]}>{label}</Text>
+      <Text style={[small, styles.label]}>
+        {label}
+        <MarkTextBreak />
+      </Text>
       {/* Always rendered, even when wordless, so marks in a row keep one baseline. */}
       <Text style={[small, styles.word]}>{word || " "}</Text>
     </Pressable>
@@ -98,7 +110,10 @@ export function MoreMark({ more, total, hidden, onPress }: { more: boolean; tota
   return (
     <Pressable role="button" aria-label={words.accessibilityLabel} onPress={onPress} style={styles.mark}>
       <View style={[styles.circle, styles.dashed, { borderColor: ui.color("control-line") }]}>
-        <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, fontWeight: "700", color: accent }}>{words.badge}</Text>
+        <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, fontWeight: "700", color: accent }}>
+          {words.badge}
+          <MarkTextBreak />
+        </Text>
       </View>
       <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, color: accent }}>{words.word}</Text>
       <Text style={styles.word}> </Text>
@@ -127,4 +142,5 @@ const styles = StyleSheet.create({
   addDashed: { borderWidth: 1.5, borderStyle: "dashed" },
   label: { fontSize: 10, lineHeight: 15 },
   word: { fontSize: 9, lineHeight: 13.5 },
+  break: { fontSize: 0 },
 });

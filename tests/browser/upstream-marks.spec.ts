@@ -74,8 +74,8 @@ test("a mark reports DNS when no FamilyFi rule is blocking", { tag: "@desktop" }
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
   await expect(marks).toBeVisible();
 
-  await expect(marks.getByRole("button", { name: /Social already blocked by DNS/i })).toBeVisible();
-  await expect(marks.getByRole("button", { name: /Gaming partially blocked by DNS/i })).toBeVisible();
+  await expect(marks.getByRole("button", { name: /Social blocked by DNS/i })).toBeVisible();
+  await expect(marks.getByRole("button", { name: /Gaming partial, some sites blocked by DNS/i })).toBeVisible();
   // Unmeasured and unruled stays honest.
   await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
 });
@@ -87,7 +87,7 @@ test("the sheet explains an upstream block without claiming FamilyFi did it", { 
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
-  await marks.getByRole("button", { name: /Social already blocked by DNS/i }).click();
+  await marks.getByRole("button", { name: /Social blocked by DNS/i }).click();
 
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name: /Already blocked \(DNS\)/i })).toBeVisible();
@@ -103,11 +103,11 @@ test("a FamilyFi rule outranks the DNS verdict on the same mark", { tag: "@deskt
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
-  await expect(marks.getByRole("button", { name: /Social already blocked by DNS/i })).toBeVisible();
+  await expect(marks.getByRole("button", { name: /Social blocked by DNS/i })).toBeVisible();
 
   // Creating our own policy for a category DNS already blocks must flip the mark to
   // ours — an enabled rule is the state shown, whatever the resolver reports.
-  await marks.getByRole("button", { name: /Social already blocked by DNS/i }).click();
+  await marks.getByRole("button", { name: /Social blocked by DNS/i }).click();
   const sheet = page.getByRole("dialog");
   const created = page.waitForResponse(
     (response) =>
@@ -122,7 +122,7 @@ test("a FamilyFi rule outranks the DNS verdict on the same mark", { tag: "@deskt
   // to "nothing is blocking this".
   await clearSlotRules(page, kid.id, 24);
   await page.reload();
-  await expect(marks.getByRole("button", { name: /Social already blocked by DNS/i })).toBeVisible();
+  await expect(marks.getByRole("button", { name: /Social blocked by DNS/i })).toBeVisible();
 });
 
 /**
@@ -139,8 +139,7 @@ test("a measured all-clear is not the same mark as an unmeasured category", { ta
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
-  // Anchored, because "VPN not blocked" is a prefix of the unmeasured wording.
-  const open = marks.getByRole("button", { name: /^VPN not blocked$/ });
+  const open = marks.getByRole("button", { name: /^VPN open, not blocked$/ });
   const unknown = marks.getByRole("button", { name: /^Video not blocked by FamilyFi$/ });
   await expect(open).toBeVisible();
   await expect(unknown).toBeVisible();
@@ -168,13 +167,13 @@ test("a mark's word names its state, and says nothing when nothing was measured"
   await page.goto(`/family/${kid.id}`);
 
   const marks = page.getByTestId(`filter-marks-${kid.id}`);
-  await expect(marks.getByRole("button", { name: /Social already blocked by DNS/i })).toContainText(
+  await expect(marks.getByRole("button", { name: /Social blocked by DNS/i })).toContainText(
     "Blocked",
   );
-  await expect(marks.getByRole("button", { name: /Gaming partially blocked by DNS/i })).toContainText(
+  await expect(marks.getByRole("button", { name: /Gaming partial, some sites blocked by DNS/i })).toContainText(
     "Partial",
   );
-  await expect(marks.getByRole("button", { name: /^VPN not blocked$/ })).toContainText("Open");
+  await expect(marks.getByRole("button", { name: /^VPN open, not blocked$/ })).toContainText("Open");
   // Unmeasured is the one wordless state: we did not look, and no word says that.
   await expect(marks.getByRole("button", { name: /^Video not blocked by FamilyFi$/ })).toHaveText(
     /^Video\s*$/,
