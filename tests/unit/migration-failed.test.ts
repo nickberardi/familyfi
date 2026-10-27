@@ -59,9 +59,11 @@ describe("the entrypoint's help when a migration fails", () => {
       `  2. docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app ${newest}`,
     );
     // No image is tagged with its version: each release's notes name its image by digest.
-    expect(out).toContain("  3. Add FAMILYFI_IMAGE=ghcr.io/nickberardi/familyfi@sha256:<digest> to .env, or the image named in the notes of");
-    expect(out).toContain("     https://github.com/nickberardi/familyfi/releases/tag/v0.34.0 name");
-    expect(out).toContain("  4. docker compose up -d app");
+    expect(out).toContain("  3. docker pull ghcr.io/nickberardi/familyfi@sha256:<digest>, with the image named in the notes of");
+    expect(out).toContain("     https://github.com/nickberardi/familyfi/releases/tag/v0.34.0\n");
+    expect(out).toContain("  4. docker tag ghcr.io/nickberardi/familyfi@sha256:<digest> ghcr.io/nickberardi/familyfi:rollback");
+    expect(out).toContain("  5. Set FAMILYFI_UPDATE_TAG=rollback in .env");
+    expect(out).toContain("  6. docker compose up -d app");
   });
 
   it("says where the backup would be when there is none from before this update", () => {

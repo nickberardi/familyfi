@@ -2,7 +2,7 @@
 # Fresh-container smoke: special-character DB password, health, login, persist restart, demo mode.
 set -eu
 
-image="${FAMILYFI_IMAGE:-familyfi:ci}"
+image="${1:-familyfi:ci}"
 network="familyfi-smoke-$$"
 db="familyfi-smoke-db-$$"
 app="familyfi-smoke-app-$$"

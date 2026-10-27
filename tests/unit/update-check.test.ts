@@ -35,21 +35,36 @@ describe("GitHub release update check", () => {
     expect(selectLatestRelease([{ tag_name: "v0.38.0", prerelease: true }], "latest")).toBeNull();
   });
 
-  it("reads the track from the tag of the image the household runs", () => {
-    expect(updateTrack("ghcr.io/nickberardi/familyfi:next")).toBe("next");
-    expect(updateTrack(" ghcr.io/nickberardi/familyfi:next ")).toBe("next");
-    expect(updateTrack("ghcr.io/nickberardi/familyfi:latest")).toBe("latest");
-    expect(updateTrack("ghcr.io/nickberardi/familyfi:0.38")).toBe("latest");
-    expect(updateTrack("ghcr.io/nickberardi/familyfi@sha256:" + "a".repeat(64))).toBe("latest");
-    expect(updateTrack("registry.local:5000/familyfi")).toBe("latest");
-    expect(updateTrack("registry.local:5000/familyfi:next")).toBe("next");
+  it("offers a line's track only that line's releases not marked Pre-release", () => {
+    const releases = [
+      { tag_name: "v0.39.0", prerelease: false },
+      { tag_name: "v0.38.2", prerelease: true },
+      { tag_name: "v0.38.1", prerelease: false },
+      { tag_name: "v0.3.8", prerelease: false },
+    ];
+    expect(selectLatestRelease(releases, { major: "0", minor: "38" })).toEqual({ version: "0.38.1", tag: "v0.38.1" });
+    expect(selectLatestRelease(releases, { major: "1", minor: "0" })).toBeNull();
+  });
+
+  it("reads the track from FAMILYFI_UPDATE_TAG, and anything it does not know as latest", () => {
+    expect(updateTrack("next")).toBe("next");
+    expect(updateTrack(" next ")).toBe("next");
+    expect(updateTrack("Next")).toBe("latest");
+    expect(updateTrack("latest")).toBe("latest");
+    expect(updateTrack("0.38")).toEqual({ major: "0", minor: "38" });
+    expect(updateTrack("1.2")).toEqual({ major: "1", minor: "2" });
+    expect(updateTrack("v1.2")).toBe("latest");
+    expect(updateTrack("0.38.1")).toBe("latest");
+    expect(updateTrack("00.38")).toBe("latest");
+    expect(updateTrack("nxt")).toBe("latest");
+    expect(updateTrack("ghcr.io/nickberardi/familyfi:next")).toBe("latest");
     expect(updateTrack("")).toBe("latest");
     expect(updateTrack(undefined)).toBe("latest");
   });
 
-  it("checks the track FAMILYFI_IMAGE names", async () => {
+  it("checks the track FAMILYFI_UPDATE_TAG names", async () => {
     const releases = [{ tag_name: "v999.0.0", prerelease: true }];
-    vi.stubEnv("FAMILYFI_IMAGE", "ghcr.io/nickberardi/familyfi:next");
+    vi.stubEnv("FAMILYFI_UPDATE_TAG", "next");
     try {
       const next = await createUpdateChecker().refresh({ fetchImpl: vi.fn(async () => jsonResponse(releases)) });
       expect(next).toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });

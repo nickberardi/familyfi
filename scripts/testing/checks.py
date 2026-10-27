@@ -30,7 +30,7 @@ def commands(name, args, root):
         "db-upgrade": [[*package, "db-upgrade"]],
         "container": [["docker", "build", "-f", "docker/Dockerfile", "-t", "familyfi:ci", "."],
                       ["sh", "scripts/ci/check-image.sh", "familyfi:ci"],
-                      ["sh", "scripts/ci/container-smoke.sh"]],
+                      ["sh", "scripts/ci/container-smoke.sh", "familyfi:ci"]],
         "mutation": [[*package, "test:mutation"], ["node", "scripts/ci/mutation-summary.mjs", *summary_file()]],
     }[name]
 
@@ -57,8 +57,6 @@ def run_check(name, args, resources, report, runs, database):
         raise RuntimeError("api-breaking needs Go (brew install go)")
     preflight(resources.root, docker=name in DOCKER)
     env = database() if name in NEEDS_DATABASE else resources.test_env("checks")
-    if name == "container":
-        env = {**env, "FAMILYFI_IMAGE": "familyfi:ci"}
     steps = coverage(args, runs) if name == "coverage" else commands(name, args, resources.root)
     timeout = 5 * 3600 if name == "mutation" else args.timeout
     idle = max(args.idle, {"container": 600, "mutation": 1800}.get(name, 0))

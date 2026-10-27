@@ -238,6 +238,8 @@ The migration history starts from one baseline, `prisma/migrations/0000000000000
 
 From the first release on the baseline (v0.22.3), a household may skip releases: any of them upgrades straight to the newest. CI proves it on every push by filling a database built by each supported release and upgrading it, and by restoring a dump of it over a database already at the new release with `restore-database.sh` and upgrading that (`pnpm db-upgrade`); until that release is tagged there is nothing to upgrade from. The floor is `OLDEST_SUPPORTED_RELEASE` in `scripts/ci/check-migration-upgrade.mjs`; raising it needs a release note telling older households which release to step through first.
 
+From v0.39.0, `FAMILYFI_UPDATE_TAG` picks the tag and `FAMILYFI_IMAGE` is no longer read. A household that set `FAMILYFI_IMAGE=ghcr.io/nickberardi/familyfi:<tag>` in `.env` replaces it with `FAMILYFI_UPDATE_TAG=<tag>` and takes the new `docker-compose.yml`; until it does, the update check offers `latest`'s releases, and with the new Compose file alone the old line is ignored and Compose runs `:latest`. One pinned by digest follows [when an update fails](#when-an-update-fails) instead.
+
 Published GHCR tags are `linux/amd64` and `linux/arm64` (`v*` git tags via Actions). Use `make docker-dev-up` to build locally. Compose interpolates `POSTGRES_*` for the database service and passes `DB_*` and `POSTGRES_*` into the app container, which reaches PostgreSQL on port 5432 inside the Compose network. The app generates `FAMILYFI_DEFAULT_PASSWORD` and `FAMILYFI_ENCRYPTION_KEY` on first boot and keeps them in `/var/lib/familyfi/data/.env` on its volume; it does not read the host's `.env`.
 
 ### When an update fails
@@ -246,10 +248,12 @@ When a release's migrations fail, FamilyFi doesn't start, and every restart fail
 
 1. `docker compose stop app`
 2. Restore the backup the updater took before installing this release, while this release's image is still the one Compose runs (older images have no restore script): `docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app /var/lib/familyfi/data/backups/familyfi-v<version>-<time>.dump`. `docker compose run --rm --no-deps --entrypoint ls app /var/lib/familyfi/data/backups` lists them.
-3. Add `FAMILYFI_IMAGE=` to `.env` with the image the notes of the release in the backup's name give, on `https://github.com/nickberardi/familyfi/releases/tag/v<version>`: `ghcr.io/nickberardi/familyfi@sha256:<digest>`, or a version tag for releases from before the two tracks.
-4. `docker compose up -d app`
+3. `docker pull ghcr.io/nickberardi/familyfi@sha256:<digest>`, with the image the notes of the release in the backup's name give, on `https://github.com/nickberardi/familyfi/releases/tag/v<version>`.
+4. `docker tag ghcr.io/nickberardi/familyfi@sha256:<digest> ghcr.io/nickberardi/familyfi:rollback`
+5. Set `FAMILYFI_UPDATE_TAG=rollback` in `.env`.
+6. `docker compose up -d app`
 
-A pinned image also holds back automatic updates (Maintenance reports **not installed**). Remove the line, or set it back to `latest` or `next`, once a release fixes the failure. Report the failure with the log. Without a backup, restore your own copy of the database and run the release it came from. `prisma migrate resolve` is only for someone who has found and fixed the cause by hand; it marks the migration done or rolled back and changes nothing else.
+GHCR has no `:rollback`, so Watchtower installs nothing while the household runs it (Maintenance reports **not installed**); from v0.39.0, Checkup also shows it as a problem. Set `FAMILYFI_UPDATE_TAG` back to `latest` or `next`, or remove the line, once a release fixes the failure. Report the failure with the log. Without a backup, restore your own copy of the database and run the release it came from. `prisma migrate resolve` is only for someone who has found and fixed the cause by hand; it marks the migration done or rolled back and changes nothing else.
 
 ## Releases
 
@@ -259,13 +263,15 @@ Create a **Pre-release** on GitHub for the intended commit on `main`, with a new
 
 ### Tracks
 
-A household follows one of two tracks, chosen by the tag in `FAMILYFI_IMAGE` ([setup](setup.md#docker-compose)):
+A household follows the tag `FAMILYFI_UPDATE_TAG` names in `.env` ([setup](setup.md#docker-compose)), for example `FAMILYFI_UPDATE_TAG=next`. Compose runs that tag, Watchtower pulls it, and the update check offers its releases:
 
-| Tag | Gets | Update check offers |
+| `FAMILYFI_UPDATE_TAG` | Gets | Update check offers |
 | --- | --- | --- |
-| `:latest` (default) | releases you have promoted | releases not marked Pre-release |
-| `:next` | every release, as soon as it is built | every release |
-| `:X.Y` | promoted releases of that line, for pinning | as `:latest` |
+| `latest`, blank or missing (default) | releases you have promoted | releases not marked Pre-release |
+| `next` | every release, as soon as it is built | every release |
+| `X.Y`, such as `0.38` | promoted releases of that line, for pinning | that line's releases not marked Pre-release |
+
+The update check reads any other value as `latest`, and Checkup shows a problem naming it. Compose still runs the tag it names, so one GHCR doesn't have, such as a typo, stops `docker compose up` until it is fixed.
 
 To promote a release, edit it on GitHub and change its label from Pre-release to None (or Latest, where GitHub offers it). [`.github/workflows/promote.yml`](../.github/workflows/promote.yml) runs on that change, takes the image its notes name and moves `:latest` and `:X.Y` to it; nothing is rebuilt, so `:latest` is exactly what ran on `:next`. It can be behind the newest Pre-release, never behind a release already promoted: that run fails and nothing moves. Don't delete a Pre-release to make a new release on its tag, since its notes hold the image. `workflow_dispatch` promotes a tag by hand with the workflow on `main`; the `released` trigger runs the workflow as it was at the release's tag, so only tags made after the workflow existed promote on their own. A release published as a full release straight away fires that trigger before its image is built; that run fails, so promote it by hand once the Release workflow finishes. Before the first promotion, `:latest` still runs the last build from before the two tracks, and households on it are offered Pre-releases they cannot install; promote the first release soon. No image is tagged with its version: each build is pushed by its digest, under no tag of its own, and a release's image is pinned by that digest in its notes.
 
@@ -289,7 +295,7 @@ It logs in to GHCR with `GHCR_TOKEN` (from the environment or a gitignored `.rel
 
 FamilyFi checks the published GitHub Releases for `nickberardi/familyfi` directly; GHCR tags and other registries are never used to decide whether an update exists. The running process checks immediately at startup and then once an hour, retaining the result only in its own memory. A restart therefore begins with an explicit `pending` status until its first check completes. While the app is open, the browser reads the cached health snapshot every five seconds while pending and every minute afterward; those reads do not trigger GitHub requests.
 
-Draft releases and malformed tags are ignored. Which releases are offered depends on the household's [track](#tracks), read from `FAMILYFI_IMAGE`: on `:next` every published release, on any other tag (or none) only releases not marked Pre-release. When it is newer than the running version, the sidebar shows an Update available alert whose Update button opens Settings' Maintenance tab, with the release's notes from GitHub, a link to the release and, with the updater set up, its Install button; the check is also exposed through `GET /api/v1/health`.
+Draft releases and malformed tags are ignored. Which releases are offered depends on the household's [track](#tracks), read from `FAMILYFI_UPDATE_TAG`: on `next` every published release, on a line such as `0.38` that line's releases not marked Pre-release, and on anything else (or nothing) only releases not marked Pre-release. When it is newer than the running version, the sidebar shows an Update available alert whose Update button opens Settings' Maintenance tab, with the release's notes from GitHub, a link to the release and, with the updater set up, its Install button; the check is also exposed through `GET /api/v1/health`.
 
 Allow outbound HTTPS from the app container to `api.github.com`. A GitHub timeout, rate limit, or other failure does not degrade FamilyFi readiness or enforcement, but health reports `update.status: error` and `update.available: null`; it is never presented as up to date. The release check sends no credentials and has a 10-second timeout.
 

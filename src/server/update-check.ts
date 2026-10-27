@@ -1,6 +1,7 @@
 import { APP_VERSION } from "@/lib/version";
 import type { UpdateCheck } from "@/lib/types";
 import { compareSemver, parseSemver, type Semver } from "@/lib/semver";
+import { updateTrackFor, type UpdateTrack } from "@/lib/update-track";
 import { unrefTimer } from "./unref-timer";
 
 export { compareSemver, parseSemver };
@@ -39,25 +40,19 @@ class GitHubHttpError extends Error {
   }
 }
 
-/**
- * Which releases a household is offered, from the tag of the image it runs (`FAMILYFI_IMAGE`,
- * which Compose passes in). `:next` follows every release, pre-releases included; any other tag,
- * a digest pin or no image at all follows `:latest`, which only releases that are not marked
- * Pre-release on GitHub reach (.github/workflows/promote.yml).
- */
-export type UpdateTrack = "latest" | "next";
+export type { UpdateTrack };
 
-export function updateTrack(image: string | undefined = process.env.FAMILYFI_IMAGE): UpdateTrack {
-  const name = (image ?? "").trim().split("@")[0].split("/").at(-1) ?? "";
-  const colon = name.lastIndexOf(":");
-  return colon >= 0 && name.slice(colon + 1) === "next" ? "next" : "latest";
+/** The household's track, from `FAMILYFI_UPDATE_TAG` (`src/lib/update-track.ts`). */
+export function updateTrack(tag: string | undefined = process.env.FAMILYFI_UPDATE_TAG): UpdateTrack {
+  return updateTrackFor(tag);
 }
 
 function releaseIsApplicable(release: GitHubRelease, track: UpdateTrack): Semver | null {
   if (release.draft === true || typeof release.tag_name !== "string") return null;
   const version = parseSemver(release.tag_name);
   if (!version) return null;
-  if (track === "latest" && release.prerelease === true) return null;
+  if (track !== "next" && release.prerelease === true) return null;
+  if (typeof track === "object" && (version.major !== track.major || version.minor !== track.minor)) return null;
   return version;
 }
 

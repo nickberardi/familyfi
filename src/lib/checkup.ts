@@ -15,6 +15,7 @@ import { FAMILYFI_POLICY_PREFIX } from "./policy-names";
 import type { HouseholdStore } from "./household-store";
 import type { IconName } from "./icons";
 import { ruleHref } from "./rule-list";
+import { knownUpdateTag } from "./update-track";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID, type Rule } from "./rules";
 
 export const CHECKUP_CHECKS = [
@@ -28,6 +29,7 @@ export const CHECKUP_CHECKS = [
   "dns_override",
   "smart_home_wifi",
   "unmanaged_networks",
+  "update_tag",
 ] as const;
 export type CheckupCheck = (typeof CHECKUP_CHECKS)[number];
 export type CheckupKind = "problem" | "note";
@@ -43,6 +45,7 @@ export const CHECK_KIND: Record<CheckupCheck, CheckupKind> = {
   dns_override: "note",
   smart_home_wifi: "note",
   unmanaged_networks: "note",
+  update_tag: "problem",
 };
 
 /** A device as the checks read it. `groupKind` is null while it is unassigned. */
@@ -165,6 +168,8 @@ export type CheckupInputs = {
   unrecordedPolicies: CheckupPolicy[] | null;
   /** FamilyFi's own policies someone changed in the UniFi console, one entry per policy. */
   drift: CheckupDrift[];
+  /** `FAMILYFI_UPDATE_TAG`, the tag this install runs and takes updates from. */
+  updateTag?: string;
 };
 
 export type CheckupRef = { id: string; name: string };
@@ -176,6 +181,8 @@ export type CheckupDetails = {
   wifis?: (CheckupRef & { settings: string[] })[];
   policies?: CheckupPolicy[];
   drift?: CheckupDrift;
+  /** The `FAMILYFI_UPDATE_TAG` FamilyFi does not know, for `update_tag`. */
+  updateTag?: string;
 };
 
 export type CheckupResult = {
@@ -415,6 +422,10 @@ export function runChecks(inputs: CheckupInputs): CheckupRun {
         ]
       : [],
   );
+
+  // An update tag FamilyFi doesn't know: updates follow latest until it is fixed.
+  const tag = inputs.updateTag?.trim() ?? "";
+  add("update_tag", knownUpdateTag(tag) ? [] : [{ key: "update_tag", check: "update_tag", details: { updateTag: tag }, subject: tag }]);
 
   return { findings, passed, skipped };
 }
@@ -661,6 +672,17 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
         fix: ["FamilyFi → Settings → Gateway → Edit connection → pick the networks → Save network selection."],
         show: { label: "Open Settings", href: "/settings?tab=gateway" },
       };
+    case "update_tag":
+      return {
+        icon: "warning",
+        title: "FamilyFi can’t follow your update setting",
+        seen: `FAMILYFI_UPDATE_TAG is “${finding.details.updateTag ?? ""}”, which isn’t latest, next or a version such as 0.38.`,
+        why: "Updates won’t install until it’s fixed. It’s probably a typo, or left over from going back to an earlier release.",
+        fix: [
+          "In the .env file next to docker-compose.yml, set FAMILYFI_UPDATE_TAG to latest, next, or a version such as 0.38, or remove the line to use latest.",
+          "Then run docker compose up -d in that folder.",
+        ],
+      };
   }
 }
 
@@ -894,5 +916,6 @@ export const CHECKUP_COPY = {
     dns_override: "Networks’ own DNS servers",
     smart_home_wifi: "Wi-Fi for smart-home devices",
     unmanaged_networks: "Networks FamilyFi doesn’t manage",
+    update_tag: "Update setting",
   } satisfies Record<CheckupCheck, string>,
 } as const;
