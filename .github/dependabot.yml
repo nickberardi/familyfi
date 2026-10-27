@@ -1,14 +1,35 @@
 version: 2
+# Each ecosystem's minor and patch updates arrive as one grouped PR a week, which
+# dependabot-auto-merge.yml merges once its required checks pass. A dependency joins the
+# first group it matches, so a major update falls through to the groups below it: packages
+# that must move in step (react with react-dom, prisma with its client, next with its lint
+# config) still share a PR, and every other major gets its own, for a person to review.
 updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: [minor, patch]
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+      next:
+        patterns: ["next", "eslint-config-next"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: "/docker"
     schedule:
       interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]

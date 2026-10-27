@@ -89,6 +89,7 @@ The workflows that run tests call `scripts/test.py`, so a local run is the CI ru
 | `container.yml` | Every release, or by hand | Image build, image hygiene, container smoke; the same helpers as `check container`, with the build action's layer cache |
 | `openapi.yml` | Pull requests that change `openapi/` | Version increase and breaking changes against `main`, with the helpers `check api-version` and `check api-breaking` call. Breaking changes require the operator's `breaking_api` label; never add it yourself. The version must satisfy the versioning rules either way |
 | `cloudflared.yml` | The 1st and 15th of each month, or by hand | `scripts/update-cloudflared.sh` pins the latest cloudflared release (both Linux hashes, checked against its release notes) and opens a PR when the pin changes. Runs no tests |
+| `dependabot-auto-merge.yml` | Dependabot pull requests | Runs no tests. Turns on auto-merge for minor and patch updates of npm packages and GitHub Actions, so GitHub squashes the PR once `main`'s required checks pass. Majors and Docker image updates wait for a person, since pull requests do not build the image. `.github/dependabot.yml` groups each ecosystem's minor and patch updates into one PR a week, and keeps packages that move in step (React, Prisma, Next.js) in one PR for a major too |
 | `mutation.yml` | Mondays, when `src/` or `tests/` changed that week, or by hand | `check mutation`. Reports only; the score and survivors are in the job summary and the `mutation-report` artifact |
 
 ### Running CI's jobs locally
