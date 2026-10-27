@@ -139,9 +139,8 @@ jobs:
     needs: ghcr
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
-    # Every tag publishes through the one :build tag and reads its digest back from it, so one at a
-    # time. scripts/release.sh reads its digest from its own build instead. GitHub keeps one waiting
-    # job per group, so a third release reaching here at once is cancelled: run its job again.
+    # Every tag publishes through the one :build tag, so one at a time. GitHub keeps one waiting job
+    # per group, so a third release reaching here at once is cancelled: run its job again.
     concurrency:
       group: release-manifest
       cancel-in-progress: false
@@ -182,9 +181,14 @@ jobs:
           else
             echo "::notice::$GITHUB_REF_NAME is older than $newest, so :next stays where it is."
           fi
-          docker buildx imagetools create "${tags[@]}" $(printf "$image@sha256:%s " *)
-          digest="$(docker buildx imagetools inspect "$image:build" --format '{{json .Manifest}}' | jq -r .digest)"
-          [[ "$digest" == sha256:* ]] || { echo "no digest for $image:build" >&2; exit 1; }
+          sources=$(printf "$image@sha256:%s " *)
+          # This build's digest from the list it pushes, not read back from :build, which another
+          # publish (scripts/release.sh's too) can move: --dry-run prints the bytes create pushes.
+          index="$(docker buildx imagetools create --dry-run "${tags[@]}" $sources)"
+          digest="sha256:$(printf '%s' "$index" | sha256sum | cut -d' ' -f1)"
+          docker buildx imagetools create "${tags[@]}" $sources
+          docker buildx imagetools inspect "$image@$digest" >/dev/null ||
+            { echo "::error::the list pushed for $GITHUB_REF_NAME is not $digest" >&2; exit 1; }
           echo "IMAGE_REF=$image@$digest" >> "$GITHUB_ENV"
       # The Release, created as a Pre-release, or the one made on GitHub that created this tag, with
       # the image named by digest. promote.yml reads it from there when the Release stops being a
