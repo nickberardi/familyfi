@@ -81,7 +81,7 @@ describe("the release version", () => {
     const epoch = "git log -1 --format=%ct -- docker/Dockerfile pnpm-lock.yaml";
     const script = read("scripts/release.sh");
     expect(script).toContain(`SOURCE_DATE_EPOCH="$(${epoch})"`);
-    expect(script).toContain("--output type=registry,rewrite-timestamp=true");
+    expect(script).toMatch(/--output "type=image,.*,push=true,rewrite-timestamp=true"/);
     const workflow = read(".github/workflows/release.yml");
     expect(workflow).toContain(`echo "SOURCE_DATE_EPOCH=$(${epoch})" >> "$GITHUB_ENV"`);
     expect(workflow).toMatch(/outputs: type=image,.*,rewrite-timestamp=true$/m);
@@ -274,5 +274,13 @@ describe("the :next and :latest tracks", () => {
     expect(promote).toContain('--tag "$image:latest" --tag "$image:${{ steps.plan.outputs.minor }}"');
     expect(read(".github/workflows/release.yml")).toContain("prerelease: true, generate_release_notes: true");
     expect(read("scripts/release.sh")).toContain('--title "$tag" --prerelease --generate-notes');
+  });
+
+  it("publishes a build by its digest, tagging nothing but :next", () => {
+    for (const file of [".github/workflows/release.yml", "scripts/release.sh"]) {
+      const tags = [...read(file).matchAll(/--tag "\$image([:@][^"]*)"/g)].map((match) => match[1]);
+      expect(new Set(tags), file).toEqual(new Set(file.endsWith(".yml") ? ["@$digest", ":next"] : [":next"]));
+    }
+    expect(read("scripts/release.sh")).toContain("push-by-digest=true");
   });
 });
