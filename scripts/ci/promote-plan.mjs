@@ -33,7 +33,9 @@ if (release.draft) fail(`${tag} is a draft. Publish it first.`);
 if (release.prerelease) fail(`${tag} is still a Pre-release. Edit it and set its label to None or Latest.`);
 
 const image = `ghcr.io/${repository.toLowerCase()}`;
-const pinned = new RegExp(`${image.replace(/[.\\/]/g, "\\$&")}@(sha256:[0-9a-f]{64})`).exec(release.body ?? "");
+const pinned = [...(release.body ?? "").matchAll(/(ghcr\.io\/[\w.\/-]+)@(sha256:[0-9a-f]{64})/g)].find(
+  (match) => match[1].toLowerCase() === image,
+);
 if (!pinned) {
   fail(
     `${tag}'s notes name no image (${image}@sha256:…), so there is nothing to promote. ` +
@@ -54,5 +56,5 @@ if (running && compareTags(running, version) > 0) {
   fail(`${tag} is older than ${current}, which :latest already runs, so :latest stays where it is.`);
 }
 
-console.log(`digest=${pinned[1]}`);
+console.log(`digest=${pinned[2]}`);
 console.log(`minor=${version.core.at(0)}.${version.core.at(1)}`);
