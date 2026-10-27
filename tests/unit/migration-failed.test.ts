@@ -59,7 +59,7 @@ describe("the entrypoint's help when a migration fails", () => {
       `  2. docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app ${newest}`,
     );
     // No image is tagged with its version: each release's notes name its image by digest.
-    expect(out).toContain("  3. Add FAMILYFI_IMAGE=ghcr.io/nickberardi/familyfi@sha256:<digest> to .env, the image the notes of");
+    expect(out).toContain("  3. Add FAMILYFI_IMAGE=ghcr.io/nickberardi/familyfi@sha256:<digest> to .env, or the image named in the notes of");
     expect(out).toContain("     https://github.com/nickberardi/familyfi/releases/tag/v0.34.0 name");
     expect(out).toContain("  4. docker compose up -d app");
   });

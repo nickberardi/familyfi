@@ -139,6 +139,11 @@ jobs:
     needs: ghcr
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
+    # Every tag publishes through the one :build tag and reads its digest back from it, so one at a
+    # time. scripts/release.sh reads its digest from its own build instead.
+    concurrency:
+      group: release-manifest
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
         with:

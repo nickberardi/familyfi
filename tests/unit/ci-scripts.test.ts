@@ -253,6 +253,13 @@ describe("the :next and :latest tracks", () => {
     expect(older.stderr).toContain("v0.37.0 is older than v0.38.0");
 
     expect(plan("v0.39.0", [built("v0.38.0", false)]).stderr).toContain("GitHub has no release for v0.39.0");
+
+    // Before the first promotion :latest runs a build no full release names.
+    const behind = node("scripts/ci/promote-plan.mjs", ["v0.37.1", "nickberardi/familyfi", "v0.38.0"], JSON.stringify([built("v0.37.1", false)]));
+    expect(behind.status).toBe(1);
+    expect(behind.stderr).toContain("v0.37.1 is older than v0.38.0, which :latest already runs");
+    const again = node("scripts/ci/promote-plan.mjs", ["v0.38.0", "nickberardi/familyfi", "v0.38.0"], JSON.stringify([built("v0.38.0", false)]));
+    expect(again.status).toBe(0);
   });
 
   it("is moved to :latest by promote.yml alone, and every release starts as a Pre-release", () => {
