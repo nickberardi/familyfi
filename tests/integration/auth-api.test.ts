@@ -69,7 +69,7 @@ describe("auth and accounts API", () => {
     });
 
     await refreshUpdateCheck({
-      fetchImpl: async () => new Response(JSON.stringify([{ tag_name: "v999.0.0", prerelease: true }])),
+      fetchImpl: async () => new Response(JSON.stringify([{ tag_name: "v999.0.0", prerelease: false }])),
       now: () => new Date("2026-09-22T12:00:00.000Z"),
     });
     const available = await getHealth(request("/api/v1/health"));

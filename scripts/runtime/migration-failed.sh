@@ -46,13 +46,15 @@ if [ -n "$backup" ]; then
   echo "release you were running, from the folder with your docker-compose.yml:"
   echo "  1. docker compose stop app"
   echo "  2. docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app $backup"
+  # Releases are published by digest; each one's notes name its image (release.yml).
+  echo "  3. Add FAMILYFI_IMAGE=$image@sha256:<digest> to .env, the image the notes of"
   if [ -n "$previous" ]; then
-    echo "  3. Add FAMILYFI_IMAGE=$image:v$previous to .env"
+    echo "     https://github.com/nickberardi/familyfi/releases/tag/v$previous name"
   else
-    echo "  3. Add FAMILYFI_IMAGE=$image:v<the release you were running> to .env"
+    echo "     the release you were running name (https://github.com/nickberardi/familyfi/releases)"
   fi
   echo "  4. docker compose up -d app"
-  echo "Step 3 also holds back automatic updates. Set it back to latest once a release fixes this."
+  echo "Step 3 also holds back automatic updates. Set it back to latest or next once a release fixes this."
 else
   echo "No backup from before this update is in $backups. Restore your own backup of the"
   echo "database, then run the release it came from (\"When an update fails\" in docs/operations.md)."

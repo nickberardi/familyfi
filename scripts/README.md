@@ -174,20 +174,20 @@ scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag
 | `--tag vX.Y.Z` | the release to publish; must start with `v` and must not exist on GitHub yet, unless `--force` |
 | `--skip-ci` | don't run the checks and tests first |
 | `--no-push` | build only: no GHCR login, no push, no GitHub Release |
-| `--force` | allow a tag that already exists on GitHub or locally, if it is `HEAD`: rebuild and push its images, overwriting them on GHCR, and create the GitHub Release only if it is missing. `X.Y` and `latest` move only when the tag is the newest release without a `-` |
+| `--force` | allow a tag that already exists on GitHub or locally, if it is `HEAD`: rebuild and push its image, create the GitHub Release if it is missing, and name the new image in its notes. `next` moves only when the tag is the newest |
 | `--allow-dirty` | allow uncommitted changes in the working tree; the build uses them |
 | `-h`, `--help` | print usage |
 
-- **Image tags** follow `release.yml`'s rules: `X.Y.Z`, plus `X.Y` and `latest` for a tag
-  without a pre-release `-`.
+- **Image tags** follow `release.yml`'s rules: `build` for every build and `next` for the
+  newest tag. The Release's notes name the image by digest. `latest` and `X.Y` move only when
+  the release is promoted ([tracks](../docs/operations.md#tracks)).
 - **Credentials:** `GHCR_TOKEN` from the environment or a gitignored `.release.env`, otherwise
   `gh auth token`, which needs the `write:packages` scope (`gh auth refresh -s write:packages`).
   The login lives in a temporary Docker config that is removed on exit, so it never joins your
   stored Docker credentials.
-- **Pre-release:** below 1.0 the Release is marked a pre-release, as every release so far has
-  been, and so is any tag with a `-`.
-- **No double publish:** the tag starts `release.yml`, whose `on-main` job finds this version's
-  images already on GHCR and skips everything after it, with a notice saying so. A Release
+- **Pre-release:** the Release is always a Pre-release; promoting it is a separate step.
+- **No double publish:** the tag starts `release.yml`, whose `on-main` job finds the image the
+  Release's notes name already on GHCR and skips everything after it, with a notice saying so. A Release
   created on GitHub, or a tag pushed any other way, has no images yet and builds through
   Actions as before.
 - **Emulation:** the architecture your machine isn't is built under emulation, which is slow.

@@ -25,25 +25,32 @@ jobs:
       - uses: ./.github/actions/runner-cleanup
       - name: Tag points at a commit on main
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
-      # scripts/release.sh pushes this version's images before it creates the Release that
-      # created this tag. A Release made on GitHub has no images yet, so it builds as always.
+      # scripts/release.sh pushes this version's image before it creates the Release that created
+      # this tag, and names it by digest in the Release's notes. A Release made on GitHub has no
+      # image yet, so it builds as always.
       - name: Published by scripts/release.sh
         id: local
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
           repo="$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          body="$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" | jq -r '.body // ""')" || body=""
+          digest="$(grep -oE "ghcr\.io/$repo@sha256:[0-9a-f]{64}" <<< "$body" | head -n 1 | cut -d@ -f2)" || digest=""
+          if [ -z "$digest" ]; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           token=$(curl -sf -u "$GITHUB_ACTOR:$GH_TOKEN" "https://ghcr.io/token?scope=repository:$repo:pull" | jq -r .token)
           code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" \
             -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
-            "https://ghcr.io/v2/$repo/manifests/$version")
+            "https://ghcr.io/v2/$repo/manifests/$digest")
           case "$code" in
             200)
-              echo "::notice::ghcr.io/$repo:$version is already published (scripts/release.sh), so this run builds nothing."
+              echo "::notice::$GITHUB_REF_NAME's image ghcr.io/$repo@$digest is already published (scripts/release.sh), so this run builds nothing."
               echo "published=true" >> "$GITHUB_OUTPUT" ;;
             404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
-            *) echo "GHCR answered $code for ghcr.io/$repo:$version" >&2; exit 1 ;;
+            *) echo "GHCR answered $code for ghcr.io/$repo@$digest" >&2; exit 1 ;;
           esac
 
   ci:
@@ -127,11 +134,20 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # Every release lands on :next as a Pre-release; only promote.yml moves :latest and :X.Y.
   manifest:
     needs: ghcr
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every tag, to tell whether this one is the newest.
+          fetch-depth: 0
+      - uses: ./.github/actions/runner-cleanup
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
       # imagetools needs no BuildKit container, so nothing is pulled while sibling jobs start.
       - uses: docker/setup-buildx-action@v4
         with:
@@ -146,28 +162,48 @@ jobs:
           path: ${{ runner.temp }}/digests
           pattern: digests-*
           merge-multiple: true
-      - name: Image metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY_IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+          image="$(echo "$REGISTRY_IMAGE" | tr '[:upper:]' '[:lower:]')"
+          # A multi-platform image is published under a tag. :build is that tag for every build and
+          # nobody runs it; the release's notes keep this build's digest after the next build moves it.
+          tags=(--tag "$image:build")
+          # A fix to an older line (v0.39.1 while :next has v0.40.0) must not move :next back to it.
+          newest="$(git -C "$GITHUB_WORKSPACE" tag -l 'v*' | node "$GITHUB_WORKSPACE/scripts/ci/newest-tag.mjs")"
+          if [ "$newest" = "$GITHUB_REF_NAME" ]; then
+            tags+=(--tag "$image:next")
+          else
+            echo "::notice::$GITHUB_REF_NAME is older than $newest, so :next stays where it is."
+          fi
+          docker buildx imagetools create "${tags[@]}" $(printf "$image@sha256:%s " *)
+          digest="$(docker buildx imagetools inspect "$image:build" --format '{{json .Manifest}}' | jq -r .digest)"
+          [[ "$digest" == sha256:* ]] || { echo "no digest for $image:build" >&2; exit 1; }
+          echo "IMAGE_REF=$image@$digest" >> "$GITHUB_ENV"
+      # The Release, created as a Pre-release, or the one made on GitHub that created this tag, with
+      # the image named by digest. promote.yml reads it from there when the Release stops being a
+      # Pre-release.
       - name: GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          body: |
-            Image: `ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}` (linux/amd64 and linux/arm64).
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # curl and jq rather than the GitHub CLI, which a self-hosted runner need not have.
+          api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
+          releases="https://api.github.com/repos/$GITHUB_REPOSITORY/releases"
+          header="Image: \`$IMAGE_REF\` (linux/amd64 and linux/arm64). Every release is on \`:next\` first; making it a full release moves \`:latest\` to it.
 
-            Licensed under the Business Source License 1.1. See LICENSE and docs/licensing.md.
+          Licensed under the Business Source License 1.1. See LICENSE and docs/licensing.md."
+          if existing="$(api "$releases/tags/$GITHUB_REF_NAME" 2>/dev/null)"; then
+            # Keep what is written there; replace an earlier build's lines.
+            body="$(jq -r '.body // ""' <<< "$existing" | sed -e '/^Image: `ghcr\.io\//d' -e '/^Licensed under the Business Source License/d' | sed '/./,$!d')"
+            jq -n --arg body "$header"$'\n\n'"$body" '{body: $body}' |
+              api -X PATCH --data @- "$releases/$(jq -r .id <<< "$existing")" >/dev/null
+          else
+            jq -n --arg tag "$GITHUB_REF_NAME" --arg body "$header" \
+              '{tag_name: $tag, name: $tag, body: $body, prerelease: true, generate_release_notes: true}' |
+              api -X POST --data @- "$releases" >/dev/null
+          fi
+          echo "::notice::$GITHUB_REF_NAME is $IMAGE_REF"
 
   # The image reports the tag's version whatever package.json says. When main's package.json
   # and OpenAPI info.version are behind a stable tag, open a PR that brings them up to it.

@@ -208,3 +208,64 @@ describe("scripts/ci/runner-cleanup.sh", () => {
     expect(dockerCalls(1, 80)).toContain("system prune --all --force --volumes");
   });
 });
+
+describe("the :next and :latest tracks", () => {
+  // Every release lands on :next as a Pre-release. Only promote.yml moves :latest, when a release
+  // stops being a Pre-release, to the image its notes name; and never back to an older release.
+  const node = (script: string, args: string[], input: string) =>
+    spawnSync(process.execPath, [path.join(repoRoot, script), ...args], { cwd: repoRoot, encoding: "utf8", input });
+  const digest = `sha256:${"a".repeat(64)}`;
+  const built = (tag: string, prerelease: boolean) => ({
+    tag_name: tag,
+    prerelease,
+    draft: false,
+    body: `Image: \`ghcr.io/nickberardi/familyfi@${digest}\` (linux/amd64 and linux/arm64).\n\n## What's Changed`,
+  });
+  const plan = (tag: string, releases: unknown[]) =>
+    node("scripts/ci/promote-plan.mjs", [tag, "nickberardi/FamilyFi"], JSON.stringify(releases));
+
+  it("moves :next only to the newest tag, in SemVer order", () => {
+    const newest = (tags: string[]) => node("scripts/ci/newest-tag.mjs", [], tags.join("\n")).stdout.trim();
+    expect(newest(["v0.40.0", "v0.39.1", "v0.9.0", "build"])).toBe("v0.40.0");
+    expect(newest(["v1.0.0-rc.2", "v1.0.0", "v1.0.0-rc.10"])).toBe("v1.0.0");
+    expect(newest(["v1.0.0-rc.2", "v1.0.0-rc.10", "v0.99.0"])).toBe("v1.0.0-rc.10");
+    expect(newest(["v0.10.0", "v0.9.9"])).toBe("v0.10.0");
+  });
+
+  it("promotes a full release by the digest in its notes, even behind the newest Pre-release", () => {
+    const result = plan("v0.38.0", [built("v0.40.0", true), built("v0.38.0", false), built("v0.37.0", false)]);
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe(`digest=${digest}\nminor=0.38\n`);
+  });
+
+  it("refuses a Pre-release, a release whose notes name no image, and one older than a full release", () => {
+    const pre = plan("v0.40.0", [built("v0.40.0", true)]);
+    expect(pre.status).toBe(1);
+    expect(pre.stderr).toContain("v0.40.0 is still a Pre-release");
+
+    const unnamed = plan("v0.38.0", [{ ...built("v0.38.0", false), body: "Image: `ghcr.io/nickberardi/familyfi:0.38.0`" }]);
+    expect(unnamed.status).toBe(1);
+    expect(unnamed.stderr).toContain("v0.38.0's notes name no image");
+
+    const older = plan("v0.37.0", [built("v0.38.0", false), built("v0.37.0", false)]);
+    expect(older.status).toBe(1);
+    expect(older.stderr).toContain("v0.37.0 is older than v0.38.0");
+
+    expect(plan("v0.39.0", [built("v0.38.0", false)]).stderr).toContain("GitHub has no release for v0.39.0");
+  });
+
+  it("is moved to :latest by promote.yml alone, and every release starts as a Pre-release", () => {
+    const latest = /:latest\b/;
+    const pushes = (text: string) => text.split("\n").filter((line) => /--tag\b|-t\b/.test(line) && latest.test(line));
+    for (const file of [...workflows.filter((f) => !f.endsWith("promote.yml")), "scripts/release.sh"]) {
+      expect(pushes(read(file)), file).toEqual([]);
+      expect(read(file), file).not.toMatch(/type=raw,value=latest|image:latest"/);
+    }
+    const promote = read(".github/workflows/promote.yml");
+    expect(promote).toMatch(/^on:\n {2}release:\n {4}types: \[released\]$/m);
+    expect(promote).toContain('--tag "$image:latest" --tag "$image:${{ steps.plan.outputs.minor }}"');
+    expect(read(".github/workflows/release.yml")).toContain("prerelease: true, generate_release_notes: true");
+    expect(read("scripts/release.sh")).toContain('--title "$tag" --prerelease --generate-notes');
+  });
+});

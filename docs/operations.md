@@ -246,38 +246,50 @@ When a release's migrations fail, FamilyFi doesn't start, and every restart fail
 
 1. `docker compose stop app`
 2. Restore the backup the updater took before installing this release, while this release's image is still the one Compose runs (older images have no restore script): `docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app /var/lib/familyfi/data/backups/familyfi-v<version>-<time>.dump`. `docker compose run --rm --no-deps --entrypoint ls app /var/lib/familyfi/data/backups` lists them.
-3. Add `FAMILYFI_IMAGE=ghcr.io/nickberardi/familyfi:v<version>` to `.env`, the version in the backup's name.
+3. Add `FAMILYFI_IMAGE=ghcr.io/nickberardi/familyfi@sha256:<digest>` to `.env`: the image the notes of the release in the backup's name give, on `https://github.com/nickberardi/familyfi/releases/tag/v<version>`.
 4. `docker compose up -d app`
 
-A pinned version also holds back automatic updates (Maintenance reports **not installed**). Remove the line, or set it back to `latest`, once a release fixes the failure. Report the failure with the log. Without a backup, restore your own copy of the database and run the release it came from. `prisma migrate resolve` is only for someone who has found and fixed the cause by hand; it marks the migration done or rolled back and changes nothing else.
+A pinned image also holds back automatic updates (Maintenance reports **not installed**). Remove the line, or set it back to `latest` or `next`, once a release fixes the failure. Report the failure with the log. Without a backup, restore your own copy of the database and run the release it came from. `prisma migrate resolve` is only for someone who has found and fixed the cause by hand; it marks the migration done or rolled back and changes nothing else.
 
 ## Releases
 
 Publishing requires the operator's request. The release tag is `v` followed by the full `MAJOR.MINOR.PATCH` version, normally the one already in `package.json` and `openapi/familyfi.v1.yaml`. Never copy an old version from a documentation example.
 
-For a tag-based release, create and push an annotated tag on the intended commit on `main`. Pushing `v*` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml). For an unpublished image tag, it requires CI and container smoke, builds `linux/amd64` and `linux/arm64` images at `ghcr.io/nickberardi/familyfi`, and creates a GitHub Release with generated notes. Stable tags publish the full version, its major/minor tag and `latest`. If the image tag already exists, the workflow assumes local publication and skips these jobs; image existence alone does not prove checks passed.
+Create a **Pre-release** on GitHub for the intended commit on `main`, with a new tag or one already pushed; pushing a `v*` tag on its own works too. The tag runs [`.github/workflows/release.yml`](../.github/workflows/release.yml), which requires CI and container smoke, builds `linux/amd64` and `linux/arm64` images at `ghcr.io/nickberardi/familyfi`, and moves `:next` to them, unless a newer tag exists already. It names the image by digest at the top of the release's notes, creating the release as a Pre-release with generated notes when there is none. If the notes already name an image GHCR has, the workflow assumes local publication and skips these jobs; that alone does not prove checks passed.
+
+### Tracks
+
+A household follows one of two tracks, chosen by the tag in `FAMILYFI_IMAGE` ([setup](setup.md#docker-compose)):
+
+| Tag | Gets | Update check offers |
+| --- | --- | --- |
+| `:latest` (default) | releases you have promoted | releases not marked Pre-release |
+| `:next` | every release, as soon as it is built | every release |
+| `:X.Y` | promoted releases of that line, for pinning | as `:latest` |
+
+To promote a release, edit it on GitHub and change its label from Pre-release to None (or Latest, where GitHub offers it). [`.github/workflows/promote.yml`](../.github/workflows/promote.yml) runs on that change, takes the image its notes name and moves `:latest` and `:X.Y` to it; nothing is rebuilt, so `:latest` is exactly what ran on `:next`. It can be behind the newest Pre-release, never behind a release already promoted: that run fails and nothing moves. Don't delete a Pre-release to make a new release on its tag, since its notes hold the image. `workflow_dispatch` promotes a tag by hand. No image is tagged with its version: `:build`, which every build overwrites, is only where a build is published, and a release's image is pinned by the digest in its notes.
+
+Moving a household from `next` to `latest` while `latest` is behind runs an older release on a newer database, which it cannot use; wait until `latest` reaches the release the household runs.
 
 Both release paths pass the tag's version into the image build (`APP_VERSION` in `docker/Dockerfile`), so Settings, the sign-in screen, `GET /api/v1/health` and the update check report the image's own tag even when `package.json` lags behind it. When a stable tag is newer than `main`'s `package.json`, `release.yml`'s `version-pr` job opens a PR that bumps `package.json` and `openapi/familyfi.v1.yaml` `info.version` to it; merge it after the release. A PR opened with the workflow's own token starts no checks, so the job uses the `RELEASE_PR_TOKEN` secret (contents and pull requests: write) when it exists; without it, the repository setting that allows GitHub Actions to create pull requests must be on, or the job fails after the release is published. Bumping both before tagging still works and opens no PR. `tests/unit/version.test.ts` fails the build when the two drift apart. `cloudflared.yml`, which opens a PR bumping the image's cloudflared on the 1st and 15th of each month, uses the same token and needs the same setting without it.
 
 Release notes say whether anyone checked a block on a real gateway since the last release. Nothing in CI proves enforcement ([testing.md](testing.md#what-no-test-proves)), so a release that changes how FamilyFi writes policies says so plainly.
 
-Releases below 1.0 should be marked **pre-release** on GitHub. The workflow does not set that flag, so the operator must mark it after creation. The local release script sets it automatically.
-
 ### Local release
 
-`scripts/release.sh` publishes a release from your machine, without the runners: it checks that `HEAD` is on `origin/main`, runs the checks and tests of `ci.yml`'s verify job and `container.yml` through `scripts/test.py`, builds and pushes both architectures to GHCR with the same tags, and creates the GitHub Release, marked a pre-release below 1.0.
+`scripts/release.sh` publishes a release from your machine, without the runners: it checks that `HEAD` is on `origin/main`, runs the checks and tests of `ci.yml`'s verify job and `container.yml` through `scripts/test.py`, builds and pushes both architectures to GHCR with the same tags, and creates the GitHub Release as a Pre-release naming the image by digest. It never promotes.
 
 ```bash
 scripts/release.sh --tag vX.Y.Z  # replace with the matching package/spec version
 ```
 
-It logs in to GHCR with `GHCR_TOKEN` (from the environment or a gitignored `.release.env`), or with `gh auth token` once `gh auth refresh -s write:packages` has granted that scope. Creating the Release creates the tag, which starts `release.yml`; its `on-main` job finds the version's images already on GHCR and skips the rest. To rebuild and push the images of a release that already exists, check out its tag and add `--force`. Options and details are in [`scripts/README.md`](../scripts/README.md#releasesh).
+It logs in to GHCR with `GHCR_TOKEN` (from the environment or a gitignored `.release.env`), or with `gh auth token` once `gh auth refresh -s write:packages` has granted that scope. Creating the Release creates the tag, which starts `release.yml`; its `on-main` job finds the image the notes name already on GHCR and skips the rest. To rebuild and push the image of a release that already exists, check out its tag and add `--force`; the release's notes then name the new image. Options and details are in [`scripts/README.md`](../scripts/README.md#releasesh).
 
 ### Update availability
 
 FamilyFi checks the published GitHub Releases for `nickberardi/familyfi` directly; GHCR tags and other registries are never used to decide whether an update exists. The running process checks immediately at startup and then once an hour, retaining the result only in its own memory. A restart therefore begins with an explicit `pending` status until its first check completes. While the app is open, the browser reads the cached health snapshot every five seconds while pending and every minute afterward; those reads do not trigger GitHub requests.
 
-Draft releases and malformed tags are ignored. While the running version is below `1.0.0`, published prereleases are eligible because FamilyFi's current release stream uses them. At `1.0.0` and later, only stable releases are offered. When it is newer than the running version, the sidebar shows an Update available alert whose Update button opens Settings' Maintenance tab, with the release's notes from GitHub, a link to the release and, with the updater set up, its Install button; the check is also exposed through `GET /api/v1/health`.
+Draft releases and malformed tags are ignored. Which releases are offered depends on the household's [track](#tracks), read from `FAMILYFI_IMAGE`: on `:next` every published release, on any other tag (or none) only releases not marked Pre-release. When it is newer than the running version, the sidebar shows an Update available alert whose Update button opens Settings' Maintenance tab, with the release's notes from GitHub, a link to the release and, with the updater set up, its Install button; the check is also exposed through `GET /api/v1/health`.
 
 Allow outbound HTTPS from the app container to `api.github.com`. A GitHub timeout, rate limit, or other failure does not degrade FamilyFi readiness or enforcement, but health reports `update.status: error` and `update.available: null`; it is never presented as up to date. The release check sends no credentials and has a 10-second timeout.
 
