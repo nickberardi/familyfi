@@ -175,7 +175,7 @@ export type CardMarks = ReturnType<typeof cardMarks>;
 /** The "More" mark's words. */
 export function moreMarkLabels(more: boolean, total: number, hidden: number) {
   return {
-    accessibilityLabel: more ? "Show fewer categories" : `Show all ${total} categories`,
+    accessibilityLabel: more ? "Show fewer categories" : `${hidden} more, show all ${total} categories`,
     badge: more ? "–" : `+${hidden}`,
     word: more ? "Fewer" : "More",
   };

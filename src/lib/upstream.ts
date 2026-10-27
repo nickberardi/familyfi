@@ -389,11 +389,11 @@ export function categoryMarkLabel(label: string, state: CategoryMarkState): stri
     case "rule":
       return `${label} blocked by FamilyFi`;
     case "blocked":
-      return `${label} already blocked by DNS`;
+      return `${label} blocked by DNS`;
     case "partial":
-      return `${label} partially blocked by DNS`;
+      return `${label} partial, some sites blocked by DNS`;
     case "open":
-      return `${label} not blocked`;
+      return `${label} open, not blocked`;
     default:
       return `${label} not blocked by FamilyFi`;
   }

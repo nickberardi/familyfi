@@ -138,9 +138,9 @@ describe("category mark state", () => {
     expect(categoryMarkWord("unknown")).toBe("");
 
     expect(categoryMarkLabel("Video", "rule")).toBe("Video blocked by FamilyFi");
-    expect(categoryMarkLabel("Video", "blocked")).toBe("Video already blocked by DNS");
-    expect(categoryMarkLabel("Video", "partial")).toBe("Video partially blocked by DNS");
-    expect(categoryMarkLabel("Video", "open")).toBe("Video not blocked");
+    expect(categoryMarkLabel("Video", "blocked")).toBe("Video blocked by DNS");
+    expect(categoryMarkLabel("Video", "partial")).toBe("Video partial, some sites blocked by DNS");
+    expect(categoryMarkLabel("Video", "open")).toBe("Video open, not blocked");
     expect(categoryMarkLabel("Video", "unknown")).toBe("Video not blocked by FamilyFi");
   });
 

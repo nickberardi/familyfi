@@ -135,7 +135,7 @@ function DevicesBody() {
                     key={device.mac}
                     className="ff-device-grid grid items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 hover:bg-[var(--ff-field-soft)]"
                   >
-                    <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="flex min-w-0 items-center gap-2.5" aria-label={`View details for ${name}`}>
+                    <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="flex min-w-0 items-center gap-2.5">
                       <DeviceMark hostname={device.hostname} />
                       <DeviceIdentity
                         device={device}
