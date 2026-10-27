@@ -32,6 +32,4 @@ jobs:
       - name: Image hygiene
         run: sh scripts/ci/check-image.sh familyfi:ci
       - name: Container smoke
-        env:
-          FAMILYFI_IMAGE: familyfi:ci
-        run: sh scripts/ci/container-smoke.sh
+        run: sh scripts/ci/container-smoke.sh familyfi:ci

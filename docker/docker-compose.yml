@@ -19,7 +19,8 @@ services:
       start_period: 10s
 
   app:
-    image: ${FAMILYFI_IMAGE:-ghcr.io/nickberardi/familyfi:latest}
+    # FAMILYFI_UPDATE_TAG picks the tag Watchtower follows: latest, next or a line like 0.38 (docs/setup.md).
+    image: ghcr.io/nickberardi/familyfi:${FAMILYFI_UPDATE_TAG:-latest}
     container_name: ${APP_CONTAINER_NAME:-familyfi-app}
     restart: unless-stopped
     environment:
@@ -39,9 +40,9 @@ services:
       FAMILYFI_REMOTE_ACCESS_PORT: ${FAMILYFI_REMOTE_ACCESS_PORT:-7002}
       # Reverse proxies in front of the web port whose X-Forwarded-For sign-in throttling believes (docs/setup.md).
       FAMILYFI_TRUSTED_PROXIES: ${FAMILYFI_TRUSTED_PROXIES:-}
-      # The image above, so the update check offers the releases of its track: `:next` every release,
-      # any other tag only releases promoted to `:latest` (docs/setup.md).
-      FAMILYFI_IMAGE: ${FAMILYFI_IMAGE:-ghcr.io/nickberardi/familyfi:latest}
+      # The tag above, so the update check offers the releases of its track: `next` every release, a line
+      # like `0.38` that line's promoted releases, anything else those promoted to `:latest` (docs/setup.md).
+      FAMILYFI_UPDATE_TAG: ${FAMILYFI_UPDATE_TAG:-latest}
     labels:
       # Watchtower updates this container and no other, after backing up the database. A failed
       # backup exits 75, which makes Watchtower skip the update.

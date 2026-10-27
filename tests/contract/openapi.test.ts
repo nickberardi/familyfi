@@ -53,6 +53,7 @@ describe("openapi contract", () => {
       "CheckupFinding.details.wifis", // only for a check about Wi-Fi
       "CheckupFinding.details.policies", // only for leftover policies
       "CheckupFinding.details.policies.copyOf", // only for an old copy of one of FamilyFi's own
+      "CheckupFinding.details.updateTag", // only for an update tag FamilyFi does not know
       "CheckupFinding.details.drift", // only for a rule changed in UniFi
       "CheckupFinding.details.drift.group", // only for a group's pause
       "CheckupFinding.details.drift.changes.familyfi", // every change but `other`

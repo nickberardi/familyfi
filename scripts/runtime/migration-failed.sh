@@ -46,15 +46,18 @@ if [ -n "$backup" ]; then
   echo "release you were running, from the folder with your docker-compose.yml:"
   echo "  1. docker compose stop app"
   echo "  2. docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-database.sh app $backup"
-  # Releases are published by digest; each one's notes name its image (release.yml).
-  echo "  3. Add FAMILYFI_IMAGE=$image@sha256:<digest> to .env, or the image named in the notes of"
+  # Releases are published by digest; each one's notes name its image (release.yml). A local tag
+  # GHCR doesn't have keeps Watchtower from installing anything until it is set back.
+  echo "  3. docker pull $image@sha256:<digest>, with the image named in the notes of"
   if [ -n "$previous" ]; then
-    echo "     https://github.com/nickberardi/familyfi/releases/tag/v$previous name"
+    echo "     https://github.com/nickberardi/familyfi/releases/tag/v$previous"
   else
-    echo "     the release you were running name (https://github.com/nickberardi/familyfi/releases)"
+    echo "     the release you were running (https://github.com/nickberardi/familyfi/releases)"
   fi
-  echo "  4. docker compose up -d app"
-  echo "Step 3 also holds back automatic updates. Set it back to latest or next once a release fixes this."
+  echo "  4. docker tag $image@sha256:<digest> $image:rollback"
+  echo "  5. Set FAMILYFI_UPDATE_TAG=rollback in .env"
+  echo "  6. docker compose up -d app"
+  echo "Step 5 also holds back automatic updates. Set it back to latest or next once a release fixes this."
 else
   echo "No backup from before this update is in $backups. Restore your own backup of the"
   echo "database, then run the release it came from (\"When an update fails\" in docs/operations.md)."

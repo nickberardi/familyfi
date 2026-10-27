@@ -1,6 +1,5 @@
 SHELL := /bin/bash
 PNPM ?= npx --yes pnpm@10.15.1
-FAMILYFI_IMAGE ?= ghcr.io/nickberardi/familyfi:latest
 COMPOSE := docker compose -p familyfi --env-file .env -f docker/docker-compose.yml
 WITH_ENV := node scripts/runtime/with-env.mjs
 # Tests and checks run through one harness; these targets are aliases for it (scripts/README.md).
@@ -93,12 +92,12 @@ docker-build:
 docker-dev-up:
 	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set POSTGRES_PASSWORD"; fi
 	node scripts/runtime/validate-env.mjs
-	FAMILYFI_IMAGE=familyfi:dev $(COMPOSE) -f docker/docker-compose.dev.yml up -d --build
+	$(COMPOSE) -f docker/docker-compose.dev.yml up -d --build
 
 docker-up:
 	@if [ ! -f .env ]; then cp .env.example .env; echo "wrote .env — set POSTGRES_PASSWORD"; fi
 	node scripts/runtime/validate-env.mjs
-	FAMILYFI_IMAGE=$(FAMILYFI_IMAGE) $(COMPOSE) up -d
+	$(COMPOSE) up -d
 
 docker-down:
 	$(COMPOSE) down
@@ -108,8 +107,8 @@ docker-logs:
 
 docker-smoke:
 	$(MAKE) docker-build
-	FAMILYFI_IMAGE=familyfi:dev sh scripts/ci/check-image.sh familyfi:dev
-	FAMILYFI_IMAGE=familyfi:dev sh scripts/ci/container-smoke.sh
+	sh scripts/ci/check-image.sh familyfi:dev
+	sh scripts/ci/container-smoke.sh familyfi:dev
 
 db-dev:
 	docker compose -p familyfi --env-file .env -f docker/docker-compose.dev-db.yml up -d --wait

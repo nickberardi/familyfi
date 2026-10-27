@@ -124,6 +124,7 @@ async function readInputs(household: Household, client: UnifiClient, siteId: str
     wifis: await readWifis(client, siteId, fallbackNetwork),
     unrecordedPolicies: await readUnrecordedPolicies(household, client, siteId, zones),
     drift: await readDrift(),
+    updateTag: process.env.FAMILYFI_UPDATE_TAG,
   };
 }
 

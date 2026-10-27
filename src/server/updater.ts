@@ -172,7 +172,7 @@ export function updateOutcome(input: {
     }
     return {
       status: "unchanged",
-      error: "Watchtower found no newer image for the tag FamilyFi runs. If FAMILYFI_IMAGE pins a version, change it to install a newer one.",
+      error: "Watchtower found no newer image for the tag FamilyFi runs. If FAMILYFI_UPDATE_TAG names a version such as 0.38, set it to latest or next to install a newer one.",
     };
   }
   if (input.now.getTime() - input.requestedAt.getTime() > UPDATE_RUN_TIMEOUT_MS) {

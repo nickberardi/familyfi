@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.38.0
+  version: 0.39.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -3132,7 +3132,7 @@ components:
             `requested` until the outcome is known. `succeeded`: the new release is running. `failed`: Watchtower
             did not replace the container (the backup before installing failed, or the replacement did), could not
             be reached, or reported nothing within 30 minutes. `skipped`: Watchtower skipped it for a reason of its
-            own. `unchanged`: no newer image under the tag FamilyFi runs, as when `FAMILYFI_IMAGE` pins a version.
+            own. `unchanged`: no newer image under the tag FamilyFi runs, as when `FAMILYFI_UPDATE_TAG` names a version line such as `0.38`.
         requestedAt: { type: string, format: date-time }
         error: { type: [string, "null"], description: "Why it did not succeed, for the operator." }
     UpdateSettings:
@@ -4251,7 +4251,7 @@ components:
         text: { type: string, description: "The message in short English, for a client without copy for `key`." }
     CheckupCheck:
       type: string
-      x-extensible-enum: [leftover_policies, gateway_drift, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks]
+      x-extensible-enum: [leftover_policies, gateway_drift, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks, update_tag]
       description: |
         One check. New checks are added over time without a breaking change: a client that does not
         know a value shows the finding's `message` and asks to update the app, and ignores the value
@@ -4268,7 +4268,8 @@ components:
         printers, on another network from the phones with mDNS forwarding off. dns_override: a
         managed network's DHCP hands out its own DNS server. smart_home_wifi: Things devices' Wi-Fi
         has no 2.4 GHz or is WPA3 only. unmanaged_networks: networks FamilyFi does not manage that
-        have devices.
+        have devices. update_tag: `FAMILYFI_UPDATE_TAG` is set to a value FamilyFi does not know
+        (not `latest`, `next` or a line such as `0.38`), so updates follow `latest`.
     CheckupFinding:
       type: object
       additionalProperties: false
@@ -4388,6 +4389,7 @@ components:
                           - { type: array, items: { type: string } }
                 seenAt: { type: string, format: date-time, description: When sync last found it changed }
                 putBack: { type: boolean, description: "Whether FamilyFi has changed it back; false while that fails" }
+            updateTag: { type: string, description: "For `update_tag`, the `FAMILYFI_UPDATE_TAG` FamilyFi does not know." }
         firstSeenAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
         dismissed:

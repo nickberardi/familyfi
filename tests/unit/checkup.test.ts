@@ -79,7 +79,7 @@ describe("network checkup", () => {
     const run = runChecks(inputs());
     expect(run.findings).toEqual([]);
     expect(run.skipped).toEqual([]);
-    expect(run.passed).toHaveLength(10);
+    expect(run.passed).toHaveLength(11);
   });
 
   it("finds leftover policies by FamilyFi's prefix only, and skips the check when policies could not be read", () => {
@@ -236,6 +236,18 @@ describe("network checkup", () => {
     expect(PRIVATE_ADDRESS_COPY.iphone.steps).toMatch(/Private Wi-Fi Address → Off\.$/);
     // Settings opens on Household; the managed networks are on the Gateway tab.
     expect(checkupCopy({ check: "unmanaged_networks", details: finding!.details }).show?.href).toBe("/settings?tab=gateway");
+  });
+
+  it("flags an update tag FamilyFi doesn't know, and passes latest, next, a line or none", () => {
+    for (const updateTag of [undefined, "", "latest", "next", "0.38"]) {
+      const run = runChecks(inputs({ updateTag }));
+      expect(found(run, "update_tag"), String(updateTag)).toEqual([]);
+      expect(run.passed).toContain("update_tag");
+    }
+    const [finding] = found(runChecks(inputs({ updateTag: " nxt " })), "update_tag");
+    expect(finding).toMatchObject({ key: "update_tag", details: { updateTag: "nxt" }, subject: "nxt" });
+    expect(checkupCopy({ check: "update_tag", details: finding!.details }).seen).toBe("FAMILYFI_UPDATE_TAG is “nxt”, which isn’t latest, next or a version such as 0.38.");
+    expect(checkupMessage(finding!)).toEqual({ key: "checkup.update_tag", text: "FamilyFi can’t follow your update setting" });
   });
 
   it("changes a finding's subject when what was seen changes, and keeps it when it does not", () => {

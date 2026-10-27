@@ -44,7 +44,7 @@ Read by `docker/docker-compose.yml` (and `docker-compose.dev-db.yml`), not by th
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `FAMILYFI_PORT` | `7001` | The host port `make docker-up` publishes. |
-| `FAMILYFI_IMAGE` | `ghcr.io/nickberardi/familyfi:latest` | The image `make docker-up` runs, and its track: `:latest` gets releases once they are promoted, `:next` every release as soon as it is built ([tracks](operations.md#tracks)). Compose passes it into the app too, so the update check offers that track's releases. |
+| `FAMILYFI_UPDATE_TAG` | `latest` | The tag of `ghcr.io/nickberardi/familyfi` the app runs and Watchtower follows: `latest` gets releases once they are promoted, `next` every release as soon as it is built, a line such as `0.38` that line's promoted releases ([tracks](operations.md#tracks)). Compose passes it into the app too, so the update check offers that tag's releases. The update check reads blank, missing or any other value as `latest`, and Checkup flags a value it doesn't know. |
 | `APP_CONTAINER_NAME`, `POSTGRES_CONTAINER_NAME`, `WATCHTOWER_CONTAINER_NAME` | `familyfi-app`, `familyfi-postgres`, `familyfi-watchtower` | Container names. |
 | `APP_DATA_VOLUME_NAME`, `POSTGRES_VOLUME_NAME`, `UPDATER_VOLUME_NAME` | `familyfi-app_data`, `familyfi-postgres_data` (`familyfi-dev-postgres_data` for the dev database), `familyfi-updater_data` | Volume names. The updater volume holds only the token FamilyFi and Watchtower share. |
 | `POSTGRES_DATA_PATH` | `/var/lib/postgresql` | Where the PostgreSQL volume mounts. |
@@ -194,9 +194,10 @@ Before it replaces the app, Watchtower runs the app's pre-update hook,
 Watchtower skips the update, so FamilyFi keeps running the release it has; Watchtower's history counts
 that as a failure, which the Maintenance tab reports.
 
-Watchtower pulls the tag the app runs, so `FAMILYFI_IMAGE` must name a moving tag (`latest`, the
-default, or `next`) for an install to change anything; an image pinned by digest reports **not
-installed** on the Maintenance tab, and `:X.Y` installs only promoted releases of that line. A container created outside this Compose file can use the same sidecar: give it the labels and
+Watchtower pulls the tag the app runs, `FAMILYFI_UPDATE_TAG` (`latest`, the default, `next` or a line
+such as `0.38`, which installs only promoted releases of that line). A tag only this machine has, such
+as the `rollback` one from [when an update fails](operations.md#when-an-update-fails), reports **not
+installed** on the Maintenance tab. A container created outside this Compose file can use the same sidecar: give it the labels and
 the updater volume of the `app` service, give Watchtower the volume read-only, and set
 `FAMILYFI_UPDATER_URL` to where Watchtower answers.
 

@@ -98,7 +98,7 @@ describe("network checkup", () => {
     expect(state.error).toBeNull();
     expect(checks(state)).toEqual(["leftover_policies", "private_addresses", "wifi_multicast", "sonos_mdns", "sonos_mixed", "casting_mdns", "dns_override"]);
     // Nothing is in a Things group yet, so no Wi-Fi carries smart-home devices.
-    expect(state.passed).toEqual(["gateway_drift", "smart_home_wifi", "unmanaged_networks"]);
+    expect(state.passed).toEqual(["gateway_drift", "smart_home_wifi", "unmanaged_networks", "update_tag"]);
     const privates = state.findings.find((finding) => finding.check === "private_addresses")!;
     expect(privates.details.devices?.map((device) => device.name)).toEqual(["Galaxy S24", "Melinda's iPhone"]);
     // Every finding carries its words, for an app too old to know its check.
