@@ -18,11 +18,11 @@
 #   -h, --help      print this help
 #
 # Steps, as in release.yml: HEAD must be on origin/main; CI passes; one buildx build for
-# linux/amd64 and linux/arm64 pushes ghcr.io/<owner>/familyfi:build and, for the newest tag,
-# :next; then a Pre-release with generated notes that name the image by digest, which creates
-# the tag on GitHub at HEAD. Making it a full release later moves :latest and :X.Y to that
-# image (.github/workflows/promote.yml); this script never does. The architecture this machine
-# isn't is built under emulation, which takes a while.
+# linux/amd64 and linux/arm64 pushes ghcr.io/<owner>/familyfi by digest, under no tag of its own,
+# and moves :next to it for the newest tag; then a Pre-release with generated notes that name the
+# image by digest, which creates the tag on GitHub at HEAD. Making it a full release later moves
+# :latest and :X.Y to that image (.github/workflows/promote.yml); this script never does. The
+# architecture this machine isn't is built under emulation, which takes a while.
 #
 # The image reports the tag's version, whatever package.json says (docker/Dockerfile).
 # Creating the tag starts release.yml, which finds the image its notes name on GHCR and skips
@@ -131,21 +131,19 @@ if ((push)); then
   unset token
 fi
 
-# The ghcr and manifest jobs, as one multi-platform build. :build is the tag every build is
-# published under; the Release's notes keep this build's digest after the next one moves it.
-tags=(--tag "$image:build")
-if [[ "$tag" == "$newest" ]]; then
-  tags+=(--tag "$image:next")
-else
-  echo "==> $tag is older than $newest; :next is left as it is"
-fi
+# The ghcr and manifest jobs, as one multi-platform build pushed by its digest, under no tag of
+# its own: the Release's notes name it, and promote.yml reads it from there.
 # As release.yml: file times clamped to when the Dockerfile or lockfile last changed, so unchanged
 # layers keep their digests and an update downloads only what changed.
 SOURCE_DATE_EPOCH="$(git log -1 --format=%ct -- docker/Dockerfile pnpm-lock.yaml)"
 export SOURCE_DATE_EPOCH
-if ((push)); then output=(--output type=registry,rewrite-timestamp=true); else output=(--output type=cacheonly); fi
+if ((push)); then
+  output=(--output "type=image,name=$image,push-by-digest=true,name-canonical=true,push=true,rewrite-timestamp=true")
+else
+  output=(--output type=cacheonly)
+fi
 docker buildx create --name "$builder" --driver docker-container >/dev/null
-echo "==> build ${tags[*]//--tag /}"
+echo "==> build $image for $tag"
 docker buildx build --builder "$builder" --file docker/Dockerfile \
   --platform linux/amd64,linux/arm64 \
   --label "org.opencontainers.image.source=https://github.com/$repo" \
@@ -153,7 +151,7 @@ docker buildx build --builder "$builder" --file docker/Dockerfile \
   --build-arg "APP_VERSION=$version" \
   --label "org.opencontainers.image.revision=$sha" \
   --metadata-file "$docker_config/build.json" \
-  "${tags[@]}" "${output[@]}" .
+  "${output[@]}" .
 
 if ((!push)); then
   echo "built $tag for linux/amd64 and linux/arm64; nothing pushed or published (--no-push)"
@@ -163,6 +161,11 @@ fi
 digest=$(node -p 'require(process.argv[1])["containerimage.digest"]' "$docker_config/build.json")
 [[ "$digest" == sha256:* ]] || die "the build reported no image digest"
 image_ref="$image@$digest"
+if [[ "$tag" == "$newest" ]]; then
+  docker buildx imagetools create --tag "$image:next" "$image_ref"
+else
+  echo "==> $tag is older than $newest; :next is left as it is"
+fi
 notes="Image: \`$image_ref\` (linux/amd64 and linux/arm64). Every release is on \`:next\` first; making it a full release moves \`:latest\` to it.
 
 Licensed under the Business Source License 1.1. See LICENSE and docs/licensing.md."
