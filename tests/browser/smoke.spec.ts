@@ -195,7 +195,8 @@ test("Checkup, not the sidebar, says an update is ready, and its Update opens th
   });
   await page.goto("/family");
   await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Update available" })).toHaveCount(0);
+  // The rail says nothing about the release; only Checkup does.
+  await expect(page.locator("aside").getByText(/v0\.6\.0/)).toHaveCount(0);
 
   await page.goto("/checkup");
   const row = page.getByTestId("checkup-finding-update_available");
