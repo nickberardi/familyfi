@@ -871,7 +871,7 @@ export function turnOnRecommended(mutate: HouseholdStore["mutate"], rules: Rule[
 
 export const CHECKUP_COPY = {
   title: "Checkup",
-  sub: "Recommended protection, and what on your network is worth fixing",
+  sub: "Recommended protection, and anything worth fixing or updating",
   protection: {
     title: "Recommended protection",
     on: (on: number, of: number) => `${on} of ${of} on`,
@@ -882,7 +882,7 @@ export const CHECKUP_COPY = {
     countries: { title: "Block countries" },
   },
   network: {
-    title: "Network checkup",
+    title: "Things to look at",
     checkNow: "Check now",
     checking: "Checking…",
     never: "Not checked yet",
