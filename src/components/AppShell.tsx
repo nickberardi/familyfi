@@ -12,11 +12,10 @@ import { unassignedBadgeCount } from "@/lib/device-list";
 import { NAV } from "@/lib/nav";
 import { familyNeedsDevices as familyNeedsDevicesCount, syncFailed as syncNeedsAttention } from "@/lib/sync-copy";
 import { reconcileNow } from "@/lib/sync-writes";
-import { AccountCard, UpdateAlertCard } from "@/ui/StatusCards";
+import { AccountCard } from "@/ui/StatusCards";
 import { SidebarStatus } from "@/components/SidebarStatus";
 import { appVersionLabel } from "@/lib/version";
 import { useAppData } from "./AppDataProvider";
-import { useUpdateCheck } from "@/ui/use-update-check";
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -312,7 +311,6 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
   const [aboutOpen, setAboutOpen] = useState(false);
   const railNav = useRef<HTMLElement>(null);
   const railNavContent = useRef<HTMLDivElement>(null);
-  const update = useUpdateCheck(request);
   // Closing on a route change is the drawer's own signal, same as the design's
   // `pickAndClose` on each item — but this also catches the back button, a redirect,
   // or anywhere else navigation happens outside a drawer tap. Adjusted during render
@@ -362,7 +360,6 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
           </nav>
           <div className="ff-sidebar-end flex flex-col gap-2">
             <SidebarStatus
-              update={update}
               sync={sync}
               busy={busy}
               error={error}
@@ -434,7 +431,6 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
                   onNavigate={() => setNavOpen(false)}
                 />
               </nav>
-              <UpdateAlertCard update={update} />
               <SidebarFooter onAbout={openAbout} />
             </div>
           </>

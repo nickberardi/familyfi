@@ -48,18 +48,6 @@ export function upToDateLine(update: UpdateCheck | null | undefined): string {
   return `FamilyFi ${versionLabel(update.currentVersion)} is up to date.`;
 }
 
-/** The "Update available" alert beside the navigation, or null when there is nothing newer. */
-export function updateAlert(update: UpdateCheck | null | undefined) {
-  const latest = latestRelease(update);
-  if (!latest || !update) return null;
-  return {
-    title: "Update available",
-    body: `${latest} is ready. You’re on ${versionLabel(update.currentVersion)}.`,
-    action: "Update",
-    href: "/settings?tab=maintenance",
-  };
-}
-
 /** The install card's title and button; without the updater the button names what is missing. */
 export function installCopy(latest: string, configured = false) {
   return { title: `Install ${latest}`, button: configured ? `Install ${latest}` : `Install ${latest} · needs the updater` };

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.39.0
+  version: 0.40.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -4251,7 +4251,7 @@ components:
         text: { type: string, description: "The message in short English, for a client without copy for `key`." }
     CheckupCheck:
       type: string
-      x-extensible-enum: [leftover_policies, gateway_drift, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks, update_tag]
+      x-extensible-enum: [leftover_policies, gateway_drift, sonos_mixed, private_addresses, wifi_multicast, sonos_mdns, casting_mdns, dns_override, smart_home_wifi, unmanaged_networks, update_tag, update_available]
       description: |
         One check. New checks are added over time without a breaking change: a client that does not
         know a value shows the finding's `message` and asks to update the app, and ignores the value
@@ -4270,6 +4270,11 @@ components:
         has no 2.4 GHz or is WPA3 only. unmanaged_networks: networks FamilyFi does not manage that
         have devices. update_tag: `FAMILYFI_UPDATE_TAG` is set to a value FamilyFi does not know
         (not `latest`, `next` or a line such as `0.38`), so updates follow `latest`.
+        update_available: a newer FamilyFi release is on offer, as `GET /api/v1/health`'s `update`
+        last found; `details` names it and the release running. It comes from the hourly update
+        check rather than a checkup run, so it can show before the first run and is listed in
+        `passed` only while the check says FamilyFi is up to date. Dismissing it lasts until a newer
+        release is offered. The Maintenance tab of Settings installs it.
     CheckupFinding:
       type: object
       additionalProperties: false
@@ -4390,6 +4395,8 @@ components:
                 seenAt: { type: string, format: date-time, description: When sync last found it changed }
                 putBack: { type: boolean, description: "Whether FamilyFi has changed it back; false while that fails" }
             updateTag: { type: string, description: "For `update_tag`, the `FAMILYFI_UPDATE_TAG` FamilyFi does not know." }
+            currentVersion: { type: string, description: "For `update_available`, the release running." }
+            latestVersion: { type: string, description: "For `update_available`, the newer release on offer." }
         firstSeenAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
         dismissed:

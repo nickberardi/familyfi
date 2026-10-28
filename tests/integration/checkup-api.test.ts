@@ -18,7 +18,9 @@ import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { GET as getSync } from "@/app/api/v1/sync/route";
 import { checkupMessage, type CheckupState } from "@/lib/checkup";
 import type { Rule } from "@/lib/rules";
+import { APP_VERSION } from "@/lib/version";
 import { prisma } from "@/server/db";
+import { refreshUpdateCheck } from "@/server/update-check";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { createFixtureUnifiClient } from "@/server/unifi/dev-mock";
 import type { MockUnifiClient } from "@/server/unifi/mock";
@@ -229,6 +231,44 @@ describe("network checkup", () => {
     await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: !household.quarantineEnforced } });
     await runReconcileOnce();
     expect(checks(await checkup(auth))).not.toContain("gateway_drift");
+  });
+
+  it("shows a newer release as a problem until it is installed, and a dismissal until the next one", async () => {
+    const offering = (tag: string) => refreshUpdateCheck({ fetchImpl: async () => new Response(JSON.stringify([{ tag_name: `v${tag}` }]), { status: 200 }) });
+    const failing = () => refreshUpdateCheck({ fetchImpl: async () => new Response("", { status: 503 }) });
+    const [major, minor] = APP_VERSION.split(".").map(Number);
+    const newer = `${major}.${minor! + 1}.0`;
+    const newest = `${major}.${minor! + 2}.0`;
+    try {
+      const auth = await signedIn();
+      await runReconcileOnce();
+      const before = await problems(auth);
+      await offering(newer);
+      let found = (await checkup(auth)).findings.find((finding) => finding.check === "update_available");
+      expect(found).toMatchObject({ id: "update_available", kind: "problem", details: { currentVersion: APP_VERSION, latestVersion: newer }, dismissed: false });
+      expect(found!.message).toEqual({ key: "checkup.update_available", text: `FamilyFi v${newer} is ready` });
+      expect(await problems(auth)).toBe(before + 1);
+      // A checkup run leaves it to the update check.
+      expect((await checkNow(auth)).status).toBe(200);
+      expect(checks(await checkup(auth))).toContain("update_available");
+
+      expect((await dismiss(auth, "update_available", true)).status).toBe(200);
+      expect(await problems(auth)).toBe(before);
+      // A check that could not answer changes nothing.
+      await failing();
+      expect((await checkup(auth)).findings.find((finding) => finding.check === "update_available")?.dismissed).toBe(true);
+      await offering(newest);
+      found = (await checkup(auth)).findings.find((finding) => finding.check === "update_available");
+      expect(found).toMatchObject({ details: { latestVersion: newest }, dismissed: false });
+
+      await offering(APP_VERSION);
+      const state = await checkup(auth);
+      expect(checks(state)).not.toContain("update_available");
+      expect(state.passed).toContain("update_available");
+      expect(await problems(auth)).toBe(before);
+    } finally {
+      await failing();
+    }
   });
 
   it("answers 409 on Check now before UniFi is set up", async () => {

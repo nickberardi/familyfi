@@ -817,7 +817,7 @@
         "settings"
       ]
     },
-    "tests/browser/smoke.spec.ts > the sidebar alerts an available update and stays quiet otherwise": {
+    "tests/browser/smoke.spec.ts > Checkup, not the sidebar, says an update is ready, and its Update opens the install card": {
       "categories": [
         "settings"
       ]

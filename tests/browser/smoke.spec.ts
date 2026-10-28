@@ -159,11 +159,11 @@ test("a sidebar section collapses, stays collapsed, and opens when one of its pa
   await expect(devices).toBeVisible();
 });
 
-test("the sidebar alerts an available update and stays quiet otherwise", { tag: "@desktop" }, async ({ page }) => {
+test("Checkup, not the sidebar, says an update is ready, and its Update opens the install card", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   // Tall enough that the rail shows its cards in full rather than collapsed into one row.
   await page.setViewportSize({ width: 1280, height: 1000 });
-  let update: UpdateCheck = {
+  const update: UpdateCheck = {
     status: "ok",
     available: true,
     currentVersion: "0.5.1",
@@ -175,21 +175,33 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
     error: null,
   };
   await page.route("**/api/v1/health", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        status: "ok",
-        db: "ok",
-        version: "0.5.1",
-        revision: 0,
-        update,
-      }),
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ status: "ok", db: "ok", version: "0.5.1", revision: 0, update }) });
+  });
+  // Answer as the server does once its update check found the newer release.
+  await page.route("**/api/v1/checkup", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { checkup: { findings: object[] } };
+    body.checkup.findings.unshift({
+      id: "update_available",
+      check: "update_available",
+      kind: "problem",
+      details: { currentVersion: "0.5.1", latestVersion: "0.6.0" },
+      message: { key: "checkup.update_available", text: "FamilyFi v0.6.0 is ready" },
+      firstSeenAt: "2026-09-22T12:00:00.000Z",
+      lastSeenAt: "2026-09-22T12:00:00.000Z",
+      dismissed: false,
     });
+    await route.fulfill({ response, json: body });
   });
   await page.goto("/family");
-  const alert = page.getByRole("region", { name: "Update available" });
-  await expect(alert).toContainText("v0.6.0 is ready. You’re on v0.5.1.");
-  await alert.getByRole("link", { name: "Update" }).click();
+  await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Update available" })).toHaveCount(0);
+
+  await page.goto("/checkup");
+  const row = page.getByTestId("checkup-finding-update_available");
+  await expect(row).toContainText("FamilyFi v0.6.0 is ready");
+  await expect(row).toContainText("You’re on v0.5.1.");
+  await row.getByRole("link", { name: "Update" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
   const card = page.getByRole("region", { name: "Install v0.6.0" });
   await expect(card.getByRole("region", { name: "Release notes" })).toContainText("Pair Device page");
@@ -198,34 +210,6 @@ test("the sidebar alerts an available update and stays quiet otherwise", { tag: 
     "https://github.com/nickberardi/familyfi/releases/tag/v0.6.0",
   );
   await expect(page.getByRole("button", { name: /Install v0\.6\.0/ })).toBeDisabled();
-
-  // Settings' other tabs don't carry the update check; the alert still shows beside them.
-  await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(alert).toBeVisible();
-
-  update = {
-    ...update,
-    available: false,
-    latestVersion: "0.5.1",
-    releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v0.5.1",
-  };
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(alert).toHaveCount(0);
-
-  update = {
-    ...update,
-    status: "error",
-    available: null,
-    latestVersion: null,
-    releaseUrl: null,
-    releaseNotes: null,
-    error: "GitHub release check failed.",
-  };
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(alert).toHaveCount(0);
 });
 
 test("the Update page installs through the updater and keeps its schedule", { tag: "@desktop" }, async ({ page }) => {
