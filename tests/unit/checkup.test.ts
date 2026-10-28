@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { UpdateCheck } from "@/lib/types";
 import {
+  CHECK_KIND,
   checkupCopy,
   checkupMessage,
   checkupSummary,
@@ -17,6 +19,7 @@ import {
   recommendedRules,
   runChecks,
   turnOnRecommended,
+  updateFindings,
   type CheckupDevice,
   type CheckupDrift,
   type CheckupInputs,
@@ -248,6 +251,22 @@ describe("network checkup", () => {
     expect(finding).toMatchObject({ key: "update_tag", details: { updateTag: "nxt" }, subject: "nxt" });
     expect(checkupCopy({ check: "update_tag", details: finding!.details }).seen).toBe("FAMILYFI_UPDATE_TAG is “nxt”, which isn’t latest, next or a version such as 0.38.");
     expect(checkupMessage(finding!)).toEqual({ key: "checkup.update_tag", text: "FamilyFi can’t follow your update setting" });
+  });
+
+  it("offers a newer release from the update check, keyed by that release, and nothing while the check has no answer", () => {
+    const update = (over: Partial<UpdateCheck>): UpdateCheck => ({
+      status: "ok", available: true, currentVersion: "0.39.0", latestVersion: "0.40.0", releaseUrl: null, releaseNotes: null, checkedAt: null, lastSuccessfulAt: null, error: null, ...over,
+    });
+    expect(updateFindings(null)).toBeNull();
+    expect(updateFindings(update({ status: "pending", available: null }))).toBeNull();
+    expect(updateFindings(update({ status: "error", available: null }))).toBeNull();
+    expect(updateFindings(update({ available: false }))).toEqual([]);
+    const [finding] = updateFindings(update({}))!;
+    expect(finding).toEqual({ key: "update_available", check: "update_available", details: { currentVersion: "0.39.0", latestVersion: "0.40.0" }, subject: "0.40.0" });
+    const copy = checkupCopy(finding!);
+    expect([copy.title, copy.seen]).toEqual(["FamilyFi v0.40.0 is ready", "You’re on v0.39.0."]);
+    expect(copy.show).toEqual({ label: "Update", href: "/settings?tab=maintenance" });
+    expect(CHECK_KIND.update_available).toBe("problem");
   });
 
   it("changes a finding's subject when what was seen changes, and keeps it when it does not", () => {

@@ -4,19 +4,17 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { noMembersAttention, syncStatusCard } from "@/lib/sync-copy";
-import type { SyncStatus, UpdateCheck } from "@/lib/types";
-import { updateAlert } from "@/lib/update-copy";
-import { DeviceAttentionCard, SyncStatusCard, UpdateAlertCard } from "@/ui/StatusCards";
+import type { SyncStatus } from "@/lib/types";
+import { DeviceAttentionCard, SyncStatusCard } from "@/ui/StatusCards";
 
 /**
- * The rail's status: an update on offer, whether the gateway is in sync, groups that need a
- * device. They show as their shared cards (`src/ui/StatusCards.tsx`) while the rail has room. When
+ * The rail's status: whether the gateway is in sync, and groups that need a device. A newer
+ * release is a Checkup problem. They show as their shared cards (`src/ui/StatusCards.tsx`) while the rail has room. When
  * the cards would squeeze the navigation into a scroll, they collapse into one row, which names
  * the one notice or counts several and opens every card in a popover beside the rail. The drawer
  * and the native app show the cards themselves.
  */
 export function SidebarStatus({
-  update,
   sync,
   busy,
   error,
@@ -25,7 +23,6 @@ export function SidebarStatus({
   nav,
   navContent,
 }: {
-  update: UpdateCheck | null;
   sync: SyncStatus | null;
   busy: boolean;
   error?: string | null;
@@ -44,7 +41,6 @@ export function SidebarStatus({
     if (open) setOpen(false);
   }
 
-  const alert = updateAlert(update);
   const status = syncStatusCard(sync, { busy, error, notice });
   const attention = noMembersAttention(sync?.issues ?? []);
   // Whether sync needs a hand (failed, partial, not configured), whatever a write in flight says.
@@ -53,7 +49,6 @@ export function SidebarStatus({
   const notices = [
     syncNotice && status.dot === "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,
     attention ? { title: attention.title, dot: "var(--ff-paused)" } : null,
-    alert ? { title: alert.title, dot: "var(--ff-accent)" } : null,
     syncNotice && status.dot !== "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,
   ].filter((item) => item !== null);
   const title = notices.length > 1 ? `${notices.length} notices` : (notices[0]?.title ?? status.title);
@@ -61,7 +56,6 @@ export function SidebarStatus({
 
   const cards = (
     <>
-      <UpdateAlertCard update={update} />
       <SyncStatusCard sync={sync} busy={busy} error={error} notice={notice} onReconcile={onReconcile} />
       <DeviceAttentionCard sync={sync} />
     </>

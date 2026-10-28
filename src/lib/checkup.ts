@@ -15,6 +15,8 @@ import { FAMILYFI_POLICY_PREFIX } from "./policy-names";
 import type { HouseholdStore } from "./household-store";
 import type { IconName } from "./icons";
 import { ruleHref } from "./rule-list";
+import type { UpdateCheck } from "./types";
+import { versionLabel } from "./update-copy";
 import { knownUpdateTag } from "./update-track";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID, type Rule } from "./rules";
 
@@ -30,6 +32,7 @@ export const CHECKUP_CHECKS = [
   "smart_home_wifi",
   "unmanaged_networks",
   "update_tag",
+  "update_available",
 ] as const;
 export type CheckupCheck = (typeof CHECKUP_CHECKS)[number];
 export type CheckupKind = "problem" | "note";
@@ -46,6 +49,7 @@ export const CHECK_KIND: Record<CheckupCheck, CheckupKind> = {
   smart_home_wifi: "note",
   unmanaged_networks: "note",
   update_tag: "problem",
+  update_available: "problem",
 };
 
 /** A device as the checks read it. `groupKind` is null while it is unassigned. */
@@ -183,6 +187,9 @@ export type CheckupDetails = {
   drift?: CheckupDrift;
   /** The `FAMILYFI_UPDATE_TAG` FamilyFi does not know, for `update_tag`. */
   updateTag?: string;
+  /** The release running and the newer one on offer, for `update_available`. */
+  currentVersion?: string;
+  latestVersion?: string;
 };
 
 export type CheckupResult = {
@@ -428,6 +435,18 @@ export function runChecks(inputs: CheckupInputs): CheckupRun {
   add("update_tag", knownUpdateTag(tag) ? [] : [{ key: "update_tag", check: "update_tag", details: { updateTag: tag }, subject: tag }]);
 
   return { findings, passed, skipped };
+}
+
+/**
+ * A newer FamilyFi release, from the update check rather than a checkup run: one finding while one is
+ * on offer, none when FamilyFi is up to date, and null while the check has no answer. Its subject is
+ * the newer release, so dismissing it lasts until the next one.
+ */
+export function updateFindings(update: UpdateCheck | null | undefined): CheckupResult[] | null {
+  if (update?.status !== "ok") return null;
+  if (!update.available || !update.latestVersion) return [];
+  const details = { currentVersion: update.currentVersion, latestVersion: update.latestVersion };
+  return [{ key: "update_available", check: "update_available", details, subject: update.latestVersion }];
 }
 
 /**
@@ -683,6 +702,17 @@ export function checkupCopy(finding: Pick<CheckupFinding, "check" | "details">):
           "Then run docker compose up -d in that folder.",
         ],
       };
+    case "update_available": {
+      const latest = versionLabel(finding.details.latestVersion ?? "");
+      return {
+        icon: "arrows-clockwise",
+        title: `FamilyFi ${latest} is ready`,
+        seen: `You’re on ${versionLabel(finding.details.currentVersion ?? "")}.`,
+        why: "New versions fix problems and add features. Your rules keep working while it installs.",
+        fix: ["FamilyFi → Settings → Maintenance → read what’s new → Install."],
+        show: { label: "Update", href: "/settings?tab=maintenance" },
+      };
+    }
   }
 }
 
@@ -917,5 +947,6 @@ export const CHECKUP_COPY = {
     smart_home_wifi: "Wi-Fi for smart-home devices",
     unmanaged_networks: "Networks FamilyFi doesn’t manage",
     update_tag: "Update setting",
+    update_available: "FamilyFi is up to date",
   } satisfies Record<CheckupCheck, string>,
 } as const;

@@ -4,14 +4,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { initials } from "@/lib/display";
 import { noMembersAttention, syncStatusCard } from "@/lib/sync-copy";
-import type { Session, SyncStatus, UpdateCheck } from "@/lib/types";
-import { updateAlert } from "@/lib/update-copy";
+import type { Session, SyncStatus } from "@/lib/types";
 
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
 
 /**
- * The cards beside the web's navigation, which the app shows at the top of More: an update on
- * offer, whether the gateway is in sync (with Reconcile now when it is not), groups that need a
+ * The cards beside the web's navigation, which the app shows at the top of More: whether the
+ * gateway is in sync (with Reconcile now when it is not), groups that need a
  * device, and who is signed in.
  */
 
@@ -53,28 +52,6 @@ function CardButton({ label, fill, ink, onPress, disabled, testID }: { label: st
     >
       <Text style={[text(14, 21, ink), styles.buttonLabel]}>{label}</Text>
     </Pressable>
-  );
-}
-
-/** "Update available" when a newer release is published; nothing otherwise. */
-export function UpdateAlertCard({ update }: { update: UpdateCheck | null }) {
-  const ui = useUI();
-  const text = useText();
-  const alert = updateAlert(update);
-  if (!alert) return null;
-  return (
-    <Card label={alert.title} testID="update-alert">
-      <View style={styles.titleRow}>
-        <View aria-hidden style={[styles.dot, { backgroundColor: ui.color("accent") }]} />
-        <Text style={[text(14, 21, "ink"), styles.bold]}>{alert.title}</Text>
-      </View>
-      <Text style={[text(14, 20, "muted"), styles.body]}>{alert.body}</Text>
-      <ui.Link href={alert.href} testID="update-alert-link">
-        <View style={[styles.button, { backgroundColor: ui.color("accent") }]}>
-          <Text style={[text(14, 21, "ink-on-fill"), styles.buttonLabel]}>{alert.action}</Text>
-        </View>
-      </ui.Link>
-    </Card>
   );
 }
 

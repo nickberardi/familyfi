@@ -7,6 +7,7 @@ import {
   knownCheck,
   openProblemCount,
   runChecks,
+  updateFindings,
   type CheckupCheck,
   type CheckupDetails,
   type CheckupDrift,
@@ -28,6 +29,8 @@ import { networkInScope } from "./unifi/scope";
 import { mapClientsToZones } from "./unifi/mapping";
 import type { ClientOverview, FirewallZone, NetworkDetails } from "./unifi/types";
 import type { CheckupPolicy } from "@/lib/checkup";
+import type { UpdateCheck } from "@/lib/types";
+import { getUpdateCheckSnapshot } from "./update-check";
 
 /**
  * The network checkup (`src/lib/checkup.ts` holds the checks): it reads what sync already read, plus
@@ -83,9 +86,10 @@ async function checkup(household: Household, client: UnifiClient, preload?: Chec
   await prisma().$transaction(async (tx) => {
     const stored = new Map((await tx.checkupFinding.findMany({ select: { key: true, subject: true } })).map((row) => [row.key, row.subject]));
     for (const finding of run.findings) await upsertFinding(tx, finding, stored, now);
-    // A finding no longer seen goes, except for a check that could not look this time.
+    // A finding no longer seen goes, except for a check that could not look this time. A newer
+    // release is the update check's to record, not the run's.
     await tx.checkupFinding.deleteMany({
-      where: { key: { notIn: run.findings.map((finding) => finding.key) }, check: { notIn: run.skipped } },
+      where: { key: { notIn: run.findings.map((finding) => finding.key) }, check: { notIn: [...run.skipped, "update_available"] } },
     });
     await tx.household.update({ where: { id: "default" }, data: { checkupRanAt: now, checkupError: null, checkupSkipped: run.skipped } });
   });
@@ -179,6 +183,24 @@ export async function recordDriftFindings(now = new Date()): Promise<void> {
   }
 }
 
+/**
+ * A newer FamilyFi release as a Checkup problem, as the update check last answered: GitHub is asked
+ * hourly, apart from the checkup, so Checkup and its badge bring the row up to date when they are read.
+ * Writes only when the answer changed; a check that could not answer leaves the row as it was.
+ */
+export async function recordUpdateFinding(update: UpdateCheck = getUpdateCheckSnapshot(), now = new Date()): Promise<void> {
+  const findings = updateFindings(update);
+  if (!findings) return;
+  const stored = await prisma().checkupFinding.findUnique({ where: { key: "update_available" }, select: { subject: true, details: true } });
+  const [finding] = findings;
+  if (!finding) {
+    if (stored) await prisma().checkupFinding.deleteMany({ where: { key: "update_available" } });
+    return;
+  }
+  if (stored && stored.subject === finding.subject && JSON.stringify(stored.details) === JSON.stringify(finding.details)) return;
+  await prisma().$transaction((tx) => upsertFinding(tx, finding, new Map(stored ? [[finding.key, stored.subject]] : []), now));
+}
+
 async function upsertFinding(tx: Prisma.TransactionClient, finding: CheckupResult, stored: Map<string, string>, now: Date) {
   const details = finding.details as Prisma.InputJsonValue;
   // A dismissal lasts until the first change: one that changes back stays shown.
@@ -238,7 +260,8 @@ type FindingRow = { key: string; check: string; details: Prisma.JsonValue; subje
 const dismissed = (row: Pick<FindingRow, "dismissedAt" | "dismissedSubject" | "subject">) => row.dismissedAt !== null && row.dismissedSubject === row.subject;
 
 /** The checkup as `GET /checkup` returns it. */
-export async function checkupState(): Promise<CheckupState> {
+export async function checkupState(update: UpdateCheck = getUpdateCheckSnapshot()): Promise<CheckupState> {
+  await recordUpdateFinding(update);
   const [household, rows] = await Promise.all([
     prisma().household.findUniqueOrThrow({ where: { id: "default" } }),
     prisma().checkupFinding.findMany({ orderBy: { key: "asc" } }),
@@ -258,13 +281,18 @@ export async function checkupState(): Promise<CheckupState> {
     // Problems first, in the order the checks are listed.
     .sort((a, b) => Number(a.kind === "note") - Number(b.kind === "note") || CHECKUP_CHECKS.indexOf(a.check) - CHECKUP_CHECKS.indexOf(b.check) || a.id.localeCompare(b.id));
   const found = new Set(findings.map((finding) => finding.check));
-  // A run that could not read the network passed nothing.
-  const passed = household.checkupRanAt && !household.checkupError ? CHECKUP_CHECKS.filter((check) => !found.has(check) && !household.checkupSkipped.includes(check)) : [];
+  // A run that could not read the network passed nothing. FamilyFi is up to date only when the update check says so.
+  const upToDate = updateFindings(update)?.length === 0;
+  const passed =
+    household.checkupRanAt && !household.checkupError
+      ? CHECKUP_CHECKS.filter((check) => !found.has(check) && !household.checkupSkipped.includes(check) && (check !== "update_available" || upToDate))
+      : [];
   return { ranAt: household.checkupRanAt?.toISOString() ?? null, error: household.checkupError, findings, passed };
 }
 
 /** The open problems, for the nav badge on `GET /sync`. */
-export async function checkupProblemCount(): Promise<number> {
+export async function checkupProblemCount(update: UpdateCheck = getUpdateCheckSnapshot()): Promise<number> {
+  await recordUpdateFinding(update);
   const rows = await prisma().checkupFinding.findMany({ select: { check: true, subject: true, dismissedAt: true, dismissedSubject: true } });
   return openProblemCount(rows.filter((row) => knownCheck(row.check)).map((row) => ({ kind: CHECK_KIND[row.check as CheckupCheck], dismissed: dismissed(row) })));
 }
