@@ -268,6 +268,14 @@ describe("network checkup", () => {
       found = (await checkup(auth)).findings.find((finding) => finding.check === "update_available");
       expect(found).toMatchObject({ details: { latestVersion: newest }, dismissed: false });
 
+      // Once FamilyFi runs another release, a row from before goes while the check has no answer.
+      await failing();
+      await prisma().checkupFinding.update({ where: { key: "update_available" }, data: { details: { currentVersion: "0.0.1", latestVersion: newest } } });
+      expect(checks(await checkup(auth))).not.toContain("update_available");
+      expect(await problems(auth)).toBe(before);
+
+      await offering(newest);
+      expect(checks(await checkup(auth))).toContain("update_available");
       await offering(APP_VERSION);
       const state = await checkup(auth);
       expect(checks(state)).not.toContain("update_available");

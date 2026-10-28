@@ -186,12 +186,18 @@ export async function recordDriftFindings(now = new Date()): Promise<void> {
 /**
  * A newer FamilyFi release as a Checkup problem, as the update check last answered: GitHub is asked
  * hourly, apart from the checkup, so Checkup and its badge bring the row up to date when they are read.
- * Writes only when the answer changed; a check that could not answer leaves the row as it was.
+ * Writes only when the answer changed. A check that could not answer leaves the row as it was,
+ * unless FamilyFi has since been updated: a row recorded on another release is gone.
  */
 export async function recordUpdateFinding(update: UpdateCheck = getUpdateCheckSnapshot(), now = new Date()): Promise<void> {
   const findings = updateFindings(update);
-  if (!findings) return;
   const stored = await prisma().checkupFinding.findUnique({ where: { key: "update_available" }, select: { subject: true, details: true } });
+  if (!findings) {
+    if (stored && (stored.details as CheckupDetails).currentVersion !== update.currentVersion) {
+      await prisma().checkupFinding.deleteMany({ where: { key: "update_available" } });
+    }
+    return;
+  }
   const [finding] = findings;
   if (!finding) {
     if (stored) await prisma().checkupFinding.deleteMany({ where: { key: "update_available" } });
