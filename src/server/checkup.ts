@@ -197,7 +197,8 @@ export async function recordUpdateFinding(update: UpdateCheck = getUpdateCheckSn
     if (stored) await prisma().checkupFinding.deleteMany({ where: { key: "update_available" } });
     return;
   }
-  if (stored && stored.subject === finding.subject && JSON.stringify(stored.details) === JSON.stringify(finding.details)) return;
+  // Field by field: jsonb does not keep the order of keys.
+  if (stored && stored.subject === finding.subject && (stored.details as CheckupDetails).currentVersion === finding.details.currentVersion) return;
   await prisma().$transaction((tx) => upsertFinding(tx, finding, new Map(stored ? [[finding.key, stored.subject]] : []), now));
 }
 
@@ -283,10 +284,10 @@ export async function checkupState(update: UpdateCheck = getUpdateCheckSnapshot(
   const found = new Set(findings.map((finding) => finding.check));
   // A run that could not read the network passed nothing. FamilyFi is up to date only when the update check says so.
   const upToDate = updateFindings(update)?.length === 0;
-  const passed =
-    household.checkupRanAt && !household.checkupError
-      ? CHECKUP_CHECKS.filter((check) => !found.has(check) && !household.checkupSkipped.includes(check) && (check !== "update_available" || upToDate))
-      : [];
+  const ran = household.checkupRanAt && !household.checkupError;
+  const passed = CHECKUP_CHECKS.filter((check) =>
+    check === "update_available" ? upToDate && !found.has(check) : ran && !found.has(check) && !household.checkupSkipped.includes(check),
+  );
   return { ranAt: household.checkupRanAt?.toISOString() ?? null, error: household.checkupError, findings, passed };
 }
 
