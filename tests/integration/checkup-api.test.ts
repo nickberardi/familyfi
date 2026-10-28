@@ -248,6 +248,13 @@ describe("network checkup", () => {
       expect(found).toMatchObject({ id: "update_available", kind: "problem", details: { currentVersion: APP_VERSION, latestVersion: newer }, dismissed: false });
       expect(found!.message).toEqual({ key: "checkup.update_available", text: `FamilyFi v${newer} is ready` });
       expect(await problems(auth)).toBe(before + 1);
+      // Reads write only when the check's answer changed.
+      const seen = async () => (await prisma().checkupFinding.findUniqueOrThrow({ where: { key: "update_available" } })).lastSeenAt.getTime();
+      const first = await seen();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await checkup(auth);
+      await problems(auth);
+      expect(await seen()).toBe(first);
       // A checkup run leaves it to the update check.
       expect((await checkNow(auth)).status).toBe(200);
       expect(checks(await checkup(auth))).toContain("update_available");
