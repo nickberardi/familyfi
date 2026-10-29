@@ -17,6 +17,7 @@ import {
   runGroupHeaderAction,
   updateGroup,
 } from "@/lib/group-writes";
+import { API_VERSION, OLDEST_CLIENT_API_VERSION } from "@/lib/api-compat";
 import { createHouseholdStore, NOTICE_MS, NOTICE_WITH_ACTION_MS, type OfflineGuard } from "@/lib/household-store";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -793,5 +794,86 @@ describe("household store with an offline guard (a phone)", () => {
     await store.reload();
     expect(store.getState().status).toBe("signedOut");
     expect(store.canControl()).toBe(false);
+  });
+});
+
+describe("household store compatibility check", () => {
+  const health = (json: Record<string, unknown>): Handler => () => ({ json });
+  const current = { version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: OLDEST_CLIENT_API_VERSION };
+
+  function checking(routes: Record<string, Handler>) {
+    const server = fakeServer(routes);
+    const store = createHouseholdStore({ request: server.request, offlineGuard: GUARD, checkCompatibility: true });
+    return { store, server };
+  }
+
+  it("asks /health beside the household and loads when the server is compatible", async () => {
+    const { store, server } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": health(current) });
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "ready", compatibility: null });
+    expect(server.calls.map((call) => call.path)).toContain("/api/v1/health");
+    expect(server.calls).toHaveLength(9);
+  });
+
+  it("keeps the household unread from a server older than this client can read", async () => {
+    // A server from before API 0.41.0 sends only its release version: 0.34 left out Checkup's message.
+    const { store } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": health({ version: "0.34.0" }) });
+    await store.reload();
+    const state = store.getState();
+    expect(state).toMatchObject({
+      status: "incompatible",
+      loaded: true,
+      compatibility: { status: "update_server", appApiVersion: API_VERSION, serverApiVersion: "0.34.0" },
+    });
+    expect(state.groups).toEqual([]);
+    expect(state.rules).toEqual([]);
+    expect(store.canControl()).toBe(false);
+  });
+
+  it("asks for an app update when the server no longer serves this client", async () => {
+    const { store } = checking({
+      ...reads(() => childGroup()),
+      "GET /api/v1/health": health({ version: "99.0.0", apiVersion: "99.0.0", minAppApiVersion: "99.0.0" }),
+    });
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "incompatible", compatibility: { status: "update_app", serverApiVersion: "99.0.0" } });
+    expect(store.getState().groups).toEqual([]);
+  });
+
+  it("loads once the server is updated, and a refresh while incompatible checks again", async () => {
+    let answer: Record<string, unknown> = { version: "0.34.0" };
+    const { store, server } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": () => ({ json: answer }) });
+    await store.reload();
+    expect(store.getState().status).toBe("incompatible");
+    answer = current;
+    vi.useFakeTimers();
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(0);
+    stop();
+    expect(store.getState()).toMatchObject({ status: "ready", compatibility: null });
+    expect(store.getState().groups.map((group) => group.id)).toEqual(["group-child"]);
+    expect(server.calls.filter((call) => call.path === "/api/v1/health")).toHaveLength(2);
+  });
+
+  it("lets a check that fails decide nothing", async () => {
+    const { store } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": () => ({ status: 503, json: { error: { message: "Degraded." } } }) });
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "ready", compatibility: null });
+  });
+
+  it("reports a 401 when the household load fails on a compatible server", async () => {
+    const { store } = checking({
+      ...reads(() => childGroup()),
+      "GET /api/v1/health": health(current),
+      "GET /api/v1/auth/session": () => ({ status: 401, json: { error: { message: "Sign in." } } }),
+    });
+    await store.reload();
+    expect(store.getState().status).toBe("signedOut");
+  });
+
+  it("never asks /health when the client doesn't check (the web)", async () => {
+    const { store, server } = setup(reads(() => childGroup()));
+    await store.reload();
+    expect(server.calls.map((call) => call.path)).not.toContain("/api/v1/health");
   });
 });

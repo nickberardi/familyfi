@@ -14,15 +14,56 @@ concurrency:
   cancel-in-progress: true
     
 jobs:
+  # The API contract's floors, first and in minutes: a pull request that forgot to raise one fails
+  # here and never starts the half-hour jobs (docs/api.md, "Versioning the contract").
+  contract:
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every commit: the base branch to compare with, and the commit that set x-oldest-client.
+          fetch-depth: 0
+      - uses: ./.github/actions/runner-cleanup
+      # Node first: pnpm/action-setup bootstraps with the npm on PATH, and the runner's own
+      # Node has a broken npm since runner 2.338.0.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.15.1
+          cache: true
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      # A release has no base branch of its own: it compares main with itself.
+      - run: scripts/test.py check api-floors --base "origin/${{ github.base_ref || 'main' }}"
+      # The oldest app x-oldest-client claims, against what this server sends, on the in-memory database.
+      - run: scripts/test.py run tests/integration/oldest-client.test.ts --database memory
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: contract-results
+          path: |
+            build/test-runs/**/results.json
+            build/test-runs/**/summary.md
+            build/test-runs/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
   verify:
+    needs: contract
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
-          # A pull request's merge commit and its first parent, the base branch.
-          fetch-depth: 2
+          # Every commit: the merge commit's first parent, the base branch, and the commit
+          # tests/integration/oldest-client.test.ts reads.
+          fetch-depth: 0
       - uses: ./.github/actions/runner-cleanup
       # Node first: pnpm/action-setup bootstraps with the npm on PATH, and the runner's own
       # Node has a broken npm since runner 2.338.0.
@@ -79,6 +120,7 @@ jobs:
 
   # Also the UTC+14 unit replay, which keeps verify, the longer job, shorter.
   browser:
+    needs: contract
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:

@@ -1,7 +1,14 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.40.0
+  version: 0.41.0
+  # The oldest app API version this server still serves: raised to `version` when a change breaks
+  # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
+  x-oldest-client: 0.36.0
+  # The oldest server API version an app built from this document can read: raised to `version`
+  # when a response gains a required field. Apps compile it in; it never leaves the app.
+  # scripts/ci/check-openapi-floors.sh enforces both (docs/api.md, "Versioning the contract").
+  x-oldest-server: 0.36.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -3053,9 +3060,23 @@ components:
         version:
           type: string
           description: Application semver from package.json (no leading v).
+        apiVersion:
+          type: string
+          description: |
+            This document's `info.version`: the API contract the server speaks. A client compares it
+            with the oldest server it can read. A server from before 0.41.0 omits it; compare `version`
+            instead.
+        minAppApiVersion:
+          type: string
+          description: |
+            The oldest client API version this server still serves (`info.x-oldest-client`). A client
+            whose API version is older must ask to be updated instead of reading the household.
         revision:
           type: integer
           minimum: 0
+          description: |
+            The household's change counter: it rises by one each time a write asks the gateway for a
+            change (each `ChangeResult`). Absent while the server is degraded.
         error:
           type: string
           description: Present when status is degraded due to configuration, not secrets.

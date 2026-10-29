@@ -35,7 +35,7 @@ describe("the Makefile", () => {
   it("keeps its test and check targets as aliases for scripts/test.py", () => {
     const makefile = read("Makefile");
     const aliases = ["test", "test-unit", "test-coverage", "test-integration", "test-browser", "test-api",
-      "test-api-breaking", "test-api-version", "test-mutation", "lint", "typecheck", "db-drift", "db-upgrade"];
+      "test-api-breaking", "test-api-floors", "test-api-version", "test-mutation", "lint", "typecheck", "db-drift", "db-upgrade"];
     for (const target of aliases) {
       const recipe = makefile.match(new RegExp(`^${target}:\\n((?:\\t.*\\n)+)`, "m"));
       expect(recipe, `make ${target}`).not.toBeNull();

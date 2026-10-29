@@ -1,3 +1,4 @@
+import { apiCompatibility, type ApiCompatibility, type HealthVersions } from "./api-compat";
 import { ApiError, TransportError, waitForChange as pollChange, type ApiRequest, type ChangeOutcome } from "./api-client";
 import {
   applyMutationResult,
@@ -22,8 +23,14 @@ import type { Account, Device, Group, Session, SyncStatus, UnifiSettings } from 
 export type NoticeAction = { label: string; run: (request: ApiRequest) => Promise<unknown> };
 
 export type HouseholdState = {
-  /** `signedOut` once the server refuses the session (401). */
-  status: "loading" | "ready" | "signedOut";
+  /**
+   * `signedOut` once the server refuses the session (401). `incompatible` when a client that checks
+   * compatibility found it can't read this server, or the server no longer serves it: nothing of the
+   * household is loaded, and `compatibility` says which side needs an update.
+   */
+  status: "loading" | "ready" | "signedOut" | "incompatible";
+  /** The last compatibility check's answer when it was not `ok`; null otherwise or when the client doesn't check. */
+  compatibility: Exclude<ApiCompatibility, { status: "ok" }> | null;
   /** The first load has finished, whether or not it worked. */
   loaded: boolean;
   session: Session | null;
@@ -106,12 +113,19 @@ export function createHouseholdStore(deps: {
   waitForChange?: (request: ApiRequest, changeId: string) => Promise<ChangeOutcome>;
   offlineGuard?: OfflineGuard;
   visibility?: Visibility;
+  /**
+   * Check `GET /api/v1/health` against this build's contract before every full load (src/lib/api-compat.ts).
+   * A client that can meet a server of another version (a paired phone) turns this on; the web is
+   * always served by its own server, so it leaves it off.
+   */
+  checkCompatibility?: boolean;
 }) {
-  const { request, offlineGuard, visibility } = deps;
+  const { request, offlineGuard, visibility, checkCompatibility = false } = deps;
   const follow = deps.waitForChange ?? ((send: ApiRequest, id: string) => pollChange(send, id));
   const connectionMessages = new Set(offlineGuard ? [offlineGuard.stale, offlineGuard.notSent, offlineGuard.maybeNotSent] : []);
   let state: HouseholdState = {
     status: "loading",
+    compatibility: null,
     loaded: false,
     session: null,
     groups: [],
@@ -170,7 +184,7 @@ export function createHouseholdStore(deps: {
   const lists = (): HouseholdLists => ({ groups: state.groups, devices: state.devices });
 
   /** Whether a control may send a write now. */
-  const canControl = () => !offlineGuard || (state.status === "ready" && !state.stale);
+  const canControl = () => state.status !== "incompatible" && (!offlineGuard || (state.status === "ready" && !state.stale));
 
   /** Content the server sent again unchanged keeps the references already shown. */
   const shared = <K extends keyof HouseholdState>(key: K, next: HouseholdState[K]) => shareUnchanged(state[key], next);
@@ -202,9 +216,14 @@ export function createHouseholdStore(deps: {
     const gen = ++loadGen;
     fullLoadAt = Date.now();
     loadsInFlight += 1;
+    // Asked beside the household, not before it: nothing reads a body until the check says it can.
+    // A check that fails decides nothing, and the load reports whatever went wrong.
+    const compatible = checkCompatibility
+      ? request<HealthVersions>("/api/v1/health").then(apiCompatibility, () => null)
+      : Promise.resolve(null);
     try {
       // All at once: a signed-out session answers 401 on every one of them anyway.
-      const [session, groups, devices, rules, sync, unifi, household, accounts] = await Promise.all([
+      const loading = Promise.all([
         request<{ session: Session }>("/api/v1/auth/session").then((body) => body.session),
         request<{ groups: Group[] }>("/api/v1/groups"),
         request<{ devices: Device[] }>("/api/v1/devices"),
@@ -214,6 +233,15 @@ export function createHouseholdStore(deps: {
         request<{ household: HouseholdPublic }>("/api/v1/settings/household"),
         request<{ accounts: Account[] }>("/api/v1/accounts"),
       ]);
+      // Its failure is read below, unless the check makes the household unreadable anyway.
+      loading.catch(() => {});
+      const compatibility = await compatible;
+      if (compatibility && compatibility.status !== "ok") {
+        if (gen !== loadGen) return;
+        set({ status: "incompatible", compatibility, loaded: true, ...reached() });
+        return;
+      }
+      const [session, groups, devices, rules, sync, unifi, household, accounts] = await loading;
       if (gen !== loadGen) return;
       // A write in flight shows its optimistic change; what this read says waits until it ends.
       if (busyCount > 0) {
@@ -222,6 +250,7 @@ export function createHouseholdStore(deps: {
       }
       set({
         status: "ready",
+        compatibility: null,
         loaded: true,
         session: shared("session", session),
         groups: shared("groups", groups.groups),
@@ -243,6 +272,8 @@ export function createHouseholdStore(deps: {
 
   /** Rereads only what changes without a write. A full reload or a write started meanwhile wins. */
   async function refreshLive(): Promise<void> {
+    // Nothing is read from a server this client can't read; only a full reload checks again.
+    if (state.status === "incompatible") return reload();
     const gen = loadGen;
     loadsInFlight += 1;
     try {

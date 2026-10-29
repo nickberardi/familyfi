@@ -266,6 +266,25 @@ A major increase needs the `breaking_api` label, which only the operator adds. T
 
 Run the check locally with `make test-api-version`, or against any ref with `node scripts/ci/check-openapi-version.mjs <ref>`.
 
+### Which apps and servers can read each other
+
+An app and a server on different contract versions can each send something the other can't read: a response field an old app relies on goes away, or a new app reads a required field an old server never sends. Two lines under `info:` say how far each side reaches:
+
+- **`x-oldest-client`**: the oldest client API version this server still serves. It rises to the new `info.version` whenever oasdiff's `breaking` check finds a change that breaks old clients, such as a response field removed or made optional. The `breaking_api` label approves such a change; the floor records which apps it leaves behind.
+- **`x-oldest-server`**: the oldest server an app built from this document can read. It rises to the new `info.version` whenever `oasdiff changelog` reports `response-required-property-added` or `response-property-became-required`. A new endpoint does not raise it: an old server answers it with 404, which a client already reports as an error.
+
+Either may rise on purpose and neither ever falls. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both start at 0.36.0.
+
+`GET /api/v1/health` reports `apiVersion` (this document's `info.version`) and `minAppApiVersion` (`x-oldest-client`) to anyone, in every answer. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
+
+| Condition | The client shows |
+| --- | --- |
+| Its own API version < the server's `minAppApiVersion` | Update the app |
+| The server's `apiVersion` < its own `x-oldest-server` | Update the server |
+| Otherwise | The household |
+
+A server from before 0.41.0 sends no `apiVersion`; its `version` is the same number. The web skips the check, since its own server serves it. `tests/integration/oldest-client.test.ts` proves `x-oldest-client`: it runs `src/lib` from the commit that first carried that version against today's route handlers, and fails on any throw.
+
 ### Values that grow
 
 A list the server is expected to extend, such as `CheckupCheck`, is declared with `x-extensible-enum` instead of `enum`, so adding a value is a minor version and not a breaking change. A client must accept a value it does not know. Where such a value is shown to the user, the object also carries a `Message`: a `key` (for example `checkup.leftover_policies`) that the client looks up in its own localized copy, and `text`, a short English line. A client with no copy for the key shows `text` and adds its own note that a newer app shows more. Clients keep their copy and localization; the server's `text` is only the fallback.

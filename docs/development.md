@@ -144,7 +144,8 @@ What to run before a pull request, the rules tests follow, and what CI checks ar
 | `make test-coverage` | `run --platform host --coverage`: unit and integration tests in one run; fails below the coverage floors |
 | `make test-browser` | `run --layer ui`: production build, then Playwright on desktop and phone, the way CI runs it |
 | `make test-api` | `check api`: OpenAPI lint, and every route and method documented |
-| `make test-api-breaking` | `check api-breaking`: breaking OpenAPI changes against `origin/main` (needs Go) |
+| `make test-api-breaking` | `check api-breaking`: breaking OpenAPI changes against `origin/main` |
+| `make test-api-floors` | `check api-floors`: OpenAPI `x-oldest-client` and `x-oldest-server` rose where a change needs it, against `origin/main` |
 | `make test-api-version` | `check api-version`: OpenAPI `info.version` is a semver increase over `origin/main` that fits the change |
 | `make test-mutation` | `check mutation`: mutation testing of the enforcement code; a report, never a gate |
 | `make db-migrate` | Apply migrations to the development database |

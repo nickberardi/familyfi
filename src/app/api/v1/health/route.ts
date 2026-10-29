@@ -1,3 +1,4 @@
+import { API_VERSION, OLDEST_CLIENT_API_VERSION } from "@/lib/api-compat";
 import { APP_VERSION } from "@/lib/version";
 import { prisma } from "@/server/db";
 import { ConfigurationError, demoModeEnabled, loadEnv } from "@/server/env";
@@ -9,9 +10,11 @@ export const dynamic = "force-dynamic";
 
 type Readiness = { body: Record<string, unknown>; status: number };
 
+// Every answer, degraded or not, says which contract it speaks, so a client can tell an update
+// from an outage (src/lib/api-compat.ts).
 function healthResponse({ body, status }: Readiness) {
   return Response.json(
-    { ...body, update: getUpdateCheckSnapshot() },
+    { ...body, apiVersion: API_VERSION, minAppApiVersion: OLDEST_CLIENT_API_VERSION, update: getUpdateCheckSnapshot() },
     { status, headers: { "cache-control": "no-store" } },
   );
 }
