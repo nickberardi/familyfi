@@ -7,7 +7,7 @@ info:
   x-oldest-client: 0.36.0
   # The oldest server API version an app built from this document can read: raised to `version`
   # when a response gains a required field. Apps compile it in; it never leaves the app.
-  # scripts/ci/check-openapi-floors.sh enforces both (docs/api.md, "Versioning the contract").
+  # scripts/ci/check-openapi-floors.mjs enforces both (docs/api.md, "Versioning the contract").
   x-oldest-server: 0.36.0
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired

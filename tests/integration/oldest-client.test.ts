@@ -155,7 +155,7 @@ describe(`the oldest client the server serves (x-oldest-client ${OLDEST_CLIENT_A
     else process.env.FAMILYFI_MODE = previousMode;
     setReconcileClientForTests(undefined);
     resetDevMockClientForTests();
-    if (extracted) rmSync(path.dirname(extracted), { recursive: true, force: true });
+    if (extracted) rmSync(path.resolve(extracted, "../.."), { recursive: true, force: true });
   });
 
   it("loads the household and draws every Family, Rules and Checkup screen without a throw", async () => {
