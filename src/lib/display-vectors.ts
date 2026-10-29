@@ -93,6 +93,7 @@ export const MODULES = { apiCompat, display, groupActions: groupActionsModule, g
 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {
+  ApiMismatchError: "the error pairing throws, which only the phone shows; tests/unit/companion-pairing.test.ts",
   internetRulePath: "an API path, not display text",
   // The Watch lists a group's rules but draws no schedule bar.
   groupScheduleToday: "the schedule bar and today's list are phone and web only; tests/unit/group-schedule.test.ts",

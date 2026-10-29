@@ -5,6 +5,7 @@
  */
 import { generateKeyPairSync, sign } from "node:crypto";
 import { TransportError } from "@/lib/api-client";
+import { API_COMPAT_COPY, API_VERSION, OLDEST_CLIENT_API_VERSION, type HealthVersions } from "@/lib/api-compat";
 import {
   LOCAL_NETWORK_DENIED,
   LOCAL_NETWORK_OFF,
@@ -59,7 +60,13 @@ const CREDENTIAL: EndpointCredential = {
   clientSecret: "secret",
 };
 
-function household({ manifestEndpoints = [LAN, EDGE], otherSigner = false } = {}) {
+const CURRENT_HEALTH: HealthVersions = { version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: OLDEST_CLIENT_API_VERSION };
+
+function household({
+  manifestEndpoints = [LAN, EDGE],
+  otherSigner = false,
+  health = CURRENT_HEALTH as HealthVersions | null,
+} = {}) {
   const keys = generateKeyPairSync("ed25519");
   const signer = otherSigner ? generateKeyPairSync("ed25519") : keys;
   const x = (keys.publicKey.export({ format: "jwk" }) as { x: string }).x;
@@ -81,6 +88,7 @@ function household({ manifestEndpoints = [LAN, EDGE], otherSigner = false } = {}
         publicKey: { kty: "OKP", crv: "Ed25519", x },
         keyFingerprint: fingerprint,
       }),
+    ...(health ? { "GET /api/v1/health": () => json(200, { ok: true, ...health }) } : {}),
     "POST /api/v1/paired/invites/cm1/claim": () =>
       json(200, {
         device: { id: "dev-1", displayName: "A phone", client: "phone", scope: "full" },
@@ -129,9 +137,10 @@ describe("pairing a phone", () => {
     const home = household();
     const pending = await verifyHousehold(home.transport, home.code);
     expect(pending.identity.householdName).toBe("A household");
-    // Verifying sends one unauthenticated read, pinned to the code's certificate, and spends nothing.
+    // Verifying sends two unauthenticated reads, pinned to the code's certificate, and spends nothing.
     expect(home.calls.map((call) => [call.method, new URL(call.url).pathname, call.trustMode, call.pin])).toEqual([
       ["GET", "/api/v1/connection/identity", "pinned", LAN.spkiSha256],
+      ["GET", "/api/v1/health", "pinned", LAN.spkiSha256],
     ]);
 
     const { profile, edgeCredentials, session } = await claimHousehold(home.transport, pending, "A phone");
@@ -149,8 +158,8 @@ describe("pairing a phone", () => {
       refreshToken: "refresh-1",
       session: { username: "admin", displayName: "An adult", kind: "recovery", expiresAt: "2030-01-01T00:00:00Z" },
     });
-    expect([home.calls[1]!.method, new URL(home.calls[1]!.url).pathname]).toEqual(["POST", "/api/v1/paired/invites/cm1/claim"]);
-    expect(JSON.parse(home.calls[1]!.body!)).toEqual({ token: "token-1", deviceName: "A phone" });
+    expect([home.calls[2]!.method, new URL(home.calls[2]!.url).pathname]).toEqual(["POST", "/api/v1/paired/invites/cm1/claim"]);
+    expect(JSON.parse(home.calls[2]!.body!)).toEqual({ token: "token-1", deviceName: "A phone" });
   });
 
   it("never reaches the network for a malformed code, and never claims for a household the code did not name", async () => {
@@ -167,7 +176,26 @@ describe("pairing a phone", () => {
 
     const impostor = household();
     await expect(verifyHousehold(impostor.transport, home.code)).rejects.toThrow(IDENTITY_MISMATCH);
-    expect(impostor.calls.map((call) => call.method)).toEqual(["GET"]); // the code was never spent
+    expect(impostor.calls.map((call) => call.method)).toEqual(["GET"]); // the code was never spent, nor its health asked
+  });
+
+  it("stops before spending the code when this app and the server can't read each other", async () => {
+    // The server no longer serves this app: it needs an update.
+    const newer = household({ health: { version: "99.0.0", apiVersion: "99.0.0", minAppApiVersion: "99.0.0" } });
+    await expect(verifyHousehold(newer.transport, newer.code)).rejects.toThrow(API_COMPAT_COPY.pairApp);
+    // A server from before apiVersion, older than this app can read.
+    const older = household({ health: { version: "0.34.0" } });
+    await expect(verifyHousehold(older.transport, older.code)).rejects.toThrow(API_COMPAT_COPY.pairServer);
+    expect(pairingFailure(await verifyHousehold(older.transport, older.code).catch((error: unknown) => error), true)).toEqual({
+      message: API_COMPAT_COPY.pairServer,
+      settings: false,
+    });
+    expect(older.calls.some((call) => call.method === "POST")).toBe(false);
+  });
+
+  it("pairs when the health read fails, which decides nothing", async () => {
+    const quiet = household({ health: null });
+    await expect(verifyHousehold(quiet.transport, quiet.code)).resolves.toMatchObject({ identity: { householdName: "A household" } });
   });
 
   it("refuses a claim whose manifest another key signed, or that leaves out the route it paired over", async () => {
@@ -479,7 +507,7 @@ describe("a companion session", () => {
     await session.verify(home.code);
     session.reject();
     expect(session.getState().pending).toBeNull();
-    expect(home.calls.map((call) => call.method)).toEqual(["GET"]);
+    expect(home.calls.map((call) => call.method)).toEqual(["GET", "GET"]);
   });
 
   it("lands on setup when secure storage cannot be read", async () => {

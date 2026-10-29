@@ -283,7 +283,7 @@ Either may rise on purpose and neither ever falls. `scripts/ci/check-openapi-flo
 | The server's `apiVersion` < its own `x-oldest-server` | Update the server |
 | Otherwise | The household |
 
-A server from before 0.41.0 sends no `apiVersion`; its `version` is the same number. The web skips the check, since its own server serves it. `tests/integration/oldest-client.test.ts` proves `x-oldest-client`: it runs `src/lib` from the commit that first carried that version against today's route handlers, and fails on any throw.
+Pairing makes the same check after the household's identity verifies and before the code is spent (`verifyHousehold` in `src/lib/companion-pairing.ts`), and the native watch apps port it, replaying its cases in `tests/fixtures/display-vectors.json`. A health read that fails decides nothing. A server from before 0.41.0 sends no `apiVersion`; its `version` is the same number. The web skips the check, since its own server serves it. `tests/integration/oldest-client.test.ts` proves `x-oldest-client`: it runs `src/lib` from the commit that first carried that version against today's route handlers, and fails on any throw.
 
 ### Values that grow
 

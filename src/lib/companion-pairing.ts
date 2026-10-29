@@ -4,12 +4,15 @@
  *
  * 1. Read the code, scanned or pasted. Nothing touches the network for a code that fails.
  * 2. Ask the route in the code who it is, and check the identity against the code's fingerprint.
+ *    Then ask it which API it speaks (`api-compat.ts`): a server this app can't read, or one that no
+ *    longer serves it, stops pairing here, before the code is spent.
  * 3. Only when the person confirms ("Trust this household"), spend the code. Pairing is the sign-in:
  *    the claim signs the phone in as the adult the invite names, and returns its session and a
  *    manifest, which must be signed by the key just checked, name the same household, and include
  *    the route the phone paired over. There is no password and no device credential.
  */
 import { ApiError, TransportError, type ApiRequest } from "./api-client";
+import { ApiMismatchError, apiCompatibility, type HealthVersions } from "./api-compat";
 import { COMPANION_OFFLINE_GUARD } from "./household-store";
 import {
   mergeEdgeCredentials,
@@ -44,7 +47,9 @@ export const PAIRING_UNREACHABLE = "Can't reach FamilyFi at the address in this 
 
 /** What to show when a pairing step fails: the check's own message, the server's, or that it could not be reached. */
 export function pairingErrorMessage(error: unknown): string {
-  if (error instanceof PairingCodeError || error instanceof TrustError || error instanceof ApiError) return error.message;
+  if (error instanceof PairingCodeError || error instanceof TrustError || error instanceof ApiError || error instanceof ApiMismatchError) {
+    return error.message;
+  }
   if (error instanceof TransportError) return PAIRING_UNREACHABLE;
   return error instanceof Error ? error.message : String(error);
 }
@@ -92,11 +97,19 @@ function codeRequest(transport: Transport, code: PairingCode): ApiRequest {
   return createCompanionRequest(transport, { routes: () => [code.endpoint], edgeCredentials: () => credentials });
 }
 
-/** Steps 1 and 2: read the code and verify who answers at its route. Throws a PairingCodeError, TrustError or transport error. */
+/**
+ * Steps 1 and 2: read the code, verify who answers at its route, and that this app and it can read
+ * each other. Throws a PairingCodeError, TrustError, ApiMismatchError or transport error. A health
+ * read that fails decides nothing, as in the household store.
+ */
 export async function verifyHousehold(transport: Transport, text: string): Promise<PendingEnrollment> {
   const code = parsePairingCode(text);
-  const identity = await codeRequest(transport, code)<ConnectionIdentity>("/api/v1/connection/identity");
+  const request = codeRequest(transport, code);
+  const identity = await request<ConnectionIdentity>("/api/v1/connection/identity");
   verifyIdentity(identity, code.keyFingerprint);
+  const health = await request<HealthVersions>("/api/v1/health").catch(() => null);
+  const compatibility = health ? apiCompatibility(health) : null;
+  if (compatibility && compatibility.status !== "ok") throw new ApiMismatchError(compatibility);
   return { code, identity };
 }
 
