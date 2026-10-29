@@ -815,6 +815,12 @@ describe("household store compatibility check", () => {
     expect(server.calls).toHaveLength(9);
   });
 
+  it("decides nothing from a health answer with no body", async () => {
+    const { store } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": () => ({ json: null }) });
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "ready", compatibility: null });
+  });
+
   it("keeps the household unread from a server older than this client can read", async () => {
     // A server from before API 0.41.0 sends only its release version: 0.34 left out Checkup's message.
     const { store } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": health({ version: "0.34.0" }) });

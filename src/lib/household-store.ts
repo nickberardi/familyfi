@@ -217,7 +217,7 @@ export function createHouseholdStore(deps: {
    * says it can. A server can update between two refreshes, or while the app is in the background.
    */
   const askCompatibility = (): Promise<ApiCompatibility | null> =>
-    checkCompatibility ? request<HealthVersions>("/api/v1/health").then(apiCompatibility, () => null) : Promise.resolve(null);
+    checkCompatibility ? request<HealthVersions | null>("/api/v1/health").then((health) => apiCompatibility(health ?? {}), () => null) : Promise.resolve(null);
 
   /**
    * Whether this read must not be shown: the server can't be read, which empties the store, or the
