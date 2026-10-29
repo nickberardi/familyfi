@@ -114,7 +114,7 @@ export function createHouseholdStore(deps: {
   offlineGuard?: OfflineGuard;
   visibility?: Visibility;
   /**
-   * Check `GET /api/v1/health` against this build's contract before every full load (src/lib/api-compat.ts).
+   * Check `GET /api/v1/health` against this build's contract beside every read, full or live (src/lib/api-compat.ts).
    * A client that can meet a server of another version (a paired phone) turns this on; the web is
    * always served by its own server, so it leaves it off.
    */
@@ -212,15 +212,44 @@ export function createHouseholdStore(deps: {
     return { stale: false, unreachable: false, ...(answered ? { error: "" } : {}) };
   };
 
+  /**
+   * Asked beside every read, full or live, not before it: nothing reads a body until the check
+   * says it can. A server can update between two refreshes, or while the app is in the background.
+   */
+  const askCompatibility = (): Promise<ApiCompatibility | null> =>
+    checkCompatibility ? request<HealthVersions>("/api/v1/health").then(apiCompatibility, () => null) : Promise.resolve(null);
+
+  /**
+   * Whether this read must not be shown: the server can't be read, which empties the store, or the
+   * check could not be made while a mismatch is already known, which keeps it. A check that fails
+   * otherwise decides nothing, and the read reports whatever went wrong.
+   */
+  function withheld(compatibility: ApiCompatibility | null): boolean {
+    if (compatibility === null) return checkCompatibility && state.status === "incompatible";
+    if (compatibility.status === "ok") return false;
+    // Nothing read from this server before, such as the household before it updated, stays either.
+    set({
+      status: "incompatible",
+      compatibility,
+      loaded: true,
+      session: null,
+      groups: [],
+      devices: [],
+      rules: [],
+      sync: null,
+      unifi: null,
+      household: null,
+      accounts: [],
+      ...reached(),
+    });
+    return true;
+  }
+
   async function reload(): Promise<void> {
     const gen = ++loadGen;
     fullLoadAt = Date.now();
     loadsInFlight += 1;
-    // Asked beside the household, not before it: nothing reads a body until the check says it can.
-    // A check that fails decides nothing, and the load reports whatever went wrong.
-    const compatible = checkCompatibility
-      ? request<HealthVersions>("/api/v1/health").then(apiCompatibility, () => null)
-      : Promise.resolve(null);
+    const compatible = askCompatibility();
     try {
       // All at once: a signed-out session answers 401 on every one of them anyway.
       const loading = Promise.all([
@@ -236,25 +265,8 @@ export function createHouseholdStore(deps: {
       // Its failure is read below, unless the check makes the household unreadable anyway.
       loading.catch(() => {});
       const compatibility = await compatible;
-      if (compatibility && compatibility.status !== "ok") {
-        if (gen !== loadGen) return;
-        // Nothing read from this server before, such as the household before it updated, stays either.
-        set({
-          status: "incompatible",
-          compatibility,
-          loaded: true,
-          session: null,
-          groups: [],
-          devices: [],
-          rules: [],
-          sync: null,
-          unifi: null,
-          household: null,
-          accounts: [],
-          ...reached(),
-        });
-        return;
-      }
+      if (gen !== loadGen) return;
+      if (withheld(compatibility)) return;
       const [session, groups, devices, rules, sync, unifi, household, accounts] = await loading;
       if (gen !== loadGen) return;
       // A write in flight shows its optimistic change; what this read says waits until it ends.
@@ -286,17 +298,23 @@ export function createHouseholdStore(deps: {
 
   /** Rereads only what changes without a write. A full reload or a write started meanwhile wins. */
   async function refreshLive(): Promise<void> {
-    // Nothing is read from a server this client can't read; only a full reload checks again.
+    // A server this client couldn't read is checked again by a full reload, which reads everything.
     if (state.status === "incompatible") return reload();
     const gen = loadGen;
     loadsInFlight += 1;
+    const compatible = askCompatibility();
     try {
-      const [groups, devices, rules, sync] = await Promise.all([
+      const loading = Promise.all([
         request<{ groups: Group[] }>("/api/v1/groups"),
         request<{ devices: Device[] }>("/api/v1/devices"),
         request<{ rules: Rule[] }>("/api/v1/rules"),
         request<SyncStatus>("/api/v1/sync"),
       ]);
+      loading.catch(() => {});
+      const compatibility = await compatible;
+      if (gen !== loadGen) return;
+      if (withheld(compatibility)) return;
+      const [groups, devices, rules, sync] = await loading;
       if (gen !== loadGen) return;
       if (busyCount > 0) {
         reloadAfterWrites = true;

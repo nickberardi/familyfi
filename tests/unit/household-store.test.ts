@@ -871,6 +871,32 @@ describe("household store compatibility check", () => {
     expect(server.calls).toHaveLength(sent);
   });
 
+  it("checks again on a live refresh, so a server updated in between is never read unchecked", async () => {
+    let answer: Record<string, unknown> = current;
+    const { store, server } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": () => ({ json: answer }) });
+    vi.useFakeTimers();
+    const stop = store.startRefreshing(1000, 60_000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getState().status).toBe("ready");
+    // The server updates past this app between two refreshes, well inside the full-reload interval.
+    answer = { version: "99.0.0", apiVersion: "99.0.0", minAppApiVersion: "99.0.0" };
+    await vi.advanceTimersByTimeAsync(1000);
+    stop();
+    // The tick was a live refresh, not a full reload, and it still checked.
+    expect(server.calls.filter((call) => call.path === "/api/v1/auth/session")).toHaveLength(1);
+    expect(store.getState()).toMatchObject({ status: "incompatible", compatibility: { status: "update_app" }, groups: [] });
+  });
+
+  it("keeps a known mismatch when a later check can't be made", async () => {
+    let health: Handler = () => ({ json: { version: "0.34.0" } });
+    const { store } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": (body) => health(body) });
+    await store.reload();
+    expect(store.getState().status).toBe("incompatible");
+    health = () => ({ status: 503, json: { error: { message: "Degraded." } } });
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "incompatible", compatibility: { status: "update_server" }, groups: [] });
+  });
+
   it("lets a check that fails decide nothing", async () => {
     const { store } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": () => ({ status: 503, json: { error: { message: "Degraded." } } }) });
     await store.reload();
