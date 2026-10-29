@@ -2,7 +2,7 @@ import { compareSemver, parseSemver } from "./semver";
 
 /**
  * Whether a client and a server can read each other, decided before the client reads the
- * household. The two floors are `info.x-oldest-client` and `info.x-oldest-server` in
+ * household. The two floors are `info.x-min-app-api` and `info.x-min-server-api` in
  * `openapi/familyfi.v1.yaml`, which CI raises from the spec diff (docs/api.md, "Versioning the
  * contract"); `tests/unit/api-compat.test.ts` keeps these constants equal to them. The native watch
  * apps port `apiCompatibility`, which `tests/fixtures/display-vectors.json` pins.
@@ -13,11 +13,11 @@ import { compareSemver, parseSemver } from "./semver";
  * A literal rather than package.json's, so a client that vendors this module, such as the companion
  * app, never bundles familyfi's package.json; `tests/unit/api-compat.test.ts` fails when it drifts.
  */
-export const API_VERSION: string = "0.41.0";
-/** The oldest client API version this server still serves (`info.x-oldest-client`). */
-export const OLDEST_CLIENT_API_VERSION = "0.36.0";
-/** The oldest server API version a client built from this contract can read (`info.x-oldest-server`). */
-export const OLDEST_SERVER_API_VERSION = "0.36.0";
+export const API_VERSION: string = "0.42.0";
+/** The oldest client API version this server still serves (`info.x-min-app-api`). */
+export const MIN_APP_API_VERSION = "0.36.0";
+/** The oldest server API version a client built from this contract can read (`info.x-min-server-api`). */
+export const MIN_SERVER_API_VERSION = "0.36.0";
 
 /** The versions `GET /api/v1/health` reports. A server from before API 0.41.0 sends only `version`. */
 export type HealthVersions = { version?: string; apiVersion?: string; minAppApiVersion?: string };
@@ -31,7 +31,7 @@ export type ApiCompatibility =
 
 export function apiCompatibility(
   health: HealthVersions,
-  client: { apiVersion: string; oldestServer: string } = { apiVersion: API_VERSION, oldestServer: OLDEST_SERVER_API_VERSION },
+  client: { apiVersion: string; minServerApi: string } = { apiVersion: API_VERSION, minServerApi: MIN_SERVER_API_VERSION },
 ): ApiCompatibility {
   // Before 0.41.0 the release version and the API version were the same number.
   const serverApiVersion = health.apiVersion ?? health.version;
@@ -40,10 +40,10 @@ export function apiCompatibility(
   // A version that can't be read decides nothing: the household load reports whatever goes wrong.
   if (!server || !app) return { status: "ok" };
   const mismatch = { appApiVersion: app.version, serverApiVersion: server.version };
-  const oldestClient = health.minAppApiVersion ? parseSemver(health.minAppApiVersion) : null;
-  if (oldestClient && compareSemver(app, oldestClient) < 0) return { status: "update_app", ...mismatch };
-  const oldestServer = parseSemver(client.oldestServer);
-  if (oldestServer && compareSemver(server, oldestServer) < 0) return { status: "update_server", ...mismatch };
+  const minAppApi = health.minAppApiVersion ? parseSemver(health.minAppApiVersion) : null;
+  if (minAppApi && compareSemver(app, minAppApi) < 0) return { status: "update_app", ...mismatch };
+  const minServerApi = parseSemver(client.minServerApi);
+  if (minServerApi && compareSemver(server, minServerApi) < 0) return { status: "update_server", ...mismatch };
   return { status: "ok" };
 }
 

@@ -5,7 +5,7 @@
  */
 import { generateKeyPairSync, sign } from "node:crypto";
 import { TransportError } from "@/lib/api-client";
-import { API_COMPAT_COPY, API_VERSION, OLDEST_CLIENT_API_VERSION, type HealthVersions } from "@/lib/api-compat";
+import { API_COMPAT_COPY, API_VERSION, MIN_APP_API_VERSION, type HealthVersions } from "@/lib/api-compat";
 import {
   LOCAL_NETWORK_DENIED,
   LOCAL_NETWORK_OFF,
@@ -60,7 +60,7 @@ const CREDENTIAL: EndpointCredential = {
   clientSecret: "secret",
 };
 
-const CURRENT_HEALTH: HealthVersions = { version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: OLDEST_CLIENT_API_VERSION };
+const CURRENT_HEALTH: HealthVersions = { version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: MIN_APP_API_VERSION };
 
 function household({
   manifestEndpoints = [LAN, EDGE],
