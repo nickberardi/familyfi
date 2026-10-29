@@ -278,6 +278,11 @@
         "contracts"
       ]
     },
+    "tests/unit/openapi-floors.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
     "tests/unit/origin.test.ts": {
       "categories": [
         "sessions"
@@ -522,6 +527,11 @@
         "runtime"
       ]
     },
+    "tests/unit/api-compat.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
     "tests/integration/agent-pairing.test.ts": {
       "categories": [
         "pairing",
@@ -529,6 +539,11 @@
       ]
     },
     "tests/integration/api-contract.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
+    "tests/integration/oldest-client.test.ts": {
       "categories": [
         "contracts"
       ]

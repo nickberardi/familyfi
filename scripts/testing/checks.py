@@ -1,12 +1,11 @@
 """Repository checks. Each calls the same helper or package script the workflows call."""
 import json
 import os
-import shutil
 
 from . import catalog
 from .resources import pnpm, preflight
 
-CHECKS = ("lint", "typecheck", "api", "api-version", "api-breaking", "audit", "db-drift", "db-upgrade",
+CHECKS = ("lint", "typecheck", "api", "api-version", "api-breaking", "api-floors", "audit", "db-drift", "db-upgrade",
           "catalog", "coverage", "container", "mutation")
 NEEDS_DATABASE = {"db-drift", "db-upgrade", "mutation"}
 DOCKER = NEEDS_DATABASE | {"container"}
@@ -24,6 +23,7 @@ def commands(name, args, root):
         "api": [[*package, "test-api"]],
         "api-version": [["node", "scripts/ci/check-openapi-version.mjs", args.base]],
         "api-breaking": [["sh", "scripts/ci/check-openapi-breaking.sh", args.base]],
+        "api-floors": [["node", "scripts/ci/check-openapi-floors.mjs", args.base]],
         # Known high or critical advisories in what ships, not in dev tooling.
         "audit": [[*package, "audit", "--prod", "--audit-level=high"]],
         "db-drift": [[*package, "db-drift"]],
@@ -53,8 +53,6 @@ def run_check(name, args, resources, report, runs, database):
     if name == "catalog":
         tests, _ = catalog.load(resources.root)
         return f"{len(tests)} categorized tests"
-    if name == "api-breaking" and not shutil.which("go"):
-        raise RuntimeError("api-breaking needs Go (brew install go)")
     preflight(resources.root, docker=name in DOCKER)
     env = database() if name in NEEDS_DATABASE else resources.test_env("checks")
     steps = coverage(args, runs) if name == "coverage" else commands(name, args, resources.root)

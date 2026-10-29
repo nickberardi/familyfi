@@ -9,7 +9,6 @@
 # (scripts/test.py passes origin/main) it compares against that ref and fetches nothing.
 set -eu
 
-OASDIFF_VERSION=v1.32.1
 spec=openapi/familyfi.v1.yaml
 base_ref="${BASE_REF:-main}"
 if [ -n "${RUNNER_TEMP:-}" ]; then
@@ -40,10 +39,7 @@ git show "$base:$spec" > "$work/base-openapi.yaml"
 } >> "$summary"
 echo "$spec changed: open an issue in familyfi-mobile for the companion app to adopt it."
 
-# Built from the Go module proxy, whose checksum database verifies the pinned version.
-GOBIN="$work/bin" GOTOOLCHAIN=auto go install "github.com/oasdiff/oasdiff@$OASDIFF_VERSION"
-
-if "$work/bin/oasdiff" breaking "$work/base-openapi.yaml" "$spec" --fail-on ERR; then
+if sh scripts/ci/oasdiff.sh breaking "$work/base-openapi.yaml" "$spec" --fail-on ERR; then
   echo "No breaking changes against $base_ref."
   exit 0
 fi

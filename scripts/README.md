@@ -125,7 +125,8 @@ call, and reports each as a result.
 | `lint`, `typecheck` | `pnpm lint`, `pnpm typecheck` | |
 | `api` | `pnpm test-api`: OpenAPI lint, and every route and method on both sides | |
 | `api-version` | `ci/check-openapi-version.mjs` against `--base` | |
-| `api-breaking` | `ci/check-openapi-breaking.sh` against `--base` | Go |
+| `api-breaking` | `ci/check-openapi-breaking.sh` against `--base` | network, once |
+| `api-floors` | `ci/check-openapi-floors.mjs` against `--base` | network, once |
 | `audit` | `pnpm audit --prod --audit-level=high` | network |
 | `db-drift` | migrate a fresh database, then `pnpm db-drift` | Docker |
 | `db-upgrade` | `pnpm db-upgrade`: every supported release upgraded to these migrations | Docker |
@@ -197,8 +198,8 @@ scripts/release.sh --tag v0.12.1 --force       # rebuild and push a released tag
 - **`ci/`:** called from the harness, from the workflows that do not run through it
   (`container.yml`, `openapi.yml`) and from `package.json` (`test-api`, `db-upgrade`,
   `test:mutation`). `tests/unit/ci-scripts.test.ts` fails when a workflow calls a helper the
-  harness does not, or runs a test runner itself. `check-openapi-breaking.sh` and
-  `check-openapi-version.mjs` take an optional base ref; without one they fetch
+  harness does not, or runs a test runner itself. `check-openapi-breaking.sh`,
+  `check-openapi-floors.mjs` and `check-openapi-version.mjs` take an optional base ref; without one they fetch
   `origin/$BASE_REF` shallowly, the way CI runs them, so local callers pass `origin/main`.
 - **`runtime/`:** `with-env.mjs` loads `.env`, builds `DATABASE_URL`, generates missing secrets
   and prepares the database before running a command, preloading `forwarded-for.mjs` so the server
