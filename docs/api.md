@@ -274,13 +274,13 @@ An app and a server on different contract versions can each send something the o
 - **`x-min-server`**: the oldest server an app built from this document can read. It rises to the new `info.version` whenever `oasdiff changelog` reports `response-required-property-added` or `response-property-became-required`. A new endpoint does not raise it: an old server answers it with 404, which a client already reports as an error.
 - **`x-min-watch`**: the oldest watch app API version this server still serves. The watches read only a few routes, so most breaking changes never reach them; until CI can tell which do, it is set by hand (0.30.0).
 
-Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both start at 0.36.0.
+Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both start at 0.36.0. `x-min-watch` started at 0.30.0, set by hand.
 
 `GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-watch`) to anyone, in every answer. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
 
 | Condition | The client shows |
 | --- | --- |
-| Its own API version < the server's `minAppApiVersion` | Update the app |
+| Its own API version < the server's `minAppApiVersion` (a watch: `minWatchApiVersion`) | Update the app |
 | The server's `apiVersion` < its own `x-min-server` | Update the server |
 | Otherwise | The household |
 
