@@ -1,5 +1,4 @@
 import { compareSemver, parseSemver } from "./semver";
-import { APP_VERSION } from "./version";
 
 /**
  * Whether a client and a server can read each other, decided before the client reads the
@@ -9,8 +8,12 @@ import { APP_VERSION } from "./version";
  * apps port `apiCompatibility`, which `tests/fixtures/display-vectors.json` pins.
  */
 
-/** This contract's `info.version`. Always the release version: `tests/unit/version.test.ts` keeps them equal. */
-export const API_VERSION = APP_VERSION;
+/**
+ * This contract's `info.version`, which is always the release version (`tests/unit/version.test.ts`).
+ * A literal rather than package.json's, so a client that vendors this module, such as the companion
+ * app, never bundles familyfi's package.json; `tests/unit/api-compat.test.ts` fails when it drifts.
+ */
+export const API_VERSION: string = "0.41.0";
 /** The oldest client API version this server still serves (`info.x-oldest-client`). */
 export const OLDEST_CLIENT_API_VERSION = "0.36.0";
 /** The oldest server API version a client built from this contract can read (`info.x-oldest-server`). */

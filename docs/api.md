@@ -253,7 +253,7 @@ CI holds the implementation to this document: `pnpm test-api` fails when a route
 
 ## Versioning the contract
 
-The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile)) vendors this repository as its `vendor/familyfi` submodule and generates its API types from `openapi/familyfi.v1.yaml` (`pnpm run schema`), so `info.version` names which contract revision a pin carries. Every pull request that changes the document raises `info.version`, and `package.json`'s version with it (`tests/unit/version.test.ts` keeps the two equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
+The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile)) vendors this repository as its `vendor/familyfi` submodule and generates its API types from `openapi/familyfi.v1.yaml` (`pnpm run schema`), so `info.version` names which contract revision a pin carries. Every pull request that changes the document raises `info.version`, and `package.json`'s version and `API_VERSION` in `src/lib/api-compat.ts` with it (`tests/unit/version.test.ts` and `tests/unit/api-compat.test.ts` keep the three equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
 
 | The pull request changes | `info.version` must |
 | --- | --- |
