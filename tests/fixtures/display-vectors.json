@@ -17843,7 +17843,11 @@
         "signedOutError": "This Watch is signed out. Set it up again from the iPhone.",
         "notAllowed": "This Watch can't do that.",
         "unexpected": "FamilyFi answered unexpectedly.",
-        "refused": "FamilyFi refused the request."
+        "refused": "FamilyFi refused the request.",
+        "updateAppTitle": "Update FamilyFi on your iPhone",
+        "updateAppBody": "Your FamilyFi server was updated, and this app can't work with it.",
+        "updateServerTitle": "Your server needs an update",
+        "updateServerBody": "Update it from FamilyFi on your iPhone or computer."
       }
     },
     {
@@ -17875,7 +17879,296 @@
         "signedOutError": "This watch is signed out. Set it up again from the phone.",
         "notAllowed": "This watch can't do that.",
         "unexpected": "FamilyFi answered unexpectedly.",
-        "refused": "FamilyFi refused the request."
+        "refused": "FamilyFi refused the request.",
+        "updateAppTitle": "Update FamilyFi on your phone",
+        "updateAppBody": "Your FamilyFi server was updated, and this app can't work with it.",
+        "updateServerTitle": "Your server needs an update",
+        "updateServerBody": "Update it from FamilyFi on your phone or computer."
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "app older than the server's oldest client",
+      "input": {
+        "health": {
+          "version": "0.45.0",
+          "apiVersion": "0.45.0",
+          "minAppApiVersion": "0.43.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "update_app",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.45.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "server older than the app's oldest server",
+      "input": {
+        "health": {
+          "version": "0.35.0",
+          "apiVersion": "0.35.0",
+          "minAppApiVersion": "0.30.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.35.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "same version",
+      "input": {
+        "health": {
+          "version": "0.41.0",
+          "apiVersion": "0.41.0",
+          "minAppApiVersion": "0.36.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "newer server at the app's version floor",
+      "input": {
+        "health": {
+          "version": "0.45.0",
+          "apiVersion": "0.45.0",
+          "minAppApiVersion": "0.41.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "older server at the app's server floor",
+      "input": {
+        "health": {
+          "version": "0.36.0",
+          "apiVersion": "0.36.0",
+          "minAppApiVersion": "0.36.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "server from before apiVersion, too old",
+      "input": {
+        "health": {
+          "version": "0.34.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.34.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "server from before apiVersion, readable",
+      "input": {
+        "health": {
+          "version": "0.40.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "apiVersion over the release version",
+      "input": {
+        "health": {
+          "version": "1.0.0",
+          "apiVersion": "0.34.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.34.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "both floors fail: the app's update comes first",
+      "input": {
+        "health": {
+          "version": "0.50.0",
+          "apiVersion": "0.50.0",
+          "minAppApiVersion": "0.50.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.60.0"
+        }
+      },
+      "expected": {
+        "status": "update_app",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.50.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "numeric order, not text",
+      "input": {
+        "health": {
+          "version": "0.9.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.10.0"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.9.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "numeric order for the app floor",
+      "input": {
+        "health": {
+          "version": "0.100.0",
+          "minAppApiVersion": "0.100.0"
+        },
+        "client": {
+          "apiVersion": "0.99.0",
+          "oldestServer": "0.1.0"
+        }
+      },
+      "expected": {
+        "status": "update_app",
+        "appApiVersion": "0.99.0",
+        "serverApiVersion": "0.100.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "leading v and build metadata",
+      "input": {
+        "health": {
+          "version": "v0.41.0+build.7"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "prerelease before its release",
+      "input": {
+        "health": {
+          "version": "0.36.0-rc.1"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.36.0-rc.1"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "no version",
+      "input": {
+        "health": {},
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "unreadable version",
+      "input": {
+        "health": {
+          "version": "dev"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "unreadable app floor",
+      "input": {
+        "health": {
+          "version": "0.41.0",
+          "minAppApiVersion": "soon"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
       }
     }
   ]

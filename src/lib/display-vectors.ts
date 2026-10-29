@@ -3,6 +3,7 @@
  * the modules whose every export needs a vector, and one vector's replay. familyfi's unit test and
  * the Expo app (in Node and on device, where the JavaScript engine's Intl differs) share it.
  */
+import * as apiCompat from "./api-compat";
 import * as groupActionsModule from "./group-actions";
 import * as display from "./display";
 import * as groupSchedule from "./group-schedule";
@@ -83,10 +84,12 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   watchNoun: (i) => watchApp.watchNoun(i.platform),
   watchPhoneNoun: (i) => watchApp.watchPhoneNoun(i.platform),
   watchAppCopy: (i) => watchApp.watchAppCopy(i.platform),
+  // The watches decide from `/health` whether to show the household, so each ports the check.
+  apiCompatibility: (i) => apiCompat.apiCompatibility(i.health, i.client),
 };
 
 /** The modules whose every exported function must have a vector, or a reason in `EXCLUDED`. */
-export const MODULES = { display, groupActions: groupActionsModule, groupSchedule, pauseSheet, ruleActions, ruleWindows, watchApp };
+export const MODULES = { apiCompat, display, groupActions: groupActionsModule, groupSchedule, pauseSheet, ruleActions, ruleWindows, watchApp };
 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {
