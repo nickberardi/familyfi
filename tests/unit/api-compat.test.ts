@@ -12,10 +12,11 @@ import {
   apiCompatibility,
   MIN_APP_API_VERSION,
   MIN_SERVER_API_VERSION,
+  MIN_WATCH_API_VERSION,
 } from "@/lib/api-compat";
 
 const info = (YAML.parse(readFileSync(path.resolve(__dirname, "../../openapi/familyfi.v1.yaml"), "utf8")) as {
-  info: { version: string; "x-min-app-api": string; "x-min-server-api": string };
+  info: { version: string; "x-min-app": string; "x-min-server": string; "x-min-watch": string };
 }).info;
 
 const client = { apiVersion: "0.41.0", minServerApi: "0.36.0" };
@@ -23,8 +24,9 @@ const client = { apiVersion: "0.41.0", minServerApi: "0.36.0" };
 describe("API compatibility", () => {
   it("carries the contract's version and floors", () => {
     expect(API_VERSION).toBe(info.version);
-    expect(MIN_APP_API_VERSION).toBe(info["x-min-app-api"]);
-    expect(MIN_SERVER_API_VERSION).toBe(info["x-min-server-api"]);
+    expect(MIN_APP_API_VERSION).toBe(info["x-min-app"]);
+    expect(MIN_SERVER_API_VERSION).toBe(info["x-min-server"]);
+    expect(MIN_WATCH_API_VERSION).toBe(info["x-min-watch"]);
   });
 
   it("asks for an app update when the app is older than the server's oldest client", () => {
@@ -64,6 +66,14 @@ describe("API compatibility", () => {
     expect(apiCompatibility({ version: "0.100.0", minAppApiVersion: "0.100.0" }, { apiVersion: "0.99.0", minServerApi: "0.1.0" }).status).toBe(
       "update_app",
     );
+  });
+
+  it("serves a watch app from the server's watch floor, not the app's", () => {
+    const watch = { ...client, watch: true };
+    const health = { version: "0.45.0", apiVersion: "0.45.0", minAppApiVersion: "0.45.0", minWatchApiVersion: "0.30.0" };
+    expect(apiCompatibility(health, client).status).toBe("update_app");
+    expect(apiCompatibility(health, watch).status).toBe("ok");
+    expect(apiCompatibility({ ...health, minWatchApiVersion: "0.43.0" }, watch).status).toBe("update_app");
   });
 
   it("decides nothing from a version it can't read", () => {

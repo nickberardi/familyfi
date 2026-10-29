@@ -1,5 +1,5 @@
 /**
- * `info.x-min-app-api` claims that every app built from that contract version on can still read
+ * `info.x-min-app` claims that every app built from that contract version on can still read
  * this server. This proves it: the shared `src/lib` as it stood when `info.version` first became
  * that floor, which is what such an app vendors, loads the dev seed household from today's route
  * handlers and draws what the app's Family, Rules and Checkup screens draw from it. Any throw fails.
@@ -40,7 +40,7 @@ function floorCommit(): string | null {
   const first = commits.split("\n").find(Boolean) ?? null;
   if (!first && MIN_APP_API_VERSION !== API_VERSION) {
     throw new Error(
-      `No commit carries info.version ${MIN_APP_API_VERSION} (x-min-app-api). This test reads git history: ` +
+      `No commit carries info.version ${MIN_APP_API_VERSION} (x-min-app). This test reads git history: ` +
         "check out every commit (actions/checkout fetch-depth: 0).",
     );
   }
@@ -49,7 +49,7 @@ function floorCommit(): string | null {
 
 /** That commit's `src/lib`, extracted under build/ with its `@/lib` imports made relative. */
 function extractLib(commit: string): string {
-  const dir = path.join(repoRoot, "build/min-app-api", commit.slice(0, 12));
+  const dir = path.join(repoRoot, "build/min-app", commit.slice(0, 12));
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const archive = execFileSync("git", ["archive", commit, "src/lib", "package.json"], { cwd: repoRoot });
@@ -132,7 +132,7 @@ type Old = {
   checkup: typeof import("@/lib/checkup");
 };
 
-describe(`the oldest client the server serves (x-min-app-api ${MIN_APP_API_VERSION})`, () => {
+describe(`the oldest client the server serves (x-min-app ${MIN_APP_API_VERSION})`, () => {
   const previousMode = process.env.FAMILYFI_MODE;
   let lib = path.join(repoRoot, "src/lib");
   let extracted: string | null = null;
@@ -237,7 +237,7 @@ describe("the versions GET /api/v1/health reports", () => {
     await resetDatabase();
   });
 
-  it("names the contract and its oldest client to anyone, over the tunnel too", async () => {
+  it("names the contract and the oldest app and watch it serves to anyone, over the tunnel too", async () => {
     const info = YAML.parse(readFileSync(path.join(repoRoot, SPEC), "utf8")).info as Record<string, string>;
     for (const headers of [{}, { "x-familyfi-via": "tunnel" }] as Record<string, string>[]) {
       const response = await getHealth(request("/api/v1/health", { headers }));
@@ -245,7 +245,8 @@ describe("the versions GET /api/v1/health reports", () => {
       expect(await response.json()).toMatchObject({
         version: API_VERSION,
         apiVersion: info.version,
-        minAppApiVersion: info["x-min-app-api"],
+        minAppApiVersion: info["x-min-app"],
+        minWatchApiVersion: info["x-min-watch"],
       });
     }
   });

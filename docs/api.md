@@ -268,22 +268,23 @@ Run the check locally with `make test-api-version`, or against any ref with `nod
 
 ### Which apps and servers can read each other
 
-An app and a server on different contract versions can each send something the other can't read: a response field an old app relies on goes away, or a new app reads a required field an old server never sends. Two lines under `info:` say how far each side reaches:
+An app and a server on different contract versions can each send something the other can't read: a response field an old app relies on goes away, or a new app reads a required field an old server never sends. Three lines under `info:` say how far each side reaches:
 
-- **`x-min-app-api`**: the oldest client API version this server still serves. It rises to the new `info.version` whenever oasdiff's `breaking` check finds a change that breaks old clients, such as a response field removed or made optional. The `breaking_api` label approves such a change; the floor records which apps it leaves behind.
-- **`x-min-server-api`**: the oldest server an app built from this document can read. It rises to the new `info.version` whenever `oasdiff changelog` reports `response-required-property-added` or `response-property-became-required`. A new endpoint does not raise it: an old server answers it with 404, which a client already reports as an error.
+- **`x-min-app`**: the oldest client API version this server still serves. It rises to the new `info.version` whenever oasdiff's `breaking` check finds a change that breaks old clients, such as a response field removed or made optional. The `breaking_api` label approves such a change; the floor records which apps it leaves behind.
+- **`x-min-server`**: the oldest server an app built from this document can read. It rises to the new `info.version` whenever `oasdiff changelog` reports `response-required-property-added` or `response-property-became-required`. A new endpoint does not raise it: an old server answers it with 404, which a client already reports as an error.
+- **`x-min-watch`**: the oldest watch app API version this server still serves. The watches read only a few routes, so most breaking changes never reach them; until CI can tell which do, it is set by hand (0.30.0).
 
-Either may rise on purpose and neither ever falls. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both start at 0.36.0.
+Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both start at 0.36.0.
 
-`GET /api/v1/health` reports `apiVersion` (this document's `info.version`) and `minAppApiVersion` (`x-min-app-api`) to anyone, in every answer. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
+`GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-watch`) to anyone, in every answer. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
 
 | Condition | The client shows |
 | --- | --- |
 | Its own API version < the server's `minAppApiVersion` | Update the app |
-| The server's `apiVersion` < its own `x-min-server-api` | Update the server |
+| The server's `apiVersion` < its own `x-min-server` | Update the server |
 | Otherwise | The household |
 
-Pairing makes the same check after the household's identity verifies and before the code is spent (`verifyHousehold` in `src/lib/companion-pairing.ts`), and the native watch apps port it, replaying its cases in `tests/fixtures/display-vectors.json`. A watch reads only a few routes, so it asks `/health` only once one of them fails, and asks for an update only for that true breakage. A health read that fails decides nothing. A server from before 0.41.0 sends no `apiVersion`; its `version` is the same number. The web skips the check, since its own server serves it. `tests/integration/min-app-api.test.ts` proves `x-min-app-api`: it runs `src/lib` from the commit that first carried that version against today's route handlers, and fails on any throw.
+Pairing makes the same check after the household's identity verifies and before the code is spent (`verifyHousehold` in `src/lib/companion-pairing.ts`), and the native watch apps port it, replaying its cases in `tests/fixtures/display-vectors.json`. A watch reads only a few routes, so it asks `/health` only once one of them fails, compares its own version with `minWatchApiVersion` (`apiCompatibility`'s `watch` client), and asks for an update only for that true breakage. A health read that fails decides nothing. A server from before 0.41.0 sends no `apiVersion`; its `version` is the same number. The web skips the check, since its own server serves it. `tests/integration/min-app.test.ts` proves `x-min-app`: it runs `src/lib` from the commit that first carried that version against today's route handlers, and fails on any throw.
 
 ### Values that grow
 

@@ -39,8 +39,9 @@ describe("openapi contract", () => {
     // out of the others (docs/api.md); one that applies but is empty is `null`. Only fields the
     // server really omits belong here. Integration tests check every response against these schemas.
     const sometimesOmitted = [
-      "Health.apiVersion", // always sent, but servers before 0.41.0 leave it out: required would raise x-min-server-api
+      "Health.apiVersion", // always sent, but servers before 0.41.0 leave it out: required would raise x-min-server
       "Health.minAppApiVersion", // likewise
+      "Health.minWatchApiVersion", // likewise
       "Health.revision", // only when the database answered
       "Health.error", // only when degraded by configuration
       "Health.gateway", // only with ?gateway=true, for a session, while ready

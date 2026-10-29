@@ -2,12 +2,13 @@
 // Fails when openapi/familyfi.v1.yaml changes in a way that older apps or older servers can't
 // follow without raising the floor that says so (docs/api.md, "Versioning the contract"):
 //
-//   - oasdiff `breaking` finds a change that breaks old apps: info.x-min-app-api must be the
+//   - oasdiff `breaking` finds a change that breaks old apps: info.x-min-app must be the
 //     new info.version. The breaking_api label (check-openapi-breaking.sh) approves the change;
 //     this records which apps it leaves behind, label or not.
-//   - oasdiff `changelog` reports a response gaining a required field: info.x-min-server-api must
+//   - oasdiff `changelog` reports a response gaining a required field: info.x-min-server must
 //     be the new info.version, since an older server never sends it.
-//   - Neither floor goes backwards, or past info.version.
+//   - info.x-min-watch, the watches' floor, is set by hand.
+//   - No floor goes backwards, or past info.version.
 //
 // Usage: node scripts/ci/check-openapi-floors.mjs [base-ref]
 // Without a ref it fetches origin/$BASE_REF (default main), the way CI runs it.
@@ -34,8 +35,10 @@ export function checkFloors({ baseSpec, headSpec, breaking, requiredAdded }) {
   const version = String(headSpec?.info?.version ?? "");
   const head = parseSemver(version);
   const floors = [
-    { key: "x-min-app-api", raise: breaking, why: "breaks apps built from older contracts" },
-    { key: "x-min-server-api", raise: requiredAdded, why: "adds required response fields, which older servers don't send" },
+    { key: "x-min-app", raise: breaking, why: "breaks apps built from older contracts" },
+    { key: "x-min-server", raise: requiredAdded, why: "adds required response fields, which older servers don't send" },
+    // The watches read only a few routes; until CI can tell which changes reach them, theirs is set by hand.
+    { key: "x-min-watch", raise: [], why: "" },
   ];
   for (const { key, raise, why } of floors) {
     const text = String(headSpec?.info?.[key] ?? "");
@@ -117,7 +120,7 @@ function main() {
         [
           "### OpenAPI floors",
           "",
-          `x-min-app-api \`${info["x-min-app-api"]}\`, x-min-server-api \`${info["x-min-server-api"]}\`, version \`${info.version}\`.`,
+          `x-min-app \`${info["x-min-app"]}\`, x-min-server \`${info["x-min-server"]}\`, x-min-watch \`${info["x-min-watch"]}\`, version \`${info.version}\`.`,
           "",
           outcome.ok ? "Passed." : ["```", ...outcome.problems, "```"].join("\n"),
           "",
@@ -128,7 +131,7 @@ function main() {
       for (const problem of outcome.problems) console.error(problem);
       return 1;
     }
-    console.log(`Floors hold against ${baseName}: x-min-app-api ${info["x-min-app-api"]}, x-min-server-api ${info["x-min-server-api"]}.`);
+    console.log(`Floors hold against ${baseName}: x-min-app ${info["x-min-app"]}, x-min-server ${info["x-min-server"]}, x-min-watch ${info["x-min-watch"]}.`);
     return 0;
   } finally {
     rmSync(work, { recursive: true, force: true });

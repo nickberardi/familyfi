@@ -1,4 +1,4 @@
-import { API_VERSION, MIN_APP_API_VERSION } from "@/lib/api-compat";
+import { API_VERSION, MIN_APP_API_VERSION, MIN_WATCH_API_VERSION } from "@/lib/api-compat";
 import { APP_VERSION } from "@/lib/version";
 import { prisma } from "@/server/db";
 import { ConfigurationError, demoModeEnabled, loadEnv } from "@/server/env";
@@ -14,7 +14,13 @@ type Readiness = { body: Record<string, unknown>; status: number };
 // from an outage (src/lib/api-compat.ts).
 function healthResponse({ body, status }: Readiness) {
   return Response.json(
-    { ...body, apiVersion: API_VERSION, minAppApiVersion: MIN_APP_API_VERSION, update: getUpdateCheckSnapshot() },
+    {
+      ...body,
+      apiVersion: API_VERSION,
+      minAppApiVersion: MIN_APP_API_VERSION,
+      minWatchApiVersion: MIN_WATCH_API_VERSION,
+      update: getUpdateCheckSnapshot(),
+    },
     { status, headers: { "cache-control": "no-store" } },
   );
 }
