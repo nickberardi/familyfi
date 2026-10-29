@@ -4,11 +4,16 @@ info:
   version: 0.42.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
-  x-min-app-api: 0.36.0
+  x-min-app: 0.36.0
   # The oldest server API version an app built from this document can read: raised to `version`
   # when a response gains a required field. Apps compile it in; it never leaves the app.
-  # scripts/ci/check-openapi-floors.mjs enforces both (docs/api.md, "Versioning the contract").
-  x-min-server-api: 0.36.0
+  x-min-server: 0.36.0
+  # The oldest watch app API version this server still serves. The watches read only a few routes,
+  # so this is set by hand until CI can tell which changes reach them. GET /api/v1/health reports it
+  # as `minWatchApiVersion`.
+  x-min-watch: 0.30.0
+  # scripts/ci/check-openapi-floors.mjs enforces all three (docs/api.md, "Versioning the contract"):
+  # none falls or passes `version`, and CI raises x-min-app and x-min-server where a change needs it.
   description: |
     Versioned HTTP API used by the FamilyFi web/PWA, the iPhone app, and paired
     AI agents. An agent starts at `/agents.md` on the same origin. Application state is desired configuration; UniFi is
@@ -3069,8 +3074,13 @@ components:
         minAppApiVersion:
           type: string
           description: |
-            The oldest client API version this server still serves (`info.x-min-app-api`). A client
+            The oldest client API version this server still serves (`info.x-min-app`). A client
             whose API version is older must ask to be updated instead of reading the household.
+        minWatchApiVersion:
+          type: string
+          description: |
+            The oldest watch app API version this server still serves (`info.x-min-watch`). A watch
+            app whose API version is older must ask to be updated once a read it needs fails.
         revision:
           type: integer
           minimum: 0

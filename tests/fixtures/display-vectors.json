@@ -18289,6 +18289,86 @@
       "expected": {
         "status": "ok"
       }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "watch app older than the server's oldest watch",
+      "input": {
+        "health": {
+          "version": "0.45.0",
+          "apiVersion": "0.45.0",
+          "minAppApiVersion": "0.30.0",
+          "minWatchApiVersion": "0.43.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "minServerApi": "0.36.0",
+          "watch": true
+        }
+      },
+      "expected": {
+        "status": "update_app",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.45.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "watch app served though the phone's floor is newer",
+      "input": {
+        "health": {
+          "version": "0.45.0",
+          "apiVersion": "0.45.0",
+          "minAppApiVersion": "0.45.0",
+          "minWatchApiVersion": "0.30.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "minServerApi": "0.36.0",
+          "watch": true
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "watch app on a server with no watch floor",
+      "input": {
+        "health": {
+          "version": "0.41.0",
+          "apiVersion": "0.41.0",
+          "minAppApiVersion": "0.45.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "minServerApi": "0.36.0",
+          "watch": true
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "watch app on a server older than it reads",
+      "input": {
+        "health": {
+          "version": "0.34.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "minServerApi": "0.36.0",
+          "watch": true
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.34.0"
+      }
     }
   ]
 }
