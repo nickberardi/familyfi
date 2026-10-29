@@ -18170,6 +18170,125 @@
       "expected": {
         "status": "ok"
       }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "versions reported in their normal form",
+      "input": {
+        "health": {
+          "version": "v0.34.0+build.1"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.34.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "surrounding space",
+      "input": {
+        "health": {
+          "version": " 0.34.0 "
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.34.0"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "prerelease numbers in numeric order",
+      "input": {
+        "health": {
+          "version": "0.36.0-rc.10"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0-rc.2"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "prerelease numbers below the floor's",
+      "input": {
+        "health": {
+          "version": "0.36.0-rc.2"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0-rc.10"
+        }
+      },
+      "expected": {
+        "status": "update_server",
+        "appApiVersion": "0.41.0",
+        "serverApiVersion": "0.36.0-rc.2"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "leading zero is unreadable",
+      "input": {
+        "health": {
+          "version": "0.036.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "unreadable app version",
+      "input": {
+        "health": {
+          "version": "0.34.0",
+          "minAppApiVersion": "0.50.0"
+        },
+        "client": {
+          "apiVersion": "dev",
+          "oldestServer": "0.36.0"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "fn": "apiCompatibility",
+      "name": "unreadable server floor",
+      "input": {
+        "health": {
+          "version": "0.34.0"
+        },
+        "client": {
+          "apiVersion": "0.41.0",
+          "oldestServer": "soon"
+        }
+      },
+      "expected": {
+        "status": "ok"
+      }
     }
   ]
 }

@@ -57,4 +57,14 @@ export const API_COMPAT_COPY = {
   safe: "Your rules and pauses keep working in the meantime.",
   versions: (app: string, server: string) => `This app ${app} · Server ${server}`,
   tryAgain: "Try again",
+  pairApp: "This version of the app can't work with your FamilyFi server. Update the app, then try again.",
+  pairServer: "This version of the app needs a newer FamilyFi server. Update it from FamilyFi's Settings on your computer, then try again.",
 } as const;
+
+/** Pairing stopped before spending the code: this client and the server can't read each other. */
+export class ApiMismatchError extends Error {
+  constructor(readonly compatibility: Exclude<ApiCompatibility, { status: "ok" }>) {
+    super(compatibility.status === "update_app" ? API_COMPAT_COPY.pairApp : API_COMPAT_COPY.pairServer);
+    this.name = "ApiMismatchError";
+  }
+}
