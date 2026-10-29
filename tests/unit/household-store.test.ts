@@ -855,6 +855,22 @@ describe("household store compatibility check", () => {
     expect(server.calls.filter((call) => call.path === "/api/v1/health")).toHaveLength(2);
   });
 
+  it("drops the household it had once the server can't be read, and sends no write", async () => {
+    let answer: Record<string, unknown> = current;
+    const routes = reads(() => childGroup());
+    const server = fakeServer({ ...routes, "GET /api/v1/health": () => ({ json: answer }) });
+    // No offline guard: the check alone keeps writes from going out.
+    const store = createHouseholdStore({ request: server.request, checkCompatibility: true });
+    await store.reload();
+    expect(store.getState().groups).toHaveLength(1);
+    answer = { version: "0.34.0" };
+    await store.reload();
+    expect(store.getState()).toMatchObject({ status: "incompatible", session: null, groups: [], rules: [], household: null, accounts: [] });
+    const sent = server.calls.length;
+    await expect(store.mutate((request) => request("/api/v1/groups/group-child", { method: "PATCH", body: {} }))).resolves.toBeUndefined();
+    expect(server.calls).toHaveLength(sent);
+  });
+
   it("lets a check that fails decide nothing", async () => {
     const { store } = checking({ ...reads(() => childGroup()), "GET /api/v1/health": () => ({ status: 503, json: { error: { message: "Degraded." } } }) });
     await store.reload();

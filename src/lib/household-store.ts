@@ -238,7 +238,21 @@ export function createHouseholdStore(deps: {
       const compatibility = await compatible;
       if (compatibility && compatibility.status !== "ok") {
         if (gen !== loadGen) return;
-        set({ status: "incompatible", compatibility, loaded: true, ...reached() });
+        // Nothing read from this server before, such as the household before it updated, stays either.
+        set({
+          status: "incompatible",
+          compatibility,
+          loaded: true,
+          session: null,
+          groups: [],
+          devices: [],
+          rules: [],
+          sync: null,
+          unifi: null,
+          household: null,
+          accounts: [],
+          ...reached(),
+        });
         return;
       }
       const [session, groups, devices, rules, sync, unifi, household, accounts] = await loading;
@@ -305,6 +319,8 @@ export function createHouseholdStore(deps: {
 
   async function mutate(run: (request: ApiRequest) => Promise<unknown>, options: MutateOptions = {}): Promise<MutationPayload | undefined> {
     const { optimistic, feedback, groupId } = options;
+    // Never write to a server this client can't read.
+    if (state.status === "incompatible") return undefined;
     // Never send, or queue, a write from a view that may be out of date.
     if (offlineGuard && !canControl()) {
       set({ error: offlineGuard.notSent, notice: "", noticeAction: null });
