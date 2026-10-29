@@ -45,5 +45,10 @@ export function watchAppCopy(platform: WatchPlatform) {
     notAllowed: `This ${watch} can't do that.`,
     unexpected: "FamilyFi answered unexpectedly.",
     refused: "FamilyFi refused the request.",
+    // When this watch app and the server can't read each other (`api-compat.ts`); nothing else shows.
+    updateAppTitle: `Update FamilyFi on your ${phone}`,
+    updateAppBody: "Your FamilyFi server was updated, and this app can't work with it.",
+    updateServerTitle: "Your server needs an update",
+    updateServerBody: `Update it from FamilyFi on your ${phone} or computer.`,
   };
 }

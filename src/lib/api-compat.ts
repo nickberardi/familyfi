@@ -5,7 +5,8 @@ import { APP_VERSION } from "./version";
  * Whether a client and a server can read each other, decided before the client reads the
  * household. The two floors are `info.x-oldest-client` and `info.x-oldest-server` in
  * `openapi/familyfi.v1.yaml`, which CI raises from the spec diff (docs/api.md, "Versioning the
- * contract"); `tests/unit/api-compat.test.ts` keeps these constants equal to them.
+ * contract"); `tests/unit/api-compat.test.ts` keeps these constants equal to them. The native watch
+ * apps port `apiCompatibility`, which `tests/fixtures/display-vectors.json` pins.
  */
 
 /** This contract's `info.version`. Always the release version: `tests/unit/version.test.ts` keeps them equal. */
