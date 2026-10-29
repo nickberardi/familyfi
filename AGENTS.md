@@ -68,6 +68,12 @@ For UI references, read `Web Design.dc.html`, `Sign In.dc.html`, and the `_ds/` 
 
 All repository skills live in `.agents/skills/`. `.claude/skills` is a directory symlink to it, so new skills are automatically shared with Claude Code. Add and edit skills only under `.agents/skills/`; maintain one definition per workflow. Skills reference the existing docs and scripts; they do not replace the rules below.
 
+Subagents are defined twice, in `.claude/agents/<name>.md` for Claude and `.codex/agents/<name>.toml` for Codex, and `tests/unit/reviewer-agents.test.ts` keeps each pair identical:
+
+- `reviewer`: reviews a finished change before a PR (see [Pull requests](#pull-requests)).
+- `bug-hunter`: traces a reported bug to its root cause and proposes a reproducing test and fix, read-only.
+- `crash-hunter`: follows a crash, stack trace or fatal exception to the failing line, read-only.
+
 ## Stack and layout
 
 Next.js App Router + TypeScript, React, Tailwind, Prisma/PostgreSQL. `src/app` holds pages and routes; `src/components` web UI; `src/ui` components shared with the native app (React Native primitives, rendered on the web through react-native-web); `src/server` database, authentication and enforcement; `src/lib` client-safe types and pure logic. `prisma` owns schema and migrations, `openapi` the HTTP contract, `tests` validation, `scripts` tooling and startup, and `docker` deployment.

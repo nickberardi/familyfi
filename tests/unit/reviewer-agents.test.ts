@@ -2,22 +2,33 @@
  * AGENTS.md: before a PR, the `reviewer` subagent reviews the change. Claude reads it from
  * `.claude/agents/reviewer.md` and Codex from `.codex/agents/reviewer.toml`; the two must
  * give the same instructions, or one tool's review quietly checks less than the other's.
+ * Every other subagent (`crash-hunter`, `bug-hunter`) follows the same rule.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const repoRoot = path.resolve(__dirname, "../..");
 const read = (file: string) => readFileSync(path.join(repoRoot, file), "utf8");
+const agentNames = (dir: string, extension: string) =>
+  readdirSync(path.join(repoRoot, dir))
+    .filter((file) => file.endsWith(extension))
+    .map((file) => file.slice(0, -extension.length))
+    .sort();
 
-function claudeReviewer() {
-  const [, frontmatter, body] = read(".claude/agents/reviewer.md").match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [];
+function claudeAgent(name: string) {
+  const [, frontmatter, body] = read(`.claude/agents/${name}.md`).match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [];
   const field = (key: string) => frontmatter.match(new RegExp(`^${key}: (.*)$`, "m"))?.[1];
-  return { name: field("name"), description: field("description"), instructions: body.trim() };
+  return {
+    name: field("name"),
+    description: field("description"),
+    permissionMode: field("permissionMode"),
+    instructions: body.trim(),
+  };
 }
 
-function codexReviewer() {
-  const toml = read(".codex/agents/reviewer.toml");
+function codexAgent(name: string) {
+  const toml = read(`.codex/agents/${name}.toml`);
   const field = (key: string) => toml.match(new RegExp(`^${key} = "(.*)"$`, "m"))?.[1];
   const instructions = toml.match(/^developer_instructions = """\n([\s\S]*?)"""$/m)?.[1];
   return {
@@ -28,18 +39,29 @@ function codexReviewer() {
   };
 }
 
-describe("reviewer subagent (AGENTS.md)", () => {
-  it("gives Claude and Codex the same reviewer", () => {
-    const claude = claudeReviewer();
-    const codex = codexReviewer();
-    expect(claude.name).toBe("reviewer");
-    expect(codex.name).toBe("reviewer");
+const agents = agentNames(".claude/agents", ".md");
+
+describe("subagents (AGENTS.md)", () => {
+  it("defines every subagent for both Claude and Codex", () => {
+    expect(agents).toEqual(expect.arrayContaining(["bug-hunter", "crash-hunter", "reviewer"]));
+    expect(agentNames(".codex/agents", ".toml")).toEqual(agents);
+  });
+
+  it.each(agents)("gives Claude and Codex the same %s", (name) => {
+    const claude = claudeAgent(name);
+    const codex = codexAgent(name);
+    expect(claude.name).toBe(name);
+    expect(codex.name).toBe(name);
     expect(codex.description).toBe(claude.description);
     expect(claude.instructions).toBeTruthy();
     expect(codex.instructions).toBe(claude.instructions);
   });
 
-  it("keeps the Codex reviewer read-only", () => {
-    expect(codexReviewer().sandbox).toBe("read-only");
+  it.each(agents)("keeps the Codex %s read-only", (name) => {
+    expect(codexAgent(name).sandbox).toBe("read-only");
+  });
+
+  it.each(["bug-hunter", "crash-hunter"])("keeps the Claude %s in plan mode", (name) => {
+    expect(claudeAgent(name).permissionMode).toBe("plan");
   });
 });
