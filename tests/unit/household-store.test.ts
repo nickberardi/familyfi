@@ -17,7 +17,7 @@ import {
   runGroupHeaderAction,
   updateGroup,
 } from "@/lib/group-writes";
-import { API_VERSION, OLDEST_CLIENT_API_VERSION } from "@/lib/api-compat";
+import { API_VERSION, MIN_APP_API_VERSION } from "@/lib/api-compat";
 import { createHouseholdStore, NOTICE_MS, NOTICE_WITH_ACTION_MS, type OfflineGuard } from "@/lib/household-store";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -799,7 +799,7 @@ describe("household store with an offline guard (a phone)", () => {
 
 describe("household store compatibility check", () => {
   const health = (json: Record<string, unknown>): Handler => () => ({ json });
-  const current = { version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: OLDEST_CLIENT_API_VERSION };
+  const current = { version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: MIN_APP_API_VERSION };
 
   function checking(routes: Record<string, Handler>) {
     const server = fakeServer(routes);

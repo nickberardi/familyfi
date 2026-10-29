@@ -2,10 +2,10 @@
 // Fails when openapi/familyfi.v1.yaml changes in a way that older apps or older servers can't
 // follow without raising the floor that says so (docs/api.md, "Versioning the contract"):
 //
-//   - oasdiff `breaking` finds a change that breaks old apps: info.x-oldest-client must be the
+//   - oasdiff `breaking` finds a change that breaks old apps: info.x-min-app-api must be the
 //     new info.version. The breaking_api label (check-openapi-breaking.sh) approves the change;
 //     this records which apps it leaves behind, label or not.
-//   - oasdiff `changelog` reports a response gaining a required field: info.x-oldest-server must
+//   - oasdiff `changelog` reports a response gaining a required field: info.x-min-server-api must
 //     be the new info.version, since an older server never sends it.
 //   - Neither floor goes backwards, or past info.version.
 //
@@ -34,8 +34,8 @@ export function checkFloors({ baseSpec, headSpec, breaking, requiredAdded }) {
   const version = String(headSpec?.info?.version ?? "");
   const head = parseSemver(version);
   const floors = [
-    { key: "x-oldest-client", raise: breaking, why: "breaks apps built from older contracts" },
-    { key: "x-oldest-server", raise: requiredAdded, why: "adds required response fields, which older servers don't send" },
+    { key: "x-min-app-api", raise: breaking, why: "breaks apps built from older contracts" },
+    { key: "x-min-server-api", raise: requiredAdded, why: "adds required response fields, which older servers don't send" },
   ];
   for (const { key, raise, why } of floors) {
     const text = String(headSpec?.info?.[key] ?? "");
@@ -117,7 +117,7 @@ function main() {
         [
           "### OpenAPI floors",
           "",
-          `x-oldest-client \`${info["x-oldest-client"]}\`, x-oldest-server \`${info["x-oldest-server"]}\`, version \`${info.version}\`.`,
+          `x-min-app-api \`${info["x-min-app-api"]}\`, x-min-server-api \`${info["x-min-server-api"]}\`, version \`${info.version}\`.`,
           "",
           outcome.ok ? "Passed." : ["```", ...outcome.problems, "```"].join("\n"),
           "",
@@ -128,7 +128,7 @@ function main() {
       for (const problem of outcome.problems) console.error(problem);
       return 1;
     }
-    console.log(`Floors hold against ${baseName}: x-oldest-client ${info["x-oldest-client"]}, x-oldest-server ${info["x-oldest-server"]}.`);
+    console.log(`Floors hold against ${baseName}: x-min-app-api ${info["x-min-app-api"]}, x-min-server-api ${info["x-min-server-api"]}.`);
     return 0;
   } finally {
     rmSync(work, { recursive: true, force: true });

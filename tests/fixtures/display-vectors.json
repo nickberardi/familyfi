@@ -17897,7 +17897,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -17917,7 +17917,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -17937,7 +17937,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -17955,7 +17955,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -17973,7 +17973,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -17989,7 +17989,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18007,7 +18007,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18024,7 +18024,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18044,7 +18044,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.60.0"
+          "minServerApi": "0.60.0"
         }
       },
       "expected": {
@@ -18062,7 +18062,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.10.0"
+          "minServerApi": "0.10.0"
         }
       },
       "expected": {
@@ -18081,7 +18081,7 @@
         },
         "client": {
           "apiVersion": "0.99.0",
-          "oldestServer": "0.1.0"
+          "minServerApi": "0.1.0"
         }
       },
       "expected": {
@@ -18099,7 +18099,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18115,7 +18115,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18131,7 +18131,7 @@
         "health": {},
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18147,7 +18147,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18164,7 +18164,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18180,7 +18180,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18198,7 +18198,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18216,7 +18216,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0-rc.2"
+          "minServerApi": "0.36.0-rc.2"
         }
       },
       "expected": {
@@ -18232,7 +18232,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0-rc.10"
+          "minServerApi": "0.36.0-rc.10"
         }
       },
       "expected": {
@@ -18250,7 +18250,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18267,7 +18267,7 @@
         },
         "client": {
           "apiVersion": "dev",
-          "oldestServer": "0.36.0"
+          "minServerApi": "0.36.0"
         }
       },
       "expected": {
@@ -18283,7 +18283,7 @@
         },
         "client": {
           "apiVersion": "0.41.0",
-          "oldestServer": "soon"
+          "minServerApi": "soon"
         }
       },
       "expected": {

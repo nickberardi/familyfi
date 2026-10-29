@@ -1,5 +1,5 @@
 /**
- * `info.x-oldest-client` claims that every app built from that contract version on can still read
+ * `info.x-min-app-api` claims that every app built from that contract version on can still read
  * this server. This proves it: the shared `src/lib` as it stood when `info.version` first became
  * that floor, which is what such an app vendors, loads the dev seed household from today's route
  * handlers and draws what the app's Family, Rules and Checkup screens draw from it. Any throw fails.
@@ -15,7 +15,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import YAML from "yaml";
 import { ApiError, type ApiRequest } from "@/lib/api-client";
-import { API_VERSION, OLDEST_CLIENT_API_VERSION } from "@/lib/api-compat";
+import { API_VERSION, MIN_APP_API_VERSION } from "@/lib/api-compat";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { POST as runCheckup } from "@/app/api/v1/checkup/run/route";
 import { GET as getHealth } from "@/app/api/v1/health/route";
@@ -35,12 +35,12 @@ const git = (...args: string[]) => execFileSync("git", args, { cwd: repoRoot, en
 
 /** The first commit whose `info.version` is the floor; none while the floor is this change's own version. */
 function floorCommit(): string | null {
-  const escaped = OLDEST_CLIENT_API_VERSION.replaceAll(".", "\\.");
+  const escaped = MIN_APP_API_VERSION.replaceAll(".", "\\.");
   const commits = git("log", "--first-parent", "--reverse", "--format=%H", `-G^  version: ${escaped}$`, "HEAD", "--", SPEC);
   const first = commits.split("\n").find(Boolean) ?? null;
-  if (!first && OLDEST_CLIENT_API_VERSION !== API_VERSION) {
+  if (!first && MIN_APP_API_VERSION !== API_VERSION) {
     throw new Error(
-      `No commit carries info.version ${OLDEST_CLIENT_API_VERSION} (x-oldest-client). This test reads git history: ` +
+      `No commit carries info.version ${MIN_APP_API_VERSION} (x-min-app-api). This test reads git history: ` +
         "check out every commit (actions/checkout fetch-depth: 0).",
     );
   }
@@ -49,7 +49,7 @@ function floorCommit(): string | null {
 
 /** That commit's `src/lib`, extracted under build/ with its `@/lib` imports made relative. */
 function extractLib(commit: string): string {
-  const dir = path.join(repoRoot, "build/oldest-client", commit.slice(0, 12));
+  const dir = path.join(repoRoot, "build/min-app-api", commit.slice(0, 12));
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const archive = execFileSync("git", ["archive", commit, "src/lib", "package.json"], { cwd: repoRoot });
@@ -132,7 +132,7 @@ type Old = {
   checkup: typeof import("@/lib/checkup");
 };
 
-describe(`the oldest client the server serves (x-oldest-client ${OLDEST_CLIENT_API_VERSION})`, () => {
+describe(`the oldest client the server serves (x-min-app-api ${MIN_APP_API_VERSION})`, () => {
   const previousMode = process.env.FAMILYFI_MODE;
   let lib = path.join(repoRoot, "src/lib");
   let extracted: string | null = null;
@@ -245,7 +245,7 @@ describe("the versions GET /api/v1/health reports", () => {
       expect(await response.json()).toMatchObject({
         version: API_VERSION,
         apiVersion: info.version,
-        minAppApiVersion: info["x-oldest-client"],
+        minAppApiVersion: info["x-min-app-api"],
       });
     }
   });

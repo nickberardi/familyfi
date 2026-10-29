@@ -543,7 +543,7 @@
         "contracts"
       ]
     },
-    "tests/integration/oldest-client.test.ts": {
+    "tests/integration/min-app-api.test.ts": {
       "categories": [
         "contracts"
       ]

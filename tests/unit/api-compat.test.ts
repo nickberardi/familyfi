@@ -10,21 +10,21 @@ import YAML from "yaml";
 import {
   API_VERSION,
   apiCompatibility,
-  OLDEST_CLIENT_API_VERSION,
-  OLDEST_SERVER_API_VERSION,
+  MIN_APP_API_VERSION,
+  MIN_SERVER_API_VERSION,
 } from "@/lib/api-compat";
 
 const info = (YAML.parse(readFileSync(path.resolve(__dirname, "../../openapi/familyfi.v1.yaml"), "utf8")) as {
-  info: { version: string; "x-oldest-client": string; "x-oldest-server": string };
+  info: { version: string; "x-min-app-api": string; "x-min-server-api": string };
 }).info;
 
-const client = { apiVersion: "0.41.0", oldestServer: "0.36.0" };
+const client = { apiVersion: "0.41.0", minServerApi: "0.36.0" };
 
 describe("API compatibility", () => {
   it("carries the contract's version and floors", () => {
     expect(API_VERSION).toBe(info.version);
-    expect(OLDEST_CLIENT_API_VERSION).toBe(info["x-oldest-client"]);
-    expect(OLDEST_SERVER_API_VERSION).toBe(info["x-oldest-server"]);
+    expect(MIN_APP_API_VERSION).toBe(info["x-min-app-api"]);
+    expect(MIN_SERVER_API_VERSION).toBe(info["x-min-server-api"]);
   });
 
   it("asks for an app update when the app is older than the server's oldest client", () => {
@@ -60,8 +60,8 @@ describe("API compatibility", () => {
   });
 
   it("orders versions by semver, not as text", () => {
-    expect(apiCompatibility({ version: "0.9.0" }, { apiVersion: "0.41.0", oldestServer: "0.10.0" }).status).toBe("update_server");
-    expect(apiCompatibility({ version: "0.100.0", minAppApiVersion: "0.100.0" }, { apiVersion: "0.99.0", oldestServer: "0.1.0" }).status).toBe(
+    expect(apiCompatibility({ version: "0.9.0" }, { apiVersion: "0.41.0", minServerApi: "0.10.0" }).status).toBe("update_server");
+    expect(apiCompatibility({ version: "0.100.0", minAppApiVersion: "0.100.0" }, { apiVersion: "0.99.0", minServerApi: "0.1.0" }).status).toBe(
       "update_app",
     );
   });
@@ -73,6 +73,6 @@ describe("API compatibility", () => {
   });
 
   it("compares against this build's contract by default", () => {
-    expect(apiCompatibility({ version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: OLDEST_CLIENT_API_VERSION }).status).toBe("ok");
+    expect(apiCompatibility({ version: API_VERSION, apiVersion: API_VERSION, minAppApiVersion: MIN_APP_API_VERSION }).status).toBe("ok");
   });
 });
