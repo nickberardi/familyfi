@@ -394,7 +394,10 @@ async function main() {
     }
     starts = options.latest ? all.slice(-1) : all;
   }
-  git("fetch", "--quiet", "--depth=1", "origin", "--no-tags", ...starts.map((tag) => `refs/tags/${tag}:refs/tags/${tag}`));
+  // Shallow only in a shallow clone: --depth on a full one would cut its history at each tag, and
+  // tests/integration/oldest-client.test.ts, later in the same job, reads that history.
+  const depth = git("rev-parse", "--is-shallow-repository") === "true" ? ["--depth=1"] : [];
+  git("fetch", "--quiet", ...depth, "origin", "--no-tags", ...starts.map((tag) => `refs/tags/${tag}:refs/tags/${tag}`));
 
   // Releases with the same migrations build the same database: upgrade each set once.
   const byMigrations = new Map();
