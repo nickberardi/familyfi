@@ -403,8 +403,9 @@ function Settings() {
  */
 function Maintenance() {
   const { unifi, household, reload: reloadHousehold } = useAppData();
-  const update = useUpdateCheck(request);
   const { settings, reload } = useUpdateSettings(request);
+  // Reading the update settings has the server ask GitHub again when its check is stale; reread it then.
+  const update = useUpdateCheck(request, settings !== null);
   const gateway = useGatewayHealth(request, unifi);
   // The new release serves new pages, so the browser reloads onto it; a page it already served only rereads.
   const onInstalled = (version: string) => (installedVersion(APP_VERSION, version) ? reload() : window.location.reload());

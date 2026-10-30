@@ -10,6 +10,8 @@ const GITHUB_RELEASES_URL = "https://api.github.com/repos/nickberardi/familyfi/r
 const GITHUB_RELEASE_PAGE_URL = "https://github.com/nickberardi/familyfi/releases/tag";
 const RELEASE_PAGE_SIZE = 100;
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+/** How old a check may be when an administrator opens the update before it is asked again. */
+export const UPDATE_CHECK_FRESH_MS = 5 * 60 * 1000;
 const UPDATE_CHECK_TIMEOUT_MS = 10_000;
 const RELEASE_NOTES_MAX_CHARS = 20_000;
 
@@ -31,6 +33,11 @@ export type UpdateCheckRefreshOptions = {
 export type UpdateChecker = {
   getSnapshot(): UpdateCheckSnapshot;
   refresh(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot>;
+  /**
+   * The cached check when it is younger than `maxAgeMs`, otherwise a new one. Only a started checker
+   * asks again: a process that never checks (tests, `next build`) never reaches GitHub from here.
+   */
+  refreshIfOlderThan(maxAgeMs: number, options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot>;
   start(): void;
 };
 
@@ -188,7 +195,14 @@ export function createUpdateChecker(): UpdateChecker {
     run();
   };
 
-  return { getSnapshot: () => snapshot, refresh, start };
+  const refreshIfOlderThan = (maxAgeMs: number, options: UpdateCheckRefreshOptions = {}): Promise<UpdateCheckSnapshot> => {
+    const now = (options.now ?? (() => new Date()))().getTime();
+    const checkedAt = snapshot.checkedAt ? new Date(snapshot.checkedAt).getTime() : null;
+    if (!started || (!inFlight && checkedAt !== null && now - checkedAt < maxAgeMs)) return Promise.resolve(snapshot);
+    return refresh(options);
+  };
+
+  return { getSnapshot: () => snapshot, refresh, refreshIfOlderThan, start };
 }
 
 // Next.js bundles instrumentation and route handlers separately. Keep one checker on
@@ -202,6 +216,15 @@ export function getUpdateCheckSnapshot(): UpdateCheckSnapshot {
 
 export function refreshUpdateCheck(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot> {
   return updateChecker.refresh(options);
+}
+
+/**
+ * Asks GitHub again when the last check is older than `UPDATE_CHECK_FRESH_MS`, so a release published
+ * (or promoted from Pre-release) since then is offered when an administrator opens the update, not
+ * up to an hour later.
+ */
+export function refreshStaleUpdateCheck(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot> {
+  return updateChecker.refreshIfOlderThan(UPDATE_CHECK_FRESH_MS, options);
 }
 
 /** Starts the immediate check and its hourly, non-overlapping refresh loop once per process. */

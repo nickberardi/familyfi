@@ -677,7 +677,9 @@ paths:
       description: |
         Whether the Watchtower sidecar is set up (it answers to the token FamilyFi shares with it), when FamilyFi installs a newer
         release on its own, and the last install with its outcome. Reading it settles an install that has
-        finished, so a client polls this while `lastRun.status` is `requested`.
+        finished, so a client polls this while `lastRun.status` is `requested`. When the server's release check is more than five
+        minutes old, reading it also checks GitHub again before answering, so `update` on `GET /api/v1/health` offers a release
+        published or promoted since.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200":
