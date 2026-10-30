@@ -7,7 +7,6 @@ import {
   selectOfferedRelease,
   trackTag,
   updateTrack,
-  UPDATE_CHECK_FRESH_MS,
   UPDATE_CHECK_NOW_MS,
 } from "@/server/update-check";
 import { APP_VERSION } from "@/lib/version";
@@ -267,7 +266,7 @@ describe("GitHub release update check", () => {
     try {
       const checker = createUpdateChecker();
       checker.start();
-      const first = await checker.refreshIfOlderThan(UPDATE_CHECK_FRESH_MS);
+      const first = await checker.refreshIfStale();
       expect(fetchImpl).toHaveBeenCalledTimes(1);
       const checkedAt = new Date(first.checkedAt!).getTime();
       const at = (ms: number) => ({ now: () => new Date(checkedAt + ms) });
@@ -278,6 +277,8 @@ describe("GitHub release update check", () => {
       expect(asked).toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });
       // A minute old is fresh enough for opening Maintenance, not for Check now.
       const again = new Date(asked.checkedAt!).getTime();
+      await checker.refreshIfStale({ now: () => new Date(again + 60_000) });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
       await checker.checkNow({ now: () => new Date(again + 60_000) });
       expect(fetchImpl).toHaveBeenCalledTimes(3);
     } finally {

@@ -50,6 +50,8 @@ export type UpdateChecker = {
    * asks again: a process that never checks (tests, `next build`) never reaches GitHub from here.
    */
   refreshIfOlderThan(maxAgeMs: number, options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot>;
+  /** An administrator opening the update: a new check when the last is older than `UPDATE_CHECK_FRESH_MS`. */
+  refreshIfStale(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot>;
   /** An administrator's Check now: a new check unless one finished in the last `UPDATE_CHECK_NOW_MS`. */
   checkNow(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot>;
   start(): void;
@@ -278,9 +280,10 @@ export function createUpdateChecker(): UpdateChecker {
     return refresh(options);
   };
 
+  const refreshIfStale = (options: UpdateCheckRefreshOptions = {}) => refreshIfOlderThan(UPDATE_CHECK_FRESH_MS, options);
   const checkNow = (options: UpdateCheckRefreshOptions = {}) => refreshIfOlderThan(UPDATE_CHECK_NOW_MS, options);
 
-  return { getSnapshot: () => snapshot, refresh, refreshIfOlderThan, checkNow, start };
+  return { getSnapshot: () => snapshot, refresh, refreshIfOlderThan, refreshIfStale, checkNow, start };
 }
 
 // Next.js bundles instrumentation and route handlers separately. Keep one checker on
@@ -302,7 +305,7 @@ export function refreshUpdateCheck(options?: UpdateCheckRefreshOptions): Promise
  * up to an hour later.
  */
 export function refreshStaleUpdateCheck(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot> {
-  return updateChecker.refreshIfOlderThan(UPDATE_CHECK_NOW_MS, options);
+  return updateChecker.refreshIfStale(options);
 }
 
 /** Starts the immediate check and its hourly, non-overlapping refresh loop once per process. */

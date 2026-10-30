@@ -53,7 +53,7 @@ export function checkedLine(update: UpdateCheck | null | undefined, now = Date.n
   return `Checked ${checkedAgo(update.checkedAt, now)}`;
 }
 
-/** The install card's title and button; without the updater the button names what is missing. */
+/** The install confirmation's title and the Install button's accessible name, which names what is missing without the updater. */
 export function installCopy(latest: string, configured = false) {
   return { title: `Install ${latest}`, button: configured ? `Install ${latest}` : `Install ${latest} · needs the updater` };
 }
