@@ -13,11 +13,10 @@ import type { Group } from "@/lib/types";
 import { installedVersion } from "@/lib/update-copy";
 import { APP_VERSION } from "@/lib/version";
 import { NewLoginFields } from "@/ui/NewLoginFields";
-import { GatewayCard, GatewayHealthCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
+import { GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
 import { SettingsTabs } from "@/ui/SettingsTabs";
 import { UpdateContent } from "@/ui/UpdateContent";
 import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
-import { useGatewayHealth } from "@/ui/use-gateway-health";
 import { useUpdateCheck } from "@/ui/use-update-check";
 import { useUpdateSettings } from "@/ui/use-update-settings";
 import { forgetCatalogNames } from "@/components/GroupGrid";
@@ -398,15 +397,13 @@ function Settings() {
 }
 
 /**
- * Settings' Maintenance tab: the server's update and its schedule, the household's backup, and the
- * gateway's load. It mounts only while the tab is open, so the console is asked for its load then.
+ * Settings' Maintenance tab: the server's update and its schedule, and the household's backup.
  */
 function Maintenance() {
-  const { unifi, household, reload: reloadHousehold } = useAppData();
+  const { household, reload: reloadHousehold } = useAppData();
   const { settings, reload } = useUpdateSettings(request);
   // Reading the update settings has the server ask GitHub again when its check is stale; reread it then.
   const update = useUpdateCheck(request, settings !== null);
-  const gateway = useGatewayHealth(request, unifi);
   // The new release serves new pages, so the browser reloads onto it; a page it already served only rereads.
   const onInstalled = (version: string) => (installedVersion(APP_VERSION, version) ? reload() : window.location.reload());
   return (
@@ -425,9 +422,6 @@ function Maintenance() {
             return reloadHousehold();
           }}
         />
-        {gateway.target !== null ? (
-          <GatewayHealthCard health={gateway.health} checking={gateway.checking} error={gateway.error} onCheck={() => void gateway.check()} />
-        ) : null}
       </div>
     </div>
   );

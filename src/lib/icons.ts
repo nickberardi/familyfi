@@ -27,6 +27,7 @@ export type IconName =
   | "gear"
   | "code"
   | "qr-code"
+  | "gauge"
   | "info"
   // Actions
   | "copy"

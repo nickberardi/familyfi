@@ -121,6 +121,7 @@ export const SETTINGS_COPY = {
   healthNotReported: "The console did not report this device’s load.",
   healthNoDevices: "The console lists no devices on this site.",
   healthFailed: "Could not check the gateway.",
+  healthNoGateway: "Connect a gateway in Settings to see its load.",
   gatewayBadge: "Gateway",
   requests: "FamilyFi’s requests to the console",
 } as const;
@@ -156,7 +157,7 @@ export function formatUptime(seconds: number | null): string {
   });
 }
 
-/** One device's load, as Settings lists it. */
+/** One device's load, as Diagnostics lists it. */
 export function gatewayHealthFacts(device: GatewayDeviceHealth): { k: string; v: string }[] {
   const percent = (value: number) => `${Math.round(value)}%`;
   const load = [device.loadAverage1Min, device.loadAverage5Min, device.loadAverage15Min];
