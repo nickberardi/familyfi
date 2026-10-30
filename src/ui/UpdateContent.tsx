@@ -41,7 +41,7 @@ export function UpdateContent({ update, onNotNow, install }: { update: UpdateChe
   const text = (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const latest = latestRelease(update);
-  const runLine = updateRunLine(install?.settings?.lastRun);
+  const runLine = updateRunLine(install?.settings?.lastRun, update?.currentVersion);
   const progress = useInstallProgress(install?.settings ?? null, install?.request, (version) => (install?.onInstalled ? install.onInstalled(version) : install?.onChanged()));
   // While an install runs, the card it belongs to is covered: a large spinner and the countdown, nothing to press.
   const overlay = progress ? (

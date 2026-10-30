@@ -66,6 +66,16 @@ describe("install progress and schedule", () => {
     expect(installing(settings({ lastRun: run({ status: "succeeded" }) }))).toBe(false);
   });
 
+  it("drops an install the running release has moved past", () => {
+    // Running v0.6.0: an install of it still says so, and one still under way still shows.
+    expect(updateRunLine(run({ status: "succeeded" }), "0.6.0")).toBe("Installed v0.6.0.");
+    expect(updateRunLine(run(), "0.7.0")).toMatch(/^Installing v0.6.0/);
+    // Running v0.7.0, an older install's outcome is history, not what is installed.
+    expect(updateRunLine(run({ status: "succeeded" }), "0.7.0")).toBeNull();
+    expect(updateRunLine(run({ status: "failed", error: "No." }), "0.7.0")).toBeNull();
+    expect(updateRunLine(run({ status: "unchanged", error: "No." }), "v0.7.0")).toBeNull();
+  });
+
   it("names the schedule in the household's time, or why there is none", () => {
     // Saturday evening in New York; the next run is Sunday at midnight there.
     const now = new Date("2026-10-10T20:00:00.000Z");
