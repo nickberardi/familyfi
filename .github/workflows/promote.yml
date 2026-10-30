@@ -4,7 +4,9 @@ name: Promote
 # Pre-release (its label set to None or Latest on GitHub), this moves :latest and :X.Y to the image
 # the Release workflow built for it. Nothing is rebuilt: the image is the one its notes name by
 # digest, which households on :next have already run. It may be behind the newest Pre-release,
-# never behind a release :latest already has (scripts/ci/promote-plan.mjs).
+# never behind a release :latest already has; a fix to an older line moves that line's :X.Y alone
+# (scripts/ci/promote-plan.mjs). A release published as a full release straight away has no image
+# yet when `released` fires, so release.yml calls this once it has built one.
 on:
   release:
     types: [released]
@@ -12,6 +14,11 @@ on:
     inputs:
       tag:
         description: Release to promote, such as v0.38.0
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
         required: true
         type: string
 
@@ -51,6 +58,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.event.release.tag_name }}
+          # On the label, a release not built yet is left to release.yml, which promotes it once it is.
+          IF_BUILT: ${{ github.event_name == 'release' && '--if-built' || '' }}
         run: |
           # curl and jq rather than the GitHub CLI, which a self-hosted runner need not have.
           api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
@@ -66,12 +75,15 @@ jobs:
           image="$(echo "$REGISTRY_IMAGE" | tr '[:upper:]' '[:lower:]')"
           current="$(docker buildx imagetools inspect "$image:latest" --format '{{json .Image}}' 2>/dev/null |
             jq -r 'if has("config") then . else (to_entries | first | .value) end | .config.Labels["org.opencontainers.image.version"] // empty')" || current=""
-          node scripts/ci/promote-plan.mjs "$TAG" "$GITHUB_REPOSITORY" ${current:+"v${current#v}"} < "$releases" >> "$GITHUB_OUTPUT"
+          node scripts/ci/promote-plan.mjs $IF_BUILT "$TAG" "$GITHUB_REPOSITORY" ${current:+"v${current#v}"} < "$releases" >> "$GITHUB_OUTPUT"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
       - name: Move :latest and :${{ steps.plan.outputs.minor }}
+        if: steps.plan.outputs.digest != ''
         run: |
           image="$(echo "$REGISTRY_IMAGE" | tr '[:upper:]' '[:lower:]')"
-          docker buildx imagetools create \
-            --tag "$image:latest" --tag "$image:${{ steps.plan.outputs.minor }}" \
-            "$image@${{ steps.plan.outputs.digest }}"
-          echo "::notice::$image:latest and :${{ steps.plan.outputs.minor }} are now $TAG (${{ steps.plan.outputs.digest }})."
+          tags=(--tag "$image:${{ steps.plan.outputs.minor }}")
+          if [ "${{ steps.plan.outputs.latest }}" = "true" ]; then
+            tags+=(--tag "$image:latest")
+          fi
+          docker buildx imagetools create "${tags[@]}" "$image@${{ steps.plan.outputs.digest }}"
+          echo "::notice::Moved ${tags[*]//--tag /} to $TAG (${{ steps.plan.outputs.digest }})."

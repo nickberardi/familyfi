@@ -236,7 +236,39 @@ describe("the :next and :latest tracks", () => {
     const result = plan("v0.38.0", [built("v0.40.0", true), built("v0.38.0", false), built("v0.37.0", false)]);
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`digest=${digest}\nminor=0.38\n`);
+    expect(result.stdout).toBe(`digest=${digest}\nminor=0.38\nlatest=true\n`);
+  });
+
+  it("moves only its line's tag to a fix behind a newer full release, and never a line's tag back", () => {
+    const fix = plan("v0.38.1", [built("v0.39.0", false), built("v0.38.1", false), built("v0.38.0", false)]);
+    expect(fix.status).toBe(0);
+    expect(fix.stdout).toBe(`digest=${digest}\nminor=0.38\nlatest=false\n`);
+    expect(fix.stderr).toContain("v0.38.1 is older than v0.39.0, which is already a full release, so only :0.38 moves to it.");
+
+    const behindLatest = node("scripts/ci/promote-plan.mjs", ["v0.37.1", "nickberardi/familyfi", "v0.38.0"], JSON.stringify([built("v0.37.1", false)]));
+    expect(behindLatest.status).toBe(0);
+    expect(behindLatest.stdout).toContain("latest=false");
+
+    const older = plan("v0.38.0", [built("v0.38.1", false), built("v0.38.0", false)]);
+    expect(older.status).toBe(1);
+    expect(older.stderr).toContain("v0.38.0 is older than v0.38.1, which is already a full release, so :latest and :0.38 stay where they are.");
+  });
+
+  it("leaves a full release whose image is still building to the Release workflow when it fires on the label", () => {
+    const building = { ...built("v0.42.1", false), body: "## What's Changed" };
+    const later = node("scripts/ci/promote-plan.mjs", ["--if-built", "v0.42.1", "nickberardi/familyfi"], JSON.stringify([building]));
+    expect(later.status).toBe(0);
+    expect(later.stdout).toBe("");
+    expect(later.stderr).toContain("the Release workflow promotes it once it is");
+    // By hand it says why nothing moved.
+    expect(plan("v0.42.1", [building]).status).toBe(1);
+
+    const release = read(".github/workflows/release.yml");
+    expect(release).toMatch(/promote:\n {4}needs: manifest\n {4}if: needs\.manifest\.outputs\.full == 'true'[\s\S]*?uses: \.\/\.github\/workflows\/promote\.yml/);
+    const promote = read(".github/workflows/promote.yml");
+    expect(promote).toContain("  workflow_call:\n");
+    expect(promote).toContain("IF_BUILT: ${{ github.event_name == 'release' && '--if-built' || '' }}");
+    expect(promote).toContain('node scripts/ci/promote-plan.mjs $IF_BUILT "$TAG"');
   });
 
   it("refuses a Pre-release, a release whose notes name no image, and one older than a full release", () => {
@@ -248,16 +280,16 @@ describe("the :next and :latest tracks", () => {
     expect(unnamed.status).toBe(1);
     expect(unnamed.stderr).toContain("v0.38.0's notes name no image");
 
-    const older = plan("v0.37.0", [built("v0.38.0", false), built("v0.37.0", false)]);
+    const older = plan("v0.37.0", [built("v0.37.1", false), built("v0.37.0", false)]);
     expect(older.status).toBe(1);
-    expect(older.stderr).toContain("v0.37.0 is older than v0.38.0");
+    expect(older.stderr).toContain("v0.37.0 is older than v0.37.1");
 
     expect(plan("v0.39.0", [built("v0.38.0", false)]).stderr).toContain("GitHub has no release for v0.39.0");
 
     // Before the first promotion :latest runs a build no full release names.
-    const behind = node("scripts/ci/promote-plan.mjs", ["v0.37.1", "nickberardi/familyfi", "v0.38.0"], JSON.stringify([built("v0.37.1", false)]));
+    const behind = node("scripts/ci/promote-plan.mjs", ["v0.38.0", "nickberardi/familyfi", "v0.38.1"], JSON.stringify([built("v0.38.0", false)]));
     expect(behind.status).toBe(1);
-    expect(behind.stderr).toContain("v0.37.1 is older than v0.38.0, which :latest already runs");
+    expect(behind.stderr).toContain("v0.38.0 is older than v0.38.1, which :latest already runs");
     const again = node("scripts/ci/promote-plan.mjs", ["v0.38.0", "nickberardi/familyfi", "v0.38.0"], JSON.stringify([built("v0.38.0", false)]));
     expect(again.status).toBe(0);
   });
@@ -271,7 +303,8 @@ describe("the :next and :latest tracks", () => {
     }
     const promote = read(".github/workflows/promote.yml");
     expect(promote).toMatch(/^on:\n {2}release:\n {4}types: \[released\]$/m);
-    expect(promote).toContain('--tag "$image:latest" --tag "$image:${{ steps.plan.outputs.minor }}"');
+    expect(promote).toContain('tags=(--tag "$image:${{ steps.plan.outputs.minor }}")');
+    expect(promote).toMatch(/if \[ "\$\{\{ steps\.plan\.outputs\.latest \}\}" = "true" \]; then\n\s+tags\+=\(--tag "\$image:latest"\)/);
     expect(read(".github/workflows/release.yml")).toContain("prerelease: true, generate_release_notes: true");
     expect(read("scripts/release.sh")).toContain('--title "$tag" --prerelease --generate-notes');
   });
