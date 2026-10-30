@@ -14,7 +14,7 @@ import { compareSemver, parseSemver } from "./semver";
  * A literal rather than package.json's, so a client that vendors this module, such as the companion
  * app, never bundles familyfi's package.json; `tests/unit/api-compat.test.ts` fails when it drifts.
  */
-export const API_VERSION: string = "0.42.1";
+export const API_VERSION: string = "0.43.0";
 /** The oldest client API version this server still serves (`info.x-min-app`). */
 export const MIN_APP_API_VERSION = "0.36.0";
 /** The oldest server API version a client built from this contract can read (`info.x-min-server`). */

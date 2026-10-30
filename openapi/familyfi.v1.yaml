@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.42.1
+  version: 0.43.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 0.36.0
@@ -687,6 +687,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UpdateSettings" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/settings/update/check:
+    post:
+      operationId: checkForUpdate
+      tags: [Update]
+      summary: Check for a newer release now
+      description: |
+        Asks GitHub and the image registry again, whatever the age of the last check, and answers with the
+        result, the same `update` `GET /api/v1/health` reports from then on. A check that finished in the last
+        fifteen seconds is answered as it is, without asking again. A failed check answers 200 with
+        `status: error`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200":
+          description: The release check
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [update]
+                properties:
+                  update: { $ref: "#/components/schemas/UpdateCheck" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
   /api/v1/settings/update/schedule:

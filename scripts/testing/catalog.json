@@ -1102,6 +1102,12 @@
         "schedules"
       ]
     },
+    "tests/browser/smoke.spec.ts > Check now asks the server again and shows its answer": {
+      "categories": [
+        "settings",
+        "schedules"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Settings exports the household and previews an import before replacing anything": {
       "categories": [
         "settings"

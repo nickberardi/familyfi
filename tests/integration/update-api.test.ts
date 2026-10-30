@@ -6,13 +6,14 @@ import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getUpdate } from "@/app/api/v1/settings/update/route";
+import { POST as checkNow } from "@/app/api/v1/settings/update/check/route";
 import { POST as install } from "@/app/api/v1/settings/update/install/route";
 import { PUT as putSchedule } from "@/app/api/v1/settings/update/schedule/route";
 import { PUT as putHousehold } from "@/app/api/v1/settings/household/route";
 import { APP_VERSION } from "@/lib/version";
-import type { UpdateRun, UpdateSettings } from "@/lib/types";
+import type { UpdateCheck, UpdateRun, UpdateSettings } from "@/lib/types";
 import { prisma } from "@/server/db";
-import { refreshUpdateCheck } from "@/server/update-check";
+import { getUpdateCheckSnapshot, refreshUpdateCheck } from "@/server/update-check";
 import {
   autoUpdateArmedForTests,
   rescheduleAutoUpdate,
@@ -150,6 +151,19 @@ describe("update settings", () => {
     expect(household).toMatchObject({ updateScheduleEnabled: true, updateSchedule: "30 2 * * 1,3" });
     const off = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: false, days: [1, 3], time: "02:30" }));
     expect(((await off.json()) as UpdateSettings)).toMatchObject({ schedule: { enabled: false, days: [1, 3], time: "02:30" }, nextRunAt: null });
+  });
+});
+
+describe("checking now", () => {
+  it("answers with the release check, as health reports it, and needs the CSRF token", async () => {
+    const auth = await adminAuth();
+    const response = await checkNow(write(auth, "/api/v1/settings/update/check", "POST"));
+    expect(response.status).toBe(200);
+    const { update } = (await response.json()) as { update: UpdateCheck };
+    expect(update).toEqual(getUpdateCheckSnapshot());
+    expect(update).toMatchObject({ status: "ok", available: true, latestVersion: NEWER });
+    const forged = await checkNow(request("/api/v1/settings/update/check", { method: "POST", auth: { ...auth, csrf: "" } }));
+    expect(forged.status).toBe(403);
   });
 });
 

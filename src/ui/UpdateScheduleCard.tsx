@@ -14,18 +14,20 @@ import { useUI } from "./UIContext";
 /**
  * When FamilyFi installs a newer release on its own: on or off, the days and the household-local
  * time. New households install on Sunday at midnight. Without the Watchtower updater it says so and
- * changes nothing.
+ * changes nothing. As a `section` it has no card of its own and closes the Updates card instead.
  */
 export function UpdateScheduleCard({
   settings,
   request,
   timezone,
   onChanged,
+  section = false,
 }: {
   settings: UpdateSettings | null;
   request: ApiRequest;
   timezone: string;
   onChanged: () => void;
+  section?: boolean;
 }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
@@ -52,12 +54,12 @@ export function UpdateScheduleCard({
     <View
       role="region"
       aria-labelledby="update-schedule-title"
-      style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]}
+      style={section ? [styles.section, { borderTopColor: ui.color("hairline-card") }] : [styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]}
       testID="update-schedule"
     >
       <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
         <View style={styles.grow}>
-          <Text role="heading" aria-level={2} id="update-schedule-title" style={[text(14, 21, "ink"), styles.bold]}>
+          <Text role="heading" aria-level={section ? 3 : 2} id="update-schedule-title" style={[text(14, 21, "ink"), styles.bold]}>
             {COPY.schedule}
           </Text>
           <Text style={text(14, 20, "muted")}>{COPY.scheduleSub}</Text>
@@ -101,6 +103,7 @@ export function UpdateScheduleCard({
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
+  section: { borderTopWidth: 1 },
   head: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },

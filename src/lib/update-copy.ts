@@ -1,7 +1,7 @@
 import { formatHhmm, relativeDayLabel } from "./display";
 import { compareSemver, parseSemver } from "./semver";
 import type { UpdateCheck, UpdateRun, UpdateSettings } from "./types";
-import { probeScheduleWhen } from "./upstream";
+import { checkedAgo, probeScheduleWhen } from "./upstream";
 
 /** A release as it is named everywhere: "v1.2.3", whether or not the tag had its "v". */
 export function versionLabel(version: string): string {
@@ -10,10 +10,18 @@ export function versionLabel(version: string): string {
 
 /** The update's words, on Settings' Maintenance tab. */
 export const UPDATE_COPY = {
-  title: "Update",
-  sub: "Release notes and installation.",
+  title: "Updates",
+  running: "Running",
+  newest: "Newest release",
+  latest: "Latest",
+  unknown: "Unknown",
+  upToDate: "Up to date",
+  available: "Update available",
   checking: "Checking for updates…",
-  unavailable: "Update check unavailable.",
+  checkingNow: "Checking…",
+  checkNow: "Check now",
+  checkFailed: "Could not check for updates.",
+  install: "Install",
   releaseNotes: "Release notes",
   viewOnGitHub: "View on GitHub",
   showAllChanges: "Show all changes",
@@ -21,14 +29,11 @@ export const UPDATE_COPY = {
   noNotes: "This release has no notes. See the full release on GitHub.",
   installNote:
     "Installing from here needs the Watchtower updater beside FamilyFi; the setup guide explains it. Until then, pull the new image and restart FamilyFi. It applies database changes on start, and your UniFi policies stay in place meanwhile.",
-  installReady:
-    "Watchtower backs up the database, then replaces FamilyFi with the new release. FamilyFi is away for a minute or two; your UniFi policies stay in place meanwhile, and this page reconnects by itself.",
   // Where pre-update-backup.sh puts its dump: /var/lib/familyfi/data/backups on the app volume (docker/docker-compose.yml).
   backupWhere: "Before installing, the database is backed up to the backups folder on FamilyFi's data volume (familyfi-app_data unless APP_DATA_VOLUME_NAME names another). The newest three backups are kept.",
   installConfirm: "FamilyFi restarts on the new release and is away for a minute or two.",
   installFailed: "Could not start the install.",
   installOverlay: "FamilyFi restarts on the new release. Your UniFi policies stay in place, and this page reloads by itself when it is back.",
-  notNow: "Not now",
   schedule: "Automatic updates",
   scheduleSub: "Install a newer release on its own, in the household's time.",
   scheduleTime: "Time",
@@ -41,11 +46,11 @@ export function latestRelease(update: UpdateCheck | null | undefined): string | 
   return update?.available && update.latestVersion ? versionLabel(update.latestVersion) : null;
 }
 
-/** What the update says when no newer release is on offer. */
-export function upToDateLine(update: UpdateCheck | null | undefined): string {
-  if (!update || update.status === "pending") return UPDATE_COPY.checking;
-  if (update.status === "error") return UPDATE_COPY.unavailable;
-  return `FamilyFi ${versionLabel(update.currentVersion)} is up to date.`;
+/** Under the newest release: when the server last asked, or that it is asking, or that it could not. */
+export function checkedLine(update: UpdateCheck | null | undefined, now = Date.now()): string {
+  if (!update || update.status === "pending" || !update.checkedAt) return UPDATE_COPY.checking;
+  const ago = checkedAgo(update.checkedAt, now);
+  return update.status === "error" ? `Could not reach GitHub, ${ago}` : `Checked ${ago}`;
 }
 
 /** The install card's title and button; without the updater the button names what is missing. */
