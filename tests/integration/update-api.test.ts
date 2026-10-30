@@ -8,6 +8,7 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getUpdate } from "@/app/api/v1/settings/update/route";
 import { POST as install } from "@/app/api/v1/settings/update/install/route";
 import { PUT as putSchedule } from "@/app/api/v1/settings/update/schedule/route";
+import { PUT as putHousehold } from "@/app/api/v1/settings/household/route";
 import { APP_VERSION } from "@/lib/version";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
 import { prisma } from "@/server/db";
@@ -16,6 +17,7 @@ import {
   autoUpdateArmedForTests,
   rescheduleAutoUpdate,
   runAutoUpdateCatchUpForTests,
+  setBackupFailureFileForTests,
   setUpdaterTokenFileForTests,
   settleUpdateRun,
   stopAutoUpdateForTests,
@@ -39,7 +41,7 @@ const watchtower = {
   url: "",
   seen: [] as Seen[],
   updateStatus: 202,
-  history: { entries: [] as Array<{ timestamp: string; updated: number; failed: number; skipped: number }> },
+  history: { entries: [] as Array<{ timestamp: string; scanned?: number; updated: number; failed: number; skipped: number; scan_failed?: boolean }> },
 };
 
 function releases(tag: string) {
@@ -185,6 +187,37 @@ describe("installing", () => {
     expect(watchtower.seen.some((call) => call.method === "GET" && call.url.startsWith("/v1/history?since="))).toBe(true);
   });
 
+  it("says the backup failed when Watchtower skipped the update for it", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "familyfi-backups-"));
+    setBackupFailureFileForTests(path.join(dir, "last-failure"));
+    try {
+      const auth = await adminAuth();
+      expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
+      writeFileSync(path.join(dir, "last-failure"), "pg_dump failed\n");
+      watchtower.history = { entries: [{ timestamp: new Date(Date.now() + 1000).toISOString(), scanned: 1, updated: 0, failed: 0, skipped: 1 }] };
+      expect((await settings(auth)).lastRun).toMatchObject({
+        status: "failed",
+        error: `The backup before installing failed (pg_dump failed), so FamilyFi kept running v${APP_VERSION}. The FamilyFi log says more.`,
+      });
+    } finally {
+      setBackupFailureFileForTests(undefined);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("calls a run settled before the release arrived a success once it runs", async () => {
+    const auth = await adminAuth();
+    expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
+    const { updateRequestedAt } = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const late = new Date(updateRequestedAt!.getTime() + 31 * 60_000);
+    expect(await settleUpdateRun({ now: () => late })).toMatchObject({ status: "failed" });
+    // The pull took longer than the time limit; Watchtower then started the new release.
+    expect(await settleUpdateRun({ currentVersion: NEWER })).toMatchObject({ status: "succeeded", error: null });
+    // A newer release than the run named leaves that run's outcome as it was.
+    await prisma().household.update({ where: { id: "default" }, data: { updateStatus: "failed" } });
+    expect(await settleUpdateRun({ currentVersion: "999.1.0" })).toMatchObject({ status: "failed" });
+  });
+
   it("succeeds when the new release starts", async () => {
     const auth = await adminAuth();
     expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
@@ -200,11 +233,13 @@ describe("installing", () => {
     expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
 
     writeToken(TOKEN);
+    // Busy with an install an earlier request asked for, which the time limit settled: that install is
+    // this one, so the request stays open for it to settle.
     watchtower.updateStatus = 429;
     const busy = await install(write(auth, "/api/v1/settings/update/install", "POST"));
-    expect(busy.status).toBe(409);
-    expect(((await busy.json()) as { error: { code: string } }).error.code).toBe("update_in_progress");
-    expect((await settings(auth)).lastRun).toMatchObject({ status: "failed", error: "Watchtower was already updating containers." });
+    expect(busy.status).toBe(202);
+    expect((await settings(auth)).lastRun).toMatchObject({ status: "requested", error: null });
+    expect(await settleUpdateRun({ currentVersion: NEWER })).toMatchObject({ status: "succeeded" });
 
     watchtower.updateStatus = 500;
     const broken = await install(write(auth, "/api/v1/settings/update/install", "POST"));
@@ -280,10 +315,29 @@ describe("the schedule", () => {
     await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", updateSchedule: "0 3 * * 0,1,2,3,4,5,6" } });
     const now = () => new Date("2026-10-14T07:10:00.000Z");
     const failing: typeof fetch = async (input, init) =>
-      github(String(input)) ? new Response("busy", { status: 503 }) : fetch(input, init);
+      github(String(input)) || String(input).startsWith("https://ghcr.io/") ? new Response("busy", { status: 503 }) : fetch(input, init);
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl: failing, now })).toBe("retry");
     expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).updateScheduleLastRunAt).toBeNull();
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("installed");
+  });
+
+  it("gives the slot back when Watchtower fails the request, so it is tried again", async () => {
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", updateSchedule: "0 3 * * 0,1,2,3,4,5,6" } });
+    const now = () => new Date("2026-10-14T07:10:00.000Z");
+    watchtower.updateStatus = 500;
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now })).toBe("retry");
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).updateScheduleLastRunAt).toBeNull();
+    watchtower.updateStatus = 202;
+    expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: () => new Date("2026-10-14T07:25:00.000Z") })).toBe("installed");
+  });
+
+  it("is armed again when the household's time zone changes", async () => {
+    const auth = await adminAuth();
+    stopAutoUpdateForTests();
+    expect(autoUpdateArmedForTests()).toBe(false);
+    const response = await putHousehold(write(auth, "/api/v1/settings/household", "PUT", { timezone: "America/Los_Angeles" }));
+    expect(response.status).toBe(200);
+    await expect.poll(() => autoUpdateArmedForTests()).toBe(true);
   });
 
   it("never lets an arm overtaken by a newer one set a timer", async () => {

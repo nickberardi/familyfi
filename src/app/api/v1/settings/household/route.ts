@@ -6,6 +6,7 @@ import { jsonError } from "@/server/http";
 import { storedQuarantineBlocking } from "@/server/quarantine";
 import { setQuarantineEnforced } from "@/server/rules";
 import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
+import { rescheduleAutoUpdate } from "@/server/updater";
 import type { Household } from "@prisma/client";
 import { demoLocked } from "@/server/demo";
 
@@ -63,7 +64,11 @@ export async function PUT(request: Request) {
         ? await setQuarantineEnforced(parsed.data.quarantineEnforced, data)
         : await prisma().household.update({ where: { id: "default" }, data });
     const change = await enqueueChange(parsed.data.quarantineEnforced !== undefined ? "quarantine" : "household");
-    if (parsed.data.timezone) rescheduleUpstreamProbe();
+    // Both schedules are kept in the household's time zone.
+    if (parsed.data.timezone) {
+      rescheduleUpstreamProbe();
+      rescheduleAutoUpdate();
+    }
     return Response.json({
       household: await publicHousehold(household),
       change,

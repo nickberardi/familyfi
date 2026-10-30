@@ -2,14 +2,18 @@
 # Watchtower's pre-update hook (the app's labels in docker/docker-compose.yml): back up the database
 # before Watchtower replaces this container with a newer release, whose start applies its migrations.
 # Exit 75 tells Watchtower to skip the update, so FamilyFi keeps running the release it has; any other
-# failure would abort Watchtower's whole update instead. Keeps the newest KEEP dumps.
+# failure would abort Watchtower's whole update instead. Keeps the newest KEEP dumps. Watchtower counts
+# exit 75 as a skip like any other, so a failure also writes its reason to FAILURE_FILE, which FamilyFi
+# reads to say the backup failed (src/server/updater.ts); a good backup removes it.
 set -u
 
 BACKUP_DIR="/var/lib/familyfi/data/backups"
+FAILURE_FILE="$BACKUP_DIR/last-failure"
 KEEP=3
 
 fail() {
   echo "pre-update backup: $1; skipping the update" >&2
+  printf '%s\n' "$1" > "$FAILURE_FILE" 2>/dev/null || true
   exit 75
 }
 
@@ -44,6 +48,7 @@ pg_dump --format=custom --no-owner --file "$target.partial" "$DATABASE_URL" || {
 }
 mv "$target.partial" "$target" || fail "could not keep $target"
 echo "pre-update backup: wrote $target"
+rm -f "$FAILURE_FILE"
 
 # Newest first by modification time; drop all but the newest KEEP.
 ls -1t "$BACKUP_DIR"/familyfi-v*.dump 2>/dev/null | tail -n "+$((KEEP + 1))" | while read -r old; do

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import type { UpdateStatus } from "@prisma/client";
 import { z } from "zod";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
@@ -31,9 +31,30 @@ const REACHABLE_TIMEOUT_MS = 3_000;
 const UPDATER_TOKEN_FILE = "/var/lib/familyfi/updater/token";
 let tokenFile = UPDATER_TOKEN_FILE;
 
+/** Where scripts/runtime/pre-update-backup.sh says why its last backup failed; it removes the file after a good one. */
+const BACKUP_FAILURE_FILE = "/var/lib/familyfi/data/backups/last-failure";
+let backupFailureFile = BACKUP_FAILURE_FILE;
+
 export function setUpdaterTokenFileForTests(path?: string) {
   tokenFile = path ?? UPDATER_TOKEN_FILE;
   reachable = undefined;
+}
+
+export function setBackupFailureFileForTests(path?: string) {
+  backupFailureFile = path ?? BACKUP_FAILURE_FILE;
+}
+
+/**
+ * Why the pre-update backup failed, when it failed at or after `since`, or null. Watchtower counts the
+ * hook's exit 75 as a skip, like any other skip, so this file is what tells the two apart.
+ */
+export function backupFailureSince(since: Date, file = backupFailureFile): string | null {
+  try {
+    if (statSync(/*turbopackIgnore: true*/ file).mtimeMs < since.getTime()) return null;
+    return readFileSync(/*turbopackIgnore: true*/ file, "utf8").trim() || "the backup failed";
+  } catch {
+    return null;
+  }
 }
 
 export type UpdaterSettings = { url: string; token: string };
@@ -122,15 +143,28 @@ const HistorySchema = z.object({
     .array(
       z.object({
         timestamp: z.iso.datetime({ offset: true }),
+        scanned: z.number().int().nonnegative().optional(),
         updated: z.number().int().nonnegative(),
         failed: z.number().int().nonnegative(),
         skipped: z.number().int().nonnegative(),
+        scan_failed: z.boolean().optional(),
       }),
     )
     .nullable(),
 });
 
-export type WatchtowerHistory = { scans: number; updated: number; failed: number; skipped: number };
+/**
+ * Scans since a request, summed. `scanned` counts the containers Watchtower looked at, null when its
+ * history does not say; `scanFailed` the scans that ended in an error before looking at any.
+ */
+export type WatchtowerHistory = {
+  scans: number;
+  scanned: number | null;
+  updated: number;
+  failed: number;
+  skipped: number;
+  scanFailed: number;
+};
 
 export type UpdateOutcome = { status: Exclude<UpdateStatus, "requested">; error: string | null } | null;
 
@@ -145,17 +179,18 @@ export function updateOutcome(input: {
   requestedAt: Date;
   now: Date;
   history: WatchtowerHistory | null;
+  /** Why the pre-update backup failed since the request, from `backupFailureSince`. */
+  backupFailure?: string | null;
 }): UpdateOutcome {
   const current = parseSemver(input.currentVersion);
   const target = parseSemver(input.targetVersion);
   if (current && target && compareSemver(current, target) >= 0) return { status: "succeeded", error: null };
   const history = input.history;
   if (history && history.scans > 0) {
-    // A pre-update hook that exits 75 (the backup failed) is counted as failed, not skipped.
     if (history.failed > 0) {
       return {
         status: "failed",
-        error: "Watchtower did not replace FamilyFi: the backup before installing failed, or the replacement did. The FamilyFi and Watchtower logs say which.",
+        error: "Watchtower could not replace FamilyFi: the backup before installing did not finish, or the replacement failed. The FamilyFi and Watchtower logs say which.",
       };
     }
     if (history.updated > 0) {
@@ -164,10 +199,26 @@ export function updateOutcome(input: {
         error: `Watchtower replaced the container, but it runs v${input.currentVersion}, not v${input.targetVersion}.`,
       };
     }
+    // The backup hook exits 75 when it fails, which Watchtower (1.23.1 and later) counts as a skip.
+    if (history.skipped > 0 && input.backupFailure) {
+      return {
+        status: "failed",
+        error: `The backup before installing failed (${input.backupFailure}), so FamilyFi kept running v${input.currentVersion}. The FamilyFi log says more.`,
+      };
+    }
     if (history.skipped > 0) {
       return {
         status: "skipped",
         error: "Watchtower skipped the update; its log says why.",
+      };
+    }
+    if (history.scanFailed > 0) {
+      return { status: "failed", error: "Watchtower could not look for a newer image; its log says why." };
+    }
+    if (history.scanned === 0) {
+      return {
+        status: "failed",
+        error: "Watchtower looked at no container. FamilyFi's container needs the Watchtower labels in the current docker-compose.yml; Watchtower's log says more.",
       };
     }
     return {
@@ -203,11 +254,14 @@ async function readHistory(since: Date, options: UpdaterOptions): Promise<Watcht
     return entries.reduce<WatchtowerHistory>(
       (sum, entry) => ({
         scans: sum.scans + 1,
+        // An older Watchtower that does not report it leaves the sum unknown.
+        scanned: sum.scanned === null || entry.scanned === undefined ? null : sum.scanned + entry.scanned,
         updated: sum.updated + entry.updated,
         failed: sum.failed + entry.failed,
         skipped: sum.skipped + entry.skipped,
+        scanFailed: sum.scanFailed + (entry.scan_failed ? 1 : 0),
       }),
-      { scans: 0, updated: 0, failed: 0, skipped: 0 },
+      { scans: 0, scanned: 0, updated: 0, failed: 0, skipped: 0, scanFailed: 0 },
     );
   } catch {
     // Unreachable while it restarts or is not running; the request stays open until the time limit.
@@ -228,14 +282,25 @@ async function finishRun(requestedAt: Date, status: Exclude<UpdateStatus, "reque
 /** Settles the open request, if there is one and its outcome is known. Returns the latest request either way. */
 export async function settleUpdateRun(options: UpdaterOptions = {}): Promise<LatestUpdate | null> {
   const open = await latestUpdate();
-  if (open?.status !== "requested") return open;
+  if (!open || open.status === "succeeded") return open;
   const now = (options.now ?? (() => new Date()))();
   const currentVersion = options.currentVersion ?? APP_VERSION;
   const current = parseSemver(currentVersion);
   const target = parseSemver(open.targetVersion);
-  const reached = current && target && compareSemver(current, target) >= 0;
+  const reached = Boolean(current && target && compareSemver(current, target) >= 0);
+  if (open.status !== "requested") {
+    // Settled too early (the time limit, or a request Watchtower took though FamilyFi heard no answer),
+    // and this release arrived after all: running it is the outcome.
+    if (!current || !target || compareSemver(current, target) !== 0) return open;
+    await prisma().household.updateMany({
+      where: { id: "default", updateStatus: open.status, updateRequestedAt: open.requestedAt },
+      data: { updateStatus: "succeeded", updateError: null },
+    });
+    return latestUpdate();
+  }
   const history = reached ? null : await readHistory(open.requestedAt, options);
-  const outcome = updateOutcome({ targetVersion: open.targetVersion, currentVersion, requestedAt: open.requestedAt, now, history });
+  const backupFailure = history && history.skipped > 0 ? backupFailureSince(open.requestedAt) : null;
+  const outcome = updateOutcome({ targetVersion: open.targetVersion, currentVersion, requestedAt: open.requestedAt, now, history, backupFailure });
   if (!outcome) return open;
   return finishRun(open.requestedAt, outcome.status, outcome.error);
 }
@@ -281,10 +346,10 @@ export async function requestUpdate(
     await finishRun(run.requestedAt, "failed", `Could not reach Watchtower at ${settings.url}.`);
     throw new UpdaterError("updater_unreachable", `Could not reach Watchtower at ${settings.url}.`);
   }
-  if (response.status === 429) {
-    await finishRun(run.requestedAt, "failed", "Watchtower was already updating containers.");
-    throw new UpdaterError("update_in_progress", "Watchtower is already updating containers. Try again in a minute.");
-  }
+  // Only FamilyFi asks Watchtower to update, so it is still installing what an earlier request asked
+  // for (one settled by the time limit). That install is this one: the request stays open, settled by
+  // the release that starts or by the scan Watchtower is finishing.
+  if (response.status === 429) return run;
   if (!response.ok) {
     const message =
       response.status === 401 ? "Watchtower refused FamilyFi's updater token." : `Watchtower answered HTTP ${response.status}.`;
@@ -318,7 +383,7 @@ export async function updateSettings(options: UpdaterOptions = {}): Promise<Upda
 let timer: ReturnType<typeof setTimeout> | undefined;
 /** Bumped by every re-arm, so an `arm` still reading the schedule when another starts never sets a timer. */
 let generation = 0;
-/** A failed release check is tried again this often while its slot is still due. */
+/** A failed release check, or a request Watchtower failed, is tried again this often while its slot is still due. */
 const RETRY_MS = 15 * 60 * 1000;
 
 type Claim = "installed" | "nothing" | "retry";
@@ -356,8 +421,15 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim
     await requestUpdate({ update }, { ...options, settings });
   } catch (error) {
     // Recorded on the household where Watchtower was asked; an install already under way is not an error.
-    if (!(error instanceof UpdaterError && error.code === "update_in_progress")) {
-      console.error("Scheduled update did not start:", error instanceof Error ? error.message : error);
+    if (error instanceof UpdaterError && error.code === "update_in_progress") return "installed";
+    console.error("Scheduled update did not start:", error instanceof Error ? error.message : error);
+    // Watchtower answered the check but failed the request: give the slot back, to try again within the hour.
+    if (error instanceof UpdaterError && error.code === "updater_unreachable") {
+      await prisma().household.updateMany({
+        where: { id: "default", updateScheduleLastRunAt: due },
+        data: { updateScheduleLastRunAt: household.updateScheduleLastRunAt },
+      });
+      return "retry";
     }
   }
   return "installed";
