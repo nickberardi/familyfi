@@ -206,7 +206,7 @@ test("Checkup, not the sidebar, says an update is ready, and its Update opens th
   await expect(row).toContainText("You’re on v0.5.1.");
   await row.getByRole("link", { name: "Update" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
-  const card = page.getByRole("region", { name: "Install v0.6.0" });
+  const card = page.getByRole("region", { name: "Updates" });
   await expect(card.getByRole("region", { name: "Release notes" })).toContainText("Pair Device page");
   await expect(card.getByRole("link", { name: "View on GitHub" })).toHaveAttribute(
     "href",
@@ -288,6 +288,41 @@ test("the Update page installs through the updater and keeps its schedule", { ta
   await schedule.getByRole("button", { name: "Saturday" }).click();
   await expect.poll(() => scheduleWrites.at(-1)).toEqual({ enabled: true, days: [0, 6], time: "00:00" });
   await expect(schedule).toContainText("Weekends at 12 AM");
+});
+
+test("Check now asks the server again and shows its answer", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const current: UpdateCheck = {
+    status: "ok",
+    available: false,
+    currentVersion: "0.5.1",
+    latestVersion: "0.5.1",
+    releaseUrl: null,
+    releaseNotes: null,
+    checkedAt: "2026-09-22T12:00:00.000Z",
+    lastSuccessfulAt: "2026-09-22T12:00:00.000Z",
+    error: null,
+  };
+  await page.route("**/api/v1/health", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ status: "ok", db: "ok", version: "0.5.1", revision: 0, update: current }) }),
+  );
+  let asked = 0;
+  await page.route("**/api/v1/settings/update/check", async (route) => {
+    asked += 1;
+    const now = new Date().toISOString();
+    const update: UpdateCheck = { ...current, available: true, latestVersion: "0.6.0", releaseNotes: "## New\n- One", checkedAt: now, lastSuccessfulAt: now };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ update }) });
+  });
+  await page.goto("/settings?tab=maintenance");
+  const card = page.getByRole("region", { name: "Updates" });
+  await expect(card.getByTestId("update-latest")).toHaveText("Latest");
+  await expect(card.getByTestId("update-chip")).toHaveText("Up to date");
+  await card.getByRole("button", { name: "Check now" }).click();
+  await expect.poll(() => asked).toBe(1);
+  // The newer release replaces "Latest" at once, without waiting for the next health poll.
+  await expect(card.getByTestId("update-latest")).toHaveText("v0.6.0");
+  await expect(card.getByTestId("update-chip")).toHaveText("Update available");
+  await expect(card.getByTestId("update-checked")).toHaveText("Checked just now");
 });
 
 test("Settings exports the household and previews an import before replacing anything", { tag: "@desktop" }, async ({ page }) => {
