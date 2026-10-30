@@ -139,6 +139,8 @@ jobs:
     needs: ghcr
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
+    outputs:
+      full: ${{ steps.full.outputs.full }}
     # One at a time, so two releases never race to move :next. GitHub keeps one waiting job per
     # group, so a third release reaching here at once is cancelled: run its job again.
     concurrency:
@@ -212,6 +214,27 @@ jobs:
               api -X POST --data @- "$releases" >/dev/null
           fi
           echo "::notice::$GITHUB_REF_NAME is $IMAGE_REF"
+      # Read after the notes name the image: a label changed from here on fires promote.yml with the
+      # image there to promote; one changed before, or a release published as a full release, did not.
+      - name: Already a full release
+        id: full
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease="$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" | jq -r '.prerelease or .draft')"
+          echo "full=$([ "$prerelease" = "false" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  # A release that is already a full release is promoted now its image exists (promote.yml).
+  promote:
+    needs: manifest
+    if: needs.manifest.outputs.full == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/promote.yml
+    with:
+      tag: ${{ github.ref_name }}
 
   # The image reports the tag's version whatever package.json says. When main's package.json
   # and OpenAPI info.version are behind a stable tag, open a PR that brings them up to it.

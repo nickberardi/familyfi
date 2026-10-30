@@ -4,12 +4,36 @@ import {
   createUpdateChecker,
   parseSemver,
   selectLatestRelease,
+  selectOfferedRelease,
+  trackTag,
   updateTrack,
 } from "@/server/update-check";
 import { APP_VERSION } from "@/lib/version";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+const isGitHub = (input: unknown) => String(input).startsWith("https://api.github.com/");
+const digestOf = (letter: string) => `sha256:${letter.repeat(64)}`;
+const imageLine = (letter: string) => `Image: \`ghcr.io/nickberardi/familyfi@${digestOf(letter)}\` (linux/amd64 and linux/arm64).`;
+
+/** GHCR as an anonymous pull sees it: each tag's digest, and 404 for any other. */
+function registry(tags: Record<string, string>) {
+  return async (input: unknown, init?: RequestInit): Promise<Response> => {
+    const url = new URL(String(input));
+    if (url.pathname === "/token") return jsonResponse({ token: "anonymous" });
+    const tag = decodeURIComponent(url.pathname.split("/manifests/")[1] ?? "");
+    const digest = tags[tag];
+    expect(init?.method).toBe("HEAD");
+    return digest ? new Response(null, { status: 200, headers: { "docker-content-digest": digest } }) : new Response(null, { status: 404 });
+  };
+}
+
+/** GitHub answers with `github`; GHCR with `tags`, or 404 for every tag. */
+function routed(github: () => Promise<Response> | Response, tags: Record<string, string> = {}) {
+  const ghcr = registry(tags);
+  return async (input: string | URL | Request, init?: RequestInit) => (isGitHub(input) ? github() : ghcr(input, init));
 }
 
 describe("GitHub release update check", () => {
@@ -165,15 +189,16 @@ describe("GitHub release update check", () => {
   it("coalesces overlapping refreshes into one cached check", async () => {
     const checker = createUpdateChecker();
     let resolveFetch!: (response: Response) => void;
-    const fetchImpl = vi.fn(
+    const github = vi.fn(
       () => new Promise<Response>((resolve) => {
         resolveFetch = resolve;
       }),
     );
+    const fetchImpl = routed(github);
     const first = checker.refresh({ fetchImpl });
     const second = checker.refresh({ fetchImpl });
     expect(first).toBe(second);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(github).toHaveBeenCalledTimes(1);
     resolveFetch(jsonResponse([]));
     await expect(first).resolves.toMatchObject({ status: "ok", available: false });
   });
@@ -181,28 +206,28 @@ describe("GitHub release update check", () => {
   it("reads every release page before selecting the highest version", async () => {
     const checker = createUpdateChecker();
     const firstPage = Array.from({ length: 100 }, () => ({ tag_name: "v0.1.0", prerelease: true }));
-    const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(jsonResponse(firstPage))
-      .mockResolvedValueOnce(jsonResponse([{ tag_name: "v999.0.0", prerelease: false }]));
+    const pages = [jsonResponse(firstPage), jsonResponse([{ tag_name: "v999.0.0", prerelease: false }])];
+    const fetchImpl = vi.fn(routed(() => pages.shift()!));
     const snapshot = await checker.refresh({ fetchImpl });
     expect(snapshot).toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(String(fetchImpl.mock.calls[1]?.[0])).toContain("page=2");
+    const githubCalls = fetchImpl.mock.calls.filter(([input]) => isGitHub(input));
+    expect(githubCalls).toHaveLength(2);
+    expect(String(githubCalls[1]?.[0])).toContain("page=2");
   });
 
   it("refreshes hourly after the previous check completes", async () => {
     vi.useFakeTimers();
-    const fetchImpl = vi.fn(async () => jsonResponse([]));
-    vi.stubGlobal("fetch", fetchImpl);
+    const github = vi.fn(async () => jsonResponse([]));
+    vi.stubGlobal("fetch", routed(github));
     try {
       const checker = createUpdateChecker();
       checker.start();
       await vi.advanceTimersByTimeAsync(0);
-      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(github).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(60 * 60 * 1000 - 1);
-      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(github).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(1);
-      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(github).toHaveBeenCalledTimes(2);
     } finally {
       vi.unstubAllGlobals();
       vi.useRealTimers();
@@ -211,10 +236,9 @@ describe("GitHub release update check", () => {
 
   it("asks again when an administrator opens a check older than its limit, and reuses a fresh one", async () => {
     // FamilyFi checked before the release left Pre-release; GitHub has promoted it since.
-    const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(jsonResponse([{ tag_name: "v999.0.0", prerelease: true }]))
-      .mockResolvedValueOnce(jsonResponse([{ tag_name: "v999.0.0", prerelease: false }]));
-    vi.stubGlobal("fetch", fetchImpl);
+    const answers = [jsonResponse([{ tag_name: "v999.0.0", prerelease: true }]), jsonResponse([{ tag_name: "v999.0.0", prerelease: false }])];
+    const fetchImpl = vi.fn(async () => answers.shift()!);
+    vi.stubGlobal("fetch", routed(fetchImpl));
     try {
       const checker = createUpdateChecker();
       checker.start();
@@ -233,6 +257,69 @@ describe("GitHub release update check", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("offers the release the track's tag holds in GHCR, whatever GitHub's labels say", () => {
+    // v0.42.1 was published as a full release before its image was built, so promote.yml failed and
+    // :latest still holds v0.42.0, which has since been labelled Pre-release again.
+    const releases = [
+      { tag_name: "v0.43.0", prerelease: true, body: "## What's Changed" },
+      { tag_name: "v0.42.1", prerelease: false, body: `${imageLine("b")}\n\n## What's Changed` },
+      { tag_name: "v0.42.0", prerelease: true, body: `${imageLine("a")}\n\n## What's Changed` },
+    ];
+    expect(selectOfferedRelease(releases, "latest", digestOf("a"))).toEqual({ version: "0.42.0", tag: "v0.42.0" });
+    // :next holds v0.42.1: v0.43.0 is a Pre-release made on GitHub whose image is still building.
+    expect(selectOfferedRelease(releases, "next", digestOf("b"))).toEqual({ version: "0.42.1", tag: "v0.42.1" });
+    expect(selectOfferedRelease(releases, "next", digestOf("B"))).toEqual({ version: "0.42.1", tag: "v0.42.1" });
+    // GHCR could not say, or holds an image no release names: GitHub's labels decide, as before.
+    expect(selectOfferedRelease(releases, "latest", null)).toEqual({ version: "0.42.1", tag: "v0.42.1" });
+    expect(selectOfferedRelease(releases, "next", digestOf("c"))).toEqual({ version: "0.43.0", tag: "v0.43.0" });
+    expect(selectOfferedRelease([{ ...releases[1]!, draft: true }], "latest", digestOf("b"))).toBeNull();
+  });
+
+  it("names the tag each track pulls", () => {
+    expect(trackTag("latest")).toBe("latest");
+    expect(trackTag("next")).toBe("next");
+    expect(trackTag({ major: "0", minor: "38" })).toBe("0.38");
+  });
+
+  it("asks GHCR for the tag FAMILYFI_UPDATE_TAG names and offers nothing newer than it holds", async () => {
+    const releases = [
+      { tag_name: "v999.1.0", prerelease: false, body: imageLine("b") },
+      { tag_name: "v999.0.0", prerelease: false, body: imageLine("a") },
+      { tag_name: `v${APP_VERSION}`, prerelease: false, body: imageLine("0") },
+    ];
+    const github = () => jsonResponse(releases);
+    // promote.yml has not moved :latest to v999.1.0 yet.
+    await expect(createUpdateChecker().refresh({ fetchImpl: routed(github, { latest: digestOf("a"), next: digestOf("b") }) })).resolves.toMatchObject({
+      status: "ok",
+      available: true,
+      latestVersion: "999.0.0",
+      releaseUrl: "https://github.com/nickberardi/familyfi/releases/tag/v999.0.0",
+      releaseNotes: imageLine("a"),
+    });
+    // Install would pull what FamilyFi already runs: nothing to offer, though GitHub lists newer.
+    await expect(createUpdateChecker().refresh({ fetchImpl: routed(github, { latest: digestOf("0") }) })).resolves.toMatchObject({
+      status: "ok",
+      available: false,
+      latestVersion: APP_VERSION,
+    });
+    vi.stubEnv("FAMILYFI_UPDATE_TAG", "999.0");
+    try {
+      const fetchImpl = vi.fn(routed(github, { "999.0": digestOf("a"), latest: digestOf("b") }));
+      await expect(createUpdateChecker().refresh({ fetchImpl })).resolves.toMatchObject({ latestVersion: "999.0.0" });
+      expect(fetchImpl.mock.calls.map(([input]) => String(input))).toContain("https://ghcr.io/v2/nickberardi/familyfi/manifests/999.0");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("falls back to GitHub's labels when GHCR does not answer", async () => {
+    const releases = [{ tag_name: "v999.0.0", prerelease: false, body: imageLine("a") }];
+    const down = (async (input: unknown) => (isGitHub(input) ? jsonResponse(releases) : Promise.reject(new TypeError("fetch failed")))) as typeof fetch;
+    await expect(createUpdateChecker().refresh({ fetchImpl: down })).resolves.toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });
+    const refused = (async (input: unknown) => (isGitHub(input) ? jsonResponse(releases) : jsonResponse({}, 403))) as typeof fetch;
+    await expect(createUpdateChecker().refresh({ fetchImpl: refused })).resolves.toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });
   });
 
   it("never asks GitHub from a checker that was not started", async () => {

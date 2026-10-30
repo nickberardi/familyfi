@@ -8,6 +8,16 @@ export { compareSemver, parseSemver };
 
 const GITHUB_RELEASES_URL = "https://api.github.com/repos/nickberardi/familyfi/releases";
 const GITHUB_RELEASE_PAGE_URL = "https://github.com/nickberardi/familyfi/releases/tag";
+const REGISTRY_URL = "https://ghcr.io";
+const IMAGE_REPOSITORY = "nickberardi/familyfi";
+/** How the Release workflow and scripts/release.sh name a release's image in its notes. */
+const RELEASE_IMAGE = /ghcr\.io\/nickberardi\/familyfi@(sha256:[0-9a-f]{64})/gi;
+const MANIFEST_TYPES = [
+  "application/vnd.oci.image.index.v1+json",
+  "application/vnd.docker.distribution.manifest.list.v2+json",
+  "application/vnd.oci.image.manifest.v1+json",
+  "application/vnd.docker.distribution.manifest.v2+json",
+].join(",");
 const RELEASE_PAGE_SIZE = 100;
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 /** How old a check may be when an administrator opens the update before it is asked again. */
@@ -63,6 +73,38 @@ function releaseIsApplicable(release: GitHubRelease, track: UpdateTrack): Semver
   return version;
 }
 
+/** The tag of `ghcr.io/nickberardi/familyfi` the track runs, and Watchtower pulls. */
+export function trackTag(track: UpdateTrack): string {
+  return typeof track === "object" ? `${track.major}.${track.minor}` : track;
+}
+
+/**
+ * The release whose image the track's tag holds now, by the digest its notes name, or null when no
+ * release names it. A release is published, or stops being a Pre-release, before its image reaches the
+ * tag: until the Release workflow has built it, or promote.yml has moved `:latest` and `:X.Y` to it, or
+ * when that promotion fails. Install pulls the tag, so only what the tag holds is offered.
+ */
+export function selectPulledRelease(releases: GitHubRelease[], digest: string): { version: string; tag: string } | null {
+  let pulled: { version: Semver; tag: string } | null = null;
+  for (const release of releases) {
+    if (release.draft === true || typeof release.tag_name !== "string" || typeof release.body !== "string") continue;
+    const version = parseSemver(release.tag_name);
+    if (!version) continue;
+    const named = [...release.body.matchAll(RELEASE_IMAGE)].some((match) => match[1]!.toLowerCase() === digest.toLowerCase());
+    if (named && (!pulled || compareSemver(version, pulled.version) > 0)) pulled = { version, tag: release.tag_name };
+  }
+  return pulled ? { version: pulled.version.version, tag: pulled.tag } : null;
+}
+
+/** What to offer: the release the track's tag holds, or, when GHCR could not say, the newest the track's labels allow. */
+export function selectOfferedRelease(
+  releases: GitHubRelease[],
+  track: UpdateTrack,
+  digest: string | null,
+): { version: string; tag: string } | null {
+  return (digest ? selectPulledRelease(releases, digest) : null) ?? selectLatestRelease(releases, track);
+}
+
 export function selectLatestRelease(
   releases: GitHubRelease[],
   track: UpdateTrack,
@@ -97,6 +139,32 @@ async function fetchReleases(fetchImpl: typeof fetch, signal: AbortSignal): Prom
     if (!Array.isArray(pageRows)) throw new Error("GitHub releases response was not an array.");
     releases.push(...(pageRows as GitHubRelease[]));
     if (pageRows.length < RELEASE_PAGE_SIZE) return releases;
+  }
+}
+
+/**
+ * The digest GHCR holds under `tag`, asked anonymously as Watchtower's pull would, or null when it
+ * cannot say. Never throws: without an answer the check falls back to GitHub's labels alone.
+ */
+async function tagDigest(fetchImpl: typeof fetch, tag: string, signal: AbortSignal): Promise<string | null> {
+  try {
+    const tokenUrl = new URL(`${REGISTRY_URL}/token`);
+    tokenUrl.searchParams.set("scope", `repository:${IMAGE_REPOSITORY}:pull`);
+    const tokenResponse = await fetchImpl(tokenUrl, { headers: { "User-Agent": "FamilyFi update check" }, signal });
+    if (!tokenResponse.ok) return null;
+    const body: unknown = await tokenResponse.json();
+    const token = body && typeof body === "object" && "token" in body && typeof body.token === "string" ? body.token : null;
+    if (!token) return null;
+    const response = await fetchImpl(`${REGISTRY_URL}/v2/${IMAGE_REPOSITORY}/manifests/${encodeURIComponent(tag)}`, {
+      method: "HEAD",
+      headers: { Accept: MANIFEST_TYPES, Authorization: `Bearer ${token}`, "User-Agent": "FamilyFi update check" },
+      signal,
+    });
+    if (!response.ok) return null;
+    const digest = response.headers.get("docker-content-digest")?.trim().toLowerCase();
+    return digest && /^sha256:[0-9a-f]{64}$/.test(digest) ? digest : null;
+  } catch {
+    return null;
   }
 }
 
@@ -145,8 +213,12 @@ export function createUpdateChecker(): UpdateChecker {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), UPDATE_CHECK_TIMEOUT_MS);
       try {
-        const releases = await fetchReleases(fetchImpl, controller.signal);
-        const latest = selectLatestRelease(releases, updateTrack());
+        const track = updateTrack();
+        const [releases, digest] = await Promise.all([
+          fetchReleases(fetchImpl, controller.signal),
+          tagDigest(fetchImpl, trackTag(track), controller.signal),
+        ]);
+        const latest = selectOfferedRelease(releases, track, digest);
         const current = parseSemver(APP_VERSION);
         if (!current) throw new Error("FamilyFi version is not valid SemVer.");
         const checkedAt = now().toISOString();
