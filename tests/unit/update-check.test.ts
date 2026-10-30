@@ -7,6 +7,8 @@ import {
   selectOfferedRelease,
   trackTag,
   updateTrack,
+  UPDATE_CHECK_FRESH_MS,
+  UPDATE_CHECK_NOW_MS,
 } from "@/server/update-check";
 import { APP_VERSION } from "@/lib/version";
 
@@ -254,6 +256,30 @@ describe("GitHub release update check", () => {
         latestVersion: "999.0.0",
       });
       expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("checks now unless a check finished in the last fifteen seconds, well inside the five-minute limit", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse([{ tag_name: "v999.0.0", prerelease: false }]));
+    vi.stubGlobal("fetch", routed(fetchImpl));
+    try {
+      const checker = createUpdateChecker();
+      checker.start();
+      const first = await checker.refreshIfOlderThan(UPDATE_CHECK_FRESH_MS);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      const checkedAt = new Date(first.checkedAt!).getTime();
+      const at = (ms: number) => ({ now: () => new Date(checkedAt + ms) });
+      await checker.checkNow(at(UPDATE_CHECK_NOW_MS - 1));
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      const asked = await checker.checkNow(at(UPDATE_CHECK_NOW_MS));
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(asked).toMatchObject({ status: "ok", available: true, latestVersion: "999.0.0" });
+      // A minute old is fresh enough for opening Maintenance, not for Check now.
+      const again = new Date(asked.checkedAt!).getTime();
+      await checker.checkNow({ now: () => new Date(again + 60_000) });
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
     } finally {
       vi.unstubAllGlobals();
     }
