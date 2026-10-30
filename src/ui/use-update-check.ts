@@ -8,9 +8,12 @@ import type { UpdateCheck } from "@/lib/types";
 /**
  * Reads the server's cached release check from `GET /api/v1/health`: every five
  * seconds while the first check is pending, then once a minute. These reads never
- * reach GitHub; the server checks on its own hourly schedule.
+ * reach GitHub; the server checks on its own hourly schedule, and again when an
+ * administrator reads `GET /api/v1/settings/update` with a check over five minutes old.
+ * A change of `reread` reads it again at once, so a caller that has just had the
+ * server check again shows its answer.
  */
-export function useUpdateCheck(request: ApiRequest): UpdateCheck | null {
+export function useUpdateCheck(request: ApiRequest, reread?: unknown): UpdateCheck | null {
   const [update, setUpdate] = useState<UpdateCheck | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +35,6 @@ export function useUpdateCheck(request: ApiRequest): UpdateCheck | null {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [request]);
+  }, [request, reread]);
   return update;
 }

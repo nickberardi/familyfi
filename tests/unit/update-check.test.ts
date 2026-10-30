@@ -208,4 +208,37 @@ describe("GitHub release update check", () => {
       vi.useRealTimers();
     }
   });
+
+  it("asks again when an administrator opens a check older than its limit, and reuses a fresh one", async () => {
+    // FamilyFi checked before the release left Pre-release; GitHub has promoted it since.
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{ tag_name: "v999.0.0", prerelease: true }]))
+      .mockResolvedValueOnce(jsonResponse([{ tag_name: "v999.0.0", prerelease: false }]));
+    vi.stubGlobal("fetch", fetchImpl);
+    try {
+      const checker = createUpdateChecker();
+      checker.start();
+      const first = await checker.refreshIfOlderThan(5 * 60 * 1000);
+      expect(first).toMatchObject({ status: "ok", available: false });
+      const checkedAt = new Date(first.checkedAt!).getTime();
+      const at = (ms: number) => ({ now: () => new Date(checkedAt + ms) });
+      await expect(checker.refreshIfOlderThan(5 * 60 * 1000, at(5 * 60 * 1000 - 1))).resolves.toMatchObject({ available: false });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      await expect(checker.refreshIfOlderThan(5 * 60 * 1000, at(5 * 60 * 1000))).resolves.toMatchObject({
+        status: "ok",
+        available: true,
+        latestVersion: "999.0.0",
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("never asks GitHub from a checker that was not started", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse([]));
+    const checker = createUpdateChecker();
+    await expect(checker.refreshIfOlderThan(0, { fetchImpl })).resolves.toMatchObject({ status: "pending" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 });
