@@ -58,9 +58,14 @@ export function installing(settings: UpdateSettings | null | undefined): boolean
   return settings?.lastRun?.status === "requested";
 }
 
-/** The last install in a line: under way, or how it ended. */
-export function updateRunLine(run: UpdateRun | null | undefined): string | null {
+/**
+ * The last install in a line: under way, or how it ended. Once FamilyFi runs a newer release than the
+ * install named, however it got there, its outcome is history and the line is dropped: "Installed
+ * v0.40.0" under "v0.42.0 is up to date" reads as if v0.42.0 never arrived.
+ */
+export function updateRunLine(run: UpdateRun | null | undefined, currentVersion?: string): string | null {
   if (!run) return null;
+  if (run.status !== "requested" && currentVersion !== undefined && runSuperseded(run.targetVersion, currentVersion)) return null;
   const target = versionLabel(run.targetVersion);
   switch (run.status) {
     case "requested":
@@ -73,6 +78,12 @@ export function updateRunLine(run: UpdateRun | null | undefined): string | null 
     case "failed":
       return `Installing ${target} failed. ${run.error ?? ""}`.trim();
   }
+}
+
+function runSuperseded(targetVersion: string, currentVersion: string): boolean {
+  const current = parseSemver(currentVersion);
+  const target = parseSemver(targetVersion);
+  return Boolean(current && target && compareSemver(current, target) > 0);
 }
 
 /** How long an install usually takes, from the request to the new release answering. */
