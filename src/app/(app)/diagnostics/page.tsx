@@ -4,7 +4,6 @@ import { request } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { DIAGNOSTICS_COPY } from "@/lib/diagnostics-copy";
-import { SETTINGS_COPY } from "@/lib/settings-copy";
 import { GatewayHealthCard } from "@/ui/SettingsCards";
 import { useGatewayHealth } from "@/ui/use-gateway-health";
 
@@ -20,7 +19,7 @@ export default function DiagnosticsPage() {
           {gateway.target !== null ? (
             <GatewayHealthCard health={gateway.health} checking={gateway.checking} error={gateway.error} onCheck={() => void gateway.check()} />
           ) : (
-            <p className="text-[14px] text-[var(--ff-muted)]">{SETTINGS_COPY.healthNoGateway}</p>
+            <p className="text-[14px] text-[var(--ff-muted)]">{DIAGNOSTICS_COPY.noGateway}</p>
           )}
         </div>
       </div>
