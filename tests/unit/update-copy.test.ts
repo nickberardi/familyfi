@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { installCopy, installCountdownLine, installedVersion, installing, latestRelease, upToDateLine, updateRunLine, updateScheduleLine, versionLabel } from "@/lib/update-copy";
+import { installCopy, installCountdownLine, installedVersion, checkedLine, installing, latestRelease, updateRunLine, updateScheduleLine, versionLabel } from "@/lib/update-copy";
 import type { UpdateCheck, UpdateRun, UpdateSettings } from "@/lib/types";
 
 const check = (over: Partial<UpdateCheck> = {}): UpdateCheck => ({
@@ -29,11 +29,13 @@ describe("update copy", () => {
     expect(installCopy("v0.6.0", true)).toEqual({ title: "Install v0.6.0", button: "Install v0.6.0" });
   });
 
-  it("says what the check found when nothing is newer", () => {
-    expect(upToDateLine(null)).toBe("Checking for updates…");
-    expect(upToDateLine(check({ status: "pending" }))).toBe("Checking for updates…");
-    expect(upToDateLine(check({ status: "error", available: null }))).toBe("Update check unavailable.");
-    expect(upToDateLine(check({ available: false }))).toBe("FamilyFi v0.5.1 is up to date.");
+  it("says when the server last checked, or that it could not", () => {
+    const now = Date.parse("2026-10-30T12:05:00.000Z");
+    expect(checkedLine(null, now)).toBe("Checking for updates…");
+    expect(checkedLine(check({ status: "pending" }), now)).toBe("Checking for updates…");
+    expect(checkedLine(check({ available: false, checkedAt: "2026-10-30T12:03:00.000Z" }), now)).toBe("Checked 2m ago");
+    expect(checkedLine(check({ checkedAt: "2026-10-30T12:04:30.000Z" }), now)).toBe("Checked just now");
+    expect(checkedLine(check({ status: "error", available: null, checkedAt: "2026-10-30T11:05:00.000Z" }), now)).toBe("Could not reach GitHub, 1h ago");
   });
 });
 

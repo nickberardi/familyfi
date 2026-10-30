@@ -412,8 +412,9 @@ function Maintenance() {
   return (
     <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
       <div className="flex flex-col gap-[18px]">
-        <UpdateContent update={update} install={{ settings, request, onChanged: reload, onInstalled }} />
-        <UpdateScheduleCard settings={settings} request={request} timezone={household?.timezone ?? "America/New_York"} onChanged={reload} />
+        <UpdateContent update={update} install={{ settings, request, onChanged: reload, onInstalled }}>
+          <UpdateScheduleCard settings={settings} request={request} timezone={household?.timezone ?? "America/New_York"} onChanged={reload} section />
+        </UpdateContent>
       </div>
       <div className="flex flex-col gap-[18px]">
         {/* An import restores the update schedule too, so its card rereads it with the household. */}

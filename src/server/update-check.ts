@@ -303,3 +303,15 @@ export function refreshStaleUpdateCheck(options?: UpdateCheckRefreshOptions): Pr
 export function startUpdateCheck(): void {
   updateChecker.start();
 }
+
+/** How soon after a check an administrator's Check now asks GitHub again; sooner answers the last check. */
+export const UPDATE_CHECK_NOW_MS = 15 * 1000;
+
+/**
+ * Check now, from Settings' Maintenance tab: asks GitHub again unless a check finished in the last
+ * fifteen seconds, so repeated presses (the demo's shared household included) cannot spend the
+ * anonymous GitHub rate limit the hourly check needs.
+ */
+export function checkForUpdateNow(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot> {
+  return updateChecker.refreshIfOlderThan(UPDATE_CHECK_NOW_MS, options);
+}
