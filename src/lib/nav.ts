@@ -36,6 +36,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/sync", label: "Sync", icon: "arrows-clockwise" },
       { href: "/pair", label: "Pair Device", icon: "qr-code" },
       { href: "/settings", label: "Settings", icon: "gear" },
+      { href: "/diagnostics", label: "Diagnostics", icon: "gauge" },
       { href: "/reference", label: "API", icon: "code", webOnly: true },
     ],
   },

@@ -56,7 +56,7 @@ test("sign-in and household pages", async ({ page }) => {
   await expect(page).toHaveURL(/\/family/);
   await expect(page.getByRole("heading", { name: "Family" })).toBeVisible();
 
-  for (const path of ["/things", "/rules", "/devices", "/sync", "/settings", "/reference"]) {
+  for (const path of ["/things", "/rules", "/devices", "/sync", "/settings", "/diagnostics", "/reference"]) {
     await page.goto(path);
     await expect(page.locator("body")).not.toContainText("Something went wrong");
   }
@@ -351,12 +351,27 @@ test("Settings opens on Household and keeps the chosen tab in its address", { ta
   await tabs.getByRole("button", { name: "Maintenance" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
   await expect(page.getByRole("region", { name: "Backup" })).toBeVisible();
-  await expect(page.getByTestId("settings-gateway-health")).toBeVisible();
+  await expect(page.getByTestId("settings-gateway-health")).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByRole("region", { name: "Backup" })).toBeVisible();
   await tabs.getByRole("button", { name: "Household" }).click();
   await expect(page).toHaveURL(/\/settings$/);
+});
+
+test("Diagnostics shows the gateway's load, listed in System after Settings", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/family");
+  const system = page.getByRole("navigation").getByRole("link");
+  const labels = await system.allTextContents();
+  const settings = labels.findIndex((label) => label.includes("Settings"));
+  expect(labels[settings + 1]).toContain("Diagnostics");
+  expect(labels[settings + 2]).toContain("API");
+
+  await page.getByRole("navigation").getByRole("link", { name: "Diagnostics" }).click();
+  await expect(page).toHaveURL(/\/diagnostics$/);
+  await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
+  await expect(page.getByTestId("settings-gateway-health-device").first()).toBeVisible();
 });
 
 /** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
