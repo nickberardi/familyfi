@@ -1112,7 +1112,12 @@
         "settings"
       ]
     },
-    "tests/browser/smoke.spec.ts > Diagnostics shows the gateway's load, listed in System after Settings": {
+    "tests/browser/smoke.spec.ts > Diagnostics leads with the gateway, listed in System after Settings": {
+      "categories": [
+        "settings"
+      ]
+    },
+    "tests/unit/diagnostics-copy.test.ts": {
       "categories": [
         "settings"
       ]

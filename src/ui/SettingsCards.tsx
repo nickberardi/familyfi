@@ -5,10 +5,10 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { initials } from "@/lib/display";
 import type { HouseholdStore } from "@/lib/household-store";
-import { SETTINGS_COPY as COPY, gatewayFacts, gatewayHealthFacts, householdMemberNote, keyState, keyStatusLine, recoveryNote, removeAdminConfirm, removeLoginConfirm, requestLoadLine } from "@/lib/settings-copy";
+import { SETTINGS_COPY as COPY, gatewayFacts, householdMemberNote, keyState, keyStatusLine, recoveryNote, removeAdminConfirm, removeLoginConfirm } from "@/lib/settings-copy";
 import { addFamilyMember, removeLogin, saveTimezone, setAdmin, setFamilyRole } from "@/lib/settings-writes";
 import { lastSweepAt, relativeSweep } from "@/lib/sync-copy";
-import type { Account, GatewayHealth, Group, SyncStatus, UnifiSettings } from "@/lib/types";
+import type { Account, Group, SyncStatus, UnifiSettings } from "@/lib/types";
 
 import { AddMemberField } from "./AddMemberField";
 import { AdminControl } from "./AdminControl";
@@ -97,70 +97,6 @@ export function GatewayCard({
         <FilledButton label={COPY.saveTimezone} onPress={() => void saveTimezone(mutate, draft)} disabled={disabled} testID="settings-save-timezone" />
       </View>
       {children}
-    </Card>
-  );
-}
-
-/**
- * Each UniFi device's CPU, memory, load and uptime as the console last reported them, gateway
- * first, and how many requests FamilyFi itself has sent the console lately. The client asks for
- * it when the card opens and when `onCheck` is pressed; nothing refreshes it on its own.
- */
-export function GatewayHealthCard({
-  health,
-  checking,
-  error,
-  onCheck,
-}: {
-  health: GatewayHealth | null;
-  checking: boolean;
-  /** Why the last check failed; the last result, if any, stays shown under it. */
-  error?: string;
-  onCheck: () => void;
-}) {
-  const ui = useUI();
-  const text = useText();
-  const problem = error || health?.devicesError;
-  return (
-    <Card title={COPY.health} sub={COPY.healthSub} testID="settings-gateway-health">
-      {problem ? <Text style={[text(14, 20, "muted"), styles.healthLine]}>{problem}</Text> : null}
-      {health?.devices?.length === 0 ? <Text style={[text(14, 20, "muted"), styles.healthLine]}>{COPY.healthNoDevices}</Text> : null}
-      {health?.devices?.map((device) => (
-        <View key={device.id} style={[styles.healthDevice, { borderTopColor: ui.color("hairline") }]} testID="settings-gateway-health-device">
-          <View style={styles.keyRow}>
-            <Text style={[text(14, 21, "ink"), styles.bold]}>{device.name}</Text>
-            {device.model ? <Text style={text(14, 21, "muted")}>{device.model}</Text> : null}
-            {device.gateway ? <Text style={[text(14, 21, "ink"), styles.bold, styles.chip, { backgroundColor: ui.color("note-fill") }]}>{COPY.gatewayBadge}</Text> : null}
-          </View>
-          {device.reported ? (
-            gatewayHealthFacts(device).map((fact) => (
-              <View key={fact.k} style={styles.healthFact}>
-                <Text style={[text(14, 21, "muted"), styles.factKey]}>{fact.k}</Text>
-                <Text style={[text(14, 21, "ink"), styles.factValue]}>{fact.v}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={[text(14, 20, "muted"), styles.keyLine]}>{COPY.healthNotReported}</Text>
-          )}
-        </View>
-      ))}
-      {health ? (
-        <View style={[styles.healthDevice, { borderTopColor: ui.color("hairline") }]}>
-          <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.requests}</Text>
-          <Text style={[text(14, 20, "muted"), styles.keyLine]} testID="settings-gateway-requests">
-            {requestLoadLine(health.requests)}
-          </Text>
-          {health.requests.endpoints.slice(0, 5).map((entry) => (
-            <View key={entry.endpoint} style={styles.healthFact}>
-              <Text style={[text(14, 21, "muted"), styles.grow, { fontFamily: MONO }]}>{entry.endpoint}</Text>
-              <Text style={[text(14, 21, "ink"), { fontFamily: MONO }]}>×{entry.count}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <View style={[styles.row, styles.timezone, { borderTopColor: ui.color("hairline") }]}>
-        <FilledButton label={checking ? COPY.healthChecking : COPY.healthCheck} onPress={onCheck} disabled={checking} testID="settings-gateway-health-check" />
-      </View>
     </Card>
   );
 }
@@ -322,7 +258,4 @@ const styles = StyleSheet.create({
   memberNote: { marginTop: 2 },
   avatar: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   addRow: { gap: 10, paddingVertical: 12, borderTopWidth: 1 },
-  healthLine: { paddingHorizontal: 18, paddingVertical: 12 },
-  healthDevice: { paddingHorizontal: 18, paddingVertical: 12, borderTopWidth: 1 },
-  healthFact: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 6 },
 });

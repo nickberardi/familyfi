@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { ApiRequest } from "@/lib/api-client";
-import { SETTINGS_COPY } from "@/lib/settings-copy";
+import { DIAGNOSTICS_COPY } from "@/lib/diagnostics-copy";
 import type { GatewayHealth, UnifiSettings } from "@/lib/types";
 
-const failure = (error: unknown) => (error instanceof Error ? error.message : SETTINGS_COPY.healthFailed);
+const failure = (error: unknown) => (error instanceof Error ? error.message : DIAGNOSTICS_COPY.failed);
 
 /**
  * Reads `GET /api/v1/health?gateway=true` for Gateway load: once when the caller mounts, and again on
