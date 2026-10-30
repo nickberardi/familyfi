@@ -222,7 +222,11 @@ describe("installing", () => {
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
     await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", updateSchedule: "0 3 * * 0,1,2,3,4,5,6" } });
     const fetchImpl: typeof fetch = async (input, init) =>
-      String(input).startsWith("https://api.github.com/") ? releases(NEWER)() : fetch(input, init);
+      String(input).startsWith("https://api.github.com/")
+        ? releases(NEWER)()
+        : String(input).startsWith("https://ghcr.io/")
+          ? new Response(null, { status: 404 })
+          : fetch(input, init);
     expect(await runAutoUpdateCatchUpForTests({ fetchImpl, now: () => new Date("2026-10-14T07:10:00.000Z") })).toBe("retry");
     expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).updateRequestedAt).toBeNull();
   });
@@ -245,8 +249,9 @@ describe("installing", () => {
 
 describe("the schedule", () => {
   const github = (url: string) => url.startsWith("https://api.github.com/");
+  // GHCR answers nothing here, so the check offers by GitHub's labels.
   const fetchImpl: typeof fetch = async (input, init) =>
-    github(String(input)) ? releases(NEWER)() : fetch(input, init);
+    github(String(input)) ? releases(NEWER)() : String(input).startsWith("https://ghcr.io/") ? new Response(null, { status: 404 }) : fetch(input, init);
 
   it("installs once for each scheduled instant, and not when the instant was missed by over an hour", async () => {
     // Every day at 03:00 New York time; 03:10 on 2026-10-14 is ten minutes after the due instant.
