@@ -180,7 +180,9 @@ test("Checkup, not the sidebar, says an update is ready, and its Update opens th
   // Answer as the server does once its update check found the newer release.
   await page.route("**/api/v1/checkup", async (route) => {
     const response = await route.fetch();
-    const body = (await response.json()) as { checkup: { findings: object[] } };
+    const body = (await response.json()) as { checkup: { findings: Record<string, unknown>[] } };
+    // The server's own update check may have found a real release by now; this one stands in for it.
+    body.checkup.findings = body.checkup.findings.filter((finding) => finding.id !== "update_available");
     body.checkup.findings.unshift({
       id: "update_available",
       check: "update_available",
@@ -351,7 +353,7 @@ test("Settings opens on Household and keeps the chosen tab in its address", { ta
   await tabs.getByRole("button", { name: "Maintenance" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=maintenance$/);
   await expect(page.getByRole("region", { name: "Backup" })).toBeVisible();
-  await expect(page.getByTestId("settings-gateway-health")).toHaveCount(0);
+  await expect(page.getByTestId("diagnostics-gateway")).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByRole("region", { name: "Backup" })).toBeVisible();
@@ -359,7 +361,7 @@ test("Settings opens on Household and keeps the chosen tab in its address", { ta
   await expect(page).toHaveURL(/\/settings$/);
 });
 
-test("Diagnostics shows the gateway's load, listed in System after Settings", { tag: "@desktop" }, async ({ page }) => {
+test("Diagnostics leads with the gateway, listed in System after Settings", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/family");
   const system = page.getByRole("navigation").getByRole("link");
@@ -371,7 +373,15 @@ test("Diagnostics shows the gateway's load, listed in System after Settings", { 
   await page.getByRole("navigation").getByRole("link", { name: "Diagnostics" }).click();
   await expect(page).toHaveURL(/\/diagnostics$/);
   await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
-  await expect(page.getByTestId("settings-gateway-health-device").first()).toBeVisible();
+  // The gateway leads in its own panel; the access points are listed under it.
+  const panel = page.getByTestId("diagnostics-gateway");
+  await expect(panel).toContainText("Dream Machine");
+  await expect(panel).toContainText("Your gateway");
+  await expect(page.getByTestId("diagnostics-others").getByTestId("diagnostics-device")).not.toHaveCount(0);
+  await expect(page.getByTestId("diagnostics-others")).not.toContainText("Dream Machine");
+  await expect(page.getByTestId("diagnostics-requests")).toBeVisible();
+  await page.getByTestId("diagnostics-check").click();
+  await expect(page.getByTestId("diagnostics-check")).toHaveText("Check now");
 });
 
 /** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
