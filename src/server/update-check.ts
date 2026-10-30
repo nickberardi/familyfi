@@ -22,6 +22,8 @@ const RELEASE_PAGE_SIZE = 100;
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 /** How old a check may be when an administrator opens the update before it is asked again. */
 export const UPDATE_CHECK_FRESH_MS = 5 * 60 * 1000;
+/** How soon after a check an administrator's Check now asks GitHub again; sooner answers the last check. */
+export const UPDATE_CHECK_NOW_MS = 15 * 1000;
 const UPDATE_CHECK_TIMEOUT_MS = 10_000;
 const RELEASE_NOTES_MAX_CHARS = 20_000;
 
@@ -48,6 +50,8 @@ export type UpdateChecker = {
    * asks again: a process that never checks (tests, `next build`) never reaches GitHub from here.
    */
   refreshIfOlderThan(maxAgeMs: number, options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot>;
+  /** An administrator's Check now: a new check unless one finished in the last `UPDATE_CHECK_NOW_MS`. */
+  checkNow(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot>;
   start(): void;
 };
 
@@ -274,7 +278,9 @@ export function createUpdateChecker(): UpdateChecker {
     return refresh(options);
   };
 
-  return { getSnapshot: () => snapshot, refresh, refreshIfOlderThan, start };
+  const checkNow = (options: UpdateCheckRefreshOptions = {}) => refreshIfOlderThan(UPDATE_CHECK_NOW_MS, options);
+
+  return { getSnapshot: () => snapshot, refresh, refreshIfOlderThan, checkNow, start };
 }
 
 // Next.js bundles instrumentation and route handlers separately. Keep one checker on
@@ -296,7 +302,7 @@ export function refreshUpdateCheck(options?: UpdateCheckRefreshOptions): Promise
  * up to an hour later.
  */
 export function refreshStaleUpdateCheck(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot> {
-  return updateChecker.refreshIfOlderThan(UPDATE_CHECK_FRESH_MS, options);
+  return updateChecker.refreshIfOlderThan(UPDATE_CHECK_NOW_MS, options);
 }
 
 /** Starts the immediate check and its hourly, non-overlapping refresh loop once per process. */
@@ -304,14 +310,11 @@ export function startUpdateCheck(): void {
   updateChecker.start();
 }
 
-/** How soon after a check an administrator's Check now asks GitHub again; sooner answers the last check. */
-export const UPDATE_CHECK_NOW_MS = 15 * 1000;
-
 /**
  * Check now, from Settings' Maintenance tab: asks GitHub again unless a check finished in the last
  * fifteen seconds, so repeated presses (the demo's shared household included) cannot spend the
  * anonymous GitHub rate limit the hourly check needs.
  */
 export function checkForUpdateNow(options?: UpdateCheckRefreshOptions): Promise<UpdateCheckSnapshot> {
-  return updateChecker.refreshIfOlderThan(UPDATE_CHECK_NOW_MS, options);
+  return updateChecker.checkNow(options);
 }

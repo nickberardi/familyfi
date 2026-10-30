@@ -48,9 +48,9 @@ export function latestRelease(update: UpdateCheck | null | undefined): string | 
 
 /** Under the newest release: when the server last asked, or that it is asking, or that it could not. */
 export function checkedLine(update: UpdateCheck | null | undefined, now = Date.now()): string {
+  if (update?.status === "error") return update.checkedAt ? `Could not reach GitHub, ${checkedAgo(update.checkedAt, now)}` : "Could not reach GitHub";
   if (!update || update.status === "pending" || !update.checkedAt) return UPDATE_COPY.checking;
-  const ago = checkedAgo(update.checkedAt, now);
-  return update.status === "error" ? `Could not reach GitHub, ${ago}` : `Checked ${ago}`;
+  return `Checked ${checkedAgo(update.checkedAt, now)}`;
 }
 
 /** The install card's title and button; without the updater the button names what is missing. */
