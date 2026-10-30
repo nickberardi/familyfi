@@ -6,8 +6,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   return withAdmin(request, async () => {
-    // An administrator looking at the update sees a release published or promoted since the hourly check.
-    const [settings] = await Promise.all([updateSettings(), refreshStaleUpdateCheck()]);
+    const settings = await updateSettings();
+    // An administrator looking at the update sees a release published or promoted since the hourly
+    // check. Not while an install is under way: its five-second polls must not wait on GitHub.
+    if (settings.lastRun?.status !== "requested") await refreshStaleUpdateCheck();
     return Response.json(settings);
   });
 }
