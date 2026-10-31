@@ -10,8 +10,8 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import type { CategorySlotState } from "@/lib/category-marks";
 import { MARK_WIDTH, moreMarkLabels } from "@/lib/category-marks";
 import { categoryMarkLabel, categoryMarkStyle, categoryMarkWord, type CategoryMarkState } from "@/lib/upstream";
+import { CURATED_SLOT_ICONS } from "@/lib/rules";
 
-import { CategoryGlyph } from "./CategoryGlyph";
 import { tokenOf, useUI } from "./UIContext";
 
 /** A small section heading between rows of marks. */
@@ -76,7 +76,7 @@ export function MarkButton({
 /** A category's glyph: its DPI slot's mark, its seeded icon, or its monogram. */
 export function CategoryMarkGlyph({ item, size, color }: { item: CategorySlotState; size: number; color: string }) {
   const ui = useUI();
-  if (item.slot) return <CategoryGlyph slot={item.slot.slot} size={size} color={color} />;
+  if (item.slot) return <ui.Icon name={CURATED_SLOT_ICONS[item.slot.slot]} size={size} color={color} />;
   if (item.icon) return <ui.Icon name={item.icon} size={size} color={color} />;
   return <Text style={{ fontFamily: ui.font, fontSize: 9, lineHeight: 13.5, fontWeight: "700", color }}>{item.monogram}</Text>;
 }

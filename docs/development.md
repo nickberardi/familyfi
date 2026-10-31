@@ -120,7 +120,7 @@ The brand ground is a separate palette from the product UI: deep navy `--ff-bran
 
 ### Iconography
 
-FamilyFi's own iconography is typographic and geometric — monograms inside `Mark`, the bordered shapes in `src/ui/CategoryGlyph.tsx`, chevrons — and that covers everything the product invented. Everything the world already named (a phone, a printer, a gear) comes from **Phosphor Regular**, imported once in `src/app/layout.tsx` from the `@phosphor-icons/web` package rather than a CDN.
+FamilyFi's own iconography is typographic — monograms inside `Mark`, chevrons — and that covers everything the product invented. Everything the world already named (a phone, a printer, a gear, and the categories: a play button for Video, a group of people for Social, `CURATED_SLOT_ICONS` in `src/lib/rules.ts`) comes from **Phosphor Regular**, imported once in `src/app/layout.tsx` from the `@phosphor-icons/web` package rather than a CDN.
 
 `src/components/ui/Icon.tsx` is the only place that may write a `ph ph-…` class, and `IconName` in `src/lib/icons.ts` is the closed set of glyphs it accepts. A name Phosphor does not have renders as *nothing at all*, which is why the union is checked against the shipped stylesheet in `tests/unit/icons.test.ts`. Do not mix in a second icon pack, and do not hand-draw a replacement for a glyph Phosphor has. Named apps keep short monograms rather than real logos — a licensing decision, not a style one. Emoji are never used.
 

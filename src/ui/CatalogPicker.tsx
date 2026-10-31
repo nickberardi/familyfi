@@ -13,9 +13,8 @@ import {
   type CatalogItem,
   type CatalogKind,
 } from "@/lib/rule-catalog";
-import { CURATED_CATEGORY_SLOTS, catalogLabel } from "@/lib/rules";
+import { CURATED_CATEGORY_SLOTS, CURATED_SLOT_ICONS, catalogLabel } from "@/lib/rules";
 
-import { CategoryGlyph } from "./CategoryGlyph";
 import { Chip, ChipGroup } from "./Chips";
 import { useUI } from "./UIContext";
 
@@ -103,7 +102,7 @@ export function CatalogPicker({
           const known = slot(id);
           return (
             <View key={id} style={[styles.picked, { backgroundColor: ui.color("field") }]} testID={`catalog-picked-${id}`}>
-              {known ? <CategoryGlyph slot={known.slot} size={12} color={ui.color("ink")} /> : null}
+              {known ? <ui.Icon name={CURATED_SLOT_ICONS[known.slot]} size={14} color={ui.color("ink")} /> : null}
               <Text style={[text, { color: ui.color("ink") }]}>{label(id)}</Text>
               <Pressable
                 role="button"
@@ -137,7 +136,7 @@ export function CatalogPicker({
             const known = slot(item.id);
             return (
               <Chip key={item.id} on={false} tone="rule" onPress={() => add(item.id)} disabled={disabled} testID={`catalog-match-${item.id}`}>
-                {known ? <CategoryGlyph slot={known.slot} size={13} color={ui.color("ink-2")} /> : null}
+                {known ? <ui.Icon name={CURATED_SLOT_ICONS[known.slot]} size={14} color={ui.color("ink-2")} /> : null}
                 <Text style={[text, styles.chipLabel, { color: ui.color("ink-2") }]}>{label(item.id)}</Text>
               </Chip>
             );

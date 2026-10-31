@@ -3,9 +3,8 @@
 import { StyleSheet, View } from "react-native";
 
 import { ruleMarkSpec } from "@/lib/rule-list";
-import type { Rule } from "@/lib/rules";
+import { CURATED_SLOT_ICONS, type Rule } from "@/lib/rules";
 
-import { CategoryGlyph } from "./CategoryGlyph";
 import { useUI } from "./UIContext";
 
 /**
@@ -27,11 +26,7 @@ export function RuleMark({ rule, size = 32 }: { rule: Pick<Rule, "kind" | "targe
   const ink = ui.color("verdict-rule-ink");
   return (
     <View aria-hidden style={[styles.round, box, box && { borderRadius: size / 2 }, { backgroundColor: ui.color("verdict-rule-fill") }]}>
-      {mark.slot ? (
-        <CategoryGlyph slot={mark.slot} size={Math.round(15 * scale)} color={ink} />
-      ) : (
-        <ui.Icon name={mark.icon} size={Math.round(16 * scale)} color={ink} />
-      )}
+      <ui.Icon name={mark.slot ? CURATED_SLOT_ICONS[mark.slot] : mark.icon} size={Math.round(16 * scale)} color={ink} />
     </View>
   );
 }

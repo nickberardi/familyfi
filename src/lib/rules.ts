@@ -1,6 +1,7 @@
 /** Client-safe rule helpers + curated slots (mirrors server curated-categories). */
 
 import { countriesSummary } from "./countries";
+import type { IconName } from "./icons";
 import { isWindowActive, windowDayBands, windowEndsAt, type InternetWindow } from "./rule-windows";
 import type { Actor } from "./types";
 
@@ -126,6 +127,15 @@ export const CURATED_CATEGORY_SLOTS: readonly CuratedCategorySlot[] = [
   { slot: "vpn", label: "VPN", categoryId: 11, catalogName: "Tunneling and proxy services" },
   { slot: "messaging", label: "Messaging", categoryId: 0, catalogName: "Instant messengers" },
 ] as const;
+
+/** Each curated slot's Phosphor glyph, the same set the seeded upstream categories draw from. */
+export const CURATED_SLOT_ICONS: Record<CuratedSlot, IconName> = {
+  video: "play-circle",
+  social: "users-three",
+  gaming: "game-controller",
+  vpn: "shield-check",
+  messaging: "chat-circle",
+};
 
 /**
  * What a picked category or app is called in the rule editor: a category FamilyFi knows
