@@ -13,7 +13,6 @@ import {
   ruleLiftedForGroup,
   rulePaused,
   windowSegments,
-  type CuratedSlot,
   type Rule,
   type RuleWindow,
 } from "./rules";
@@ -121,6 +120,11 @@ export function ruleStatus(
   }
   const [first] = ruleWhenLines(rule);
   return { line: `On · ${first ? `${first.times}${first.days ? ` · ${first.days}` : ""}` : "No windows"}`, tone: "on" };
+}
+
+/** The words on a rule's switch: Quarantine says Enforced, as it does on Devices; every other rule On. */
+export function ruleToggleLabels(rule: Partial<Pick<Rule, "builtIn">>): { onLabel?: string; offLabel?: string } {
+  return rule.builtIn === "quarantine" ? { onLabel: "Enforced", offLabel: "Off" } : {};
 }
 
 /** The rule's glyph on its mark, which is one shape for every rule: what it blocks, its built-in's own glyph, or "APP" for apps. */

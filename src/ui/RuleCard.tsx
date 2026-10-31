@@ -3,7 +3,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ruleActionSpecs, ruleGroupStateLines, ruleStateLine } from "@/lib/rule-actions";
-import { RULES_COPY as COPY, ruleAppliesTo, ruleCardDimmed, ruleEditable, ruleHref, ruleStatus, ruleWhenLines } from "@/lib/rule-list";
+import { RULES_COPY as COPY, ruleAppliesTo, ruleCardDimmed, ruleEditable, ruleHref, ruleStatus, ruleToggleLabels, ruleWhenLines } from "@/lib/rule-list";
 import { ruleBlocksLabel, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
@@ -233,7 +233,7 @@ export function RuleCardActions({
 /** A rule's switch: on or off for every group it covers. */
 export function RuleToggle({ rule, disabled = false, onToggle }: { rule: Rule; disabled?: boolean; onToggle: () => void }) {
   const ui = useUI();
-  return <ui.Toggle label={rule.name} on={rule.enabled} onToggle={onToggle} disabled={disabled} testID={`rule-toggle-${rule.id}`} />;
+  return <ui.Toggle label={rule.name} on={rule.enabled} onToggle={onToggle} disabled={disabled} {...ruleToggleLabels(rule)} testID={`rule-toggle-${rule.id}`} />;
 }
 
 /**

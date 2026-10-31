@@ -9,6 +9,7 @@ import {
   ruleEditable,
   ruleHref,
   ruleMarkSpec,
+  ruleToggleLabels,
   ruleStatus,
   rulesListView,
   rulesScopeHref,
@@ -107,6 +108,12 @@ describe("the Rules list", () => {
     expect(ruleMarkSpec(rule({ kind: "category", targetIds: [-1] }))).toEqual({ icon: "prohibit" });
     expect(ruleMarkSpec(rule({ builtIn: "quarantine" }))).toEqual({ icon: "shield-warning" });
     expect(ruleMarkSpec(rule({ builtIn: "countries" }))).toEqual({ icon: "globe-hemisphere-west" });
+  });
+
+  it("says Quarantine is Enforced, as Devices does, and every other rule On", () => {
+    expect(ruleToggleLabels({ builtIn: "quarantine" })).toEqual({ onLabel: "Enforced", offLabel: "Off" });
+    expect(ruleToggleLabels({ builtIn: "dns" })).toEqual({});
+    expect(ruleToggleLabels({})).toEqual({});
   });
 
   it("bars the whole day for an always rule, and splits a window that crosses midnight", () => {
