@@ -53,9 +53,14 @@ export function RuleCard({
           <RuleMark rule={rule} />
         </View>
         <ui.Link href={ruleHref(rule)} grow testID={`rule-open-${rule.id}`}>
-          <Text role="heading" aria-level={2} style={[text(ui.font, 16, 24), styles.name, { color: ui.color("ink") }]}>
-            {rule.name}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text role="heading" aria-level={2} style={[text(ui.font, 16, 24), styles.name, { color: ui.color("ink") }]}>
+              {rule.name}
+            </Text>
+            {rule.builtIn ? (
+              <Text style={[text(ui.font, 14, 20), styles.builtIn, { color: ui.color("ink-2"), backgroundColor: ui.color("field") }]}>{COPY.builtIn}</Text>
+            ) : null}
+          </View>
           <Text style={[text(ui.font, 14, 21), styles.blocks, { color: ui.color("ink-2") }]}>{ruleBlocksLabel(rule, catalogNames)}</Text>
         </ui.Link>
         <RuleToggle rule={rule} disabled={disabled} onToggle={onToggle} />
@@ -267,7 +272,9 @@ const styles = StyleSheet.create({
   card: { overflow: "hidden", borderRadius: 12, borderWidth: 1 },
   faded: { opacity: 0.4 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, paddingBottom: 12 },
+  nameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   name: { margin: 0, fontWeight: "600", letterSpacing: -0.4 },
+  builtIn: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, fontWeight: "600", overflow: "hidden" },
   blocks: { marginTop: 2 },
   lead: { marginBottom: 10 },
   schedule: { paddingHorizontal: 16, paddingBottom: 16 },
