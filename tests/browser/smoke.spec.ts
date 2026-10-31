@@ -384,6 +384,14 @@ test("Diagnostics leads with the gateway, listed in System after Settings", { ta
   await expect(page.getByTestId("diagnostics-check")).toHaveText("Check now");
 });
 
+/** Opens a group's Edit sheet from its page header. */
+async function openEdit(page: Page, name: string) {
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: `Edit ${name}` });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
 /** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
 async function addGroup(page: Page, kind: "family" | "things", fill: (dialog: Locator) => Promise<void>, name: string) {
   await page.goto(`/${kind}`);
@@ -469,31 +477,25 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Homework 3–6 PM" })).toBeVisible();
 
+  // Edit opens the design's "Edit <name>" sheet over the page; Save closes it with a notice.
   const renamed = `${name} Jr`;
-  await page.getByLabel("Name").fill(renamed);
-  const editHeading = page.getByRole("heading", { name: "Edit" });
-  // Measured on the page, not the viewport: clicking Save may scroll it into view, the window on a
-  // phone and the main column on a desktop, where the form sits below the devices.
-  const pageY = () =>
-    editHeading.evaluate((element) => {
-      let y = element.getBoundingClientRect().top;
-      for (let parent = element.parentElement; parent; parent = parent.parentElement) y += parent.scrollTop;
-      return y;
-    });
-  // The page's own reads (the category catalog above the form on a phone) have landed first.
-  await page.waitForLoadState("networkidle");
-  const yBefore = await pageY();
-  await page.getByRole("button", { name: "Save" }).click();
+  const edit = await openEdit(page, name);
+  await edit.getByLabel("Name").fill(renamed);
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(edit).toHaveCount(0);
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
-  await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText("Saved.");
-  expect(await pageY()).toBe(yBefore);
+  await expect(page.locator('[aria-live="polite"] .pointer-events-auto')).toContainText(`${renamed} saved`);
+  // Focus goes back to the Edit button that opened it.
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeFocused();
 
   // Groups can no longer be protected from FamilyFi.
   await expect(page.getByLabel(/Protected/)).toHaveCount(0);
 
   // An adult starts from a custom schedule only.
-  await page.getByLabel("Role").selectOption("adult");
-  await page.getByRole("button", { name: "Save" }).click();
+  const role = await openEdit(page, renamed);
+  await role.getByRole("group", { name: "Role" }).getByRole("button", { name: "Adult" }).click();
+  await role.getByRole("button", { name: "Save" }).click();
+  await expect(role).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Custom schedule" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bedtime 9 PM–7 AM" })).toHaveCount(0);
   // Role never limits a control: an adult can be blocked too. Only the suggested schedules differ.
@@ -523,9 +525,43 @@ test("add things group opens a sheet over Things, and the new group can be edite
   await expect(page.getByText("Group not found.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 
-  await page.getByLabel("Monogram").fill("TV");
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByLabel("Monogram")).toHaveValue("TV");
+  const edit = await openEdit(page, name);
+  await expect(edit.getByRole("group", { name: "Role" })).toHaveCount(0);
+  await edit.getByLabel("Monogram").fill("TV");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(edit).toHaveCount(0);
+  await expect((await openEdit(page, name)).getByLabel("Monogram")).toHaveValue("TV");
+});
+
+test("a group's Edit sheet checks its fields, closes on Escape, and asks before deleting", async ({ page }) => {
+  await signIn(page);
+  const name = `Delete me ${test.info().project.name} ${Date.now()}`;
+  const id = await addGroup(page, "family", (dialog) => dialog.getByLabel("Name").fill(name), name);
+  await page.goto(`/family/${id}`);
+  await expect(page.getByRole("link", { name: "← Family" })).toBeVisible();
+  // The edit form, the resolver card and the delete link live in the sheet, not on the page.
+  await expect(page.getByRole("heading", { name: "DNS resolver" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Delete group/ })).toHaveCount(0);
+
+  let edit = await openEdit(page, name);
+  await edit.getByLabel("Name").fill(" ");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(edit.getByRole("alert")).toHaveText("Give it a name.");
+  await page.keyboard.press("Escape");
+  await expect(edit).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeFocused();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+
+  edit = await openEdit(page, name);
+  await edit.getByRole("button", { name: "Delete…" }).click();
+  const confirm = page.getByRole("dialog", { name: `Delete ${name}?` });
+  await expect(confirm).toContainText("Its devices become Unassigned");
+  await confirm.getByRole("button", { name: "Never mind" }).click();
+  await expect(page.getByRole("dialog", { name: `Edit ${name}` })).toBeVisible();
+  await page.getByRole("button", { name: "Delete…" }).click();
+  await page.getByRole("dialog", { name: `Delete ${name}?` }).getByRole("button", { name: "Delete group" }).click();
+  await expect(page).toHaveURL(/\/family$/);
+  await expect(page.getByText(name)).toHaveCount(0);
 });
 
 test("desktop Sync summary keeps four cards on one row", { tag: "@desktop" }, async ({ page }) => {

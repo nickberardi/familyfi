@@ -857,6 +857,11 @@
         "groups"
       ]
     },
+    "tests/browser/smoke.spec.ts > a group's Edit sheet checks its fields, closes on Escape, and asks before deleting": {
+      "categories": [
+        "groups"
+      ]
+    },
     "tests/browser/smoke.spec.ts > desktop Sync summary keeps four cards on one row": {
       "categories": [
         "sync"

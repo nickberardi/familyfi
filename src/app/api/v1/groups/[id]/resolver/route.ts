@@ -12,7 +12,7 @@ import { demoLocked } from "@/server/demo";
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
- * A group's own DNS-over-HTTPS endpoint — "Override for this group" on its page.
+ * A group's own DNS-over-HTTPS endpoint — "Own endpoint" in the web's Edit sheet, "Override for this group" in the app.
  *
  * Reporting only, like everything upstream: this changes which resolver FamilyFi
  * *asks about* this group, never what reaches its devices. Pointing the devices
