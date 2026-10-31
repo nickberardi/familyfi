@@ -265,7 +265,7 @@ export function RuleCardSummary({ rule, timezone, now }: { rule: Rule; timezone:
   );
 }
 
-/** Tags a built-in rule (quarantine, Lock DNS, Block countries) beside its name. */
+/** A built-in rule's tag, beside its name. */
 function BuiltInTag() {
   const ui = useUI();
   return <Text style={[text(ui.font, 14, 20), styles.builtIn, { color: ui.color("ink-2"), backgroundColor: ui.color("field") }]}>{COPY.builtIn}</Text>;
