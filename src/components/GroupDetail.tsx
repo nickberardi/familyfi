@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import { loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
-import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupEditBody, groupEditDraft, roleLocked, rulesNeedDevice, type FamilyRole } from "@/lib/group-form";
+import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupDetailSub, groupEditBody, groupEditDraft, roleLocked, rulesNeedDevice, type FamilyRole } from "@/lib/group-form";
 import { deleteGroup, runGroupCardAction, updateGroup, type GroupCardRun } from "@/lib/group-writes";
 import { groupStatus, groupStatusColor } from "@/lib/group-actions";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
@@ -13,7 +13,7 @@ import { groupCardControls } from "@/ui/group-card-controls";
 import { deviceName } from "@/lib/device-assign";
 import { deviceHref } from "@/lib/device-detail";
 import { internetRulesForGroup, internetWindowsForGroup } from "@/lib/rules";
-import { cardNoteLine } from "@/lib/display";
+import { cardNoteLine, deviceKindLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
 import { GroupFilterMarks } from "@/components/FilterMarks";
 import { PauseSheet } from "@/components/PauseSheet";
@@ -21,7 +21,10 @@ import { useFilterCatalog } from "@/components/GroupGrid";
 import { GROUP_SCHEDULE_COPY, GroupSchedule } from "@/ui/GroupSchedule";
 import { InternetPresets } from "@/ui/InternetPresets";
 import { GroupResolverCard } from "@/components/upstream/GroupResolverCard";
-import type { Group } from "@/lib/types";
+import { PageHeader } from "@/components/PageHeader";
+import { Icon } from "@/components/ui/Icon";
+import { DeviceMark } from "@/ui/DeviceMark";
+import type { Device, Group } from "@/lib/types";
 
 const FIELD = "rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]";
 
@@ -123,127 +126,156 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   const header = groupCardControls(group, rules, timezone, now, run, !busy);
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      <header>
+    <>
+      <PageHeader title={group.name} sub={groupDetailSub(group)} />
+      <div className="flex max-w-[960px] flex-col gap-[18px] p-4 md:p-6">
         <Link href={kind === "family" ? "/family" : "/things"} className="w-fit text-[14px] font-semibold text-[var(--ff-accent)]">
           ← Back to {kind === "family" ? "Family" : "Things"}
         </Link>
-        <h1 className="mt-2 text-[21px] font-bold tracking-tight">{group.name}</h1>
-      </header>
-      <div className="grid grid-cols-1 items-start gap-[18px] md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))]">
-        <div className="flex min-w-0 flex-col gap-[18px]">
-          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-            <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
-              <div className="min-w-0 flex-1">
-                <h2 className="flex items-center gap-1.5 text-[14px] font-normal" style={{ color: groupStatusColor(status.tone) }}>
-                  <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: groupStatusColor(status.tone) }} />
-                  {status.label}
-                </h2>
-                <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
-                {header.more ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={header.more.onPress}
-                    data-testid={header.more.testID}
-                    className="mt-1 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
-                  >
-                    {header.more.label}
-                  </button>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={header.action.onPress}
-                data-testid={header.action.testID}
-                className="shrink-0 rounded-[8px] bg-[var(--ff-accent)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
-              >
-                {header.action.label}
-              </button>
+        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+          <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="flex items-center gap-1.5 text-[14px] font-normal" style={{ color: groupStatusColor(status.tone) }}>
+                <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: groupStatusColor(status.tone) }} />
+                {status.label}
+              </h2>
+              <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
+              {header.more ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={header.more.onPress}
+                  data-testid={header.more.testID}
+                  className="mt-1 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
+                >
+                  {header.more.label}
+                </button>
+              ) : null}
             </div>
-            <div className="px-3 pb-3">
-              <GroupSchedule
-                group={group}
-                rules={rules}
-                catalogNames={catalogNames}
-                timezone={timezone}
-                now={now}
-                variant="details"
-                onRun={run}
-                enabled={!busy}
-                footer={
-                  <div className="flex flex-col gap-2.5">
-                    {internetRulesForGroup(rules, group.id).length === 0 ? <InternetPresets group={group} mutate={store.mutate} disabled={busy} /> : null}
-                    <Link href={`/rules/new?group=${group.id}`} className="self-start text-[14px] font-semibold text-[var(--ff-accent)]" data-testid={`schedule-add-${group.id}`}>
-                      {GROUP_SCHEDULE_COPY.add}
-                    </Link>
-                  </div>
-                }
-              />
-            </div>
-            <GroupFilterMarks
+            <button
+              type="button"
+              disabled={busy}
+              onClick={header.action.onPress}
+              data-testid={header.action.testID}
+              className="shrink-0 rounded-[8px] bg-[var(--ff-accent)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
+            >
+              {header.action.label}
+            </button>
+          </div>
+          <div className="px-3 pb-3">
+            <GroupSchedule
               group={group}
               rules={rules}
               catalogNames={catalogNames}
-              upstreamCategories={upstreamCategories}
               timezone={timezone}
-              showAppAdd
-            />
-          </section>
-        </div>
-        <div className="flex min-w-0 flex-col gap-[18px]">
-          <GroupEditForm key={group.id} group={group} />
-          <GroupResolverCard
-            groupId={group.id}
-            groupName={group.name}
-            dohOverrideUrl={group.dohOverrideUrl ?? null}
-            resolver={groupResolver}
-            onChanged={() => {
-              void reload();
-              void loadGroupResolver(request, id).then(setGroupResolver);
-            }}
-          />
-          <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-            <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">{GROUP_DETAIL_COPY.devices}</h2>
-            {members.length === 0 ? (
-              <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
-                {GROUP_DETAIL_COPY.noDevices}
-                {rulesNeedDevice(group) ? (
-                  <>
-                    {" "}
-                    {GROUP_DETAIL_COPY.rulesNeedDevice.before}{" "}
-                    <Link href={`/devices?assign=${id}`} className="font-semibold text-[var(--ff-accent)]">
-                      {GROUP_DETAIL_COPY.rulesNeedDevice.link}
-                    </Link>
-                    {GROUP_DETAIL_COPY.rulesNeedDevice.after}
-                  </>
-                ) : null}
-              </p>
-            ) : (
-              members.map((device) => (
-                <div key={device.mac} className="flex items-center gap-3 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">
-                  <Link href={deviceHref(device, id)} className="min-w-0 flex-1 text-[14px] text-[var(--ff-accent)]">{deviceName(device)}</Link>
-                  <div className="font-mono text-[14px] text-[var(--ff-muted)]">{device.mac}</div>
+              now={now}
+              variant="details"
+              onRun={run}
+              enabled={!busy}
+              footer={
+                <div className="flex flex-col gap-2.5">
+                  {internetRulesForGroup(rules, group.id).length === 0 ? <InternetPresets group={group} mutate={store.mutate} disabled={busy} /> : null}
+                  <Link href={`/rules/new?group=${group.id}`} className="self-start text-[14px] font-semibold text-[var(--ff-accent)]" data-testid={`schedule-add-${group.id}`}>
+                    {GROUP_SCHEDULE_COPY.add}
+                  </Link>
                 </div>
-              ))
-            )}
-          </section>
-          {/* Disabled while a write is in flight, which the store would otherwise drop without a word. */}
-          <button
-            type="button"
-            disabled={busy}
-            className="self-start text-[14px] font-semibold text-[var(--ff-danger)] disabled:opacity-50"
-            onClick={() =>
-              void deleteGroup(store.mutate, group, () => router.replace(kind === "family" ? "/family" : "/things"))
-            }
-          >
-            Delete group (devices become quarantined)
-          </button>
-        </div>
+              }
+            />
+          </div>
+          <GroupFilterMarks
+            group={group}
+            rules={rules}
+            catalogNames={catalogNames}
+            upstreamCategories={upstreamCategories}
+            timezone={timezone}
+            showAppAdd
+          />
+        </section>
+        <GroupDevices group={group} members={members} />
+        <GroupEditForm key={group.id} group={group} />
+        <GroupResolverCard
+          groupId={group.id}
+          groupName={group.name}
+          dohOverrideUrl={group.dohOverrideUrl ?? null}
+          resolver={groupResolver}
+          onChanged={() => {
+            void reload();
+            void loadGroupResolver(request, id).then(setGroupResolver);
+          }}
+        />
+        {/* Disabled while a write is in flight, which the store would otherwise drop without a word. */}
+        <button
+          type="button"
+          disabled={busy}
+          className="self-start text-[14px] font-semibold text-[var(--ff-danger)] disabled:opacity-50"
+          onClick={() =>
+            void deleteGroup(store.mutate, group, () => router.replace(kind === "family" ? "/family" : "/things"))
+          }
+        >
+          Delete group (devices become quarantined)
+        </button>
       </div>
       {sheet ? <PauseSheet group={group} target={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
-    </div>
+    </>
+  );
+}
+
+/** The group's devices as the Devices page lists them: type, name and kind, then their addresses, each row opening the device. */
+function GroupDevices({ group, members }: { group: Group; members: Device[] }) {
+  const assignHref = `/devices?assign=${group.id}`;
+  return (
+    <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+      <div className="flex items-center gap-2.5 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
+        <h2 className="flex-1 text-[14px] font-semibold">{GROUP_DETAIL_COPY.devices[group.kind]}</h2>
+        <Link href={assignHref} className="text-[14px] font-semibold text-[var(--ff-accent)]">
+          {GROUP_DETAIL_COPY.assignDevices}
+        </Link>
+      </div>
+      {members.length === 0 ? (
+        <p className="px-[18px] py-4 text-[14px] text-[var(--ff-muted)]">
+          {GROUP_DETAIL_COPY.noDevices}
+          {rulesNeedDevice(group) ? (
+            <>
+              {" "}
+              {GROUP_DETAIL_COPY.rulesNeedDevice.before}{" "}
+              <Link href={assignHref} className="font-semibold text-[var(--ff-accent)]">
+                {GROUP_DETAIL_COPY.rulesNeedDevice.link}
+              </Link>
+              {GROUP_DETAIL_COPY.rulesNeedDevice.after}
+            </>
+          ) : null}
+        </p>
+      ) : (
+        <>
+          <div className="ff-group-device-grid grid items-center gap-3.5 bg-[var(--ff-field-soft)] px-[18px] py-2.5 text-[14px] font-semibold text-[var(--ff-muted)]">
+            <div>{GROUP_DETAIL_COPY.deviceColumns.device}</div>
+            <div className="hidden md:block">{GROUP_DETAIL_COPY.deviceColumns.address}</div>
+            <div className="hidden md:block">{GROUP_DETAIL_COPY.deviceColumns.hardware}</div>
+            <div aria-hidden="true" />
+          </div>
+          {members.map((device) => (
+            <Link
+              key={device.mac}
+              href={deviceHref(device, group.id)}
+              className="ff-group-device-grid grid items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 text-[var(--ff-ink)] hover:bg-[var(--ff-field-soft)]"
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <DeviceMark hostname={device.hostname} />
+                <div className="min-w-0">
+                  <div className="truncate text-[14px]">{deviceName(device)}</div>
+                  <div className="truncate text-[14px] text-[var(--ff-muted)]">{deviceKindLabel(device.hostname)}</div>
+                </div>
+              </div>
+              <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] md:block">{device.ip ?? "—"}</div>
+              <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] md:block">{device.mac.toUpperCase()}</div>
+              <span aria-hidden="true" className="flex text-[var(--ff-chevron)]">
+                <Icon name="caret-right" size={14} />
+              </span>
+            </Link>
+          ))}
+        </>
+      )}
+    </section>
   );
 }
 

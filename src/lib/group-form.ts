@@ -4,6 +4,7 @@
  * /groups/{id}`). The writes themselves are in `group-writes.ts`.
  */
 import type { Account, Group } from "./types";
+import { roleLabel } from "./display";
 
 export type FamilyRole = "child" | "teen" | "adult";
 export type GroupKind = Group["kind"];
@@ -104,13 +105,22 @@ export const GROUP_DETAIL_COPY = {
   neverMind: "Never mind",
   roleLocked: "This person has a personal login, so their role stays Adult.",
   currentState: "Current state",
-  devices: "Devices",
+  /** The devices card's title: a person's devices are assigned to them, a things group holds its own. */
+  devices: { family: "Assigned devices", things: "Devices in this group" },
+  assignDevices: "Assign devices",
+  deviceColumns: { device: "Device", address: "Address", hardware: "Hardware" },
   noDevices: "No devices assigned.",
   /** After "No devices assigned." when the group has rules or a pause: the words around the link to assign one. */
   rulesNeedDevice: { before: "Its rules cannot apply on UniFi until you", link: "assign a device", after: "." },
   delete: "Delete group",
   notFound: "Group not found.",
 } as const;
+
+/** The group detail header's line under the name: a person's role, or what a things group is. */
+export function groupDetailSub(group: Pick<Group, "kind" | "familyRole">): string {
+  if (group.kind === "things") return "Device group";
+  return roleLabel(group.familyRole) || "Family member";
+}
 
 /** What deleting a group does, before the person confirms it. */
 export function deleteGroupConfirm(group: Pick<Group, "name">) {
