@@ -394,8 +394,8 @@ describe("Lock DNS on the clients", () => {
     );
   });
 
-  it("reads as a narrow rule with a shield", () => {
-    expect(ruleMarkSpec(lockDns)).toEqual({ shape: "round", icon: "shield-check" });
+  it("reads as a rule with a shield", () => {
+    expect(ruleMarkSpec(lockDns)).toEqual({ icon: "shield-check" });
     expect(ruleBlocksLabel(lockDns, new Map())).toBe("Other DNS servers · everything else stays on");
   });
 

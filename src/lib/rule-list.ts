@@ -9,6 +9,7 @@ import { ruleStateLine } from "./rule-actions";
 import { ruleActivelyBlocking } from "./upstream";
 import {
   CURATED_CATEGORY_SLOTS,
+  CURATED_SLOT_ICONS,
   ruleLiftedForGroup,
   rulePaused,
   windowSegments,
@@ -122,24 +123,16 @@ export function ruleStatus(
   return { line: `On · ${first ? `${first.times}${first.days ? ` · ${first.days}` : ""}` : "No windows"}`, tone: "on" };
 }
 
-/** The rule's kind at a glance: a square globe for all internet, a round mark for anything narrower, a round globe for countries. */
-export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pick<Rule, "builtIn">>): {
-  shape: "square" | "round";
-  slot?: CuratedSlot;
-  icon: IconName;
-} {
-  if (rule.builtIn === "dns") return { shape: "round", icon: "shield-check" };
-  if (rule.kind === "internet") return { shape: "square", icon: "globe-simple" };
-  if (rule.builtIn === "countries") return { shape: "round", icon: "globe-simple" };
-  const slot =
-    rule.kind === "category"
-      ? CURATED_CATEGORY_SLOTS.find((item) => (rule.targetIds ?? []).includes(item.categoryId))
-      : undefined;
-  return {
-    shape: "round",
-    ...(slot ? { slot: slot.slot } : {}),
-    icon: rule.kind === "app" ? "app-window" : rule.kind === "domain" ? "link-simple" : "prohibit",
-  };
+/** The rule's glyph on its mark, which is one shape for every rule: what it blocks, its built-in's own glyph, or "APP" for apps. */
+export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pick<Rule, "builtIn">>): { icon: IconName } | { text: string } {
+  if (rule.builtIn === "quarantine") return { icon: "shield-warning" };
+  if (rule.builtIn === "dns") return { icon: "shield-check" };
+  if (rule.builtIn === "countries") return { icon: "globe-hemisphere-west" };
+  if (rule.kind === "internet") return { icon: "globe-simple" };
+  if (rule.kind === "app") return { text: "APP" };
+  if (rule.kind === "domain") return { icon: "link-simple" };
+  const slot = CURATED_CATEGORY_SLOTS.find((item) => (rule.targetIds ?? []).includes(item.categoryId));
+  return { icon: slot ? CURATED_SLOT_ICONS[slot.slot] : "prohibit" };
 }
 
 /** The minutes a rule blocks on a 24-hour bar, any day. */
@@ -162,6 +155,8 @@ export const RULES_COPY = {
   title: "Rules",
   subtitle: "What is blocked, when, and for whom",
   newRule: "New rule",
+  /** Beside a built-in rule's name on its card: FamilyFi made it, and it cannot be deleted. */
+  builtIn: "Built-in",
   scopeLabel: "Show rules for",
   all: "All",
   when: "When",

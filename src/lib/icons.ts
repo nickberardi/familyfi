@@ -40,8 +40,10 @@ export type IconName =
   | "warning"
   // About
   | "github-logo"
-  // Rule kinds
+  // Rule kinds and built-in rules
   | "globe-simple"
+  | "shield-warning"
+  | "globe-hemisphere-west"
   | "app-window"
   | "link-simple"
   // Device types

@@ -99,11 +99,14 @@ describe("the Rules list", () => {
     expect(ruleCardDimmed(rule({ pause: { active: true, until: "2026-03-04T16:00:00Z", kind: "pause", by: null } as never }), now)).toBe(true);
   });
 
-  it("marks all internet with a square globe and narrower rules with a round mark", () => {
-    expect(ruleMarkSpec(rule({}))).toEqual({ shape: "square", icon: "globe-simple" });
-    expect(ruleMarkSpec(rule({ kind: "app" }))).toEqual({ shape: "round", icon: "app-window" });
-    expect(ruleMarkSpec(rule({ kind: "domain" }))).toEqual({ shape: "round", icon: "link-simple" });
-    expect(ruleMarkSpec(rule({ kind: "category", targetIds: [-1] }))).toEqual({ shape: "round", icon: "prohibit" });
+  it("marks every rule with the glyph of what it blocks, and each built-in with its own", () => {
+    expect(ruleMarkSpec(rule({}))).toEqual({ icon: "globe-simple" });
+    expect(ruleMarkSpec(rule({ kind: "app" }))).toEqual({ text: "APP" });
+    expect(ruleMarkSpec(rule({ kind: "domain" }))).toEqual({ icon: "link-simple" });
+    expect(ruleMarkSpec(rule({ kind: "category", targetIds: [24] }))).toEqual({ icon: "users-three" });
+    expect(ruleMarkSpec(rule({ kind: "category", targetIds: [-1] }))).toEqual({ icon: "prohibit" });
+    expect(ruleMarkSpec(rule({ builtIn: "quarantine" }))).toEqual({ icon: "shield-warning" });
+    expect(ruleMarkSpec(rule({ builtIn: "countries" }))).toEqual({ icon: "globe-hemisphere-west" });
   });
 
   it("bars the whole day for an always rule, and splits a window that crosses midnight", () => {
