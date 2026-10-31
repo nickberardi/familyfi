@@ -35,6 +35,12 @@ describe("shared UI palette", () => {
     expect(String(PRESS_OPACITY)).toBe(declared["press-opacity"]);
   });
 
+  it("gives every dark mark ink a dark value, so no category mark draws dark on the dark card", () => {
+    const darkInks = Object.entries(LIGHT).filter(([name, value]) => /^verdict-.*-ink$/.test(name) && value !== "#ffffff");
+    expect(darkInks.length).toBeGreaterThan(0);
+    expect(darkInks.map(([name]) => name).filter((name) => !(name in DARK))).toEqual([]);
+  });
+
   it("has a dark value only for tokens the web declares", () => {
     expect(Object.keys(DARK).filter((name) => !(name in LIGHT))).toEqual([]);
   });
