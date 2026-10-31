@@ -384,7 +384,6 @@ test("Diagnostics leads with the gateway, listed in System after Settings", { ta
   await expect(page.getByTestId("diagnostics-check")).toHaveText("Check now");
 });
 
-/** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
 /** Opens a group's Edit sheet from its page header. */
 async function openEdit(page: Page, name: string) {
   await page.getByRole("button", { name: "Edit", exact: true }).click();
@@ -393,6 +392,7 @@ async function openEdit(page: Page, name: string) {
   return sheet;
 }
 
+/** Adds a group through the Add sheet on its grid, which stays put, and returns the new id. */
 async function addGroup(page: Page, kind: "family" | "things", fill: (dialog: Locator) => Promise<void>, name: string) {
   await page.goto(`/${kind}`);
   await expect(page.getByText("Loading household…")).toHaveCount(0);

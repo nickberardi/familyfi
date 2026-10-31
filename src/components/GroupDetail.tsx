@@ -29,7 +29,8 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
   const { groups, devices, rules, household, store, loading, busy } = useAppData();
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<GroupSheetTarget | null>(null);
-  const [editing, setEditing] = useState(false);
+  // The Edit button that opened the sheet, kept from its click: Safari never focuses a clicked button.
+  const [editing, setEditing] = useState<HTMLElement | null>(null);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
 
   if (!group) {
@@ -46,7 +47,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
 
   return (
     <>
-      <PageHeader title={group.name} sub={groupDetailSub(group)} actionLabel={GROUP_EDIT_COPY.open} onAction={() => setEditing(true)} />
+      <PageHeader title={group.name} sub={groupDetailSub(group)} actionLabel={GROUP_EDIT_COPY.open} onAction={(event) => setEditing(event.currentTarget)} />
       {/* 960px of content, as the design has it, plus the page padding either side. */}
       <div className="flex max-w-[992px] flex-col gap-[18px] p-4 md:max-w-[1008px] md:p-6">
         <Link href={kind === "family" ? "/family" : "/things"} className="w-fit text-[14px] font-semibold text-[var(--ff-accent)]">
@@ -119,7 +120,8 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
           key={group.id}
           group={group}
           demo={demo}
-          onClose={() => setEditing(false)}
+          opener={editing}
+          onClose={() => setEditing(null)}
           onDeleted={() => router.replace(kind === "family" ? "/family" : "/things")}
         />
       ) : null}

@@ -81,3 +81,44 @@ test("a missing or bad endpoint is refused with a reason", { tag: "@desktop" }, 
   await sheet.getByRole("button", { name: "Save" }).click();
   await expect(sheet.getByRole("alert")).toHaveText("The endpoint must start with https://");
 });
+
+test("a refused endpoint keeps the sheet open, the name saved, and Save tries only the endpoint again", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const kid = await firstChild(page);
+  await page.goto(`/family/${kid.id}`);
+  const renamed = `${kid.name} R`;
+
+  const groupWrites: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT" && new URL(request.url()).pathname === `/api/v1/groups/${kid.id}`) groupWrites.push(request.url());
+  });
+  const resolverPath = `**/api/v1/groups/${kid.id}/resolver`;
+  await page.route(resolverPath, (route) =>
+    route.request().method() === "PUT"
+      ? route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ error: { code: "invalid_resolver", message: "That resolver did not answer." } }) })
+      : route.continue(),
+  );
+
+  const sheet = await openFresh(page, kid.name);
+  await sheet.getByLabel("Name").fill(renamed);
+  await sheet.getByRole("button", { name: "Own endpoint" }).click();
+  await sheet.getByLabel("Endpoint URL").fill("https://strict.example.com/dns-query/kids");
+  await sheet.getByRole("button", { name: "Save" }).click();
+
+  // The name landed, so the sheet's title follows it; the endpoint did not.
+  const open = page.getByRole("dialog", { name: `Edit ${renamed}` });
+  await expect(open.getByRole("alert")).toHaveText("That resolver did not answer.");
+  await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
+  expect(groupWrites).toHaveLength(1);
+
+  await page.unroute(resolverPath);
+  await open.getByRole("button", { name: "Save" }).click();
+  await expect(open).toHaveCount(0);
+  expect(groupWrites).toHaveLength(1);
+
+  // Leave the seed as found.
+  const restore = await openFresh(page, renamed);
+  await restore.getByLabel("Name").fill(kid.name);
+  await restore.getByRole("button", { name: "Save" }).click();
+  await expect(restore).toHaveCount(0);
+});

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useNavDrawer } from "./AppShell";
 
 export function PageHeader({
@@ -14,7 +14,8 @@ export function PageHeader({
   sub: string;
   actionHref?: string;
   actionLabel?: string;
-  onAction?: () => void;
+  /** Gets the click, so a sheet the action opens can hand focus back to the button. */
+  onAction?: (event: MouseEvent<HTMLButtonElement>) => void;
   /** A second, lesser header action, before the primary one. */
   secondary?: ReactNode;
 }) {
