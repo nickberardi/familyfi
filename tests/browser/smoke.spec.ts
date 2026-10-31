@@ -572,6 +572,10 @@ test("a device opened from its group returns to that group", async ({ page }) =>
   if (test.info().project.name === "phone") {
     // A phone opens the device's page, whose way back is the group.
     await expect(page.getByRole("link", { name: `‹ ${group.name}` })).toHaveAttribute("href", groupPath);
+    // A modal link shared from a wide screen opens the page on a phone.
+    await page.goto(`${groupPath}?device=${mac}`);
+    await expect(page).toHaveURL(new RegExp(`/devices/${mac}$`));
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   } else {
     // A wide screen opens it over the group, and Back closes it there.
     await expect(page.getByRole("dialog")).toBeVisible();

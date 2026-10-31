@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAppData } from "@/components/AppDataProvider";
 import { deviceModalHistory } from "@/components/DeviceLink";
 import { PRIMARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { privateAddressDevices } from "@/lib/checkup";
-import { DEVICE_MODAL_PARAM, deviceDetail, deviceModalSearch } from "@/lib/device-detail";
+import { DEVICE_MODAL_PARAM, deviceDetail, deviceHref, deviceModalSearch } from "@/lib/device-detail";
 import { DEVICES_COPY } from "@/lib/device-list";
 import { DeviceDetailContent } from "@/ui/DeviceDetailContent";
 import { PrivateAddressCard } from "@/ui/PrivateAddress";
@@ -18,8 +18,22 @@ export function DeviceDetailModal() {
     // Back, or any other way the param goes, closes the modal; the next one starts fresh.
     if (!mac) deviceModalHistory.pushed = false;
   }, [mac]);
-  return mac ? <DeviceModal key={mac} mac={mac} /> : null;
+  const router = useRouter();
+  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
+  useEffect(() => {
+    // A phone opens a device as its page, as the design does, even from a shared modal link.
+    if (mac && narrow) router.replace(deviceHref({ mac }));
+  }, [mac, narrow, router]);
+  return mac && !narrow ? <DeviceModal key={mac} mac={mac} /> : null;
 }
+
+const NARROW = "(max-width: 767px)";
+function subscribeNarrow(onChange: () => void) {
+  const media = window.matchMedia(NARROW);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+const isNarrow = () => window.matchMedia(NARROW).matches;
 
 function DeviceModal({ mac }: { mac: string }) {
   const router = useRouter();
@@ -36,20 +50,23 @@ function DeviceModal({ mac }: { mac: string }) {
     };
   }, []);
 
-  useEffect(() => {
-    // Focus goes back to the row that opened the modal, which stays on the page beneath it.
-    const opener = deviceModalHistory.opener;
-    deviceModalHistory.opener = null;
-    return () => {
-      if (opener?.isConnected) opener.focus();
-    };
-  }, []);
+  // Focus goes back to the row that opened the modal, which stays on the page beneath it. It moves only
+  // once the address no longer opens this device, so Strict Mode's rehearsal of the effect leaves it be.
+  const [opener] = useState(() => deviceModalHistory.opener);
+  useEffect(
+    () => () => {
+      const open = new URLSearchParams(window.location.search).get(DEVICE_MODAL_PARAM) === mac;
+      if (!open && opener?.isConnected) opener.focus();
+    },
+    [opener, mac],
+  );
 
   // A second Escape or Done before the first close lands must not step back twice.
   const closing = useRef(false);
   function close() {
     if (closing.current) return;
     closing.current = true;
+    deviceModalHistory.opener = null;
     if (deviceModalHistory.pushed) {
       deviceModalHistory.pushed = false;
       router.back();

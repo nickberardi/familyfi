@@ -33,7 +33,7 @@ export function SheetFrame({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="px-[18px] pt-[18px] pb-1">
-          <div className="text-[17px] font-bold tracking-tight">{title}</div>
+          <h2 className="text-[17px] font-bold tracking-tight">{title}</h2>
           {sub ? <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{sub}</p> : null}
         </div>
         <div className="flex flex-col gap-3 px-[18px] py-3.5">{children}</div>
