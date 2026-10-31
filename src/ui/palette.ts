@@ -158,9 +158,18 @@ export const DARK: Partial<Record<ColorToken, string>> = {
   "upstream-fill": "#5854d6",
   "upstream-ink": "rgb(181, 173, 255)",
   "upstream-tint": "rgba(88, 84, 214, 0.14)",
+  "verdict-open-fill": "rgba(117, 222, 138, 0.16)",
+  "verdict-open-ink": "rgb(117, 222, 138)",
+  "verdict-open-line": "rgba(117, 222, 138, 0.32)",
+  "verdict-partial-ink": "rgb(181, 173, 255)",
+  "verdict-partial-line": "rgba(181, 173, 255, 0.3)",
   "verdict-rule-fill": "rgba(255, 128, 120, 0.1)",
   "verdict-rule-ink": "rgb(255, 128, 120)",
   "verdict-rule-line": "rgba(255, 128, 120, 0.3)",
+  // A mark nothing measured: the dark field, with the secondary ink.
+  "verdict-unknown-fill": "rgba(118, 118, 128, 0.12)",
+  "verdict-unknown-ink": "rgba(255, 255, 255, 0.75)",
+  "verdict-unknown-line": "rgba(255, 255, 255, 0.14)",
   "well": "#2c2c2e",
 };
 
