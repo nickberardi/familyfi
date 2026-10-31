@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, lineHeight: 22, fontWeight: "600" },
   body: { fontSize: 14, lineHeight: 20 },
   gap: { marginTop: 4 },
-  label: { marginTop: 12, fontSize: 14, lineHeight: 20, fontWeight: "600", letterSpacing: 0.3, textTransform: "uppercase" },
+  label: { marginTop: 10, fontSize: 14, lineHeight: 20, fontWeight: "600", letterSpacing: 0.3, textTransform: "uppercase" },
   action: { marginTop: 6, alignSelf: "flex-start" },
   actionLabel: { fontSize: 14, lineHeight: 21, fontWeight: "600" },
   markLine: { flexDirection: "row", alignItems: "center", gap: 6 },
