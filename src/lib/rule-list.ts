@@ -56,6 +56,11 @@ export function ruleHref(rule: Pick<Rule, "id"> & Partial<Pick<Rule, "builtIn">>
   return rule.builtIn === "quarantine" ? "/devices" : `/rules/${rule.id}`;
 }
 
+/** Whether a rule has a page to edit it on: every rule but quarantine, which is never edited. */
+export function ruleEditable(rule: Partial<Pick<Rule, "builtIn">>): boolean {
+  return rule.builtIn !== "quarantine";
+}
+
 /** Who a rule covers, by name: its groups, or its whole networks. */
 export function ruleAppliesTo(
   rule: Pick<Rule, "scope" | "groupIds" | "networkIds"> & Partial<Pick<Rule, "builtIn">>,
@@ -163,6 +168,7 @@ export const RULES_COPY = {
   appliesTo: "Applies to",
   unassigned: "Unassigned devices",
   everyGroup: "Every group",
+  edit: "Edit",
   footnote:
     "Each window is its own UniFi policy. Edits are desired configuration, written to UniFi on the next reconcile; Sync shows whether the gateway accepted them.",
 } as const;

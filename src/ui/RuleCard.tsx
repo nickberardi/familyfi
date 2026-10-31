@@ -3,7 +3,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ruleActionSpecs, ruleGroupStateLines, ruleStateLine } from "@/lib/rule-actions";
-import { RULES_COPY as COPY, ruleAppliesTo, ruleCardDimmed, ruleHref, ruleStatus, ruleWhenLines } from "@/lib/rule-list";
+import { RULES_COPY as COPY, ruleAppliesTo, ruleCardDimmed, ruleEditable, ruleHref, ruleStatus, ruleWhenLines } from "@/lib/rule-list";
 import { ruleBlocksLabel, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
@@ -159,7 +159,10 @@ function RuleFacts({
   );
 }
 
-/** A rule card's foot: whether it is paused, for everyone or for a group, and what can be done about it now. */
+/**
+ * A rule card's foot: Edit, then whether it is paused, for everyone or for a group, and what can be
+ * done about it now. An off rule keeps its foot for Edit; quarantine, never edited, has none of its own.
+ */
 export function RuleCardActions({
   rule,
   groups,
@@ -182,9 +185,17 @@ export function RuleCardActions({
   const overrides = ruleGroupStateLines(rule, groupNames, timezone, now);
   const actions = ruleActionSpecs(rule, timezone, now);
   const lines = [...(state ? [state] : []), ...overrides];
-  if (!lines.length && !actions.length) return null;
+  const editable = ruleEditable(rule);
+  if (!lines.length && !actions.length && !editable) return null;
   return (
     <View style={[styles.actions, { borderTopColor: ui.color("line") }]}>
+      {editable ? (
+        <ui.Link href={ruleHref(rule)} label={`${COPY.edit} ${rule.name}`} testID={`rule-edit-${rule.id}`}>
+          <View style={[styles.button, { borderWidth: 1, borderColor: ui.color("hairline-card") }]}>
+            <Text style={[body, styles.buttonLabel, { color: ui.color("ink") }]}>{COPY.edit}</Text>
+          </View>
+        </ui.Link>
+      ) : null}
       <View style={styles.lines}>
         {lines.map((line) => (
           <Text key={line} style={[body, { color: ui.color("ink-2") }]}>

@@ -721,6 +721,13 @@ test("Rules: pause a rule from its card and resume it", { tag: "@desktop" }, asy
     await card.getByRole("button", { name: "Resume", exact: true }).click();
     await expect(card.getByText(/^Paused until/)).toHaveCount(0);
     await expect(card.getByRole("button", { name: "Pause for everyone" })).toBeVisible();
+
+    // Edit opens the rule's page, and stays on the card while the rule is off.
+    await card.getByRole("switch", { name: ruleName }).click();
+    await expect(card.getByRole("switch", { name: ruleName })).not.toBeChecked();
+    await expect(card.getByRole("button", { name: "Pause for everyone" })).toHaveCount(0);
+    await card.getByRole("link", { name: `Edit ${ruleName}` }).click();
+    await expect(page).toHaveURL(new RegExp(`/rules/${rule.id}$`));
   } finally {
     await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
   }
@@ -733,6 +740,8 @@ test("Rules: quarantine is a built-in rule that pauses from its card and resumes
     const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Quarantine" }) });
     await expect(card.getByText("All internet · every unassigned device")).toBeVisible();
     await expect(card.getByText("Unassigned devices")).toBeVisible();
+    // Quarantine is never edited, so its card has no Edit.
+    await expect(card.getByRole("link", { name: /^Edit / })).toHaveCount(0);
     // The mock household enforces quarantine; it is paused, never allowed.
     const toggle = card.getByRole("switch", { name: "Quarantine" });
     await expect(toggle).toBeChecked();
