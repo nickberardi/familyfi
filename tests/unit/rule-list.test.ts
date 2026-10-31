@@ -6,6 +6,7 @@ import {
   ruleAppliesTo,
   ruleBarBands,
   ruleCardDimmed,
+  ruleEditable,
   ruleHref,
   ruleMarkSpec,
   ruleStatus,
@@ -219,5 +220,12 @@ describe("a rule's status line", () => {
 describe("the way to a rule's page", () => {
   it("opens a rule, and quarantine's devices, since quarantine is never edited", () => {
     expect(ruleHref(rule({ builtIn: "quarantine" }))).toBe("/devices");
+  });
+
+  it("offers Edit on every rule but quarantine, including the other built-in rules", () => {
+    expect(ruleEditable(rule({}))).toBe(true);
+    expect(ruleEditable(rule({ builtIn: "dns" }))).toBe(true);
+    expect(ruleEditable(rule({ builtIn: "countries" }))).toBe(true);
+    expect(ruleEditable(rule({ builtIn: "quarantine" }))).toBe(false);
   });
 });
