@@ -11,7 +11,7 @@ import { groupStatus, groupStatusColor } from "@/lib/group-actions";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
 import { groupCardControls } from "@/ui/group-card-controls";
 import { deviceName } from "@/lib/device-assign";
-import { deviceHref } from "@/lib/device-detail";
+import { DeviceLink } from "@/components/DeviceLink";
 import { internetRulesForGroup, internetWindowsForGroup } from "@/lib/rules";
 import { cardNoteLine, deviceKindLabel } from "@/lib/display";
 import { useAppData } from "@/components/AppDataProvider";
@@ -255,9 +255,10 @@ function GroupDevices({ group, members }: { group: Group; members: Device[] }) {
             <div aria-hidden="true" />
           </div>
           {members.map((device) => (
-            <Link
+            <DeviceLink
               key={device.mac}
-              href={deviceHref(device, group.id)}
+              device={device}
+              fromGroupId={group.id}
               className="ff-group-device-grid grid items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 text-[var(--ff-ink)] hover:bg-[var(--ff-field-soft)]"
             >
               <div className="flex min-w-0 items-center gap-2.5">
@@ -276,7 +277,7 @@ function GroupDevices({ group, members }: { group: Group; members: Device[] }) {
               <span aria-hidden="true" className="flex text-[var(--ff-chevron)]">
                 <Icon name="caret-right" size={14} />
               </span>
-            </Link>
+            </DeviceLink>
           ))}
         </>
       )}

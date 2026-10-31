@@ -255,6 +255,7 @@ export const PRIVATE_ADDRESS_COPY = {
   cardTitle: "Private Wi-Fi address",
   cardBody: "This device hides its real address on this Wi-Fi, and the address can change. When it does, FamilyFi sees a new, unassigned device and this one loses its group’s rules.",
   howToFix: "How to fix",
+  hideFix: "Hide",
   iphone: { label: "iPhone and iPad:", steps: "Settings → Wi-Fi → (i) next to this network → Private Wi-Fi Address → Off." },
   android: { label: "Android:", steps: "Settings → Wi-Fi → this network → Privacy → Use device MAC." },
 } as const;

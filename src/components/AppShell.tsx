@@ -1,10 +1,11 @@
 "use client";
 
 import { Toast } from "@/ui/Toast";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AboutSheet, SOURCE_URL } from "@/components/AboutSheet";
+import { DeviceDetailModal } from "@/components/DeviceDetailModal";
 import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api, request } from "@/lib/api";
@@ -436,6 +437,10 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
           </>
         ) : null}
         {aboutOpen ? <AboutSheet demo={demo} onClose={closeAbout} /> : null}
+        {/* `?device=<mac>` on any page: the device's detail in a modal, as a wide screen opens it. */}
+        <Suspense fallback={null}>
+          <DeviceDetailModal />
+        </Suspense>
       </div>
     </NavDrawerCtx.Provider>
   );

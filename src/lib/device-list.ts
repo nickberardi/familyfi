@@ -88,6 +88,7 @@ export const DEVICES_COPY = {
   detailLoading: "Loading device…",
   detailUnavailable: "Device details are unavailable right now.",
   detailNotFound: "Device not found.",
+  detailDone: "Done",
 } as const;
 
 /** What a device's group control is called: its group "for" the device. */
