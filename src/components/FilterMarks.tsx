@@ -18,7 +18,7 @@ import type { Group } from "@/lib/types";
 /** The web's small section heading, in the page's line height. */
 export function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ color: "var(--ff-ink-2)" }}>
+    <div className="text-[14px] leading-[21px] font-semibold" style={{ color: "var(--ff-ink-2)" }}>
       {children}
     </div>
   );

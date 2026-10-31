@@ -1,12 +1,10 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { request } from "@/lib/api";
-import { loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
-import { FAMILY_ROLES, GROUP_DETAIL_COPY, MONOGRAM_MAX, groupDetailSub, groupEditBody, groupEditDraft, roleLocked, rulesNeedDevice, type FamilyRole } from "@/lib/group-form";
-import { deleteGroup, runGroupCardAction, updateGroup, type GroupCardRun } from "@/lib/group-writes";
+import { GROUP_DETAIL_COPY, GROUP_EDIT_COPY, groupDetailSub, rulesNeedDevice } from "@/lib/group-form";
+import { runGroupCardAction, type GroupCardRun } from "@/lib/group-writes";
 import { groupStatus, groupStatusColor } from "@/lib/group-actions";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
 import { groupCardControls } from "@/ui/group-card-controls";
@@ -20,98 +18,19 @@ import { PauseSheet } from "@/components/PauseSheet";
 import { useFilterCatalog } from "@/components/GroupGrid";
 import { GROUP_SCHEDULE_COPY, GroupSchedule } from "@/ui/GroupSchedule";
 import { InternetPresets } from "@/ui/InternetPresets";
-import { GroupResolverCard } from "@/components/upstream/GroupResolverCard";
+import { GroupEditSheet } from "@/components/GroupEditSheet";
 import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/ui/Icon";
 import { DeviceMark } from "@/ui/DeviceMark";
 import type { Device, Group } from "@/lib/types";
 
-const FIELD = "rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px]";
-
-function GroupEditForm({ group }: { group: Group }) {
-  const { store, busy, accounts } = useAppData();
-  const lockedRole = roleLocked(group, accounts);
-  const initial = groupEditDraft(group);
-  const [name, setName] = useState(initial.name);
-  const [familyRole, setFamilyRole] = useState<FamilyRole>(initial.familyRole);
-  const [monogram, setMonogram] = useState(initial.monogram);
-
-  const draft = { name, familyRole, monogram };
-  const canSave = groupEditBody(group, draft) !== null;
-
-  async function onSave() {
-    if (!canSave) return;
-    await updateGroup(store.mutate, group, draft);
-  }
-
-  return (
-    <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-      <h2 className="border-b border-[var(--ff-hairline-card)] px-[18px] py-4 text-[14px] font-semibold">{GROUP_DETAIL_COPY.edit}</h2>
-      <form
-        className="flex flex-col gap-3 p-[18px]"
-        method="post"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void onSave();
-        }}
-      >
-        <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
-          {GROUP_DETAIL_COPY.name}
-          <input required className={FIELD} value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        {group.kind === "family" ? (
-          <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
-            {GROUP_DETAIL_COPY.role}
-            <select
-              className={FIELD}
-              value={familyRole}
-              disabled={lockedRole && familyRole === "adult"}
-              onChange={(e) => {
-                const role = e.target.value as FamilyRole;
-                if (lockedRole && role !== "adult") return;
-                setFamilyRole(role);
-              }}
-            >
-              {FAMILY_ROLES.map((role) => (
-                <option key={role.value} value={role.value} disabled={lockedRole && role.value !== "adult"}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <label className="flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]">
-            {GROUP_DETAIL_COPY.monogram}
-            <input maxLength={MONOGRAM_MAX} className={FIELD} value={monogram} onChange={(e) => setMonogram(e.target.value)} />
-          </label>
-        )}
-        <button
-          type="submit"
-          disabled={busy || !canSave}
-          className="self-start rounded-[9px] bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
-        >
-          {GROUP_DETAIL_COPY.save}
-        </button>
-      </form>
-    </section>
-  );
-}
-
-export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: string }) {
+export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "things"; id: string; demo?: boolean }) {
   const router = useRouter();
-  const { groups, devices, rules, household, store, reload, loading, busy } = useAppData();
-  const [groupResolver, setGroupResolver] = useState<GroupResolver | null>(null);
+  const { groups, devices, rules, household, store, loading, busy } = useAppData();
   const group = groups.find((item) => item.id === id);
   const [sheet, setSheet] = useState<GroupSheetTarget | null>(null);
+  const [editing, setEditing] = useState(false);
   const { catalogNames, upstreamCategories } = useFilterCatalog();
-
-  // The effective source may be this group's DoH override or its devices' networks.
-  useEffect(() => {
-    const start = window.setTimeout(() => {
-      void loadGroupResolver(request, id).then(setGroupResolver);
-    }, 0);
-    return () => window.clearTimeout(start);
-  }, [id]);
 
   if (!group) {
     if (loading) return null;
@@ -127,11 +46,11 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
 
   return (
     <>
-      <PageHeader title={group.name} sub={groupDetailSub(group)} />
+      <PageHeader title={group.name} sub={groupDetailSub(group)} actionLabel={GROUP_EDIT_COPY.open} onAction={() => setEditing(true)} />
       {/* 960px of content, as the design has it, plus the page padding either side. */}
       <div className="flex max-w-[992px] flex-col gap-[18px] p-4 md:max-w-[1008px] md:p-6">
         <Link href={kind === "family" ? "/family" : "/things"} className="w-fit text-[14px] font-semibold text-[var(--ff-accent)]">
-          ← Back to {kind === "family" ? "Family" : "Things"}
+          ← {kind === "family" ? "Family" : "Things"}
         </Link>
         <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
           <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
@@ -193,30 +112,17 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
           />
         </section>
         <GroupDevices group={group} members={members} />
-        <GroupEditForm key={group.id} group={group} />
-        <GroupResolverCard
-          groupId={group.id}
-          groupName={group.name}
-          dohOverrideUrl={group.dohOverrideUrl ?? null}
-          resolver={groupResolver}
-          onChanged={() => {
-            void reload();
-            void loadGroupResolver(request, id).then(setGroupResolver);
-          }}
-        />
-        {/* Disabled while a write is in flight, which the store would otherwise drop without a word. */}
-        <button
-          type="button"
-          disabled={busy}
-          className="self-start text-[14px] font-semibold text-[var(--ff-danger)] disabled:opacity-50"
-          onClick={() =>
-            void deleteGroup(store.mutate, group, () => router.replace(kind === "family" ? "/family" : "/things"))
-          }
-        >
-          Delete group (devices become quarantined)
-        </button>
       </div>
       {sheet ? <PauseSheet group={group} target={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
+      {editing ? (
+        <GroupEditSheet
+          key={group.id}
+          group={group}
+          demo={demo}
+          onClose={() => setEditing(false)}
+          onDeleted={() => router.replace(kind === "family" ? "/family" : "/things")}
+        />
+      ) : null}
     </>
   );
 }
@@ -285,7 +191,7 @@ function GroupDevices({ group, members }: { group: Group; members: Device[] }) {
   );
 }
 
-export function GroupDetailPage({ kind, params }: { kind: "family" | "things"; params: Promise<{ id: string }> }) {
+export function GroupDetailPage({ kind, params, demo = false }: { kind: "family" | "things"; params: Promise<{ id: string }>; demo?: boolean }) {
   const { id } = use(params);
-  return <GroupDetail kind={kind} id={id} />;
+  return <GroupDetail kind={kind} id={id} demo={demo} />;
 }

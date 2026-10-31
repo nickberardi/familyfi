@@ -25,46 +25,59 @@ async function firstChild(page: Page) {
   return kid!;
 }
 
+/** Opens the group's Edit sheet and returns it to the household resolver if it had its own. */
+async function openFresh(page: Page, name: string) {
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: `Edit ${name}` });
+  await expect(sheet).toBeVisible();
+  const dns = sheet.getByRole("group", { name: "DNS-over-HTTPS" });
+  if ((await dns.getByRole("button", { name: "Own endpoint" }).getAttribute("aria-pressed")) === "true") {
+    await dns.getByRole("button", { name: "Household default" }).click();
+    await sheet.getByRole("button", { name: "Save" }).click();
+    await expect(sheet).toHaveCount(0);
+    return openFresh(page, name);
+  }
+  return sheet;
+}
+
 test("a group can take its own resolver and hand it back", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await firstChild(page);
   await page.goto(`/family/${kid.id}`);
 
-  const card = page.locator("section", { has: page.getByRole("heading", { name: "DNS resolver" }) });
-  await expect(card).toBeVisible();
-
-  // Leave it as found: clear any override before asserting the default state.
-  if (await card.getByRole("button", { name: "Remove override" }).count()) {
-    await card.getByRole("button", { name: "Remove override" }).click();
-  }
-  await expect(card.getByText(/Uses the household's DNS-over-HTTPS override/i)).toBeVisible();
-
-  await card.getByRole("button", { name: "Override for this group" }).click();
-  await page
-    .getByLabel(`DNS-over-HTTPS endpoint for ${kid.name}`)
-    .fill("https://strict.example.com/dns-query/kids");
-  await card.getByRole("button", { name: "Save endpoint" }).click();
+  let sheet = await openFresh(page, kid.name);
+  await expect(sheet.getByTestId("group-edit-dns-help")).toContainText(/Uses the household's DNS-over-HTTPS override/i);
+  await sheet.getByRole("button", { name: "Own endpoint" }).click();
+  await sheet.getByLabel("Endpoint URL").fill("https://strict.example.com/dns-query/kids");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toHaveCount(0);
 
   // Shown in full — a mistyped endpoint has to be visible to be fixable.
-  await expect(card.getByText("https://strict.example.com/dns-query/kids")).toBeVisible();
-  await expect(card.getByRole("button", { name: "Replace" })).toBeVisible();
+  sheet = await (async () => {
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    return page.getByRole("dialog", { name: `Edit ${kid.name}` });
+  })();
+  await expect(sheet.getByLabel("Endpoint URL")).toHaveValue("https://strict.example.com/dns-query/kids");
+  await expect(sheet.getByTestId("group-edit-dns-help")).toContainText(`DNS-over-HTTPS override for ${kid.name}`);
 
-  await card.getByRole("button", { name: "Remove override" }).click();
-  await expect(card.getByText(/Uses the household's DNS-over-HTTPS override/i)).toBeVisible();
+  await sheet.getByRole("button", { name: "Household default" }).click();
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toHaveCount(0);
+  sheet = await openFresh(page, kid.name);
+  await expect(sheet.getByLabel("Endpoint URL")).toHaveCount(0);
+  await expect(sheet.getByTestId("group-edit-dns-help")).toContainText(/Uses the household's DNS-over-HTTPS override/i);
 });
 
-test("a bad endpoint is refused with a reason", { tag: "@desktop" }, async ({ page }) => {
+test("a missing or bad endpoint is refused with a reason", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const kid = await firstChild(page);
   await page.goto(`/family/${kid.id}`);
 
-  const card = page.locator("section", { has: page.getByRole("heading", { name: "DNS resolver" }) });
-  if (await card.getByRole("button", { name: "Remove override" }).count()) {
-    await card.getByRole("button", { name: "Remove override" }).click();
-  }
-  await card.getByRole("button", { name: "Override for this group" }).click();
-  await page.getByLabel(`DNS-over-HTTPS endpoint for ${kid.name}`).fill("http://dns.example.com/q");
-  await card.getByRole("button", { name: "Save endpoint" }).click();
-
-  await expect(card.getByText(/must start with https/i)).toBeVisible();
+  const sheet = await openFresh(page, kid.name);
+  await sheet.getByRole("button", { name: "Own endpoint" }).click();
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet.getByRole("alert")).toHaveText("Paste an https:// endpoint, or use the household default.");
+  await sheet.getByLabel("Endpoint URL").fill("http://dns.example.com/q");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet.getByRole("alert")).toHaveText("The endpoint must start with https://");
 });
