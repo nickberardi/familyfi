@@ -54,14 +54,10 @@ export function GroupFilterMarks({
 
   return (
     <>
-      <div
-        className="pb-2.5"
-        style={{ borderTop: "1px solid var(--ff-hairline)" }}
-        data-testid={`filter-marks-${group.id}`}
-      >
-        <div className="px-[18px] pt-2">
+      <div data-testid={`filter-marks-${group.id}`}>
+        <div className="px-[18px] pt-1 pb-3.5">
           <SectionLabel>Categories</SectionLabel>
-          <div className="flex flex-wrap gap-3.5 py-2">
+          <div className="flex flex-wrap gap-3 pt-1">
             {categorySlotStates(group, rules, upstreamCategories ?? [], timezone).map((item) => (
               <CategoryMark key={item.key} item={item} onPress={() => setSheet(categorySheet(item))} />
             ))}
@@ -69,9 +65,9 @@ export function GroupFilterMarks({
         </div>
 
         {showApps ? (
-          <div className="px-[18px] pt-2" style={{ borderTop: "1px solid var(--ff-hairline)" }}>
+          <div className="px-[18px] pt-2 pb-3.5" style={{ borderTop: "1px solid var(--ff-hairline)" }}>
             <SectionLabel>App rules</SectionLabel>
-            <div className="flex flex-wrap gap-3.5 py-2 pb-1">
+            <div className="flex flex-wrap gap-3 pt-2">
               {apps.map((rule) => {
                 const name = parentFacingRuleLabel(rule, catalogNames);
                 return (
