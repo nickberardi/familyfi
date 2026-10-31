@@ -92,7 +92,7 @@ export function DeviceDetailContent({
 
 function Row({ row, compact }: { row: DeviceDetailRow; compact: boolean }) {
   const ui = useUI();
-  // In the modal's narrower columns an address keeps to one line, a size down, as the design sets it.
+  // In the modal's narrower columns an address keeps to one line.
   const keepWhole = compact && row.mono;
   const value = [styles.body, styles.value, keepWhole && styles.whole, { fontFamily: row.mono ? MONO : ui.font, color: ui.color(row.group ? "accent" : "ink") }];
   return (
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   compactColumns: { flexDirection: "row", alignItems: "flex-start", gap: 20 },
   compactSection: { minWidth: 0 },
   compactSectionTitle: { marginBottom: 4, fontWeight: "600" },
-  whole: { flexShrink: 0, fontSize: 13 },
+  whole: { flexShrink: 0 },
   compactRow: { minHeight: 0, gap: 10, paddingVertical: 6 },
   value: { flexShrink: 1, minWidth: 0, textAlign: "right" },
 });

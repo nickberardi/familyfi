@@ -7,7 +7,7 @@ export const SECONDARY_BUTTON =
 export const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
 
-/** The modal frame the sheets share: scrim, card, title and a footer row. A `form` sheet is wider, for two columns. */
+/** The modal frame the sheets share: scrim, card, title and a footer row. A `form` sheet is wider, for two columns that fit a MAC address beside its label. */
 export function SheetFrame({
   title,
   sub,
@@ -29,7 +29,7 @@ export function SheetFrame({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`my-auto w-full ${size === "form" ? "max-w-[520px]" : "max-w-[440px]"} overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-[var(--ff-shadow-sheet)]`}
+        className={`my-auto w-full ${size === "form" ? "max-w-[544px]" : "max-w-[440px]"} overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-[var(--ff-shadow-sheet)]`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="px-[18px] pt-[18px] pb-1">
