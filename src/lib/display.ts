@@ -1,6 +1,6 @@
 import { WEEKDAYS, addCalendarDays, bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays, zonedParts } from "./clock";
 import type { IconName } from "./icons";
-import { internetState, type InternetWindow } from "./rule-windows";
+import { internetState, windowTitle, type InternetWindow } from "./rule-windows";
 import type { Group } from "./types";
 
 // The clock helpers live in ./clock; every client still finds them here.
@@ -139,7 +139,11 @@ export function windowTimes(start: string, end: string): string {
   return `${formatHhmm(start)}–${formatHhmm(end)}`;
 }
 
-/** The line under a card's name: its devices, and how many internet windows it has. */
+/**
+ * The line under a card's name: its devices, then its one internet window by its times and name
+ * ("off 9 PM–7 AM, School nights"), or how many it has. The window's name is kept as typed, since
+ * it may be a person's name.
+ */
 export function cardNoteLine(group: Group, windows: InternetWindow[]): string {
   if (group.deviceCount === 0 && (group.internetRuleIds.length > 0 || group.suspension.active)) {
     return "No devices · rules cannot apply on UniFi until you assign one";
@@ -147,7 +151,9 @@ export function cardNoteLine(group: Group, windows: InternetWindow[]): string {
   const devices = `${group.deviceCount} ${group.deviceCount === 1 ? "device" : "devices"}`;
   if (windows.length === 0) return `${devices} · no internet rule`;
   if (windows.some((window) => window.always)) return `${devices} · internet off always`;
-  return `${devices} · ${windows.length} internet ${windows.length === 1 ? "window" : "windows"}`;
+  const only = windows.length === 1 ? windows[0] : undefined;
+  if (only) return `${devices} · off ${windowTimes(only.start, only.end)}, ${windowTitle(only)}`;
+  return `${devices} · ${windows.length} internet schedules`;
 }
 
 /**
