@@ -264,7 +264,11 @@ function GroupDevices({ group, members }: { group: Group; members: Device[] }) {
                 <DeviceMark hostname={device.hostname} />
                 <div className="min-w-0">
                   <div className="truncate text-[14px]">{deviceName(device)}</div>
-                  <div className="truncate text-[14px] text-[var(--ff-muted)]">{deviceKindLabel(device.hostname)}</div>
+                  <div className="truncate text-[14px] text-[var(--ff-muted)]">
+                    {deviceKindLabel(device.hostname)}
+                    {/* The address columns hide on a phone, so the MAC tells unnamed devices apart there. */}
+                    <span className="font-mono md:hidden"> · {device.mac.toUpperCase()}</span>
+                  </div>
                 </div>
               </div>
               <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] md:block">{device.ip ?? "—"}</div>
