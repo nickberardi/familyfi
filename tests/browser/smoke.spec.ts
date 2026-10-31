@@ -615,6 +615,11 @@ test("a device's modal keeps its place on refresh and Done closes it", { tag: "@
   const mac = dialog.getByText(/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/);
   await expect(mac).toHaveCSS("font-size", "14px");
   expect((await mac.boundingBox())!.height).toBeLessThan(30);
+  // The keyboard stays in the modal: Tab past its last control comes back to its first.
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press("Tab");
+    expect(await dialog.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  }
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(link).toBeFocused();
