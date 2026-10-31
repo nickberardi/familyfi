@@ -126,11 +126,12 @@ export function createGroup(mutate: Mutate, draft: NewGroupDraft) {
   });
 }
 
-export function updateGroup(mutate: Mutate, group: Group, draft: GroupEditDraft) {
+export function updateGroup(mutate: Mutate, group: Group, draft: GroupEditDraft, feedback?: { notice: string }) {
   const body = groupEditBody(group, draft);
   if (!body) return Promise.resolve(undefined);
   return mutate((send) => send<{ group: Group; change: { changeId: string } }>(`/api/v1/groups/${group.id}`, { method: "PUT", body }), {
     groupId: group.id,
+    feedback,
   });
 }
 

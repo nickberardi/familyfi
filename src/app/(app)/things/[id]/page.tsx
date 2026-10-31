@@ -1,5 +1,6 @@
 import { GroupDetailPage } from "@/components/GroupDetail";
+import { demoModeEnabled } from "@/server/env";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
-  return <GroupDetailPage kind="things" params={params} />;
+  return <GroupDetailPage kind="things" params={params} demo={demoModeEnabled()} />;
 }

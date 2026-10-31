@@ -24,12 +24,14 @@ export function Segmented<T extends string>({
   value: T;
   segments: readonly Segment<T>[];
   onChange: (next: T) => void;
-  size?: "sm" | "md";
+  /** `lg` is the sheets' 14px size, the smallest text the app shows outside marks. */
+  size?: "sm" | "md" | "lg";
   /** Stretch segments to fill the row (sheet controls) instead of hugging (table rows). */
   grow?: boolean;
 }) {
   // A stretched row of five shares a phone's width, so its segments pad less there.
-  const pad = size === "sm" ? "px-2.5 py-1.5 text-[11px]" : grow ? "px-1.5 py-1.5 text-[13px] sm:px-3" : "px-3 py-1.5 text-[13px]";
+  const pad =
+    size === "sm" ? "px-2.5 py-1.5 text-[11px]" : size === "lg" ? "px-3 py-1.5 text-[14px]" : grow ? "px-1.5 py-1.5 text-[13px] sm:px-3" : "px-3 py-1.5 text-[13px]";
 
   return (
     <div
