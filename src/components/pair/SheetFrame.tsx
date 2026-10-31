@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 export const PRIMARY_BUTTON =
   "rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40";
@@ -6,6 +6,24 @@ export const SECONDARY_BUTTON =
   "rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40";
 export const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Tab and Shift+Tab cycle within the sheet, so the page behind the scrim can't be reached from the keyboard. */
+function keepFocusInside(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.key !== "Tab") return;
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE));
+  if (!items.length) return;
+  const first = items[0]!;
+  const last = items[items.length - 1]!;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
 /** The modal frame the sheets share: scrim, card, title and a footer row. A `form` sheet is wider, for two columns that fit a MAC address beside its label. */
 export function SheetFrame({
@@ -31,6 +49,7 @@ export function SheetFrame({
         aria-label={title}
         className={`my-auto w-full ${size === "form" ? "max-w-[544px]" : "max-w-[440px]"} overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-[var(--ff-shadow-sheet)]`}
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={keepFocusInside}
       >
         <div className="px-[18px] pt-[18px] pb-1">
           <h2 className="text-[17px] font-bold tracking-tight">{title}</h2>
