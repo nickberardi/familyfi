@@ -108,7 +108,7 @@ export const GROUP_DETAIL_COPY = {
   /** The devices card's title: a person's devices are assigned to them, a things group holds its own. */
   devices: { family: "Assigned devices", things: "Devices in this group" },
   assignDevices: "Assign devices",
-  deviceColumns: { device: "Device", address: "Address", hardware: "Hardware" },
+  deviceColumns: { device: "Device", address: "IP address", hardware: "MAC address" },
   noDevices: "No devices assigned.",
   /** After "No devices assigned." when the group has rules or a pause: the words around the link to assign one. */
   rulesNeedDevice: { before: "Its rules cannot apply on UniFi until you", link: "assign a device", after: "." },

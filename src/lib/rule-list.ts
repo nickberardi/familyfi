@@ -1,7 +1,7 @@
 /**
  * The Rules list every client shows: which rules a scope shows, how each card reads, and its copy.
- * Internet rules lead with a square globe and the accent; category, app and website rules take the
- * round mark and the rule verdict's lighter treatment, so the two never read alike.
+ * Every rule takes the same grey mark; its glyph says what the rule blocks, and its switch says
+ * whether it is on.
  */
 import { daysLabel, windowTimes } from "./display";
 import type { IconName } from "./icons";
@@ -127,13 +127,13 @@ export function ruleToggleLabels(rule: Partial<Pick<Rule, "builtIn">>): { onLabe
   return rule.builtIn === "quarantine" ? { onLabel: "Enforced", offLabel: "Off" } : {};
 }
 
-/** The rule's glyph on its mark, which is one shape for every rule: what it blocks, its built-in's own glyph, or "APP" for apps. */
-export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pick<Rule, "builtIn">>): { icon: IconName } | { text: string } {
+/** The rule's glyph on its mark, which is one shape for every rule: what it blocks, or its built-in's own glyph. */
+export function ruleMarkSpec(rule: Pick<Rule, "kind" | "targetIds"> & Partial<Pick<Rule, "builtIn">>): { icon: IconName } {
   if (rule.builtIn === "quarantine") return { icon: "shield-warning" };
   if (rule.builtIn === "dns") return { icon: "shield-check" };
   if (rule.builtIn === "countries") return { icon: "globe-hemisphere-west" };
   if (rule.kind === "internet") return { icon: "globe-simple" };
-  if (rule.kind === "app") return { text: "APP" };
+  if (rule.kind === "app") return { icon: "app-window" };
   if (rule.kind === "domain") return { icon: "link-simple" };
   const slot = CURATED_CATEGORY_SLOTS.find((item) => (rule.targetIds ?? []).includes(item.categoryId));
   return { icon: slot ? CURATED_SLOT_ICONS[slot.slot] : "prohibit" };

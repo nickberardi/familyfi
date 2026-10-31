@@ -1,6 +1,6 @@
 "use client";
 
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { ruleMarkSpec } from "@/lib/rule-list";
 import type { Rule } from "@/lib/rules";
@@ -16,14 +16,9 @@ export function RuleMark({ rule, size = 34 }: { rule: Pick<Rule, "kind" | "targe
   const ui = useUI();
   const mark = ruleMarkSpec(rule);
   const scale = size / 34;
-  const ink = ui.color("ink-2");
   return (
     <View aria-hidden style={[styles.tile, { width: size, height: size, borderRadius: 9 * scale, backgroundColor: ui.color("field") }]}>
-      {"icon" in mark ? (
-        <ui.Icon name={mark.icon} size={Math.round(17 * scale)} color={ink} />
-      ) : (
-        <Text style={{ fontFamily: ui.font, fontSize: 10, lineHeight: 15, fontWeight: "700", color: ink }}>{mark.text}</Text>
-      )}
+      <ui.Icon name={mark.icon} size={Math.round(17 * scale)} color={ui.color("ink-2")} />
     </View>
   );
 }

@@ -102,7 +102,7 @@ describe("the Rules list", () => {
 
   it("marks every rule with the glyph of what it blocks, and each built-in with its own", () => {
     expect(ruleMarkSpec(rule({}))).toEqual({ icon: "globe-simple" });
-    expect(ruleMarkSpec(rule({ kind: "app" }))).toEqual({ text: "APP" });
+    expect(ruleMarkSpec(rule({ kind: "app" }))).toEqual({ icon: "app-window" });
     expect(ruleMarkSpec(rule({ kind: "domain" }))).toEqual({ icon: "link-simple" });
     expect(ruleMarkSpec(rule({ kind: "category", targetIds: [24] }))).toEqual({ icon: "users-three" });
     expect(ruleMarkSpec(rule({ kind: "category", targetIds: [-1] }))).toEqual({ icon: "prohibit" });
