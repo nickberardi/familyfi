@@ -3,6 +3,7 @@
  * Every rule takes the same grey mark; its glyph says what the rule blocks, and its switch says
  * whether it is on.
  */
+import { DEVICES_COPY } from "./device-list";
 import { daysLabel, windowTimes } from "./display";
 import type { IconName } from "./icons";
 import { ruleStateLine } from "./rule-actions";
@@ -124,7 +125,7 @@ export function ruleStatus(
 
 /** The words on a rule's switch: Quarantine says Enforced, as it does on Devices; every other rule On. */
 export function ruleToggleLabels(rule: Partial<Pick<Rule, "builtIn">>): { onLabel?: string; offLabel?: string } {
-  return rule.builtIn === "quarantine" ? { onLabel: "Enforced", offLabel: "Off" } : {};
+  return rule.builtIn === "quarantine" ? { onLabel: DEVICES_COPY.quarantineOn, offLabel: DEVICES_COPY.quarantineOff } : {};
 }
 
 /** The rule's glyph on its mark, which is one shape for every rule: what it blocks, or its built-in's own glyph. */
