@@ -14,6 +14,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { deviceIcon, deviceKindLabel } from "@/lib/display";
 import type { IconName } from "@/lib/icons";
+import { CURATED_CATEGORY_SLOTS, CURATED_SLOT_ICONS } from "@/lib/rules";
 import { UPSTREAM_SEED_CATEGORIES, upstreamCategoryIcon } from "@/lib/upstream-domains";
 
 const repoRoot = path.resolve(__dirname, "../..");
@@ -53,6 +54,12 @@ describe("icons", () => {
       expect(upstreamCategoryIcon(category.slug, "user")).toBeUndefined();
     }
     expect(upstreamCategoryIcon("knitting", "seed")).toBeUndefined();
+  });
+
+  it("gives every curated category slot a glyph", () => {
+    for (const { slot } of CURATED_CATEGORY_SLOTS) {
+      expect(available.has(CURATED_SLOT_ICONS[slot]), `${slot}: ph-${CURATED_SLOT_ICONS[slot]}`).toBe(true);
+    }
   });
 
   /** Every branch of `deviceKindLabel` must land on a glyph, including its fallback. */
