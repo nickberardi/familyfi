@@ -32,7 +32,20 @@ const LABEL = "flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-mute
  * group starts here too and asks first. Saving sends the group's fields, then its resolver, so a
  * resolver that fails leaves the name saved and the sheet open to try that part again.
  */
-export function GroupEditSheet({ group, demo, onClose, onDeleted }: { group: Group; demo: boolean; onClose: () => void; onDeleted: () => void }) {
+export function GroupEditSheet({
+  group,
+  demo,
+  opener,
+  onClose,
+  onDeleted,
+}: {
+  group: Group;
+  demo: boolean;
+  /** Where focus goes back to when the sheet closes. */
+  opener: HTMLElement | null;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
   const { store, busy, accounts } = useAppData();
   const lockedRole = roleLocked(group, accounts);
   const [initial] = useState(() => groupEditSheetDraft(group));
@@ -41,7 +54,11 @@ export function GroupEditSheet({ group, demo, onClose, onDeleted }: { group: Gro
   const [confirming, setConfirming] = useState(false);
   // Undefined while it loads, so the sheet never says "unavailable" before it has asked.
   const [resolver, setResolver] = useState<GroupResolver | null | undefined>(undefined);
-  const set = (patch: Partial<GroupEditSheetDraft>) => setDraft((current) => ({ ...current, ...patch }));
+  // An edit clears the last refusal, which no longer describes what the sheet holds.
+  const set = (patch: Partial<GroupEditSheetDraft>) => {
+    setError("");
+    setDraft((current) => ({ ...current, ...patch }));
+  };
 
   useEffect(() => {
     let live = true;
@@ -52,7 +69,6 @@ export function GroupEditSheet({ group, demo, onClose, onDeleted }: { group: Gro
   }, [group.id]);
 
   // Escape closes, and focus goes back to the Edit button that opened the sheet.
-  const [opener] = useState(() => (typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null)));
   const closeRef = useRef(onClose);
   useEffect(() => {
     closeRef.current = onClose;
