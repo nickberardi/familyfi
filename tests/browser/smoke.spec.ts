@@ -603,6 +603,32 @@ test("a device's modal keeps its place on refresh and Done closes it", { tag: "@
 
   // The link itself is still the device's page, for a new tab or a phone.
   await expect(link).toHaveAttribute("href", /^\/devices\/[^/?]+$/);
+
+  // Escape closes it too, and focus returns to the row that opened it.
+  await link.click();
+  await expect(dialog).toBeVisible();
+  // A MAC address stays on one line beside its label at 14px, which is why the modal is 544px wide.
+  const mac = dialog.getByText(/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/);
+  await expect(mac).toHaveCSS("font-size", "14px");
+  expect((await mac.boundingBox())!.height).toBeLessThan(30);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(link).toBeFocused();
+});
+
+test("a device with a private address folds how to fix it in its modal", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/devices");
+  const row = page.locator('a[href^="/devices/"]').filter({ has: page.getByTestId("private-address-mark") }).first();
+  await expect(row, "the mock household has a device with a private address").toHaveCount(1);
+  await row.click();
+  const dialog = page.getByRole("dialog");
+  const toggle = dialog.getByTestId("private-address-toggle");
+  await expect(toggle).toHaveText("How to fix");
+  await expect(dialog.getByText("iPhone and iPad:")).toHaveCount(0);
+  await toggle.click();
+  await expect(toggle).toHaveText("Hide");
+  await expect(dialog.getByText("iPhone and iPad:")).toBeVisible();
 });
 
 test("device assignment updates immediately", { tag: "@desktop" }, async ({ page }) => {

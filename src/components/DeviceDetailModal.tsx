@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAppData } from "@/components/AppDataProvider";
 import { deviceModalHistory } from "@/components/DeviceLink";
@@ -36,7 +36,20 @@ function DeviceModal({ mac }: { mac: string }) {
     };
   }, []);
 
+  useEffect(() => {
+    // Focus goes back to the row that opened the modal, which stays on the page beneath it.
+    const opener = deviceModalHistory.opener;
+    deviceModalHistory.opener = null;
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
+
+  // A second Escape or Done before the first close lands must not step back twice.
+  const closing = useRef(false);
   function close() {
+    if (closing.current) return;
+    closing.current = true;
     if (deviceModalHistory.pushed) {
       deviceModalHistory.pushed = false;
       router.back();

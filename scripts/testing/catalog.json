@@ -877,6 +877,11 @@
         "devices"
       ]
     },
+    "tests/browser/smoke.spec.ts > a device with a private address folds how to fix it in its modal": {
+      "categories": [
+        "devices"
+      ]
+    },
     "tests/browser/smoke.spec.ts > device assignment updates immediately": {
       "categories": [
         "devices"
