@@ -128,7 +128,8 @@ export function GroupDetail({ kind, id }: { kind: "family" | "things"; id: strin
   return (
     <>
       <PageHeader title={group.name} sub={groupDetailSub(group)} />
-      <div className="flex max-w-[960px] flex-col gap-[18px] p-4 md:p-6">
+      {/* 960px of content, as the design has it, plus the page padding either side. */}
+      <div className="flex max-w-[992px] flex-col gap-[18px] p-4 md:max-w-[1008px] md:p-6">
         <Link href={kind === "family" ? "/family" : "/things"} className="w-fit text-[14px] font-semibold text-[var(--ff-accent)]">
           ← Back to {kind === "family" ? "Family" : "Things"}
         </Link>

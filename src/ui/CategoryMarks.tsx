@@ -142,5 +142,5 @@ const styles = StyleSheet.create({
   addDashed: { borderWidth: 1.5, borderStyle: "dashed" },
   label: { fontSize: 10, lineHeight: 15 },
   word: { fontSize: 9, lineHeight: 13.5 },
-  break: { fontSize: 0 },
+  break: { fontSize: 0, lineHeight: 0 },
 });

@@ -54,8 +54,8 @@ export function PageHeader({
         ☰
       </button>
       <div className="min-w-0 flex-1">
-        <h1 className="m-0 text-[21px] font-bold tracking-tight">{title}</h1>
-        <p className="mt-0.5 text-[14px] text-[var(--ff-muted)]">{sub}</p>
+        <h1 className="m-0 text-[21px] leading-[1.2] font-bold tracking-tight">{title}</h1>
+        <p className="mt-0.5 text-[14px] leading-[1.25] text-[var(--ff-muted)]">{sub}</p>
       </div>
       {secondary}
       {action}
