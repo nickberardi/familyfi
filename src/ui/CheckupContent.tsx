@@ -19,11 +19,12 @@ import {
   type CheckupState,
 } from "@/lib/checkup";
 import type { IconName } from "@/lib/icons";
-import { ruleHref } from "@/lib/rule-list";
+import { ruleHref, ruleToggleLabels } from "@/lib/rule-list";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 import { ExternalLink } from "./ExternalLink";
+import { RuleMark } from "./RuleMark";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /**
@@ -53,7 +54,15 @@ export function ProtectionCard({
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="checkup-protection">
       <CardHead title={COPY.protection.title} trailing={<Text style={[styles.body, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{COPY.protection.on(on, rules.length)}</Text>} />
       {rules.map((rule) => (
-        <Row key={rule.id} icon={rule.builtIn === "countries" ? "globe-simple" : "shield-check"} tone="accent" testID={`checkup-protection-${rule.id}`}>
+        <Row
+          key={rule.id}
+          mark={
+            <View style={rule.enabled ? null : styles.faded}>
+              <RuleMark rule={rule} />
+            </View>
+          }
+          testID={`checkup-protection-${rule.id}`}
+        >
           <View style={styles.grow}>
             <Text style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>{protectionTitle(rule)}</Text>
             <Text style={[styles.body, { fontFamily: ui.font, color: ui.color("ink-3") }]}>
@@ -65,7 +74,7 @@ export function ProtectionCard({
               </ui.Link>
             ) : null}
           </View>
-          <ui.Toggle label={protectionTitle(rule)} on={rule.enabled} onToggle={() => onToggle(rule)} disabled={disabled} testID={`checkup-toggle-${rule.id}`} />
+          <ui.Toggle label={protectionTitle(rule)} on={rule.enabled} onToggle={() => onToggle(rule)} disabled={disabled} {...ruleToggleLabels(rule)} testID={`checkup-toggle-${rule.id}`} />
         </Row>
       ))}
       {on < rules.length ? (
@@ -425,14 +434,29 @@ const MARK_TONE = {
   muted: { fill: "field", ink: "ink-3" },
 } as const;
 
-function Row({ icon, tone, testID, children }: { icon: IconName; tone: keyof typeof MARK_TONE; testID?: string; children: ReactNode }) {
+/** A row led by a finding's tinted icon (`icon` and `tone`), or by a mark of the caller's own (`mark`). */
+function Row({
+  icon,
+  tone = "accent",
+  mark,
+  testID,
+  children,
+}: {
+  icon?: IconName;
+  tone?: keyof typeof MARK_TONE;
+  mark?: ReactNode;
+  testID?: string;
+  children: ReactNode;
+}) {
   const ui = useUI();
   const colors = MARK_TONE[tone];
   return (
     <View style={[styles.row, { borderTopColor: ui.color("hairline") }]} testID={testID}>
-      <View aria-hidden style={[styles.mark, { backgroundColor: ui.color(colors.fill) }]}>
-        <ui.Icon name={icon} size={17} color={ui.color(colors.ink)} />
-      </View>
+      {mark ?? (
+        <View aria-hidden style={[styles.mark, { backgroundColor: ui.color(colors.fill) }]}>
+          {icon ? <ui.Icon name={icon} size={17} color={ui.color(colors.ink)} /> : null}
+        </View>
+      )}
       {children}
     </View>
   );
@@ -456,6 +480,7 @@ function Fold({ icon, label, open, onPress, testID }: { icon: IconName; label: s
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
+  faded: { opacity: 0.4 },
   head: { flexDirection: "row", alignItems: "baseline", gap: 12, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
   cardTitle: { margin: 0, fontSize: 16, lineHeight: 22, fontWeight: "600" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: 1 },
