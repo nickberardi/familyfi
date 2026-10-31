@@ -122,3 +122,39 @@ test("a refused endpoint keeps the sheet open, the name saved, and Save tries on
   await restore.getByRole("button", { name: "Save" }).click();
   await expect(restore).toHaveCount(0);
 });
+
+test("after a refused endpoint, putting the name back is still a change Save sends", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const kid = await firstChild(page);
+  await page.goto(`/family/${kid.id}`);
+  const renamed = `${kid.name} B`;
+
+  const groupWrites: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT" && new URL(request.url()).pathname === `/api/v1/groups/${kid.id}`) groupWrites.push(request.url());
+  });
+  const resolverPath = `**/api/v1/groups/${kid.id}/resolver`;
+  await page.route(resolverPath, (route) =>
+    route.request().method() === "PUT"
+      ? route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ error: { code: "invalid_resolver", message: "That resolver did not answer." } }) })
+      : route.continue(),
+  );
+
+  const sheet = await openFresh(page, kid.name);
+  await sheet.getByLabel("Name").fill(renamed);
+  await sheet.getByRole("button", { name: "Own endpoint" }).click();
+  await sheet.getByLabel("Endpoint URL").fill("https://strict.example.com/dns-query/kids");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  const open = page.getByRole("dialog", { name: `Edit ${renamed}` });
+  await expect(open.getByRole("alert")).toHaveText("That resolver did not answer.");
+
+  // Every field now reads as the sheet opened, but the saved name is the new one.
+  await open.getByLabel("Name").fill(kid.name);
+  await open.getByLabel("Endpoint URL").fill("");
+  await open.getByRole("button", { name: "Household default" }).click();
+  await expect(open.getByRole("button", { name: "Save" })).toBeEnabled();
+  await open.getByRole("button", { name: "Save" }).click();
+  await expect(open).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: kid.name, exact: true })).toBeVisible();
+  expect(groupWrites).toHaveLength(2);
+});

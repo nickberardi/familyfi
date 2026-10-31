@@ -48,8 +48,7 @@ export function GroupEditSheet({
 }) {
   const { store, busy, accounts } = useAppData();
   const lockedRole = roleLocked(group, accounts);
-  const [initial] = useState(() => groupEditSheetDraft(group));
-  const [draft, setDraft] = useState<GroupEditSheetDraft>(initial);
+  const [draft, setDraft] = useState<GroupEditSheetDraft>(() => groupEditSheetDraft(group));
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
   // Undefined while it loads, so the sheet never says "unavailable" before it has asked.
@@ -87,7 +86,10 @@ export function GroupEditSheet({
     };
   }, [opener]);
 
-  const dirty = (Object.keys(initial) as (keyof GroupEditSheetDraft)[]).some((key) => draft[key] !== initial[key]);
+  // Measured against the group as saved now, not as the sheet opened: after a save that only partly
+  // landed, putting a field back to how it was is still a change to send.
+  const saved = groupEditSheetDraft(group);
+  const dirty = (Object.keys(saved) as (keyof GroupEditSheetDraft)[]).some((key) => draft[key] !== saved[key]);
   const failure = () => store.getState().error || GROUP_RESOLVER_COPY.saveFailed;
 
   async function save() {
