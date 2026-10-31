@@ -371,3 +371,14 @@ input[type="search"]::-webkit-search-cancel-button {
 * {
   box-sizing: border-box;
 }
+
+/* A group's devices: name and kind, then the IP and MAC once there is room, then the chevron. */
+.ff-group-device-grid {
+  grid-template-columns: minmax(0, 1fr) 16px;
+}
+
+@media (min-width: 768px) {
+  .ff-group-device-grid {
+    grid-template-columns: minmax(0, 1fr) 130px 170px 16px;
+  }
+}

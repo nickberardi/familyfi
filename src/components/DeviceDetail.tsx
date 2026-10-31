@@ -45,7 +45,7 @@ export function DeviceDetailPage({
   return (
     <>
       <PageHeader title={DEVICES_COPY.title} sub={DEVICES_COPY.detailSubtitle} />
-      <div className="mx-auto flex max-w-[920px] flex-col gap-4 p-4 md:p-6">
+      <div className="flex max-w-[920px] flex-col gap-4 p-4 md:p-6">
         <Link href={fromGroup ? groupHref(fromGroup) : "/devices"} className="self-start text-[14px] text-[var(--ff-accent)]">
           ‹ {fromGroup ? fromGroup.name : "All devices"}
         </Link>

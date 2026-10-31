@@ -3,6 +3,7 @@ import {
   rulesNeedDevice,
   deleteGroupConfirm,
   groupEditBody,
+  groupDetailSub,
   groupEditDraft,
   monogramPlaceholder,
   newGroupBody,
@@ -72,5 +73,11 @@ describe("editing a group", () => {
 
   it("names an open card's Details link for its group", () => {
     expect(GROUP_CARD_COPY.detailsLabel("Sam")).toBe("Details for Sam");
+  });
+
+  it("heads a group's detail page with its role, or as a device group", () => {
+    expect(groupDetailSub(group({ familyRole: "teen" }))).toBe("Teen");
+    expect(groupDetailSub(group({ familyRole: null }))).toBe("Family member");
+    expect(groupDetailSub(group({ kind: "things", familyRole: null }))).toBe("Device group");
   });
 });
