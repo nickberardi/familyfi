@@ -762,7 +762,7 @@
           }
         ]
       },
-      "expected": "4 devices · 1 internet window"
+      "expected": "4 devices · off 9:30 PM–6:45 AM, Bedtime"
     },
     {
       "fn": "cardNoteLine",
@@ -809,7 +809,7 @@
           }
         ]
       },
-      "expected": "2 devices · 1 internet window"
+      "expected": "2 devices · off 10 PM–7 AM, Bedtime"
     },
     {
       "fn": "cardNoteLine",
@@ -941,7 +941,52 @@
           }
         ]
       },
-      "expected": "1 device · 1 internet window"
+      "expected": "1 device · off 9:30 PM–6:45 AM, Bedtime"
+    },
+    {
+      "fn": "cardNoteLine",
+      "name": "one window named by its rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Betsy",
+          "monogram": null,
+          "familyRole": "child",
+          "deviceCount": 1,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "dohOverrideUrl": null,
+          "access": "available",
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r1"
+          ]
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "start": "21:30",
+            "end": "06:45",
+            "ruleName": "School nights"
+          }
+        ]
+      },
+      "expected": "1 device · off 9:30 PM–6:45 AM, School nights"
     },
     {
       "fn": "cardNoteLine",
@@ -3018,7 +3063,7 @@
           }
         ]
       },
-      "expected": "4 devices · 2 internet windows"
+      "expected": "4 devices · 2 internet schedules"
     },
     {
       "fn": "cardNoteLine",

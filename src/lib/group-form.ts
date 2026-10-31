@@ -122,6 +122,60 @@ export function groupDetailSub(group: Pick<Group, "kind" | "familyRole">): strin
   return roleLabel(group.familyRole) || "Family member";
 }
 
+/** How a group's category checks reach DNS: the household's way, or its own DNS-over-HTTPS endpoint. */
+export type GroupDohMode = "default" | "custom";
+
+/** The Edit sheet's draft: the group's fields and its DNS-over-HTTPS choice. */
+export type GroupEditSheetDraft = GroupEditDraft & { doh: GroupDohMode; url: string };
+
+export function groupEditSheetDraft(group: Group): GroupEditSheetDraft {
+  const url = group.dohOverrideUrl ?? "";
+  return { ...groupEditDraft(group), doh: url ? "custom" : "default", url };
+}
+
+/** The Edit sheet's words, from the design's "Edit <name>" modal. */
+export const GROUP_EDIT_COPY = {
+  open: "Edit",
+  title: (name: string) => `Edit ${name}`,
+  doh: "DNS-over-HTTPS",
+  dohModes: [
+    { value: "default", label: "Household default" },
+    { value: "custom", label: "Own endpoint" },
+  ] as readonly { value: GroupDohMode; label: string }[],
+  url: "Endpoint URL",
+  urlPlaceholder: "https://dns.example.com/dns-query/profile",
+  demoLocked: "The demo shares one household, so its DNS settings stay as they are.",
+  delete: "Delete…",
+  cancel: "Cancel",
+  save: "Save",
+  saving: "Saving…",
+  saved: (name: string) => `${name} saved`,
+  errors: {
+    name: "Give it a name.",
+    urlMissing: "Paste an https:// endpoint, or use the household default.",
+    urlScheme: "The endpoint must start with https://",
+  },
+} as const;
+
+/** What stops the Edit sheet saving, in the design's words, or null when it may. */
+export function groupEditError(draft: Pick<GroupEditSheetDraft, "name" | "doh" | "url">): string | null {
+  if (!draft.name.trim()) return GROUP_EDIT_COPY.errors.name;
+  if (draft.doh !== "custom") return null;
+  const url = draft.url.trim();
+  if (!url) return GROUP_EDIT_COPY.errors.urlMissing;
+  if (!/^https:\/\/\S+/i.test(url)) return GROUP_EDIT_COPY.errors.urlScheme;
+  return null;
+}
+
+/** The resolver call a draft needs (`PUT` or `DELETE /groups/{id}/resolver`), if its DNS choice changed. */
+export type GroupResolverEdit = { kind: "none" } | { kind: "set"; url: string } | { kind: "clear" };
+
+export function groupResolverEdit(current: string | null | undefined, draft: Pick<GroupEditSheetDraft, "doh" | "url">): GroupResolverEdit {
+  if (draft.doh === "default") return current ? { kind: "clear" } : { kind: "none" };
+  const url = draft.url.trim();
+  return url && url !== current ? { kind: "set", url } : { kind: "none" };
+}
+
 /** What deleting a group does, before the person confirms it. */
 export function deleteGroupConfirm(group: Pick<Group, "name">) {
   return {

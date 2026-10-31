@@ -5,6 +5,10 @@ import {
   groupEditBody,
   groupDetailSub,
   groupEditDraft,
+  groupEditError,
+  groupEditSheetDraft,
+  groupResolverEdit,
+  GROUP_EDIT_COPY,
   monogramPlaceholder,
   newGroupBody,
   newGroupCopy,
@@ -79,5 +83,31 @@ describe("editing a group", () => {
     expect(groupDetailSub(group({ familyRole: "teen" }))).toBe("Teen");
     expect(groupDetailSub(group({ familyRole: null }))).toBe("Family member");
     expect(groupDetailSub(group({ kind: "things", familyRole: null }))).toBe("Device group");
+  });
+});
+
+describe("the Edit sheet", () => {
+  it("starts from the group, with its own endpoint shown in full", () => {
+    expect(groupEditSheetDraft(group({ dohOverrideUrl: null }))).toMatchObject({ name: "Sam", familyRole: "child", doh: "default", url: "" });
+    expect(groupEditSheetDraft(group({ dohOverrideUrl: "https://dns.nextdns.io/abc123" }))).toMatchObject({ doh: "custom", url: "https://dns.nextdns.io/abc123" });
+    expect(GROUP_EDIT_COPY.title("Sam")).toBe("Edit Sam");
+  });
+
+  it("names what stops a save, in the design's words", () => {
+    expect(groupEditError({ name: " ", doh: "default", url: "" })).toBe("Give it a name.");
+    expect(groupEditError({ name: "Sam", doh: "default", url: "anything" })).toBeNull();
+    expect(groupEditError({ name: "Sam", doh: "custom", url: "  " })).toBe("Paste an https:// endpoint, or use the household default.");
+    expect(groupEditError({ name: "Sam", doh: "custom", url: "http://dns.example.com" })).toBe("The endpoint must start with https://");
+    expect(groupEditError({ name: "Sam", doh: "custom", url: "https://" })).toBe("The endpoint must start with https://");
+    expect(groupEditError({ name: "Sam", doh: "custom", url: " https://dns.example.com/q " })).toBeNull();
+  });
+
+  it("sends a resolver call only when the DNS choice changed", () => {
+    const own = "https://dns.example.com/q";
+    expect(groupResolverEdit(null, { doh: "default", url: "" })).toEqual({ kind: "none" });
+    expect(groupResolverEdit(own, { doh: "default", url: own })).toEqual({ kind: "clear" });
+    expect(groupResolverEdit(null, { doh: "custom", url: ` ${own} ` })).toEqual({ kind: "set", url: own });
+    expect(groupResolverEdit(own, { doh: "custom", url: own })).toEqual({ kind: "none" });
+    expect(groupResolverEdit(own, { doh: "custom", url: "https://other.example.com/q" })).toEqual({ kind: "set", url: "https://other.example.com/q" });
   });
 });

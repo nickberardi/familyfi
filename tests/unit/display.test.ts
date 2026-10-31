@@ -43,8 +43,11 @@ describe("schedule copy", () => {
     expect(daysLabel([0, 3])).toBe("Sun, Wed");
   });
 
-  it("counts internet windows on the note line, or says there is no internet rule", () => {
-    expect(cardNoteLine(group(), [bedtime])).toBe("4 devices · 1 internet window");
+  it("names one internet window on the note line, counts several, or says there is no internet rule", () => {
+    expect(cardNoteLine(group(), [bedtime])).toBe("4 devices · off 9:30 PM–6:45 AM, Bedtime");
+    // A window without a name of its own goes by its rule's.
+    expect(cardNoteLine(group(), [{ ...bedtime, name: " ", ruleName: "School nights" }])).toBe("4 devices · off 9:30 PM–6:45 AM, School nights");
+    expect(cardNoteLine(group({ deviceCount: 1 }), [bedtime, { ...bedtime, name: "Homework", start: "15:00", end: "18:00" }])).toBe("1 device · 2 internet schedules");
     expect(cardNoteLine(group({ internetRuleIds: [] }), [])).toBe("4 devices · no internet rule");
     expect(cardNoteLine(group({ deviceCount: 0 }), [bedtime])).toBe("No devices · rules cannot apply on UniFi until you assign one");
   });
