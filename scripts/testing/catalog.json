@@ -872,6 +872,11 @@
         "devices"
       ]
     },
+    "tests/browser/smoke.spec.ts > a device's modal keeps its place on refresh and Done closes it": {
+      "categories": [
+        "devices"
+      ]
+    },
     "tests/browser/smoke.spec.ts > device assignment updates immediately": {
       "categories": [
         "devices"

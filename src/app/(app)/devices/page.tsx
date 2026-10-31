@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { DeviceLink } from "@/components/DeviceLink";
 import { useSearchParams } from "next/navigation";
 import { DeviceAssignSelect } from "@/components/DeviceAssign";
 import { deviceName } from "@/lib/device-assign";
@@ -135,7 +135,7 @@ function DevicesBody() {
                     key={device.mac}
                     className="ff-device-grid grid items-center gap-3.5 border-t border-[var(--ff-hairline)] px-[18px] py-2.5 hover:bg-[var(--ff-field-soft)]"
                   >
-                    <Link href={`/devices/${encodeURIComponent(device.mac)}`} className="flex min-w-0 items-center gap-2.5">
+                    <DeviceLink device={device} className="flex min-w-0 items-center gap-2.5">
                       <DeviceMark hostname={device.hostname} />
                       <DeviceIdentity
                         device={device}
@@ -154,7 +154,7 @@ function DevicesBody() {
                           )
                         }
                       />
-                    </Link>
+                    </DeviceLink>
                     <div className="hidden min-w-0 truncate font-mono text-[14px] text-[var(--ff-muted)] xl:block">
                       {device.ip ?? "—"}
                     </div>

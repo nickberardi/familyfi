@@ -99,3 +99,15 @@ export function deviceHref(device: Pick<Device, "mac">, fromGroupId?: string): s
   const path = `/devices/${encodeURIComponent(device.mac)}`;
   return fromGroupId ? `${path}?from=${encodeURIComponent(fromGroupId)}` : path;
 }
+
+/** The search param that opens a device's modal over the current page on a wide screen. */
+export const DEVICE_MODAL_PARAM = "device";
+
+/** The current page's query with the device modal opened on `mac`, or closed when `mac` is null. */
+export function deviceModalSearch(search: string, mac: string | null): string {
+  const params = new URLSearchParams(search);
+  if (mac) params.set(DEVICE_MODAL_PARAM, mac);
+  else params.delete(DEVICE_MODAL_PARAM);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}

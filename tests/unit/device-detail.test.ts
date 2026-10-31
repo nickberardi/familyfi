@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deviceDetail, deviceHref, groupHref, presenceTone } from "@/lib/device-detail";
+import { deviceDetail, deviceHref, deviceModalSearch, groupHref, presenceTone } from "@/lib/device-detail";
 import { formatLogWhen } from "@/lib/sync-copy";
 import type { Device, Group } from "@/lib/types";
 
@@ -83,5 +83,18 @@ describe("a device's detail", () => {
     expect(groupHref({ id: "g2", kind: "things" })).toBe("/things/g2");
     expect(deviceHref({ mac: "02:00:00:00:00:0a" })).toBe("/devices/02%3A00%3A00%3A00%3A00%3A0a");
     expect(deviceHref({ mac: "02:00:00:00:00:0a" }, "g1")).toBe("/devices/02%3A00%3A00%3A00%3A00%3A0a?from=g1");
+  });
+});
+
+describe("deviceModalSearch", () => {
+  it("opens the modal alongside the page's own query", () => {
+    expect(deviceModalSearch("", "02:00:00:00:00:0a")).toBe("?device=02%3A00%3A00%3A00%3A00%3A0a");
+    expect(deviceModalSearch("?assign=g1", "aa:bb")).toBe("?assign=g1&device=aa%3Abb");
+    expect(deviceModalSearch("?device=old", "aa:bb")).toBe("?device=aa%3Abb");
+  });
+
+  it("closes it and keeps the rest of the query", () => {
+    expect(deviceModalSearch("?device=aa%3Abb", null)).toBe("");
+    expect(deviceModalSearch("?private=1&device=aa%3Abb", null)).toBe("?private=1");
   });
 });

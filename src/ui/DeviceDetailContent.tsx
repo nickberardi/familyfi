@@ -11,50 +11,77 @@ import { useWide } from "./use-wide";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
-/** A device's detail: its presence at a glance, then its Device and Connection sections, side by side when wide. */
+/**
+ * A device's detail: its presence at a glance, then its Device and Connection sections, side by side when wide.
+ * `compact` is the web's device modal: the modal's title carries the name, and the sections drop their cards.
+ */
 export function DeviceDetailContent({
   device,
   group,
   networks,
   timezone,
   now,
+  compact = false,
 }: {
   device: Device;
   group: Group | null | undefined;
   networks: { id: string; name: string; vlanId: number }[];
   timezone: string;
   now: Date;
+  compact?: boolean;
 }) {
   const ui = useUI();
   const wide = useWide();
   const detail = deviceDetail(device, group, networks, timezone, now);
   const tone = presenceTone(detail.presence);
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
+  const pill = (
+    <View style={[styles.pill, compact && styles.compactPill, { backgroundColor: ui.color(tone.fill) }]} testID="device-presence">
+      <View aria-hidden style={[styles.dot, { backgroundColor: ui.color(tone.ink) }]} />
+      <Text style={[styles.pillText, { fontFamily: ui.font, color: ui.color(tone.ink) }]}>{detail.status}</Text>
+    </View>
+  );
   return (
     <View style={styles.stack} testID="device-detail">
-      <View style={[styles.header, card]}>
-        <DeviceMark hostname={device.hostname} size="detail" />
-        <View style={styles.headerWords}>
-          <View style={styles.titleRow}>
-            <Text role="heading" aria-level={2} style={[styles.name, { fontFamily: ui.font, color: ui.color("ink") }]}>
-              {detail.name}
-            </Text>
-            <View style={[styles.pill, { backgroundColor: ui.color(tone.fill) }]} testID="device-presence">
-              <View aria-hidden style={[styles.dot, { backgroundColor: ui.color(tone.ink) }]} />
-              <Text style={[styles.pillText, { fontFamily: ui.font, color: ui.color(tone.ink) }]}>{detail.status}</Text>
-            </View>
+      {compact ? (
+        <View style={styles.compactHeader}>
+          <DeviceMark hostname={device.hostname} size="detail" />
+          <View style={styles.compactWords}>
+            {pill}
+            <Text style={[styles.body, { fontFamily: ui.font, color: ui.color("muted") }]}>{detail.summary}</Text>
           </View>
-          <Text style={[styles.body, styles.summary, { fontFamily: ui.font, color: ui.color("muted") }]}>{detail.summary}</Text>
         </View>
-      </View>
-      <View style={wide ? styles.columns : styles.stack}>
+      ) : (
+        <View style={[styles.header, card]}>
+          <DeviceMark hostname={device.hostname} size="detail" />
+          <View style={styles.headerWords}>
+            <View style={styles.titleRow}>
+              <Text role="heading" aria-level={2} style={[styles.name, { fontFamily: ui.font, color: ui.color("ink") }]}>
+                {detail.name}
+              </Text>
+              {pill}
+            </View>
+            <Text style={[styles.body, styles.summary, { fontFamily: ui.font, color: ui.color("muted") }]}>{detail.summary}</Text>
+          </View>
+        </View>
+      )}
+      <View style={wide ? (compact ? styles.compactColumns : styles.columns) : styles.stack}>
         {detail.sections.map((section) => (
-          <View key={section.title} role="region" aria-label={section.title} style={[styles.section, card, wide && styles.column]}>
-            <Text role="heading" aria-level={3} style={[styles.body, styles.sectionTitle, { fontFamily: ui.font, color: ui.color("ink") }]}>
+          <View
+            key={section.title}
+            role="region"
+            aria-label={section.title}
+            style={[compact ? styles.compactSection : [styles.section, card], wide && styles.column]}
+          >
+            <Text
+              role="heading"
+              aria-level={3}
+              style={[styles.body, compact ? styles.compactSectionTitle : styles.sectionTitle, { fontFamily: ui.font, color: ui.color("ink") }]}
+            >
               {section.title}
             </Text>
             {section.rows.map((row) => (
-              <Row key={row.label} row={row} />
+              <Row key={row.label} row={row} compact={compact} />
             ))}
           </View>
         ))}
@@ -63,11 +90,13 @@ export function DeviceDetailContent({
   );
 }
 
-function Row({ row }: { row: DeviceDetailRow }) {
+function Row({ row, compact }: { row: DeviceDetailRow; compact: boolean }) {
   const ui = useUI();
-  const value = [styles.body, styles.value, { fontFamily: row.mono ? MONO : ui.font, color: ui.color(row.group ? "accent" : "ink") }];
+  // In the modal's narrower columns an address keeps to one line, a size down, as the design sets it.
+  const keepWhole = compact && row.mono;
+  const value = [styles.body, styles.value, keepWhole && styles.whole, { fontFamily: row.mono ? MONO : ui.font, color: ui.color(row.group ? "accent" : "ink") }];
   return (
-    <View style={[styles.row, { borderTopColor: ui.color("hairline") }]}>
+    <View style={[styles.row, compact && styles.compactRow, { borderTopColor: ui.color("hairline") }]}>
       <Text style={[styles.body, styles.label, { fontFamily: ui.font, color: ui.color("muted") }]}>{row.label}</Text>
       {row.group ? (
         <ui.Link href={groupHref(row.group)}>
@@ -99,5 +128,13 @@ const styles = StyleSheet.create({
   sectionTitle: { paddingVertical: 14, fontWeight: "600" },
   row: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16, minHeight: 44, borderTopWidth: 1, paddingVertical: 11 },
   label: { flexShrink: 0 },
+  compactHeader: { flexDirection: "row", alignItems: "center", gap: 14 },
+  compactWords: { flex: 1, minWidth: 0, alignItems: "flex-start", gap: 4 },
+  compactPill: { paddingVertical: 0 },
+  compactColumns: { flexDirection: "row", alignItems: "flex-start", gap: 20 },
+  compactSection: { minWidth: 0 },
+  compactSectionTitle: { marginBottom: 4, fontWeight: "600" },
+  whole: { flexShrink: 0, fontSize: 13 },
+  compactRow: { minHeight: 0, gap: 10, paddingVertical: 6 },
   value: { flexShrink: 1, minWidth: 0, textAlign: "right" },
 });

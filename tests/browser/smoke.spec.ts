@@ -565,13 +565,44 @@ test("a device opened from its group returns to that group", async ({ page }) =>
   expect(device, "the mock household has an assigned device").toBeTruthy();
   const group = groups.find((item) => item.id === device!.groupId)!;
   const groupPath = `/${group.kind}/${group.id}`;
+  const mac = encodeURIComponent(device!.mac);
 
   await page.goto(groupPath);
-  await page.locator(`a[href^="/devices/${encodeURIComponent(device!.mac)}?from="]`).click();
-  await expect(page.getByRole("link", { name: `‹ ${group.name}` })).toHaveAttribute("href", groupPath);
+  await page.locator(`a[href^="/devices/${mac}?from="]`).click();
+  if (test.info().project.name === "phone") {
+    // A phone opens the device's page, whose way back is the group.
+    await expect(page.getByRole("link", { name: `‹ ${group.name}` })).toHaveAttribute("href", groupPath);
+  } else {
+    // A wide screen opens it over the group, and Back closes it there.
+    await expect(page.getByRole("dialog")).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe(groupPath);
+    await page.goBack();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`${groupPath}$`));
+  }
 
-  await page.goto(`/devices/${encodeURIComponent(device!.mac)}`);
+  await page.goto(`/devices/${mac}`);
   await expect(page.getByRole("link", { name: "‹ All devices" })).toHaveAttribute("href", "/devices");
+});
+
+test("a device's modal keeps its place on refresh and Done closes it", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/devices");
+  const link = page.locator('a[href^="/devices/"]').first();
+  await link.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/devices\?device=/);
+
+  await page.reload();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("region", { name: "Device" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/devices$/);
+
+  // The link itself is still the device's page, for a new tab or a phone.
+  await expect(link).toHaveAttribute("href", /^\/devices\/[^/?]+$/);
 });
 
 test("device assignment updates immediately", { tag: "@desktop" }, async ({ page }) => {
@@ -604,17 +635,20 @@ test("device identity opens readable connection details", async ({ page }) => {
   const link = page.locator('a[href^="/devices/"]').first();
   await expect(link).toBeVisible();
   await link.click();
-  await expect(page).toHaveURL(/\/devices\/[^/]+$/);
-  const identity = page.getByRole("region", { name: "Device" });
-  const connection = page.getByRole("region", { name: "Connection" });
+  const phone = test.info().project.name === "phone";
+  // A phone opens the device's page; a wide screen opens its modal over the list.
+  await expect(page).toHaveURL(phone ? /\/devices\/[^/]+$/ : /\/devices\?device=[^&]+$/);
+  const scope = phone ? page.locator("body") : page.getByRole("dialog");
+  const identity = scope.getByRole("region", { name: "Device" });
+  const connection = scope.getByRole("region", { name: "Connection" });
   await expect(identity).toBeVisible();
   await expect(connection).toBeVisible();
-  await expect(page.getByText("MAC address")).toBeVisible();
-  await expect(page.getByText("Checked", { exact: true })).toBeVisible();
+  await expect(scope.getByText("MAC address")).toBeVisible();
+  await expect(scope.getByText("Checked", { exact: true })).toBeVisible();
   const first = await identity.boundingBox();
   const second = await connection.boundingBox();
   expect(first && second).toBeTruthy();
-  if (test.info().project.name === "phone") {
+  if (phone) {
     expect(second!.y).toBeGreaterThan(first!.y + first!.height - 2);
   } else {
     expect(Math.abs(second!.y - first!.y)).toBeLessThan(2);
