@@ -57,9 +57,7 @@ export function RuleCard({
             <Text role="heading" aria-level={2} style={[text(ui.font, 16, 24), styles.name, { color: ui.color("ink") }]}>
               {rule.name}
             </Text>
-            {rule.builtIn ? (
-              <Text style={[text(ui.font, 14, 20), styles.builtIn, { color: ui.color("ink-2"), backgroundColor: ui.color("field") }]}>{COPY.builtIn}</Text>
-            ) : null}
+            {rule.builtIn ? <BuiltInTag /> : null}
           </View>
           <Text style={[text(ui.font, 14, 21), styles.blocks, { color: ui.color("ink-2") }]}>{ruleBlocksLabel(rule, catalogNames)}</Text>
         </ui.Link>
@@ -250,9 +248,12 @@ export function RuleCardSummary({ rule, timezone, now }: { rule: Rule; timezone:
         <RuleMark rule={rule} size={44} />
       </View>
       <View style={styles.value}>
-        <Text role="heading" aria-level={2} numberOfLines={1} style={[text(ui.font, 19, 26), styles.title, { color: ui.color("ink") }]}>
-          {rule.name}
-        </Text>
+        <View style={styles.summaryName}>
+          <Text role="heading" aria-level={2} numberOfLines={1} style={[text(ui.font, 19, 26), styles.title, styles.shrink, { color: ui.color("ink") }]}>
+            {rule.name}
+          </Text>
+          {rule.builtIn ? <BuiltInTag /> : null}
+        </View>
         <View style={styles.status}>
           <View style={[styles.dot, { backgroundColor: tone }]} />
           <Text numberOfLines={1} style={[text(ui.font, 14, 21), styles.shrink, { color: tone }]}>
@@ -264,6 +265,12 @@ export function RuleCardSummary({ rule, timezone, now }: { rule: Rule; timezone:
   );
 }
 
+/** Tags a built-in rule (quarantine, Lock DNS, Block countries) beside its name. */
+function BuiltInTag() {
+  const ui = useUI();
+  return <Text style={[text(ui.font, 14, 20), styles.builtIn, { color: ui.color("ink-2"), backgroundColor: ui.color("field") }]}>{COPY.builtIn}</Text>;
+}
+
 function text(font: string | undefined, size: number, lineHeight: number) {
   return { fontFamily: font, fontSize: size, lineHeight };
 }
@@ -273,8 +280,9 @@ const styles = StyleSheet.create({
   faded: { opacity: 0.4 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, paddingBottom: 12 },
   nameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  summaryName: { flexDirection: "row", alignItems: "center", gap: 8 },
   name: { margin: 0, fontWeight: "600", letterSpacing: -0.4 },
-  builtIn: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, fontWeight: "600", overflow: "hidden" },
+  builtIn: { flexShrink: 0, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, fontWeight: "600", overflow: "hidden" },
   blocks: { marginTop: 2 },
   lead: { marginBottom: 10 },
   schedule: { paddingHorizontal: 16, paddingBottom: 16 },
