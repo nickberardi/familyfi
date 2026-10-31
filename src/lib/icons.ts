@@ -1,10 +1,9 @@
 /**
  * The closed set of Phosphor glyph names the product may draw.
  *
- * FamilyFi's own iconography is typographic and geometric — monograms inside `Mark`,
- * the bordered shapes in `src/ui/CategoryGlyph.tsx`, chevrons — and that covers everything the product
- * invented. It does not cover the things the world already named: a phone, a printer,
- * a television, a settings gear. Those come from Phosphor Regular, imported once in
+ * FamilyFi's own iconography is typographic — monograms inside `Mark`, chevrons — and
+ * that covers everything the product invented. It does not cover the things the world
+ * already named: a phone, a printer, a television, a settings gear, a category. Those come from Phosphor Regular, imported once in
  * `src/app/layout.tsx` and served from this deployment rather than a CDN.
  *
  * A union rather than a string, because a Phosphor glyph that does not exist renders as
