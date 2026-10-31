@@ -39,7 +39,7 @@ test("a group can take its own resolver and hand it back", { tag: "@desktop" }, 
   }
   await expect(card.getByText(/Uses the household's DNS-over-HTTPS override/i)).toBeVisible();
 
-  await card.getByRole("button", { name: "Override for this member" }).click();
+  await card.getByRole("button", { name: "Override for this group" }).click();
   await page
     .getByLabel(`DNS-over-HTTPS endpoint for ${kid.name}`)
     .fill("https://strict.example.com/dns-query/kids");
@@ -62,7 +62,7 @@ test("a bad endpoint is refused with a reason", { tag: "@desktop" }, async ({ pa
   if (await card.getByRole("button", { name: "Remove override" }).count()) {
     await card.getByRole("button", { name: "Remove override" }).click();
   }
-  await card.getByRole("button", { name: "Override for this member" }).click();
+  await card.getByRole("button", { name: "Override for this group" }).click();
   await page.getByLabel(`DNS-over-HTTPS endpoint for ${kid.name}`).fill("http://dns.example.com/q");
   await card.getByRole("button", { name: "Save endpoint" }).click();
 
