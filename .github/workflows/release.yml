@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   on-main:
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
     timeout-minutes: 10
     outputs:
       published: ${{ steps.local.outputs.published }}
@@ -137,7 +137,7 @@ jobs:
   # Every release lands on :next as a Pre-release; only promote.yml moves :latest and :X.Y.
   manifest:
     needs: ghcr
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
     timeout-minutes: 10
     outputs:
       full: ${{ steps.full.outputs.full }}
