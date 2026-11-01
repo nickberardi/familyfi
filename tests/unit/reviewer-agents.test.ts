@@ -57,8 +57,12 @@ describe("subagents (AGENTS.md)", () => {
     expect(codex.instructions).toBe(claude.instructions);
   });
 
-  it.each(agents)("keeps the Codex %s read-only", (name) => {
-    expect(codexAgent(name).sandbox).toBe("read-only");
+  // Codex ignores `sandbox_mode` in a custom agent file: an agent inherits the parent session's
+  // sandbox, so only its instructions keep it from editing. A `sandbox_mode` line would read as
+  // a guarantee it is not.
+  it.each(agents)("keeps the Codex %s read-only by its instructions, not a sandbox_mode it ignores", (name) => {
+    expect(codexAgent(name).sandbox).toBeUndefined();
+    expect(codexAgent(name).instructions).toMatch(/never edit|do not modify/i);
   });
 
   it.each(["bug-hunter", "crash-hunter"])("keeps the Claude %s in plan mode", (name) => {
