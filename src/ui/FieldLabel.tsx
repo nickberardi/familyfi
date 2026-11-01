@@ -10,5 +10,5 @@ import { useUI } from "./UIContext";
  */
 export function FieldLabel({ children }: { children: string }) {
   const ui = useUI();
-  return <Text aria-hidden style={{ fontFamily: ui.font, fontSize: 12, lineHeight: 18, fontWeight: "600", marginBottom: 6, color: ui.color("ink-3") }}>{children}</Text>;
+  return <Text aria-hidden style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, fontWeight: "600", marginBottom: 6, color: ui.color("ink-3") }}>{children}</Text>;
 }

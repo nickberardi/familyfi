@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 /**
  * The web's one dialog frame: scrim, card, focus kept inside, Escape and a click on the scrim
@@ -41,6 +41,9 @@ export function Modal({
 }) {
   const card = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
+  // Read while rendering: React applies a child's autoFocus before any effect runs, so by then
+  // the focused element is already inside the dialog.
+  const [opener] = useState(() => (typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null));
   useEffect(() => {
     close.current = onClose;
   });
@@ -48,7 +51,6 @@ export function Modal({
   useEffect(() => {
     const self = {};
     open.push(self);
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const root = card.current;
     // A field the content focused itself keeps focus; otherwise the dialog takes it, so Tab starts inside.
     if (root && !root.contains(document.activeElement)) root.focus();
@@ -63,7 +65,7 @@ export function Modal({
       open.splice(open.indexOf(self), 1);
       if (opener?.isConnected) opener.focus();
     };
-  }, []);
+  }, [opener]);
 
   /** Tab and Shift+Tab cycle within the dialog, so the page behind the scrim can't be reached from the keyboard. */
   function keepFocusInside(event: KeyboardEvent<HTMLDivElement>) {

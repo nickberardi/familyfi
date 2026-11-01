@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
 import { api } from "@/lib/api";
 import { BACKUP_COPY as COPY, importSummaryLines } from "@/lib/backup-copy";
 import type { ImportSummary } from "@/lib/types";
 
-const BUTTON = "rounded-lg px-3.5 py-2 text-[14px] font-semibold disabled:opacity-40";
 
 function upload(file: File, mode: "preview" | "apply") {
   return api<{ summary: ImportSummary }>(`/api/v1/settings/import?mode=${mode}`, {
@@ -77,7 +77,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
         <button
           type="button"
           disabled={busy !== ""}
-          className={`${BUTTON} border border-[var(--ff-line)] text-[var(--ff-ink)]`}
+          className={SECONDARY_BUTTON}
           onClick={() => input.current?.click()}
         >
           {busy === "reading" ? COPY.reading : COPY.choose}
@@ -94,7 +94,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
             <button
               type="button"
               disabled={busy !== ""}
-              className={`${BUTTON} bg-[var(--ff-danger)] text-[var(--ff-ink-on-fill)]`}
+              className={DESTRUCTIVE_BUTTON}
               onClick={() => void apply()}
               data-testid="backup-apply"
             >
@@ -103,7 +103,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
             <button
               type="button"
               disabled={busy !== ""}
-              className={`${BUTTON} border border-[var(--ff-line)] text-[var(--ff-muted)]`}
+              className={CANCEL_BUTTON}
               onClick={() => {
                 setPreview(null);
                 setFile(null);

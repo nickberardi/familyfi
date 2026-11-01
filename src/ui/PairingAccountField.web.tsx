@@ -19,7 +19,7 @@ export function PairingAccountField({
       {label}
       <select
         data-testid="pairing-account"
-        className="mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]"
+        className="ff-input mt-1 font-normal"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >

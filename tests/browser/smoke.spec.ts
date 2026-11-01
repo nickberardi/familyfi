@@ -427,6 +427,8 @@ test("removing an adult's admin access asks first, and declining changes nothing
   await expect(admin).toBeVisible();
   await admin.click();
   expect(await answerConfirm(page, false)).toMatch(/admin/i);
+  // The confirm hands focus back to the control that asked.
+  await expect(admin).toBeFocused();
   await expect(admin).toHaveAttribute("aria-pressed", "true");
   expect(writes).toEqual([]);
 });

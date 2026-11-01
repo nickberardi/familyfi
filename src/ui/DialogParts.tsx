@@ -34,8 +34,8 @@ export type DialogAction = {
 /**
  * Cancel on the left of the actions, right-aligned, the main action right-most. Three buttons
  * don't fit a 400px dialog or a phone, so with more than one action the footer stacks
- * full-width buttons, the main action on top and Cancel last. `leading` sits on the far left:
- * an Edit sheet's "Delete…".
+ * full-width buttons, the main action on top and Cancel last. `leading` sits on the far left,
+ * or above a stacked footer: an Edit sheet's "Delete…".
  */
 export function DialogFooter({
   cancelLabel = "Cancel",
@@ -55,6 +55,7 @@ export function DialogFooter({
   if (actions.length > 1) {
     return (
       <View style={[styles.footer, styles.stacked]}>
+        {leading ? <View style={styles.stackedLeading}>{leading}</View> : null}
         {[...actions].reverse().map((action) => (
           <Button key={action.label} size="md" grow kind={action.kind ?? "primary"} label={action.label} onPress={action.onPress} disabled={action.disabled} busy={action.busy} testID={action.testID} />
         ))}
@@ -81,4 +82,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" },
   stacked: { flexDirection: "column", alignItems: "stretch" },
   leading: { marginRight: "auto" },
+  stackedLeading: { alignSelf: "flex-start" },
 });
