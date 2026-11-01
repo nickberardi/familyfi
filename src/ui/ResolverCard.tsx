@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 
 import type { ApiRequest } from "@/lib/api-client";
 import { resolverScheduleLine, toggleProbeDay, type UpstreamResolverSettings } from "@/lib/upstream";
 import { CATEGORIES_COPY, canSaveResolverUrl, clearResolver, saveResolverUrl, updateResolver } from "@/lib/upstream-writes";
 
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { Button } from "./Button";
+import { useUI } from "./UIContext";
 
 const COPY = CATEGORIES_COPY.resolver;
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
@@ -75,29 +76,6 @@ export function ResolverCard({
     );
   }
 
-  const button = (label: string, tone: string, onPress: () => void, options: { disabled?: boolean; testID?: string; filled?: boolean } = {}) => {
-    const disabled = options.disabled ?? false;
-    return (
-      <Pressable
-        role="button"
-        aria-disabled={disabled}
-        disabled={disabled}
-        onPress={onPress}
-        testID={options.testID}
-        style={({ pressed }) => [
-          styles.button,
-          options.filled
-            ? { backgroundColor: ui.color(canSave ? "accent" : "field-strong"), paddingVertical: 8, paddingHorizontal: 14 }
-            : { borderWidth: 1, borderColor: ui.color("control-line") },
-          disabled && !options.filled && { opacity: 0.4 },
-          pressed && !disabled && { opacity: PRESS_OPACITY },
-        ]}
-      >
-        <Text style={[small(options.filled ? 13 : 12.5, 18.75, tone), styles.bold]}>{label}</Text>
-      </Pressable>
-    );
-  };
-
   return (
     <View
       role="region"
@@ -163,23 +141,24 @@ export function ResolverCard({
           <View style={styles.paste}>
             <ui.TextField label={COPY.endpoint} value={url} onChange={setUrl} placeholder={COPY.placeholder} onSubmit={save} url disabled={!enabled} testID="resolver-url" />
             <View style={styles.buttons}>
-              {button(COPY.save, canSave ? "ink-on-fill" : "locked", save, { disabled: !canSave, filled: true, testID: "resolver-save" })}
-              {button(
-                COPY.cancel,
-                "ink-3",
-                () => {
+              <Button
+                kind="cancel"
+                size="md"
+                label={COPY.cancel}
+                onPress={() => {
                   setPasting(false);
                   setUrl("");
                   setError("");
-                },
-                { testID: "resolver-cancel" },
-              )}
+                }}
+                testID="resolver-cancel"
+              />
+              <Button kind="primary" size="md" label={COPY.save} onPress={save} disabled={!canSave} busy={busy} testID="resolver-save" />
             </View>
           </View>
         ) : (
           <View style={[styles.buttons, styles.actions]}>
-            {button(resolver?.url ? COPY.replace : COPY.add, "accent", () => setPasting(true), { disabled: !enabled, testID: "resolver-paste" })}
-            {resolver?.url ? button(COPY.remove, "danger", () => void remove(), { disabled: off, testID: "resolver-remove" }) : null}
+            <Button kind="secondary" size="md" label={resolver?.url ? COPY.replace : COPY.add} onPress={() => setPasting(true)} disabled={!enabled} testID="resolver-paste" />
+            {resolver?.url ? <Button kind="destructive" size="md" label={COPY.remove} onPress={() => void remove()} disabled={off} testID="resolver-remove" /> : null}
           </View>
         )}
 
@@ -204,7 +183,6 @@ const styles = StyleSheet.create({
   paste: { marginTop: 12, gap: 8 },
   buttons: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   actions: { marginTop: 12 },
-  button: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   bold: { fontWeight: "600" },
   error: { marginTop: 8 },
 });
