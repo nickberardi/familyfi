@@ -2,7 +2,7 @@
 
 One Next.js App Router application serves the UI and `/api/v1`. All UniFi calls are server-side.
 Read the system map, ownership, key flows and feature map first; the remaining sections explain
-enforcement and DNS details. [Development conventions](development.md) owns design and coding
+enforcement and DNS details. [Design system](design.md) owns design rules and [development conventions](development.md) coding
 rules; [API guidance](api.md) owns the shared client contract.
 
 ## System map

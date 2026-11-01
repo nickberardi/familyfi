@@ -6,7 +6,7 @@ This is the FamilyFi design system as the code carries it out, for the web here 
 
 The design system is the claude.ai/design project **FamilyFi Design System** (`e4b1fda4-6b5f-44f2-a103-d851f0d4051f`, <https://claude.ai/design/p/e4b1fda4-6b5f-44f2-a103-d851f0d4051f>). Its `readme.md`, `SKILL.md`, `guidelines/`, `tokens/` and component notes are the source for look, voice and component behaviour. This file is the repository's copy of those rules, with each one tied to the code that carries it out, so that agents, CI and contributors without access to the project can check a change against it.
 
-- **Last synced:** 2026-11-01, from the project's `readme.md`, `SKILL.md`, `guidelines/rules-model.md`, `guidelines/card-stack-motion.md` and `tokens/`.
+- **Last synced:** 2026-11-01, from the project's `readme.md`, `SKILL.md`, `github.md`, `guidelines/rules-model.md`, `guidelines/card-stack-motion.md` and `tokens/`. The project keeps its own sync log in its `github.md`.
 - **Keeping the two matched** is the [design-sync skill](../.agents/skills/design-sync/SKILL.md): it pulls the project into this file, and turns a design decision made in a pull request into a change for the project. A UI decision is not finished until both agree.
 - **Who wins.** The project decides how FamilyFi looks and reads. This repository decides how it is built: file locations, token names, font and icon delivery, tests, and the [invariants](../AGENTS.md#invariants). Where the code and the project disagree on a look and neither has been decided, it is listed under [Open differences](#open-differences) for the operator; never settle it silently in either direction.
 - **Review.** Before a pull request that changes UI, the `design-reviewer` subagent (`.claude/agents/design-reviewer.md`, `.codex/agents/design-reviewer.toml`) checks the diff against this file. See [Pull requests](../AGENTS.md#pull-requests).
@@ -31,7 +31,7 @@ Record deliberate web choices here and native choices there, with links rather t
 ## Non-negotiables
 
 - **Never restyle a verdict.** See [Colour](#colour).
-- **Accent blue is interaction only**, never state and never a verdict. Nothing clickable takes the brand cyan.
+- **Accent blue is interaction only**, never a verdict. Its one use as state is the internet rule: its band on the day timeline and its Internet mark. Nothing clickable takes the brand cyan.
 - **Everything sits on a card.** Hairlines do a shadow's job; only sheets, toasts, switch knobs and the phone's card stack lift.
 - **14px is the floor** for anything a person reads. The one exception is the 10 / 9 caption and state word under a `Mark` (the logo tagline is artwork).
 - **Voice:** second person, sentence case, no exclamation, no emoji. Destructive copy states the consequence in one sentence before the button.
@@ -65,7 +65,7 @@ The Devices list leads with the observed connection status and links each identi
 **Size ramp:** 26 stat · 21 page title · 17 object title on web, 19 on phone (group card, rule card, `EditorSection`) · 17 sheet and dialog title · 16 input and phone action · 15 sidebar wordmark · **14 body, the floor**. Labels, chips, segmented controls, the On/Off pill, time fields, day letters, section labels, tags, notes, table headers and the write-preview verbs are all 14px. Only the `Mark` caption (10px) and its state word (9px) are smaller.
 
 - **Card titles have two tiers.** Panel headers on settings-style cards (Settings, Pair Device, Resolver, Updates, Diagnostics, Checkup) are 14px/600. Object and section titles (group card, rule card, `EditorSection`) are 17px/600 on web and 19px on phone.
-- Weights are 400, 500, 600 and 700. Titles and monograms track at -0.01em. Body leading on 14px copy is 20px.
+- Weights are 400, 500, 600 and 700. Titles and monograms track at -0.01em. Body leading on 14px copy is 20px in the project; shared `Text` uses 1.5× its size (see [Open differences](#open-differences)).
 - **Numbers and identifiers are mono:** MAC addresses, IPs, policy names, endpoints, timestamps, console IDs. A placeholder for a missing value ("—", "No key saved") is not mono.
 
 ## Colour
@@ -150,7 +150,7 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 - **Card** (`Card` in `src/components/ui/Controls.tsx`) is the white ground with a hairline border (`--ff-hairline-card`). `padded` for content, unpadded for flush row lists.
 - **CardFoot** (`src/ui/CardFoot.tsx`) is the one foot for the group card and the rule card: the state line on its own row, then a row of outlined buttons (white, hairline-card border, radius 9, 14px semibold, ink text). The strong action (Resume, Unblock) stays a filled primary. Edit sits left on its own; the other actions sit right, the primary right-most. At large text (font scale 1.35 and up) the buttons stack. "More time" is a button here, and a text link only when it hangs off a header state line. `ActionRow` is retired.
 - **GroupCard** (`src/components/GroupCard.tsx`, with `src/ui/GroupCard*.tsx` and `ExpandingGroupCard.tsx`) opens and closes. Closed: identity, caret, Internet mark, divider, one fitted line of categories. Open: the group's one button (Block, Unblock or Resume) in the corner, today's schedule, categories, app rules, then a `CardFoot` with "Details" left and "Show less" / "Show more" right.
-- **Card marks** (`src/ui/InternetMark.tsx`, `src/ui/CategoryMarks.tsx`, `src/ui/GroupCardMarks.tsx`). The Internet mark is a 34px rounded tile: On, Blocked, Off (the group's internet rule is switched off) or No rule (only when it has none). The More and "Block an app" marks are dashed.
+- **Card marks** (`src/ui/InternetMark.tsx`, `src/ui/CategoryMarks.tsx`, `src/ui/GroupCardMarks.tsx`). The Internet mark is a 34px rounded tile with a state word (its words are an [open difference](#open-differences)); "No rule" only when the group has none. The More and "Block an app" marks are dashed.
 - **SectionLabel** (`SectionLabel` in `src/ui/CategoryMarks.tsx` for shared components, and a web copy in `src/components/FilterMarks.tsx`) is 14px, 600, `--ff-ink-2`, sentence case: group card sections, table headers, Sync stat tiles, release notes, Running / Newest, Checkup heads, "How to fix".
 - **Tag** (`src/ui/Tag.tsx`) is a grey square, sentence case, 14px: "Built-in", "Experimental". "Private" on a device is not a Tag; it stays the orange warning icon and word.
 - **Day timeline** (the project's `ScheduleBar`; `src/ui/DayTimeline.tsx`, inside `src/ui/GroupSchedule.tsx`) is the 24-hour strip: every rule on one bar (internet in accent, others in `--ff-schedule-1…5`), the orange hairline is now, 14px hour labels (12 AM, 6 AM, Noon, 6 PM).
@@ -170,7 +170,7 @@ The product writes like a careful sysadmin explaining something to their spouse:
 - **Plain household pages.** Family, Things, Rules, Devices, Categories, Checkup, the rule editor and its write preview, and every sheet use plain words and keep "gateway". "UniFi policy", "reconcile", "desired state" and "DPI" appear only on Sync and Diagnostics. The sync button is "Sync now" / "Syncing…".
 - **Rule, not schedule.** "Rule" is the noun for what a household makes; "schedule" is only the time view: "+ Add a rule", "Pause or change rules →", "Edit rule and schedule". Header buttons say "New X" and match their sheet's title. Apps are blocked with "Block an app".
 - **Lists** read "A, B and C", with no "only": "YouTube, Roblox and TikTok · everything else stays on".
-- **Status lines.** "Online · no internet rule" only when the group really has none (its device line is then just the count, "4 devices"); "Online · internet rule off"; "Online · internet rule paused for everyone until <time>".
+- **Status lines** (the code's are an [open difference](#open-differences)). "Online · no internet rule" only when the group really has none (its device line is then just the count, "4 devices"); "Online · internet rule off"; "Online · internet rule paused for everyone until <time>".
 - **State is named, not decorated.** "Paused until 6:00 PM", "Blocked upstream", "Unknown — quarantined". Never "Oops!" or "All good 🎉".
 - **Consequences up front.** Destructive copy says what will actually happen, in one sentence, before the button.
 
@@ -192,7 +192,7 @@ FamilyFi's own iconography is typographic — monograms inside `Mark`, chevrons 
 
 ## Motion
 
-0ms for state flips, 120ms for hovers (`--ff-duration-fast`), 180ms for sheets, easing `--ff-ease-standard` (`cubic-bezier(.32,.72,0,1)`). Nothing slides in decoratively; the gateway is the slow part, never the interface. The phone's card stack is the one element that overshoots (520ms settle, 200ms with Reduce Motion). Respect `prefers-reduced-motion`.
+0ms for state flips, 120ms for hovers (`--ff-duration-fast`), 180ms for sheets (a project value with no token here yet), easing `--ff-ease-standard` (`cubic-bezier(.32,.72,0,1)`). Nothing slides in decoratively; the gateway is the slow part, never the interface. The phone's card stack is the one element that overshoots (520ms settle, 200ms with Reduce Motion; these springs live in familyfi-mobile's `src/design/motion.ts`). Respect `prefers-reduced-motion`.
 
 ## Phone and watch
 
@@ -213,7 +213,7 @@ The `design-reviewer` subagent covers what the tests cannot: role, size, copy an
 
 ## Open differences
 
-Places where the code and the design project disagree and the operator has not yet decided. The reviewer reports a change that widens one; the design-sync skill lists new ones here.
+Places where the code and the design project disagree and the operator has not yet decided. Several copy rows are the UX audit's third pull request (copy), not yet built. Until a row is settled, the reviewer judges new code by the project's rule and leaves existing code alone. The reviewer reports a change that widens one; the design-sync skill lists new ones here.
 
 | Topic | Design project | Code today |
 | --- | --- | --- |
@@ -222,8 +222,13 @@ Places where the code and the design project disagree and the operator has not y
 | Card stack on web | Web uses the stack under 768px | The web draws neither the stack nor its heads (see [Shared components](#shared-components)) |
 | Logo in the narrow top bar | `SKILL.md`: inline lockup in the top bar; `readme.md`: stacked lockup heads the drawer | Stacked lockup in the drawer |
 | Width tokens | `--ff-width-detail` (960), `--ff-width-editor` (760) | Literal `max-w-[1008px]` and `max-w-[808px]` (padding included); no tokens |
-| Text under 14px | Only the `Mark` caption (10) and state word (9) | Also the 9px category and app monograms (`src/ui/CategoryMarks.tsx`) and a 10px label in `src/ui/AdminControl.web.tsx` |
+| Text under 14px | Only the `Mark` caption (10) and state word (9) | Also monograms (9px in `src/ui/CategoryMarks.tsx`, 10/12px in `src/ui/MonoTile.tsx`, 12px for three letters in `src/ui/GroupCardHeader.tsx`), the 10px badge in the More mark (`CategoryMarks.tsx`) and a 10px label in `src/ui/AdminControl.web.tsx` |
 | Shared section label | One `SectionLabel` | Two copies, `src/ui/CategoryMarks.tsx` and `src/components/FilterMarks.tsx` |
+| Internet mark words | On, Blocked, Off (the internet rule is switched off), No rule | "Blocked" while the group is paused and "Off" while an internet window is on now (`src/lib/internet-zone.ts`) |
+| Status lines | "4 devices" with no internet rule; "Online · internet rule off"; "… paused for everyone until <time>" | "4 devices · no internet rule" (`src/lib/display.ts`); no "rule off" line; "Online · internet rule paused <until>" (`src/lib/group-actions.ts`) |
+| Sync button | "Sync now" / "Syncing…" | Not used as a label (`src/lib/sync-copy.ts`) |
+| Day timeline hours | 12 AM, 6 AM, Noon, 6 PM | "NOON" in uppercase (`src/lib/day-timeline.ts`) |
+| 14px line height | 20px | Shared components use both 20 and 21 (1.5×) |
 | Radius token names | `--ff-radius-lg` (9), `--ff-radius-md` (7) | `--ff-radius-button`, `--ff-radius-control` |
 
 Deliberate differences, not open: fonts are self-hosted through `next/font` and Phosphor comes from the `@phosphor-icons/web` package, so a household gateway never reaches a third party at runtime, where the project loads both from CDNs. The project's note that the product "ships no icon set" predates Phosphor in the repo.
