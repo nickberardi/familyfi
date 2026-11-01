@@ -17,7 +17,7 @@ jobs:
   # The API contract's floors, first and in minutes: a pull request that forgot to raise one fails
   # here and never starts the half-hour jobs (docs/api.md, "Versioning the contract").
   contract:
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -56,7 +56,7 @@ jobs:
   # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
   verify:
     needs: contract
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -121,7 +121,7 @@ jobs:
   # Also the UTC+14 unit replay, which keeps verify, the longer job, shorter.
   browser:
     needs: contract
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && fromJSON('["self-hosted","linux","x64"]') || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
