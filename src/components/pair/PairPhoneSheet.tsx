@@ -29,7 +29,7 @@ export function PairPhoneSheet({
   const { session } = useAppData();
   const pairing = usePairing({ request, route, replacing, username: session?.username ?? null, onPaired });
   return (
-    <SheetFrame title={pairing.heading.title} sub={pairing.heading.sub} onClose={onClose} footer={<PairingActions pairing={pairing} onClose={onClose} />}>
+    <SheetFrame size="form" title={pairing.heading.title} sub={pairing.heading.sub} onClose={onClose} footer={<PairingActions pairing={pairing} onClose={onClose} />}>
       <PairingBody pairing={pairing} />
     </SheetFrame>
   );

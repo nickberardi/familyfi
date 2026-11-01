@@ -66,7 +66,7 @@ describe("editing a group", () => {
   });
 
   it("says what deleting does before it happens", () => {
-    expect(deleteGroupConfirm(group())).toMatchObject({ title: "Delete Sam?", confirm: "Delete group", cancel: "Never mind" });
+    expect(deleteGroupConfirm(group())).toMatchObject({ title: "Delete Sam?", confirm: "Delete group", cancel: "Cancel" });
   });
 
   it("tells a group with rules or a pause, and no devices, that its rules cannot apply yet", () => {

@@ -9,7 +9,7 @@ import { CopyRow } from "@/components/ui/CopyRow";
 import { Segmented } from "@/components/ui/Segmented";
 import { useAppData } from "@/components/AppDataProvider";
 import { usePairingCode } from "@/components/pair/pairing-code-session";
-import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
+import { CANCEL_BUTTON, FIELD, PRIMARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 
 /**
  * Connect an agent: name it and choose its scope, then show the prompt to paste into it. The prompt
@@ -58,11 +58,12 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
     return (
       <SheetFrame
         title="Connect an agent"
+        size="form"
         sub="Makes a prompt for an AI agent on your home network, such as Claude Code or Codex. The agent gets its own access, which you can revoke here. It never sees your password."
         onClose={onClose}
         footer={
           <>
-            <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>
+            <button type="button" className={CANCEL_BUTTON} onClick={onClose}>
               Cancel
             </button>
             <button type="button" className={PRIMARY_BUTTON} disabled={busy || recovery || !name.trim()} onClick={() => void generate()}>
@@ -91,6 +92,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
 
   return (
     <SheetFrame
+      size="form"
       title={claimed ? "Agent connected" : "Paste this into your agent"}
       sub={
         claimed
@@ -105,7 +107,7 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
           </button>
         ) : (
           <>
-            <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>
+            <button type="button" className={CANCEL_BUTTON} onClick={onClose}>
               Cancel
             </button>
             <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => void generate()}>

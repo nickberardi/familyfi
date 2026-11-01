@@ -20,6 +20,8 @@ import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
 import { useUpdateCheck } from "@/ui/use-update-check";
 import { useUpdateSettings } from "@/ui/use-update-settings";
 import { forgetCatalogNames } from "@/components/GroupGrid";
+import { CANCEL_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
+import { SheetFrame } from "@/components/pair/SheetFrame";
 
 const FIELD =
   "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
@@ -232,7 +234,7 @@ function Settings() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
+                      className={PRIMARY_BUTTON}
                       onClick={() =>
                         void mutate(() =>
                           api("/api/v1/settings/unifi", {
@@ -327,7 +329,7 @@ function Settings() {
                 <div className="mt-3.5 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
+                    className={PRIMARY_BUTTON}
                     onClick={() => {
                       setPasting(true);
                       setApiKey("");
@@ -337,7 +339,7 @@ function Settings() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]"
+                    className={SECONDARY_BUTTON}
                     onClick={() => void testConnection()}
                   >
                     Test connection
@@ -353,32 +355,20 @@ function Settings() {
       </div>
 
       {loginFor ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--ff-scrim)] p-6">
-          <div className="w-full max-w-[420px] overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-[var(--ff-shadow-sheet)]">
-            <div className="px-[18px] pt-[18px] pb-1">
-              <div className="text-[17px] font-bold tracking-tight">{createLoginTitle(loginFor)}</div>
-              <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{SETTINGS_COPY.loginNote}</p>
-            </div>
-            <div className="px-[18px] py-3.5">
-              <NewLoginFields
-                username={loginUser}
-                password={pw1}
-                confirm={pw2}
-                onChange={(field, value) => (field === "username" ? setLoginUser(value) : field === "password" ? setPw1(value) : setPw2(value))}
-              />
-            </div>
-            <div className="flex border-t border-[var(--ff-hairline-card)]">
-              <button
-                type="button"
-                className="flex-1 py-3 text-center text-[14px] text-[var(--ff-muted)]"
-                onClick={() => setLoginFor(null)}
-              >
+        <SheetFrame
+          title={createLoginTitle(loginFor)}
+          sub={SETTINGS_COPY.loginNote}
+          size="form"
+          onClose={() => setLoginFor(null)}
+          footer={
+            <>
+              <button type="button" className={CANCEL_BUTTON} onClick={() => setLoginFor(null)}>
                 {SETTINGS_COPY.cancel}
               </button>
               <button
                 type="button"
                 disabled={!login.canCreate}
-                className="flex-1 border-l border-[var(--ff-hairline-card)] py-3 text-center text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
+                className={PRIMARY_BUTTON}
                 onClick={() => {
                   const group = loginFor;
                   void createLogin(store.mutate, group, loginUser, pw1).then((result) => {
@@ -388,9 +378,16 @@ function Settings() {
               >
                 {SETTINGS_COPY.createLogin}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <NewLoginFields
+            username={loginUser}
+            password={pw1}
+            confirm={pw2}
+            onChange={(field, value) => (field === "username" ? setLoginUser(value) : field === "password" ? setPw1(value) : setPw2(value))}
+          />
+        </SheetFrame>
       ) : null}
     </>
   );

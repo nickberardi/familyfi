@@ -13,6 +13,7 @@ import {
 } from "@/lib/countries-editor";
 import type { Group } from "@/lib/types";
 
+import { Alert } from "./Alert";
 import { Chip, ChipGroup } from "./Chips";
 import { EditorSection } from "./EditorSection";
 import { RuleAppliesTo } from "./RuleAppliesTo";
@@ -53,9 +54,9 @@ export function CountriesRuleForm({
   return (
     <View style={styles.form}>
       {error ? (
-        <Text role="alert" style={[note, styles.error, { backgroundColor: ui.color("danger-fill"), color: ui.color("danger") }]} testID="countries-error">
+        <Alert tone="danger" role="alert" testID="countries-error">
           {error}
-        </Text>
+        </Alert>
       ) : null}
 
       <EditorSection title={COPY.status.title} note={COPY.status.note}>
@@ -114,7 +115,6 @@ export function CountriesRuleForm({
 
 const styles = StyleSheet.create({
   form: { gap: 16 },
-  error: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   label: { fontSize: 14, lineHeight: 21, fontWeight: "600" },
   textButton: { alignSelf: "flex-start" },

@@ -3,6 +3,7 @@
 import { BACKUP_COPY as COPY } from "@/lib/backup-copy";
 import type { ImportSummary } from "@/lib/types";
 import { BackupImport } from "./BackupImport";
+import { PRIMARY_BUTTON } from "@/components/ui/buttons";
 
 /** Settings' Backup card: download the household as an export, or replace it with one. */
 export function BackupCard({ onImported }: { onImported: (summary: ImportSummary) => void | Promise<void> }) {
@@ -25,7 +26,7 @@ export function BackupCard({ onImported }: { onImported: (summary: ImportSummary
             <a
               href="/api/v1/settings/export"
               download
-              className="inline-block rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
+              className={PRIMARY_BUTTON}
               data-testid="backup-export"
             >
               {COPY.exportLabel}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
 import { useNavDrawer } from "./AppShell";
+import { PRIMARY_BUTTON } from "@/components/ui/buttons";
 
 export function PageHeader({
   title,
@@ -23,7 +24,7 @@ export function PageHeader({
   let action: ReactNode = null;
   if (actionHref && actionLabel) {
     action = (
-      <Link href={actionHref} className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]">
+      <Link href={actionHref} className={PRIMARY_BUTTON}>
         {actionLabel}
       </Link>
     );
@@ -32,7 +33,7 @@ export function PageHeader({
       <button
         type="button"
         onClick={onAction}
-        className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)]"
+        className={PRIMARY_BUTTON}
       >
         {actionLabel}
       </button>

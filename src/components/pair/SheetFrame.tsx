@@ -1,63 +1,46 @@
-import type { KeyboardEvent, ReactNode } from "react";
+"use client";
 
-export const PRIMARY_BUTTON =
-  "rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40";
-export const SECONDARY_BUTTON =
-  "rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40";
-export const FIELD =
-  "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
+import { useId, type ReactNode } from "react";
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import { Modal, type ModalSize } from "@/components/ui/Modal";
 
-/** Tab and Shift+Tab cycle within the sheet, so the page behind the scrim can't be reached from the keyboard. */
-function keepFocusInside(event: KeyboardEvent<HTMLDivElement>) {
-  if (event.key !== "Tab") return;
-  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE));
-  if (!items.length) return;
-  const first = items[0]!;
-  const last = items[items.length - 1]!;
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
-}
+export { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
 
-/** The modal frame the sheets share: scrim, card, title and a footer row. A `form` sheet is wider, for two columns that fit a MAC address beside its label. */
+/**
+ * A dialog with a title, an optional line under it, its content and a footer of actions:
+ * Cancel on the left of the main action, right-aligned, with no divider. `confirm` (400px) is
+ * a decision about something that exists; `form` (520px) creates or edits one.
+ */
 export function SheetFrame({
   title,
   sub,
-  size = "sheet",
+  size,
   onClose,
   children,
   footer,
+  raised,
+  testID,
 }: {
   title: string;
-  size?: "sheet" | "form";
+  size: ModalSize;
   sub?: string;
   onClose: () => void;
-  children: ReactNode;
+  children?: ReactNode;
   footer: ReactNode;
+  raised?: boolean;
+  testID?: string;
 }) {
+  const titleId = useId();
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-[var(--ff-scrim)] p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={`my-auto w-full ${size === "form" ? "max-w-[544px]" : "max-w-[440px]"} overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-[var(--ff-shadow-sheet)]`}
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={keepFocusInside}
-      >
-        <div className="px-[18px] pt-[18px] pb-1">
-          <h2 className="text-[17px] font-bold tracking-tight">{title}</h2>
-          {sub ? <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{sub}</p> : null}
-        </div>
-        <div className="flex flex-col gap-3 px-[18px] py-3.5">{children}</div>
-        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--ff-hairline-card)] px-[18px] py-3">{footer}</div>
+    <Modal labelledBy={titleId} size={size} onClose={onClose} raised={raised} testID={testID}>
+      <div className="px-[18px] pt-[18px] pb-1">
+        <h2 id={titleId} className="text-[17px] leading-[24px] font-semibold tracking-tight">
+          {title}
+        </h2>
+        {sub ? <p className="mt-1.5 text-[14px] leading-5 text-[var(--ff-ink-2)]">{sub}</p> : null}
       </div>
-    </div>
+      {children ? <div className="flex flex-col gap-3 px-[18px] py-3.5">{children}</div> : <div className="h-2" />}
+      <div className="flex flex-wrap items-center justify-end gap-2 px-[18px] pt-1 pb-[18px]">{footer}</div>
+    </Modal>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -120,12 +121,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
         actionLabel={saved ? COPY.save : COPY.create}
         secondary={
           saved ? (
-            <button
-              type="button"
-              className="rounded-lg px-3.5 py-2 text-[14px] font-semibold"
-              style={{ background: "var(--ff-danger-fill)", color: "var(--ff-danger)" }}
-              onClick={() => setConfirmDelete(true)}
-            >
+            <button type="button" className={DESTRUCTIVE_BUTTON} onClick={() => setConfirmDelete(true)}>
               {COPY.deleteRule}
             </button>
           ) : null
@@ -158,42 +154,30 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
       </form>
 
       {confirmDelete && saved ? (
-        <div className="fixed inset-0 z-[81] flex items-center justify-center bg-[var(--ff-scrim)] p-6" onClick={() => setConfirmDelete(false)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-rule-title"
-            className="w-full max-w-[420px] overflow-hidden rounded-[14px] bg-[var(--ff-card)]"
-            style={{ boxShadow: "var(--ff-shadow-sheet)" }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex flex-col gap-2 p-5">
-              <h2 id="delete-rule-title" className="text-[17px] font-bold tracking-tight">
-                {deleteRuleCopy(saved).title}
-              </h2>
-              <p className="text-[14px] leading-5 text-[var(--ff-ink-2)]">{deleteRuleCopy(saved).message}</p>
-              <ul className="font-mono text-[14px] text-[var(--ff-ink-2)]">
-                {saved.policyNames.map((name) => (
-                  <li key={name} className="line-through">
-                    {name}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex border-t border-[var(--ff-hairline-card)]">
-              <button type="button" className="flex-1 py-3 text-[14px] text-[var(--ff-ink-3)]" onClick={() => setConfirmDelete(false)}>
+        <SheetFrame
+          title={deleteRuleCopy(saved).title}
+          sub={deleteRuleCopy(saved).message}
+          size="confirm"
+          onClose={() => setConfirmDelete(false)}
+          footer={
+            <>
+              <button type="button" autoFocus className={CANCEL_BUTTON} onClick={() => setConfirmDelete(false)}>
                 {deleteRuleCopy(saved).cancel}
               </button>
-              <button
-                type="button"
-                className="flex-1 border-l border-[var(--ff-hairline-card)] py-3 text-[14px] font-semibold text-[var(--ff-danger)]"
-                onClick={() => void remove()}
-              >
+              <button type="button" className={DESTRUCTIVE_BUTTON} onClick={() => void remove()}>
                 {deleteRuleCopy(saved).confirm}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <ul className="font-mono text-[14px] text-[var(--ff-ink-2)]">
+            {saved.policyNames.map((name) => (
+              <li key={name} className="line-through">
+                {name}
+              </li>
+            ))}
+          </ul>
+        </SheetFrame>
       ) : null}
     </>
   );

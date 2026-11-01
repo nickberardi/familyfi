@@ -28,6 +28,7 @@ import type { RuleWrite } from "@/lib/rule-writes";
 import { MAX_RULE_NAME, MAX_WINDOW_NAME, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
+import { Alert } from "./Alert";
 import { CatalogPicker } from "./CatalogPicker";
 import { EditorSection } from "./EditorSection";
 import { RuleAppliesTo } from "./RuleAppliesTo";
@@ -80,9 +81,9 @@ export function RuleEditorForm({
   return (
     <View style={styles.form}>
       {error ? (
-        <Text role="alert" style={[text(14, 21), styles.error, { backgroundColor: ui.color("danger-fill"), color: ui.color("danger") }]} testID="rule-error">
+        <Alert tone="danger" role="alert" testID="rule-error">
           {error}
-        </Text>
+        </Alert>
       ) : null}
 
       <EditorSection title={COPY.name.title} note={COPY.name.note}>
@@ -203,9 +204,9 @@ export function RuleEditorForm({
               );
             })}
             {state.overlaps.length ? (
-              <Text role="status" style={[text(14, 20), styles.overlap, { backgroundColor: ui.color("paused-fill"), color: ui.color("ink") }]}>
-                {state.overlaps.join(" ")} {COPY.when.overlap}
-              </Text>
+              <Alert tone="warning" role="status">
+                {`${state.overlaps.join(" ")} ${COPY.when.overlap}`}
+              </Alert>
             ) : null}
             <View style={styles.addRow}>
               <TextButton label={COPY.when.add} onPress={() => edit(addWindow)} disabled={disabled || !canAddWindow(draft)} testID="rule-add-window" />
@@ -226,7 +227,7 @@ export function RuleEditorForm({
       >
         {draft.kind === "internet" ? <Text style={note}>{COPY.appliesTo.internetNote}</Text> : null}
         {outsideDns ? (
-          <Text role="note" style={[text(14, 20), styles.overlap, { backgroundColor: ui.color("field-soft"), color: ui.color("ink-2") }]} testID="rule-outside-dns">
+          <Text role="note" style={[text(14, 20), styles.note, { backgroundColor: ui.color("field-soft"), color: ui.color("ink-2") }]} testID="rule-outside-dns">
             {outsideDns}
           </Text>
         ) : null}
@@ -368,14 +369,13 @@ export function RuleWritesList({ writes }: { writes: RuleWrite[] }) {
 
 const styles = StyleSheet.create({
   form: { gap: 16 },
-  error: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden" },
+  note: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden" },
   grow: { flex: 1, minWidth: 0 },
   struck: { textDecorationLine: "line-through" },
   removed: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8 },
   windowHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   remove: { width: 28, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   windowControls: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12 },
-  overlap: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden" },
   addRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   policyBox: { borderRadius: 9, padding: 12 },
   policyHead: { flexDirection: "row", alignItems: "baseline", gap: 8 },

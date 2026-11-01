@@ -34,6 +34,7 @@ function StepsBadge({ store }: { store: AppStore }) {
       {open ? (
         <SheetFrame
           title={PLAY_BETA.title}
+            size="confirm"
           sub={PLAY_BETA.sub}
           onClose={() => setOpen(false)}
           footer={

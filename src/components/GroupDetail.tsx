@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/ui/Icon";
 import { DeviceMark } from "@/ui/DeviceMark";
 import type { Device, Group } from "@/lib/types";
+import { PRIMARY_BUTTON } from "@/components/ui/buttons";
 
 export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "things"; id: string; demo?: boolean }) {
   const router = useRouter();
@@ -78,7 +79,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
               disabled={busy}
               onClick={header.action.onPress}
               data-testid={header.action.testID}
-              className="shrink-0 rounded-[8px] bg-[var(--ff-accent)] px-2.5 py-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-50"
+              className={`shrink-0 ${PRIMARY_BUTTON}`}
             >
               {header.action.label}
             </button>

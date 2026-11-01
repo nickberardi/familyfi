@@ -8,8 +8,9 @@ import { HomeAccessCard } from "@/components/pair/HomeAccessCard";
 import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
 import { RemoteAccessCard } from "@/components/pair/RemoteAccessCard";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/pair/SheetFrame";
+import { askConfirm } from "@/components/ui/ConfirmHost";
 import { request } from "@/lib/api";
-import { PAIR_COPY, confirmLine, removeAllConfirm, removeConfirm, removePhone, removeRevokedPhones, revokeConfirm, revokePhone } from "@/lib/pair-device";
+import { PAIR_COPY, removeAllConfirm, removeConfirm, removePhone, removeRevokedPhones, revokeConfirm, revokePhone } from "@/lib/pair-device";
 import type { PairedPhone } from "@/lib/types";
 import { PairedDevicesCard } from "@/ui/PairedDevices";
 import { usePairDevice } from "@/ui/use-pair-device";
@@ -68,20 +69,20 @@ export default function PairDevicePage() {
         <PairedDevicesCard
           phones={phones}
           canPair={canPair}
-          onRevoke={(phone) => {
-            if (!window.confirm(confirmLine(revokeConfirm(phone)))) return;
+          onRevoke={async (phone) => {
+            if (!(await askConfirm({ ...revokeConfirm(phone), destructive: true }))) return;
             void run(() => revokePhone(request, phone));
           }}
           onRepair={(phone) => {
             setReplacing(phone);
             setPairing(true);
           }}
-          onRemove={(phone) => {
-            if (!window.confirm(confirmLine(removeConfirm(phone)))) return;
+          onRemove={async (phone) => {
+            if (!(await askConfirm({ ...removeConfirm(phone), destructive: true }))) return;
             void run(() => removePhone(request, phone));
           }}
-          onRemoveAllRevoked={(count) => {
-            if (!window.confirm(confirmLine(removeAllConfirm(count)))) return;
+          onRemoveAllRevoked={async (count) => {
+            if (!(await askConfirm({ ...removeAllConfirm(count), destructive: true }))) return;
             void run(() => removeRevokedPhones(request));
           }}
         />

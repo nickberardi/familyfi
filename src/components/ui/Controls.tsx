@@ -19,7 +19,7 @@ export function TimeField({
 }) {
   return (
     <label className="flex flex-none items-center gap-1.5">
-      <span className="text-[11px]" style={{ color: "var(--ff-ink-4)" }}>
+      <span className="text-[14px]" style={{ color: "var(--ff-ink-3)" }}>
         {label}
       </span>
       <input
@@ -28,8 +28,7 @@ export function TimeField({
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-[7px] border px-[7px] py-[5px] text-[12.5px] outline-none disabled:cursor-not-allowed disabled:opacity-40"
-        style={{ borderColor: "var(--ff-input-line)", background: "var(--ff-card)" }}
+        className="ff-input w-auto px-[7px] py-[5px] text-[14px] leading-5"
       />
     </label>
   );
@@ -74,10 +73,7 @@ export function TextField({
           onSubmit();
         }
       }}
-      className={`w-full min-w-0 rounded-[7px] border px-[10px] py-[7px] text-[13.5px] outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
-        mono ? "font-mono" : ""
-      }`}
-      style={{ borderColor: "var(--ff-input-line)", background: "var(--ff-card)" }}
+      className={`ff-input min-w-0 ${mono ? "font-mono" : ""}`}
     />
   );
 }
@@ -87,7 +83,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   return (
     <label className="block">
       <span
-        className="mb-1.5 block text-[12px] font-semibold"
+        className="mb-1.5 block text-[14px] font-semibold"
         style={{ color: "var(--ff-ink-3)" }}
       >
         {label}

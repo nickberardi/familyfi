@@ -6,6 +6,7 @@ import { fromLockDnsRule, LOCK_DNS_COPY as COPY, lockDnsOpenLabel, lockDnsWrites
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
+import { Alert } from "./Alert";
 import { EditorSection } from "./EditorSection";
 import { RuleAppliesTo } from "./RuleAppliesTo";
 import { RuleWritesList } from "./RuleEditorForm";
@@ -43,9 +44,9 @@ export function LockDnsForm({
   return (
     <View style={styles.form}>
       {error ? (
-        <Text role="alert" style={[body, styles.caution, { backgroundColor: ui.color("danger-fill"), color: ui.color("danger") }]} testID="lock-dns-error">
+        <Alert tone="danger" role="alert" testID="lock-dns-error">
           {error}
-        </Text>
+        </Alert>
       ) : null}
       <EditorSection title={COPY.blocks.title} note={COPY.blocks.note}>
         <View role="list" style={styles.items}>
@@ -61,9 +62,9 @@ export function LockDnsForm({
             </View>
           ))}
         </View>
-        <Text style={[body, styles.caution, { backgroundColor: ui.color("paused-fill") }]} testID="lock-dns-caution">
+        <Alert tone="warning" testID="lock-dns-caution">
           {COPY.blocks.caution}
-        </Text>
+        </Alert>
       </EditorSection>
 
       <RuleAppliesTo draft={draft} groups={groups} networks={networks} edit={edit} note={COPY.appliesTo.note} disabled={disabled} testID="lock-dns">
@@ -122,5 +123,4 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   itemTitle: { fontWeight: "600", lineHeight: 21 },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  caution: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden" },
 });

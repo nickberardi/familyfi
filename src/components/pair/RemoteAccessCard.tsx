@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
-import { confirmLine } from "@/lib/pair-device";
+import { askConfirm } from "@/components/ui/ConfirmHost";
 import {
   CLOUDFLARE_AUTOMATIC_GUIDE,
   MY_DOMAIN_GUIDE,
@@ -24,7 +24,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { CloudflareAdvanced } from "./CloudflareAdvanced";
 import { PinCheck } from "./PinCheck";
 import { RouteForm } from "./RouteForm";
-import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
+import { CANCEL_BUTTON, FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
 type Top = "off" | "quick" | "tailscale" | "cloudflare" | "myDomain";
 type Cloudflare = "automatic" | "advanced";
@@ -91,13 +91,15 @@ export function RemoteAccessCard({
   }
 
   /** Switching away from a route phones paired through asks first. */
-  function leaving(next: string | null): boolean {
+  async function leaving(next: string | null): Promise<boolean> {
     if (!published || published.id === next) return true;
     const count = pairedThrough(published.id);
     if (!count) return true;
-    return window.confirm(
-      `${count} phone${count === 1 ? "" : "s"} paired through ${published.url}. They can't reach FamilyFi once you switch, and must be paired again over the new route.`,
-    );
+    return askConfirm({
+      title: `Switch away from ${published.url}?`,
+      message: `${count} phone${count === 1 ? "" : "s"} paired through it. They can't reach FamilyFi once you switch, and must be paired again over the new route.`,
+      confirmLabel: "Switch",
+    });
   }
 
   async function put(body: Record<string, unknown>) {
@@ -117,14 +119,14 @@ export function RemoteAccessCard({
     }
   }
 
-  function pickTop(next: Top) {
+  async function pickTop(next: Top) {
     setError("");
     if (next === "off") {
-      if (leaving(null)) void put({ mode: "off" });
+      if (await leaving(null)) void put({ mode: "off" });
       return;
     }
     if (next === "quick") {
-      if (leaving(routes?.find((route) => route.kind === "quick")?.id ?? null)) void put({ mode: "quick" });
+      if (await leaving(routes?.find((route) => route.kind === "quick")?.id ?? null)) void put({ mode: "quick" });
       return;
     }
     // The other choices only open their setup: nothing is published until one is used.
@@ -134,8 +136,8 @@ export function RemoteAccessCard({
     setEditing(null);
   }
 
-  function publishRoute(route: ConnectionRoute) {
-    if (!leaving(route.id)) return Promise.resolve();
+  async function publishRoute(route: ConnectionRoute) {
+    if (!(await leaving(route.id))) return;
     return put({ mode: "named", endpointId: route.id });
   }
 
@@ -148,7 +150,13 @@ export function RemoteAccessCard({
   const saved = savedRoutes(choice, routes ?? []);
 
   async function turnOffAccess(route: ConnectionRoute) {
-    if (!window.confirm("Turn off Cloudflare Access for this route in FamilyFi? Phones stop sending the token, so remove the Access application in Cloudflare too, or it turns them away.")) return;
+    const go = await askConfirm({
+      title: "Turn off Cloudflare Access for this route?",
+      message: "Phones stop sending the token, so remove the Access application in Cloudflare too, or it turns them away.",
+      confirmLabel: "Turn off Access",
+      destructive: true,
+    });
+    if (!go) return;
     setBusy(true);
     setError("");
     try {
@@ -163,7 +171,7 @@ export function RemoteAccessCard({
 
   /** Removing the published route leaves nothing published: the server turns remote access off. */
   async function removeRoute(route: ConnectionRoute) {
-    if (!window.confirm(confirmLine(removeRouteConfirm(route, { published: route.id === published?.id, pairedCount: pairedThrough(route.id) })))) return;
+    if (!(await askConfirm({ ...removeRouteConfirm(route, { published: route.id === published?.id, pairedCount: pairedThrough(route.id) }), destructive: true }))) return;
     setBusy(true);
     setError("");
     try {
@@ -413,7 +421,7 @@ export function RemoteAccessCard({
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {settingUp ? (
-                    <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={() => void put({ mode: "off" })}>
+                    <button type="button" className={CANCEL_BUTTON} disabled={busy} onClick={() => void put({ mode: "off" })}>
                       Cancel
                     </button>
                   ) : domainReady && isPublished ? null : (
@@ -421,9 +429,9 @@ export function RemoteAccessCard({
                       type="button"
                       className={PRIMARY_BUTTON}
                       disabled={busy || noBinary || !hostname.trim()}
-                      onClick={() => {
+                      onClick={async () => {
                         const domain = routes?.find((route) => route.kind === "domain");
-                        if (leaving(domainReady ? (domain?.id ?? null) : null)) void put({ mode: "named", hostname: hostname.trim() });
+                        if (await leaving(domainReady ? (domain?.id ?? null) : null)) void put({ mode: "named", hostname: hostname.trim() });
                       }}
                     >
                       {domainReady ? "Turn on" : "Connect with Cloudflare"}
@@ -434,13 +442,14 @@ export function RemoteAccessCard({
                       type="button"
                       className="text-[14px] font-semibold text-[var(--ff-danger)]"
                       disabled={busy}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            `Forget ${tunnel.hostname}? FamilyFi deletes its tunnel key and turns remote access off, then asks you to sign in to Cloudflare once more so it can delete its tunnel and DNS record there.`,
-                          )
-                        )
-                          return;
+                      onClick={async () => {
+                        const go = await askConfirm({
+                          title: `Forget ${tunnel.hostname}?`,
+                          message: "FamilyFi deletes its tunnel key and turns remote access off, then asks you to sign in to Cloudflare once more so it can delete its tunnel and DNS record there.",
+                          confirmLabel: "Forget domain",
+                          destructive: true,
+                        });
+                        if (!go) return;
                         setForgotten(tunnel.hostname ?? "");
                         setHostname("");
                         void put({ mode: "off", forget: true });

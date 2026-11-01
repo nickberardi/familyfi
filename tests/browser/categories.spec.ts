@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { answerConfirm } from "./confirm-dialog";
+
 const username = process.env.FAMILYFI_RECOVERY_USERNAME ?? "admin";
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 
@@ -91,8 +93,8 @@ test("a custom category is created report-only and can be deleted", { tag: "@des
   await page.getByText(label, { exact: true }).click();
   // Custom categories say so, and are the only ones that offer deletion.
   await expect(page.getByText(/Custom category — report-only/i)).toBeVisible();
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Delete category" }).click();
+  await answerConfirm(page);
 
   await expect(page.getByRole("heading", { name: "Categories" })).toBeVisible();
   await expect(page.getByText(label, { exact: true })).toHaveCount(0);

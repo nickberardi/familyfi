@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { request } from "@/lib/api";
 import { useAppData } from "@/components/AppDataProvider";
-import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
+import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, FIELD, PRIMARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { Segmented } from "@/components/ui/Segmented";
+import { Alert } from "@/ui/Alert";
 import {
   FAMILY_ROLES,
   GROUP_DETAIL_COPY,
@@ -67,18 +68,9 @@ export function GroupEditSheet({
     };
   }, [group.id]);
 
-  // Escape closes, and focus goes back to the Edit button that opened the sheet.
-  const closeRef = useRef(onClose);
+  // Focus goes back to the Edit button that opened the sheet (the dialog frame closes it on Escape).
   useEffect(() => {
-    closeRef.current = onClose;
-  });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRef.current();
-    };
-    document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("keydown", onKey);
       // Strict Mode remounts the sheet at once: only a sheet that is really gone hands focus back.
       window.setTimeout(() => {
         if (opener?.isConnected && !document.querySelector('[role="dialog"]')) opener.focus();
@@ -118,26 +110,25 @@ export function GroupEditSheet({
     return (
       <SheetFrame
         title={copy.title}
-        size="form"
+        sub={copy.body}
+        size="confirm"
         onClose={onClose}
         footer={
           <>
-            <button type="button" autoFocus onClick={() => setConfirming(false)} className={SECONDARY_BUTTON}>
+            <button type="button" autoFocus onClick={() => setConfirming(false)} className={CANCEL_BUTTON}>
               {copy.cancel}
             </button>
             <button
               type="button"
               disabled={busy}
               onClick={() => void deleteGroup(store.mutate, group, onDeleted)}
-              className="rounded-lg bg-[var(--ff-danger)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
+              className={DESTRUCTIVE_BUTTON}
             >
               {copy.confirm}
             </button>
           </>
         }
-      >
-        <p className="text-[14px] leading-5">{copy.body}</p>
-      </SheetFrame>
+      />
     );
   }
 
@@ -153,11 +144,11 @@ export function GroupEditSheet({
             type="button"
             disabled={busy}
             onClick={() => setConfirming(true)}
-            className="mr-auto py-2 text-[14px] font-semibold text-[var(--ff-danger)] disabled:opacity-40"
+            className="mr-auto py-2 text-[14px] font-semibold text-[var(--ff-danger)] disabled:opacity-[var(--ff-disabled-opacity)]"
           >
             {GROUP_EDIT_COPY.delete}
           </button>
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <button type="button" onClick={onClose} className={CANCEL_BUTTON}>
             {GROUP_EDIT_COPY.cancel}
           </button>
           <button type="submit" form="group-edit-form" disabled={busy || !dirty} className={PRIMARY_BUTTON}>
@@ -239,9 +230,9 @@ export function GroupEditSheet({
           <p>{GROUP_RESOLVER_COPY.hostNote}</p>
         </div>
         {error ? (
-          <p role="alert" className="rounded-[9px] border border-[var(--ff-paused-line)] bg-[var(--ff-paused-fill)] px-3 py-2 text-[14px] leading-5 font-semibold text-[var(--ff-paused)]">
+          <Alert tone="danger" role="alert">
             {error}
-          </p>
+          </Alert>
         ) : null}
       </form>
     </SheetFrame>

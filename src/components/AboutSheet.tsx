@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
 import { PRIMARY_BUTTON } from "@/components/pair/SheetFrame";
@@ -22,38 +23,11 @@ const TABS = [
  */
 export function AboutSheet({ demo, onClose }: { demo: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<AboutTab>("about");
-  const done = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    // Focus goes back to whatever opened About, when it is still on the page (the drawer's row is not).
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    done.current?.focus();
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      if (opener?.isConnected) opener.focus();
-    };
-  }, [onClose]);
-
   const shown = demo ? tab : "about";
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto p-4 md:p-6"
-      style={{ background: "var(--ff-scrim)" }}
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="about-title"
-        className="my-auto grid w-full max-w-[520px] gap-3.5 rounded-[14px] p-[18px]"
-        style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Modal labelledBy="about-title" size="form" raised onClose={onClose}>
+      <div className="grid gap-3.5 p-[18px]">
         <div>
           <h2 id="about-title" className="m-0 text-[17px] font-semibold tracking-tight text-[var(--ff-ink)]">
             About FamilyFi
@@ -119,11 +93,11 @@ export function AboutSheet({ demo, onClose }: { demo: boolean; onClose: () => vo
             View source
           </a>
           <div className="flex-1" />
-          <button ref={done} type="button" onClick={onClose} className={PRIMARY_BUTTON}>
+          <button type="button" autoFocus onClick={onClose} className={PRIMARY_BUTTON}>
             Done
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

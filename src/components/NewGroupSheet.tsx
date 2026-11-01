@@ -1,5 +1,6 @@
 "use client";
 
+import { Modal } from "@/components/ui/Modal";
 import { useAppData } from "@/components/AppDataProvider";
 import { NewGroupForm } from "@/ui/NewGroupForm";
 
@@ -12,21 +13,8 @@ export function NewGroupSheet({ kind, onClose }: { kind: "family" | "things"; on
   const { store } = useAppData();
 
   return (
-    <div
-      className="fixed inset-0 z-[81] flex items-center justify-center p-6"
-      style={{ background: "var(--ff-scrim)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="new-group-title"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-[420px] overflow-hidden rounded-[14px]"
-        style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <NewGroupForm kind={kind} mutate={store.mutate} onDone={onClose} />
-      </div>
-    </div>
+    <Modal labelledBy="new-group-title" size="form" onClose={onClose}>
+      <NewGroupForm kind={kind} mutate={store.mutate} onDone={onClose} />
+    </Modal>
   );
 }

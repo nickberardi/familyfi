@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SECONDARY_BUTTON } from "@/components/ui/buttons";
 
 function readCsrf(): string {
   const match = document.cookie.match(/(?:^|; )familyfi_csrf=([^;]*)/);
@@ -27,7 +28,7 @@ export function SignOutButton() {
       type="button"
       onClick={() => void signOut()}
       disabled={pending}
-      className="self-start rounded-[9px] border border-[var(--ff-line)] px-4 py-2.5 text-[14px] font-semibold text-[var(--ff-accent)]"
+      className={`self-start ${SECONDARY_BUTTON}`}
     >
       {pending ? "Signing out…" : "Sign out"}
     </button>
