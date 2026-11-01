@@ -77,7 +77,8 @@ export function noMembersAttention(
   const title = names.length === 1 ? `${names[0]} needs devices` : `${names.join(" and ")} need devices`;
   return {
     title,
-    message: rows[0]!.message,
+    // The server's issue text speaks of UniFi policies; the household page says it plainly.
+    message: names.length === 1 ? `${names[0]} has no devices, so its rules can’t apply yet.` : `${names.join(" and ")} have no devices, so their rules can’t apply yet.`,
     href: `/devices?assign=${rows[0]!.groupId}`,
   };
 }
@@ -258,8 +259,9 @@ export function familyNeedsDevices(sync: Pick<SyncStatus, "issues"> | null | und
 }
 
 /**
- * The sync status card beside the navigation: what state the gateway is in, why, and whether to
- * offer Reconcile now. `busy`, `error` and `notice` are the household store's.
+ * The sync status card beside the navigation: what state the gateway is in, in its own words for
+ * each state, and what to do about it: Sync now when a sync failed or left changes behind, or
+ * Settings when no gateway is set up. `busy`, `error` and `notice` are the household store's.
  */
 export function syncStatusCard(
   sync: SyncStatus | null | undefined,
@@ -268,13 +270,28 @@ export function syncStatusCard(
   const failed = syncFailed(sync);
   const unconfigured = sync?.connectionStatus === "unconfigured";
   const partial = sync?.lastRun?.status === "partial";
+  // In sync only once the last sweep finished and wrote the latest revision; anything newer waits.
+  const current = sync?.lastRun?.status === "applied" && sync.lastRun.appliedRevision === sync.revision;
+  const [title, message] = unconfigured
+    ? ["Gateway not connected", "Connect your gateway in Settings."]
+    : busy
+      ? ["Syncing…", "Sending changes to your gateway…"]
+      : failed
+        ? ["Sync needs attention", sync?.lastRun?.error || "The last sync didn’t finish. Sync shows why."]
+        : partial
+          ? ["Partial apply", "Some changes didn’t reach your gateway. Sync shows which."]
+          : current
+            ? ["Gateway in sync", "Your gateway has every change."]
+            : ["Waiting to sync", "Changes go to your gateway at the next sync."];
   return {
-    title: unconfigured ? "UniFi not configured" : failed ? "Sync needs attention" : partial ? "Partial apply" : "Gateway in sync",
+    title,
     dot: unconfigured ? "var(--ff-muted)" : failed ? "var(--ff-danger)" : "var(--ff-on)",
-    message: busy
-      ? "Writing desired state to UniFi…"
-      : error || notice || (failed ? sync?.lastRun?.error : null) || "Desired state is written on the next reconcile.",
-    showReconcile: busy || unconfigured || failed || partial,
-    reconcile: busy ? "Reconciling…" : "Reconcile now",
+    message: (!busy && !unconfigured && (error || notice)) || message,
+    /** The gateway needs a hand: not set up, a failed sync, or one that left changes behind. */
+    attention: unconfigured || failed || partial,
+    showReconcile: !unconfigured && (busy || failed || partial),
+    reconcile: busy ? "Syncing…" : "Sync now",
+    /** With no gateway, the way to connect one instead of Sync now. */
+    settings: unconfigured ? { label: "Open Settings", href: "/settings?tab=gateway" } : null,
   };
 }

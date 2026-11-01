@@ -11,25 +11,28 @@ import {
   toggleCountry,
   type CountriesDraft,
 } from "@/lib/countries-editor";
+import type { RuleWrite } from "@/lib/rule-writes";
 import type { Group } from "@/lib/types";
 
 import { Alert } from "./Alert";
 import { Chip, ChipGroup } from "./Chips";
 import { EditorSection } from "./EditorSection";
 import { RuleAppliesTo } from "./RuleAppliesTo";
+import { RuleWritesList } from "./RuleEditorForm";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 type Edit = (next: (draft: CountriesDraft) => CountriesDraft) => void;
 
 /**
  * The Block countries editor's form, shared by every client: its switch, the countries it blocks,
- * and what it applies to, picked as for any rule. Each client wraps it in its own page or sheet with the save action.
+ * what it applies to, picked as for any rule, and what saving writes. Each client wraps it in its own page or sheet with the save action.
  */
 export function CountriesRuleForm({
   draft,
   groups,
   networks,
   error,
+  writes,
   disabled = false,
   edit,
 }: {
@@ -38,6 +41,8 @@ export function CountriesRuleForm({
   /** The networks FamilyFi manages (`managedNetworks`), which it can cover whole. */
   networks: { id: string; name: string }[];
   error: string;
+  /** What saving writes (`countriesWrites`), shown last as on every rule editor. */
+  writes?: RuleWrite[];
   disabled?: boolean;
   edit: Edit;
 }) {
@@ -109,6 +114,12 @@ export function CountriesRuleForm({
       </EditorSection>
 
       <RuleAppliesTo draft={draft} groups={groups} networks={networks} edit={edit} note={COPY.appliesTo.note} disabled={disabled} testID="countries" />
+
+      {writes ? (
+        <EditorSection title={COPY.writes.title} note={COPY.writes.note}>
+          {writes.length ? <RuleWritesList writes={writes} /> : <Text style={note}>{COPY.writes.none}</Text>}
+        </EditorSection>
+      ) : null}
     </View>
   );
 }

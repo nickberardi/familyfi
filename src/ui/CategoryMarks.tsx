@@ -62,8 +62,9 @@ export function MarkButton({
   return (
     <Pressable role="button" aria-label={categoryMarkLabel(label, state)} onPress={onPress} testID={testID} style={styles.mark}>
       <View style={[styles.circle, { backgroundColor: fill }]}>{children}</View>
-      {/* Wraps across words in the 52px column, as the web's label does, rather than cutting off. */}
-      <Text style={[small, styles.label]}>
+      {/* Wraps across words in the 52px column, at most two lines; a longer rule name ends in an
+          ellipsis, and the button's name keeps it whole. */}
+      <Text numberOfLines={2} style={[small, styles.label]}>
         {label}
         <MarkTextBreak />
       </Text>

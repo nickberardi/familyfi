@@ -49,7 +49,7 @@ describe("sync copy", () => {
       ]),
     ).toEqual({
       title: "Betsy needs devices",
-      message: "Betsy has no assigned devices, so its UniFi policies cannot be created.",
+      message: "Betsy has no devices, so its rules can’t apply yet.",
       href: "/devices?assign=betsy",
     });
     expect(issueActionLabel("no_members")).toBe("Needs assigned devices");
@@ -185,19 +185,38 @@ describe("sync copy", () => {
     expect(familyNeedsDevices(null)).toBe(0);
   });
 
-  it("titles the status card and offers Reconcile now only when it helps", () => {
+  it("titles the status card and offers Sync now only when it helps", () => {
     expect(syncStatusCard(sync())).toEqual({
       title: "Gateway in sync",
       dot: "var(--ff-on)",
-      message: "Desired state is written on the next reconcile.",
+      message: "Your gateway has every change.",
+      attention: false,
       showReconcile: false,
-      reconcile: "Reconcile now",
+      reconcile: "Sync now",
+      settings: null,
     });
+    // Each state says its own thing; none borrows "every change" from another.
     const failed = sync({ lastRun: { ...sync().lastRun!, status: "failed", error: "UniFi unreachable" } });
-    expect(syncStatusCard(failed)).toMatchObject({ title: "Sync needs attention", dot: "var(--ff-danger)", message: "UniFi unreachable", showReconcile: true });
-    expect(syncStatusCard(sync({ connectionStatus: "unconfigured" }))).toMatchObject({ title: "UniFi not configured", dot: "var(--ff-muted)", showReconcile: true });
-    expect(syncStatusCard(sync({ lastRun: { ...sync().lastRun!, status: "partial" } }))).toMatchObject({ title: "Partial apply", showReconcile: true });
-    expect(syncStatusCard(sync(), { busy: true })).toMatchObject({ message: "Writing desired state to UniFi…", showReconcile: true, reconcile: "Reconciling…" });
+    expect(syncStatusCard(failed)).toMatchObject({ title: "Sync needs attention", dot: "var(--ff-danger)", message: "UniFi unreachable", attention: true, showReconcile: true });
+    expect(syncStatusCard(sync({ connectionStatus: "error", lastRun: { ...sync().lastRun!, status: "failed", error: null } })).message).toBe(
+      "The last sync didn’t finish. Sync shows why.",
+    );
+    expect(syncStatusCard(sync({ connectionStatus: "unconfigured" }))).toMatchObject({
+      title: "Gateway not connected",
+      message: "Connect your gateway in Settings.",
+      dot: "var(--ff-muted)",
+      attention: true,
+      showReconcile: false,
+      settings: { label: "Open Settings", href: "/settings?tab=gateway" },
+    });
+    expect(syncStatusCard(sync({ lastRun: { ...sync().lastRun!, status: "partial" } }))).toMatchObject({
+      title: "Partial apply",
+      message: "Some changes didn’t reach your gateway. Sync shows which.",
+      showReconcile: true,
+    });
+    expect(syncStatusCard(sync({ revision: 5 }))).toMatchObject({ title: "Waiting to sync", message: "Changes go to your gateway at the next sync.", attention: false });
+    expect(syncStatusCard(null)).toMatchObject({ title: "Waiting to sync", attention: false });
+    expect(syncStatusCard(sync(), { busy: true })).toMatchObject({ title: "Syncing…", message: "Sending changes to your gateway…", showReconcile: true, reconcile: "Syncing…" });
     expect(syncStatusCard(failed, { error: "Saving failed" }).message).toBe("Saving failed");
     expect(syncStatusCard(sync(), { notice: "Saved." }).message).toBe("Saved.");
   });

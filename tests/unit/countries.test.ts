@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COUNTRIES, RECOMMENDED_BLOCKED_COUNTRIES, countriesSummary, countryName, isCountryCode } from "@/lib/countries";
-import { countriesEditorState, fromCountriesRule, resetRecommendedCountries, searchCountries, toggleCountry, validateCountriesDraft } from "@/lib/countries-editor";
+import { countriesEditorState, countriesWrites, fromCountriesRule, resetRecommendedCountries, searchCountries, toggleCountry, validateCountriesDraft } from "@/lib/countries-editor";
 import { toggleRuleGroup } from "@/lib/rule-editor";
 import { ruleBlocksLabel } from "@/lib/rules";
 
@@ -48,6 +48,26 @@ describe("countries", () => {
     // A rule on networks carries no groupIds.
     const onNetworks = { enabled: true, countries: ["KP"], scope: "network" as const, networkIds: ["lan"] };
     expect(fromCountriesRule(onNetworks, groups)).toMatchObject({ scope: "network", networkIds: ["lan"] });
+  });
+
+  it("previews its one gateway entry: added when it first covers someone, then changed or kept", () => {
+    const groups = [{ id: "a" }, { id: "b" }];
+    // A household starts with it off and covering nobody, so the gateway has no entry yet.
+    const fresh = { id: "countries", enabled: false, countries: ["KP"], scope: "group" as const, groupIds: [], policyNames: ["FF: Block countries"] };
+    const start = fromCountriesRule(fresh, groups);
+    expect(countriesWrites({ ...start, enabled: true }, fresh, groups)).toEqual([{ verb: "NEW", name: "FF: Block countries", detail: "Blocks North Korea" }]);
+    expect(countriesWrites({ ...start, countries: [] }, fresh, groups)).toEqual([]);
+
+    const saved = { ...fresh, groupIds: ["a", "b"] };
+    const draft = fromCountriesRule(saved, groups);
+    expect(countriesWrites(draft, saved, groups)).toEqual([{ verb: "KEEP", name: "FF: Block countries", detail: "Off · blocks North Korea" }]);
+    expect(countriesWrites({ ...toggleCountry(draft, "RU"), enabled: true, groupIds: ["a"] }, saved, groups)).toEqual([
+      { verb: "CHANGE", name: "FF: Block countries", detail: "Turned on · Blocks North Korea and Russia · Applies to changed" },
+    ]);
+    // A draft that can't be saved changes nothing.
+    expect(countriesWrites({ ...draft, enabled: true, countries: [] }, saved, groups)[0]?.verb).toBe("KEEP");
+    // Before the server has named it, the preview names it as the gateway will.
+    expect(countriesWrites(draft, { ...saved, policyNames: [] }, groups)[0]?.name).toMatch(/Block countries$/);
   });
 
   it("searches by a word of the name or the code, leaving out the picked ones", () => {

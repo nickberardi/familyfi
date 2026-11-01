@@ -11,7 +11,6 @@ import type { LockDnsOpen, Rule } from "./rules";
 
 export const LOCK_DNS_COPY = {
   title: "Lock DNS",
-  back: "All rules",
   save: "Save",
   unsaved: "Unsaved changes",
   status: {
@@ -56,7 +55,7 @@ export const LOCK_DNS_COPY = {
   },
   writes: {
     title: "What FamilyFi will write",
-    note: "Applied on the next reconcile. Your own UniFi policies are never touched.",
+    note: "Sent to your gateway at the next sync. Rules you made on the gateway are never touched.",
     none: "Nothing until it applies to something.",
   },
 } as const;
