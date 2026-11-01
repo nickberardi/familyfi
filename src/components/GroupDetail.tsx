@@ -69,7 +69,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
                   disabled={busy}
                   onClick={header.more.onPress}
                   data-testid={header.more.testID}
-                  className="mt-1 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-50"
+                  className="mt-1 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
                 >
                   {header.more.label}
                 </button>

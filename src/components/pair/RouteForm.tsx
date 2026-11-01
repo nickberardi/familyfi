@@ -227,15 +227,15 @@ export function RouteForm({
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <button type="button" className={PRIMARY_BUTTON} disabled={saving || !canSave || !url.trim() || (pinned && !pin.trim())} onClick={() => void save()}>
-          {saving ? "Saving…" : "Use this address"}
-        </button>
+      <div className="flex flex-wrap justify-end gap-2">
         {onCancel ? (
           <button type="button" className={CANCEL_BUTTON} onClick={onCancel}>
             Cancel
           </button>
         ) : null}
+        <button type="button" className={PRIMARY_BUTTON} disabled={saving || !canSave || !url.trim() || (pinned && !pin.trim())} onClick={() => void save()}>
+          {saving ? "Saving…" : "Use this address"}
+        </button>
       </div>
     </div>
   );

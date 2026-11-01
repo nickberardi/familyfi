@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Add app filter": a member-page action only. Categories are a fixed catalog with nothing to add,
+ * "Block an app": a member-page action only. Categories are a fixed catalog with nothing to add,
  * so only app rules get an entry point, and never from the family-list card. The form is shared
  * with the native app (`src/ui/AddAppForm.tsx`); the dialog is the web's.
  */

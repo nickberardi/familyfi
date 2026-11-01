@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import type { UIConfirmRequest } from "@/ui/UIContext";
 
@@ -45,6 +45,13 @@ export function ConfirmHost() {
     () => pending,
     () => null,
   );
+  // Going Back leaves the page that asked, so the question is declined rather than left over the next one.
+  useEffect(() => {
+    if (!request) return;
+    const decline = () => answer(false);
+    window.addEventListener("popstate", decline);
+    return () => window.removeEventListener("popstate", decline);
+  }, [request]);
   if (!request) return null;
   return (
     <SheetFrame

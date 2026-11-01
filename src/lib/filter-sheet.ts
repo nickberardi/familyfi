@@ -58,14 +58,16 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
         shared ? ` Turning it off turns “${state.rule!.name}” off for every group it covers.` : ""
       }`
     : scheduledIdle
-      ? `${state.name} has a FamilyFi policy on a schedule, and this is not one of its hours.${
+      ? `${state.name} is blocked on a schedule, and this is not one of its hours.${
           upstreamBlocked ? " Its DNS resolver is blocking it anyway right now." : ""
         }`
       : upstreamBlocked
         ? `${group.name}'s DNS resolver already blocks every ${state.name} domain we test.${measured} FamilyFi is not doing it, so it cannot schedule or pause it — create a policy if you want that.`
         : upstreamPartial
           ? `${group.name}'s DNS resolver blocks ${upstream!.blockedCount} of ${upstream!.totalCount} ${state.name} domains we test.${measured} A FamilyFi policy would cover the rest.`
-          : "Create a FamilyFi policy? Schedulable afterward, same as Internet.";
+          : state.rule
+            ? `Turns “${state.rule.name}” back on with its own schedule.`
+            : `Blocks ${state.name} for ${group.name} all day. You can add a schedule afterwards.`;
   const domainCount = state.kind === "category" ? state.domains.length : 0;
   const websitesNote = `UniFi has no ${state.name} category, so FamilyFi can't block it as one. ${
     domainCount
@@ -80,9 +82,9 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
     /** A scheduled rule's windows, one line each. */
     windows: state.rule?.mode === "scheduled" ? (state.rule.windows ?? []).map((window) => `${window.name ? `${window.name} · ` : ""}${windowTimes(window.start, window.end)} · ${daysLabel(window.days)}`) : [],
     action,
-    actionLabel: websitesOnly ? "Block its websites" : owned ? "Turn off" : "Create policy",
-    /** The link to the rule editor, under the button. */
-    editLabel: state.rule ? "Edit rule and schedule" : "Schedule it instead",
+    actionLabel: websitesOnly ? "Block its websites" : owned ? `Turn off ${state.name}` : state.rule ? "Turn on" : `Block ${state.name}`,
+    /** The link to the rule editor under the button; a rule that is off only offers to turn back on. */
+    editLabel: owned ? "Edit rule and schedule" : state.rule ? "" : "Block on a schedule…",
     cancel: "Cancel",
     /** A phone showing a cached household can't change the rule until it reconnects. */
     stale: "Cached household — connect to FamilyFi to change this rule.",
@@ -133,20 +135,25 @@ export function filterEditHref(group: Pick<Group, "id">, state: CategorySheetSta
   return `/rules/new?kind=category&target=${state.kind === "category" ? state.categoryId : ""}&group=${group.id}`;
 }
 
-/** What adding an app filter to a group says. */
+/** When a Scheduled app rule from the Block an app form blocks: overnight, every day. */
+export const APP_NIGHT_WINDOW = { name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" } as const;
+
+/** What blocking an app for a group says. */
 export function addAppCopy(group: Pick<Group, "name">) {
   return {
-    title: "Add app filter",
+    title: "Block an app",
     body: `Blocks an app for ${group.name}.`,
     app: "App",
-    search: "Search catalog",
+    search: "Search apps",
     picker: "DPI application",
     pick: "Select…",
     enforcement: "Enforcement",
     always: "Always",
     scheduled: "Scheduled",
+    /** Under the control once Scheduled is picked: when it will block. */
+    scheduledNote: `Blocks ${windowTimes(APP_NIGHT_WINDOW.start, APP_NIGHT_WINDOW.end)} every day. Change it on the rule’s page.`,
     cancel: "Cancel",
-    create: "Create policy",
+    create: "Block",
     loadFailed: "Could not load the DPI catalog.",
     createFailed: "Could not block the app.",
   } as const;
@@ -170,7 +177,7 @@ export function createAppRule(
         groupIds: [group.id],
         targetIds: [appId],
         mode,
-        ...(mode === "scheduled" ? { windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }] } : {}),
+        ...(mode === "scheduled" ? { windows: [{ ...APP_NIGHT_WINDOW, days: [...APP_NIGHT_WINDOW.days] }] } : {}),
       },
     }),
   );

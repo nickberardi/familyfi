@@ -48,7 +48,7 @@ export function Chip({
       style={({ pressed }) => [
         styles.chip,
         { backgroundColor: ui.color(colors.fill), borderColor: ui.color(colors.line) },
-        disabled && { opacity: 0.5 },
+        disabled && { opacity: 0.4 },
         pressed && !disabled && { opacity: PRESS_OPACITY },
       ]}
     >

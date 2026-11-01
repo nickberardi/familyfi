@@ -126,7 +126,7 @@ export function PairedDevicesCard({
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="paired-devices">
       <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
         <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
-        <Text style={text(14, 21, "muted")}>{COPY.pairedSub}</Text>
+        <Text style={text(14, 21, "ink-2")}>{COPY.pairedSub}</Text>
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>
@@ -222,7 +222,7 @@ export function RemoteAccessSummary({ tunnel, published }: { tunnel: RemoteAcces
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
-  head: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 10, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
+  head: { gap: 2, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   remoteHead: { alignItems: "center", gap: 12 },
   bold: { fontWeight: "600" },
   regular: { fontWeight: "400" },

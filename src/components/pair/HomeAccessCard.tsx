@@ -52,7 +52,7 @@ export function HomeAccessCard() {
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
         <div className="min-w-[200px] flex-1">
           <div className="text-[14px] font-semibold">Home access</div>
-          <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">Where FamilyFi is on your home network. AI agents connect here.</div>
+          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">Where FamilyFi is on your home network. AI agents connect here.</div>
         </div>
         <span className="text-[14px] font-semibold text-[var(--ff-on-ink)]">Always on</span>
       </div>
@@ -82,12 +82,12 @@ export function HomeAccessCard() {
             <p className="text-[var(--ff-muted)]">
               {valid ? "An IP address and port, or a name such as familyfi.local. Leave it empty to use the address you open FamilyFi at." : "Use an http or https address with no path."}
             </p>
-            <div className="flex flex-wrap gap-2">
-              <button type="submit" className={PRIMARY_BUTTON} disabled={busy || !valid}>
-                Save
-              </button>
+            <div className="flex flex-wrap justify-end gap-2">
               <button type="button" className={CANCEL_BUTTON} disabled={busy} onClick={() => setEditing(false)}>
                 Cancel
+              </button>
+              <button type="submit" className={PRIMARY_BUTTON} disabled={busy || !valid}>
+                Save
               </button>
             </div>
           </form>

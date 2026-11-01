@@ -243,7 +243,7 @@ export function RemoteAccessCard({
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
         <div className="min-w-[200px] flex-1">
           <div className="text-[14px] font-semibold">Remote access</div>
-          <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">Choose how the FamilyFi app reaches home. Phones use this one address.</div>
+          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">Choose how the FamilyFi app reaches home. Phones use this one address.</div>
         </div>
         {tunnel && tunnel.status !== "off" ? (
           <span data-testid="remote-status" className="text-[14px] font-semibold" style={{ color: status.ink }}>

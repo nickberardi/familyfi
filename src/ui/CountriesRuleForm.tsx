@@ -102,7 +102,7 @@ export function CountriesRuleForm({
           disabled={disabled}
           onPress={() => edit(resetRecommendedCountries)}
           testID="countries-recommended"
-          style={({ pressed }) => [styles.textButton, disabled && { opacity: 0.5 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+          style={({ pressed }) => [styles.textButton, disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
         >
           <Text style={[styles.label, { fontFamily: ui.font, color: ui.color("accent") }]}>{COPY.countries.recommended}</Text>
         </Pressable>
