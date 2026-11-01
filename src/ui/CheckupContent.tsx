@@ -86,7 +86,7 @@ export function ProtectionCard({
             disabled={disabled}
             onPress={onTurnOnAll}
             testID="checkup-turn-on-all"
-            style={({ pressed }) => [styles.primary, { backgroundColor: ui.color("accent") }, disabled && { opacity: 0.5 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+            style={({ pressed }) => [styles.primary, { backgroundColor: ui.color("accent") }, disabled && { opacity: 0.6 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
           >
             <Text style={[styles.primaryLabel, { fontFamily: ui.font, color: ui.color("ink-on-fill") }]}>{COPY.protection.turnOnAll}</Text>
           </Pressable>
@@ -137,7 +137,7 @@ export function NetworkCheckupCard({
         title={COPY.network.title}
         sub={checkupSummary(checkup, now)}
         trailing={
-          <Pressable role="button" aria-disabled={disabled || checking} disabled={disabled || checking} onPress={onCheckNow} testID="checkup-run" style={({ pressed }) => [(disabled || checking) && { opacity: 0.5 }, pressed && { opacity: PRESS_OPACITY }]}>
+          <Pressable role="button" aria-disabled={disabled || checking} disabled={disabled || checking} onPress={onCheckNow} testID="checkup-run" style={({ pressed }) => [(disabled || checking) && { opacity: 0.4 }, pressed && { opacity: PRESS_OPACITY }]}>
             <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("accent") }]}>{checking ? COPY.network.checking : COPY.network.checkNow}</Text>
           </Pressable>
         }
@@ -333,7 +333,7 @@ function LeftoverRow({
               disabled={removeOff}
               onPress={() => onRemovePolicies(ticked)}
               testID="checkup-remove-policies"
-              style={({ pressed }) => [styles.danger, { borderColor: ui.color("danger") }, removeOff && { opacity: 0.5 }, pressed && !removeOff && { opacity: PRESS_OPACITY }]}
+              style={({ pressed }) => [styles.danger, { borderColor: ui.color("danger") }, removeOff && { opacity: 0.4 }, pressed && !removeOff && { opacity: PRESS_OPACITY }]}
             >
               <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("danger") }]}>{text.remove(ticked.length)}</Text>
             </Pressable>
@@ -397,7 +397,7 @@ function DriftRow({
               disabled={disabled}
               onPress={onPutBack}
               testID={`checkup-put-back-${finding.id}`}
-              style={({ pressed }) => [styles.solid, { backgroundColor: ui.color("accent") }, disabled && { opacity: 0.5 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+              style={({ pressed }) => [styles.solid, { backgroundColor: ui.color("accent") }, disabled && { opacity: 0.6 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
             >
               <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-on-fill") }]}>{text.putBack}</Text>
             </Pressable>

@@ -54,7 +54,7 @@ export function SyncContent({
               disabled={busy}
               onPress={onReconcile}
               testID="sync-problem-retry"
-              style={({ pressed }) => [styles.retry, { backgroundColor: ui.color("accent-fill") }, busy && { opacity: 0.5 }, pressed && !busy && { opacity: PRESS_OPACITY }]}
+              style={({ pressed }) => [styles.retry, { backgroundColor: ui.color("accent-fill") }, busy && { opacity: 0.4 }, pressed && !busy && { opacity: PRESS_OPACITY }]}
             >
               <Text style={[text(14, 21, "accent"), styles.bold]}>{busy ? "Trying again…" : "Try again now"}</Text>
             </Pressable>

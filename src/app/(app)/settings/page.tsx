@@ -20,7 +20,7 @@ import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
 import { useUpdateCheck } from "@/ui/use-update-check";
 import { useUpdateSettings } from "@/ui/use-update-settings";
 import { forgetCatalogNames } from "@/components/GroupGrid";
-import { CANCEL_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
+import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
 import { SheetFrame } from "@/components/pair/SheetFrame";
 
 const FIELD = "ff-input mt-1 font-normal";
@@ -248,7 +248,7 @@ function Settings() {
                     {unifi?.configured ? (
                       <button
                         type="button"
-                        className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-muted)]"
+                        className={CANCEL_BUTTON}
                         onClick={() => setEditingGateway(false)}
                       >
                         Done
@@ -295,7 +295,7 @@ function Settings() {
                     <button
                       type="button"
                       disabled={apiKey.length < 8}
-                      className="rounded-lg bg-[var(--ff-accent)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
+                      className={PRIMARY_BUTTON}
                       onClick={() => saveKey()}
                     >
                       Save and test
@@ -303,7 +303,7 @@ function Settings() {
                     {offerForget ? (
                       <button
                         type="button"
-                        className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-danger)]"
+                        className={DESTRUCTIVE_BUTTON}
                         onClick={() => saveKey(true)}
                       >
                         {SETTINGS_COPY.forgetOldGateway}
@@ -312,7 +312,7 @@ function Settings() {
                     {unifi?.configured ? (
                       <button
                         type="button"
-                        className="rounded-lg border border-[var(--ff-line)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-muted)]"
+                        className={CANCEL_BUTTON}
                         onClick={() => {
                           setPasting(false);
                           setApiKey("");
