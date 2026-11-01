@@ -2,7 +2,7 @@
  * AGENTS.md: before a PR, the `reviewer` subagent reviews the change. Claude reads it from
  * `.claude/agents/reviewer.md` and Codex from `.codex/agents/reviewer.toml`; the two must
  * give the same instructions, or one tool's review quietly checks less than the other's.
- * Every other subagent (`crash-hunter`, `bug-hunter`) follows the same rule.
+ * Every other subagent (`crash-hunter`, `bug-hunter`, `design-reviewer`) follows the same rule.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -43,7 +43,7 @@ const agents = agentNames(".claude/agents", ".md");
 
 describe("subagents (AGENTS.md)", () => {
   it("defines every subagent for both Claude and Codex", () => {
-    expect(agents).toEqual(expect.arrayContaining(["bug-hunter", "crash-hunter", "reviewer"]));
+    expect(agents).toEqual(expect.arrayContaining(["bug-hunter", "crash-hunter", "design-reviewer", "reviewer"]));
     expect(agentNames(".codex/agents", ".toml")).toEqual(agents);
   });
 

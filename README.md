@@ -52,6 +52,7 @@ Set `FAMILYFI_MODE=dev` to use a mock gateway and a seeded household instead of 
 | [Architecture](docs/architecture.md) | How enforcement, schedules and DNS reports work |
 | [API](docs/api.md) | The HTTP contract and authentication ([OpenAPI](openapi/familyfi.v1.yaml)) |
 | [Development](docs/development.md) and [testing](docs/testing.md) | Conventions, commands and checks |
+| [Design system](docs/design.md) | How FamilyFi looks and reads, kept in step with the design project |
 
 ### Contributing
 

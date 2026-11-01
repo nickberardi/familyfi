@@ -38,7 +38,7 @@ For a change to either shared artifact:
 5. Use the [native repository's current adoption instructions](https://github.com/nickberardi/familyfi-mobile/blob/main/docs/development.md#paired-familyfi-changes) for its refresh, generation and validation procedure. Keep those commands there. A passing server check does not establish that a consumer has adopted the change.
 
 Platform-specific navigation, typography and layout are owned by each implementation; use the
-[design ownership map](development.md#design-ownership) when comparing them.
+[design ownership map](design.md#ownership) when comparing them.
 
 ## Implemented
 
