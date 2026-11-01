@@ -44,12 +44,13 @@ export function SidebarStatus({
   const status = syncStatusCard(sync, { busy, error, notice });
   const attention = noMembersAttention(sync?.issues ?? []);
   // Whether sync needs a hand (failed, partial, not configured), whatever a write in flight says.
-  const syncNotice = syncStatusCard(sync).attention;
+  const settled = syncStatusCard(sync);
+  const syncNotice = settled.attention;
   // Most urgent first: the row takes the first one's dot.
   const notices = [
-    syncNotice && status.dot === "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,
+    syncNotice && settled.dot === "var(--ff-danger)" ? { title: settled.title, dot: settled.dot } : null,
     attention ? { title: attention.title, dot: "var(--ff-paused)" } : null,
-    syncNotice && status.dot !== "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,
+    syncNotice && settled.dot !== "var(--ff-danger)" ? { title: settled.title, dot: settled.dot } : null,
   ].filter((item) => item !== null);
   const title = notices.length > 1 ? `${notices.length} notices` : (notices[0]?.title ?? status.title);
   const dot = notices[0]?.dot ?? status.dot;
