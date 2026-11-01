@@ -77,7 +77,8 @@ export function noMembersAttention(
   const title = names.length === 1 ? `${names[0]} needs devices` : `${names.join(" and ")} need devices`;
   return {
     title,
-    message: rows[0]!.message,
+    // The server's issue text speaks of UniFi policies; the household page says it plainly.
+    message: names.length === 1 ? `${names[0]} has no devices, so its rules can’t apply yet.` : `${names.join(" and ")} have no devices, so their rules can’t apply yet.`,
     href: `/devices?assign=${rows[0]!.groupId}`,
   };
 }

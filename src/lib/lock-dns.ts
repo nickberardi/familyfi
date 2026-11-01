@@ -11,7 +11,6 @@ import type { LockDnsOpen, Rule } from "./rules";
 
 export const LOCK_DNS_COPY = {
   title: "Lock DNS",
-  back: "All rules",
   save: "Save",
   unsaved: "Unsaved changes",
   status: {

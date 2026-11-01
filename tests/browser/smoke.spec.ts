@@ -934,10 +934,11 @@ test("Rules: the built-in rule pages go back where they were opened from and pre
     await expect(back).toHaveAttribute("href", `/rules?group=${nick!.id}`);
     await expect(page.getByRole("heading", { name: "What FamilyFi will write" })).toBeVisible();
   }
-  // Nothing changed yet: Block countries keeps its one entry on the gateway.
-  await expect(page.getByTestId("rule-writes").getByText("KEEP")).toHaveCount(1);
-  await page.getByTestId("countries-enabled").click();
-  await expect(page.getByTestId("rule-writes").getByText("CHANGE")).toBeVisible();
+  // Block countries is one entry on the gateway: switching it previews a change to that entry, or adds it.
+  const writes = page.getByTestId("rule-writes");
+  await expect(writes.getByRole("listitem")).toHaveCount(1);
+  await page.getByRole("switch", { name: "Block countries" }).click();
+  await expect(writes.getByText(/Turned (on|off)|^Blocks /).first()).toBeVisible();
 });
 
 test("Block for a custom time, then offer it first next time", { tag: "@desktop" }, async ({ page }) => {
@@ -1285,7 +1286,7 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await expect(page.getByRole("button", { name: "Block an app" })).toBeVisible();
   // Adding an app the server refuses keeps the form open, saying so.
   await page.getByRole("button", { name: "Block an app" }).click();
-  const picker = page.getByLabel("DPI application");
+  const picker = page.getByLabel("App", { exact: true });
   await expect(picker.locator("option")).not.toHaveCount(1);
   await picker.selectOption({ index: 1 });
   await page.route("**/api/v1/rules", (route) =>

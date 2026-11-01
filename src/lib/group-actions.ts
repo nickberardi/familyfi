@@ -115,7 +115,8 @@ export type GroupStatus = {
 
 /**
  * What a card's status line says the group is doing now: blocked, which rule blocks it, an
- * unblock, or (with nothing of the kind) its internet schedule.
+ * unblock, its internet rule paused or allowed (for it, or for everyone), or (with nothing of the
+ * kind) its internet schedule.
  */
 export function groupStatus(group: Group, rules: Rule[], timezone: string, now: Date): GroupStatus {
   const by = (actor: Actor) => (actor ? ` by ${actor.name}` : "");
@@ -141,7 +142,8 @@ export function groupStatus(group: Group, rules: Rule[], timezone: string, now: 
   if (paused) return { tone: "on", label: `Online · internet rule paused ${until(paused.until, "until you resume")}` };
   const pausedForEveryone = internetRules.find((rule) => rule.enabled && rulePaused(rule, now));
   if (pausedForEveryone && internetWindowsForGroup(rules, group.id, now).length === 0) {
-    return { tone: "on", label: `Online · internet rule paused for everyone ${until(pausedForEveryone.pause.until, "until you resume")}` };
+    const verb = pausedForEveryone.pause.kind === "allow" ? "allowed" : "paused";
+    return { tone: "on", label: `Online · internet rule ${verb} for everyone ${until(pausedForEveryone.pause.until, "until you resume")}` };
   }
   return { tone: "on", label: cardStateLabel(group, internetWindowsForGroup(rules, group.id, now), timezone, now) };
 }

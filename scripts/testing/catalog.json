@@ -920,6 +920,11 @@
         "rules"
       ]
     },
+    "tests/browser/smoke.spec.ts > Rules: the built-in rule pages go back where they were opened from and preview their writes": {
+      "categories": [
+        "rules"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Rules: quarantine is a built-in rule that pauses from its card and resumes on Devices": {
       "categories": [
         "rules",

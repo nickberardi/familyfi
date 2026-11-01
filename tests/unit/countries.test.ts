@@ -50,9 +50,15 @@ describe("countries", () => {
     expect(fromCountriesRule(onNetworks, groups)).toMatchObject({ scope: "network", networkIds: ["lan"] });
   });
 
-  it("previews its one gateway entry, changed or kept, never added or deleted", () => {
+  it("previews its one gateway entry: added when it first covers someone, then changed or kept", () => {
     const groups = [{ id: "a" }, { id: "b" }];
-    const saved = { id: "countries", enabled: false, countries: ["KP"], scope: "group" as const, groupIds: [], policyNames: ["FF: Block countries"] };
+    // A household starts with it off and covering nobody, so the gateway has no entry yet.
+    const fresh = { id: "countries", enabled: false, countries: ["KP"], scope: "group" as const, groupIds: [], policyNames: ["FF: Block countries"] };
+    const start = fromCountriesRule(fresh, groups);
+    expect(countriesWrites({ ...start, enabled: true }, fresh, groups)).toEqual([{ verb: "NEW", name: "FF: Block countries", detail: "Blocks North Korea" }]);
+    expect(countriesWrites({ ...start, countries: [] }, fresh, groups)).toEqual([]);
+
+    const saved = { ...fresh, groupIds: ["a", "b"] };
     const draft = fromCountriesRule(saved, groups);
     expect(countriesWrites(draft, saved, groups)).toEqual([{ verb: "KEEP", name: "FF: Block countries", detail: "Off · blocks North Korea" }]);
     expect(countriesWrites({ ...toggleCountry(draft, "RU"), enabled: true, groupIds: ["a"] }, saved, groups)).toEqual([

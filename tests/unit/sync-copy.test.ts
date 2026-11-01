@@ -49,7 +49,7 @@ describe("sync copy", () => {
       ]),
     ).toEqual({
       title: "Betsy needs devices",
-      message: "Betsy has no assigned devices, so its UniFi policies cannot be created.",
+      message: "Betsy has no devices, so its rules can’t apply yet.",
       href: "/devices?assign=betsy",
     });
     expect(issueActionLabel("no_members")).toBe("Needs assigned devices");
