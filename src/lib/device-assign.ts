@@ -26,6 +26,6 @@ export function networkLabel(device: Device, networks: { id: string; name: strin
 export function assignDevicesCopy(group: Pick<Group, "name">) {
   return {
     needsTitle: `${group.name} needs devices`,
-    needsBody: `${group.name} has no assigned devices, so its UniFi policies cannot be created. Assign an unassigned device below.`,
+    needsBody: `${group.name} has no assigned devices, so its rules can’t apply yet. Assign an unassigned device below.`,
   } as const;
 }

@@ -403,7 +403,7 @@ export function createHouseholdStore(deps: {
             // A change the gateway refused is reported even after a newer write, so it is never lost.
             if (change.status === "failed") set({ error: change.error ?? "That change did not apply." });
             else if (followToken !== followGen) return;
-            else if (change.status === "partial") set({ notice: change.error ?? "Reconcile finished with issues." });
+            else if (change.status === "partial") set({ notice: change.error ?? "Some changes didn’t reach your gateway. Sync shows which." });
             else if (change.status === "pending") set({ notice: change.error ?? "Still applying." });
             // Keep the change's own notice, and its Undo, once the gateway has it.
             else if (feedback) set({ error: "" });

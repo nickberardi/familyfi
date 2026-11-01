@@ -66,8 +66,8 @@ describe("ruleWritePlan", () => {
     const always = { ...video, mode: "always" as const, windows: [] };
     expect(ruleWritePlan(video, always)).toEqual([
       { verb: "NEW", name: "FamilyFi Video", detail: "Always on" },
-      { verb: "DELETE", name: "FamilyFi Video – Dinner", detail: "Replaced by the always-on policy" },
-      { verb: "DELETE", name: "FamilyFi Video – Overnight", detail: "Replaced by the always-on policy" },
+      { verb: "DELETE", name: "FamilyFi Video – Dinner", detail: "Replaced by the always-on entry" },
+      { verb: "DELETE", name: "FamilyFi Video – Overnight", detail: "Replaced by the always-on entry" },
     ]);
     expect(ruleWritePlan(always, video)[0]).toEqual({ verb: "DELETE", name: "FamilyFi Video", detail: "Replaced by scheduled windows" });
     expect(ruleWritePlan(always, { ...always, targetIds: [24] })).toEqual([{ verb: "CHANGE", name: "FamilyFi Video", detail: "Blocks changed" }]);

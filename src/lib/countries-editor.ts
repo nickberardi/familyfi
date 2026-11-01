@@ -69,20 +69,23 @@ export function countriesEditorState(draft: CountriesDraft, saved: SavedCountrie
 }
 
 /**
- * What saving writes: Block countries is one always-on entry on the gateway, kept while it is off,
- * so a save changes it or keeps it, never adds or deletes one. A draft that can't be saved previews no change.
+ * What saving writes, as Lock DNS previews it: Block countries is one always-on entry on the gateway
+ * once it covers someone, kept while it is off. A household starts with it covering nobody, so its
+ * first save adds it. A draft that can't be saved previews no change.
  */
 export function countriesWrites(draft: CountriesDraft, saved: SavedCountries & Partial<Pick<Rule, "id" | "policyNames">>, groups: Pick<Group, "id">[]): RuleWrite[] {
   const before = fromCountriesRule(saved, groups);
   const after = validateCountriesDraft(draft) ? before : draft;
   const name = saved.policyNames?.[0] ?? rulePolicyNames({ id: saved.id ?? "", name: COUNTRIES_EDITOR_COPY.title, useGeneratedName: false, mode: "always", windows: [] })[0]!;
+  const detail = `${after.enabled ? "Blocks" : "Off · blocks"} ${countriesSummary(after.countries)}`;
+  if (saved.scope === "group" && !saved.groupIds?.length) return after === draft ? [{ verb: "NEW", name, detail }] : [];
   const why = [
     ...(before.enabled !== after.enabled ? [after.enabled ? "Turned on" : "Turned off"] : []),
     ...(before.countries.join() !== [...after.countries].sort().join() ? [`Blocks ${countriesSummary(after.countries)}`] : []),
     ...(sameAppliesTo(before, after) ? [] : ["Applies to changed"]),
   ];
   if (why.length) return [{ verb: "CHANGE", name, detail: why.join(" · ") }];
-  return [{ verb: "KEEP", name, detail: `${after.enabled ? "Blocks" : "Off · blocks"} ${countriesSummary(after.countries)}` }];
+  return [{ verb: "KEEP", name, detail }];
 }
 
 /** What saving sends: the switch, the countries, and what it applies to. */
@@ -126,6 +129,7 @@ export const COUNTRIES_EDITOR_COPY = {
   },
   writes: {
     title: "What FamilyFi will write",
+    none: "Nothing until it applies to something.",
     note: "One entry on your gateway, sent at the next sync. Rules you made on the gateway are never touched.",
   },
 } as const;

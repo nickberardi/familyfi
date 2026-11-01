@@ -117,7 +117,7 @@ export function CountriesRuleForm({
 
       {writes ? (
         <EditorSection title={COPY.writes.title} note={COPY.writes.note}>
-          <RuleWritesList writes={writes} />
+          {writes.length ? <RuleWritesList writes={writes} /> : <Text style={note}>{COPY.writes.none}</Text>}
         </EditorSection>
       ) : null}
     </View>

@@ -45,7 +45,7 @@ export function ruleWritePlan(saved: RuleDraft | null, draft: RuleDraft): RuleWr
     if (saved?.mode === "always") writes.push(change(name, savedNames[0]!, []));
     else writes.push({ verb: "NEW", name, detail: "Always on" });
     if (saved?.mode === "scheduled") {
-      savedNames.forEach((before) => writes.push({ verb: "DELETE", name: before, detail: "Replaced by the always-on policy" }));
+      savedNames.forEach((before) => writes.push({ verb: "DELETE", name: before, detail: "Replaced by the always-on entry" }));
     }
     return writes;
   }

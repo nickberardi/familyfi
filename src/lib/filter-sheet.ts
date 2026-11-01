@@ -54,7 +54,7 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
   const websitesOnly = state.kind === "category" && state.categoryId === null && !state.rule;
   const shared = (state.rule?.groupIds?.length ?? 0) > 1;
   const body = on
-    ? `Its own policy, its own controls — scoped to ${state.name} only. Everything else stays on.${
+    ? `Blocks ${state.name} only, with its own controls. Everything else stays on.${
         shared ? ` Turning it off turns “${state.rule!.name}” off for every group it covers.` : ""
       }`
     : scheduledIdle
@@ -64,7 +64,7 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
       : upstreamBlocked
         ? `${group.name}'s DNS resolver already blocks every ${state.name} domain we test.${measured} FamilyFi is not doing it, so it cannot schedule or pause it. Block it here if you want that.`
         : upstreamPartial
-          ? `${group.name}'s DNS resolver blocks ${upstream!.blockedCount} of ${upstream!.totalCount} ${state.name} domains we test.${measured} A FamilyFi policy would cover the rest.`
+          ? `${group.name}'s DNS resolver blocks ${upstream!.blockedCount} of ${upstream!.totalCount} ${state.name} domains we test.${measured} Block it here to cover the rest.`
           : state.rule
             ? `Turns “${state.rule.name}” back on with its own schedule.`
             : `Blocks ${state.name} for ${group.name} all day. You can add a schedule afterwards.`;
@@ -145,7 +145,7 @@ export function addAppCopy(group: Pick<Group, "name">) {
     body: `Blocks an app for ${group.name}.`,
     app: "App",
     search: "Search apps",
-    picker: "DPI application",
+    picker: "App",
     pick: "Select…",
     enforcement: "Enforcement",
     always: "Always",
@@ -154,7 +154,7 @@ export function addAppCopy(group: Pick<Group, "name">) {
     scheduledNote: `Blocks ${windowTimes(APP_NIGHT_WINDOW.start, APP_NIGHT_WINDOW.end)} every day. Change it on the rule’s page.`,
     cancel: "Cancel",
     create: "Block",
-    loadFailed: "Could not load the DPI catalog.",
+    loadFailed: "Could not load the list of apps.",
     createFailed: "Could not block the app.",
   } as const;
 }
