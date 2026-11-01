@@ -10,7 +10,7 @@ import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
 
 /**
  * The cards beside the web's navigation, which the app shows at the top of More: whether the
- * gateway is in sync (with Reconcile now when it is not), groups that need a
+ * gateway is in sync (with Sync now when it is not), groups that need a
  * device, and who is signed in.
  */
 
@@ -55,7 +55,7 @@ function CardButton({ label, fill, ink, onPress, disabled, testID }: { label: st
   );
 }
 
-/** Whether the gateway is in sync, why not, and Reconcile now when it is not. */
+/** Whether the gateway is in sync, why not, and Sync now (or Settings) when it is not. */
 export function SyncStatusCard({
   sync,
   busy,
@@ -84,6 +84,13 @@ export function SyncStatusCard({
       <Text style={[text(14, 20, "muted"), styles.body]}>{status.message}</Text>
       {status.showReconcile ? (
         <CardButton label={status.reconcile} fill="accent-fill" ink="accent" onPress={onReconcile} disabled={busy || disabled} testID="sync-reconcile" />
+      ) : null}
+      {status.settings ? (
+        <ui.Link href={status.settings.href} testID="sync-open-settings">
+          <View style={[styles.button, { backgroundColor: ui.color("accent-fill") }]}>
+            <Text style={[text(14, 21, "accent"), styles.buttonLabel]}>{status.settings.label}</Text>
+          </View>
+        </ui.Link>
       ) : null}
     </Card>
   );

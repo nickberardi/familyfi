@@ -173,7 +173,7 @@ export function saveRule(mutate: Mutate, draft: EditorDraft, saved: Pick<Rule, "
 /** Delete a rule; it leaves the list once the server agrees. */
 export function deleteRule(mutate: Mutate, saved: Pick<Rule, "id" | "name">) {
   return mutate(async (send) => ({ ...(await send<object>(`/api/v1/rules/${saved.id}`, { method: "DELETE" })), removedRuleId: saved.id }), {
-    feedback: { notice: `${saved.name} deleted. Its UniFi policies are removed on the next reconcile.` },
+    feedback: { notice: `${saved.name} deleted.` },
   });
 }
 
@@ -282,7 +282,6 @@ export function ruleEditorState(draft: EditorDraft, saved: Rule | null) {
   const summary = [
     RULE_KINDS.find((item) => item.value === draft.kind)!.label,
     scheduled ? `${windows.length} ${windows.length === 1 ? "window" : "windows"}` : "always",
-    `${policyNames.length} UniFi ${policyNames.length === 1 ? "policy" : "policies"}`,
   ].join(" · ");
   return {
     title: draft.name.trim() || saved?.name || "New rule",
@@ -316,14 +315,14 @@ export const RULE_EDITOR_COPY = {
   notFoundTitle: "Rule not found",
   notFoundLine: "This rule was deleted, or the link is out of date.",
   builtIn: "Quarantine is built in, so it can’t be edited. Switch it, pause it or resume it from Rules or Devices.",
-  name: { title: "Name", note: "What your household calls it, and what UniFi’s policy table shows.", label: "Rule name", placeholder: "e.g. School nights" },
+  name: { title: "Name", note: "What your household calls it, and the name your gateway shows.", label: "Rule name", placeholder: "e.g. School nights" },
   policyNames: {
-    one: "Name in UniFi",
-    many: "Names in UniFi · one policy per window",
+    one: "Name on the gateway",
+    many: "Names on the gateway · one per window",
     useRuleName: "Use rule name",
     useGenerated: "Use generated name",
-    oneNote: "Follows the rule name. With a second window each policy gets the window’s name on the end.",
-    manyNote: "Rule name, then the window name. The FamilyFi prefix is fixed, so administrators can tell FamilyFi’s policies apart.",
+    oneNote: "Follows the rule name. With a second window each entry gets the window’s name on the end.",
+    manyNote: "Rule name, then the window name. The FamilyFi prefix is fixed, so you can tell FamilyFi’s entries apart.",
   },
   blocks: { title: "What it blocks", savedKind: "A saved rule keeps what it blocks. Make a new rule to block something else." },
   domains: {
@@ -333,17 +332,17 @@ export const RULE_EDITOR_COPY = {
   },
   when: {
     title: "When",
-    note: "Each window is its own UniFi policy with one schedule. Windows can cross midnight.",
+    note: "Each window is a separate entry on your gateway. Windows can cross midnight.",
     always: "Always",
     scheduled: "Scheduled",
-    alwaysNote: "Blocked all day, every day. One UniFi policy.",
+    alwaysNote: "Blocked all day, every day. One entry on your gateway.",
     removed: "removed on save.",
     undo: "Undo",
-    newWindow: "New · adds 1 policy",
+    newWindow: "New · adds 1 window",
     lastWindow: "A scheduled rule needs at least one window. To remove it entirely, delete the rule.",
     overlap: "Both block while they overlap; access comes back when the later one ends.",
     add: "+ Add window",
-    addNote: "Each window adds one UniFi policy",
+    addNote: "Each window adds one entry on your gateway.",
   },
   appliesTo: {
     title: "Applies to",
@@ -354,7 +353,7 @@ export const RULE_EDITOR_COPY = {
     networksLabel: "Networks",
     internetNote: "All internet can’t be blocked for a whole network, which would take every device offline. Choose the people and things it applies to.",
   },
-  writes: { title: "What FamilyFi will write", note: "Applied on the next reconcile. Your own UniFi policies are never touched." },
+  writes: { title: "What FamilyFi will write", note: "Sent to your gateway at the next sync. Rules you made on the gateway are never touched." },
 } as const;
 
 /** A window's name, or its place in the list. */
@@ -371,7 +370,7 @@ export function windowTimeLabels(kind: RuleKind): { start: string; end: string }
 export function deleteRuleCopy(saved: Pick<Rule, "name" | "policyNames">) {
   return {
     title: `Delete “${saved.name}”?`,
-    message: `Removes ${saved.policyNames.length === 1 ? "its UniFi policy" : `all ${saved.policyNames.length} of its UniFi policies`} on the next reconcile, and discards unsaved edits. Other rules are not affected. This can’t be undone.`,
+    message: "Removes it from your gateway at the next sync and discards unsaved edits. Other rules aren’t affected. This can’t be undone.",
     cancel: "Cancel",
     confirm: "Delete rule",
   } as const;

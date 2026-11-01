@@ -838,7 +838,7 @@
         },
         "windows": []
       },
-      "expected": "4 devices · no internet rule"
+      "expected": "4 devices"
     },
     {
       "fn": "cardNoteLine",
@@ -867,7 +867,7 @@
         },
         "windows": []
       },
-      "expected": "4 devices · no internet rule"
+      "expected": "4 devices"
     },
     {
       "fn": "cardNoteLine",
@@ -896,7 +896,7 @@
         },
         "windows": []
       },
-      "expected": "4 devices · no internet rule"
+      "expected": "4 devices"
     },
     {
       "fn": "cardNoteLine",
@@ -1031,7 +1031,7 @@
           }
         ]
       },
-      "expected": "No devices · rules cannot apply on UniFi until you assign one"
+      "expected": "No devices · assign one so its rules apply"
     },
     {
       "fn": "cardNoteLine",
@@ -1060,7 +1060,7 @@
         },
         "windows": []
       },
-      "expected": "0 devices · no internet rule"
+      "expected": "0 devices"
     },
     {
       "fn": "cardNoteLine",
@@ -1089,7 +1089,7 @@
         },
         "windows": []
       },
-      "expected": "0 devices · no internet rule"
+      "expected": "0 devices"
     },
     {
       "fn": "cardStateLabel",
@@ -1442,7 +1442,7 @@
         "windows": [],
         "now": "2026-09-14T22:00:00-04:00"
       },
-      "expected": "No controls applied"
+      "expected": "Online · no internet rule"
     },
     {
       "fn": "cardStateLabel",
@@ -3063,7 +3063,7 @@
           }
         ]
       },
-      "expected": "4 devices · 2 internet schedules"
+      "expected": "4 devices · 2 internet windows"
     },
     {
       "fn": "cardNoteLine",
@@ -3095,7 +3095,7 @@
         },
         "windows": []
       },
-      "expected": "No devices · rules cannot apply on UniFi until you assign one"
+      "expected": "No devices · assign one so its rules apply"
     },
     {
       "fn": "cardNoteLine",
@@ -17489,6 +17489,192 @@
       "expected": {
         "tone": "on",
         "label": "Online · Dinner at 6:00 PM"
+      }
+    },
+    {
+      "fn": "groupStatus",
+      "name": "an internet rule switched off is not no rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": false,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "tone": "on",
+        "label": "Online · internet rule off"
+      }
+    },
+    {
+      "fn": "groupStatus",
+      "name": "an internet rule paused for everyone",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": true,
+              "until": "2026-10-15T22:00:00.000Z",
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "tone": "on",
+        "label": "Online · internet rule paused for everyone until 6:00 PM"
       }
     },
     {

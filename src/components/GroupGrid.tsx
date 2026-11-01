@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { request } from "@/lib/api";
 import { readCatalogNames, loadUpstreamCategories, type CatalogNames } from "@/lib/category-marks";
+import { newGroupCopy } from "@/lib/group-form";
 import { groupPageSummary, groupPageTitle } from "@/lib/group-page";
 import { householdTimezone } from "@/lib/household-state";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
@@ -80,7 +81,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
       <PageHeader
         title={title}
         sub={sub}
-        actionLabel="Add"
+        actionLabel={newGroupCopy(kind).title}
         onAction={() => setAdding(true)}
       />
       <div className="grid grid-cols-1 items-start gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">

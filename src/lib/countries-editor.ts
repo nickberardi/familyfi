@@ -5,7 +5,9 @@
  */
 import { COUNTRIES, RECOMMENDED_BLOCKED_COUNTRIES, countriesSummary, countryName, type Country } from "./countries";
 import type { HouseholdStore } from "./household-store";
-import { appliesToBody, type AppliesTo } from "./rule-editor";
+import { rulePolicyNames } from "./policy-names";
+import { appliesToBody, sameAppliesTo, type AppliesTo } from "./rule-editor";
+import type { RuleWrite } from "./rule-writes";
 import type { Rule } from "./rules";
 import type { Group } from "./types";
 
@@ -66,6 +68,23 @@ export function countriesEditorState(draft: CountriesDraft, saved: SavedCountrie
   };
 }
 
+/**
+ * What saving writes: Block countries is one always-on entry on the gateway, kept while it is off,
+ * so a save changes it or keeps it, never adds or deletes one. A draft that can't be saved previews no change.
+ */
+export function countriesWrites(draft: CountriesDraft, saved: SavedCountries & Partial<Pick<Rule, "id" | "policyNames">>, groups: Pick<Group, "id">[]): RuleWrite[] {
+  const before = fromCountriesRule(saved, groups);
+  const after = validateCountriesDraft(draft) ? before : draft;
+  const name = saved.policyNames?.[0] ?? rulePolicyNames({ id: saved.id ?? "", name: COUNTRIES_EDITOR_COPY.title, useGeneratedName: false, mode: "always", windows: [] })[0]!;
+  const why = [
+    ...(before.enabled !== after.enabled ? [after.enabled ? "Turned on" : "Turned off"] : []),
+    ...(before.countries.join() !== [...after.countries].sort().join() ? [`Blocks ${countriesSummary(after.countries)}`] : []),
+    ...(sameAppliesTo(before, after) ? [] : ["Applies to changed"]),
+  ];
+  if (why.length) return [{ verb: "CHANGE", name, detail: why.join(" · ") }];
+  return [{ verb: "KEEP", name, detail: `${after.enabled ? "Blocks" : "Off · blocks"} ${countriesSummary(after.countries)}` }];
+}
+
 /** What saving sends: the switch, the countries, and what it applies to. */
 function sent(draft: CountriesDraft) {
   return { enabled: draft.enabled, countries: [...draft.countries].sort(), ...appliesToBody(draft) };
@@ -86,7 +105,7 @@ export const COUNTRIES_EDITOR_COPY = {
   unsaved: "Unsaved changes",
   status: {
     title: "Status",
-    note: "When it’s on, one FamilyFi policy in UniFi stops the chosen groups’ devices reaching servers in these countries. Everything else stays on.",
+    note: "When it’s on, the devices it applies to can’t reach servers in these countries. Everything else keeps working.",
     label: "Block countries",
   },
   countries: {
@@ -104,5 +123,9 @@ export const COUNTRIES_EDITOR_COPY = {
     note: "Every group, Things too, unless you narrow it or pick whole networks. A new group joins while every group is on.",
     none: "Pick at least one person or thing the rule applies to.",
     noNetwork: "Pick at least one network.",
+  },
+  writes: {
+    title: "What FamilyFi will write",
+    note: "One entry on your gateway, sent at the next sync. Rules you made on the gateway are never touched.",
   },
 } as const;

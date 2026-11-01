@@ -73,8 +73,13 @@ describe("rules helpers", () => {
     const catalog = new Map([["app:99", "TikTok"]]);
     expect(parentFacingRuleLabel(rule({ id: "1", kind: "category", targetIds: [4] }), catalog)).toBe("Video");
     expect(parentFacingRuleLabel(rule({ id: "2", kind: "app", targetIds: [99] }), catalog)).toBe("TikTok");
-    expect(parentFacingRuleLabel(rule({ id: "3", kind: "app", targetIds: [12345] }), catalog)).toBe("App");
+    // An app the catalog hasn't named yet, and a rule blocking several, go by the rule's name.
+    expect(parentFacingRuleLabel(rule({ id: "3", kind: "app", name: "Chat app", targetIds: [12345] }), catalog)).toBe("Chat app");
+    expect(parentFacingRuleLabel(rule({ id: "4", kind: "app", name: "Kid apps", targetIds: [99, 100] }), catalog)).toBe("Kid apps");
+    expect(parentFacingRuleLabel(rule({ id: "5", kind: "app", name: "", targetIds: [12345] }), catalog)).toBe("App");
     expect(glyphForAppName("TikTok")).toBe("TI");
+    expect(glyphForAppName("Kid apps")).toBe("KA");
+    expect(glyphForAppName("")).toBe("AP");
   });
 
   it("normalizes a pasted website to the domain the gateway blocks", () => {

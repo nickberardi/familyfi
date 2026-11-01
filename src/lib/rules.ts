@@ -180,19 +180,22 @@ export function parentFacingRuleLabel(
     const slot = CURATED_CATEGORY_SLOTS.find((s) => (rule.targetIds ?? []).includes(s.categoryId));
     if (slot) return slot.label;
   }
-  const key = `${rule.kind}:${(rule.targetIds ?? []).join(",")}`;
-  const named = catalogNames.get(key);
-  if (named) return named;
-  if ((rule.targetIds ?? []).length === 1) {
-    const single = catalogNames.get(`${rule.kind}:${(rule.targetIds ?? [])[0]}`);
+  const targets = rule.targetIds ?? [];
+  // One app is called by its name; a rule blocking several ("Kid apps") by its own name, as is
+  // one whose app the catalog has not named yet, so a mark never reads a bare "App".
+  if (targets.length === 1) {
+    const single = catalogNames.get(`${rule.kind}:${targets[0]}`);
     if (single) return single;
   }
+  if (rule.kind === "app" && rule.name.trim()) return rule.name;
   return rule.kind === "category" ? "Category" : rule.kind === "app" ? "App" : rule.name;
 }
 
+/** A mark's two letters: a name of several words by their initials ("Kid apps" → KA), one word by its first two (TikTok → TI). */
 export function glyphForAppName(name: string): string {
-  const cleaned = name.replace(/[^a-zA-Z0-9]/g, "");
-  return (cleaned.slice(0, 2) || "AP").toUpperCase();
+  const words = name.split(/\s+/).map((word) => word.replace(/[^a-zA-Z0-9]/g, "")).filter(Boolean);
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return (words.join("").slice(0, 2) || "AP").toUpperCase();
 }
 
 export type InternetRulePreset = { name: string; days: number[]; start: string; end: string; label: string };

@@ -24,7 +24,7 @@ const group = (overrides: Partial<Group> = {}) =>
 
 describe("adding a group", () => {
   it("asks a family member for a role and a Things group for a monogram", () => {
-    expect(newGroupCopy("family")).toMatchObject({ title: "New family member", create: "Add person" });
+    expect(newGroupCopy("family")).toMatchObject({ title: "New person", create: "Add person" });
     expect(newGroupCopy("things")).toMatchObject({ title: "New group", create: "Create group" });
     expect(newGroupBody({ kind: "family", name: " Sam ", familyRole: "teen", monogram: "XX" })).toEqual({
       kind: "family",

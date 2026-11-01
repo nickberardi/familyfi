@@ -24,6 +24,7 @@ import {
 import {
   COUNTRIES_EDITOR_COPY,
   countriesEditorState,
+  countriesWrites,
   fromCountriesRule,
   saveCountriesRule,
   validateCountriesDraft,
@@ -59,7 +60,7 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
     if (loading) return null;
     return <NotFound title={COPY.notFoundTitle} line={COPY.notFoundLine} back={{ href: "/rules", label: "All rules" }} />;
   }
-  if (rule?.builtIn === "dns") return <LockDnsPage key={rule.id} rule={rule} />;
+  if (rule?.builtIn === "dns") return <LockDnsPage key={rule.id} rule={rule} returnGroup={one(search.group) ?? null} />;
   if (rule?.builtIn === "countries") return <CountriesEditor key={rule.id} saved={rule} returnGroup={one(search.group) ?? null} />;
   if (rule?.builtIn) {
     return (
@@ -183,7 +184,7 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
   );
 }
 
-/** Block countries: its switch, countries and groups. Its name, kind and schedule are FamilyFi's. */
+/** Block countries: its switch, countries and groups, and what saving writes. Its name, kind and schedule are FamilyFi's. */
 function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: string | null }) {
   const router = useRouter();
   const { groups, unifi, store, busy } = useAppData();
@@ -222,6 +223,7 @@ function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: str
           groups={groups}
           networks={managedNetworksOf(unifi)}
           error={error}
+          writes={countriesWrites(draft, saved, groups)}
           edit={(next) => {
             setError("");
             setDraft(next);
