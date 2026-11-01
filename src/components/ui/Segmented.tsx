@@ -31,7 +31,7 @@ export function Segmented<T extends string>({
 }) {
   // A stretched row of five shares a phone's width, so its segments pad less there.
   const pad =
-    size === "sm" ? "px-2.5 py-1.5 text-[11px]" : size === "lg" ? "px-3 py-1.5 text-[14px]" : grow ? "px-1.5 py-1.5 text-[13px] sm:px-3" : "px-3 py-1.5 text-[13px]";
+    size === "sm" ? "px-2.5 py-1.5 text-[14px]" : size === "lg" ? "px-3 py-1.5 text-[14px]" : grow ? "px-1.5 py-1.5 text-[14px] sm:px-3" : "px-3 py-1.5 text-[14px]";
 
   return (
     <div

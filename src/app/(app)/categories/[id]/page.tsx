@@ -1,9 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { PageHeader } from "@/components/PageHeader";
+import { BackLink, DETAIL_PAGE } from "@/components/ui/BackLink";
+import { NotFound } from "@/components/ui/NotFound";
 import { request } from "@/lib/api";
+import { ApiError } from "@/lib/api-client";
+import { sourceNoteText } from "@/lib/upstream";
+import { Alert } from "@/ui/Alert";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
 import { CATEGORIES_COPY, loadUpstreamCategory } from "@/lib/upstream-writes";
 import { CategoryDetailContent } from "@/ui/CategoryDetailContent";
@@ -16,6 +21,8 @@ export default function CategoryDetailPage() {
   const id = params?.id;
   const [category, setCategory] = useState<UpstreamCategoryRow | null>(null);
   const [error, setError] = useState("");
+  // A 404 is "not found"; anything else is a load that failed and can be tried again.
+  const [missing, setMissing] = useState(false);
 
   const loadGen = useRef(0);
 
@@ -26,8 +33,10 @@ export default function CategoryDetailPage() {
       const next = await loadUpstreamCategory(request, id);
       if (gen !== loadGen.current) return;
       setCategory(next);
+      setError("");
     } catch (err) {
       if (gen !== loadGen.current) return;
+      setMissing(err instanceof ApiError && err.status === 404);
       setError(err instanceof Error ? err.message : COPY.loadFailed);
     }
   }, [id]);
@@ -41,37 +50,35 @@ export default function CategoryDetailPage() {
     };
   }, [load]);
 
+  const back = <BackLink href="/categories" label={COPY.back} />;
   if (!category) {
+    if (!error) return null;
+    if (missing) return <NotFound title={COPY.notFoundTitle} line={COPY.notFoundLine} back={{ href: "/categories", label: COPY.back }} />;
     return (
-      <div className="px-4 py-6 md:px-6">
-        {error ? (
-          <p className="m-0 text-[13px]" style={{ color: "var(--ff-danger)" }}>
-            {error}
-          </p>
-        ) : (
-          <p className="m-0 text-[13px]" style={{ color: "var(--ff-ink-3)" }}>
-            {COPY.loading}
-          </p>
-        )}
-      </div>
+      <>
+        <PageHeader title={COPY.title} />
+        <div className={DETAIL_PAGE}>
+          {back}
+          <Alert tone="danger" role="alert" action={{ label: COPY.retry, onPress: () => void load() }}>
+            {COPY.loadFailed}
+          </Alert>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-4 md:px-6">
-      <Link
-        href="/categories"
-        className="w-fit text-[13.5px] font-semibold no-underline"
-        style={{ color: "var(--ff-accent)" }}
-      >
-        {COPY.back}
-      </Link>
-      <CategoryDetailContent category={category} request={request} onChanged={load} onDeleted={() => router.push("/categories")} />
-      {error ? (
-        <p className="m-0 text-[13px]" style={{ color: "var(--ff-danger)" }}>
-          {error}
-        </p>
-      ) : null}
-    </div>
+    <>
+      <PageHeader title={category.label} sub={sourceNoteText(category.source)} />
+      <div className={DETAIL_PAGE}>
+        {back}
+        <CategoryDetailContent category={category} request={request} onChanged={load} onDeleted={() => router.push("/categories")} named={false} />
+        {error ? (
+          <Alert tone="danger" role="alert">
+            {error}
+          </Alert>
+        ) : null}
+      </div>
+    </>
   );
 }

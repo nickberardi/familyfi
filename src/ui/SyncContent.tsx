@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   problem: { gap: 8, paddingHorizontal: 18, paddingVertical: 16 },
   retry: { alignSelf: "flex-start", marginTop: 4, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   tile: { flexGrow: 1, flexBasis: 200, minWidth: 0, paddingHorizontal: 18, paddingVertical: 16 },
-  statLabel: { fontWeight: "600", letterSpacing: 0.35, textTransform: "uppercase" },
+  statLabel: { fontWeight: "600" },
   statValue: { marginTop: 6, fontWeight: "700", letterSpacing: -0.65 },
   statNote: { marginTop: 2 },
   log: { overflow: "hidden" },

@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 export function FormField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--ff-ink-3)" }}>
+      <span className="mb-1.5 block text-[14px] font-semibold" style={{ color: "var(--ff-ink-3)" }}>
         {label}
       </span>
       {children}

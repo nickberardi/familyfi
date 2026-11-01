@@ -22,6 +22,6 @@ describe("group page heading", () => {
   });
 
   it("describes the Things page", () => {
-    expect(groupPageSummary("things", [])).toBe("Device groups that are not a person. House destinations are Things groups.");
+    expect(groupPageSummary("things", [])).toBe("Device groups that are not a person");
   });
 });

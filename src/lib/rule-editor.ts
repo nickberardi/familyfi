@@ -313,6 +313,8 @@ export const RULE_EDITOR_COPY = {
   deleteRule: "Delete rule…",
   unsaved: "Unsaved changes",
   notFound: "Rule not found.",
+  notFoundTitle: "Rule not found",
+  notFoundLine: "This rule was deleted, or the link is out of date.",
   builtIn: "Quarantine is built in, so it can’t be edited. Switch it, pause it or resume it from Rules or Devices.",
   name: { title: "Name", note: "What your household calls it, and what UniFi’s policy table shows.", label: "Rule name", placeholder: "e.g. School nights" },
   policyNames: {

@@ -87,7 +87,7 @@ export function GatewayCard({
       {gatewayFacts(unifi).map((fact, index) => (
         <View key={fact.k} style={[styles.fact, index > 0 && { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]}>
           <Text style={[text(14, 21, "muted"), styles.factKey]}>{fact.k}</Text>
-          <Text style={[text(14, 21, "ink"), styles.factValue]}>{fact.v}</Text>
+          <Text style={[text(14, 21, "ink"), styles.factValue, fact.mono && { fontFamily: MONO }]}>{fact.v}</Text>
         </View>
       ))}
       <View style={[styles.row, styles.timezone, { borderTopColor: ui.color("hairline") }]}>

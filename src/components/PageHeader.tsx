@@ -12,7 +12,7 @@ export function PageHeader({
   secondary,
 }: {
   title: string;
-  sub: string;
+  sub?: string;
   actionHref?: string;
   actionLabel?: string;
   /** Gets the click, so a sheet the action opens can hand focus back to the button. */
@@ -57,7 +57,7 @@ export function PageHeader({
       </button>
       <div className="min-w-0 flex-1">
         <h1 className="m-0 text-[21px] leading-[1.2] font-bold tracking-tight">{title}</h1>
-        <p className="mt-0.5 text-[14px] leading-[1.25] text-[var(--ff-muted)]">{sub}</p>
+        {sub ? <p className="mt-0.5 text-[14px] leading-[1.25] text-[var(--ff-muted)]">{sub}</p> : null}
       </div>
       {secondary}
       {action}

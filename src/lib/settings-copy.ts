@@ -8,7 +8,8 @@ export function managedNetworksLabel(unifi: UnifiSettings): string {
   return selected.map((network) => network.name).join(", ");
 }
 
-export function gatewayFacts(unifi: UnifiSettings | null): { k: string; v: string }[] {
+/** Settings › Gateway's facts. `mono` marks a machine value (a host, console or site ID), set in the code font. */
+export function gatewayFacts(unifi: UnifiSettings | null): { k: string; v: string; mono?: true }[] {
   if (!unifi?.configured) {
     return [
       { k: "Console", v: "Not configured" },
@@ -23,8 +24,8 @@ export function gatewayFacts(unifi: UnifiSettings | null): { k: string; v: strin
       : consoleHostFromBaseUrl(unifi.baseUrl) || unifi.baseUrl || "—";
   return [
     { k: "Console", v: unifi.mode === "cloud" ? "Cloud" : "Local" },
-    { k: unifi.mode === "cloud" ? "Console ID" : "Host", v: host },
-    { k: "Site", v: unifi.siteId || "—" },
+    { k: unifi.mode === "cloud" ? "Console ID" : "Host", v: host, ...(host !== "—" ? { mono: true as const } : {}) },
+    { k: "Site", v: unifi.siteId || "—", ...(unifi.siteId ? { mono: true as const } : {}) },
     { k: "Networks", v: managedNetworksLabel(unifi) },
     { k: "TLS", v: unifi.tlsInsecure ? "Allow self-signed" : "Verify certificates" },
     { k: "Status", v: connectionStatusLabel(unifi.connectionStatus) },
@@ -82,7 +83,7 @@ export const FAMILY_ROLE_CHOICES = ["child", "teen", "adult"] as const;
 /** The Settings page's words. */
 export const SETTINGS_COPY = {
   title: "Settings",
-  sub: "Household, gateway and maintenance.",
+  sub: "Household, gateway and maintenance",
   tabs: "Settings sections",
   gateway: "Gateway",
   timezone: "Timezone",

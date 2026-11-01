@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { GROUP_CARD_COPY } from "@/lib/group-page";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
 import { runGroupCardAction } from "@/lib/group-writes";
 import { cardMarks, categorySheet, categorySlotStates } from "@/lib/category-marks";
@@ -15,14 +14,7 @@ import { GROUP_SCHEDULE_COPY, GroupSchedule } from "@/ui/GroupSchedule";
 import { useAppData } from "./AppDataProvider";
 import { FilterSheet, type FilterSheetState } from "./filters/FilterSheet";
 import { GroupCardFrame } from "@/ui/GroupCardFrame";
-
-export type CardAction = {
-  label: string;
-  href?: string;
-  onClick?: () => void;
-  strong?: boolean;
-  testID?: string;
-};
+import { GroupCardLinks } from "@/ui/ExpandingGroupCard";
 
 /**
  * A person or group of things, as the Family and Things pages show it.
@@ -111,12 +103,7 @@ export function GroupCard({
       />
 
       {open ? (
-        <ActionRow
-          actions={[
-            { label: GROUP_CARD_COPY.details, href },
-            { label: GROUP_CARD_COPY.showLess, onClick: () => setOpen(false), testID: `group-show-less-${group.id}` },
-          ]}
-        />
+        <GroupCardLinks group={group} detailsHref={href} onShowLess={() => setOpen(false)} />
       ) : null}
 
       {sheet ? (
@@ -126,28 +113,3 @@ export function GroupCard({
   );
 }
 
-function ActionRow({ actions }: { actions: CardAction[] }) {
-  if (actions.length === 0) return null;
-  return (
-    <div className="flex border-t border-[var(--ff-hairline-strong)]">
-      {actions.map((action, index) => {
-        const className =
-          "flex-1 py-3 text-center text-[16px] md:py-2.5 md:text-[14px] " +
-          (action.strong ? "font-semibold text-[var(--ff-accent)]" : "font-medium text-[var(--ff-accent)]");
-        const style = { borderLeft: index ? "1px solid var(--ff-hairline-strong)" : undefined };
-        if (action.href) {
-          return (
-            <Link key={action.label} href={action.href} className={className} style={style}>
-              {action.label}
-            </Link>
-          );
-        }
-        return (
-          <button key={action.label} type="button" onClick={action.onClick} className={className} style={style} data-testid={action.testID}>
-            {action.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}

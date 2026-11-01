@@ -113,6 +113,8 @@ export const GROUP_DETAIL_COPY = {
   rulesNeedDevice: { before: "Its rules cannot apply on UniFi until you", link: "assign a device", after: "." },
   delete: "Delete group",
   notFound: "Group not found.",
+  notFoundTitle: "Group not found",
+  notFoundLine: "This group was deleted, or the link is out of date.",
 } as const;
 
 /** The group detail header's line under the name: a person's role, or what a things group is. */

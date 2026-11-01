@@ -135,7 +135,7 @@ export function TogglePill({
       title={title}
       disabled={disabled}
       onClick={onToggle}
-      className="inline-flex h-[33px] flex-none items-center gap-1.5 rounded-[7px] border pr-[11px] pl-2 text-[13px] font-semibold disabled:opacity-40"
+      className="inline-flex h-[34px] flex-none items-center gap-1.5 rounded-[7px] border pr-[11px] pl-2 text-[14px] font-semibold disabled:opacity-[var(--ff-disabled-opacity)]"
       style={{
         background: on ? "var(--ff-accent-fill)" : "var(--ff-card)",
         borderColor: on ? "var(--ff-accent-line)" : "var(--ff-input-line)",

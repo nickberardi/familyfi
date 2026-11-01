@@ -117,7 +117,7 @@ export function GroupResolverCard({
             <Text selectable style={[styles.url, { color: ui.color("ink") }]}>
               {dohOverrideUrl}
             </Text>
-            <Text style={[small(12, 18), styles.note]}>{COPY.overrideNote(groupName)}</Text>
+            <Text style={[small(14, 20), styles.note]}>{COPY.overrideNote(groupName)}</Text>
             <View style={[styles.row, styles.actions]}>
               {outline(COPY.replace, "accent", () => setPasting(true), "group-resolver-replace")}
               {outline(COPY.remove, "danger", () => void run(() => removeGroupResolver(request, groupId), COPY.removeFailed), "group-resolver-remove")}
@@ -125,16 +125,16 @@ export function GroupResolverCard({
           </>
         ) : (
           <>
-            <Text style={small(12.5, 20.3125)}>{groupResolverSummary(resolver)}</Text>
+            <Text style={small(14, 20)}>{groupResolverSummary(resolver)}</Text>
             {resolver?.networks.map((network) => (
-              <Text key={network.id} style={[small(12, 18), styles.note]}>
+              <Text key={network.id} style={[small(14, 20), styles.note]}>
                 {groupResolverNetworkLine(network)}
               </Text>
             ))}
             <View style={[styles.row, styles.actions]}>{outline(COPY.override, "accent", () => setPasting(true), "group-resolver-override")}</View>
           </>
         )}
-        {!pasting ? <Text style={[small(12, 18), styles.hostNote]}>{COPY.hostNote}</Text> : null}
+        {!pasting ? <Text style={[small(14, 20), styles.hostNote]}>{COPY.hostNote}</Text> : null}
         {error ? <Text style={[styles.error, { fontFamily: ui.font, color: ui.color("danger") }]}>{error}</Text> : null}
       </View>
     </View>
@@ -150,13 +150,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   actions: { marginTop: 10 },
   small: { justifyContent: "center", borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
-  smallLabel: { fontSize: 12.5, lineHeight: 18.75, fontWeight: "600" },
+  smallLabel: { fontSize: 14, lineHeight: 20, fontWeight: "600" },
   medium: { justifyContent: "center", borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   filled: { borderWidth: 0 },
-  mediumLabel: { fontSize: 13, lineHeight: 19.5, fontWeight: "600" },
+  mediumLabel: { fontSize: 14, lineHeight: 20, fontWeight: "600" },
   // A long endpoint breaks anywhere on the web, as it always has; natively it wraps at its slashes.
-  url: { fontFamily: MONO, fontSize: 13, lineHeight: 19.5, ...Platform.select({ web: { wordBreak: "break-all" } as object, default: {} }) },
+  url: { fontFamily: MONO, fontSize: 14, lineHeight: 20, ...Platform.select({ web: { wordBreak: "break-all" } as object, default: {} }) },
   note: { marginTop: 4 },
   hostNote: { marginTop: 8 },
-  error: { marginTop: 8, fontSize: 13, lineHeight: 19.5 },
+  error: { marginTop: 8, fontSize: 14, lineHeight: 20 },
 });

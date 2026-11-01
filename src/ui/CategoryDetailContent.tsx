@@ -20,6 +20,7 @@ import { CATEGORIES_COPY, checkCategory, deleteCategory, deleteCategoryCopy, pat
 
 import { MonoTile } from "./MonoTile";
 import { NetworkCheckDetails } from "./NetworkCheckResults";
+import { Button } from "./Button";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 import { VerdictChip } from "./VerdictChip";
 
@@ -37,8 +38,11 @@ export function CategoryDetailContent({
   enabled = true,
   onChanged,
   onDeleted,
+  named = true,
 }: {
   category: UpstreamCategoryRow;
+  /** Draws the category's name and kind in its card; false where the page header already does. */
+  named?: boolean;
   request: ApiRequest;
   /** False while the household is stale, so nothing is sent. */
   enabled?: boolean;
@@ -83,19 +87,7 @@ export function CategoryDetailContent({
     }, COPY.deleteFailed);
   }
 
-  const outline = (label: string, onPress: () => void, testID: string) => (
-    <Pressable
-      role="button"
-      aria-disabled={off}
-      disabled={off}
-      onPress={onPress}
-      testID={testID}
-      style={({ pressed }) => [styles.outline, { borderColor: ui.color("control-line") }, off && { opacity: 0.4 }, pressed && !off && { opacity: PRESS_OPACITY }]}
-    >
-      <Text style={[small(12.5, 18.75, "ink"), styles.bold]}>{label}</Text>
-    </Pressable>
-  );
-
+  const outline = (label: string, onPress: () => void, testID: string) => <Button kind="secondary" size="md" label={label} onPress={onPress} disabled={off} testID={testID} />;
   const textButton = (label: string, token: string, onPress: () => void, testID: string, accessibleLabel?: string) => (
     <Pressable
       role="button"
@@ -106,7 +98,7 @@ export function CategoryDetailContent({
       testID={testID}
       style={({ pressed }) => [off && { opacity: 0.4 }, pressed && !off && { opacity: PRESS_OPACITY }]}
     >
-      <Text style={[small(12.5, 18.75, token), styles.bold]}>{label}</Text>
+      <Text style={[small(14, 20, token), styles.bold]}>{label}</Text>
     </Pressable>
   );
 
@@ -116,15 +108,19 @@ export function CategoryDetailContent({
         <View style={styles.headRow}>
           <MonoTile monogram={category.monogram} source={category.source} icon={upstreamCategoryIcon(category.slug, category.source)} size="detail" />
           <View style={styles.headWords}>
-            <Text role="heading" aria-level={1} style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>
-              {category.label}
-            </Text>
-            <Text style={[small(12.5, 18.75), styles.sourceNote]}>{sourceNoteText(category.source)}</Text>
+            {named ? (
+              <>
+                <Text role="heading" aria-level={1} style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>
+                  {category.label}
+                </Text>
+                <Text style={[small(14, 20), styles.sourceNote]}>{sourceNoteText(category.source)}</Text>
+              </>
+            ) : null}
           </View>
           <VerdictChip style={verdictStyle(check)} size="detail" testID="category-verdict" />
           {outline(COPY.checkNow, () => void run(() => checkCategory(request, category), COPY.checkFailed), "category-check-now")}
         </View>
-        <Text style={[small(12.5, 18.75), styles.checkLine]}>{categoryCheckLine(check)}</Text>
+        <Text style={[small(14, 20), styles.checkLine]}>{categoryCheckLine(check)}</Text>
         <NetworkCheckDetails check={check} />
         <View style={[styles.checking, { borderTopColor: ui.color("hairline") }]}>
           <ui.Toggle
@@ -136,7 +132,7 @@ export function CategoryDetailContent({
             disabled={off}
             testID="category-checking"
           />
-          <Text style={small(12.5, 18.75)}>{enabledNoteText(category.enabled)}</Text>
+          <Text style={small(14, 20)}>{enabledNoteText(category.enabled)}</Text>
           <View style={styles.grow} />
           {category.source === "user" ? textButton(COPY.deleteCategory, "danger", () => void remove(), "category-delete") : null}
         </View>
@@ -178,14 +174,14 @@ export function CategoryDetailContent({
             testID="category-domain-add-button"
             style={({ pressed }) => [styles.add, { backgroundColor: ui.color("accent") }, (off || !newDomain.trim()) && { opacity: 0.4 }, pressed && { opacity: PRESS_OPACITY }]}
           >
-            <Text style={[small(13, 19.5, "ink-on-fill"), styles.bold]}>{COPY.add}</Text>
+            <Text style={[small(14, 20, "ink-on-fill"), styles.bold]}>{COPY.add}</Text>
           </Pressable>
         </View>
         {/* Lists are uncapped by decision; this is how growth is priced. */}
-        <Text style={[small(12, 18, "ink-4"), styles.cost]}>{category.costNote}</Text>
+        <Text style={[small(14, 20, "ink-4"), styles.cost]}>{category.costNote}</Text>
       </View>
 
-      {error ? <Text style={small(13, 19.5, "danger")}>{error}</Text> : null}
+      {error ? <Text style={small(14, 20, "danger")}>{error}</Text> : null}
     </View>
   );
 }
@@ -206,12 +202,11 @@ const styles = StyleSheet.create({
   checkLine: { marginTop: 8 },
   checking: { marginTop: 14, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10, paddingTop: 14, borderTopWidth: 1 },
   grow: { flex: 1, minWidth: 0 },
-  outline: { flexShrink: 0, borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 },
   bold: { fontWeight: "600" },
   domains: { overflow: "hidden" },
   domainsTitle: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, fontSize: 14, lineHeight: 21, fontWeight: "600" },
   domainRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 10, borderTopWidth: 1 },
-  domainName: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 19.5 },
+  domainName: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 20 },
   struck: { textDecorationLine: "line-through" },
   addRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 18, paddingVertical: 13, borderTopWidth: 1 },
   add: { flexShrink: 0, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },

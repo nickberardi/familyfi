@@ -26,6 +26,7 @@ import type { Group } from "@/lib/types";
 import { Alert } from "./Alert";
 import { ExternalLink } from "./ExternalLink";
 import { RuleMark } from "./RuleMark";
+import { Button } from "./Button";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /**
@@ -137,9 +138,7 @@ export function NetworkCheckupCard({
         title={COPY.network.title}
         sub={checkupSummary(checkup, now)}
         trailing={
-          <Pressable role="button" aria-disabled={disabled || checking} disabled={disabled || checking} onPress={onCheckNow} testID="checkup-run" style={({ pressed }) => [(disabled || checking) && { opacity: 0.4 }, pressed && { opacity: PRESS_OPACITY }]}>
-            <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("accent") }]}>{checking ? COPY.network.checking : COPY.network.checkNow}</Text>
-          </Pressable>
+          <Button kind="secondary" size="md" label={checking ? COPY.network.checking : COPY.network.checkNow} onPress={onCheckNow} disabled={disabled || checking} testID="checkup-run" />
         }
       />
       {checkup?.error ? (
@@ -492,7 +491,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, lineHeight: 22, fontWeight: "600" },
   body: { fontSize: 14, lineHeight: 20 },
   gap: { marginTop: 8 },
-  label: { marginTop: 12, fontSize: 14, lineHeight: 20, fontWeight: "600", letterSpacing: 0.3, textTransform: "uppercase" },
+  label: { marginTop: 12, fontSize: 14, lineHeight: 20, fontWeight: "600" },
   subhead: { marginTop: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, borderTopWidth: 1 },
   edit: { marginTop: 4 },
   action: { fontSize: 14, lineHeight: 21, fontWeight: "600" },

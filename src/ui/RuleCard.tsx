@@ -1,6 +1,6 @@
 "use client";
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { ruleActionSpecs, ruleGroupStateLines, ruleStateLine } from "@/lib/rule-actions";
 import { RULES_COPY as COPY, ruleAppliesTo, ruleCardDimmed, ruleEditable, ruleHref, ruleStatus, ruleToggleLabels, ruleWhenLines } from "@/lib/rule-list";
@@ -9,7 +9,9 @@ import type { Group } from "@/lib/types";
 
 import { RuleBar } from "./RuleBar";
 import { RuleMark } from "./RuleMark";
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { CardFoot } from "./CardFoot";
+import { Tag } from "./Tag";
+import { useUI } from "./UIContext";
 
 export type RuleCardAction = "pause" | "resume" | "extend" | "allow" | "disallow";
 
@@ -163,8 +165,8 @@ function RuleFacts({
 }
 
 /**
- * A rule card's foot: Edit, then whether it is paused, for everyone or for a group, and what can be
- * done about it now. An off rule keeps its foot for Edit; quarantine, never edited, has none of its own.
+ * A rule card's foot (`CardFoot`): whether it is paused, for everyone or for a group, then Edit and
+ * what can be done about it now. An off rule keeps its foot for Edit; quarantine, never edited, has none of its own.
  */
 export function RuleCardActions({
   rule,
@@ -181,50 +183,21 @@ export function RuleCardActions({
   disabled?: boolean;
   onAction: (action: RuleCardAction) => void;
 }) {
-  const ui = useUI();
-  const body = text(ui.font, 14, 21);
   const groupNames = Object.fromEntries(groups.map((group) => [group.id, group.name]));
   const state = ruleStateLine(rule, timezone, now);
-  const overrides = ruleGroupStateLines(rule, groupNames, timezone, now);
-  const actions = ruleActionSpecs(rule, timezone, now);
-  const lines = [...(state ? [state] : []), ...overrides];
-  const editable = ruleEditable(rule);
-  if (!lines.length && !actions.length && !editable) return null;
+  const lines = [...(state ? [state] : []), ...ruleGroupStateLines(rule, groupNames, timezone, now)];
   return (
-    <View style={[styles.actions, { borderTopColor: ui.color("line") }]}>
-      {editable ? (
-        <ui.Link href={ruleHref(rule)} label={`${COPY.edit} ${rule.name}`} testID={`rule-edit-${rule.id}`}>
-          <View style={[styles.button, { borderWidth: 1, borderColor: ui.color("hairline-card") }]}>
-            <Text style={[body, styles.buttonLabel, { color: ui.color("ink") }]}>{COPY.edit}</Text>
-          </View>
-        </ui.Link>
-      ) : null}
-      <View style={styles.lines}>
-        {lines.map((line) => (
-          <Text key={line} style={[body, { color: ui.color("ink-2") }]}>
-            {line}
-          </Text>
-        ))}
-      </View>
-      {actions.map((action) => (
-        <Pressable
-          key={action.label}
-          role="button"
-          aria-disabled={disabled}
-          disabled={disabled}
-          testID={`rule-action-${action.run}-${rule.id}`}
-          onPress={() => onAction(action.run)}
-          style={({ pressed }) => [
-            styles.button,
-            action.strong ? { backgroundColor: ui.color("accent") } : { borderWidth: 1, borderColor: ui.color("hairline-card") },
-            disabled && { opacity: 0.4 },
-            pressed && !disabled && { opacity: PRESS_OPACITY },
-          ]}
-        >
-          <Text style={[body, styles.buttonLabel, { color: ui.color(action.strong ? "ink-on-fill" : "ink") }]}>{action.label}</Text>
-        </Pressable>
-      ))}
-    </View>
+    <CardFoot
+      lines={lines}
+      leading={ruleEditable(rule) ? { label: COPY.edit, href: ruleHref(rule), accessibilityLabel: `${COPY.edit} ${rule.name}`, testID: `rule-edit-${rule.id}` } : undefined}
+      actions={ruleActionSpecs(rule, timezone, now).map((action) => ({
+        label: action.label,
+        strong: action.strong,
+        disabled,
+        onPress: () => onAction(action.run),
+        testID: `rule-action-${action.run}-${rule.id}`,
+      }))}
+    />
   );
 }
 
@@ -267,8 +240,7 @@ export function RuleCardSummary({ rule, timezone, now }: { rule: Rule; timezone:
 
 /** A built-in rule's tag, beside its name. */
 function BuiltInTag() {
-  const ui = useUI();
-  return <Text style={[text(ui.font, 14, 20), styles.builtIn, { color: ui.color("ink-2"), backgroundColor: ui.color("field") }]}>{COPY.builtIn}</Text>;
+  return <Tag>{COPY.builtIn}</Tag>;
 }
 
 function text(font: string | undefined, size: number, lineHeight: number) {
@@ -281,7 +253,6 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, paddingBottom: 12 },
   nameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   name: { margin: 0, fontWeight: "600", letterSpacing: -0.4 },
-  builtIn: { flexShrink: 0, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, fontWeight: "600", overflow: "hidden" },
   blocks: { marginTop: 2 },
   lead: { marginBottom: 10 },
   schedule: { paddingHorizontal: 16, paddingBottom: 16 },
@@ -291,10 +262,6 @@ const styles = StyleSheet.create({
   value: { flex: 1, minWidth: 0, gap: 2 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   chip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, overflow: "hidden" },
-  actions: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 12 },
-  lines: { marginRight: "auto", flexShrink: 1 },
-  button: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  buttonLabel: { fontWeight: "600" },
   summary: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   title: { fontWeight: "600", letterSpacing: -0.475 },
   status: { flexDirection: "row", alignItems: "center", gap: 6 },
