@@ -113,7 +113,7 @@ test("a FamilyFi rule outranks the DNS verdict on the same mark", { tag: "@deskt
     (response) =>
       ["POST", "PATCH"].includes(response.request().method()) && response.url().includes("/api/v1/rules"),
   );
-  await sheet.getByRole("button", { name: /Create|Turn on/i }).first().click();
+  await sheet.getByRole("button", { name: /^(Block Social|Turn on)$/ }).first().click();
   expect((await created).ok()).toBeTruthy();
 
   await expect(marks.getByRole("button", { name: /Social blocked by FamilyFi/i })).toBeVisible();

@@ -466,7 +466,7 @@ test("add person opens a sheet over Family, and the new person can be edited", a
   const name = `QA ${test.info().project.name} ${Date.now()}`;
   const id = await addGroup(page, "family", (dialog) => dialog.getByLabel("Name").fill(name), name);
   await page.goto(`/family/${id}`);
-  await expect(page.getByText("Group not found.")).toHaveCount(0);
+  await expect(page.getByText("Group not found", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   // A new person has nothing scheduled, and the page says so rather than implying a rule.
   await expect(page.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
@@ -502,7 +502,7 @@ test("add person opens a sheet over Family, and the new person can be edited", a
 
   await page.goto("/family/does-not-exist");
   await expect(page.getByText("Loading household…")).toHaveCount(0);
-  await expect(page.getByText("Group not found.")).toBeVisible();
+  await expect(page.getByText("Group not found", { exact: true })).toBeVisible();
 });
 
 test("add things group opens a sheet over Things, and the new group can be edited", { tag: "@desktop" }, async ({ page }) => {
@@ -521,7 +521,7 @@ test("add things group opens a sheet over Things, and the new group can be edite
   );
   await page.goto(`/things/${id}`);
   await expect(page.getByText("Loading household…")).toHaveCount(0);
-  await expect(page.getByText("Group not found.")).toHaveCount(0);
+  await expect(page.getByText("Group not found", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 
   const edit = await openEdit(page, name);
@@ -606,7 +606,7 @@ test("a device opened from its group returns to that group", async ({ page }) =>
   await page.locator(`a[href^="/devices/${mac}?from="]`).click();
   if (test.info().project.name === "phone") {
     // A phone opens the device's page, whose way back is the group.
-    await expect(page.getByRole("link", { name: `‹ ${group.name}` })).toHaveAttribute("href", groupPath);
+    await expect(page.getByRole("link", { name: `← ${group.name}` })).toHaveAttribute("href", groupPath);
     // A modal link shared from a wide screen opens the page on a phone.
     await page.goto(`${groupPath}?device=${mac}`);
     await expect(page).toHaveURL(new RegExp(`/devices/${mac}$`));
@@ -621,7 +621,7 @@ test("a device opened from its group returns to that group", async ({ page }) =>
   }
 
   await page.goto(`/devices/${mac}`);
-  await expect(page.getByRole("link", { name: "‹ All devices" })).toHaveAttribute("href", "/devices");
+  await expect(page.getByRole("link", { name: "← All devices" })).toHaveAttribute("href", "/devices");
 });
 
 test("a device's modal keeps its place on refresh and Done closes it", { tag: "@desktop" }, async ({ page }) => {

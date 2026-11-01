@@ -13,21 +13,25 @@ async function signIn(page: Page) {
 
 test("turning off the resolver's checking asks first, and Escape keeps it on", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
+  // Other tests share this household, so its resolver is never changed: the page reads and writes
+  // a stand-in that starts with checking on and remembers what was sent.
+  const real = await page.request.get("/api/v1/upstream/resolver");
+  const resolver: Record<string, unknown> = { ...((await real.json()) as { resolver: Record<string, unknown> }).resolver, probeEnabled: true };
+  if (!resolver.url) resolver.url = "https://dns.example.com/dns-query";
+  const writes: unknown[] = [];
+  await page.route("**/api/v1/upstream/resolver", async (route) => {
+    if (route.request().method() === "PUT") {
+      const patch = route.request().postDataJSON() as Record<string, unknown>;
+      writes.push(patch);
+      Object.assign(resolver, patch);
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ resolver }) });
+  });
+
   await page.goto("/categories");
   const card = page.getByTestId("resolver-card");
   const checking = card.getByRole("switch", { name: "Checking" });
-  await expect(checking).toBeVisible();
-  // The seed household may start with checking off; turning it on never asks.
-  if ((await checking.getAttribute("aria-checked")) === "false") {
-    await checking.click();
-    await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-    await expect(checking).toHaveAttribute("aria-checked", "true");
-  }
-
-  const writes: string[] = [];
-  page.on("request", (sent) => {
-    if (sent.method() === "PUT" && sent.url().includes("/api/v1/upstream/resolver")) writes.push(sent.postData() ?? "");
-  });
+  await expect(checking).toHaveAttribute("aria-checked", "true");
 
   // Escape answers Cancel: nothing is sent and checking stays on.
   await checking.click();
@@ -44,9 +48,9 @@ test("turning off the resolver's checking asks first, and Escape keeps it on", {
   await expect(checking).toHaveAttribute("aria-checked", "false");
   await expect(card.getByText("Paused — earlier results cleared")).toBeVisible();
   await checking.click();
-  await expect(dialog).toBeHidden();
   await expect(checking).toHaveAttribute("aria-checked", "true");
-  expect(writes.map((body) => JSON.parse(body))).toEqual([{ probeEnabled: false }, { probeEnabled: true }]);
+  await expect(dialog).toHaveCount(0);
+  expect(writes).toEqual([{ probeEnabled: false }, { probeEnabled: true }]);
 });
 
 test("going Back declines a question the page asked", { tag: "@desktop" }, async ({ page }) => {
