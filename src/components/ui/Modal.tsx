@@ -63,7 +63,11 @@ export function Modal({
     return () => {
       document.removeEventListener("keydown", onKey);
       open.splice(open.indexOf(self), 1);
-      if (opener?.isConnected) opener.focus();
+      // Strict Mode runs this cleanup and the effect again at once, with the dialog still on the
+      // page: only a dialog that is really gone hands focus back.
+      window.setTimeout(() => {
+        if (opener?.isConnected && !root?.isConnected) opener.focus();
+      }, 0);
     };
   }, [opener]);
 

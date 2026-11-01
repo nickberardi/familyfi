@@ -36,7 +36,7 @@ export type UI = {
   Select: ComponentType<UISelectProps>;
   /** Goes to a page by the web's path; the app maps the path to its own route. */
   Link: ComponentType<UILinkProps>;
-  /** Asks before something that can't be undone; resolves true to go ahead. The web goes ahead without asking. */
+  /** Asks before something that can't be undone; resolves true to go ahead. The web asks in its own dialog (`ConfirmHost`). */
   confirm: (request: UIConfirmRequest) => Promise<boolean>;
   /** Puts text on the clipboard: a pairing code to paste on another phone. */
   copyText: (value: string) => Promise<void>;

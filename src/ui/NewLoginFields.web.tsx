@@ -2,7 +2,7 @@
 
 import { SETTINGS_COPY as COPY, loginFormState } from "@/lib/settings-copy";
 
-const FIELD = "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
+const FIELD = "ff-input mt-1 font-normal";
 const LABEL = "text-[14px] font-semibold text-[var(--ff-muted)]";
 
 /** The web's new-login fields: each label wraps its input, so clicking it focuses the field. */

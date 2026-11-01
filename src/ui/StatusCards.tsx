@@ -48,7 +48,7 @@ function CardButton({ label, fill, ink, onPress, disabled, testID }: { label: st
       disabled={disabled}
       onPress={onPress}
       testID={testID}
-      style={({ pressed }) => [styles.button, { backgroundColor: ui.color(fill) }, disabled && { opacity: 0.5 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+      style={({ pressed }) => [styles.button, { backgroundColor: ui.color(fill) }, disabled && { opacity: 0.6 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
     >
       <Text style={[text(14, 21, ink), styles.buttonLabel]}>{label}</Text>
     </Pressable>
