@@ -17063,6 +17063,41 @@
       ]
     },
     {
+      "fn": "withCustomChoices",
+      "name": "an unblock whose rule has no end lists Until I resume last",
+      "input": {
+        "options": [
+          {
+            "label": "Until I resume",
+            "note": "no end time",
+            "request": {
+              "kind": "current"
+            }
+          }
+        ],
+        "recent": null
+      },
+      "expected": [
+        {
+          "label": "For…",
+          "note": "choose how long",
+          "picker": "for"
+        },
+        {
+          "label": "Until…",
+          "note": "choose a time",
+          "picker": "until"
+        },
+        {
+          "label": "Until I resume",
+          "note": "no end time",
+          "request": {
+            "kind": "current"
+          }
+        }
+      ]
+    },
+    {
       "fn": "parseCustomPause",
       "name": "a duration",
       "input": {

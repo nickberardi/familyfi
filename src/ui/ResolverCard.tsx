@@ -52,6 +52,17 @@ export function ResolverCard({
     }
   }
 
+  async function setChecking(on: boolean) {
+    if (!resolver) return;
+    if (!on && !(await ui.confirm({ title: COPY.turnOff.title, message: COPY.turnOff.message, confirmLabel: COPY.turnOff.confirm, destructive: true }))) return;
+    void run(() => updateResolver(request, { probeEnabled: on }), COPY.toggleFailed);
+  }
+
+  async function remove() {
+    if (!(await ui.confirm({ title: COPY.removeConfirm.title, message: COPY.removeConfirm.message, confirmLabel: COPY.removeConfirm.confirm, destructive: true }))) return;
+    void run(() => clearResolver(request), COPY.clearFailed);
+  }
+
   function save() {
     if (!canSave) return;
     void run(
@@ -94,14 +105,22 @@ export function ResolverCard({
       style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]}
       testID="resolver-card"
     >
-      <Text
-        role="heading"
-        aria-level={2}
-        id="resolver-card-title"
-        style={[styles.title, { fontFamily: ui.font, color: ui.color("ink"), borderBottomColor: ui.color("hairline-card") }]}
-      >
-        {COPY.title}
-      </Text>
+      <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
+        <Text role="heading" aria-level={2} id="resolver-card-title" style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>
+          {COPY.title}
+        </Text>
+        {resolver?.url ? (
+          <ui.Toggle
+            label={COPY.checking}
+            on={resolver.probeEnabled}
+            onToggle={() => void setChecking(!resolver.probeEnabled)}
+            onLabel={COPY.checkingOn}
+            offLabel={COPY.checkingOff}
+            disabled={off}
+            testID="resolver-checking"
+          />
+        ) : null}
+      </View>
       <View style={styles.body}>
         {resolver?.url && !pasting ? <Text style={{ fontFamily: MONO, fontSize: 14, lineHeight: 20, color: ui.color("ink") }}>{resolver.url}</Text> : null}
         {!resolver?.url && !pasting ? (
@@ -160,13 +179,7 @@ export function ResolverCard({
         ) : (
           <View style={[styles.buttons, styles.actions]}>
             {button(resolver?.url ? COPY.replace : COPY.add, "accent", () => setPasting(true), { disabled: !enabled, testID: "resolver-paste" })}
-            {resolver?.url
-              ? button(resolver.probeEnabled ? COPY.checkingOn : COPY.checkingOff, "ink-2", () => void run(() => updateResolver(request, { probeEnabled: !resolver.probeEnabled }), COPY.toggleFailed), {
-                  disabled: off,
-                  testID: "resolver-checking",
-                })
-              : null}
-            {resolver ? button(COPY.remove, "danger", () => void run(() => clearResolver(request), COPY.clearFailed), { disabled: off, testID: "resolver-remove" }) : null}
+            {resolver?.url ? button(COPY.remove, "danger", () => void remove(), { disabled: off, testID: "resolver-remove" }) : null}
           </View>
         )}
 
@@ -178,7 +191,8 @@ export function ResolverCard({
 
 const styles = StyleSheet.create({
   card: { overflow: "hidden", borderRadius: 12, borderWidth: 1 },
-  title: { paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1, fontSize: 14, lineHeight: 21, fontWeight: "600" },
+  head: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 12, minHeight: 51, borderBottomWidth: 1 },
+  title: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 21, fontWeight: "600" },
   body: { paddingHorizontal: 18, paddingVertical: 16 },
   network: { marginTop: 4 },
   note: { marginTop: 6 },

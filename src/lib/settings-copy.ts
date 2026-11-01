@@ -148,6 +148,11 @@ export function createLoginTitle(group: Pick<Group, "name">): string {
   return `Create login for ${group.name}`;
 }
 
+/** The create-login form's first line: every login is an administrator's, so it says so before the password. */
+export function createLoginLede(group: Pick<Group, "name">): string {
+  return `${group.name} becomes an administrator and can change every rule. ${SETTINGS_COPY.loginNote}`;
+}
+
 /** What the new-login form says about the two passwords, and whether it can be sent. */
 export function loginFormState(username: string, password: string, confirm: string) {
   const hint =
@@ -169,7 +174,7 @@ export function removeAdminConfirm(account: Pick<Account, "username">, group: Pi
 export function removeLoginConfirm(account: Pick<Account, "username">, group: Pick<Group, "name">) {
   return {
     title: "Remove login?",
-    message: `${account.username} can no longer sign in to FamilyFi. ${group.name} stays in the household.`,
+    message: `${account.username} is signed out and can no longer sign in, and the phones, Watches and agents acting as ${group.name} are removed. ${group.name} stays in the household.`,
     confirmLabel: "Remove login",
   };
 }

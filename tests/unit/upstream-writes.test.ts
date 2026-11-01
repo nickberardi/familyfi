@@ -88,7 +88,7 @@ describe("category lines", () => {
   const now = new Date("2026-03-04T15:00:00Z");
 
   it("says when checks run, and when they run next", () => {
-    expect(resolverScheduleLine({ ...resolver, probeEnabled: false }, "UTC", now)).toBe("Paused — last results kept");
+    expect(resolverScheduleLine({ ...resolver, probeEnabled: false }, "UTC", now)).toBe("Paused — earlier results cleared");
     expect(resolverScheduleLine({ ...resolver, probeDays: [] }, "UTC", now)).toBe("No days selected — checking won't run");
     expect(resolverScheduleLine(resolver, "UTC", now)).toBe(`Weekdays at ${formatHhmm("03:00")}`);
     expect(resolverScheduleLine({ ...resolver, nextRunAt: "2026-03-05T03:00:00Z" }, "UTC", now)).toBe(

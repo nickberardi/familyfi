@@ -12,6 +12,7 @@ import { askConfirm } from "@/components/ui/ConfirmHost";
 import { request } from "@/lib/api";
 import { PAIR_COPY, removeAllConfirm, removeConfirm, removePhone, removeRevokedPhones, revokeConfirm, revokePhone } from "@/lib/pair-device";
 import type { PairedPhone } from "@/lib/types";
+import { Alert } from "@/ui/Alert";
 import { PairedDevicesCard } from "@/ui/PairedDevices";
 import { usePairDevice } from "@/ui/use-pair-device";
 
@@ -55,9 +56,9 @@ export default function PairDevicePage() {
       />
       <div className="flex flex-col gap-4 p-4 md:p-6">
         {error ? (
-          <p role="alert" className="rounded-[9px] bg-[var(--ff-danger-fill)] px-3 py-2.5 text-[14px] font-semibold text-[var(--ff-danger)]">
+          <Alert tone="danger" role="alert">
             {error}
-          </p>
+          </Alert>
         ) : null}
 
         <AppStoresCard />

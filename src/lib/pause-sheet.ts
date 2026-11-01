@@ -19,6 +19,9 @@ export type PauseSheetRequest =
 
 export type PauseSheetOption = { label: string; note: string; request: PauseSheetRequest };
 
+/** The note on the one option with no end time, which every sheet lists last. */
+const NO_END_TIME = "no end time";
+
 /**
  * A time someone chose with For… or Until…. An `until` keeps the time of day ("HH:MM", household
  * time), so the same choice offered again tomorrow still means that time.
@@ -108,7 +111,7 @@ export function pauseSheetOptions(
           },
         ]
       : []),
-    { label: "Until I unblock", note: "no end time", request: { kind: "pauseUntil", until: null } },
+    { label: "Until I unblock", note: NO_END_TIME, request: { kind: "pauseUntil", until: null } },
   ];
 }
 
@@ -177,7 +180,7 @@ export function rulePauseSheetOptions(
           },
         ]
       : []),
-    { label: "Until I resume", note: "no end time", request: { kind: "pauseUntil", until: null } },
+    { label: "Until I resume", note: NO_END_TIME, request: { kind: "pauseUntil", until: null } },
   ];
 }
 
@@ -224,7 +227,7 @@ export function unblockSheetOptions(
   return [
     {
       label: last ? `Until ${formatClock(new Date(last), timezone)}` : "Until I resume",
-      note: last === null ? "no end time" : blocking.length === 1 ? `when ${blocking[0]!.name} ends` : "when these end",
+      note: last === null ? NO_END_TIME : blocking.length === 1 ? `when ${blocking[0]!.name} ends` : "when these end",
       request: { kind: "current" },
     },
   ];
@@ -270,13 +273,19 @@ export function customPauseLabel(custom: CustomPause): string {
   return `For ${parts.join(" ")}`;
 }
 
+function noEndTime(option: PauseSheetOption): boolean {
+  return option.note === NO_END_TIME;
+}
+
 /**
  * The sheet's choices with the custom ones: the last custom choice first, unless a quick option
  * already says the same, then the quick options with For… and Until… before Until I resume.
  */
 export function withCustomChoices(options: PauseSheetOption[], recent: PauseSheetOption | null): PauseSheetChoice[] {
-  const ended = options.filter((option) => !(option.request.kind === "pauseUntil" && option.request.until === null));
-  const open = options.filter((option) => option.request.kind === "pauseUntil" && option.request.until === null);
+  // The option with no end time comes last on every sheet: Pause's and Block's, and Unblock's
+  // "Until I resume" when a rule blocking now has no end of its own.
+  const open = options.filter(noEndTime);
+  const ended = options.filter((option) => !noEndTime(option));
   const lead = recent && !options.some((option) => option.label === recent.label) ? [recent] : [];
   return [
     ...lead,

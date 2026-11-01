@@ -100,14 +100,19 @@ export function deviceGroupLabel(device: Pick<Device, "hostname" | "mac">): stri
   return `Group for ${device.hostname ?? device.mac}`;
 }
 
-/** What removing a device is called, and the native app's confirmation of it. */
-export function deviceRemoveCopy(device: Pick<Device, "hostname" | "mac">) {
+/**
+ * What removing a device is called, and the confirmation every client asks. A device that is still
+ * connected comes straight back unassigned; only with quarantine on does that leave it offline.
+ */
+export function deviceRemoveCopy(device: Pick<Device, "hostname" | "mac">, quarantineEnforced = false) {
   const name = device.hostname ?? "Unnamed device";
   return {
     label: `Delete ${name} (${device.mac.toUpperCase()})`,
     action: "Remove",
     title: `Remove ${name}?`,
-    message: "FamilyFi forgets this device. If it joins a managed network again, it comes back as unassigned.",
+    message: quarantineEnforced
+      ? "FamilyFi forgets this device. While it’s connected, it comes back unassigned and stays offline until you assign it."
+      : "FamilyFi forgets this device.",
     confirm: "Remove device",
   } as const;
 }

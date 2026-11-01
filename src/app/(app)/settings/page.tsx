@@ -7,7 +7,7 @@ import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unif
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { BackupCard } from "@/components/BackupCard";
-import { SETTINGS_COPY, createLoginTitle, loginFormState, settingsTab, usernameFromName, type SettingsTab } from "@/lib/settings-copy";
+import { SETTINGS_COPY, createLoginLede, createLoginTitle, loginFormState, settingsTab, usernameFromName, type SettingsTab } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
 import type { Group } from "@/lib/types";
 import { installedVersion } from "@/lib/update-copy";
@@ -356,7 +356,7 @@ function Settings() {
       {loginFor ? (
         <SheetFrame
           title={createLoginTitle(loginFor)}
-          sub={SETTINGS_COPY.loginNote}
+          sub={createLoginLede(loginFor)}
           size="form"
           onClose={() => setLoginFor(null)}
           footer={

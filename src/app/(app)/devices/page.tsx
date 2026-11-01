@@ -27,6 +27,7 @@ import { DeviceIdentity } from "@/ui/DeviceIdentity";
 import { DeviceMark } from "@/ui/DeviceMark";
 import { PrivateAddressMark, PrivateAddressNotice } from "@/ui/PrivateAddress";
 import { QuarantineCard } from "@/ui/QuarantineCard";
+import { askConfirm } from "@/components/ui/ConfirmHost";
 
 export default function DevicesPage() {
   return (
@@ -167,7 +168,11 @@ function DevicesBody() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => void deleteDevice(store.mutate, device)}
+                      onClick={async () => {
+                        const ask = deviceRemoveCopy(device, enforced);
+                        if (!(await askConfirm({ title: ask.title, message: ask.message, confirmLabel: ask.confirm, destructive: true }))) return;
+                        void deleteDevice(store.mutate, device);
+                      }}
                       aria-label={deviceRemoveCopy(device).label}
                       className="flex h-5 w-5 items-center justify-center rounded-md text-[14px] leading-none disabled:opacity-40"
                       style={{ color: "var(--ff-danger)" }}

@@ -20,6 +20,7 @@ import { toggleRuleEnabled } from "@/lib/group-writes";
 import { PageHeader } from "@/components/PageHeader";
 import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { useAppData } from "@/components/AppDataProvider";
+import { Alert } from "@/ui/Alert";
 import { NetworkCheckupCard, ProtectionCard } from "@/ui/CheckupContent";
 
 export default function CheckupPage() {
@@ -104,14 +105,18 @@ export default function CheckupPage() {
     <>
       <PageHeader title={COPY.title} sub={COPY.sub} />
       {error ? (
-        <p role="alert" className="mx-4 mt-4 rounded-[9px] bg-[var(--ff-danger-fill)] px-3 py-2 text-[14px] text-[var(--ff-danger)] md:mx-6">
-          {error}
-        </p>
+        <div className="mx-4 mt-4 md:mx-6">
+          <Alert tone="danger" role="alert">
+            {error}
+          </Alert>
+        </div>
       ) : null}
       {notice ? (
-        <p role="status" className="mx-4 mt-4 rounded-[9px] bg-[var(--ff-accent-tint)] px-3 py-2 text-[14px] text-[var(--ff-ink)] md:mx-6">
-          {notice}
-        </p>
+        <div className="mx-4 mt-4 md:mx-6">
+          <Alert tone="info" role="status">
+            {notice}
+          </Alert>
+        </div>
       ) : null}
       <div className="grid items-start gap-4 p-4 md:p-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <ProtectionCard

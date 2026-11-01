@@ -39,7 +39,7 @@ export function LockDnsPage({ rule }: { rule: Rule }) {
 
   return (
     <>
-      <PageHeader title={COPY.title} sub={lockDnsSummary(rule)} onAction={() => void save()} actionLabel={COPY.save} />
+      <PageHeader title={COPY.title} sub={lockDnsSummary(draft)} onAction={() => void save()} actionLabel={COPY.save} />
       <form
         className={EDITOR_PAGE}
         onSubmit={(event) => {
