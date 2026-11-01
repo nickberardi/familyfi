@@ -26,7 +26,7 @@ export function normalizeMonogram(value: string): string {
 export function newGroupCopy(kind: GroupKind) {
   const family = kind === "family";
   return {
-    title: family ? "New family member" : "New group",
+    title: family ? "New person" : "New group",
     body: family
       ? "A person in the household. Assign their devices afterward."
       : "A Things group is any set of devices that isn't a person. Assign devices to it afterward.",
@@ -111,7 +111,7 @@ export const GROUP_DETAIL_COPY = {
   deviceColumns: { device: "Device", address: "IP address", hardware: "MAC address" },
   noDevices: "No devices assigned.",
   /** After "No devices assigned." when the group has rules or a pause: the words around the link to assign one. */
-  rulesNeedDevice: { before: "Its rules cannot apply on UniFi until you", link: "assign a device", after: "." },
+  rulesNeedDevice: { before: "Its rules apply once you", link: "assign a device", after: "." },
   delete: "Delete group",
   notFound: "Group not found.",
   notFoundTitle: "Group not found",

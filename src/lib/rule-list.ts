@@ -170,7 +170,7 @@ export const RULES_COPY = {
   everyGroup: "Every group",
   edit: "Edit",
   footnote:
-    "Each window is its own UniFi policy. Edits are desired configuration, written to UniFi on the next reconcile; Sync shows whether the gateway accepted them.",
+    "Each window is a separate entry on your gateway. Sync shows whether your gateway has your changes.",
 } as const;
 
 /** A group with no rules: it stays online and unfiltered. */

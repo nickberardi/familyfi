@@ -139,6 +139,10 @@ export function groupStatus(group: Group, rules: Rule[], timezone: string, now: 
   const internetRules = groupScopedRules(rules, group.id).filter((rule) => rule.kind === "internet");
   const paused = groupRulePause(group, internetRules, now);
   if (paused) return { tone: "on", label: `Online · internet rule paused ${until(paused.until, "until you resume")}` };
+  const pausedForEveryone = internetRules.find((rule) => rule.enabled && rulePaused(rule, now));
+  if (pausedForEveryone && internetWindowsForGroup(rules, group.id, now).length === 0) {
+    return { tone: "on", label: `Online · internet rule paused for everyone ${until(pausedForEveryone.pause.until, "until you resume")}` };
+  }
   return { tone: "on", label: cardStateLabel(group, internetWindowsForGroup(rules, group.id, now), timezone, now) };
 }
 

@@ -44,7 +44,7 @@ export function SidebarStatus({
   const status = syncStatusCard(sync, { busy, error, notice });
   const attention = noMembersAttention(sync?.issues ?? []);
   // Whether sync needs a hand (failed, partial, not configured), whatever a write in flight says.
-  const syncNotice = syncStatusCard(sync).showReconcile;
+  const syncNotice = syncStatusCard(sync).attention;
   // Most urgent first: the row takes the first one's dot.
   const notices = [
     syncNotice && status.dot === "var(--ff-danger)" ? { title: status.title, dot: status.dot } : null,

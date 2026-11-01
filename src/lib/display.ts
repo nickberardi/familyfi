@@ -146,14 +146,15 @@ export function windowTimes(start: string, end: string): string {
  */
 export function cardNoteLine(group: Group, windows: InternetWindow[]): string {
   if (group.deviceCount === 0 && (group.internetRuleIds.length > 0 || group.suspension.active)) {
-    return "No devices · rules cannot apply on UniFi until you assign one";
+    return "No devices · assign one so its rules apply";
   }
   const devices = `${group.deviceCount} ${group.deviceCount === 1 ? "device" : "devices"}`;
-  if (windows.length === 0) return `${devices} · no internet rule`;
+  // The status line says when there is no internet rule, so the device line is just the count.
+  if (windows.length === 0) return devices;
   if (windows.some((window) => window.always)) return `${devices} · internet off always`;
   const only = windows.length === 1 ? windows[0] : undefined;
   if (only) return `${devices} · off ${windowTimes(only.start, only.end)}, ${windowTitle(only)}`;
-  return `${devices} · ${windows.length} internet schedules`;
+  return `${devices} · ${windows.length} internet windows`;
 }
 
 /**
@@ -174,8 +175,8 @@ export function cardStateLabel(group: Group, windows: InternetWindow[], timezone
     case "online":
       return state.next ? `Online · ${state.next.window} at ${formatClock(new Date(state.next.at), timezone)}` : "Online";
     case "no_rule":
-      if (group.kind === "family" && group.familyRole === "adult") return "No controls applied";
-      return "Online · no internet rule";
+      // The same words for every kind of group; a rule that exists but is off is not "no rule".
+      return group.internetRuleIds.length === 0 ? "Online · no internet rule" : "Online · internet rule off";
     default:
       return "Online";
   }

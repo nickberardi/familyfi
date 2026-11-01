@@ -12,16 +12,17 @@ import {
   validateLockDnsDraft,
   type LockDnsDraft,
 } from "@/lib/lock-dns";
-import { managedNetworks } from "@/lib/rule-editor";
+import { managedNetworks, ruleEditorBack } from "@/lib/rule-editor";
 import type { Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { LockDnsForm } from "@/ui/LockDnsForm";
 
 /** The built-in Lock DNS rule's page on the web: the shared form under the page header and its Save. */
-export function LockDnsPage({ rule }: { rule: Rule }) {
+export function LockDnsPage({ rule, returnGroup }: { rule: Rule; returnGroup: string | null }) {
   const router = useRouter();
   const { groups, unifi, store, busy } = useAppData();
+  const { href: back, label: backLabel } = ruleEditorBack(returnGroup, groups);
   const [draft, setDraft] = useState<LockDnsDraft>(() => fromLockDnsRule(rule));
   const [error, setError] = useState("");
   const dirty = lockDnsDirty(rule, draft);
@@ -34,7 +35,7 @@ export function LockDnsPage({ rule }: { rule: Rule }) {
       return;
     }
     const result = await saveLockDns(store.mutate, rule, draft);
-    if (result?.rule) router.push("/rules");
+    if (result?.rule) router.push(back);
   }
 
   return (
@@ -48,7 +49,7 @@ export function LockDnsPage({ rule }: { rule: Rule }) {
         }}
       >
         <div className="flex items-center gap-3">
-          <BackLink href="/rules" label={COPY.back} />
+          <BackLink href={back} label={backLabel} />
           {dirty ? <span className="text-[14px] text-[var(--ff-paused)]">{COPY.unsaved}</span> : null}
         </div>
         <LockDnsForm

@@ -222,7 +222,7 @@ describe("saving a draft", () => {
     expect(notices).toEqual([
       "Bedtime created. FamilyFi writes it to the gateway next.",
       "School nights saved. FamilyFi writes it to the gateway next.",
-      "School nights deleted. Its UniFi policies are removed on the next reconcile.",
+      "School nights deleted.",
     ]);
     expect(removed).toEqual({ ok: true, removedRuleId: "r1" });
   });
@@ -231,13 +231,13 @@ describe("saving a draft", () => {
 describe("what the editor shows", () => {
   it("titles and summarises the draft, and says whether it changed", () => {
     const state = ruleEditorState(blankDraft({ kind: "internet" }), null);
-    expect(state).toMatchObject({ title: "New rule", summary: "All internet · 1 window · 1 UniFi policy", scheduled: true, dirty: true });
+    expect(state).toMatchObject({ title: "New rule", summary: "All internet · 1 window", scheduled: true, dirty: true });
     expect(state.writes.map((write) => write.verb)).toEqual(["NEW"]);
     const rule = saved();
     expect(ruleEditorState(fromRule(rule), rule)).toMatchObject({ title: "School nights", dirty: false });
     expect(ruleEditorState({ ...fromRule(rule), name: " " }, rule).title).toBe("School nights");
-    expect(ruleEditorState(addWindow(fromRule(rule)), rule)).toMatchObject({ summary: "All internet · 2 windows · 2 UniFi policies", dirty: true });
-    expect(ruleEditorState(changeMode(blankDraft({ kind: "app" }), "always"), null).summary).toBe("Apps · always · 1 UniFi policy");
+    expect(ruleEditorState(addWindow(fromRule(rule)), rule)).toMatchObject({ summary: "All internet · 2 windows", dirty: true });
+    expect(ruleEditorState(changeMode(blankDraft({ kind: "app" }), "always"), null).summary).toBe("Apps · always");
   });
 
   it("reports overlapping windows only while scheduled", () => {
@@ -266,9 +266,8 @@ describe("what the editor shows", () => {
     expect(windowTimeLabels("app")).toEqual({ start: "Blocked", end: "Until" });
   });
 
-  it("warns how many policies deleting a rule removes", () => {
-    expect(deleteRuleCopy(saved()).message).toMatch(/^Removes its UniFi policy/);
-    expect(deleteRuleCopy(saved({ policyNames: ["a", "b"] })).message).toMatch(/^Removes all 2 of its UniFi policies/);
+  it("says deleting a rule takes it off the gateway and discards unsaved edits", () => {
+    expect(deleteRuleCopy(saved()).message).toBe("Removes it from your gateway at the next sync and discards unsaved edits. Other rules aren’t affected. This can’t be undone.");
     expect(deleteRuleCopy(saved()).title).toBe("Delete “School nights”?");
   });
 });

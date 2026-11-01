@@ -48,10 +48,10 @@ test.describe("accessibility", () => {
 
   test("add sheets", async ({ page }) => {
     await signIn(page);
-    for (const [route, title] of [["/family", "New family member"], ["/things", "New group"]] as const) {
+    for (const [route, title] of [["/family", "New person"], ["/things", "New group"]] as const) {
       await page.goto(route);
       await page.waitForLoadState("networkidle");
-      await page.getByRole("button", { name: "Add", exact: true }).click();
+      await page.getByRole("button", { name: title, exact: true }).click();
       await expect(page.getByRole("dialog", { name: title })).toBeVisible();
       await expectAccessible(page, `${route} add sheet`, { navigate: false });
     }

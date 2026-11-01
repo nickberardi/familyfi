@@ -116,7 +116,7 @@ test("the sidebar's notices collapse into one row when the rail is short", { tag
 
 test("reconciling from the collapsed notices keeps the row, and Escape returns focus to it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
-  // A failed sync, so its card offers Reconcile now; the write that follows changes what it says.
+  // A failed sync, so its card offers Sync now; the write that follows changes what it says.
   await page.route("**/api/v1/sync", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
     const response = await route.fetch();
@@ -398,8 +398,10 @@ async function openEdit(page: Page, name: string) {
 async function addGroup(page: Page, kind: "family" | "things", fill: (dialog: Locator) => Promise<void>, name: string) {
   await page.goto(`/${kind}`);
   await expect(page.getByText("Loading household…")).toHaveCount(0);
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: kind === "family" ? "New family member" : "New group" });
+  // The header button says what it makes, and its sheet has the same title.
+  const sheetTitle = kind === "family" ? "New person" : "New group";
+  await page.getByRole("button", { name: sheetTitle, exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: sheetTitle });
   await expect(dialog).toBeVisible();
   await fill(dialog);
   const created = page.waitForResponse(
@@ -765,7 +767,7 @@ test("Rules: a two-window internet rule across midnight, named in UniFi, on the 
   for (let left = await studyDaysOff.count(); left > 0; left -= 1) await studyDaysOff.first().click();
   await expect(studyDaysOff).toHaveCount(0);
   // Two windows: each policy is named after the rule, then its window.
-  await expect(page.getByText("Names in UniFi · one policy per window")).toBeVisible();
+  await expect(page.getByText("Names on the gateway · one per window")).toBeVisible();
   await expect(page.getByText(`${ruleName} – Bed`)).toHaveCount(2);
   await expect(page.getByText(`${ruleName} – Study`)).toHaveCount(2);
   // The first window already crosses midnight (9 PM–7 AM); the second overlaps nothing.
@@ -919,6 +921,23 @@ test("Rules: Lock DNS is a built-in rule whose page changes only what it applies
   } finally {
     await page.request.patch("/api/v1/rules/dns", { headers: await csrfHeaders(page), data: { scope: "group", groupIds: seeded.groupIds } });
   }
+});
+
+test("Rules: the built-in rule pages go back where they were opened from and preview their writes", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string }[] };
+  const nick = groups.find((group) => group.name === "Nick");
+  expect(nick, "The mock seed must include Nick").toBeTruthy();
+  for (const id of ["dns", "countries"]) {
+    await page.goto(`/rules/${id}?group=${nick!.id}`);
+    const back = page.getByRole("link", { name: "Rules for Nick" });
+    await expect(back).toHaveAttribute("href", `/rules?group=${nick!.id}`);
+    await expect(page.getByRole("heading", { name: "What FamilyFi will write" })).toBeVisible();
+  }
+  // Nothing changed yet: Block countries keeps its one entry on the gateway.
+  await expect(page.getByTestId("rule-writes").getByText("KEEP")).toHaveCount(1);
+  await page.getByTestId("countries-enabled").click();
+  await expect(page.getByTestId("rule-writes").getByText("CHANGE")).toBeVisible();
 });
 
 test("Block for a custom time, then offer it first next time", { tag: "@desktop" }, async ({ page }) => {
