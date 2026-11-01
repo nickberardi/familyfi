@@ -22,6 +22,7 @@ function focusables(root: HTMLElement): HTMLElement[] {
 export function Modal({
   label,
   labelledBy,
+  describedBy,
   size,
   onClose,
   children,
@@ -32,6 +33,8 @@ export function Modal({
   label?: string;
   /** The id of the heading inside that names it. */
   labelledBy?: string;
+  /** The id of the line that says what the dialog's action does. */
+  describedBy?: string;
   size: ModalSize;
   onClose: () => void;
   children: ReactNode;
@@ -98,6 +101,7 @@ export function Modal({
         aria-modal="true"
         aria-label={labelledBy ? undefined : label}
         aria-labelledby={labelledBy}
+        aria-describedby={describedBy}
         tabIndex={-1}
         data-testid={testID}
         className={`my-auto w-full ${size === "form" ? "max-w-[var(--ff-dialog-form)]" : "max-w-[var(--ff-dialog-confirm)]"} overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-[var(--ff-shadow-sheet)] outline-none`}
