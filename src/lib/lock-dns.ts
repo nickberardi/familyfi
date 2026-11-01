@@ -14,6 +14,11 @@ export const LOCK_DNS_COPY = {
   back: "All rules",
   save: "Save",
   unsaved: "Unsaved changes",
+  status: {
+    title: "Status",
+    note: "When it’s on, the devices it applies to can’t use other DNS servers. Websites and apps keep working.",
+    label: "Lock DNS",
+  },
   blocks: {
     title: "What it blocks",
     note: "The ways around your gateway’s DNS. Websites and apps keep working.",
@@ -64,9 +69,9 @@ const PART_DETAIL: Record<LockDnsPart, string> = {
   "private-relay": "Turns off iCloud Private Relay",
 };
 
-/** "Built in · always · 4 UniFi policies", counting Private Relay's while it is on. */
-export function lockDnsSummary(rule: Pick<Rule, "blockPrivateRelay">): string {
-  return `Built in · always · ${lockDnsParts(rule.blockPrivateRelay ?? false).length} UniFi policies`;
+/** "On · other DNS servers and encrypted DNS": its switch and what it blocks, the shape Block countries' subtitle takes. */
+export function lockDnsSummary(draft: Pick<LockDnsDraft, "enabled">): string {
+  return `${draft.enabled ? "On" : "Off"} · other DNS servers and encrypted DNS`;
 }
 
 /** Who an entry of the "Left open" list belongs to: "Household resolver", "Emma’s resolver", "Handed out by IoT". */
@@ -75,11 +80,17 @@ export function lockDnsOpenLabel(entry: Pick<LockDnsOpen, "source" | "name">): s
   return entry.source === "group" ? `${entry.name}’s resolver` : `Handed out by ${entry.name}`;
 }
 
-/** What Lock DNS applies to, and whether it turns off iCloud Private Relay, saved or being picked. */
-export type LockDnsDraft = AppliesTo & { blockPrivateRelay: boolean };
+/** Lock DNS's switch, what it applies to, and whether it turns off iCloud Private Relay, saved or being picked. */
+export type LockDnsDraft = AppliesTo & { enabled: boolean; blockPrivateRelay: boolean };
 
-export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay">): LockDnsDraft {
-  return { scope: rule.scope, groupIds: [...(rule.groupIds ?? [])], networkIds: [...(rule.networkIds ?? [])], blockPrivateRelay: rule.blockPrivateRelay ?? false };
+export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay"> & Partial<Pick<Rule, "enabled">>): LockDnsDraft {
+  return {
+    enabled: rule.enabled ?? true,
+    scope: rule.scope,
+    groupIds: [...(rule.groupIds ?? [])],
+    networkIds: [...(rule.networkIds ?? [])],
+    blockPrivateRelay: rule.blockPrivateRelay ?? false,
+  };
 }
 
 /**
@@ -104,15 +115,16 @@ export function validateLockDnsDraft(draft: LockDnsDraft): string | null {
 }
 
 /** Whether the pick differs from the saved rule. */
-export function lockDnsDirty(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay">, draft: LockDnsDraft): boolean {
-  return !sameAppliesTo(fromLockDnsRule(rule), draft) || (rule.blockPrivateRelay ?? false) !== draft.blockPrivateRelay;
+export function lockDnsDirty(rule: Pick<Rule, "scope" | "groupIds" | "networkIds" | "blockPrivateRelay"> & Partial<Pick<Rule, "enabled">>, draft: LockDnsDraft): boolean {
+  const saved = fromLockDnsRule(rule);
+  return !sameAppliesTo(saved, draft) || saved.blockPrivateRelay !== draft.blockPrivateRelay || saved.enabled !== draft.enabled;
 }
 
-/** Saves what Lock DNS applies to and its Private Relay switch; resolves to the store's payload, or undefined when it failed. */
+/** Saves Lock DNS's switch, what it applies to and its Private Relay switch; resolves to the store's payload, or undefined when it failed. */
 export function saveLockDns(mutate: HouseholdStore["mutate"], rule: Pick<Rule, "id">, draft: LockDnsDraft) {
   return mutate((send) => send<{ rule: Rule }>(`/api/v1/rules/${rule.id}`, {
       method: "PATCH",
-      body: { ...appliesToBody(draft), blockPrivateRelay: draft.blockPrivateRelay },
+      body: { enabled: draft.enabled, ...appliesToBody(draft), blockPrivateRelay: draft.blockPrivateRelay },
     }), {
     feedback: { notice: "Lock DNS saved. FamilyFi writes it to the gateway next." },
   });

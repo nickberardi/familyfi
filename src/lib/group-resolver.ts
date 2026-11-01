@@ -25,6 +25,12 @@ export const GROUP_RESOLVER_COPY = {
   overrideNote: (groupName: string) => `DNS-over-HTTPS override for ${groupName}. Category results here are measured through this endpoint.`,
   replace: "Replace",
   remove: "Remove override",
+  /** Removing an override asks first, as the household's does. */
+  removeConfirm: (groupName: string) => ({
+    title: `Remove ${groupName}’s DoH override?`,
+    message: `Checks for ${groupName} go back to the household’s DNS resolver.`,
+    confirm: "Remove override",
+  }),
   override: "Override for this group",
   hostNote: "Checks run from the FamilyFi host. A device on another VLAN may get a different answer.",
   saveFailed: "Could not save the endpoint.",

@@ -12,6 +12,7 @@ import {
   GROUP_EDIT_COPY,
   MONOGRAM_MAX,
   deleteGroupConfirm,
+  rulesOnlyFor,
   groupEditBody,
   groupEditError,
   groupEditSheetDraft,
@@ -47,7 +48,7 @@ export function GroupEditSheet({
   onClose: () => void;
   onDeleted: () => void;
 }) {
-  const { store, busy, accounts } = useAppData();
+  const { store, busy, accounts, rules } = useAppData();
   const lockedRole = roleLocked(group, accounts);
   const [draft, setDraft] = useState<GroupEditSheetDraft>(() => groupEditSheetDraft(group));
   const [error, setError] = useState("");
@@ -106,7 +107,7 @@ export function GroupEditSheet({
   }
 
   if (confirming) {
-    const copy = deleteGroupConfirm(group);
+    const copy = deleteGroupConfirm(group, rulesOnlyFor(group, rules));
     return (
       <SheetFrame
         title={copy.title}

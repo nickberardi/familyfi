@@ -77,5 +77,10 @@ describe("the Devices list", () => {
   it("names a device's removal by its name and MAC", () => {
     expect(deviceRemoveCopy(device({ hostname: "tablet", mac: "02:00:00:00:00:0a" })).label).toBe("Delete tablet (02:00:00:00:00:0A)");
     expect(deviceRemoveCopy(device({})).title).toBe("Remove Unnamed device?");
+    // Only quarantine keeps a returning device offline, so only then is that said.
+    expect(deviceRemoveCopy(device({})).message).toBe("FamilyFi forgets this device.");
+    expect(deviceRemoveCopy(device({}), true).message).toBe(
+      "FamilyFi forgets this device. While it’s connected, it comes back unassigned and stays offline until you assign it.",
+    );
   });
 });

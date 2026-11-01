@@ -4,6 +4,7 @@
  * /groups/{id}`). The writes themselves are in `group-writes.ts`.
  */
 import type { Account, Group } from "./types";
+import type { Rule } from "./rules";
 import { roleLabel } from "./display";
 
 export type FamilyRole = "child" | "teen" | "adult";
@@ -177,11 +178,26 @@ export function groupResolverEdit(current: string | null | undefined, draft: Pic
   return url && url !== current ? { kind: "set", url } : { kind: "none" };
 }
 
-/** What deleting a group does, before the person confirms it. */
-export function deleteGroupConfirm(group: Pick<Group, "name">) {
+/** The rules that cover this group alone, which the server deletes with it; built-in rules only lose the group. */
+export function rulesOnlyFor(group: Pick<Group, "id">, rules: readonly (Pick<Rule, "scope"> & Partial<Pick<Rule, "groupIds" | "builtIn">>)[]): number {
+  return rules.filter((rule) => !rule.builtIn && rule.scope === "group" && (rule.groupIds ?? []).length > 0 && (rule.groupIds ?? []).every((id) => id === group.id)).length;
+}
+
+/**
+ * What deleting a group does, before the person confirms it. Given how many rules cover it alone
+ * (`rulesOnlyFor`), it names them; without the count it says it in general.
+ */
+export function deleteGroupConfirm(group: Pick<Group, "name">, ownRules?: number) {
+  const rest = "its devices become Unassigned until you assign them. A linked login stays.";
+  const rules =
+    ownRules === undefined
+      ? `Rules only ${group.name} uses are deleted, and ${rest}`
+      : ownRules === 0
+        ? "Its devices become Unassigned until you assign them. A linked login stays."
+        : `${ownRules === 1 ? "The 1 rule" : `The ${ownRules} rules`} only ${group.name} uses ${ownRules === 1 ? "is" : "are"} deleted, and ${rest}`;
   return {
     title: `Delete ${group.name}?`,
-    body: "Its devices become Unassigned and quarantined until you assign them. Any linked personal login remains active but is no longer linked to this group.",
+    body: rules,
     confirm: "Delete group",
     cancel: "Cancel",
   } as const;

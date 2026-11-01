@@ -400,8 +400,8 @@ describe("Lock DNS on the clients", () => {
   });
 
   it("shows what saving what it applies to writes", () => {
-    const groups = (...groupIds: string[]) => ({ scope: "group" as const, groupIds, networkIds: [], blockPrivateRelay: false });
-    const networks = (...networkIds: string[]) => ({ scope: "network" as const, groupIds: [], networkIds, blockPrivateRelay: false });
+    const groups = (...groupIds: string[]) => ({ enabled: true, scope: "group" as const, groupIds, networkIds: [], blockPrivateRelay: false });
+    const networks = (...networkIds: string[]) => ({ enabled: true, scope: "network" as const, groupIds: [], networkIds, blockPrivateRelay: false });
     expect(lockDnsWrites(groups(), groups())).toEqual([]);
     expect(lockDnsWrites(groups(), groups("kid")).map((write) => write.verb)).toEqual(["NEW", "NEW", "NEW", "NEW"]);
     expect(lockDnsWrites(groups("kid"), groups("kid")).map((write) => write.verb)).toEqual(["KEEP", "KEEP", "KEEP", "KEEP"]);
@@ -413,7 +413,7 @@ describe("Lock DNS on the clients", () => {
   });
 
   it("shows Private Relay's policy coming and going with its switch", () => {
-    const kid = { scope: "group" as const, groupIds: ["kid"], networkIds: [], blockPrivateRelay: false };
+    const kid = { enabled: true, scope: "group" as const, groupIds: ["kid"], networkIds: [], blockPrivateRelay: false };
     const relay = { ...kid, blockPrivateRelay: true };
     const writes = (saved: typeof kid, draft: typeof kid) => lockDnsWrites(saved, draft).map((write) => `${write.verb} ${write.name}`);
     expect(writes(kid, relay)).toEqual([...lockDnsParts(false).map((part) => `KEEP ${lockDnsPolicyName(part)}`), "NEW FamilyFi Lock DNS Private Relay"]);
@@ -422,20 +422,24 @@ describe("Lock DNS on the clients", () => {
     // Switched on while it applies to nothing, it writes nothing.
     expect(writes({ ...kid, groupIds: [] }, { ...relay, groupIds: [] })).toEqual([]);
     expect(lockDnsDirty(kid, relay)).toBe(true);
-    expect(lockDnsSummary(kid)).toBe("Built in · always · 4 UniFi policies");
-    expect(lockDnsSummary(relay)).toBe("Built in · always · 5 UniFi policies");
+    expect(lockDnsSummary(kid)).toBe("On · other DNS servers and encrypted DNS");
+    expect(lockDnsSummary({ ...kid, enabled: false })).toBe("Off · other DNS servers and encrypted DNS");
+    // Its switch is part of what saving sends, as Block countries' is.
+    expect(lockDnsDirty({ ...kid, enabled: true }, { ...kid, enabled: false })).toBe(true);
   });
 
   it("reads the rule as the server sends it, without the other scope's list or the switch", () => {
     // Lock DNS on people carries no networkIds; on networks, no groupIds. blockPrivateRelay is only on Lock DNS.
-    expect(fromLockDnsRule({ scope: "group", groupIds: ["kid"] })).toEqual({ scope: "group", groupIds: ["kid"], networkIds: [], blockPrivateRelay: false });
+    expect(fromLockDnsRule({ scope: "group", groupIds: ["kid"] })).toEqual({ enabled: true, scope: "group", groupIds: ["kid"], networkIds: [], blockPrivateRelay: false });
+    expect(fromLockDnsRule({ enabled: false, scope: "group", groupIds: ["kid"] }).enabled).toBe(false);
     expect(fromLockDnsRule({ scope: "network", networkIds: ["lan"], blockPrivateRelay: true })).toEqual({
+      enabled: true,
       scope: "network",
       groupIds: [],
       networkIds: ["lan"],
       blockPrivateRelay: true,
     });
-    expect(lockDnsDirty({ scope: "group", groupIds: ["kid"] }, { scope: "group", groupIds: ["kid"], networkIds: [], blockPrivateRelay: false })).toBe(false);
+    expect(lockDnsDirty({ scope: "group", groupIds: ["kid"] }, { enabled: true, scope: "group", groupIds: ["kid"], networkIds: [], blockPrivateRelay: false })).toBe(false);
   });
 
   it("names who each DNS it leaves open belongs to", () => {
@@ -445,7 +449,7 @@ describe("Lock DNS on the clients", () => {
   });
 
   it("knows when what it applies to differs from the saved rule", () => {
-    const saved = { scope: "group" as const, groupIds: ["kid", "teen"], networkIds: [], blockPrivateRelay: false };
+    const saved = { enabled: true, scope: "group" as const, groupIds: ["kid", "teen"], networkIds: [], blockPrivateRelay: false };
     expect(lockDnsDirty(saved, { ...saved, groupIds: ["teen", "kid"] })).toBe(false);
     expect(lockDnsDirty(saved, { ...saved, groupIds: ["teen"] })).toBe(true);
     // Networks picked and left behind on the other tab are not a change.

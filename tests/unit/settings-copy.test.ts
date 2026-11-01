@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLoginTitle, gatewayFacts, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeAdminConfirm, removeLoginConfirm, settingsTab, usernameFromName } from "@/lib/settings-copy";
+import { createLoginLede, createLoginTitle, gatewayFacts, householdMemberNote, keyStatusLine, loginFormState, recoveryNote, removeAdminConfirm, removeLoginConfirm, settingsTab, usernameFromName } from "@/lib/settings-copy";
 import type { UnifiSettings } from "@/lib/types";
 
 const unifi: UnifiSettings = {
@@ -84,9 +84,10 @@ describe("settings copy", () => {
   it("names the recovery admin, a new login and removing one", () => {
     expect(recoveryNote({ username: "admin" })).toBe("Recovery admin · username admin · password is FAMILYFI_DEFAULT_PASSWORD on the server");
     expect(createLoginTitle({ name: "An adult" })).toBe("Create login for An adult");
+    expect(createLoginLede({ name: "An adult" })).toMatch(/^An adult becomes an administrator and can change every rule\. /);
     expect(removeLoginConfirm({ username: "adult" }, { name: "An adult" })).toEqual({
       title: "Remove login?",
-      message: "adult can no longer sign in to FamilyFi. An adult stays in the household.",
+      message: "adult is signed out and can no longer sign in, and the phones, Watches and agents acting as An adult are removed. An adult stays in the household.",
       confirmLabel: "Remove login",
     });
   });

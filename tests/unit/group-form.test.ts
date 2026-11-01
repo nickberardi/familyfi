@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   rulesNeedDevice,
   deleteGroupConfirm,
+  rulesOnlyFor,
   groupEditBody,
   groupDetailSub,
   groupEditDraft,
@@ -66,7 +67,28 @@ describe("editing a group", () => {
   });
 
   it("says what deleting does before it happens", () => {
-    expect(deleteGroupConfirm(group())).toMatchObject({ title: "Delete Sam?", confirm: "Delete group", cancel: "Cancel" });
+    expect(deleteGroupConfirm(group())).toMatchObject({
+      title: "Delete Sam?",
+      body: "Rules only Sam uses are deleted, and its devices become Unassigned until you assign them. A linked login stays.",
+      confirm: "Delete group",
+      cancel: "Cancel",
+    });
+    expect(deleteGroupConfirm(group(), 0).body).toBe("Its devices become Unassigned until you assign them. A linked login stays.");
+    expect(deleteGroupConfirm(group(), 1).body).toMatch(/^The 1 rule only Sam uses is deleted, and its devices/);
+    expect(deleteGroupConfirm(group(), 3).body).toMatch(/^The 3 rules only Sam uses are deleted/);
+  });
+
+  it("counts only the rules the server deletes with a group: its own, never a shared or built-in one", () => {
+    const own = { scope: "group" as const, groupIds: ["g1"] };
+    expect(
+      rulesOnlyFor({ id: "g1" }, [
+        own,
+        { scope: "group" as const, groupIds: ["g1", "g2"] },
+        { scope: "group" as const, groupIds: ["g1"], builtIn: "dns" as const },
+        { scope: "network" as const, groupIds: [] },
+        { scope: "group" as const, groupIds: ["g2"] },
+      ]),
+    ).toBe(1);
   });
 
   it("tells a group with rules or a pause, and no devices, that its rules cannot apply yet", () => {

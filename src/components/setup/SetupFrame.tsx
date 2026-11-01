@@ -7,6 +7,7 @@ import { Logo } from "@/components/ui/Logo";
 import { RECOVERY_USERNAME } from "@/lib/constants";
 import { SETUP_LEDES, SETUP_STEP_COUNT, setupFoot } from "@/lib/setup";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
+import { Alert } from "@/ui/Alert";
 
 export const TITLE =
   "m-0 text-[17px] font-semibold tracking-tight text-[var(--ff-ink)]";
@@ -78,12 +79,9 @@ export function SetupFrame({
           {children}
 
           {error ? (
-            <p
-              role="alert"
-              className="m-0 rounded-[9px] bg-[var(--ff-danger-fill)] px-3 py-2.5 text-[14px] leading-[1.45] text-[var(--ff-danger)]"
-            >
+            <Alert tone="danger" role="alert">
               {error}
-            </p>
+            </Alert>
           ) : null}
 
           <div className="flex gap-2.5">

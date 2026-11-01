@@ -220,7 +220,7 @@ export function checkedAgo(checkedAt: string, now = Date.now()): string {
 
 /** The check schedule in a line: paused, never, or when it runs and when it runs next. */
 export function resolverScheduleLine(resolver: Pick<UpstreamResolverSettings, "probeEnabled" | "probeDays" | "probeTime" | "nextRunAt">, timezone: string, now: Date): string {
-  if (!resolver.probeEnabled) return "Paused — last results kept";
+  if (!resolver.probeEnabled) return "Paused — earlier results cleared";
   if (resolver.probeDays.length === 0) return "No days selected — checking won't run";
   const when = `${probeScheduleWhen(resolver.probeDays)} at ${formatHhmm(resolver.probeTime)}`;
   if (!resolver.nextRunAt) return when;

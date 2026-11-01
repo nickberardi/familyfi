@@ -63,6 +63,12 @@ export function GroupResolverCard({
     }
   }
 
+  async function remove() {
+    const ask = COPY.removeConfirm(groupName);
+    if (!(await ui.confirm({ title: ask.title, message: ask.message, confirmLabel: ask.confirm, destructive: true }))) return;
+    void run(() => removeGroupResolver(request, groupId), COPY.removeFailed);
+  }
+
   function save() {
     if (!canSave) return;
     void run(
@@ -120,7 +126,7 @@ export function GroupResolverCard({
             <Text style={[small(14, 20), styles.note]}>{COPY.overrideNote(groupName)}</Text>
             <View style={[styles.row, styles.actions]}>
               {outline(COPY.replace, "accent", () => setPasting(true), "group-resolver-replace")}
-              {outline(COPY.remove, "danger", () => void run(() => removeGroupResolver(request, groupId), COPY.removeFailed), "group-resolver-remove")}
+              {outline(COPY.remove, "danger", () => void remove(), "group-resolver-remove")}
             </View>
           </>
         ) : (

@@ -48,6 +48,13 @@ export function LockDnsForm({
           {error}
         </Alert>
       ) : null}
+      <EditorSection title={COPY.status.title} note={COPY.status.note}>
+        <View style={styles.toggleRow}>
+          <Text style={[body, styles.grow, styles.itemTitle, { color: ui.color("ink") }]}>{COPY.status.label}</Text>
+          <ui.Toggle label={COPY.status.label} on={draft.enabled} onToggle={() => edit((current) => ({ ...current, enabled: !current.enabled }))} disabled={disabled} testID="lock-dns-enabled" />
+        </View>
+      </EditorSection>
+
       <EditorSection title={COPY.blocks.title} note={COPY.blocks.note}>
         <View role="list" style={styles.items}>
           {COPY.blocks.items.map((item) => (

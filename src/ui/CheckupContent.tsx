@@ -325,6 +325,15 @@ function LeftoverRow({
           })}
         </View>
         <View style={[styles.actions, styles.leftoverActions]}>
+          {/* Keeping them is the safe answer, so it sits first, left of the red remove. */}
+          <Button
+            kind="secondary"
+            size="md"
+            label={finding.dismissed ? COPY.network.restore : text.keep(policies.length)}
+            onPress={() => onDismiss(finding, !finding.dismissed)}
+            disabled={disabled}
+            testID={`checkup-dismiss-${finding.id}`}
+          />
           {onRemovePolicies ? (
             <Pressable
               role="button"
@@ -337,9 +346,6 @@ function LeftoverRow({
               <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("danger") }]}>{text.remove(ticked.length)}</Text>
             </Pressable>
           ) : null}
-          <Pressable role="button" aria-disabled={disabled} disabled={disabled} onPress={() => onDismiss(finding, !finding.dismissed)} testID={`checkup-dismiss-${finding.id}`}>
-            <Text style={[styles.action, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{finding.dismissed ? COPY.network.restore : text.keep(policies.length)}</Text>
-          </Pressable>
         </View>
       </View>
     </Row>
@@ -509,7 +515,7 @@ const styles = StyleSheet.create({
   tickMark: { fontSize: 12, lineHeight: 14, fontWeight: "700" },
   strong: { fontWeight: "600" },
   copyNote: { marginTop: 2 },
-  leftoverActions: { marginTop: 12 },
+  leftoverActions: { marginTop: 12, columnGap: 8, rowGap: 8 },
   driftRow: { flexDirection: "row", gap: 12, paddingHorizontal: 12, paddingVertical: 8 },
   driftLabel: { width: 72, flexShrink: 0 },
   cell: { flex: 1, minWidth: 0 },
