@@ -213,7 +213,7 @@ The `design-reviewer` subagent covers what the tests cannot: role, size, copy an
 
 ## Open differences
 
-Places where the code and the design project disagree and the operator has not yet decided. Several copy rows are the UX audit's third pull request (copy), not yet built. The table is a record of known drift, not a complete inventory: a review judges only the code a change adds or alters, by the project's rule, and never reports untouched code. The reviewer reports a change that widens one; the design-sync skill lists new ones here.
+Places where the code and the design project disagree and the operator has not yet decided. The table is a record of known drift, not a complete inventory: a review judges only the code a change adds or alters, by the project's rule, and never reports untouched code. The reviewer reports a change that widens one; the design-sync skill lists new ones here.
 
 | Topic | Design project | Code today |
 | --- | --- | --- |
@@ -225,14 +225,12 @@ Places where the code and the design project disagree and the operator has not y
 | Text under 14px | Only the `Mark` caption (10) and state word (9) | Also monograms (9px in `src/ui/CategoryMarks.tsx`, 10/12px in `src/ui/MonoTile.tsx`, 12px for three letters in `src/ui/GroupCardHeader.tsx`), the 10px badge in the More mark (`CategoryMarks.tsx`) and a 10px check glyph in the Admin chip's checkbox (`src/ui/AdminControl.web.tsx`) |
 | Shared section label | One `SectionLabel` | Two copies, `src/ui/CategoryMarks.tsx` and `src/components/FilterMarks.tsx` |
 | Internet mark words | On, Blocked, Off (the internet rule is switched off), No rule | "Blocked" while the group is paused and "Off" while an internet window is on now (`src/lib/internet-zone.ts`) |
-| Status lines | "4 devices" with no internet rule; "Online · internet rule off"; "… paused for everyone until <time>" | "4 devices · no internet rule" (`src/lib/display.ts`); no "rule off" line; "Online · internet rule paused <until>" (`src/lib/group-actions.ts`) |
-| Sync button | "Sync now" / "Syncing…" | "Reconcile now" / "Reconciling…" (`src/lib/sync-copy.ts`), shown in the rail's status card |
-| Technical words on household pages | "UniFi policy", "reconcile", "desired state", "DPI" only on Sync and Diagnostics | Also in the rule editor (`src/lib/rule-editor.ts`), Lock DNS (`src/lib/lock-dns.ts`), the Block an app sheet (`src/lib/filter-sheet.ts`), device assignment (`src/lib/device-assign.ts`), the store's toast (`src/lib/household-store.ts`) and `src/lib/upstream.ts` |
+| Status lines | "Online · internet rule paused for everyone until <time>" | "Online · internet rule paused until <time>" (`src/lib/group-actions.ts`) |
+| Technical words on household pages | "UniFi policy", "reconcile", "desired state", "DPI" only on Sync and Diagnostics | A custom category's note says "no UniFi policy" (`src/lib/upstream.ts`) |
 | Rule, not schedule | "+ Add a rule", "Pause or change rules →" | "+ Add a schedule", "Pause or change schedules →" (`src/ui/GroupSchedule.tsx`) |
 | Toast | Bottom-centre, about 4 seconds, never the only copy of an error | Top-centre (`AppShell.tsx`), 6 seconds (`NOTICE_MS`), and it shows the store's error itself (`src/ui/Toast.tsx`) with a Dismiss button |
-| Editors | Every editor has a write preview; leaving with unsaved changes asks first | Block countries has no write preview; editors show "Unsaved" but don't ask on leaving |
+| Editors | Leaving with unsaved changes asks first | Editors show "Unsaved" but don't ask on leaving |
 | Back link position | Above the title | Below the page header (`BackLink.tsx`, `RuleEditor.tsx`, `LockDnsPage.tsx`) |
-| Rule and app marks | Rule marks show names and monograms ("Kid apps" → KA); never "App" | Rule cards draw a Phosphor glyph (`ruleMarkSpec`, `src/lib/rule-list.ts`); app monograms are always the first two letters (`glyphForAppName`); an unnamed app rule falls back to "App" (`parentFacingRuleLabel`) |
 | Write preview colours | KEEP in `--ff-ink-2` | KEEP in `ink-3` and CHANGE in the accent (`src/ui/RuleEditorForm.tsx`) |
 | `quiet` button on web | One of five roles on both platforms | Only `src/ui/Button.tsx` has it; `src/components/ui/buttons.ts` does not |
 | Day timeline hours | 12 AM, 6 AM, Noon, 6 PM | "NOON" in uppercase (`src/lib/day-timeline.ts`, `RULE_BAR_TICKS` in `src/lib/rule-list.ts`) |
