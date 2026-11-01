@@ -54,23 +54,25 @@ pass. Keep these distinctions when naming features and choosing data owners.
 | --- | --- |
 | Code or naming | [Implementation and review](docs/development.md#implementation-and-review), [naming](docs/development.md#naming) when adding or renaming symbols, relevant tests |
 | Enforcement, schedules, DNS or server boundaries | [Architecture](docs/architecture.md) |
-| UI | [Design system and interactions](docs/development.md#design-system-and-interactions), existing `src/components/ui` primitives, local `designs/` references when present |
+| UI | [Design system](docs/design.md), existing `src/ui` and `src/components/ui` primitives, local `designs/` references when present |
 | HTTP contract or authentication | [API](docs/api.md), `openapi/familyfi.v1.yaml`, authorization matrix in `tests/integration/authorization-matrix.test.ts` |
 | Database, environment or deployment | [Setup](docs/setup.md), [operations](docs/operations.md), [naming and migration rules](docs/development.md#naming) |
 | Tests, CI or scripts | [Testing](docs/testing.md), [scripts](scripts/README.md) |
 
-For UI references, read `Web Design.dc.html`, `Sign In.dc.html`, and the `_ds/` bundle's `readme.md`, `tokens/` and `_ds_bundle.js` when available. They are optional local references, never dependencies. Repository rules, current components and tokens, and architecture take precedence over prototype behaviour, sizes, colours and delivery mechanisms. Missing `designs/` does not block UI work.
+The design system is the claude.ai/design project **FamilyFi Design System**; [docs/design.md](docs/design.md) is the repository's copy of its rules and says which side decides what. Keep the two matched with the design-sync skill. Local `designs/` exports (`Web Design.dc.html`, `Sign In.dc.html`, the `_ds/` bundle) are optional references, never dependencies, and missing `designs/` does not block UI work. Repository rules, current components and tokens, and architecture take precedence over prototype behaviour and delivery mechanisms.
 
 ## Repository skills
 
 - [Validate a change](.agents/skills/validate-change/SKILL.md): select and run checks before handoff or reproduce a CI failure.
 - [Release](.agents/skills/release/SKILL.md): prepare or publish a release when requested by the operator.
+- [Design sync](.agents/skills/design-sync/SKILL.md): bring `docs/design.md` and the FamilyFi Design System project back into agreement, in either direction.
 
 All repository skills live in `.agents/skills/`. `.claude/skills` is a directory symlink to it, so new skills are automatically shared with Claude Code. Add and edit skills only under `.agents/skills/`; maintain one definition per workflow. Skills reference the existing docs and scripts; they do not replace the rules below.
 
 Subagents are defined twice, in `.claude/agents/<name>.md` for Claude and `.codex/agents/<name>.toml` for Codex, and `tests/unit/reviewer-agents.test.ts` keeps each pair identical:
 
 - `reviewer`: reviews a finished change before a PR (see [Pull requests](#pull-requests)).
+- `design-reviewer`: reviews a finished UI change against [docs/design.md](docs/design.md) before a PR.
 - `bug-hunter`: traces a reported bug to its root cause and proposes a reproducing test and fix, read-only.
 - `crash-hunter`: follows a crash, stack trace or fatal exception to the failing line, read-only.
 
@@ -117,7 +119,7 @@ Each invariant names the tests that enforce it; `tests/unit/invariants.test.ts` 
 
 PRs include validation appropriate to the change. Behaviour changes include tests; API contract changes include an OpenAPI update in the same change. An internal refactor with unchanged HTTP behaviour does not require a spec edit or version bump. The PR description explicitly lists every issue or alert it closes; use `Closes #<number>` for GitHub issues and identify security alerts by their Dependabot alert number and advisory.
 
-**Before opening a PR, spawn the `reviewer` subagent** (`.claude/agents/reviewer.md` for Claude, `.codex/agents/reviewer.toml` for Codex) with the plan or issue the change was built from. Fix every blocking finding, then spawn a fresh reviewer again, until it reports none. The agent that wrote a change never reviews it. The reviewer is two files only because Claude and Codex define subagents in different formats; `tests/unit/reviewer-agents.test.ts` keeps their instructions identical, so edit both together rather than merging them into a skill.
+**Before opening a PR, spawn the `reviewer` subagent** (`.claude/agents/reviewer.md` for Claude, `.codex/agents/reviewer.toml` for Codex) with the plan or issue the change was built from. Fix every blocking finding, then spawn a fresh reviewer again, until it reports none. The agent that wrote a change never reviews it. When the change touches UI (`src/ui`, `src/components`, a page or layout under `src/app`, `globals.css`, `public/brand`, or user-facing copy in `src/lib`), also spawn the **`design-reviewer`** subagent the same way, until it too reports none. A design decision the change makes on purpose goes into `docs/design.md` in the same PR, and into the design project through the design-sync skill. The reviewer is two files only because Claude and Codex define subagents in different formats; `tests/unit/reviewer-agents.test.ts` keeps their instructions identical, so edit both together rather than merging them into a skill.
 
 ## OpenAPI consumer coordination
 
