@@ -37,7 +37,7 @@ export function InternetPresets({
           disabled={disabled}
           onPress={() => void addInternetPreset(mutate, group, preset)}
           testID={`internet-preset-${preset.name}-${group.id}`}
-          style={({ pressed }) => [chip, disabled && { opacity: 0.5 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+          style={({ pressed }) => [chip, disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
         >
           <ui.Icon name="plus" size={12} color={accent} />
           <Text style={label}>{preset.label}</Text>

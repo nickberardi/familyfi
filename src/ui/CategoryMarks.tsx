@@ -126,7 +126,7 @@ export function AddAppMark({ onPress, disabled = false }: { onPress: () => void;
   const ui = useUI();
   const accent = ui.color("accent");
   return (
-    <Pressable role="button" aria-label="Add app filter" aria-disabled={disabled} disabled={disabled} onPress={onPress} style={styles.mark} testID="add-app-mark">
+    <Pressable role="button" aria-label="Block an app" aria-disabled={disabled} disabled={disabled} onPress={onPress} style={styles.mark} testID="add-app-mark">
       <View style={[styles.circle, styles.addDashed, { borderColor: ui.color("control-line") }]}>
         <Text style={{ fontFamily: ui.font, fontSize: 16, lineHeight: 16, fontWeight: "300", color: accent }}>+</Text>
       </View>

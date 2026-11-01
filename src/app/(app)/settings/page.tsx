@@ -53,6 +53,8 @@ function Settings() {
   const [offerForget, setOfferForget] = useState(false);
   const [editingGateway, setEditingGateway] = useState(false);
   const [loginFor, setLoginFor] = useState<Group | null>(null);
+  // Held while a login is being created, so a second press can't send it twice.
+  const [creatingLogin, setCreatingLogin] = useState(false);
   const [loginUser, setLoginUser] = useState("");
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
@@ -366,13 +368,16 @@ function Settings() {
               </button>
               <button
                 type="button"
-                disabled={!login.canCreate}
+                disabled={!login.canCreate || creatingLogin}
                 className={PRIMARY_BUTTON}
                 onClick={() => {
                   const group = loginFor;
-                  void createLogin(store.mutate, group, loginUser, pw1).then((result) => {
-                    if (result) setLoginFor(null);
-                  });
+                  setCreatingLogin(true);
+                  void createLogin(store.mutate, group, loginUser, pw1)
+                    .then((result) => {
+                      if (result) setLoginFor(null);
+                    })
+                    .finally(() => setCreatingLogin(false));
                 }}
               >
                 {SETTINGS_COPY.createLogin}

@@ -783,6 +783,12 @@
         "categories"
       ]
     },
+    "tests/browser/dialogs.spec.ts": {
+      "categories": [
+        "categories",
+        "devices"
+      ]
+    },
     "tests/browser/group-resolver.spec.ts": {
       "categories": [
         "groups",

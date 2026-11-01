@@ -249,7 +249,7 @@ function TextButton({ label, onPress, disabled = false, testID }: { label: strin
       disabled={disabled}
       onPress={onPress}
       testID={testID}
-      style={({ pressed }) => [disabled && { opacity: 0.5 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+      style={({ pressed }) => [disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
     >
       <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, fontWeight: "600", color: ui.color("accent") }}>{label}</Text>
     </Pressable>

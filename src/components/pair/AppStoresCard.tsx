@@ -75,7 +75,7 @@ export function AppStoresCard() {
       <div className="flex flex-wrap items-center gap-3 px-[18px] py-[15px]">
         <div className="min-w-[200px] flex-1">
           <div className="text-[14px] font-semibold">{PAIR_COPY.getApp}</div>
-          <div className="mt-0.5 text-[14px] text-[var(--ff-muted)]">{PAIR_COPY.getAppSub}</div>
+          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">{PAIR_COPY.getAppSub}</div>
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {APP_STORES.map((store: AppStore) =>

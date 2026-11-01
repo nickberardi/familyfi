@@ -112,6 +112,7 @@ export function AddAppForm({
             disabled={!enabled}
             testID="add-app-mode"
           />
+          {mode === "scheduled" ? <Text style={[styles.note, { fontFamily: ui.font, color: ui.color("ink-3") }]}>{copy.scheduledNote}</Text> : null}
         </View>
         {error ? <Text style={[styles.error, { fontFamily: ui.font, color: ui.color("danger") }]}>{error}</Text> : null}
       </View>
@@ -129,4 +130,5 @@ const styles = StyleSheet.create({
   fields: { gap: 14, paddingHorizontal: 18, paddingVertical: 14 },
   search: { marginBottom: 8 },
   error: { margin: 0, fontSize: 14, lineHeight: 21 },
+  note: { marginTop: 8, fontSize: 14, lineHeight: 20 },
 });

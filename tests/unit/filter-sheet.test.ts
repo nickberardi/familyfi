@@ -21,14 +21,24 @@ describe("filter sheet", () => {
     expect(filterSheetCopy(group, category())).toMatchObject({
       heading: "Nothing's blocking Video yet",
       action: "create",
-      actionLabel: "Create policy",
-      editLabel: "Schedule it instead",
+      actionLabel: "Block Video",
+      editLabel: "Block on a schedule…",
+      body: "Blocks Video for A child all day. You can add a schedule afterwards.",
+    });
+  });
+
+  it("offers only to turn a rule that is off back on", () => {
+    expect(filterSheetCopy(group, category({ rule: rule({ enabled: false }) }))).toMatchObject({
+      action: "enable",
+      actionLabel: "Turn on",
+      editLabel: "",
+      body: "Turns “Video for A child” back on with its own schedule.",
     });
   });
 
   it("turns off a blocking rule, and warns when it covers other groups", () => {
     const copy = filterSheetCopy(group, category({ rule: rule({ groupIds: ["g1", "g2"] }), activelyBlocking: true }));
-    expect(copy).toMatchObject({ heading: "Video · blocked", action: "turnOff", actionLabel: "Turn off", editLabel: "Edit rule and schedule" });
+    expect(copy).toMatchObject({ heading: "Video · blocked", action: "turnOff", actionLabel: "Turn off Video", editLabel: "Edit rule and schedule" });
     expect(copy.body).toContain("for every group it covers");
   });
 
@@ -36,6 +46,7 @@ describe("filter sheet", () => {
     const windows = [{ id: "w1", name: "School", start: "08:00", end: "15:00", days: [1, 2, 3, 4, 5] }];
     const copy = filterSheetCopy(group, category({ rule: rule({ mode: "scheduled", windows } as Partial<Rule>) }));
     expect(copy.heading).toBe("Video · scheduled, not now");
+    expect(copy.body).toBe("Video is blocked on a schedule, and this is not one of its hours.");
     expect(copy.action).toBe("turnOff");
     expect(copy.windows).toHaveLength(1);
     expect(copy.windows[0]).toMatch(/^School · /);
@@ -109,5 +120,8 @@ describe("filter sheet links and the Add app filter", () => {
       },
     ]);
     expect(addAppCopy(group).body).toBe("Blocks an app for A child.");
+    expect(addAppCopy(group)).toMatchObject({ title: "Block an app", search: "Search apps", create: "Block" });
+    // The line under Scheduled says the window a Scheduled rule gets.
+    expect(addAppCopy(group).scheduledNote).toBe("Blocks 9 PM–7 AM every day. Change it on the rule’s page.");
   });
 });

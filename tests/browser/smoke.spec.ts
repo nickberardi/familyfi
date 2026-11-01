@@ -1105,7 +1105,7 @@ test("cards show every household category; one UniFi cannot block offers a Websi
   await marks.getByRole("button", { name: /^AI / }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByText(/UniFi has no AI category/)).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Create policy" })).toHaveCount(0);
+  await expect(sheet.getByRole("button", { name: "Block AI" })).toHaveCount(0);
   await sheet.getByRole("link", { name: "Block its websites" }).click();
   await expect(page).toHaveURL(/\/rules\/new\?kind=domain/);
   // A named draft titles the page with its name.
@@ -1187,7 +1187,7 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await expect(marks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
   await expect(page.getByText(/Porn/i)).toHaveCount(0);
   // No App + on list cards
-  await expect(marks.getByRole("button", { name: "Add app filter" })).toHaveCount(0);
+  await expect(marks.getByRole("button", { name: "Block an app" })).toHaveCount(0);
   // No group is exempt: an adult's card shows its marks too.
   await expect(page.getByTestId(`filter-marks-${adult!.id}`)).toBeVisible();
 
@@ -1220,7 +1220,7 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   const settled = page.waitForResponse(
     async (response) => /\/api\/v1\/changes\//.test(response.url()) && ((await response.json()) as { change?: { status?: string } }).change?.status !== "pending",
   );
-  await offSheet.getByRole("button", { name: "Create policy" }).click();
+  await offSheet.getByRole("button", { name: /^(Block Video|Turn on)$/ }).click();
   expect((await create).ok()).toBeTruthy();
 
   // The mark now stands for the rule.
@@ -1242,7 +1242,7 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
   await detailMarks.getByRole("button", { name: /Video blocked by FamilyFi/i }).click();
   const onSheet = page.getByRole("dialog");
   await expect(onSheet.getByRole("heading", { name: /Video · blocked/i })).toBeVisible();
-  await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeVisible();
+  await expect(onSheet.getByRole("button", { name: "Turn off Video" })).toBeVisible();
   // A change the server refuses leaves the sheet open, saying why.
   await page.route("**/api/v1/rules/*/off", (route) =>
     route.fulfill({
@@ -1251,21 +1251,21 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
       body: JSON.stringify({ error: { code: "conflict", message: "The rule changed elsewhere." } }),
     }),
   );
-  await onSheet.getByRole("button", { name: "Turn off" }).click();
+  await onSheet.getByRole("button", { name: "Turn off Video" }).click();
   await expect(onSheet.getByText("The rule changed elsewhere.")).toBeVisible();
-  await expect(onSheet.getByRole("button", { name: "Turn off" })).toBeEnabled();
+  await expect(onSheet.getByRole("button", { name: "Turn off Video" })).toBeEnabled();
   await page.unroute("**/api/v1/rules/*/off");
   const off = page.waitForResponse(
     (response) => response.request().method() === "POST" && /\/api\/v1\/rules\/[^/]+\/off/.test(response.url()),
   );
-  await onSheet.getByRole("button", { name: "Turn off" }).click();
+  await onSheet.getByRole("button", { name: "Turn off Video" }).click();
   expect((await off).ok()).toBeTruthy();
   await expect(detailMarks.getByRole("button", { name: /Video not blocked/i })).toBeVisible();
 
   // GroupDetail: App + present
-  await expect(page.getByRole("button", { name: "Add app filter" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Block an app" })).toBeVisible();
   // Adding an app the server refuses keeps the form open, saying so.
-  await page.getByRole("button", { name: "Add app filter" }).click();
+  await page.getByRole("button", { name: "Block an app" }).click();
   const picker = page.getByLabel("DPI application");
   await expect(picker.locator("option")).not.toHaveCount(1);
   await picker.selectOption({ index: 1 });

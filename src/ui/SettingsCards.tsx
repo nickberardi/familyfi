@@ -32,7 +32,7 @@ function Card({ title, sub, children, testID }: { title: string; sub?: string; c
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID={testID}>
       <View style={[styles.cardHead, { borderBottomColor: ui.color("hairline-card") }]}>
         <Text style={[text(14, 21, "ink"), styles.bold]}>{title}</Text>
-        {sub ? <Text style={text(14, 21, "muted")}>{sub}</Text> : null}
+        {sub ? <Text style={text(14, 21, "ink-2")}>{sub}</Text> : null}
       </View>
       {children}
     </View>
@@ -236,7 +236,7 @@ export function HouseholdCard({
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
-  cardHead: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 10, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
+  cardHead: { gap: 2, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18 },

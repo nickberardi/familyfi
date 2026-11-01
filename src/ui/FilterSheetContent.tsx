@@ -35,7 +35,7 @@ export function FilterSheetContent({
   note?: string;
   /** The measured results by network. */
   details?: ReactNode;
-  /** Where "Edit rule and schedule" or "Schedule it instead" goes (`filterEditHref`). */
+  /** Where "Edit rule and schedule" or "Block on a schedule…" goes (`filterEditHref`). */
   editHref?: string;
   /** Where "Block its websites" goes (`filterWebsitesHref`), for a category UniFi cannot block. */
   websitesHref?: string;
@@ -79,7 +79,7 @@ export function FilterSheetContent({
         ) : (
           <>
             <Button size="md" grow kind={turnOff ? "destructive" : "primary"} label={copy.actionLabel} onPress={onAction} disabled={off} testID="filter-sheet-action" />
-            {editHref ? linkButton(editHref, copy.editLabel, "secondary", "filter-sheet-edit") : null}
+            {editHref && copy.editLabel ? linkButton(editHref, copy.editLabel, "secondary", "filter-sheet-edit") : null}
           </>
         )}
         <Button size="md" grow kind="cancel" label={copy.cancel} onPress={onCancel} testID="filter-sheet-cancel" />

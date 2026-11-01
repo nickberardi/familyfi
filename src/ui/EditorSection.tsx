@@ -28,6 +28,6 @@ export function EditorSection({ title, note, badge, children }: { title: string;
 const styles = StyleSheet.create({
   section: { gap: 12, borderRadius: 12, borderWidth: 1, padding: 18 },
   heading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
-  title: { margin: 0, fontSize: 15, lineHeight: 22.5, fontWeight: "600" },
+  title: { margin: 0, fontSize: 17, lineHeight: 24, fontWeight: "600" },
   note: { marginTop: 2, fontSize: 14, lineHeight: 20 },
 });
