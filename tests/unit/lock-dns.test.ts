@@ -426,6 +426,10 @@ describe("Lock DNS on the clients", () => {
     expect(lockDnsSummary({ ...kid, enabled: false })).toBe("Off · other DNS servers and encrypted DNS");
     // Its switch is part of what saving sends, as Block countries' is.
     expect(lockDnsDirty({ ...kid, enabled: true }, { ...kid, enabled: false })).toBe(true);
+    // Turning it off keeps its policies, turned off: the preview says so rather than KEEP.
+    expect(lockDnsWrites({ ...kid, enabled: true }, { ...kid, enabled: false }).map((write) => [write.verb, write.detail])).toEqual(
+      Array(4).fill(["CHANGE", "Turned off"]),
+    );
   });
 
   it("reads the rule as the server sends it, without the other scope's list or the switch", () => {

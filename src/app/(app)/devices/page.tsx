@@ -169,7 +169,7 @@ function DevicesBody() {
                       type="button"
                       disabled={busy}
                       onClick={async () => {
-                        const ask = deviceRemoveCopy(device, enforced);
+                        const ask = deviceRemoveCopy(device, enforced && !pausedLine);
                         if (!(await askConfirm({ title: ask.title, message: ask.message, confirmLabel: ask.confirm, destructive: true }))) return;
                         void deleteDevice(store.mutate, device);
                       }}

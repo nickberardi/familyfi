@@ -62,7 +62,7 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
           upstreamBlocked ? " Its DNS resolver is blocking it anyway right now." : ""
         }`
       : upstreamBlocked
-        ? `${group.name}'s DNS resolver already blocks every ${state.name} domain we test.${measured} FamilyFi is not doing it, so it cannot schedule or pause it — create a policy if you want that.`
+        ? `${group.name}'s DNS resolver already blocks every ${state.name} domain we test.${measured} FamilyFi is not doing it, so it cannot schedule or pause it. Block it here if you want that.`
         : upstreamPartial
           ? `${group.name}'s DNS resolver blocks ${upstream!.blockedCount} of ${upstream!.totalCount} ${state.name} domains we test.${measured} A FamilyFi policy would cover the rest.`
           : state.rule
