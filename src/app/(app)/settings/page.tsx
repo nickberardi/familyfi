@@ -20,7 +20,7 @@ import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
 import { useUpdateCheck } from "@/ui/use-update-check";
 import { useUpdateSettings } from "@/ui/use-update-settings";
 import { forgetCatalogNames } from "@/components/GroupGrid";
-import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
+import { CANCEL_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
 import { SheetFrame } from "@/components/pair/SheetFrame";
 
 const FIELD = "ff-input mt-1 font-normal";
@@ -303,7 +303,7 @@ function Settings() {
                     {offerForget ? (
                       <button
                         type="button"
-                        className={DESTRUCTIVE_BUTTON}
+                        className={SECONDARY_BUTTON}
                         onClick={() => saveKey(true)}
                       >
                         {SETTINGS_COPY.forgetOldGateway}
