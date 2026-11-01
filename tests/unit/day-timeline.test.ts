@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { TIMELINE_BAND_LOOK, bandTimes, timelineBandLook, timelineLegend, timelinePercent, timelineRank, type TimelineBand } from "@/lib/day-timeline";
+import {
+  TIMELINE_BAND_LOOK,
+  TIMELINE_HOURS,
+  bandTimes,
+  timelineBandLook,
+  timelineHours,
+  timelineLegend,
+  timelinePercent,
+  timelineRank,
+  type TimelineBand,
+} from "@/lib/day-timeline";
 
 const band = (patch: Partial<TimelineBand>): TimelineBand => ({ kind: "window", from: 0, to: 60, label: "Bedtime", source: "Bedtime rule", ...patch });
 
@@ -55,5 +65,22 @@ describe("day timeline", () => {
     expect(timelineBandLook({ kind: "window", tone: 2 })).toEqual(TIMELINE_BAND_LOOK.window);
     expect(timelineBandLook({ kind: "category", tone: 2 })).toEqual({ fill: "schedule-3-fill", line: "schedule-3-line" });
     expect(timelineBandLook({ kind: "category", tone: 0, dim: true }).opacity).toBeCloseTo(0.35);
+  });
+  it("keeps every hour label that fits under the bar, dropping the inner ones at large text sizes", () => {
+    // Each label's width at the standard text size on iPhone, and a phone card's bar.
+    const standard = [41, 33, 42, 33, 41];
+    const at = (scale: number) => standard.map((width) => width * scale);
+    expect(timelineHours(330, standard)).toEqual(TIMELINE_HOURS);
+    // The first accessibility size: the five run together, the ends and noon fit.
+    expect(timelineHours(330, at(2.35))).toEqual(["12 AM", "NOON", "12 AM"]);
+    // The largest: only the ends.
+    expect(timelineHours(330, at(3.1))).toEqual(["12 AM", "12 AM"]);
+  });
+
+  it("shows all five hour labels until the bar and labels are measured", () => {
+    expect(timelineHours(0, [])).toEqual(TIMELINE_HOURS);
+    expect(timelineHours(330, [])).toEqual(TIMELINE_HOURS);
+    expect(timelineHours(0, [41, 33, 42, 33, 41])).toEqual(TIMELINE_HOURS);
+    expect(timelineHours(330, [96, 0, 99, 78, 96])).toEqual(TIMELINE_HOURS);
   });
 });

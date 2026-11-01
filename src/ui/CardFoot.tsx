@@ -1,8 +1,9 @@
 "use client";
 
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { PRESS_OPACITY, useUI } from "./UIContext";
+import { useLargeText } from "./use-large-text";
 
 /** One of a card's actions: a button (`onPress`) or a link to a page (`href`). */
 export type CardAction = {
@@ -27,7 +28,7 @@ export type CardAction = {
  */
 export function CardFoot({ lines = [], leading, actions = [] }: { lines?: readonly string[]; leading?: CardAction; actions?: readonly CardAction[] }) {
   const ui = useUI();
-  const stacked = useWindowDimensions().fontScale >= STACK_AT;
+  const stacked = useLargeText();
   if (!lines.length && !leading && !actions.length) return null;
   const ordered = [...actions.filter((action) => !action.strong), ...actions.filter((action) => action.strong)];
   return (
@@ -84,9 +85,6 @@ function FootButton({ action, stacked }: { action: CardAction; stacked: boolean 
     </Pressable>
   );
 }
-
-/** The text size, as a multiple of the default, from which the buttons stack. */
-const STACK_AT = 1.35;
 
 const styles = StyleSheet.create({
   foot: { gap: 10, borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 12 },

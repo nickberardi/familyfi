@@ -1,6 +1,6 @@
 "use client";
 
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { cardNoteLine, roleTag } from "@/lib/display";
 import { groupStatus, groupStatusColor } from "@/lib/group-actions";
@@ -43,6 +43,7 @@ export function GroupCardHeader({
   const stateColor = ui.color(tokenOf(groupStatusColor(status.tone)));
   const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
   const wide = useWide();
+  const { fontScale } = useWindowDimensions();
 
   return (
     <View style={styles.row}>
@@ -85,7 +86,10 @@ export function GroupCardHeader({
           <Text style={[body, { color: ui.color("ink-2") }]}>{roleTag(group)}</Text>
         </View>
         <View style={styles.state}>
-          <View style={[styles.dot, { backgroundColor: stateColor }]} />
+          {/* One line high, so a status that wraps keeps its dot beside the first line. */}
+          <View style={[styles.dotLine, { height: body.lineHeight * fontScale }]}>
+            <View style={[styles.dot, { backgroundColor: stateColor }]} />
+          </View>
           <Text style={[body, styles.shrink, { color: stateColor }]}>{status.label}</Text>
         </View>
         {note ? <Text style={[body, { marginTop: 2, color: ui.color("ink-3") }]}>{cardNoteLine(group, windows)}</Text> : null}
@@ -100,7 +104,8 @@ const styles = StyleSheet.create({
   person: { borderRadius: 22 },
   words: { flex: 1, minWidth: 0 },
   title: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8 },
-  state: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  state: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 2 },
+  dotLine: { justifyContent: "center" },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
   shrink: { flexShrink: 1 },
 });
