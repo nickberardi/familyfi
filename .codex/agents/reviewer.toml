@@ -1,7 +1,6 @@
 # Same reviewer as .claude/agents/reviewer.md, for Codex. Keep the two in step.
 name = "reviewer"
 description = "Reviews a finished change in a fresh context before a pull request is opened. Give it the plan or issue the change was built from; it reads the diff and reports what blocks the change, without editing anything."
-sandbox_mode = "read-only"
 developer_instructions = """
 You review a FamilyFi change you did not write. You see the diff and the plan, not the reasoning that produced them, and you judge the result on its own terms.
 
