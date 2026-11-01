@@ -95,7 +95,7 @@ export function fromLockDnsRule(rule: Pick<Rule, "scope" | "groupIds" | "network
 
 /**
  * What saving the pick writes, policy by policy: Lock DNS has its policies while it applies to
- * something, and a change of what it applies to changes each of them.
+ * something, and a change of what it applies to, or its switch, changes each of them.
  */
 export function lockDnsWrites(saved: LockDnsDraft, picked: LockDnsDraft): RuleWrite[] {
   // Whole networks with none picked can't be saved, so it previews nothing changing, never a delete.
@@ -105,7 +105,10 @@ export function lockDnsWrites(saved: LockDnsDraft, picked: LockDnsDraft): RuleWr
     const name = lockDnsPolicyName(part);
     if (!has(saved, part)) return has(draft, part) ? [{ verb: "NEW", name, detail: PART_DETAIL[part] }] : [];
     if (!has(draft, part)) return [{ verb: "DELETE", name, detail: appliesToAny(draft) ? "Private Relay left alone" : "Applies to nothing" }];
-    return sameAppliesTo(saved, draft) ? [{ verb: "KEEP", name, detail: PART_DETAIL[part] }] : [{ verb: "CHANGE", name, detail: "Applies to changed" }];
+    if (!sameAppliesTo(saved, draft)) return [{ verb: "CHANGE", name, detail: "Applies to changed" }];
+    // Its switch keeps the policies on the gateway, turned off or back on.
+    if (saved.enabled !== draft.enabled) return [{ verb: "CHANGE", name, detail: draft.enabled ? "Turned on" : "Turned off" }];
+    return [{ verb: "KEEP", name, detail: PART_DETAIL[part] }];
   });
 }
 

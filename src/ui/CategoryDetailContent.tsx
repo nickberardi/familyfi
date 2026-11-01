@@ -172,7 +172,7 @@ export function CategoryDetailContent({
             disabled={off || !newDomain.trim()}
             onPress={add}
             testID="category-domain-add-button"
-            style={({ pressed }) => [styles.add, { backgroundColor: ui.color("accent") }, (off || !newDomain.trim()) && { opacity: 0.4 }, pressed && { opacity: PRESS_OPACITY }]}
+            style={({ pressed }) => [styles.add, { backgroundColor: ui.color("accent") }, (off || !newDomain.trim()) && { opacity: 0.6 }, pressed && { opacity: PRESS_OPACITY }]}
           >
             <Text style={[small(14, 20, "ink-on-fill"), styles.bold]}>{COPY.add}</Text>
           </Pressable>
