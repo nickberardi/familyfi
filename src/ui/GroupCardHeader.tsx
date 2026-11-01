@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { cardNoteLine, roleTag } from "@/lib/display";
@@ -44,6 +45,8 @@ export function GroupCardHeader({
   const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
   const wide = useWide();
   const { fontScale } = useWindowDimensions();
+  // The status's first line as drawn (native), else its line height at this text size (web).
+  const [firstLine, setFirstLine] = useState<number | null>(null);
 
   return (
     <View style={styles.row}>
@@ -87,10 +90,18 @@ export function GroupCardHeader({
         </View>
         <View style={styles.state}>
           {/* One line high, so a status that wraps keeps its dot beside the first line. */}
-          <View style={[styles.dotLine, { height: body.lineHeight * fontScale }]}>
+          <View style={[styles.dotLine, { height: firstLine ?? body.lineHeight * fontScale }]}>
             <View style={[styles.dot, { backgroundColor: stateColor }]} />
           </View>
-          <Text style={[body, styles.shrink, { color: stateColor }]}>{status.label}</Text>
+          <Text
+            style={[body, styles.shrink, { color: stateColor }]}
+            onTextLayout={(event) => {
+              const height = event.nativeEvent.lines[0]?.height;
+              if (height && height > 0) setFirstLine(height);
+            }}
+          >
+            {status.label}
+          </Text>
         </View>
         {note ? <Text style={[body, { marginTop: 2, color: ui.color("ink-3") }]}>{cardNoteLine(group, windows)}</Text> : null}
       </View>

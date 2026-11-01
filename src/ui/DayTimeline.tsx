@@ -16,6 +16,7 @@ import {
 } from "@/lib/day-timeline";
 
 import { useUI } from "./UIContext";
+import { useLargeText } from "./use-large-text";
 
 /**
  * Today on a 24-hour bar, shared by every client: the time a group has no internet, and why.
@@ -42,7 +43,10 @@ export function DayTimeline({
   // The hour row's width and each label's own width, so only the labels that fit are shown.
   const [hoursWidth, setHoursWidth] = useState(0);
   const [hourWidths, setHourWidths] = useState<number[]>(() => TIMELINE_HOURS.map(() => 0));
-  const hours = timelineHours(hoursWidth, hourWidths);
+  const largeText = useLargeText();
+  const measured = hoursWidth > 0 && hourWidths.every((width) => width > 0);
+  // Until the labels are measured, large text starts from the ends and noon, so all five never overlap.
+  const hours = !measured && largeText ? [TIMELINE_HOURS[0], TIMELINE_HOURS[2], TIMELINE_HOURS[4]] : timelineHours(hoursWidth, hourWidths);
   const picked = chosen !== null ? bands[chosen] : undefined;
   const order = bands.map((band, index) => ({ band, index })).sort((a, b) => timelineRank(a.band) - timelineRank(b.band));
   const items = legend ? timelineLegend(bands) : [];
@@ -144,7 +148,8 @@ const styles = StyleSheet.create({
   band: { position: "absolute", top: 0, bottom: 0 },
   now: { position: "absolute", top: 0, bottom: 0, width: 2 },
   hours: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
-  measure: { position: "absolute", top: 0, left: 0, flexDirection: "row", opacity: 0 },
+  // Hidden, unselectable copies of every label, measured so the visible row shows only those that fit.
+  measure: { position: "absolute", top: 0, left: 0, flexDirection: "row", opacity: 0, userSelect: "none" },
   measured: { flexShrink: 0 },
   legend: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 12, rowGap: 6, marginTop: 4 },
   // react-native-web keeps a View at full width (flexShrink 0); a long window name wraps instead.
