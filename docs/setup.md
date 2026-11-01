@@ -147,7 +147,7 @@ choose **Docker**). Copy only the token from the command the dashboard shows. In
 
 ```yaml
   cloudflared:
-    image: cloudflare/cloudflared:2026.10.1
+    image: cloudflare/cloudflared:2026.10.7
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
