@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "./Icon";
+import { SECONDARY_BUTTON } from "./buttons";
 
 /** A labelled value in the machine column, with a button that copies it. */
 export function CopyRow({ label, value, testId }: { label: string; value: string; testId: string }) {
@@ -16,7 +17,7 @@ export function CopyRow({ label, value, testId }: { label: string; value: string
         <button
           type="button"
           aria-label={`Copy ${label.toLowerCase()}`}
-          className="flex flex-none items-center gap-1.5 rounded-lg border border-[var(--ff-line)] px-2.5 py-2 text-[14px] font-semibold text-[var(--ff-accent)]"
+          className={`flex-none ${SECONDARY_BUTTON}`}
           onClick={() => {
             void navigator.clipboard?.writeText(value).then(() => {
               setCopied(true);

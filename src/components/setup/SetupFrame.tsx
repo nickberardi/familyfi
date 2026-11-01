@@ -6,6 +6,7 @@ import { copyText } from "@/components/ui/copy-text";
 import { Wordmark } from "@/components/ui/Logo";
 import { RECOVERY_USERNAME } from "@/lib/constants";
 import { SETUP_LEDES, SETUP_STEP_COUNT, setupFoot } from "@/lib/setup";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
 
 export const TITLE =
   "m-0 text-[17px] font-semibold tracking-tight text-[var(--ff-ink)]";
@@ -92,7 +93,7 @@ export function SetupFrame({
                 type="button"
                 disabled={pending}
                 onClick={onBack}
-                className="flex-1 rounded-[9px] border border-[var(--ff-line)] py-2.5 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
+                className={`flex-1 ${SECONDARY_BUTTON} py-2.5`}
               >
                 Back
               </button>
@@ -101,7 +102,7 @@ export function SetupFrame({
               type="button"
               disabled={pending || disabled}
               onClick={onNext}
-              className="flex-[2] rounded-[9px] bg-[var(--ff-accent)] py-2.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
+              className={`flex-[2] ${PRIMARY_BUTTON} py-2.5`}
             >
               {pending ? "Saving…" : cta}
             </button>

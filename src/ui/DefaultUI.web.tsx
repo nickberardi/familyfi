@@ -2,9 +2,9 @@ import NextLink from "next/link";
 
 import { TextField, TimeField, TogglePill } from "@/components/ui/Controls";
 import { DayPicker } from "@/components/ui/DayPicker";
+import { askConfirm } from "@/components/ui/ConfirmHost";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
-import { confirmLine } from "@/lib/pair-device";
 
 import type { UI } from "./UIContext";
 
@@ -24,8 +24,7 @@ export const defaultUI: UI = {
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border px-3 py-2 text-[15px]"
-        style={{ borderColor: "var(--ff-line)" }}
+        className="ff-input"
       />
     ) : (
       <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={mono} />
@@ -43,10 +42,9 @@ export const defaultUI: UI = {
     <select
       className={
         variant === "field"
-          ? "w-full rounded-lg border px-3 py-2.5 text-[16px]"
-          : "w-full max-w-full rounded-[7px] border border-[var(--ff-input-line)] bg-[var(--ff-card)] px-2 py-1.5 text-[14px] disabled:opacity-50"
+          ? "ff-input"
+          : "ff-input max-w-full px-2 py-1.5 text-[14px] leading-5"
       }
-      style={variant === "field" ? { borderColor: "var(--ff-line)" } : undefined}
       value={value}
       aria-label={label}
       disabled={disabled}
@@ -73,8 +71,8 @@ export const defaultUI: UI = {
       {children}
     </NextLink>
   ),
-  // The browser's own dialog, as Pair asks: one line, and nothing happens unless it is accepted.
-  confirm: (request) => Promise.resolve(window.confirm(confirmLine(request))),
+  // The web's own confirm dialog (`ConfirmHost`): nothing happens unless it is accepted.
+  confirm: askConfirm,
   copyText: async (value) => {
     await navigator.clipboard?.writeText(value);
   },

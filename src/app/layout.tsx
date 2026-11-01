@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { DemoBanner } from "@/components/DemoBanner";
+import { ConfirmHost } from "@/components/ui/ConfirmHost";
 import { ReactNativeWebStyles } from "@/components/ReactNativeWebStyles";
 /*
  * Phosphor Regular, the product's one icon set, imported from the package rather
@@ -49,6 +50,7 @@ export default function RootLayout({
       <body>
         <DemoBanner />
         <ReactNativeWebStyles>{children}</ReactNativeWebStyles>
+        <ConfirmHost />
       </body>
     </html>
   );

@@ -1,6 +1,8 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { UpdateCheck, UpdateRun, UpdateSettings } from "@/lib/types";
 
+import { answerConfirm } from "./confirm-dialog";
+
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 const username = "admin";
 
@@ -270,8 +272,8 @@ test("the Update page installs through the updater and keeps its schedule", { ta
   // On the web each is a real anchor, so Enter and copy-link work.
   await expect(notes.getByRole("link", { name: "pull #250" })).toHaveAttribute("href", "https://github.com/nickberardi/familyfi/pull/250");
   await expect(notes.getByRole("link", { name: "@nickberardi" })).toBeVisible();
-  page.once("dialog", (dialog) => void dialog.accept());
   await install.click();
+  await answerConfirm(page);
   await expect(page.getByTestId("update-run").first()).toContainText("Installing v0.6.0");
   await expect(install).toBeDisabled();
   // The Install card is covered while the install runs, until health reports the new release.
@@ -423,13 +425,8 @@ test("removing an adult's admin access asks first, and declining changes nothing
   await page.goto("/settings");
   const admin = page.getByTestId("settings-household").locator("[data-testid^='settings-admin-'][aria-pressed='true']").first();
   await expect(admin).toBeVisible();
-  let asked = "";
-  page.once("dialog", (dialog) => {
-    asked = dialog.message();
-    void dialog.dismiss();
-  });
   await admin.click();
-  await expect.poll(() => asked).toMatch(/admin/i);
+  expect(await answerConfirm(page, false)).toMatch(/admin/i);
   await expect(admin).toHaveAttribute("aria-pressed", "true");
   expect(writes).toEqual([]);
 });
@@ -556,7 +553,7 @@ test("a group's Edit sheet checks its fields, closes on Escape, and asks before 
   await edit.getByRole("button", { name: "Delete…" }).click();
   const confirm = page.getByRole("dialog", { name: `Delete ${name}?` });
   await expect(confirm).toContainText("Its devices become Unassigned");
-  await confirm.getByRole("button", { name: "Never mind" }).click();
+  await confirm.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("dialog", { name: `Edit ${name}` })).toBeVisible();
   await page.getByRole("button", { name: "Delete…" }).click();
   await page.getByRole("dialog", { name: `Delete ${name}?` }).getByRole("button", { name: "Delete group" }).click();

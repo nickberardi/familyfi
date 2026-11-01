@@ -18,7 +18,7 @@ import {
 } from "@/lib/checkup";
 import { toggleRuleEnabled } from "@/lib/group-writes";
 import { PageHeader } from "@/components/PageHeader";
-import { SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
+import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { useAppData } from "@/components/AppDataProvider";
 import { NetworkCheckupCard, ProtectionCard } from "@/ui/CheckupContent";
 
@@ -143,16 +143,17 @@ function ConfirmRemove({ policies, busy, onCancel, onConfirm }: { policies: Chec
   return (
     <SheetFrame
       title={text.confirmTitle(policies.length)}
+      size="confirm"
       onClose={() => (busy ? undefined : onCancel())}
       footer={
         <>
-          <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={onCancel}>
+          <button type="button" className={CANCEL_BUTTON} disabled={busy} onClick={onCancel}>
             {text.cancel}
           </button>
           <button
             type="button"
             data-testid="checkup-confirm-remove"
-            className="rounded-lg bg-[var(--ff-danger)] px-3.5 py-2 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
+            className={DESTRUCTIVE_BUTTON}
             disabled={busy}
             onClick={onConfirm}
           >

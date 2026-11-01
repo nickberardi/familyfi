@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { homeAddress, homeOrigin, type HomeAccess } from "@/lib/connection-routes";
-import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
+import { CANCEL_BUTTON, FIELD, PRIMARY_BUTTON } from "./SheetFrame";
 
 /**
  * Home access: where FamilyFi is on the home network, kept apart from Remote access, the route
@@ -86,7 +86,7 @@ export function HomeAccessCard() {
               <button type="submit" className={PRIMARY_BUTTON} disabled={busy || !valid}>
                 Save
               </button>
-              <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={() => setEditing(false)}>
+              <button type="button" className={CANCEL_BUTTON} disabled={busy} onClick={() => setEditing(false)}>
                 Cancel
               </button>
             </div>

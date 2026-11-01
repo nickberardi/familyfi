@@ -5,7 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { addressConflict, canPin, routeForAddress } from "@/lib/connection-routes";
 import type { ConnectionRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
 import { Segmented } from "@/components/ui/Segmented";
-import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
+import { CANCEL_BUTTON, FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./SheetFrame";
 
 type Trust = "system" | "pinned";
 
@@ -232,7 +232,7 @@ export function RouteForm({
           {saving ? "Saving…" : "Use this address"}
         </button>
         {onCancel ? (
-          <button type="button" className={SECONDARY_BUTTON} onClick={onCancel}>
+          <button type="button" className={CANCEL_BUTTON} onClick={onCancel}>
             Cancel
           </button>
         ) : null}

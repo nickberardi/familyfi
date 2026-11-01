@@ -216,6 +216,18 @@
   --ff-duration-fast: 120ms;
   --ff-ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
   --ff-press-opacity: 0.72;
+  /* A disabled control fades to 40%; a filled button to 60%, so its label still reads. */
+  --ff-disabled-opacity: 0.4;
+  --ff-disabled-opacity-filled: 0.6;
+
+  /*
+   * Shape. Buttons are 9, fields and other controls 7. Dialogs are 400 for a decision about
+   * something that exists (a confirm) and 520 for creating or editing one (a form).
+   */
+  --ff-radius-button: 9px;
+  --ff-radius-control: 7px;
+  --ff-dialog-confirm: 400px;
+  --ff-dialog-form: 520px;
 
   /*
    * Pairing QR. Always black on white, whatever the surface around it: phone cameras
@@ -260,6 +272,34 @@ button {
 a:active,
 button:not(:disabled):active {
   opacity: var(--ff-press-opacity);
+}
+
+/*
+ * The one text field: 16px (so iOS never zooms), the control radius, and a visible focus
+ * ring of an accent border and a light accent halo.
+ */
+@layer components {
+  .ff-input {
+    width: 100%;
+    border: 1px solid var(--ff-input-line);
+    border-radius: var(--ff-radius-control);
+    background: var(--ff-card);
+    color: var(--ff-ink);
+    font-size: 16px;
+    line-height: 24px;
+    padding: 7px 11px;
+    outline: none;
+  }
+
+  .ff-input:focus-visible,
+  .ff-input:focus {
+    border-color: var(--ff-accent);
+    box-shadow: 0 0 0 3px var(--ff-focus-ring);
+  }
+
+  .ff-input:disabled {
+    opacity: var(--ff-disabled-opacity);
+  }
 }
 
 /* react-native-web's reset (for the shared src/ui components) hides the search field's clear

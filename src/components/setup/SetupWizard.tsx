@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppData } from "@/components/AppDataProvider";
 import { BackupImport } from "@/components/BackupImport";
-import { FIELD } from "@/components/pair/SheetFrame";
+import { FIELD, SECONDARY_BUTTON } from "@/components/pair/SheetFrame";
 import { AdminSignInStep, BODY, CHECKBOX, ROW_RULE, SetupFrame, TITLE } from "@/components/setup/SetupFrame";
 import { Icon } from "@/components/ui/Icon";
 import { api, request } from "@/lib/api";
@@ -397,7 +397,7 @@ export function SetupWizard({ initialStep = 0, password }: { initialStep?: numbe
             />
             <button
               type="submit"
-              className="rounded-lg border border-[var(--ff-line)] px-3.5 text-[14px] font-semibold text-[var(--ff-accent)]"
+              className={SECONDARY_BUTTON}
             >
               Add
             </button>

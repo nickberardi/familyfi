@@ -102,7 +102,6 @@ export const GROUP_DETAIL_COPY = {
   monogram: "Monogram",
   save: "Save",
   saving: "Saving…",
-  neverMind: "Never mind",
   roleLocked: "This person has a personal login, so their role stays Adult.",
   currentState: "Current state",
   /** The devices card's title: a person's devices are assigned to them, a things group holds its own. */
@@ -182,6 +181,6 @@ export function deleteGroupConfirm(group: Pick<Group, "name">) {
     title: `Delete ${group.name}?`,
     body: "Its devices become Unassigned and quarantined until you assign them. Any linked personal login remains active but is no longer linked to this group.",
     confirm: "Delete group",
-    cancel: "Never mind",
+    cancel: "Cancel",
   } as const;
 }

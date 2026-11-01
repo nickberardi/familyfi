@@ -23,6 +23,7 @@ import { ruleHref, ruleToggleLabels } from "@/lib/rule-list";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
+import { Alert } from "./Alert";
 import { ExternalLink } from "./ExternalLink";
 import { RuleMark } from "./RuleMark";
 import { PRESS_OPACITY, useUI } from "./UIContext";
@@ -142,9 +143,11 @@ export function NetworkCheckupCard({
         }
       />
       {checkup?.error ? (
-        <Text role="alert" style={[body, styles.error, { backgroundColor: ui.color("danger-fill"), color: ui.color("danger") }]} testID="checkup-error">
-          {COPY.network.error} {checkup.error}
-        </Text>
+        <View style={styles.error}>
+          <Alert tone="danger" role="alert" testID="checkup-error">
+            {`${COPY.network.error} ${checkup.error}`}
+          </Alert>
+        </View>
       ) : null}
       {sections.problems.length ? <SubHead>{COPY.network.problems(sections.problems.length)}</SubHead> : null}
       {sections.problems.map((finding, index) => (
@@ -497,7 +500,7 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 16 },
   primary: { height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   primaryLabel: { fontSize: 15, lineHeight: 22, fontWeight: "600" },
-  error: { marginHorizontal: 16, marginBottom: 12, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden" },
+  error: { marginHorizontal: 16, marginBottom: 12 },
   fold: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1 },
   passedList: { gap: 4, paddingHorizontal: 16, paddingBottom: 12 },
   readOnly: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1 },

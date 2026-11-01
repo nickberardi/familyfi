@@ -22,6 +22,8 @@ import { ruleInternetWindows, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { useState } from "react";
 import { useAppData } from "./AppDataProvider";
+import { CANCEL_BUTTON, PRIMARY_BUTTON } from "@/components/ui/buttons";
+import { Modal } from "@/components/ui/Modal";
 
 /** A group card's sheet: its block, its unblock, or a rule area's pause for it alone (`groupSheet`). */
 export function PauseSheet({
@@ -151,59 +153,49 @@ function PauseSheetView({
   const resolve = (option: PauseSheetOption) =>
     (recent && option.label === customPauseLabel(recent) && custom(recent)) || option;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ff-scrim)] p-6" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pause-sheet-title"
-        className="w-full max-w-[400px] overflow-hidden rounded-[14px] bg-[var(--ff-card)] shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="p-[18px]">
-          <h2 id="pause-sheet-title" className="text-[17px] font-bold tracking-tight">
-            {title}
-          </h2>
-          <p className="mt-1 text-[14px] leading-5 text-[var(--ff-muted)]">{body}</p>
-        </div>
-        {choices.map((choice) => (
-          <div key={choice.label}>
-            <button
-              type="button"
-              aria-expanded={isPicker(choice) ? open === choice.picker : undefined}
-              className="flex w-full items-baseline gap-2.5 border-t border-[var(--ff-line)] px-[18px] py-3 text-left"
-              onClick={() => {
-                if (isPicker(choice)) setOpen(open === choice.picker ? null : choice.picker);
-                else void onPick(resolve(choice).request).then(onClose);
+    <Modal labelledBy="pause-sheet-title" size="confirm" onClose={onClose}>
+      <div className="px-[18px] pt-[18px] pb-3">
+        <h2 id="pause-sheet-title" className="text-[17px] leading-[24px] font-semibold tracking-tight">
+          {title}
+        </h2>
+        <p className="mt-1.5 text-[14px] leading-5 text-[var(--ff-ink-2)]">{body}</p>
+      </div>
+      {choices.map((choice) => (
+        <div key={choice.label}>
+          <button
+            type="button"
+            aria-expanded={isPicker(choice) ? open === choice.picker : undefined}
+            className="flex w-full items-baseline gap-2.5 border-t border-[var(--ff-line)] px-[18px] py-3 text-left"
+            onClick={() => {
+              if (isPicker(choice)) setOpen(open === choice.picker ? null : choice.picker);
+              else void onPick(resolve(choice).request).then(onClose);
+            }}
+          >
+            <span className="flex-1 text-[15px] font-semibold text-[var(--ff-accent)]">{choice.label}</span>
+            <span className="text-[14px] text-[var(--ff-muted)]">{choice.note}</span>
+          </button>
+          {isPicker(choice) && open === choice.picker ? (
+            <CustomPausePicker
+              picker={choice.picker}
+              recent={recent}
+              confirm={confirm}
+              custom={custom}
+              onDone={(picked, option) => {
+                void onPick(option.request).then(() => {
+                  onCustom(picked);
+                  onClose();
+                });
               }}
-            >
-              <span className="flex-1 text-[15px] font-semibold text-[var(--ff-accent)]">{choice.label}</span>
-              <span className="text-[14px] text-[var(--ff-muted)]">{choice.note}</span>
-            </button>
-            {isPicker(choice) && open === choice.picker ? (
-              <CustomPausePicker
-                picker={choice.picker}
-                recent={recent}
-                confirm={confirm}
-                custom={custom}
-                onDone={(picked, option) => {
-                  void onPick(option.request).then(() => {
-                    onCustom(picked);
-                    onClose();
-                  });
-                }}
-              />
-            ) : null}
-          </div>
-        ))}
-        <button
-          type="button"
-          className="w-full border-t border-[var(--ff-line)] py-3 text-center text-[14px] text-[var(--ff-muted)]"
-          onClick={onClose}
-        >
-          Never mind
+            />
+          ) : null}
+        </div>
+      ))}
+      <div className="flex justify-end border-t border-[var(--ff-line)] px-[18px] pt-3 pb-[18px]">
+        <button type="button" className={CANCEL_BUTTON} onClick={onClose}>
+          Cancel
         </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -236,8 +228,7 @@ function CustomPausePicker({
         ? { kind: "until", clock }
         : null;
   const option = choice ? custom(choice) : null;
-  const field = "rounded-[7px] border px-2 py-1.5 text-[15px] outline-none";
-  const fieldStyle = { borderColor: "var(--ff-input-line)", background: "var(--ff-card)" };
+  const field = "ff-input w-auto px-2 py-1";
   return (
     <form
       className="flex flex-wrap items-center gap-2.5 bg-[var(--ff-field-soft)] px-[18px] py-3"
@@ -258,7 +249,6 @@ function CustomPausePicker({
               value={hours}
               onChange={(event) => setHours(event.target.value)}
               className={`${field} w-[64px]`}
-              style={fieldStyle}
               autoFocus
             />
             hr
@@ -272,7 +262,6 @@ function CustomPausePicker({
               value={minutes}
               onChange={(event) => setMinutes(event.target.value)}
               className={`${field} w-[64px]`}
-              style={fieldStyle}
             />
             min
           </label>
@@ -286,7 +275,6 @@ function CustomPausePicker({
             value={clock}
             onChange={(event) => setClock(event.target.value)}
             className={field}
-            style={fieldStyle}
             autoFocus
           />
         </label>
@@ -295,7 +283,7 @@ function CustomPausePicker({
       <button
         type="submit"
         disabled={!option}
-        className="rounded-[7px] bg-[var(--ff-accent)] px-3 py-1.5 text-[14px] font-semibold text-[var(--ff-ink-on-fill)] disabled:opacity-40"
+        className={PRIMARY_BUTTON}
       >
         {confirm}
       </button>

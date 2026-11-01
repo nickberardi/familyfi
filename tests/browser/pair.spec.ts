@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
+import { answerConfirm, answerConfirms } from "./confirm-dialog";
+
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 const shots = process.env.PHONES_SCREENSHOT_DIR;
 
@@ -96,7 +98,7 @@ test("going back to Off from an unsaved My domain choice switches the picker to 
 test("publishes a My domain route, pairs a phone through it, and revokes it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const url = `https://pair-e2e-${Date.now()}.home`;
-  page.on("dialog", (dialog) => void dialog.accept());
+  await answerConfirms(page);
 
   try {
     await page.goto("/pair");
@@ -182,7 +184,7 @@ test("pins a My domain certificate from a pasted PEM and puts the pin in the pai
   await signIn(page);
   const url = `https://pinned-e2e-${Date.now()}.home`;
   const dir = mkdtempSync(path.join(tmpdir(), "familyfi-pin-e2e-"));
-  page.on("dialog", (dialog) => void dialog.accept());
+  await answerConfirms(page);
   try {
     execFileSync("openssl", ["req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "2", "-subj", "/CN=familyfi.home", "-keyout", path.join(dir, "k.pem"), "-out", path.join(dir, "c.pem")], { stdio: "ignore" });
     const certificate = readFileSync(path.join(dir, "c.pem"), "utf8");
@@ -225,7 +227,7 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
   const stamp = Date.now();
   const home = `https://switch-home-${stamp}.home`;
   const tailnet = `https://switch-${stamp}.tail1234.ts.net`;
-  page.on("dialog", (dialog) => void dialog.accept());
+  await answerConfirms(page);
   try {
     await page.goto("/pair");
     const card = await publishMyDomain(page, home);
@@ -268,10 +270,7 @@ test("lists every saved Tailscale route and removes them, turning remote access 
   await add(second, 1);
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: published } });
   const asked: string[] = [];
-  page.on("dialog", (dialog) => {
-    asked.push(dialog.message());
-    void dialog.accept();
-  });
+  await answerConfirms(page, (question) => asked.push(question));
   let invite = "";
   try {
     await page.goto("/pair");
@@ -302,8 +301,8 @@ test("lists every saved Tailscale route and removes them, turning remote access 
     invite = "";
 
     await saved.getByRole("button", { name: "Remove" }).click();
-    expect(asked.pop()).toBe(`Remove ${first}? Phones reach home through it now, so remote access turns off.`);
     await expect(card.getByRole("button", { name: "Off" })).toHaveAttribute("aria-pressed", "true");
+    expect(asked.pop()).toBe(`Remove ${first}? Phones reach home through it now, so remote access turns off.`);
     await expect(card.getByTestId("remote-url")).toHaveCount(0);
     expect(await enabledUrls(page)).toEqual([]);
     await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
@@ -317,7 +316,7 @@ test("lists every saved Tailscale route and removes them, turning remote access 
 test("won't move an address saved under Tailscale to My domain", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const tailnet = `https://moved-${Date.now()}.tail1234.ts.net`;
-  page.on("dialog", (dialog) => void dialog.accept());
+  await answerConfirms(page);
   try {
     await page.goto("/pair");
     const card = page.getByTestId("remote-access");
@@ -346,7 +345,7 @@ test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a 
   const phone = `Access iPhone ${stamp}`;
   const first = { id: `${stamp}aaaaaaaaaaaaaaaaaaaa.access`, secret: `first-${stamp}-0123456789abcdef` };
   const second = { id: first.id, secret: `second-${stamp}-fedcba9876543210` };
-  page.on("dialog", (dialog) => void dialog.accept());
+  await answerConfirms(page);
   try {
     await page.goto("/pair");
     const card = page.getByTestId("remote-access");
@@ -416,7 +415,7 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
   await signIn(page);
   const url = `https://revoked-e2e-${Date.now()}.home`;
   const tag = `${Date.now()}`;
-  page.on("dialog", (dialog) => void dialog.accept());
+  await answerConfirms(page);
   const headers = await csrf(page);
   const route = ((await (await page.request.post("/api/v1/connection/endpoints", { headers, data: { url, transport: "lan", trustMode: "system" } })).json()) as { endpoint: { id: string } }).endpoint.id;
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
@@ -536,8 +535,8 @@ test("sets up remote access on a domain through the Cloudflare sign-in link", { 
     await shot(page, "remote-domain-running");
 
     // Forget asks for one more sign-in to delete FamilyFi's tunnel and DNS record; Keep them leaves them.
-    page.once("dialog", (dialog) => void dialog.accept());
     await card.getByRole("button", { name: "Forget domain" }).click();
+    await answerConfirm(page);
     const removal = card.getByRole("link", { name: "Sign in to Cloudflare to delete them" });
     await expect(removal).toHaveAttribute("href", /^https:\/\/dash\.cloudflare\.com\/argotunnel/);
     await expect(card.getByTestId("remote-login")).toContainText(`${hostname} is forgotten.`);

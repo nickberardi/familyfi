@@ -4,6 +4,7 @@
  * (`src/lib/filter-sheet.ts`); the popover is the web's own.
  */
 
+import { Modal } from "@/components/ui/Modal";
 import type { CategorySheetState } from "@/lib/category-marks";
 import { useState } from "react";
 import { applyFilterAction, filterEditHref, filterSheetCopy, filterWebsitesHref } from "@/lib/filter-sheet";
@@ -50,30 +51,17 @@ export function FilterSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[81] flex items-center justify-center p-6"
-      style={{ background: "var(--ff-scrim)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="filter-sheet-title"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-[360px] overflow-hidden rounded-[14px]"
-        style={{ background: "var(--ff-card)", boxShadow: "var(--ff-shadow-sheet)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <FilterSheetContent
-          copy={copy}
-          busy={busy}
-          error={error}
-          details={<NetworkCheckDetails check={upstream} />}
-          websitesHref={filterWebsitesHref(group, state)}
-          editHref={filterEditHref(group, state)}
-          onAction={() => void run()}
-          onCancel={onClose}
-        />
-      </div>
-    </div>
+    <Modal labelledBy="filter-sheet-title" size="confirm" onClose={onClose}>
+      <FilterSheetContent
+        copy={copy}
+        busy={busy}
+        error={error}
+        details={<NetworkCheckDetails check={upstream} />}
+        websitesHref={filterWebsitesHref(group, state)}
+        editHref={filterEditHref(group, state)}
+        onAction={() => void run()}
+        onCancel={onClose}
+      />
+    </Modal>
   );
 }

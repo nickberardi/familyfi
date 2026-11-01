@@ -114,11 +114,6 @@ export function removeAllConfirm(count: number) {
   return { title: `Remove all ${count} revoked devices from the list?`, message: "This can't be undone.", confirmLabel: PAIR_COPY.removeAllRevoked };
 }
 
-/** The web asks with one line; it joins a confirmation's title and message. */
-export function confirmLine(confirm: { title: string; message: string }): string {
-  return `${confirm.title} ${confirm.message}`;
-}
-
 function pairedDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }

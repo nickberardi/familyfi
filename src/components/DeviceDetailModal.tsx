@@ -74,13 +74,6 @@ function DeviceModal({ mac }: { mac: string }) {
       router.replace(`${pathname}${deviceModalSearch(searchParams.toString(), null)}`, { scroll: false });
     }
   }
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  });
 
   const device = devices.find((item) => item.mac.toLowerCase() === mac.toLowerCase());
   const group = device?.groupId ? groups.find((item) => item.id === device.groupId) : null;

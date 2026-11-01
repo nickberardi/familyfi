@@ -5,6 +5,7 @@ import { StyleSheet, Text, TextInput, View, type TextInputInstance } from "react
 
 import { SIGN_IN_NOTE } from "@/lib/sign-in";
 
+import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { useUI } from "./UIContext";
 
@@ -110,9 +111,9 @@ export function SignInForm({
         />
       </View>
       {error ? (
-        <Text role="alert" testID="sign-in-error" style={[styles.error, { fontFamily: ui.font, backgroundColor: ui.color("danger-fill"), color: ui.color("danger") }]}>
+        <Alert tone="danger" role="alert" testID="sign-in-error">
           {error}
-        </Text>
+        </Alert>
       ) : null}
       <Button label={pending ? "Signing in…" : "Sign in"} disabled={pending} onPress={() => void submit()} testID="sign-in-submit" style={buttonStyle} labelStyle={buttonLabelStyle} />
       {note ? <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, color: ui.color("muted") }}>{note}</Text> : null}
@@ -125,5 +126,4 @@ const styles = StyleSheet.create({
   plain: { gap: 14 },
   field: { gap: 6 },
   input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, lineHeight: 24, outlineWidth: 0 },
-  error: { borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, lineHeight: 20, overflow: "hidden" },
 });

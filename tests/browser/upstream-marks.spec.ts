@@ -93,7 +93,7 @@ test("the sheet explains an upstream block without claiming FamilyFi did it", { 
   await expect(sheet.getByRole("heading", { name: /Already blocked \(DNS\)/i })).toBeVisible();
   // It must say FamilyFi is not the one blocking, since it cannot schedule or pause it.
   await expect(sheet.getByText(/FamilyFi is not doing it/i)).toBeVisible();
-  await sheet.getByRole("button", { name: /Never mind|Cancel|Close/i }).first().click();
+  await sheet.getByRole("button", { name: /Cancel|Close/i }).first().click();
 });
 
 test("a FamilyFi rule outranks the DNS verdict on the same mark", { tag: "@desktop" }, async ({ page }) => {

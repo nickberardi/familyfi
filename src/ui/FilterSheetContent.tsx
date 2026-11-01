@@ -1,11 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import type { filterSheetCopy } from "@/lib/filter-sheet";
 
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { Button } from "./Button";
+import { DialogHeader } from "./DialogParts";
+import { useUI } from "./UIContext";
 
 /**
  * What a category's or app rule's sheet says and offers (`src/lib/filter-sheet.ts`), shared by
@@ -41,79 +43,54 @@ export function FilterSheetContent({
   onCancel: () => void;
 }) {
   const ui = useUI();
-  const text = (size: number, lineHeight: number) => ({ fontFamily: ui.font, fontSize: size, lineHeight });
+  const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 20 };
   const turnOff = copy.action === "turnOff";
   const off = busy || disabled;
+  /** A link drawn as a button of the given role: the web's Link or the platform's route. */
+  const linkButton = (href: string, label: string, role: "primary" | "secondary", testID: string) => (
+    <ui.Link href={href} onNavigate={onCancel} testID={testID}>
+      <View style={[styles.linkButton, role === "primary" ? { backgroundColor: ui.color("accent") } : { borderWidth: 1, borderColor: ui.color("accent-line"), backgroundColor: ui.color("accent-fill") }]}>
+        <Text style={[text, styles.strong, { color: ui.color(role === "primary" ? "ink-on-fill" : "accent-hover") }]}>{label}</Text>
+      </View>
+    </ui.Link>
+  );
   return (
     <View testID="filter-sheet">
+      <DialogHeader title={copy.heading} body={copy.body} titleId="filter-sheet-title" />
       <View style={styles.content}>
-        <Text role="heading" aria-level={2} id="filter-sheet-title" style={[text(16, 24), styles.heading, { color: ui.color("ink") }]}>
-          {copy.heading}
-        </Text>
-        <Text style={[text(13, 17.875), { color: ui.color("ink-3") }]}>{copy.body}</Text>
         {copy.windows.length ? (
           <View role="list">
             {/* A rule's windows in order; two can read the same, so the position is the key. */}
             {copy.windows.map((line, index) => (
-              <Text key={index} role="listitem" style={[text(13, 17.875), { color: ui.color("ink-2") }]}>
+              <Text key={index} role="listitem" style={[text, { color: ui.color("ink-2") }]}>
                 {line}
               </Text>
             ))}
           </View>
         ) : null}
         {details}
-        {note ? <Text style={[text(13, 19.5), { color: ui.color("muted") }]}>{note}</Text> : null}
-        {error ? <Text style={[text(13, 19.5), { color: ui.color("danger") }]}>{error}</Text> : null}
+        {note ? <Text style={[text, { color: ui.color("ink-2") }]}>{note}</Text> : null}
+        {error ? <Text style={[text, { color: ui.color("danger") }]}>{error}</Text> : null}
+      </View>
+      {/* Main action on top, the other way to go next, then Cancel: three don't fit a row. */}
+      <View style={styles.footer}>
         {copy.action === "websites" ? (
-          websitesHref ? (
-            <ui.Link href={websitesHref} onNavigate={onCancel} testID="filter-sheet-websites">
-              <View style={[styles.action, { backgroundColor: ui.color("accent") }]}>
-                <Text style={[text(14, 21), styles.strong, { color: ui.color("ink-on-fill") }]}>{copy.actionLabel}</Text>
-              </View>
-            </ui.Link>
-          ) : null
+          websitesHref ? linkButton(websitesHref, copy.actionLabel, "primary", "filter-sheet-websites") : null
         ) : (
           <>
-            <Pressable
-              role="button"
-              aria-disabled={off}
-              disabled={off}
-              onPress={onAction}
-              testID="filter-sheet-action"
-              style={({ pressed }) => [
-                styles.action,
-                { backgroundColor: ui.color(turnOff ? "danger-fill" : "accent") },
-                off && { opacity: 0.5 },
-                pressed && !off && { opacity: PRESS_OPACITY },
-              ]}
-            >
-              <Text style={[text(14, 21), styles.strong, { color: ui.color(turnOff ? "danger" : "ink-on-fill") }]}>{copy.actionLabel}</Text>
-            </Pressable>
-            {editHref ? (
-              <ui.Link href={editHref} onNavigate={onCancel} testID="filter-sheet-edit">
-                <Text style={[text(14, 21), styles.strong, { color: ui.color("accent") }]}>{copy.editLabel}</Text>
-              </ui.Link>
-            ) : null}
+            <Button size="md" grow kind={turnOff ? "destructive" : "primary"} label={copy.actionLabel} onPress={onAction} disabled={off} testID="filter-sheet-action" />
+            {editHref ? linkButton(editHref, copy.editLabel, "secondary", "filter-sheet-edit") : null}
           </>
         )}
+        <Button size="md" grow kind="cancel" label={copy.cancel} onPress={onCancel} testID="filter-sheet-cancel" />
       </View>
-      <Pressable
-        role="button"
-        onPress={onCancel}
-        testID="filter-sheet-cancel"
-        style={({ pressed }) => [styles.cancel, { borderTopColor: ui.color("hairline-card") }, pressed && { opacity: PRESS_OPACITY }]}
-      >
-        <Text style={[text(14, 21), { color: ui.color("ink-3") }]}>{copy.cancel}</Text>
-      </Pressable>
     </View>
   );
 }
 
-
 const styles = StyleSheet.create({
-  content: { gap: 10, padding: 20 },
-  heading: { fontWeight: "700", letterSpacing: -0.4 },
+  content: { gap: 10, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 10 },
   strong: { fontWeight: "600", textAlign: "center" },
-  action: { marginTop: 4, borderRadius: 9, paddingVertical: 10, alignItems: "center" },
-  cancel: { borderTopWidth: 1, paddingVertical: 12, alignItems: "center" },
+  linkButton: { borderRadius: 9, paddingVertical: 7, paddingHorizontal: 14, minHeight: 36, alignItems: "center", justifyContent: "center" },
+  footer: { gap: 8, paddingHorizontal: 18, paddingTop: 4, paddingBottom: 18 },
 });
