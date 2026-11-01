@@ -130,6 +130,10 @@ export const DARK: Partial<Record<ColorToken, string>> = {
   "line": "#38383a",
   "locked": "rgba(255, 255, 255, 0.6)",
   "mark": "#8e8e93",
+  // A category tile draws the black dark-mode ink-on-fill too, so its fills lighten as the mark's
+  // does: a seeded category to the mark's grey, one the household made to the dark upstream indigo.
+  "mono-seed-fill": "#8e8e93",
+  "mono-user-fill": "rgb(181, 173, 255)",
   "muted": "rgba(235, 235, 245, 0.6)",
   "note-fill": "rgba(120, 120, 128, 0.32)",
   "now": "#ff9f0a",

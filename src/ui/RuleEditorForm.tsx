@@ -36,6 +36,7 @@ import { RuleBar } from "./RuleBar";
 import { RuleNameField } from "./RuleNameField";
 import { RuleWindowFrame } from "./RuleWindowFrame";
 import { PRESS_OPACITY, useUI } from "./UIContext";
+import { useLargeText } from "./use-large-text";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
@@ -261,6 +262,8 @@ function PolicyNames({ names, generated, onToggle, disabled }: { names: string[]
   const ui = useUI();
   const many = names.length > 1;
   const mono = { fontFamily: MONO, fontSize: 14, lineHeight: 21 };
+  // At large text sizes the length goes under the name, which would otherwise wrap a few letters a line.
+  const stacked = useLargeText();
   return (
     <View style={[styles.policyBox, { backgroundColor: ui.color("field-soft") }]} testID="rule-policy-names">
       <View style={styles.policyHead}>
@@ -271,8 +274,8 @@ function PolicyNames({ names, generated, onToggle, disabled }: { names: string[]
       </View>
       <View role="list" style={styles.policyList}>
         {names.map((name, index) => (
-          <View key={index} role="listitem" style={styles.policyRow}>
-            <Text style={[mono, styles.grow, { color: ui.color("ink") }]}>
+          <View key={index} role="listitem" style={stacked ? null : styles.policyRow}>
+            <Text style={[mono, !stacked && styles.grow, { color: ui.color("ink") }]}>
               <Text style={{ color: ui.color("ink-3") }}>{FAMILYFI_POLICY_PREFIX}</Text>
               {name.slice(FAMILYFI_POLICY_PREFIX.length)}
             </Text>

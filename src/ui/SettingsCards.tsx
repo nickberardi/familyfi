@@ -168,7 +168,9 @@ export function HouseholdCard({
 
   const avatar = (letters: string) => (
     <View style={[styles.avatar, { backgroundColor: ui.color("mark") }]}>
-      <Text style={[text(14, 21, "ink-on-fill"), styles.bold]}>{letters}</Text>
+      <Text maxFontSizeMultiplier={1.2} style={[text(14, 21, "ink-on-fill"), styles.bold]}>
+        {letters}
+      </Text>
     </View>
   );
 

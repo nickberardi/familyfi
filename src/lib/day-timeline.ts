@@ -47,6 +47,22 @@ const DIM_OPACITY = 0.35;
 /** The hour labels under the bar, left to right. */
 export const TIMELINE_HOURS = ["12 AM", "6 AM", "NOON", "6 PM", "12 AM"] as const;
 
+/** The labels to try, fullest first, by position in `TIMELINE_HOURS`: all five, the ends and noon, the ends. */
+const HOUR_CHOICES = [[0, 1, 2, 3, 4], [0, 2, 4], [0, 4]] as const;
+
+/**
+ * The hour labels that fit under a bar `width` wide, given each label's own width at the current
+ * text size and the least space between two labels. At large text sizes five labels are wider than
+ * a phone's bar and run together, so the inner ones go: first 6 AM and 6 PM, then noon. Until the
+ * bar and every label are measured, all five, as before.
+ */
+export function timelineHours(width: number, labelWidths: readonly number[], gap = 8): readonly string[] {
+  if (!(width > 0) || labelWidths.length !== TIMELINE_HOURS.length || labelWidths.some((labelWidth) => !(labelWidth > 0))) return TIMELINE_HOURS;
+  const fits = (choice: readonly number[]) => choice.reduce((sum, index) => sum + labelWidths[index]!, 0) + gap * (choice.length - 1) <= width;
+  const choice = HOUR_CHOICES.find(fits) ?? HOUR_CHOICES[HOUR_CHOICES.length - 1]!;
+  return choice.map((index) => TIMELINE_HOURS[index]);
+}
+
 /** A band's share of the day, as a CSS/React Native percentage. */
 export function timelinePercent(minutes: number): `${string}%` {
   return `${((minutes / 1440) * 100).toFixed(3)}%`;

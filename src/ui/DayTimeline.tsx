@@ -7,6 +7,7 @@ import { localNowPercent } from "@/lib/display";
 import {
   TIMELINE_HOURS,
   bandTimes,
+  timelineHours,
   timelineLegend,
   timelinePercent,
   timelineBandLook,
@@ -38,6 +39,10 @@ export function DayTimeline({
   const ui = useUI();
   const [chosen, setChosen] = useState<number | null>(null);
   const [ring, setRing] = useState<number | null>(null);
+  // The hour row's width and each label's own width, so only the labels that fit are shown.
+  const [hoursWidth, setHoursWidth] = useState(0);
+  const [hourWidths, setHourWidths] = useState<number[]>(() => TIMELINE_HOURS.map(() => 0));
+  const hours = timelineHours(hoursWidth, hourWidths);
   const picked = chosen !== null ? bands[chosen] : undefined;
   const order = bands.map((band, index) => ({ band, index })).sort((a, b) => timelineRank(a.band) - timelineRank(b.band));
   const items = legend ? timelineLegend(bands) : [];
@@ -81,12 +86,28 @@ export function DayTimeline({
           style={[styles.now, { pointerEvents: "none" }, { left: localNowPercent(timezone, now ?? new Date()) as DimensionValue, backgroundColor: ui.color("now") }]}
         />
       </View>
-      <View style={styles.hours} aria-hidden>
-        {TIMELINE_HOURS.map((hour, index) => (
+      <View style={styles.hours} aria-hidden onLayout={(event) => setHoursWidth(event.nativeEvent.layout.width)}>
+        {hours.map((hour, index) => (
           <Text key={index} style={[text, { color: ui.color("muted") }]}>
             {hour}
           </Text>
         ))}
+        {/* Every label at its own width, unseen, to tell which fit at the current text size. */}
+        <View style={[styles.measure, { pointerEvents: "none" }]}>
+          {TIMELINE_HOURS.map((hour, index) => (
+            <Text
+              key={index}
+              numberOfLines={1}
+              style={[text, styles.measured]}
+              onLayout={(event) => {
+                const width = event.nativeEvent.layout.width;
+                setHourWidths((widths) => (widths[index] === width ? widths : widths.map((known, at) => (at === index ? width : known))));
+              }}
+            >
+              {hour}
+            </Text>
+          ))}
+        </View>
       </View>
       {/* Always present, so a screen reader announces each choice as it fills; no height while empty. */}
       <Text aria-live="polite" style={[text, !picked && styles.empty]}>
@@ -123,6 +144,8 @@ const styles = StyleSheet.create({
   band: { position: "absolute", top: 0, bottom: 0 },
   now: { position: "absolute", top: 0, bottom: 0, width: 2 },
   hours: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+  measure: { position: "absolute", top: 0, left: 0, flexDirection: "row", opacity: 0 },
+  measured: { flexShrink: 0 },
   legend: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 12, rowGap: 6, marginTop: 4 },
   // react-native-web keeps a View at full width (flexShrink 0); a long window name wraps instead.
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },

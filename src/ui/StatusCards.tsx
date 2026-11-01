@@ -122,7 +122,9 @@ export function AccountCard({ session, onSignOut, label = "Sign out" }: { sessio
   return (
     <View style={[styles.account, { backgroundColor: ui.color("card-veil") }]} testID="account-card">
       <View style={[styles.avatar, { backgroundColor: ui.color("person-fill") }]}>
-        <Text style={[text(14, 21, "on"), styles.bold]}>{initials(session?.displayName ?? "A")}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={[text(14, 21, "on"), styles.bold]}>
+          {initials(session?.displayName ?? "A")}
+        </Text>
       </View>
       <View style={styles.who}>
         <Text style={[text(14, 21, "ink"), styles.bold]} numberOfLines={1}>
