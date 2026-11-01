@@ -17,7 +17,7 @@ The design system is the claude.ai/design project **FamilyFi Design System** (`e
 | Concern | Authoritative location |
 | --- | --- |
 | Web colour, typography and spacing tokens | [globals.css](../src/app/globals.css); font loading in [layout.tsx](../src/app/layout.tsx) |
-| Reusable controls and marks | [src/components/ui](../src/components/ui); compose these before introducing a new primitive |
+| Reusable controls and marks | [src/ui](../src/ui) and [src/components/ui](../src/components/ui); compose these before introducing a new primitive |
 | Brand artwork and its composition | [public/brand](../public/brand) and [Logo.tsx](../src/components/ui/Logo.tsx) |
 | Access labels, schedules and actions | [display.ts](../src/lib/display.ts), [group-actions.ts](../src/lib/group-actions.ts), [pause-sheet.ts](../src/lib/pause-sheet.ts), [rule-actions.ts](../src/lib/rule-actions.ts), [day-timeline.ts](../src/lib/day-timeline.ts), [group-schedule.ts](../src/lib/group-schedule.ts), [internet-zone.ts](../src/lib/internet-zone.ts) and [shared vectors](testing.md#display-vectors) |
 | Components shared with the native app | [src/ui](../src/ui): React Native components the web renders through react-native-web; see [shared components](#shared-components) |
@@ -91,13 +91,12 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 - The Card System's density ladder is 44 / 32 / 24 px marks — comfortable, compact, dense. Never a fourth size. (The 22px filter mark and the 34px category and Internet tile are marks of their own kind, not density steps.)
 - **Widths** are content widths; padding is extra. Detail pages 960, editors 760, confirm dialogs 400, form dialogs 520.
 - **Touch targets** are at least 44px on phone; a tight row's remove `x` has a 32px target on web.
-- Prefer a shared primitive in `src/components/ui` over a fourth copy of the same control. If you are writing a segmented control, a mark, a day picker or a pill, one already exists.
+- Prefer a shared primitive in `src/ui` or `src/components/ui` over a fourth copy of the same control. If you are writing a segmented control, a mark, a day picker or a pill, one already exists.
 
 ## Buttons
 
-- **A button's role decides its look**, never the page it sits on. `primary` is the one main action, filled in the accent; `secondary` an alternative, accent text on a light accent wash with an accent hairline; `destructive` removes or turns something off, filled red, and always asks first; `cancel` backs out in grey text with no border. Shared components take the role from `Button` (`src/ui/Button.tsx`), web components from `src/components/ui/buttons.ts`. A disabled filled button fades to `--ff-disabled-opacity-filled` (0.6), any other control to `--ff-disabled-opacity` (0.4). Button corners are `--ff-radius-button` (9px), field and select corners `--ff-radius-control` (7px).
-
-- **Five roles**, chosen by what the button does: `primary` (the one action the surface exists for), `destructive` (deletes or pulls a live policy, always names its object, "Remove device", "Delete rule", and always opens or sits inside a confirm), `secondary` (a real alternative, a write that isn't the primary such as "Keep it" on Checkup, and "Check now" (small) on every surface, Diagnostics included), `cancel` (always labelled "Cancel", never "Never mind"), `quiet` (a tertiary action inside a row or card).
+- **A button's role decides its look**, never the page it sits on. `primary` is the one main action, filled in the accent; `secondary` an alternative, accent text on a light accent wash with an accent hairline; `destructive` removes or turns something off, filled red, and always asks first; `cancel` backs out in grey text with no border; `quiet` is a tertiary action inside a row or card. Shared components take the role from `Button` (`src/ui/Button.tsx`), web components from `src/components/ui/buttons.ts`. A disabled filled button fades to `--ff-disabled-opacity-filled` (0.6), any other control to `--ff-disabled-opacity` (0.4). Button corners are `--ff-radius-button` (9px), field and select corners `--ff-radius-control` (7px).
+- **Choosing the role**, by what the button does: `primary` (the one action the surface exists for), `destructive` (deletes or pulls a live policy, always names its object, "Remove device", "Delete rule", and always opens or sits inside a confirm), `secondary` (a real alternative, a write that isn't the primary such as "Keep it" on Checkup, and "Check now" (small) on every surface, Diagnostics included), `cancel` (always labelled "Cancel", never "Never mind"), `quiet` (a tertiary action inside a row or card).
 - **Order:** Cancel left, primary right-most. Labels name the verb and its object, never "OK" or "Submit". While busy, both lock and the primary shows its progressive form ("Saving…").
 - **In-card single actions stay filled** (Unblock, Resume, Export household, Replace key, Save timezone).
 - The one exception to "Cancel is left-most": an edit dialog may carry one "Delete…" as red text on the far left of its footer. The rule editor's header "Delete rule…" is a red fill. In tight rows (the Devices list) remove is a red Phosphor `x` that always opens the confirm.
@@ -115,7 +114,7 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 - **Three actions** (primary, a secondary such as "Block on a schedule…" or "Edit rule and schedule", and Cancel) stack full-width, primary on top and Cancel last, on web and phone.
 - **Category sheet copy.** Creating: "Block <name>" / "Blocks <name> for <group> all day…". Re-enabling an off rule: "Turn on" / "Turns “<rule>” back on with its own schedule". "Turn off <name>" is a red fill and, for a rule several groups share, says it turns off for every group it covers.
 - **Remove device:** "FamilyFi forgets this device. While it's connected, it comes back unassigned and stays offline until you assign it." (the second sentence only while unassigned devices are kept offline).
-- On the phone the same content is a `Sheet`, with the same anatomy and footer rules.
+- On the phone the same content is the app's `Sheet` (familyfi-mobile), with the same anatomy and footer rules; shared dialog content draws its header and footer with `DialogParts`.
 
 ## Notices
 
@@ -124,41 +123,41 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 - An `Alert` has a tone icon, an optional 14px/600 title in the tone's ink, a 14px body in `--ff-ink-2`, and at most one accent text action. Its tint is painted over the card colour so it looks the same on the page and inside a card. One shared component for web and phone.
 - It sits above what it is about and stays until the condition clears. Warning and danger take no dismiss. One alert per condition, at most two per page. A static caution about a consequence (the Lock DNS caution) is a warning too.
 - A **Toast** is a receipt: bottom-centre, one at a time, about 4 seconds, may carry Undo, and is never the only copy of an error.
-- A **StatusCard** (rail and More: update available, sync status, devices to assign) is not an `Alert`.
+- The **status cards** in the rail and on More (`src/ui/StatusCards.tsx`: sync status, devices to assign, the signed-in account; update available) are not `Alert`s.
 
 ## Forms
 
 - **Fields** use `.ff-input` (in `globals.css`): 16px text, the input line, and an accent border with a 3px focus ring. Labels over a field are 14px semibold in `ink-3`.
 
-- `Field` stacks the label over its control in every sheet. Never `outline: none` without a replacement focus style.
-- **Segmented** (Always | Scheduled, Person | Network) is a white chip on the field trough, 14px at every size.
-- **DayPicker** is seven 32px day toggles with 14px letters, accent fill when selected; it wraps on very narrow screens (about 320px).
+- `Field`, `TextField`, `TimeField` and `TogglePill` are in `src/components/ui/Controls.tsx`; shared forms get their fields through `useUI()`. `Field` stacks the label over its control in every sheet. Never `outline: none` without a replacement focus style.
+- **Segmented** (`src/components/ui/Segmented.tsx`; Always | Scheduled, Person | Network) is a white chip on the field trough, 14px at every size.
+- **DayPicker** (`src/components/ui/DayPicker.tsx`) is seven 32px day toggles with 14px letters, accent fill when selected; it wraps on very narrow screens (about 320px).
 - **TimeField** ("Offline", "Back on") has its 14px label inline to the left and a 14px value.
 - **Every switch is the On/Off pill** (14px). A control that turns something on or off is a real switch, never a button labelled with its state. Quarantine's pill reads Enforced / Off.
 - Disabled is 0.4, or 0.6 on filled buttons, and nothing else.
 
 ## Pages and navigation
 
-- **PageHeader**: sticky 21px title, a subtitle that is one plain line with no full stop, and at most one accent action. Every detail page has one that names the item (device and category pages included). An editor's Save is that one action; there is no pinned footer.
-- **Back links** sit above the title in one style: "← Label", 14px semibold accent. A rule opened from a group reads "← Rules for <name>". ‹ is retired.
+- **PageHeader** (`src/components/PageHeader.tsx`): sticky 21px title, a subtitle that is one plain line with no full stop, and at most one accent action. Every detail page has one that names the item (device and category pages included). An editor's Save is that one action; there is no pinned footer.
+- **Back links** (`src/components/ui/BackLink.tsx`) sit above the title in one style: "← Label", 14px semibold accent. A rule opened from a group reads "← Rules for <name>". ‹ is retired.
 - **Loading** shows the page header, never a blank page. A real not-found is the header and back link, then an `EmptyCard` saying so. A failed load is a danger `Alert` with "Try again", never "not found".
-- **EmptyCard** is the one-line "Nothing here yet." in a card's place.
+- **EmptyCard** (`src/ui/EmptyCard.tsx`; not found is `src/components/ui/NotFound.tsx`) is the one-line "Nothing here yet." in a card's place.
 - **Web navigation**: the rail on the left with three groups (Household, Network, System); its section headings are the only uppercase labels in FamilyFi. On narrow screens the rail becomes a drawer behind a top bar, page padding drops to 16px and auto-fit grids collapse to one column (the breakpoint is an [open difference](#open-differences)).
 - **Phone navigation**: the tab bar holds only the three daily destinations (Family, Things, Devices) plus **More**. Never add a fifth tab; a new page is one entry in More, pushed full-screen with a back button.
 
 ## Cards
 
-- **Card** is the white ground with a hairline border (`--ff-hairline-card`). `padded` for content, unpadded for flush row lists.
+- **Card** (`Card` in `src/components/ui/Controls.tsx`) is the white ground with a hairline border (`--ff-hairline-card`). `padded` for content, unpadded for flush row lists.
 - **CardFoot** (`src/ui/CardFoot.tsx`) is the one foot for the group card and the rule card: the state line on its own row, then a row of outlined buttons (white, hairline-card border, radius 9, 14px semibold, ink text). The strong action (Resume, Unblock) stays a filled primary. Edit sits left on its own; the other actions sit right, the primary right-most. At large text (font scale 1.35 and up) the buttons stack. "More time" is a button here, and a text link only when it hangs off a header state line. `ActionRow` is retired.
-- **GroupCard** opens and closes. Closed: identity, caret, Internet mark, divider, one fitted line of categories. Open: the group's one button (Block, Unblock or Resume) in the corner, today's schedule, categories, app rules, then a `CardFoot` with "Details" left and "Show less" / "Show more" right.
-- **CardMarks.** The Internet mark is a 34px rounded tile: On, Blocked, Off (the group's internet rule is switched off) or No rule (only when it has none). The More and "Block an app" marks are dashed.
-- **SectionLabel** is 14px, 600, `--ff-ink-2`, sentence case: group card sections, table headers, Sync stat tiles, release notes, Running / Newest, Checkup heads, "How to fix".
-- **Tag** is a grey square, sentence case, 14px: "Built-in", "Experimental". "Private" on a device is not a Tag; it stays the orange warning icon and word.
-- **ScheduleBar** is the 24-hour strip: every rule on one bar (internet in accent, others in `--ff-schedule-1…5`), the orange hairline is now, 14px hour labels (12 AM, 6 AM, Noon, 6 PM).
-- **RuleCard** is one card for every rule, standard or built-in. Built-in rules (Quarantine, Lock DNS, Countries, later SafeSearch) differ only by the "Built-in" tag and list first, in that fixed order; then the household's rules in the order they were made, which is also the order that colours a group's schedule. Its foot reads Edit, then More time, then Resume. A single-app mark shows the app's name, falling back to the rule's name (never "App"); a rule blocking several apps shows the rule's own name. Monograms are word initials for two or more words ("Kid apps" → KA), otherwise the first two letters (TikTok → TI). Captions cap at two lines with an ellipsis.
+- **GroupCard** (`src/components/GroupCard.tsx`, with `src/ui/GroupCard*.tsx` and `ExpandingGroupCard.tsx`) opens and closes. Closed: identity, caret, Internet mark, divider, one fitted line of categories. Open: the group's one button (Block, Unblock or Resume) in the corner, today's schedule, categories, app rules, then a `CardFoot` with "Details" left and "Show less" / "Show more" right.
+- **Card marks** (`src/ui/InternetMark.tsx`, `src/ui/CategoryMarks.tsx`, `src/ui/GroupCardMarks.tsx`). The Internet mark is a 34px rounded tile: On, Blocked, Off (the group's internet rule is switched off) or No rule (only when it has none). The More and "Block an app" marks are dashed.
+- **SectionLabel** (`SectionLabel` in `src/ui/CategoryMarks.tsx` for shared components, and a web copy in `src/components/FilterMarks.tsx`) is 14px, 600, `--ff-ink-2`, sentence case: group card sections, table headers, Sync stat tiles, release notes, Running / Newest, Checkup heads, "How to fix".
+- **Tag** (`src/ui/Tag.tsx`) is a grey square, sentence case, 14px: "Built-in", "Experimental". "Private" on a device is not a Tag; it stays the orange warning icon and word.
+- **Day timeline** (the project's `ScheduleBar`; `src/ui/DayTimeline.tsx`, inside `src/ui/GroupSchedule.tsx`) is the 24-hour strip: every rule on one bar (internet in accent, others in `--ff-schedule-1…5`), the orange hairline is now, 14px hour labels (12 AM, 6 AM, Noon, 6 PM).
+- **RuleCard** (`src/ui/RuleCard.tsx`, listed by `src/components/rules/RulesList.tsx`) is one card for every rule, standard or built-in. Built-in rules (Quarantine, Lock DNS, Countries, later SafeSearch) differ only by the "Built-in" tag and list first, in that fixed order; then the household's rules in the order they were made, which is also the order that colours a group's schedule. Its foot reads Edit, then More time, then Resume. A single-app mark shows the app's name, falling back to the rule's name (never "App"); a rule blocking several apps shows the rule's own name. Monograms are word initials for two or more words ("Kid apps" → KA), otherwise the first two letters (TikTok → TI). Captions cap at two lines with an ellipsis.
 - **A new built-in rule** defines its id and Phosphor glyph, its "Blocks" summary, its Applies to wording, its switch words if On/Off would mislead, what a pause lifts, its own page, and its Checkup entry. Built-ins are never deleted or renamed and never appear on a group's schedule.
 - **Built-in rule pages.** Lock DNS has the same Status section with an On/Off switch as Block countries; the switch edits the draft and saves with Save. Subtitles read "On · <what it blocks>" / "Off · <what it blocks>". Every editor, Block countries included, has a write preview.
-- **EditorPage / EditorSection** is the long-form destination: 760 wide, Save in the page header, the write preview always visible, and leaving with unsaved changes asks with a confirm. `EditorSection`'s note is 14px `--ff-ink-2`; its title takes the platform's object-title size. On the phone it is a pushed full-screen page, not a taller sheet.
+- **Editor pages** (the project's `EditorPage`: the `EDITOR_PAGE` layout in `src/components/ui/BackLink.tsx`, sections from `src/ui/EditorSection.tsx`, as in `src/components/rules/RuleEditor.tsx`) are the long-form destination: 760 wide, Save in the page header, the write preview always visible, and leaving with unsaved changes asks with a confirm. `EditorSection`'s note is 14px `--ff-ink-2`; its title takes the platform's object-title size. On the phone it is a pushed full-screen page, not a taller sheet.
 - **Write preview.** NEW / CHANGE / DELETE / KEEP stay uppercase mono at 14px, each a tinted fill with coloured text (KEEP on the field fill in `--ff-ink-2`), in a fixed-width column. They are not Tags. Rows sit directly in the editor card.
 - **Card stack** (phone Family, Things and Rules): closed cards tuck 8px under the one in front; tapping a head opens it, cards above fold to peeks and cards below follow. Close by tapping the head, dragging down (commit past 90px, or 12px faster than 800px/s), Back or Escape. Layout comes from `src/lib/card-stack.ts`; the native motion lives in familyfi-mobile. Spec: the project's `guidelines/card-stack-motion.md`.
 
@@ -201,10 +200,12 @@ The native app keeps the shared meaning above and adapts the presentation to eac
 
 - Same cards and verdict colours; 16px page padding; object titles 19px.
 - The tab bar holds Family, Things, Devices and More, never a fifth tab.
-- Dialogs are `Sheet`s with the same content and copy as the web's `Modal`.
+- Dialogs are the app's own `Sheet` (in familyfi-mobile) with the same content and copy as the web's `Modal`.
 - The card stack replaces the card grid on phones.
 
 ## Enforcement
+
+- Accessibility: contrast at least 4.5:1; nothing a person reads is under 14px except the exceptions under [Type](#type), and no text under 14px is drawn below 0.7 alpha. `tests/unit/mark-contrast.test.ts` checks colour tokens and `tests/browser/accessibility.spec.ts` runs axe (WCAG 2.1 A and AA) on every page in both viewports, with no exceptions.
 
 `tests/unit/naming.test.ts` fails the build on a raw colour literal, an abbreviated product prefix, a misnamed file, an unprefixed env var of ours, a `var(--ff-…)` reference with no declaration, and a Phosphor class written outside `Icon`. `tests/unit/icons.test.ts` fails it on a glyph name the installed icon font does not have, and `tests/unit/mark-contrast.test.ts` on a verdict, accent, status or text colour under 4.5:1. These rules were written down once before and drifted anyway — the tokens existed while 71 literals sat in components — so treat the tests as the contract and this section as their explanation. Extend both together.
 
@@ -221,6 +222,8 @@ Places where the code and the design project disagree and the operator has not y
 | Card stack on web | Web uses the stack under 768px | The web draws neither the stack nor its heads (see [Shared components](#shared-components)) |
 | Logo in the narrow top bar | `SKILL.md`: inline lockup in the top bar; `readme.md`: stacked lockup heads the drawer | Stacked lockup in the drawer |
 | Width tokens | `--ff-width-detail` (960), `--ff-width-editor` (760) | Literal `max-w-[1008px]` and `max-w-[808px]` (padding included); no tokens |
+| Text under 14px | Only the `Mark` caption (10) and state word (9) | Also the 9px category and app monograms (`src/ui/CategoryMarks.tsx`) and a 10px label in `src/ui/AdminControl.web.tsx` |
+| Shared section label | One `SectionLabel` | Two copies, `src/ui/CategoryMarks.tsx` and `src/components/FilterMarks.tsx` |
 | Radius token names | `--ff-radius-lg` (9), `--ff-radius-md` (7) | `--ff-radius-button`, `--ff-radius-control` |
 
 Deliberate differences, not open: fonts are self-hosted through `next/font` and Phosphor comes from the `@phosphor-icons/web` package, so a household gateway never reaches a third party at runtime, where the project loads both from CDNs. The project's note that the product "ships no icon set" predates Phosphor in the repo.
