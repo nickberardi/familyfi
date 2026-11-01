@@ -24,6 +24,8 @@ import { Icon } from "@/components/ui/Icon";
 import { DeviceMark } from "@/ui/DeviceMark";
 import type { Device, Group } from "@/lib/types";
 import { PRIMARY_BUTTON } from "@/components/ui/buttons";
+import { BackLink } from "@/components/ui/BackLink";
+import { NotFound } from "@/components/ui/NotFound";
 
 export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "things"; id: string; demo?: boolean }) {
   const router = useRouter();
@@ -36,7 +38,8 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
 
   if (!group) {
     if (loading) return null;
-    return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{GROUP_DETAIL_COPY.notFound}</p>;
+    const section = kind === "family" ? { href: "/family", label: "Family" } : { href: "/things", label: "Things" };
+    return <NotFound title={GROUP_DETAIL_COPY.notFoundTitle} line={GROUP_DETAIL_COPY.notFoundLine} back={section} />;
   }
   const members = devices.filter((device) => device.groupId === id);
   const timezone = household?.timezone ?? "America/New_York";
@@ -51,9 +54,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
       <PageHeader title={group.name} sub={groupDetailSub(group)} actionLabel={GROUP_EDIT_COPY.open} onAction={(event) => setEditing(event.currentTarget)} />
       {/* 960px of content, as the design has it, plus the page padding either side. */}
       <div className="flex max-w-[992px] flex-col gap-[18px] p-4 md:max-w-[1008px] md:p-6">
-        <Link href={kind === "family" ? "/family" : "/things"} className="w-fit text-[14px] font-semibold text-[var(--ff-accent)]">
-          ← {kind === "family" ? "Family" : "Things"}
-        </Link>
+        <BackLink href={kind === "family" ? "/family" : "/things"} label={kind === "family" ? "Family" : "Things"} />
         <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
           <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
             <div className="min-w-0 flex-1">

@@ -78,7 +78,7 @@ export default function CategoriesPage() {
         <ResolverCard resolver={resolver} request={request} timezone={household?.timezone ?? "America/New_York"} onChanged={() => void load()} />
 
         {error ? (
-          <p className="m-0 text-[13px]" style={{ color: "var(--ff-danger)" }}>
+          <p className="m-0 text-[14px]" style={{ color: "var(--ff-danger)" }}>
             {error}
           </p>
         ) : null}

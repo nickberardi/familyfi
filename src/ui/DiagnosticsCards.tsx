@@ -1,12 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { DIAGNOSTICS_COPY as COPY, checkedAgo, formatLoad, formatPercent, formatUptime, loadTone, requestFigures, requestWindow, splitDevices } from "@/lib/diagnostics-copy";
 import type { GatewayDeviceHealth, GatewayHealth } from "@/lib/types";
 
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { Button } from "./Button";
+import { useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
 
@@ -61,7 +62,6 @@ export function GatewayLoadCard({
   onCheck: () => void;
   now?: Date;
 }) {
-  const ui = useUI();
   const text = useText();
   const gateway = health?.devices ? splitDevices(health.devices).gateway : null;
   const problem = error || health?.devicesError;
@@ -80,16 +80,7 @@ export function GatewayLoadCard({
       sub={sub}
       testID="diagnostics-gateway"
       aside={
-        <Pressable
-          role="button"
-          aria-disabled={checking}
-          disabled={checking}
-          onPress={onCheck}
-          testID="diagnostics-check"
-          style={({ pressed }) => [styles.button, { backgroundColor: ui.color("accent") }, checking && { opacity: 0.4 }, pressed && !checking && { opacity: PRESS_OPACITY }]}
-        >
-          <Text style={[text(14, 21, "ink-on-fill"), styles.bold]}>{checking ? COPY.checking : COPY.check}</Text>
-        </Pressable>
+        <Button kind="secondary" size="md" label={checking ? COPY.checking : COPY.check} onPress={onCheck} disabled={checking} testID="diagnostics-check" />
       }
     >
       {problem ? <Text style={[text(14, 20, "muted"), styles.line]}>{problem}</Text> : null}
@@ -178,9 +169,9 @@ export function ConsoleRequestsCard({ requests }: { requests: GatewayHealth["req
       </View>
       {requests.endpoints.slice(0, 5).map((entry) => (
         <View key={entry.endpoint} style={[styles.endpoint, { borderTopColor: ui.color("hairline") }]}>
-          <Text style={[text(13, 19, "muted"), styles.grow, { fontFamily: MONO }]}>{entry.endpoint}</Text>
-          <Text style={[text(13, 19, "ink"), styles.count, { fontFamily: MONO }]}>×{entry.count}</Text>
-          <Text style={[text(13, 19, "muted"), styles.ms, { fontFamily: MONO }]}>{Math.round(entry.averageMs)} ms</Text>
+          <Text style={[text(14, 20, "muted"), styles.grow, { fontFamily: MONO }]}>{entry.endpoint}</Text>
+          <Text style={[text(14, 20, "ink"), styles.count, { fontFamily: MONO }]}>×{entry.count}</Text>
+          <Text style={[text(14, 20, "muted"), styles.ms, { fontFamily: MONO }]}>{Math.round(entry.averageMs)} ms</Text>
         </View>
       ))}
     </Card>
@@ -195,7 +186,6 @@ const styles = StyleSheet.create({
   big: { fontWeight: "700", letterSpacing: -0.5 },
   grow: { flex: 1, minWidth: 0 },
   sub: { marginTop: 2 },
-  button: { flexShrink: 0, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   line: { paddingHorizontal: 18, paddingVertical: 12 },
   meter: { height: 6, borderRadius: 3, overflow: "hidden" },
   meterFill: { height: 6, borderRadius: 3 },

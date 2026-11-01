@@ -25,7 +25,7 @@ export function DayPicker({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex flex-none gap-1" role="group" aria-label="Days">
+    <div className="flex min-w-0 flex-wrap gap-1" role="group" aria-label="Days">
       {DAYS.map((day) => {
         const on = days.includes(day.value);
         return (
@@ -36,7 +36,7 @@ export function DayPicker({
             aria-label={day.name}
             disabled={disabled}
             onClick={() => onToggle(day.value)}
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] border text-[12.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-[7px] border text-[14px] font-semibold disabled:cursor-not-allowed disabled:opacity-[var(--ff-disabled-opacity)]"
             style={{
               background: on ? "var(--ff-accent)" : "var(--ff-card)",
               color: on ? "var(--ff-ink-on-fill)" : "var(--ff-ink-3)",

@@ -12,7 +12,7 @@ import { internetRulesForGroup, internetWindowsForGroup, type Rule } from "@/lib
 import type { Group } from "@/lib/types";
 import type { UpstreamCategoryRow } from "@/lib/upstream";
 
-import { ActionRow } from "./ActionRow";
+import { CardFoot } from "./CardFoot";
 import { groupCardControls } from "./group-card-controls";
 import { GroupCardFrame } from "./GroupCardFrame";
 import { GroupCardMarks } from "./GroupCardMarks";
@@ -210,28 +210,31 @@ export function StackedGroupBody(props: ExpandedGroupProps) {
 export function GroupCardLinks({
   group,
   onDetails,
+  detailsHref,
   onShowLess,
 }: {
   group: Pick<Group, "id" | "name">;
   onDetails?: () => void;
+  /** The group's page as a link, where the platform links rather than navigates (the web). */
+  detailsHref?: string;
   onShowLess?: () => void;
 }) {
+  const details = onDetails || detailsHref;
   return (
-    <ActionRow
-      actions={[
-        ...(onDetails
-          ? [
-              {
-                label: GROUP_CARD_COPY.details,
-                accessibilityLabel: GROUP_CARD_COPY.detailsLabel(group.name),
-                onPress: onDetails,
-                navigates: true,
-                testID: `group-details-${group.id}`,
-              },
-            ]
-          : []),
-        ...(onShowLess ? [{ label: GROUP_CARD_COPY.showLess, onPress: onShowLess, testID: `group-show-less-${group.id}` }] : []),
-      ]}
+    <CardFoot
+      leading={
+        details
+          ? {
+              label: GROUP_CARD_COPY.details,
+              accessibilityLabel: GROUP_CARD_COPY.detailsLabel(group.name),
+              href: detailsHref,
+              onPress: onDetails,
+              navigates: true,
+              testID: `group-details-${group.id}`,
+            }
+          : undefined
+      }
+      actions={onShowLess ? [{ label: GROUP_CARD_COPY.showLess, onPress: onShowLess, testID: `group-show-less-${group.id}` }] : []}
     />
   );
 }

@@ -1,11 +1,14 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
+import { BackLink, DETAIL_PAGE } from "@/components/ui/BackLink";
+import { NotFound } from "@/components/ui/NotFound";
+import { deviceKindLabel } from "@/lib/display";
+import { Alert } from "@/ui/Alert";
 import { privateAddressDevices } from "@/lib/checkup";
-import { groupHref } from "@/lib/device-detail";
+import { deviceDetail, groupHref } from "@/lib/device-detail";
 import { DEVICES_COPY } from "@/lib/device-list";
 import { DeviceDetailContent } from "@/ui/DeviceDetailContent";
 import { PrivateAddressCard } from "@/ui/PrivateAddress";
@@ -42,22 +45,25 @@ export function DeviceDetailPage({
   // A group's device list links here with `?from=<group id>` so the way back returns to that group.
   const fromGroup = typeof from === "string" ? groups.find((item) => item.id === from) : undefined;
 
+  const back = fromGroup ? { href: groupHref(fromGroup), label: fromGroup.name } : { href: "/devices", label: "All devices" };
+  if (!device) {
+    if (loading) return null;
+    if (!error) return <NotFound title={DEVICES_COPY.detailNotFoundTitle} line={DEVICES_COPY.detailNotFoundLine} back={back} />;
+  }
+
   return (
     <>
-      <PageHeader title={DEVICES_COPY.title} sub={DEVICES_COPY.detailSubtitle} />
-      {/* 920px of content, as the design has it, plus the page padding either side. */}
-      <div className="flex max-w-[952px] flex-col gap-4 p-4 md:max-w-[968px] md:p-6">
-        <Link href={fromGroup ? groupHref(fromGroup) : "/devices"} className="self-start text-[14px] text-[var(--ff-accent)]">
-          ‹ {fromGroup ? fromGroup.name : "All devices"}
-        </Link>
+      <PageHeader title={device ? deviceDetail(device, group, unifi?.networks ?? [], timezone, now).name : DEVICES_COPY.title} sub={device ? DEVICES_COPY.detailSub(deviceKindLabel(device.hostname), group?.name) : undefined} />
+      <div className={DETAIL_PAGE}>
+        <BackLink href={back.href} label={back.label} />
         {!device ? (
-          <div className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px] text-[14px]">
-            {loading ? DEVICES_COPY.detailLoading : error ? DEVICES_COPY.detailUnavailable : DEVICES_COPY.detailNotFound}
-          </div>
+          <Alert tone="danger" role="alert">
+            {DEVICES_COPY.detailUnavailable}
+          </Alert>
         ) : (
           <>
             {privateAddressDevices([device]).length ? <PrivateAddressCard /> : null}
-            <DeviceDetailContent device={device} group={group} networks={unifi?.networks ?? []} timezone={timezone} now={now} />
+            <DeviceDetailContent device={device} group={group} networks={unifi?.networks ?? []} timezone={timezone} now={now} named={false} />
           </>
         )}
       </div>

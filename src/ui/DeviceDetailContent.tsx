@@ -22,6 +22,7 @@ export function DeviceDetailContent({
   timezone,
   now,
   compact = false,
+  named = true,
 }: {
   device: Device;
   group: Group | null | undefined;
@@ -29,6 +30,8 @@ export function DeviceDetailContent({
   timezone: string;
   now: Date;
   compact?: boolean;
+  /** Draws the device's name over its status; false where the page header already names it. */
+  named?: boolean;
 }) {
   const ui = useUI();
   const wide = useWide();
@@ -56,9 +59,11 @@ export function DeviceDetailContent({
           <DeviceMark hostname={device.hostname} size="detail" />
           <View style={styles.headerWords}>
             <View style={styles.titleRow}>
-              <Text role="heading" aria-level={2} style={[styles.name, { fontFamily: ui.font, color: ui.color("ink") }]}>
-                {detail.name}
-              </Text>
+              {named ? (
+                <Text role="heading" aria-level={2} style={[styles.name, { fontFamily: ui.font, color: ui.color("ink") }]}>
+                  {detail.name}
+                </Text>
+              ) : null}
               {pill}
             </View>
             <Text style={[styles.body, styles.summary, { fontFamily: ui.font, color: ui.color("muted") }]}>{detail.summary}</Text>

@@ -3,7 +3,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { copyText } from "@/components/ui/copy-text";
-import { Wordmark } from "@/components/ui/Logo";
+import { Logo } from "@/components/ui/Logo";
 import { RECOVERY_USERNAME } from "@/lib/constants";
 import { SETUP_LEDES, SETUP_STEP_COUNT, setupFoot } from "@/lib/setup";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
@@ -41,13 +41,12 @@ export function SetupFrame({
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--ff-page)] px-4 py-10 md:px-6">
       <div className="flex w-full max-w-[460px] flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="m-0 flex">
-            {/* The wordmark is decorative, so the heading carries the name. */}
-            <Wordmark size={26} />
-            <span className="sr-only">FamilyFi</span>
+        {/* The same centred lockup as sign-in: setup is the household's first sight of FamilyFi. */}
+        <div className="flex flex-col gap-3">
+          <h1 className="m-0 flex justify-center">
+            <Logo variant="stacked" size="md" />
           </h1>
-          <p className={BODY}>{SETUP_LEDES[step]}</p>
+          <p className={`${BODY} text-center`}>{SETUP_LEDES[step]}</p>
         </div>
 
         {step < SETUP_STEP_COUNT ? (

@@ -10,6 +10,7 @@ import { UPDATE_COPY as COPY, checkedLine, installCopy, installing, latestReleas
 import { checkForUpdate, installUpdate } from "@/lib/update-writes";
 
 import { ExternalLink } from "./ExternalLink";
+import { Button } from "./Button";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 import { useInstallProgress } from "./use-install-progress";
 
@@ -116,12 +117,12 @@ export function UpdateContent({ update: polled, install, children }: { update: U
 
   const checkLabel = checking ? COPY.checkingNow : COPY.checkNow;
   const chip = latest ? (
-    <Text style={[text(13, 18, "accent"), styles.bold, styles.chip, { backgroundColor: ui.color("accent-tint"), borderColor: ui.color("accent-line") }]} testID="update-chip">
+    <Text style={[text(14, 20, "accent"), styles.bold, styles.chip, { backgroundColor: ui.color("accent-tint"), borderColor: ui.color("accent-line") }]} testID="update-chip">
       {COPY.available}
     </Text>
   ) : update?.status === "ok" ? (
     <Text
-      style={[text(13, 18, "verdict-open-ink"), styles.bold, styles.chip, { backgroundColor: ui.color("verdict-open-fill"), borderColor: ui.color("verdict-open-line") }]}
+      style={[text(14, 20, "verdict-open-ink"), styles.bold, styles.chip, { backgroundColor: ui.color("verdict-open-fill"), borderColor: ui.color("verdict-open-line") }]}
       testID="update-chip"
     >
       {COPY.upToDate}
@@ -152,9 +153,7 @@ export function UpdateContent({ update: polled, install, children }: { update: U
           {checkedLine(update)}
         </Text>
         {install ? (
-          <Text role="button" aria-disabled={!canCheck} onPress={() => void checkNow()} style={[text(14, 20, "accent"), styles.bold, !canCheck && styles.off]} testID="update-check">
-            {checkLabel}
-          </Text>
+          <Button kind="secondary" size="md" label={checkLabel} onPress={() => void checkNow()} disabled={!canCheck} testID="update-check" />
         ) : null}
       </View>
     </>
@@ -166,16 +165,7 @@ export function UpdateContent({ update: polled, install, children }: { update: U
         </Text>
         <View style={styles.grow} />
         {install ? (
-          <Pressable
-            role="button"
-            aria-disabled={!canCheck}
-            disabled={!canCheck}
-            onPress={() => void checkNow()}
-            style={({ pressed }) => [styles.button, { borderColor: ui.color("control-line"), backgroundColor: ui.color("card") }, !canCheck && styles.off, pressed && canCheck && { opacity: PRESS_OPACITY }]}
-            testID="update-check"
-          >
-            <Text style={[text(14, 21, "ink"), styles.bold]}>{checkLabel}</Text>
-          </Pressable>
+          <Button kind="secondary" size="md" label={checkLabel} onPress={() => void checkNow()} disabled={!canCheck} testID="update-check" />
         ) : null}
       </View>
       <Text style={[text(14, 20, update?.status === "error" ? "danger" : "muted"), styles.checkedRow]} testID="update-checked">
@@ -194,7 +184,7 @@ export function UpdateContent({ update: polled, install, children }: { update: U
       ) : (
         sections.map((section, index) => (
           <View key={section.title} style={[styles.section, index > 0 && [styles.rule, hairline]]}>
-            <Text role="heading" aria-level={3} style={[text(14, 21, "muted"), styles.bold, styles.sectionTitle]}>
+            <Text role="heading" aria-level={3} style={[text(14, 21, "muted"), styles.bold]}>
               {section.title}
             </Text>
             <View role="list" style={styles.items}>
@@ -263,13 +253,13 @@ export function UpdateContent({ update: polled, install, children }: { update: U
       </View>
       <View style={[styles.versions, !sideBySide && styles.stacked]} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
         <View style={[styles.cell, sideBySide ? [styles.cellSide, hairline] : null]}>
-          <Text style={[text(13, 18, "muted"), styles.bold, styles.label]}>{COPY.running}</Text>
+          <Text style={[text(14, 20, "muted"), styles.bold]}>{COPY.running}</Text>
           <Text style={[text(22, 36, "ink"), styles.version, styles.value]} testID="update-running">
             {update ? versionLabel(update.currentVersion) : "…"}
           </Text>
         </View>
         <View style={[styles.cell, !sideBySide && [styles.rule, hairline], latest ? { backgroundColor: ui.color("accent-wash") } : null]} testID="update-newest">
-          <Text style={[text(13, 18, latest ? "accent" : "muted"), styles.bold, styles.label]}>{COPY.newest}</Text>
+          <Text style={[text(14, 20, latest ? "accent" : "muted"), styles.bold]}>{COPY.newest}</Text>
           {newest}
         </View>
       </View>
@@ -291,7 +281,6 @@ const styles = StyleSheet.create({
   stacked: { flexDirection: "column" },
   cell: { flex: 1, minWidth: 0, paddingHorizontal: 18, paddingVertical: 16 },
   cellSide: { borderRightWidth: 1 },
-  label: { letterSpacing: 0.35, textTransform: "uppercase" },
   version: { fontWeight: "700", fontVariant: ["tabular-nums"] },
   value: { marginTop: 4 },
   valueRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: 4, minHeight: 36 },
@@ -300,7 +289,6 @@ const styles = StyleSheet.create({
   off: { opacity: 0.4 },
   rule: { borderTopWidth: 1 },
   section: { paddingHorizontal: 18, paddingVertical: 14 },
-  sectionTitle: { letterSpacing: 0.35, textTransform: "uppercase" },
   items: { marginTop: 8, gap: 6 },
   item: { flexDirection: "row", gap: 8, paddingLeft: 4 },
   notesFoot: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 11 },

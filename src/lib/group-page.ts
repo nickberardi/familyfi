@@ -9,7 +9,7 @@ export function groupPageTitle(kind: Group["kind"]): string {
 }
 
 export function groupPageSummary(kind: Group["kind"], groups: Pick<Group, "kind" | "name" | "access">[]): string {
-  if (kind === "things") return "Device groups that are not a person. House destinations are Things groups.";
+  if (kind === "things") return "Device groups that are not a person";
   const rows = groups.filter((group) => group.kind === kind);
   const paused = rows.filter((group) => group.access === "paused").map((group) => group.name);
   const offline = rows.filter((group) => group.access === "blocked").map((group) => group.name);

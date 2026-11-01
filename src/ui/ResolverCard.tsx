@@ -103,23 +103,23 @@ export function ResolverCard({
         {COPY.title}
       </Text>
       <View style={styles.body}>
-        {resolver?.url && !pasting ? <Text style={{ fontFamily: MONO, fontSize: 13, lineHeight: 19.5, color: ui.color("ink") }}>{resolver.url}</Text> : null}
+        {resolver?.url && !pasting ? <Text style={{ fontFamily: MONO, fontSize: 14, lineHeight: 20, color: ui.color("ink") }}>{resolver.url}</Text> : null}
         {!resolver?.url && !pasting ? (
-          <Text style={small(12.5, 20)}>{resolver?.source === "dhcp" ? COPY.dhcp : resolver?.reason ?? COPY.unavailable}</Text>
+          <Text style={small(14, 20)}>{resolver?.source === "dhcp" ? COPY.dhcp : resolver?.reason ?? COPY.unavailable}</Text>
         ) : null}
         {resolver?.networks?.map((network) => (
-          <Text key={network.id} style={[small(12, 18), styles.network]}>
+          <Text key={network.id} style={[small(14, 20), styles.network]}>
             {network.name}: {network.reason ?? network.servers.join(", ")}
           </Text>
         ))}
-        <Text style={[small(12, 19.5), styles.note]}>{COPY.note}</Text>
+        <Text style={[small(14, 20), styles.note]}>{COPY.note}</Text>
 
         {resolver ? (
           <View style={[styles.schedule, { borderTopColor: ui.color("hairline") }]}>
             <View style={styles.scheduleHead}>
               <View style={styles.grow}>
-                <Text style={[small(12.5, 18.75, "ink"), styles.bold]}>{COPY.schedule}</Text>
-                <Text style={[small(12, 18), styles.scheduleLine]}>{resolverScheduleLine(resolver, timezone, new Date())}</Text>
+                <Text style={[small(14, 20, "ink"), styles.bold]}>{COPY.schedule}</Text>
+                <Text style={[small(14, 20), styles.scheduleLine]}>{resolverScheduleLine(resolver, timezone, new Date())}</Text>
               </View>
               <ui.TimeField
                 label={COPY.time}
@@ -170,7 +170,7 @@ export function ResolverCard({
           </View>
         )}
 
-        {error ? <Text style={[small(13, 19.5, "danger"), styles.error]}>{error}</Text> : null}
+        {error ? <Text style={[small(14, 20, "danger"), styles.error]}>{error}</Text> : null}
       </View>
     </View>
   );

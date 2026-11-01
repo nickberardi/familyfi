@@ -1,6 +1,8 @@
 "use client";
 
 import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
+import { BackLink, EDITOR_PAGE } from "@/components/ui/BackLink";
+import { NotFound } from "@/components/ui/NotFound";
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -55,7 +57,7 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
   const rule = id ? rules.find((item) => item.id === id) : undefined;
   if (id && !rule) {
     if (loading) return null;
-    return <p className="p-6 text-[14px] text-[var(--ff-muted)]">{COPY.notFound}</p>;
+    return <NotFound title={COPY.notFoundTitle} line={COPY.notFoundLine} back={{ href: "/rules", label: "All rules" }} />;
   }
   if (rule?.builtIn === "dns") return <LockDnsPage key={rule.id} rule={rule} />;
   if (rule?.builtIn === "countries") return <CountriesEditor key={rule.id} saved={rule} returnGroup={one(search.group) ?? null} />;
@@ -128,16 +130,14 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
         }
       />
       <form
-        className="flex max-w-[760px] flex-col gap-4 p-4 md:p-6"
+        className={EDITOR_PAGE}
         onSubmit={(event) => {
           event.preventDefault();
           void save();
         }}
       >
         <div className="flex items-center gap-3">
-          <Link href={back} className="text-[14px] font-semibold text-[var(--ff-accent)]">
-            ‹ {backLabel}
-          </Link>
+          <BackLink href={back} label={backLabel} />
           {saved && dirty ? <span className="text-[14px] text-[var(--ff-paused)]">{COPY.unsaved}</span> : null}
         </div>
         <RuleEditorForm
@@ -207,16 +207,14 @@ function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: str
     <>
       <PageHeader title={COUNTRIES_EDITOR_COPY.title} sub={summary} onAction={() => void save()} actionLabel={COUNTRIES_EDITOR_COPY.save} />
       <form
-        className="flex max-w-[760px] flex-col gap-4 p-4 md:p-6"
+        className={EDITOR_PAGE}
         onSubmit={(event) => {
           event.preventDefault();
           void save();
         }}
       >
         <div className="flex items-center gap-3">
-          <Link href={back} className="text-[14px] font-semibold text-[var(--ff-accent)]">
-            ‹ {backLabel}
-          </Link>
+          <BackLink href={back} label={backLabel} />
           {dirty ? <span className="text-[14px] text-[var(--ff-paused)]">{COUNTRIES_EDITOR_COPY.unsaved}</span> : null}
         </div>
         <CountriesRuleForm

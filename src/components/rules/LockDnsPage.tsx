@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { BackLink, EDITOR_PAGE } from "@/components/ui/BackLink";
 import { useRouter } from "next/navigation";
 import {
   fromLockDnsRule,
@@ -41,16 +41,14 @@ export function LockDnsPage({ rule }: { rule: Rule }) {
     <>
       <PageHeader title={COPY.title} sub={lockDnsSummary(rule)} onAction={() => void save()} actionLabel={COPY.save} />
       <form
-        className="flex max-w-[760px] flex-col gap-4 p-4 md:p-6"
+        className={EDITOR_PAGE}
         onSubmit={(event) => {
           event.preventDefault();
           void save();
         }}
       >
         <div className="flex items-center gap-3">
-          <Link href="/rules" className="text-[14px] font-semibold text-[var(--ff-accent)]">
-            ‹ {COPY.back}
-          </Link>
+          <BackLink href="/rules" label={COPY.back} />
           {dirty ? <span className="text-[14px] text-[var(--ff-paused)]">{COPY.unsaved}</span> : null}
         </div>
         <LockDnsForm

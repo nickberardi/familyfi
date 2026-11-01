@@ -95,7 +95,7 @@ export function formatLogWhen(iso: string, timezone: string): string {
 /** The Sync page's words. */
 export const SYNC_COPY = {
   title: "Sync",
-  sub: "App-owned policy state, sweeps, and failures.",
+  sub: "App-owned policy state, sweeps and failures",
   when: "When",
   action: "Action",
   result: "Result",

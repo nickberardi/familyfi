@@ -30,7 +30,7 @@ export function ApiPage({ demo }: { demo: boolean }) {
     <>
       <PageHeader
         title="FamilyFi API"
-        sub="The HTTP API behind the web app, the phone app and paired AI agents. Try it out uses your signed-in session."
+        sub="The HTTP API behind the web app, the phone app and paired AI agents"
         secondary={
           <div className="flex basis-full justify-end gap-2 md:basis-auto">
             <button type="button" className={SECONDARY_BUTTON} onClick={() => setConnecting(true)}>

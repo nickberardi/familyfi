@@ -26,6 +26,9 @@ describe("settings copy", () => {
     expect(facts.find((row) => row.k === "Host")?.v).toBe("10.1.2.1");
     expect(facts.find((row) => row.k === "Networks")?.v).toBe("Family");
     expect(facts.find((row) => row.k === "Status")?.v).toBe("Connected");
+    // Only machine values take the code font.
+    expect(facts.filter((row) => row.mono).map((row) => row.k)).toEqual(["Host", "Site"]);
+    expect(gatewayFacts(null).some((row) => row.mono)).toBe(false);
   });
 
   it("describes family members without claiming kids can log in", () => {

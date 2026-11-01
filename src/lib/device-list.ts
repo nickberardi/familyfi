@@ -74,7 +74,7 @@ export function quarantineTitle(enforced: boolean, paused = false): string {
 
 export const DEVICES_COPY = {
   title: "Devices",
-  subtitle: "Assignment is by MAC address and persists while a device is offline.",
+  subtitle: "Assignment is by MAC address and persists while a device is offline",
   detailSubtitle: "Assignment persists while a device is offline.",
   noDevices: "No devices yet. New in-scope MACs appear as unassigned.",
   noMatch: "Nothing matches this filter.",
@@ -88,6 +88,10 @@ export const DEVICES_COPY = {
   detailLoading: "Loading device…",
   detailUnavailable: "Device details are unavailable right now.",
   detailNotFound: "Device not found.",
+  detailNotFoundTitle: "Device not found",
+  /** A device page's subtitle under its name: "Phone · Nick", "Phone · Unassigned". */
+  detailSub: (kind: string, group: string | null | undefined) => `${kind} · ${group ?? "Unassigned"}`,
+  detailNotFoundLine: "This device was removed, or the link is out of date.",
   detailDone: "Done",
 } as const;
 
