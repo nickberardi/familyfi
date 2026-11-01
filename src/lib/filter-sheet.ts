@@ -69,7 +69,7 @@ export function filterSheetCopy(group: Pick<Group, "id" | "name">, state: Catego
             ? `Turns “${state.rule.name}” back on with its own schedule.`
             : `Blocks ${state.name} for ${group.name} all day. You can add a schedule afterwards.`;
   const domainCount = state.kind === "category" ? state.domains.length : 0;
-  const websitesNote = `UniFi has no ${state.name} category, so FamilyFi can't block it as one. ${
+  const websitesNote = `Your gateway has no ${state.name} category, so FamilyFi can't block it as one. ${
     domainCount
       ? `A Websites rule can block the ${domainCount} ${domainCount === 1 ? "website" : "websites"} this category checks.`
       : "Add its websites on the Categories page, or block them with a Websites rule."

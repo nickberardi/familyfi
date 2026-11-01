@@ -407,7 +407,7 @@ export function createHouseholdStore(deps: {
             else if (change.status === "pending") set({ notice: change.error ?? "Still applying." });
             // Keep the change's own notice, and its Undo, once the gateway has it.
             else if (feedback) set({ error: "" });
-            else set({ error: "", notice: "Saved. The gateway has the current desired state." });
+            else set({ error: "", notice: "Saved. Your gateway has every change." });
             await reload();
           })
           .catch(async (error: unknown) => {

@@ -1124,7 +1124,7 @@ test("cards show every household category; one UniFi cannot block offers a Websi
   await expect(card.locator("button[aria-expanded=true]")).toBeVisible();
   await marks.getByRole("button", { name: /^AI / }).click();
   const sheet = page.getByRole("dialog");
-  await expect(sheet.getByText(/UniFi has no AI category/)).toBeVisible();
+  await expect(sheet.getByText(/Your gateway has no AI category/)).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Block AI" })).toHaveCount(0);
   await sheet.getByRole("link", { name: "Block its websites" }).click();
   await expect(page).toHaveURL(/\/rules\/new\?kind=domain/);
