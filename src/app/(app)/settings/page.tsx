@@ -23,8 +23,7 @@ import { forgetCatalogNames } from "@/components/GroupGrid";
 import { CANCEL_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
 import { SheetFrame } from "@/components/pair/SheetFrame";
 
-const FIELD =
-  "mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]";
+const FIELD = "ff-input mt-1 font-normal";
 
 
 export default function SettingsPage() {

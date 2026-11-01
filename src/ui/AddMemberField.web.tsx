@@ -6,7 +6,7 @@ import { SETTINGS_COPY as COPY } from "@/lib/settings-copy";
 export function AddMemberField({ value, onChange, onSubmit }: { value: string; onChange: (next: string) => void; onSubmit: () => void; disabled?: boolean }) {
   return (
     <input
-      className="w-full flex-1 rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]"
+      className="ff-input flex-1 font-normal"
       value={value}
       onChange={(event) => onChange(event.target.value)}
       onKeyDown={(event) => {

@@ -228,7 +228,7 @@ function CustomPausePicker({
         ? { kind: "until", clock }
         : null;
   const option = choice ? custom(choice) : null;
-  const field = "ff-input w-auto px-2 py-1";
+  const field = "ff-input px-2 py-1";
   return (
     <form
       className="flex flex-wrap items-center gap-2.5 bg-[var(--ff-field-soft)] px-[18px] py-3"
@@ -274,7 +274,7 @@ function CustomPausePicker({
             required
             value={clock}
             onChange={(event) => setClock(event.target.value)}
-            className={field}
+            className={`${field} w-auto`}
             autoFocus
           />
         </label>

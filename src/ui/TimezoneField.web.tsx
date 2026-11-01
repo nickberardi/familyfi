@@ -9,7 +9,7 @@ export function TimezoneField({ value, onChange }: { value: string; onChange: (n
       {COPY.timezone}
       <input
         list="ff-tz"
-        className="mt-1 w-full rounded-lg border border-[var(--ff-line)] px-3 py-2.5 text-[16px] font-normal text-[var(--ff-ink)]"
+        className="ff-input mt-1 font-normal"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

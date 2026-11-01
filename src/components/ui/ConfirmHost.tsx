@@ -21,6 +21,7 @@ function publish(next: Pending | null) {
   for (const listener of listeners) listener();
 }
 
+// Answered only while a ConfirmHost is mounted, which the root layout guarantees.
 export function askConfirm(request: UIConfirmRequest): Promise<boolean> {
   // A second question while one is open declines the first: only one is ever answered.
   pending?.resolve(false);
