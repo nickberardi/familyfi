@@ -196,13 +196,22 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     const detail = `internet rule ${verb} for everyone ${until(pausedForEveryone.pause.until, "until you resume")}`;
     return online("on", `Online · ${detail}`, detail, "unblocked");
   }
+  // Nothing blocks or lifts a rule for the group: its internet schedule, as cardStateLabel names it.
   const label = cardStateLabel(group, windows, timezone, now);
   const state = internetState(group, windows, now, timezone);
-  // cardStateLabel names the state; the badge takes its first word and the line keeps the rest.
-  const rest = label.includes(" · ") ? label.slice(label.indexOf(" · ") + 3) : "";
-  if (state.state === "paused") return blocked("on", label, label.replace(/^All internet paused /, "paused "), "blocked");
-  if (state.state === "blocked") return blocked("on", label, rest);
-  return online("on", label, rest, state.state === "allowed" ? "unblocked" : "none");
+  switch (state.state) {
+    case "blocked":
+      return blocked("on", label, `${state.window} ${until(state.until, "· always")}`);
+    case "allowed":
+      return online("on", label, `allowed ${until(state.until, "until you resume the schedule")}${by(state.by)}`, "unblocked");
+    case "online":
+      return online("on", label, state.next ? `${state.next.window} at ${formatClock(new Date(state.next.at), timezone)}` : "");
+    case "no_rule":
+      return online("on", label, group.internetRuleIds.length === 0 ? "no internet rule" : "internet rule off");
+    default:
+      // A pause is the group's suspension, handled first.
+      return online("on", label, "");
+  }
 }
 
 /** The line under a card's name starts like a sentence. */
