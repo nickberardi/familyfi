@@ -26,7 +26,28 @@ import type { Actor, Group } from "./types";
 /** What a tap on the group's header button, or its More time link, does. */
 export type GroupRun = "block" | "moreBlock" | "unblock" | "unblockNow" | "resume" | "moreUnblock";
 
-export type GroupActionSpec = { label: string; run: GroupRun };
+export type GroupActionSpec = { label: string; run: GroupRun; menu?: GroupActionSpec[] };
+
+/**
+ * PROTOTYPE ONLY (thread "Rethink the Unblock button on cards"): which card design to draw.
+ * "now" is main's behaviour; "scheduled" ignores always-on category, app and website rules;
+ * "menu" adds a dropdown; "link" adds an Allow link beside Block.
+ */
+export type UnblockVariant = "now" | "scheduled" | "menu" | "link";
+export function unblockVariant(): UnblockVariant {
+  try {
+    const value = (globalThis as { localStorage?: Storage }).localStorage?.getItem("ffUnblockVariant");
+    return value === "scheduled" || value === "menu" || value === "link" ? value : "now";
+  } catch {
+    return "now";
+  }
+}
+
+/** Rules that count for the card: every rule today; in the prototypes, always-on partial rules don't. */
+function cardBlocking(blocking: BlockingRule[]): BlockingRule[] {
+  if (unblockVariant() === "now") return blocking;
+  return blocking.filter((rule) => rule.kind === "internet" || rule.until !== null);
+}
 
 /** What a tap on a rule area's button, or its More time link, does for the card's group. */
 export type GroupRuleRun = "pause" | "resume" | "extend";
@@ -167,7 +188,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
       ? blocked("paused", `Blocked ${until(end, "")}${by(who)}`, `${until(end, "")}${by(who)}`, "blocked")
       : blocked("paused", `Blocked${by(who)} until you unblock`, who ? `until you unblock, by ${who.name}` : "until you unblock", "blocked");
   }
-  const blocking = rulesBlockingGroup(group, rules, timezone, now);
+  const blocking = cardBlocking(rulesBlockingGroup(group, rules, timezone, now));
   const internet = blocking.find((rule) => rule.kind === "internet");
   if (internet) {
     const detail = `${internet.name} ${until(internet.until, "· always")}`;
@@ -251,12 +272,24 @@ export function groupHeaderActions(
   timezone: string,
   now: Date,
 ): { action: GroupActionSpec; more: GroupActionSpec | null } {
-  const blocking = rulesBlockingGroup(group, rules, timezone, now);
+  const variant = unblockVariant();
+  const blocking = cardBlocking(rulesBlockingGroup(group, rules, timezone, now));
   if (group.suspension.active) {
     return {
       action: { label: "Unblock", run: blocking.length ? "unblock" : "unblockNow" },
       more: group.suspension.until ? { label: "More time", run: "moreBlock" } : null,
     };
+  }
+  const partial = blocking.length > 0 && !blocking.some((rule) => rule.kind === "internet");
+  if (partial && variant === "menu") {
+    const allow = `Allow ${names(blocking.map((rule) => rule.name))}`;
+    return {
+      action: { label: allow, run: "unblock", menu: [{ label: allow, run: "unblock" }, { label: "Block all internet", run: "block" }] },
+      more: null,
+    };
+  }
+  if (partial && variant === "link") {
+    return { action: { label: "Block", run: "block" }, more: { label: `Allow ${names(blocking.map((rule) => rule.name))}`, run: "unblock" } };
   }
   if (blocking.length) return { action: { label: "Unblock", run: "unblock" }, more: null };
   const unblock = groupUnblock(group, rules, now);

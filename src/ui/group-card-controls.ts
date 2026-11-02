@@ -26,6 +26,7 @@ export function groupCardControls(
     disabled: !enabled,
     onPress: () => onRun({ kind: "header", run: spec.run }),
     testID: `group-action-${spec.run}-${group.id}`,
+    menu: spec.menu?.map((item) => asHeader(item, false)),
   });
   return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null };
 }
