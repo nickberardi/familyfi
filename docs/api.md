@@ -26,8 +26,9 @@ A server in [demo mode](operations.md#demo-mode) refuses configuration writes wi
 `demo_locked`: `PUT /settings/household`, `PUT /settings/unifi`, account and password writes,
 `PUT`/`DELETE` on `/upstream/resolver` and `/groups/{id}/resolver`, route writes under
 `/connection/endpoints`, `POST /connection/pins`, `PUT /connection/tunnel`, `PUT /settings/update/schedule`,
-`POST /settings/update/install`, and `GET /settings/export` and `POST /settings/import`. Clients show the message; the household
-itself (groups, rules, pauses, devices) and pairing are unchanged.
+`POST /settings/update/install`, and `GET /settings/export` and `POST /settings/import`. The error carries a `link`
+to installing FamilyFi at home ("Set up your own"). Clients show the message, and an error's `link` as a button
+beside it; the household itself (groups, rules, pauses, devices) and pairing are unchanged.
 
 For a change to either shared artifact:
 

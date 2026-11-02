@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
-import type { ApiRequest } from "@/lib/api-client";
+import type { ApiRequest, ErrorLink } from "@/lib/api-client";
 import type { HouseholdLists, HouseholdPublic, MutationPayload } from "@/lib/household-state";
 import { createHouseholdStore, type HouseholdStore, type NoticeAction, type Visibility } from "@/lib/household-store";
 import type { Rule } from "@/lib/rules";
@@ -28,6 +28,7 @@ type AppData = {
   /** The server refused the session; the page is on its way to sign-in. */
   signedOut: boolean;
   error: string;
+  errorLink: ErrorLink | null;
   notice: string;
   noticeAction: NoticeAction | null;
   reload: () => Promise<void>;
@@ -88,6 +89,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       stale: state.stale,
       signedOut: state.status === "signedOut",
       error: state.error,
+      errorLink: state.errorLink,
       notice: state.notice,
       noticeAction: state.noticeAction,
       reload: store.reload,

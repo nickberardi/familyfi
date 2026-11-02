@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { ApiRequest } from "@/lib/api-client";
+import { errorNotice, type ApiRequest, type ErrorNotice } from "@/lib/api-client";
 import { collapseReleaseNotes, parseReleaseNotes } from "@/lib/release-notes";
 import type { UpdateCheck, UpdateSettings } from "@/lib/types";
 import { UPDATE_COPY as COPY, checkedLine, installCopy, installing, latestRelease, updateRunLine, versionLabel } from "@/lib/update-copy";
@@ -11,6 +11,7 @@ import { checkForUpdate, installUpdate } from "@/lib/update-writes";
 
 import { ExternalLink } from "./ExternalLink";
 import { Button } from "./Button";
+import { ErrorNote } from "./ErrorNote";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 import { useInstallProgress } from "./use-install-progress";
 
@@ -50,7 +51,7 @@ function newerCheck(polled: UpdateCheck | null, asked: UpdateCheck | null): Upda
 export function UpdateContent({ update: polled, install, children }: { update: UpdateCheck | null; install?: UpdateInstall; children?: ReactNode }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const [checking, setChecking] = useState(false);
   const [asked, setAsked] = useState<UpdateCheck | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -76,11 +77,11 @@ export function UpdateContent({ update: polled, install, children }: { update: U
     const go = await ui.confirm({ title: copy.title, message: COPY.installConfirm, confirmLabel: copy.button });
     if (!go) return;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await installUpdate(install.request);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : COPY.installFailed);
+      setError(errorNotice(failure, COPY.installFailed));
     } finally {
       setBusy(false);
       install.onChanged();
@@ -90,11 +91,11 @@ export function UpdateContent({ update: polled, install, children }: { update: U
   async function checkNow() {
     if (!install || !canCheck) return;
     setChecking(true);
-    setError("");
+    setError(null);
     try {
       setAsked(await checkForUpdate(install.request));
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : COPY.checkFailed);
+      setError(errorNotice(failure, COPY.checkFailed));
     } finally {
       setChecking(false);
     }
@@ -239,7 +240,7 @@ export function UpdateContent({ update: polled, install, children }: { update: U
             {shownRun}
           </Text>
         ) : null}
-        {error ? <Text style={text(14, 20, "danger")}>{error}</Text> : null}
+        {error ? <ErrorNote notice={error} style={text(14, 20, "danger")} /> : null}
       </View>
     ) : null;
 

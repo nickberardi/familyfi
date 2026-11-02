@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { ErrorLine } from "@/components/ErrorLine";
+import { api } from "@/lib/api";
+import { apiErrorNotice, type ErrorNotice } from "@/lib/api-client";
 import { homeAddress, homeOrigin, type HomeAccess } from "@/lib/connection-routes";
 import { CANCEL_BUTTON, FIELD, PRIMARY_BUTTON } from "./SheetFrame";
 
@@ -16,23 +18,23 @@ export function HomeAccessCard() {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
 
   useEffect(() => {
     api<{ home: HomeAccess }>("/api/v1/connection/home")
       .then((result) => setHome(result.home))
-      .catch((caught) => setError(caught instanceof ApiError ? caught.message : "Could not load home access."));
+      .catch((caught) => setError(apiErrorNotice(caught, "Could not load home access.")));
   }, []);
 
   async function save(url: string | null) {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const result = await api<{ home: HomeAccess }>("/api/v1/connection/home", { method: "PUT", body: JSON.stringify({ url }) });
       setHome(result.home);
       setEditing(false);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not save the home network address.");
+      setError(apiErrorNotice(caught, "Could not save the home network address."));
     } finally {
       setBusy(false);
     }
@@ -117,11 +119,7 @@ export function HomeAccessCard() {
             </div>
           </div>
         )}
-        {error ? (
-          <p role="alert" className="font-semibold text-[var(--ff-danger)]">
-            {error}
-          </p>
-        ) : null}
+        {error ? <ErrorLine notice={error} className="font-semibold text-[var(--ff-danger)]" /> : null}
       </div>
     </section>
   );

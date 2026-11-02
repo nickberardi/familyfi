@@ -1,4 +1,4 @@
-import { ApiError, TransportError, type ApiRequest } from "./api-client";
+import { apiErrorOf, TransportError, type ApiRequest } from "./api-client";
 import { candidateRoutes, edgeHeaders, isEdgeUnavailable, type EndpointCredential } from "./companion-trust";
 import type { ConnectionRoute } from "./types";
 
@@ -124,8 +124,7 @@ export function createCompanionRequest(transport: Transport, connection: Compani
       }
       connection.onRoute?.(route);
       if (response.status < 200 || response.status >= 300) {
-        const error = (body as { error?: { code?: string; message?: string } } | null)?.error;
-        throw new ApiError(error?.message ?? "Request failed.", response.status, error?.code);
+        throw apiErrorOf(body, response.status);
       }
       return body as T;
     }

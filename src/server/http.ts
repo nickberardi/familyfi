@@ -1,16 +1,19 @@
 import { BlockList, isIP } from "node:net";
 import { NextResponse } from "next/server";
+import type { ErrorLink } from "@/lib/api-client";
 import { ConfigurationError } from "./env";
 
 export type ApiErrorBody = {
   error: {
     code: string;
     message: string;
+    link?: ErrorLink;
   };
 };
 
-export function jsonError(status: number, code: string, message: string): NextResponse<ApiErrorBody> {
-  return NextResponse.json({ error: { code, message } }, { status });
+/** `link`: somewhere the person can go next, shown as a button beside the message. */
+export function jsonError(status: number, code: string, message: string, link?: ErrorLink): NextResponse<ApiErrorBody> {
+  return NextResponse.json({ error: link ? { code, message, link } : { code, message } }, { status });
 }
 
 export function jsonCaughtError(error: unknown): NextResponse<ApiErrorBody> {
