@@ -358,6 +358,12 @@ jobs:
             const next = text.replace(/^(info:\n(?:[ \t]+.*\n)*?[ \t]+version:[ \t]*)\S+/m, `$1${process.argv[1]}`);
             if (next === text) throw new Error(`no info.version to change in ${file}`);
             fs.writeFileSync(file, next);
+            // API_VERSION is info.version as a literal (tests/unit/api-compat.test.ts).
+            const compat = "src/lib/api-compat.ts";
+            const source = fs.readFileSync(compat, "utf8");
+            const bumped = source.replace(/^(export const API_VERSION: string = ")[^"]+(";)$/m, `$1${process.argv[1]}$2`);
+            if (bumped === source) throw new Error(`no API_VERSION to change in ${compat}`);
+            fs.writeFileSync(compat, bumped);
           ' "$tag_version"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -92,6 +92,7 @@ describe("the release version", () => {
     expect(job).toBeDefined();
     expect(job).toContain('npm pkg set "version=$tag_version"');
     expect(job).toContain("openapi/familyfi.v1.yaml");
+    expect(job).toContain("src/lib/api-compat.ts");
     expect(job).toContain(`{base: "main", head: $head, title: $title, body: $body}`);
   });
 });
