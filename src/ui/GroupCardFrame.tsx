@@ -10,13 +10,15 @@ import type { Group } from "@/lib/types";
 import { CardButton, CardTextButton, type ZoneAction } from "./CardActions";
 import { GroupCardHeader } from "./GroupCardHeader";
 import { useUI } from "./UIContext";
+import { useLargeText } from "./use-large-text";
 import { useWide } from "./use-wide";
 
 /**
  * A group card's frame, shared by every client: the card, and its header as the button that opens
  * and closes it. Closed, the header shows a caret. Open, the group's one button (`action`: Block,
  * Unblock or Resume) takes the caret's corner, with More time under the status line while a timed
- * block or unblock lasts (`more`); the caller then offers its own way to close. What the card shows
+ * block or unblock lasts (`more`); the caller then offers its own way to close. At large text sizes
+ * the button would cover the name and badge, so it goes under the header instead. What the card shows
  * below the header, open or closed, is the caller's.
  */
 export function GroupCardFrame({
@@ -46,7 +48,10 @@ export function GroupCardFrame({
 }) {
   const ui = useUI();
   const wide = useWide();
-  const corner = open && action;
+  const largeText = useLargeText();
+  const corner = open && action && !largeText;
+  const under = open && action && largeText;
+  const inset = group.kind === "things" ? THINGS_TEXT_INSET : HEADER_PAD;
   return (
     <View
       role="article"
@@ -78,8 +83,13 @@ export function GroupCardFrame({
           <CardButton action={{ ...action, strong: true }} />
         </View>
       ) : null}
+      {under ? (
+        <View style={[styles.under, { paddingLeft: inset }]}>
+          <CardButton action={{ ...action, strong: true }} />
+        </View>
+      ) : null}
       {open && more ? (
-        <View style={[styles.more, { paddingLeft: group.kind === "things" ? THINGS_TEXT_INSET : HEADER_PAD }]}>
+        <View style={[styles.more, under ? styles.afterUnder : null, { paddingLeft: inset }]}>
           <CardTextButton action={more} />
         </View>
       ) : null}
@@ -98,5 +108,7 @@ const styles = StyleSheet.create({
   roomForAction: { paddingRight: 112 },
   caret: { marginTop: 2, flexShrink: 0 },
   action: { position: "absolute", top: 14, right: 16 },
+  under: { marginTop: -4, paddingRight: HEADER_PAD, paddingBottom: 12, flexDirection: "row" },
   more: { marginTop: -8, paddingBottom: 10, flexDirection: "row" },
+  afterUnder: { marginTop: -6 },
 });
