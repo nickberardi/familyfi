@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { SignInForm } from "@/components/SignInForm";
 import { Logo } from "@/components/ui/Logo";
 import { appVersionLabel } from "@/lib/version";
-import { DEMO_SIGN_IN_NOTE, DEMO_USERNAME } from "@/lib/demo";
+import { DEMO_SIGN_IN_NOTE } from "@/lib/demo";
 import { isHomeAddress } from "@/lib/setup";
+import { DEV_ADMIN } from "@/server/dev-household";
 import { demoModeEnabled, recoveryPassword } from "@/server/env";
 import { householdHasGateway } from "@/server/setup-entry";
 
@@ -18,9 +19,11 @@ export default async function LoginPage() {
   const configured = demo || (await householdHasGateway().catch(() => true));
   if (!configured && isHomeAddress((await headers()).get("host"))) redirect("/setup");
   // The public demo shows its one shared login to every visitor; settings and passwords are locked there.
+  // It is the seed's administrator, whose password is the recovery account's, never the recovery
+  // account itself: no phone signs in as that, so a visitor could not pair the app as it.
   // Without a password the form stays empty, so sign-in reports the problem as it does elsewhere.
   const demoPassword = demo ? demoSignInPassword() : "";
-  const demoLogin = demoPassword ? { username: DEMO_USERNAME, password: demoPassword } : undefined;
+  const demoLogin = demoPassword ? { username: DEV_ADMIN.username, password: demoPassword } : undefined;
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <div className="flex w-full max-w-[400px] flex-col gap-5">

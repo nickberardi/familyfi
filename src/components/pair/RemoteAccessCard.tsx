@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ErrorLine } from "@/components/ErrorLine";
+import { ErrorNote } from "@/ui/ErrorNote";
 import { api } from "@/lib/api";
 import { apiErrorNotice, type ErrorNotice } from "@/lib/api-client";
 import { askConfirm } from "@/components/ui/ConfirmHost";
@@ -508,7 +508,7 @@ export function RemoteAccessCard({
           </div>
         ) : null}
         {tunnel?.error ? <div className="font-semibold text-[var(--ff-danger)]">{tunnel.error}</div> : null}
-        {error ? <ErrorLine notice={error} className="font-semibold text-[var(--ff-danger)]" /> : null}
+        {error ? <ErrorNote notice={error} style={{ fontWeight: "600" }} /> : null}
         {noBinary && tunnelChoice ? (
           <div className="text-[var(--ff-muted)]">
             This server doesn&rsquo;t have cloudflared. The FamilyFi Docker image includes it; for development, install it with Homebrew.

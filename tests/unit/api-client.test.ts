@@ -38,6 +38,9 @@ describe("API errors", () => {
 
   it("drops a link it can't use, and reads a body with no error", () => {
     expect(apiErrorOf({ error: { code: "x", message: "No.", link: { label: "Go" } } }, 400).link).toBeUndefined();
+    for (const url of ["javascript:alert(1)", "http://example.com", "otherapp://open", "not a url"]) {
+      expect(apiErrorOf({ error: { code: "x", message: "No.", link: { label: "Go", url } } }, 400).link).toBeUndefined();
+    }
     const empty = apiErrorOf(null, 502);
     expect({ message: empty.message, code: empty.code }).toEqual({ message: "Request failed.", code: undefined });
   });

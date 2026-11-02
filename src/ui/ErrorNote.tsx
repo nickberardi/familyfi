@@ -8,15 +8,17 @@ import { ExternalLink } from "./ExternalLink";
 import { useUI } from "./UIContext";
 
 /**
- * A failed action's message, in the caller's danger style, with the error's link beneath it when
- * it has one, such as the demo's "Set up your own".
+ * A failed action's message, announced as an alert, with the error's link beneath it when it has
+ * one, such as the demo's "Set up your own". The text is 14 px danger unless `style` says otherwise.
+ * One component for shared and web-only cards alike.
  */
-export function ErrorNote({ notice, style, testID }: { notice: ErrorNotice; style: StyleProp<TextStyle>; testID?: string }) {
+export function ErrorNote({ notice, style, testID }: { notice: ErrorNotice; style?: StyleProp<TextStyle>; testID?: string }) {
   const ui = useUI();
-  if (!notice.link) return <Text style={style} testID={testID}>{notice.text}</Text>;
+  const text = [{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, color: ui.color("danger") }, style];
+  if (!notice.link) return <Text role="alert" style={text} testID={testID}>{notice.text}</Text>;
   return (
-    <View style={styles.note} testID={testID}>
-      <Text style={style}>{notice.text}</Text>
+    <View role="alert" style={styles.note} testID={testID}>
+      <Text style={text}>{notice.text}</Text>
       <ExternalLink
         href={notice.link.url}
         style={[styles.link, { fontFamily: ui.font, color: ui.color("accent") }]}

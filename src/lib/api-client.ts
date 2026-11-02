@@ -20,12 +20,23 @@ export class ApiError extends Error {
   }
 }
 
-/** The error an API response body carries, read defensively: a `link` is kept only when both its parts are text. */
+/** Only an https link is followed: never another app's deep link or a script. */
+function httpsUrl(url: unknown): string | undefined {
+  if (typeof url !== "string") return undefined;
+  try {
+    return new URL(url).protocol === "https:" ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The error an API response body carries, read defensively: a `link` is kept only when its label is text and its url https. */
 export function apiErrorOf(body: unknown, status: number): ApiError {
   const error = (body as { error?: { code?: unknown; message?: unknown; link?: { label?: unknown; url?: unknown } } } | null)?.error;
   const message = typeof error?.message === "string" ? error.message : "Request failed.";
   const code = typeof error?.code === "string" ? error.code : undefined;
-  const link = typeof error?.link?.label === "string" && typeof error.link.url === "string" ? { label: error.link.label, url: error.link.url } : undefined;
+  const url = httpsUrl(error?.link?.url);
+  const link = typeof error?.link?.label === "string" && url ? { label: error.link.label, url } : undefined;
   return new ApiError(message, status, code, link);
 }
 

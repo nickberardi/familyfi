@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ErrorLine } from "@/components/ErrorLine";
+import { ErrorNote } from "@/ui/ErrorNote";
 import { api } from "@/lib/api";
 import { apiErrorNotice, type ErrorNotice } from "@/lib/api-client";
 import { homeAddress, homeOrigin, type HomeAccess } from "@/lib/connection-routes";
@@ -119,7 +119,7 @@ export function HomeAccessCard() {
             </div>
           </div>
         )}
-        {error ? <ErrorLine notice={error} className="font-semibold text-[var(--ff-danger)]" /> : null}
+        {error ? <ErrorNote notice={error} style={{ fontWeight: "600" }} /> : null}
       </div>
     </section>
   );

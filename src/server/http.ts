@@ -11,7 +11,7 @@ export type ApiErrorBody = {
   };
 };
 
-/** `link`: somewhere the person can go next, shown as a button beside the message. */
+/** `link`: somewhere the person can go next, shown as a link under the message. */
 export function jsonError(status: number, code: string, message: string, link?: ErrorLink): NextResponse<ApiErrorBody> {
   return NextResponse.json({ error: link ? { code, message, link } : { code, message } }, { status });
 }

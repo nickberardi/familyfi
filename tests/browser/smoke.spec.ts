@@ -332,6 +332,11 @@ test("Settings exports the household and previews an import before replacing any
   await page.goto("/settings?tab=maintenance");
   const backup = page.getByRole("region", { name: "Backup" });
   await expect(backup.getByRole("link", { name: "Export household" })).toHaveAttribute("href", "/api/v1/settings/export");
+  // The download goes through fetch, so it still saves the server's file under its own name.
+  const download = page.waitForEvent("download");
+  await backup.getByRole("link", { name: "Export household" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^familyfi-.*\.tar\.gz$/);
+  await expect(backup.getByTestId("backup-export-error")).toHaveCount(0);
   await backup.getByLabel("Import an export").setInputFiles({ name: "not-an-export.tar.gz", mimeType: "application/gzip", buffer: Buffer.from("nope") });
   await expect(backup.getByRole("alert")).toContainText("not a FamilyFi export");
   await expect(backup.getByRole("button", { name: "Replace the household" })).toHaveCount(0);

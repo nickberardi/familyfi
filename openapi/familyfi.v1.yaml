@@ -4491,12 +4491,12 @@ components:
               type: object
               additionalProperties: false
               description: |
-                Where the person can go next, shown as a button beside `message`: a `demo_locked`
+                Where the person can go next, shown as a link under `message`: a `demo_locked`
                 error points at installing FamilyFi at home. Omitted when there is nowhere to send them.
               required: [label, url]
               properties:
-                label: { type: string, description: "The button's words, such as \"Set up your own\"." }
-                url: { type: string, format: uri }
+                label: { type: string, description: "The link's words, such as \"Set up your own\"." }
+                url: { type: string, format: uri, description: "An https address; clients ignore a link to anything else." }
     UpstreamDomain:
       type: object
       additionalProperties: false
