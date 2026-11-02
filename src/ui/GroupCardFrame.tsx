@@ -1,13 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
-import { CardButton, CardTextButton, type ZoneAction } from "./CardActions";
+import { CardButton, CardMenuButton, CardTextButton, type ZoneAction } from "./CardActions";
 import { GROUP_TILE_INSET, GroupCardHeader } from "./GroupCardHeader";
 import { useUI } from "./UIContext";
 import { useLargeText } from "./use-large-text";
@@ -47,6 +47,7 @@ export function GroupCardFrame({
   children?: ReactNode;
 }) {
   const ui = useUI();
+  const [menuOpen, setMenuOpen] = useState(false);
   const wide = useWide();
   const largeText = useLargeText();
   const corner = open && action && !largeText;
@@ -58,6 +59,7 @@ export function GroupCardFrame({
       testID={testID ? `group-card-${testID}` : undefined}
       style={[
         styles.card,
+        menuOpen ? { overflow: "visible", zIndex: 5 } : null,
         { backgroundColor: ui.color("card") },
         // Cards are outlined on wide screens, as on the web's md breakpoint.
         wide && { borderWidth: 1, borderColor: ui.color("hairline-card") },
@@ -68,7 +70,7 @@ export function GroupCardFrame({
         aria-expanded={open}
         onPress={onToggle}
         testID={testID ? `group-header-${testID}` : undefined}
-        style={[styles.header, corner ? styles.roomForAction : null]}
+        style={[styles.header, corner ? styles.roomForAction : null, corner && action?.menu ? { paddingRight: 200 } : null]}
       >
         <GroupCardHeader group={group} rules={rules} windows={windows} timezone={timezone} now={now} />
         {corner ? null : (
@@ -79,8 +81,8 @@ export function GroupCardFrame({
       </Pressable>
       {/* Beside the header rather than in it, since a button cannot sit inside the header's button. */}
       {corner ? (
-        <View style={styles.action}>
-          <CardButton action={{ ...action, strong: true }} />
+        <View style={[styles.action, { zIndex: 10 }]}>
+          {action.menu ? <CardMenuButton action={action} onOpenChange={setMenuOpen} /> : <CardButton action={{ ...action, strong: true }} />}
         </View>
       ) : null}
       {under ? (
