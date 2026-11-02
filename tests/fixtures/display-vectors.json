@@ -16463,7 +16463,7 @@
         ],
         "mode": "pause"
       },
-      "expected": "Lifts Video for TV only. For… and Until… lift all of TV's rules for that time, except those that always block a category, app or website. The rules stay as they are for everyone else."
+      "expected": "Lifts Video for TV only. For… and Until… lift every rule TV has for that time, except ones that always block a category, app or website. The rules stay as they are for everyone else."
     },
     {
       "fn": "unblockSheetBody",
@@ -16505,7 +16505,7 @@
         ],
         "mode": "pause"
       },
-      "expected": "Ends the block and lifts Dinner and Video for TV only. For… and Until… lift all of TV's rules for that time, except those that always block a category, app or website. The rules stay as they are for everyone else."
+      "expected": "Ends the block and lifts Dinner and Video for TV only. For… and Until… lift every rule TV has for that time, except ones that always block a category, app or website. The rules stay as they are for everyone else."
     },
     {
       "fn": "unblockSheetBody",
