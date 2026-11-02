@@ -135,7 +135,8 @@ describe("sign-in on the public demo", () => {
 
   it("fills in the shared demo login for every visitor", async () => {
     process.env.FAMILYFI_MODE = "demo";
-    expect(signInFormProps(await visit(LoginPage))).toEqual({ demoLogin: { username: "admin", password: recoveryPassword() } });
+    // The seed administrator, not the recovery admin: no phone pairs as the recovery admin.
+    expect(signInFormProps(await visit(LoginPage))).toEqual({ demoLogin: { username: "nick", password: recoveryPassword() } });
   });
 
   it.each(["prod", "dev", "test"])("never carries the password in %s mode", async (value) => {
