@@ -40,6 +40,8 @@ export function BackupCard({ onImported }: { onImported: (summary: ImportSummary
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<ErrorNotice | null>(null);
   async function exportHousehold(event: MouseEvent<HTMLAnchorElement>) {
+    // A modified or middle click keeps the browser's own handling of the link.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
     event.preventDefault();
     if (exporting) return;
     setExporting(true);
@@ -69,7 +71,7 @@ export function BackupCard({ onImported }: { onImported: (summary: ImportSummary
               onClick={exportHousehold}
               aria-disabled={exporting || undefined}
               // An anchor is never `disabled`, so it fades like a busy filled button through aria-disabled.
-              className={`${PRIMARY_BUTTON} aria-disabled:opacity-[var(--ff-disabled-opacity-filled)]`}
+              className={`${PRIMARY_BUTTON} aria-disabled:cursor-default aria-disabled:opacity-[var(--ff-disabled-opacity-filled)]`}
               data-testid="backup-export"
             >
               {exporting ? COPY.exporting : COPY.exportLabel}
