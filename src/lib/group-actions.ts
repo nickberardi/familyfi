@@ -281,12 +281,16 @@ export function groupHeaderActions(
     };
   }
   const partial = blocking.length > 0 && !blocking.some((rule) => rule.kind === "internet");
-  if (partial && variant === "menu") {
-    const allow = `Allow ${names(blocking.map((rule) => rule.name))}`;
-    return {
-      action: { label: allow, run: "unblock", menu: [{ label: allow, run: "unblock" }, { label: "Block all internet", run: "block" }] },
-      more: null,
-    };
+  if (variant === "menu" && !blocking.some((rule) => rule.kind === "internet")) {
+    // Block first; the dropdown pauses each partial rule blocking now, scheduled ones first, then always-on ones.
+    const all = rulesBlockingGroup(group, rules, timezone, now).filter((rule) => rule.kind !== "internet");
+    const ordered = [...all.filter((rule) => rule.until !== null), ...all.filter((rule) => rule.until === null)];
+    const ruleName = (id: string) => rules.find((rule) => rule.id === id)?.name ?? "";
+    const menu = ordered.map((rule): GroupActionSpec => ({
+      label: `Pause ${ruleName(rule.ruleId)}${rule.until ? ` until ${formatClock(new Date(rule.until), timezone)}` : ""}`,
+      run: "unblock",
+    }));
+    if (menu.length) return { action: { label: "Block", run: "block", menu }, more: null };
   }
   if (partial && variant === "link") {
     return { action: { label: "Block", run: "block" }, more: { label: `Allow ${names(blocking.map((rule) => rule.name))}`, run: "unblock" } };

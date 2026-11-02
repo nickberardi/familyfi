@@ -70,7 +70,7 @@ export function GroupCardFrame({
         aria-expanded={open}
         onPress={onToggle}
         testID={testID ? `group-header-${testID}` : undefined}
-        style={[styles.header, corner ? styles.roomForAction : null, corner && action?.menu ? { paddingRight: 200 } : null]}
+        style={[styles.header, corner ? styles.roomForAction : null, corner && action?.menu ? { paddingRight: 150 } : null]}
       >
         <GroupCardHeader group={group} rules={rules} windows={windows} timezone={timezone} now={now} />
         {corner ? null : (

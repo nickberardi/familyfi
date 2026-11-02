@@ -102,7 +102,7 @@ export function CardMenuButton({ action, onOpenChange }: { action: ZoneAction; o
             top: 38,
             right: 0,
             zIndex: 10,
-            minWidth: 220,
+            minWidth: 280,
             borderRadius: 10,
             paddingVertical: 4,
             backgroundColor: ui.color("card"),
@@ -113,7 +113,7 @@ export function CardMenuButton({ action, onOpenChange }: { action: ZoneAction; o
         >
           {(action.menu ?? []).map((item, index) => (
             <Pressable key={item.label} role="menuitem" onPress={item.onPress} style={{ paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: index ? 1 : 0, borderTopColor: ui.color("hairline-card") }}>
-              <Text style={{ fontFamily: ui.font, fontSize: 15, lineHeight: 21, fontWeight: index === 0 ? "600" : "400", color: ui.color("ink") }}>{item.label}</Text>
+              <Text style={{ fontFamily: ui.font, fontSize: 15, lineHeight: 21, fontWeight: "400", color: ui.color("ink") }}>{item.label}</Text>
             </Pressable>
           ))}
         </View>
