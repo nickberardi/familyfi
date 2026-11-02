@@ -1021,7 +1021,7 @@ test("Block names its scope and can be undone", { tag: "@desktop" }, async ({ pa
     await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
     expect((await paused).ok()).toBeTruthy();
     // The badge, then the line saying who blocked it until when.
-    await expect(page.getByRole("heading", { name: /^Blocked, Until / })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Blocked, until / })).toBeVisible();
     await expect(page.getByRole("button", { name: "Unblock", exact: true })).toBeVisible();
 
     const resumed = page.waitForResponse((response) => response.url().endsWith(`/groups/${tv!.id}/rules/internet/resume`));
