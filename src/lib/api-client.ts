@@ -4,10 +4,10 @@
  * browser's cookie session with its CSRF header (`api.ts`), or a native app's bearer session.
  */
 
-/** A response from the server with an error status; `code` is the API's `error.code`. */
 /** Where an error points the person next (`error.link` in an API error): a button's words and its address. */
 export type ErrorLink = { label: string; url: string };
 
+/** A response from the server with an error status; `code` is the API's `error.code`, `link` its `error.link`. */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -37,6 +37,7 @@ export function apiErrorNotice(caught: unknown, fallback: string): ErrorNotice {
   return caught instanceof ApiError ? errorNotice(caught, fallback) : { text: fallback };
 }
 
+/** An API error's message and link; any other error's message; else `fallback`. */
 export function errorNotice(caught: unknown, fallback: string): ErrorNotice {
   if (caught instanceof ApiError) return caught.link ? { text: caught.message, link: caught.link } : { text: caught.message };
   return { text: caught instanceof Error ? caught.message : fallback };

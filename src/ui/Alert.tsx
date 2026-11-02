@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { IconName } from "@/lib/icons";
 
+import { ExternalLink } from "./ExternalLink";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 /**
@@ -35,8 +36,8 @@ export function Alert({
   title?: string;
   /** The body: one or two plain sentences. */
   children?: ReactNode;
-  /** One text action, such as "Show them" or "Try again". */
-  action?: { label: string; onPress: () => void; pressed?: boolean; testID?: string };
+  /** One text action, such as "Show them" or "Try again", or a link out, such as an error's "Set up your own". */
+  action?: { label: string; onPress: () => void; pressed?: boolean; testID?: string } | { label: string; href: string; testID?: string };
   /** `alert` for an error that just happened, `status` for a condition shown as the page loads. */
   role?: "alert" | "status";
   testID?: string;
@@ -53,7 +54,13 @@ export function Alert({
         <View style={styles.grow}>
           {title ? <Text style={[styles.title, { fontFamily: ui.font, color: ui.color("ink") }]}>{title}</Text> : null}
           {body}
-          {action ? (
+          {action && "href" in action ? (
+            <View style={styles.action}>
+              <ExternalLink href={action.href} hitSlop={TOUCH} style={[styles.actionLabel, { fontFamily: ui.font, color: ui.color("accent") }]} color={ui.color("accent")} testID={action.testID}>
+                {action.label}
+              </ExternalLink>
+            </View>
+          ) : action ? (
             <Pressable
               role="button"
               aria-pressed={action.pressed}
@@ -69,6 +76,9 @@ export function Alert({
     </View>
   );
 }
+
+/** A 20 pt line reaches 44 pt to touch on a phone. */
+const TOUCH = { top: 12, bottom: 12, left: 0, right: 8 };
 
 const styles = StyleSheet.create({
   ground: { borderRadius: 10 },

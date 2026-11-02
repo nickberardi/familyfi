@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { request } from "@/lib/api";
+import { errorNotice, type ErrorNotice } from "@/lib/api-client";
 import {
   CHECKUP_COPY as COPY,
   leftoverRemovalNotice,
@@ -27,7 +28,7 @@ export default function CheckupPage() {
   const { rules, groups, unifi, store, busy } = useAppData();
   const [checkup, setCheckup] = useState<CheckupState | null>(null);
   const [checking, setChecking] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const [notice, setNotice] = useState("");
   // The leftover policies waiting on the administrator's confirmation.
   const [confirming, setConfirming] = useState<CheckupPolicy[] | null>(null);
@@ -42,7 +43,7 @@ export default function CheckupPage() {
       const next = await loadCheckup(request);
       if (gen === loadGen.current) setCheckup(next);
     } catch (err) {
-      if (gen === loadGen.current) setError(err instanceof Error ? err.message : String(err));
+      if (gen === loadGen.current) setError(errorNotice(err, String(err)));
     }
   }, []);
 
@@ -56,14 +57,14 @@ export default function CheckupPage() {
 
   /** A write that returns the checkup, then a reload so the nav badge follows. */
   async function write(run: () => Promise<CheckupState>) {
-    setError("");
+    setError(null);
     setNotice("");
     loadGen.current += 1;
     try {
       setCheckup(await run());
       void store.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorNotice(err, String(err)));
     }
   }
 
@@ -106,8 +107,8 @@ export default function CheckupPage() {
       <PageHeader title={COPY.title} sub={COPY.sub} />
       {error ? (
         <div className="mx-4 mt-4 md:mx-6">
-          <Alert tone="danger" role="alert">
-            {error}
+          <Alert tone="danger" role="alert" action={error.link ? { label: error.link.label, href: error.link.url, testID: "error-link" } : undefined}>
+            {error.text}
           </Alert>
         </div>
       ) : null}
