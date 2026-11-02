@@ -202,7 +202,7 @@ export function createHouseholdStore(deps: {
     if (offlineGuard) {
       // Keep what is shown, but say it may be out of date. A write's own failure message,
       // already shown, says more than this one, so it stays.
-      set({ loaded: true, stale: true, unreachable: error instanceof TransportError, error: state.error || offlineGuard.stale });
+      set({ loaded: true, stale: true, unreachable: error instanceof TransportError, error: state.error || offlineGuard.stale, errorLink: state.error ? state.errorLink : null });
     } else {
       // The first load says why it failed; a later refresh keeps the page as it is.
       if (!state.loaded) loadFailure = error instanceof Error ? error.message : "Request failed.";
