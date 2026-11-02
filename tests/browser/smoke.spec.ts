@@ -35,7 +35,7 @@ test("sign-in and household pages", async ({ page }) => {
   test.skip(!password, "FAMILYFI_DEFAULT_PASSWORD is required for browser tests");
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "FamilyFi" })).toBeVisible();
-  await expect(page.getByText(/v0\.\d+\.\d+/)).toBeVisible();
+  await expect(page.getByText(/v\d+\.\d+\.\d+/)).toBeVisible();
   const usernameBox = page.getByLabel("Username");
   await expect(usernameBox).toHaveCSS("font-size", "16px");
 
