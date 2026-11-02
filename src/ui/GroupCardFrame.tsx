@@ -8,7 +8,7 @@ import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 import { CardButton, CardTextButton, type ZoneAction } from "./CardActions";
-import { GroupCardHeader } from "./GroupCardHeader";
+import { GROUP_TILE_INSET, GroupCardHeader } from "./GroupCardHeader";
 import { useUI } from "./UIContext";
 import { useLargeText } from "./use-large-text";
 import { useWide } from "./use-wide";
@@ -99,8 +99,8 @@ export function GroupCardFrame({
 }
 
 const HEADER_PAD = 18;
-/** Where a things card's words start: past its 44 pt monogram tile and the 12 pt gap. */
-const THINGS_TEXT_INSET = HEADER_PAD + 44 + 12;
+/** Where a things card's words start: past its monogram tile. */
+const THINGS_TEXT_INSET = HEADER_PAD + GROUP_TILE_INSET;
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, overflow: "hidden" },

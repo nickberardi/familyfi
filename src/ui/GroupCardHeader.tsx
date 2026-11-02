@@ -20,6 +20,9 @@ import { useWide } from "./use-wide";
  * around it (open or closed, marks, actions) belongs to the caller. A stacked card shows a person's
  * monogram too (`mark`), and its note in the card's body instead (`note={false}`).
  */
+/** How far a card's words sit past its monogram tile: the 44 pt tile and the 12 pt gap. */
+export const GROUP_TILE_INSET = 44 + 12;
+
 export function GroupCardHeader({
   group,
   rules,
@@ -92,9 +95,11 @@ export function GroupCardHeader({
   );
 }
 
+const TILE = 44;
+
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 12, flex: 1 },
-  tile: { width: 44, height: 44, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: GROUP_TILE_INSET - TILE, flex: 1 },
+  tile: { width: TILE, height: TILE, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   person: { borderRadius: 22 },
   words: { flex: 1, minWidth: 0 },
   title: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 2 },
