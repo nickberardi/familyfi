@@ -59,10 +59,10 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
         <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
           <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
             <div className="min-w-0 flex-1">
-              {/* One name for the heading, "Blocked, until 1:26 PM by Nick", not the badge and line run together. */}
+              {/* One name for the heading, "Blocked, Until 1:26 PM by Nick", not the badge and line run together. */}
               <h2
                 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14px] font-normal"
-                aria-label={status.detail ? `${groupBadge(status.badge).label}, ${status.detail.charAt(0).toLowerCase()}${status.detail.slice(1)}` : groupBadge(status.badge).label}
+                aria-label={status.detail ? `${groupBadge(status.badge).label}, ${status.detail}` : groupBadge(status.badge).label}
               >
                 <StatusBadge badge={status.badge} />
                 {status.detail ? <span style={{ color: groupDetailColor(status.change) }}>{status.detail}</span> : null}
