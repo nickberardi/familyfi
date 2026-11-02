@@ -882,6 +882,24 @@ describe("household rules", () => {
       expect(await errorCode(await unblockAction(unblockGroup, auth, emma.id, { until: inMinutes(-5).toISOString() }))).toEqual([400, "invalid_request"]);
     });
 
+    it("leaves an always-on category, app or website rule on, but lifts an always-on internet rule", async () => {
+      const auth = await signedIn();
+      const emma = await child();
+      const tiktok = await ruleOf(await postRule(auth, { name: "No TikTok", kind: "domain", groupIds: [emma.id], domains: ["tiktok.com"], mode: "always" }));
+      // How the group is set up is not a block on it: alone, there is nothing to unblock.
+      expect(await errorCode(await unblockAction(unblockGroup, auth, emma.id))).toEqual([409, "not_blocked"]);
+
+      const grounded = await ruleOf(await postRule(auth, { name: "Grounded", kind: "internet", groupIds: [emma.id], mode: "always" }));
+      expect((await unblockAction(unblockGroup, auth, emma.id)).status).toBe(200);
+      expect((await liftOf(grounded.id, emma.id)).pauseKind).toBe("allow");
+      expect((await liftOf(tiktok.id, emma.id)).pauseActive).toBe(false);
+
+      // Given a time, every other rule is lifted, but not this one.
+      await groupAction(pause, auth, emma.id);
+      expect((await unblockAction(unblockGroup, auth, emma.id, { until: inMinutes(60).toISOString() })).status).toBe(200);
+      expect((await liftOf(tiktok.id, emma.id)).pauseActive).toBe(false);
+    });
+
     it("ends the group's own pause even when no rule blocks it", async () => {
       const auth = await signedIn();
       const emma = await child();

@@ -6706,10 +6706,19 @@
       },
       "expected": {
         "action": {
-          "label": "Unblock",
-          "run": "unblock"
+          "label": "Block",
+          "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": [
+          {
+            "label": "Pause TV video evenings",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video evenings"
+          }
+        ]
       }
     },
     {
@@ -7118,7 +7127,8 @@
           "label": "Unblock",
           "run": "unblock"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -7527,7 +7537,8 @@
           "label": "Block",
           "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -7938,7 +7949,8 @@
         "more": {
           "label": "More time",
           "run": "moreBlock"
-        }
+        },
+        "menu": []
       }
     },
     {
@@ -8356,7 +8368,8 @@
           "label": "Unblock",
           "run": "unblockNow"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -8790,7 +8803,8 @@
         "more": {
           "label": "More time",
           "run": "moreUnblock"
-        }
+        },
+        "menu": []
       }
     },
     {
@@ -9263,7 +9277,8 @@
           "label": "Resume",
           "run": "resume"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -9720,7 +9735,8 @@
           "label": "Block",
           "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -10161,7 +10177,8 @@
           "label": "Block",
           "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -10582,7 +10599,8 @@
           "label": "Block",
           "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -10843,7 +10861,8 @@
           "label": "Unblock",
           "run": "unblock"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -11259,10 +11278,26 @@
       },
       "expected": {
         "action": {
-          "label": "Unblock",
-          "run": "unblock"
+          "label": "Block",
+          "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": [
+          {
+            "label": "Pause No social",
+            "ruleIds": [
+              "r-social"
+            ],
+            "name": "No social"
+          },
+          {
+            "label": "Pause TV video evenings",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video evenings"
+          }
+        ]
       }
     },
     {
@@ -11781,7 +11816,8 @@
           "label": "Block",
           "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -11847,7 +11883,8 @@
           "label": "Block",
           "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
     },
     {
@@ -16426,7 +16463,7 @@
         ],
         "mode": "pause"
       },
-      "expected": "Lifts Video for TV only. For… and Until… lift every rule TV has for that time. The rules stay as they are for everyone else."
+      "expected": "Lifts Video for TV only. For… and Until… lift every rule TV has for that time, except ones that always block a category, app or website. The rules stay as they are for everyone else."
     },
     {
       "fn": "unblockSheetBody",
@@ -16468,7 +16505,7 @@
         ],
         "mode": "pause"
       },
-      "expected": "Ends the block and lifts Dinner and Video for TV only. For… and Until… lift every rule TV has for that time. The rules stay as they are for everyone else."
+      "expected": "Ends the block and lifts Dinner and Video for TV only. For… and Until… lift every rule TV has for that time, except ones that always block a category, app or website. The rules stay as they are for everyone else."
     },
     {
       "fn": "unblockSheetBody",
@@ -20343,8 +20380,857 @@
           "label": "Block",
           "run": "block"
         },
-        "more": null
+        "more": null,
+        "menu": []
       }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "only an always-on website rule blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-tiktok",
+            "name": "No TikTok",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "tiktok.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Block",
+          "run": "block"
+        },
+        "more": null,
+        "menu": [
+          {
+            "label": "Pause No TikTok",
+            "ruleIds": [
+              "r-tiktok"
+            ],
+            "name": "No TikTok"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "a scheduled category rule and an always-on website rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-tiktok",
+            "name": "No TikTok",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "tiktok.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Block",
+          "run": "block"
+        },
+        "more": null,
+        "menu": [
+          {
+            "label": "Pause TV video evenings",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video evenings"
+          },
+          {
+            "label": "Pause No TikTok",
+            "ruleIds": [
+              "r-tiktok"
+            ],
+            "name": "No TikTok"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "an internet window blocking with an always-on website rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-tiktok",
+            "name": "No TikTok",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "tiktok.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T23:30:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Unblock",
+          "run": "unblock"
+        },
+        "more": null,
+        "menu": []
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "only an always-on website rule blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-tiktok",
+            "name": "No TikTok",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "tiktok.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Dinner at 6:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "rulesToUnblock",
+      "name": "leaves out an always-on website rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-tiktok",
+            "name": "No TikTok",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "tiktok.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-video",
+          "kind": "category",
+          "name": "Video",
+          "until": "2026-10-15T22:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "fn": "rulesToUnblock",
+      "name": "keeps an always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-grounded",
+            "name": "Grounded",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-tiktok",
+            "name": "No TikTok",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "tiktok.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": [
+        {
+          "ruleId": "r-grounded",
+          "kind": "internet",
+          "name": "Grounded",
+          "until": null
+        }
+      ]
+    },
+    {
+      "fn": "standingRule",
+      "name": "an always-on website rule",
+      "input": {
+        "rule": {
+          "kind": "domain",
+          "mode": "always"
+        }
+      },
+      "expected": true
+    },
+    {
+      "fn": "standingRule",
+      "name": "an always-on internet rule",
+      "input": {
+        "rule": {
+          "kind": "internet",
+          "mode": "always"
+        }
+      },
+      "expected": false
+    },
+    {
+      "fn": "standingRule",
+      "name": "a scheduled category rule",
+      "input": {
+        "rule": {
+          "kind": "category",
+          "mode": "scheduled"
+        }
+      },
+      "expected": false
     },
     {
       "fn": "rulesBlockingGroup",

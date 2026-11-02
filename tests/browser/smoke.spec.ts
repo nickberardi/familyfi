@@ -35,7 +35,7 @@ test("sign-in and household pages", async ({ page }) => {
   test.skip(!password, "FAMILYFI_DEFAULT_PASSWORD is required for browser tests");
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "FamilyFi" })).toBeVisible();
-  await expect(page.getByText(/v0\.\d+\.\d+/)).toBeVisible();
+  await expect(page.getByText(/v\d+\.\d+\.\d+/)).toBeVisible();
   const usernameBox = page.getByLabel("Username");
   await expect(usernameBox).toHaveCSS("font-size", "16px");
 
@@ -1056,7 +1056,7 @@ test("Block names its scope and can be undone", { tag: "@desktop" }, async ({ pa
   }
 });
 
-test("a group card's one button, its schedule link, Show less, and a rule paused on the details page", { tag: "@desktop" }, async ({ page }) => {
+test("a group card's one button and its rule dropdown, its schedule link, Show less, and a rule paused on the details page", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const name = `QA card ${test.info().project.name} ${Date.now() % 100000}`;
   const made = await page.request.post("/api/v1/groups", { headers: await csrfHeaders(page), data: { name, kind: "family", familyRole: "child" } });
@@ -1072,20 +1072,38 @@ test("a group card's one button, its schedule link, Show less, and a rule paused
   try {
     await page.goto("/family");
     const card = page.locator("article").filter({ has: page.getByTestId(`filter-marks-${group.id}`) });
-    // Closed, the card shows no button; open, its one button is Unblock, since Video blocks it now.
-    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toHaveCount(0);
+    // Closed, the card shows no button. Open, an always-on Video rule is how the group is set up, not
+    // a block on it, so its one button is Block, with the rule's Pause in the dropdown beside it.
+    await expect(card.getByTestId(`group-action-block-${group.id}`)).toHaveCount(0);
     await card.locator("button[aria-expanded=false]").first().click();
-    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toBeVisible();
-    await expect(card.getByRole("button", { name: "Pause", exact: true })).toHaveCount(0);
-    await expect(card.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
-    await card.getByTestId(`group-show-less-${group.id}`).click();
+    await expect(card.getByTestId(`group-action-block-${group.id}`)).toBeVisible();
     await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toHaveCount(0);
+    await expect(card.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
+    await card.getByRole("button", { name: `Pause a rule for ${name}` }).click();
+    await page.keyboard.press("Escape");
+    const choice = card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`);
+    await expect(choice).toHaveCount(0);
+    // Escape hands focus back to the caret.
+    await expect(card.getByRole("button", { name: `Pause a rule for ${name}` })).toBeFocused();
+    await card.getByRole("button", { name: `Pause a rule for ${name}` }).click();
+    await expect(choice).toHaveText(`Pause ${name} video`);
+    await choice.click();
+    // The dropdown's choice opens the rule's own pause sheet, for this group alone.
+    const fromCard = page.getByRole("dialog", { name: `Pause ${name} video for ${name}?` });
+    const pausedFromCard = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
+    await fromCard.getByRole("button", { name: /For 30 minutes/ }).click();
+    expect((await pausedFromCard).ok()).toBeTruthy();
+    await expect(card.getByRole("button", { name: `Pause a rule for ${name}` })).toHaveCount(0);
+    await card.getByTestId(`group-show-less-${group.id}`).click();
+    await expect(card.getByTestId(`group-action-block-${group.id}`)).toHaveCount(0);
 
     await card.locator("button[aria-expanded=false]").first().click();
     await card.getByRole("link", { name: "Pause or change schedules →" }).click();
     await expect(page).toHaveURL(new RegExp(`/family/${group.id}$`));
 
-    // On the details page the rule pauses for this group alone, and resumes.
+    // On the details page the rule resumes for this group alone, and pauses again.
+    await expect(page.getByTestId(`schedule-${group.id}`).getByText(/Paused until /)).toBeVisible();
+    await page.getByTestId(`schedule-resume-${rule.id}-${group.id}`).click();
     await page.getByTestId(`schedule-pause-${rule.id}-${group.id}`).click();
     const sheet = page.getByRole("dialog", { name: new RegExp(`^Pause .* for ${name}\\?$`) });
     const paused = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));

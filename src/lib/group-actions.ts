@@ -18,15 +18,20 @@ import type { Actor, Group } from "./types";
  * Apple Watch ports it, and `tests/fixtures/display-vectors.json` pins it.
  *
  * A group as a whole is blocked and unblocked: Block blocks all its internet, and Unblock lifts
- * whatever is blocking it now, of any kind. A single rule under a group is paused and resumed,
- * for that group alone. Either way the rule itself never changes, and a place shows one button
- * for its state, never its opposite beside it.
+ * whatever is blocking it now, of any kind, except an always-on category, app or website rule,
+ * which is how the group is set up rather than a block on it. A single rule under a group is
+ * paused and resumed, for that group alone, from the card's dropdown or the group's page. Either
+ * way the rule itself never changes, and a place shows one button for its state, never its
+ * opposite beside it.
  */
 
 /** What a tap on the group's header button, or its More time link, does. */
 export type GroupRun = "block" | "moreBlock" | "unblock" | "unblockNow" | "resume" | "moreUnblock";
 
 export type GroupActionSpec = { label: string; run: GroupRun };
+
+/** A choice in the dropdown beside the card's Block or Resume: pause one rule for the card's group, from its sheet. */
+export type GroupMenuItem = { label: string; ruleIds: string[]; name: string };
 
 /** What a tap on a rule area's button, or its More time link, does for the card's group. */
 export type GroupRuleRun = "pause" | "resume" | "extend";
@@ -54,6 +59,21 @@ export function rulesBlockingGroup(group: Pick<Group, "id">, rules: Rule[], time
       return [{ ruleId: rule.id, kind: rule.kind, name: blockingName(rule, now, timezone), until: ends?.toISOString() ?? null }];
     })
     .sort((a, b) => lasts(b.until) - lasts(a.until));
+}
+
+/**
+ * An always-on category, app or website rule: how the group is set up, not a block on it now. The
+ * card's badge, line and button leave it out, and an unblock never lifts it; it is paused from the
+ * card's dropdown or the group's page. An always-on internet rule blocks all internet, so it counts.
+ */
+export function standingRule(rule: Pick<Rule, "kind" | "mode">): boolean {
+  return rule.kind !== "internet" && rule.mode === "always";
+}
+
+/** The rules blocking the group now that its Unblock lifts: `rulesBlockingGroup` without its standing rules. */
+export function rulesToUnblock(group: Pick<Group, "id">, rules: Rule[], timezone: string, now: Date): BlockingRule[] {
+  const standing = new Set(rules.filter(standingRule).map((rule) => rule.id));
+  return rulesBlockingGroup(group, rules, timezone, now).filter((rule) => !standing.has(rule.ruleId));
 }
 
 /** "Video" for a category FamilyFi knows, an internet rule's window ("Dinner"), else the rule's name. */
@@ -167,7 +187,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
       ? blocked("paused", `Blocked ${until(end, "")}${by(who)}`, `${until(end, "")}${by(who)}`, "blocked")
       : blocked("paused", `Blocked${by(who)} until you unblock`, who ? `until you unblock, by ${who.name}` : "until you unblock", "blocked");
   }
-  const blocking = rulesBlockingGroup(group, rules, timezone, now);
+  const blocking = rulesToUnblock(group, rules, timezone, now);
   const internet = blocking.find((rule) => rule.kind === "internet");
   if (internet) {
     const detail = `${internet.name} ${until(internet.until, "· always")}`;
@@ -241,27 +261,41 @@ export function groupDetailColor(change: GroupStatusParts["change"]): string {
 }
 
 /**
- * The group's one header button, and its More time link while a timed block or unblock lasts.
- * Block blocks all internet; Unblock lifts whatever blocks it now (at once when only its own block
- * does, otherwise from a sheet); Resume ends an unblock.
+ * The group's one header button, its More time link while a timed block or unblock lasts, and,
+ * while the group has the internet, a dropdown pausing each category, app or website rule blocking
+ * part of it now, scheduled ones first. Block blocks all internet; Unblock lifts whatever blocks it
+ * now but its standing rules (at once when only its own block does, otherwise from a sheet); Resume
+ * ends an unblock.
  */
 export function groupHeaderActions(
   group: Group,
   rules: Rule[],
   timezone: string,
   now: Date,
-): { action: GroupActionSpec; more: GroupActionSpec | null } {
-  const blocking = rulesBlockingGroup(group, rules, timezone, now);
+): { action: GroupActionSpec; more: GroupActionSpec | null; menu: GroupMenuItem[] } {
+  const blocking = rulesToUnblock(group, rules, timezone, now);
   if (group.suspension.active) {
     return {
       action: { label: "Unblock", run: blocking.length ? "unblock" : "unblockNow" },
       more: group.suspension.until ? { label: "More time", run: "moreBlock" } : null,
+      menu: [],
     };
   }
-  if (blocking.length) return { action: { label: "Unblock", run: "unblock" }, more: null };
+  if (blocking.some((rule) => rule.kind === "internet")) return { action: { label: "Unblock", run: "unblock" }, more: null, menu: [] };
+  const menu = groupRuleMenu(group, rules, timezone, now);
   const unblock = groupUnblock(group, rules, now);
-  if (unblock) return { action: { label: "Resume", run: "resume" }, more: unblock.until ? { label: "More time", run: "moreUnblock" } : null };
-  return { action: { label: "Block", run: "block" }, more: null };
+  if (unblock) return { action: { label: "Resume", run: "resume" }, more: unblock.until ? { label: "More time", run: "moreUnblock" } : null, menu };
+  return { action: { label: "Block", run: "block" }, more: null, menu };
+}
+
+/** The dropdown's choices: "Pause" each category, app or website rule blocking the group now, scheduled ones first. */
+function groupRuleMenu(group: Group, rules: Rule[], timezone: string, now: Date): GroupMenuItem[] {
+  const partial = rulesBlockingGroup(group, rules, timezone, now).filter((rule) => rule.kind !== "internet");
+  const ordered = [...partial.filter((rule) => rule.until !== null), ...partial.filter((rule) => rule.until === null)];
+  return ordered.flatMap((blocking) => {
+    const rule = rules.find((candidate) => candidate.id === blocking.ruleId);
+    return rule ? [{ label: `Pause ${rule.name}`, ruleIds: [rule.id], name: rule.name }] : [];
+  });
 }
 
 /**

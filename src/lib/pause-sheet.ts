@@ -193,7 +193,8 @@ export function rulePauseSheetCustom(rule: Pick<Rule, "pause">, custom: CustomPa
 /*
  * A group's unblock: whatever blocks it now stops, for this group alone. Its first choice lifts
  * each rule blocking now until that rule's windows end; For… and Until… lift every rule the group
- * has for the time chosen. `blocking` is `rulesBlockingGroup`, longest first.
+ * has for the time chosen. Neither lifts an always-on category, app or website rule
+ * (`standingRule`). `blocking` is `rulesToUnblock`, longest first.
  */
 
 export function unblockSheetTitle(group: Pick<Group, "name">, mode: PauseSheetMode): string {
@@ -204,7 +205,7 @@ export function unblockSheetBody(group: Pick<Group, "name" | "suspension">, bloc
   if (mode === "extend") return "Its rules stay lifted for longer. Resume brings them back sooner.";
   const what = blocking.length ? listNames(blocking.map((rule) => rule.name)) : "its rules";
   const lifts = group.suspension.active ? `Ends the block and lifts ${what}` : `Lifts ${what}`;
-  return `${lifts} for ${group.name} only. For… and Until… lift every rule ${group.name} has for that time. The rules stay as they are for everyone else.`;
+  return `${lifts} for ${group.name} only. For… and Until… lift every rule ${group.name} has for that time, except ones that always block a category, app or website. The rules stay as they are for everyone else.`;
 }
 
 export function unblockSheetOptions(
