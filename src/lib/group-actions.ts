@@ -165,7 +165,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     const { until: end, by: who } = group.suspension;
     return end
       ? blocked("paused", `Blocked ${until(end, "")}${by(who)}`, `${until(end, "")}${by(who)}`, "blocked")
-      : blocked("paused", `Blocked${by(who)} until you unblock`, `${by(who).trim()} until you unblock`.trim(), "blocked");
+      : blocked("paused", `Blocked${by(who)} until you unblock`, who ? `by ${who.name}, until you unblock` : "until you unblock", "blocked");
   }
   const blocking = rulesBlockingGroup(group, rules, timezone, now);
   const internet = blocking.find((rule) => rule.kind === "internet");

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GROUP_DETAIL_COPY, GROUP_EDIT_COPY, groupDetailSub, rulesNeedDevice } from "@/lib/group-form";
 import { runGroupCardAction, type GroupCardRun } from "@/lib/group-writes";
-import { groupBadge, groupDetailColor, groupStatusParts } from "@/lib/group-actions";
+import { groupDetailColor, groupStatusParts } from "@/lib/group-actions";
+import { StatusBadge } from "@/ui/StatusBadge";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
 import { groupCardControls } from "@/ui/group-card-controls";
 import { deviceName } from "@/lib/device-assign";
@@ -46,7 +47,6 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
   const now = new Date();
   const windows = internetWindowsForGroup(rules, group.id, now);
   const status = groupStatusParts(group, rules, timezone, now);
-  const badge = groupBadge(status.badge);
   const run = (tap: GroupCardRun) => runGroupCardAction(store.mutate, group, tap, setSheet);
   const header = groupCardControls(group, rules, timezone, now, run, !busy);
 
@@ -60,9 +60,9 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
           <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
             <div className="min-w-0 flex-1">
               <h2 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14px] font-normal">
-                <span className="shrink-0 rounded-full px-2 py-px font-semibold leading-5" style={{ color: badge.ink, background: badge.fill }}>
-                  {badge.label}
-                </span>{" "}
+                <StatusBadge badge={status.badge} />
+                {/* Read as "Blocked, until 1:26 PM by Nick", not one run-on phrase. */}
+                <span className="sr-only">, </span>
                 {status.detail ? <span style={{ color: groupDetailColor(status.change) }}>{status.detail}</span> : null}
               </h2>
               <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>

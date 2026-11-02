@@ -3,12 +3,13 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { cardNoteLine } from "@/lib/display";
-import { groupBadge, groupDetailColor, groupStatusParts } from "@/lib/group-actions";
+import { groupDetailColor, groupStatusParts } from "@/lib/group-actions";
 import { groupMonogram, personMonogram } from "@/lib/internet-zone";
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
+import { StatusBadge } from "./StatusBadge";
 import { tokenOf, useUI } from "./UIContext";
 import { useWide } from "./use-wide";
 
@@ -41,7 +42,6 @@ export function GroupCardHeader({
   const ui = useUI();
   const monogram = groupMonogram(group);
   const status = groupStatusParts(group, rules, timezone, now);
-  const badge = groupBadge(status.badge);
   const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
   const wide = useWide();
 
@@ -83,12 +83,7 @@ export function GroupCardHeader({
           >
             {group.name}
           </Text>
-          <Text
-            testID={`group-badge-${group.id}`}
-            style={[styles.badge, { fontFamily: ui.font, color: ui.color(tokenOf(badge.ink)), backgroundColor: ui.color(tokenOf(badge.fill)) }]}
-          >
-            {badge.label}
-          </Text>
+          <StatusBadge badge={status.badge} testID={`group-badge-${group.id}`} />
         </View>
         {status.detail ? <Text style={[body, styles.detail, { color: ui.color(tokenOf(groupDetailColor(status.change))) }]}>{status.detail}</Text> : null}
         {note ? <Text style={[body, { marginTop: 2, color: ui.color("ink-3") }]}>{cardNoteLine(group, windows)}</Text> : null}
@@ -103,7 +98,5 @@ const styles = StyleSheet.create({
   person: { borderRadius: 22 },
   words: { flex: 1, minWidth: 0 },
   title: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 2 },
-  // A state badge: tinted and round, never the grey square Tag that names a kind of thing.
-  badge: { flexShrink: 0, overflow: "hidden", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1, fontSize: 14, lineHeight: 20, fontWeight: "600" },
   detail: { marginTop: 2 },
 });
