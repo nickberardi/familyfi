@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
-import { ErrorLine } from "@/components/ErrorLine";
+import { ErrorNote } from "@/ui/ErrorNote";
 import { api } from "@/lib/api";
 import { errorNotice, type ErrorNotice } from "@/lib/api-client";
 import { BACKUP_COPY as COPY, importSummaryLines } from "@/lib/backup-copy";
@@ -117,7 +117,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
         </div>
       ) : null}
       {done ? <p className="text-[14px] text-[var(--ff-ink)]" role="status">{COPY.done}</p> : null}
-      {error ? <ErrorLine notice={error} className="text-[14px] text-[var(--ff-danger)]" /> : null}
+      {error ? <ErrorNote notice={error} /> : null}
     </div>
   );
 }

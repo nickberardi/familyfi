@@ -773,6 +773,26 @@ describe("household store with an offline guard (a phone)", () => {
     expect(server.calls.some((call) => call.method === "POST")).toBe(false);
   });
 
+  it("keeps a write's error and its link when a refresh then fails", async () => {
+    const link = { label: "Set up your own", url: "https://github.com/nickberardi/familyfi#install" };
+    let reachable = true;
+    const routes = reads(() => childGroup());
+    const { store } = setup(
+      {
+        ...routes,
+        "GET /api/v1/groups": () => (reachable ? routes["GET /api/v1/groups"]!(undefined) : offline()),
+        "POST /api/v1/rules/quarantine/on": () => ({ status: 403, json: { error: { code: "demo_locked", message: "This is a shared demo.", link } } }),
+      },
+      { offlineGuard: GUARD },
+    );
+    await store.reload();
+    await store.mutate((send) => send("/api/v1/rules/quarantine/on", { method: "POST" }));
+    await flush();
+    reachable = false;
+    await store.reload();
+    expect(store.getState()).toMatchObject({ stale: true, error: "This is a shared demo.", errorLink: link });
+  });
+
   it("tells a refused refresh from one that reached nothing", async () => {
     const routes = reads(() => childGroup());
     const { store } = setup(

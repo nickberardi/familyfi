@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ErrorLine } from "@/components/ErrorLine";
+import { ErrorNote } from "@/ui/ErrorNote";
 import { api, ApiError } from "@/lib/api";
 import { apiErrorNotice, type ErrorNotice } from "@/lib/api-client";
 import { addressConflict, canPin, routeForAddress } from "@/lib/connection-routes";
@@ -185,7 +185,7 @@ export function RouteForm({
               </button>
             </div>
           ) : null}
-          {readError ? <ErrorLine notice={readError} className="font-semibold text-[var(--ff-danger)]" /> : null}
+          {readError ? <ErrorNote notice={readError} style={{ fontWeight: "600" }} /> : null}
           {read ? (
             <p data-testid="certificate-read" className="leading-5">
               {read.subject} · issued by {read.issuer} · expires {expiry(read.validTo)}
@@ -220,7 +220,7 @@ export function RouteForm({
         </p>
       )}
       {extra}
-      {error ? <ErrorLine notice={error} className="font-semibold text-[var(--ff-danger)]" /> : null}
+      {error ? <ErrorNote notice={error} style={{ fontWeight: "600" }} /> : null}
       <div className="flex flex-wrap justify-end gap-2">
         {onCancel ? (
           <button type="button" className={CANCEL_BUTTON} onClick={onCancel}>
