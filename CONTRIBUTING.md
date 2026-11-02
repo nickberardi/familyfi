@@ -1,5 +1,28 @@
 # Contributing
 
+FamilyFi is a Next.js app with PostgreSQL. Its `/api/v1` HTTP API is shared by the web app, the [mobile app](https://github.com/nickberardi/familyfi-mobile) and AI agents. The [README](README.md) and the [user guide](https://github.com/nickberardi/familyfi/wiki) are for households running FamilyFi; this page and `docs/` are for people working on it.
+
+## Run from source
+
+```bash
+cp .env.example .env   # set POSTGRES_PASSWORD
+make setup
+make dev               # http://localhost:3000
+```
+
+Set `FAMILYFI_MODE=dev` to use a mock gateway and a seeded household instead of a real UniFi console, and add `DB_MODE=memory` to skip PostgreSQL too. [Setup](docs/setup.md#local-development) has the details.
+
+| Reference | |
+| --- | --- |
+| [Setup](docs/setup.md) | Every environment setting, modes, running from source, sidecars |
+| [Operations](docs/operations.md) | Backup and restore, remote access, upgrades, releases |
+| [Architecture](docs/architecture.md) | How enforcement, schedules and DNS reports work |
+| [API](docs/api.md) | The HTTP contract and authentication ([OpenAPI](openapi/familyfi.v1.yaml)) |
+| [Development](docs/development.md) and [testing](docs/testing.md) | Conventions, commands and checks |
+| [Design system](docs/design.md) | How FamilyFi looks and reads, kept in step with the design project |
+
+## Pull requests
+
 See [docs/licensing.md](docs/licensing.md). Sending a pull request accepts the contributor terms below.
 
 Do not send patches that assume MIT/Apache terms, and do not commit `/designs/`, `.env` files, UniFi keys, or unsanitized household API responses.
