@@ -55,6 +55,11 @@
         "test-infrastructure"
       ]
     },
+    "tests/unit/browser-fixtures.test.ts": {
+      "categories": [
+        "test-infrastructure"
+      ]
+    },
     "tests/unit/ci-scripts.test.ts": {
       "categories": [
         "test-infrastructure"

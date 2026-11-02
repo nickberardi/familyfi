@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 
