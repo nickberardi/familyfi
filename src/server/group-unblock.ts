@@ -1,4 +1,5 @@
 import { RuleLiftKind } from "@prisma/client";
+import { standingRule } from "@/lib/group-actions";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
 import { enqueueChange } from "./changes";
@@ -14,7 +15,7 @@ const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: nul
 
 /**
  * Unblocks a group: whatever blocks it now stops, for this group alone, whichever kind of rule
- * it is. The group's own pause ends, and each rule blocking it now is allowed for the group until
+ * it is, except an always-on category, app or website rule (`standingRule`), which stays on. The group's own pause ends, and each rule blocking it now is allowed for the group until
  * its active windows end, or every rule it has until `until`. An allowance, one per rule, so its
  * devices leave the rule's policies and the rule itself is untouched. `end` and `extend` act on
  * those allowances together: `extend` gives each timed one the same new end, the latest plus `minutes`. Returns `{ group, rules, change }`, `rules` being the group's own.
@@ -44,9 +45,11 @@ export async function runGroupUnblock(
     const block = blockRuleOf(existing);
     const blockedByPause = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
     // A rule paused for everyone, or paused for this group, is not blocking it. One this group is
-    // already allowed is included, so an unblock can be given a new time.
+    // already allowed is included, so an unblock can be given a new time. An always-on category,
+    // app or website rule is how the group is set up, not a block on it: an unblock leaves it on.
     const candidates = links.filter(
-      ({ rule, ...link }) => rule.enabled && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
+      ({ rule, ...link }) =>
+        rule.enabled && !standingRule(rule) && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
     );
     const ends = new Map(candidates.map(({ rule }) => [rule.id, activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone)] as const));
     // By default only the rules blocking now, each until its own windows end; given a time, every rule.
