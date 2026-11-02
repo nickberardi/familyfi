@@ -47,7 +47,7 @@ export type HouseholdState = {
   /** The last refresh could not reach the server at all (no route answered), rather than being refused. */
   unreachable: boolean;
   error: string;
-  /** Where the error points next, such as the demo's "Set up your own"; shown as the toast's action. Cleared with the error. */
+  /** Where the error points next, such as the demo's "Set up your own": a link under the toast's message, never its action slot. Cleared with the error. */
   errorLink: ErrorLink | null;
   notice: string;
   noticeAction: NoticeAction | null;

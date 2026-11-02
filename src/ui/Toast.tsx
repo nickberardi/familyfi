@@ -1,9 +1,10 @@
 "use client";
 
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ErrorLink } from "@/lib/api-client";
 
+import { ExternalLink } from "./ExternalLink";
 import { useUI } from "./UIContext";
 
 /**
@@ -44,10 +45,9 @@ export function Toast({
         </Text>
         {/* Under the message, not beside it, so a phone keeps the message's width. */}
         {error && errorLink ? (
-          <Pressable role="link" testID="toast-link" hitSlop={TOUCH} onPress={() => void Linking.openURL(errorLink.url)} style={styles.link}>
-            <Text style={[text, { fontWeight: "600", color: ui.color("accent") }]}>{errorLink.label}</Text>
-            <ui.Icon name="arrow-square-out" size={14} color={ui.color("accent")} />
-          </Pressable>
+          <ExternalLink href={errorLink.url} hitSlop={TOUCH} style={[text, styles.link, { color: ui.color("accent") }]} color={ui.color("accent")} testID="toast-link">
+            {errorLink.label}
+          </ExternalLink>
         ) : null}
       </View>
       {!error && actionLabel && onAction ? (
@@ -79,6 +79,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   message: { flex: 1, minWidth: 0, gap: 4 },
-  link: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
+  link: { fontWeight: "600" },
   button: { flexShrink: 0, borderRadius: 4, paddingHorizontal: 6 },
 });

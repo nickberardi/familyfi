@@ -22,12 +22,16 @@ export function ErrorNote({ notice, style, testID }: { notice: ErrorNotice; styl
         style={[styles.link, { fontFamily: ui.font, color: ui.color("accent") }]}
         color={ui.color("accent")}
         testID={testID ? `${testID}-link` : "error-link"}
+        hitSlop={TOUCH}
       >
         {notice.link.label}
       </ExternalLink>
     </View>
   );
 }
+
+/** A 20 pt line reaches 44 pt to touch on a phone. */
+const TOUCH = { top: 12, bottom: 12, left: 0, right: 8 };
 
 const styles = StyleSheet.create({
   note: { gap: 4, alignItems: "flex-start" },
