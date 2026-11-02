@@ -35,7 +35,7 @@ export async function startDemoReset(now = new Date(), exit: () => void = () => 
   return at;
 }
 
-export const DEMO_LOCKED = "This is a shared demo, so you can't change its settings. You can still try groups, rules, devices and pairing a phone.";
+export const DEMO_LOCKED = "Settings and setup are locked in this shared demo. You can still try groups, rules, devices and pairing a phone.";
 
 /**
  * Refuses a configuration write in demo mode, where every visitor shares one household: the gateway,
