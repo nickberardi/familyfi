@@ -342,6 +342,22 @@ test("Settings exports the household and previews an import before replacing any
   await expect(backup.getByRole("button", { name: "Replace the household" })).toHaveCount(0);
 });
 
+test("Settings shows a refused export's message and link instead of saving the error", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const link = { label: "Set up your own", url: "https://github.com/nickberardi/familyfi#install" };
+  await page.route("**/api/v1/settings/export", (route) =>
+    route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: { code: "demo_locked", message: "Settings and setup are locked in this shared demo.", link } }) }),
+  );
+  let downloads = 0;
+  page.on("download", () => downloads++);
+  await page.goto("/settings?tab=maintenance");
+  const backup = page.getByRole("region", { name: "Backup" });
+  await backup.getByRole("link", { name: "Export household" }).click();
+  await expect(backup.getByTestId("backup-export-error")).toContainText("locked in this shared demo");
+  await expect(backup.getByTestId("backup-export-error-link")).toHaveAttribute("href", link.url);
+  expect(downloads).toBe(0);
+});
+
 test("Settings opens on Household and keeps the chosen tab in its address", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/settings");

@@ -507,7 +507,7 @@ export function RemoteAccessCard({
             ) : null}
           </div>
         ) : null}
-        {tunnel?.error ? <div className="font-semibold text-[var(--ff-danger)]">{tunnel.error}</div> : null}
+        {tunnel?.error ? <ErrorNote notice={{ text: tunnel.error }} style={{ fontWeight: "600" }} /> : null}
         {error ? <ErrorNote notice={error} style={{ fontWeight: "600" }} /> : null}
         {noBinary && tunnelChoice ? (
           <div className="text-[var(--ff-muted)]">

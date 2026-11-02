@@ -5,6 +5,7 @@ export const BACKUP_COPY = {
   title: "Backup",
   sub: "Export the household to a file, or restore one.",
   exportLabel: "Export household",
+  exporting: "Exporting…",
   exportNote:
     "A .tar.gz with your groups, rules, devices, administrator logins and settings, and a database dump for a full restore. It holds password hashes but no UniFi key or Cloudflare token: keep it somewhere safe.",
   importLabel: "Import an export",

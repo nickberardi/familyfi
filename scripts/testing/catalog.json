@@ -1143,6 +1143,11 @@
         "settings"
       ]
     },
+    "tests/browser/smoke.spec.ts > Settings shows a refused export's message and link instead of saving the error": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Settings opens on Household and keeps the chosen tab in its address": {
       "categories": [
         "settings"

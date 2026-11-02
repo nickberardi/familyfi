@@ -4,7 +4,7 @@
  * browser's cookie session with its CSRF header (`api.ts`), or a native app's bearer session.
  */
 
-/** Where an error points the person next (`error.link` in an API error): a button's words and its address. */
+/** Where an error points the person next (`error.link` in an API error): the link's words and its address, drawn under the message. */
 export type ErrorLink = { label: string; url: string };
 
 /** A response from the server with an error status; `code` is the API's `error.code`, `link` its `error.link`. */

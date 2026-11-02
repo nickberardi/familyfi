@@ -14,7 +14,7 @@ import { useUI } from "./UIContext";
  */
 export function ErrorNote({ notice, style, testID }: { notice: ErrorNotice; style?: StyleProp<TextStyle>; testID?: string }) {
   const ui = useUI();
-  const text = [{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, color: ui.color("danger") }, style];
+  const text = [{ fontFamily: ui.font, fontSize: 14, lineHeight: 20, color: ui.color("danger") }, style];
   if (!notice.link) return <Text role="alert" style={text} testID={testID}>{notice.text}</Text>;
   return (
     <View role="alert" style={styles.note} testID={testID}>
