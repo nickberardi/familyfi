@@ -110,6 +110,7 @@ describe("interactive and status colours", () => {
     ["a person monogram on its fill", "var(--ff-person-ink)", "var(--ff-person-fill)", CARD],
     ["the Online badge", "var(--ff-status-online-ink)", "var(--ff-status-online-fill)", CARD],
     ["the Blocked badge", "var(--ff-status-blocked-ink)", "var(--ff-status-blocked-fill)", CARD],
+    ["the Limited badge", "var(--ff-status-limited-ink)", "var(--ff-status-limited-fill)", CARD],
     ["an unblock's line on a card", "var(--ff-status-online-ink)", "var(--ff-card)", CARD],
     ["a block's line on a card", "var(--ff-status-blocked-ink)", "var(--ff-card)", CARD],
     ...(["--ff-ink-2", "--ff-ink-3", "--ff-ink-4", "--ff-locked"] as const).flatMap((ink) => [

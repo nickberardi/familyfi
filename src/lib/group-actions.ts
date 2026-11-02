@@ -115,11 +115,11 @@ export type GroupStatus = {
 
 /**
  * A card's status as its badge and the line under it. The badge says whether the group has the
- * internet; the line says why, in grey while its rules do what they always do, in red when someone
+ * internet: Online, Limited while a category, app or website rule blocks part of it, or Blocked; the line says why, in grey while its rules do what they always do, in red when someone
  * blocked it, and in green when someone lifted a block (an unblock, or its internet rule paused).
  */
 export type GroupStatusParts = {
-  badge: "online" | "blocked";
+  badge: "online" | "limited" | "blocked";
   /** The line under the name, or empty when the badge says it all. */
   detail: string;
   /** Who changed what the rules normally do: nobody, a block, or a lift. */
@@ -154,6 +154,8 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     detail: sentence(detail),
     change,
   });
+  // Some of its internet is blocked (a category, app or website rule), so Unblock has something to lift.
+  const limited = (label: string, detail: string): FullStatus => ({ tone: "rule", label, badge: "limited", detail: sentence(detail), change: "none" });
   const blocked = (tone: GroupStatus["tone"], label: string, detail: string, change: GroupStatusParts["change"] = "none"): FullStatus => ({
     tone,
     label,
@@ -176,7 +178,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
   if (blocking.length) {
     const last = blocking[0]!.until;
     const detail = `${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}`;
-    return online("rule", `Online · ${detail}`, detail);
+    return limited(`Online · ${detail}`, detail);
   }
   const unblock = groupUnblock(group, rules, now);
   if (unblock) {
@@ -230,6 +232,7 @@ export function groupStatusColor(tone: GroupStatus["tone"]): string {
 /** The badge beside a card's name: its word, and the `--ff-*` ink and fill it is drawn in. */
 export function groupBadge(badge: GroupStatusParts["badge"]): { label: string; ink: string; fill: string } {
   if (badge === "blocked") return { label: "Blocked", ink: "var(--ff-status-blocked-ink)", fill: "var(--ff-status-blocked-fill)" };
+  if (badge === "limited") return { label: "Limited", ink: "var(--ff-status-limited-ink)", fill: "var(--ff-status-limited-fill)" };
   return { label: "Online", ink: "var(--ff-status-online-ink)", fill: "var(--ff-status-online-fill)" };
 }
 

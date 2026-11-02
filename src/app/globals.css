@@ -151,6 +151,9 @@
   --ff-status-online-fill: var(--ff-on-tint);
   --ff-status-blocked-ink: var(--ff-danger);
   --ff-status-blocked-fill: var(--ff-danger-fill);
+  /* Amber while a category, app or website rule blocks part of its internet. */
+  --ff-status-limited-ink: #a84300; /* --ff-paused, deepened to keep 4.5:1 on its tint */
+  --ff-status-limited-fill: var(--ff-paused-fill-strong);
 
   /*
    * Verdict chips and marks. Five states, each needing its own ink, fill and line,

@@ -14007,7 +14007,7 @@
         "now": "2026-10-15T20:30:00.000Z"
       },
       "expected": {
-        "badge": "online",
+        "badge": "limited",
         "detail": "Video blocked until 6:00 PM",
         "change": "none"
       }
@@ -15538,7 +15538,7 @@
         "now": "2026-10-15T20:30:00.000Z"
       },
       "expected": {
-        "badge": "online",
+        "badge": "limited",
         "detail": "Social and Video blocked until 7:00 PM",
         "change": "none"
       }
@@ -16304,6 +16304,18 @@
         "label": "Blocked",
         "ink": "var(--ff-status-blocked-ink)",
         "fill": "var(--ff-status-blocked-fill)"
+      }
+    },
+    {
+      "fn": "groupBadge",
+      "name": "a group a category, app or website rule blocks part of",
+      "input": {
+        "badge": "limited"
+      },
+      "expected": {
+        "label": "Limited",
+        "ink": "var(--ff-status-limited-ink)",
+        "fill": "var(--ff-status-limited-fill)"
       }
     },
     {
