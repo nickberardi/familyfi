@@ -29,6 +29,7 @@ import { POST as installUpdate } from "@/app/api/v1/settings/update/install/rout
 import { PUT as setUpdateSchedule } from "@/app/api/v1/settings/update/schedule/route";
 import { DELETE as clearResolver, PUT as setResolver } from "@/app/api/v1/upstream/resolver/route";
 import { prisma } from "@/server/db";
+import { DEMO_SET_UP_LINK } from "@/lib/demo";
 import { ensureDemoRoute } from "@/server/demo";
 import { DEV_MOCK_ROGUE_POLICY_ID } from "@/server/unifi/dev-mock";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
@@ -109,7 +110,7 @@ describe("demo mode", () => {
     ];
     for (const response of responses) {
       expect(response.status).toBe(403);
-      expect(((await response.json()) as { error: { code: string } }).error.code).toBe("demo_locked");
+      expect(((await response.json()) as { error: { code: string; link?: unknown } }).error).toMatchObject({ code: "demo_locked", link: DEMO_SET_UP_LINK });
     }
 
     expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toEqual(before);
@@ -139,7 +140,7 @@ describe("demo mode", () => {
     // reads as on rather than as a route nothing has come in through.
     const tunnel = ((await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: { status: string; reachability: unknown } }).tunnel;
     expect(tunnel).toMatchObject({ status: "running", reachability: null });
-    // The demo's shared login is the recovery admin, so its phones pair as a personal administrator.
+    // A phone pairs as a personal administrator, never the recovery admin.
     const accountId = (await pairingAdmin()).id;
     const invite = await createInvite(write(auth, "/api/v1/paired/invites", "POST", { client: "phone", endpointId: route.id, accountId, displayName: "Reviewer iPhone" }));
     expect(invite.status).toBe(201);

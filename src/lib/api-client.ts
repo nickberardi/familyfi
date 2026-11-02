@@ -5,15 +5,41 @@
  */
 
 /** A response from the server with an error status; `code` is the API's `error.code`. */
+/** Where an error points the person next (`error.link` in an API error): a button's words and its address. */
+export type ErrorLink = { label: string; url: string };
+
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly link?: ErrorLink,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+/** The error an API response body carries, read defensively: a `link` is kept only when both its parts are text. */
+export function apiErrorOf(body: unknown, status: number): ApiError {
+  const error = (body as { error?: { code?: unknown; message?: unknown; link?: { label?: unknown; url?: unknown } } } | null)?.error;
+  const message = typeof error?.message === "string" ? error.message : "Request failed.";
+  const code = typeof error?.code === "string" ? error.code : undefined;
+  const link = typeof error?.link?.label === "string" && typeof error.link.url === "string" ? { label: error.link.label, url: error.link.url } : undefined;
+  return new ApiError(message, status, code, link);
+}
+
+/** What a failed action shows: its message, and the error's link when it has one. */
+export type ErrorNotice = { text: string; link?: ErrorLink };
+
+/** `errorNotice`, but only an API error's own message is shown; anything else reads as `fallback`. */
+export function apiErrorNotice(caught: unknown, fallback: string): ErrorNotice {
+  return caught instanceof ApiError ? errorNotice(caught, fallback) : { text: fallback };
+}
+
+export function errorNotice(caught: unknown, fallback: string): ErrorNotice {
+  if (caught instanceof ApiError) return caught.link ? { text: caught.message, link: caught.link } : { text: caught.message };
+  return { text: caught instanceof Error ? caught.message : fallback };
 }
 
 /** No response at all: the server could not be reached, so a write may or may not have landed. */

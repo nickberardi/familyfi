@@ -1,22 +1,27 @@
 "use client";
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+
+import type { ErrorLink } from "@/lib/api-client";
 
 import { useUI } from "./UIContext";
 
 /**
  * The outcome of the last write, shared by every client: the notice (in the "on" colour) or the
- * error (in danger), a notice's action such as Undo, and Dismiss. Where it sits on screen, and how
+ * error (in danger), a notice's action such as Undo or an error's link such as "Set up your own", and Dismiss. Where it sits on screen, and how
  * it is announced, belongs to the caller.
  */
 export function Toast({
   error,
+  errorLink,
   notice,
   actionLabel,
   onAction,
   onDismiss,
 }: {
   error: string;
+  /** Where the error points next; opened in the browser. */
+  errorLink?: ErrorLink | null;
   notice: string;
   /** A notice's action, such as "Undo"; never shown beside an error. */
   actionLabel?: string;
@@ -33,9 +38,18 @@ export function Toast({
       testID="toast"
       style={[styles.toast, { backgroundColor: ui.color("card"), borderColor: ui.color("line"), boxShadow: ui.shadow("toast") }]}
     >
-      <Text testID="toast-message" style={[text, styles.message, { color: ui.color(error ? "danger" : "on") }]}>
-        {message}
-      </Text>
+      <View style={styles.message}>
+        <Text testID="toast-message" style={[text, { color: ui.color(error ? "danger" : "on") }]}>
+          {message}
+        </Text>
+        {/* Under the message, not beside it, so a phone keeps the message's width. */}
+        {error && errorLink ? (
+          <Pressable role="link" testID="toast-link" hitSlop={TOUCH} onPress={() => void Linking.openURL(errorLink.url)} style={styles.link}>
+            <Text style={[text, { fontWeight: "600", color: ui.color("accent") }]}>{errorLink.label}</Text>
+            <ui.Icon name="arrow-square-out" size={14} color={ui.color("accent")} />
+          </Pressable>
+        ) : null}
+      </View>
       {!error && actionLabel && onAction ? (
         <Pressable role="button" testID="toast-action" hitSlop={TOUCH} onPress={onAction} style={styles.button}>
           <Text style={[text, { fontWeight: "600", color: ui.color("accent") }]}>{actionLabel}</Text>
@@ -64,6 +78,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  message: { flex: 1, minWidth: 0 },
+  message: { flex: 1, minWidth: 0, gap: 4 },
+  link: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
   button: { flexShrink: 0, borderRadius: 4, paddingHorizontal: 6 },
 });

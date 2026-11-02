@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { api, ApiError } from "@/lib/api";
+import { ErrorLine } from "@/components/ErrorLine";
+import { api } from "@/lib/api";
+import { apiErrorNotice, type ErrorNotice } from "@/lib/api-client";
 import { askConfirm } from "@/components/ui/ConfirmHost";
 import {
   CLOUDFLARE_AUTOMATIC_GUIDE,
@@ -73,7 +75,7 @@ export function RemoteAccessCard({
   const [editing, setEditing] = useState<string | null>(null);
   const [hostname, setHostname] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const [seen, setSeen] = useState<string | null>(null);
   const [forgotten, setForgotten] = useState("");
   const [checking, setChecking] = useState(false);
@@ -104,7 +106,7 @@ export function RemoteAccessCard({
 
   async function put(body: Record<string, unknown>) {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const result = await api<{ tunnel: RemoteAccess }>("/api/v1/connection/tunnel", { method: "PUT", body: JSON.stringify(body) });
       onTunnel(result.tunnel);
@@ -112,7 +114,7 @@ export function RemoteAccessCard({
       setSeen(null);
       setEditing(null);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not change remote access.");
+      setError(apiErrorNotice(caught, "Could not change remote access."));
     } finally {
       setBusy(false);
       await onChange();
@@ -120,7 +122,7 @@ export function RemoteAccessCard({
   }
 
   async function pickTop(next: Top) {
-    setError("");
+    setError(null);
     if (next === "off") {
       if (await leaving(null)) void put({ mode: "off" });
       return;
@@ -158,11 +160,11 @@ export function RemoteAccessCard({
     });
     if (!go) return;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await api(`/api/v1/connection/endpoints/${route.id}`, { method: "PUT", body: JSON.stringify({ edgeAuth: "none" }) });
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not turn off Cloudflare Access.");
+      setError(apiErrorNotice(caught, "Could not turn off Cloudflare Access."));
     } finally {
       setBusy(false);
       await onChange();
@@ -173,11 +175,11 @@ export function RemoteAccessCard({
   async function removeRoute(route: ConnectionRoute) {
     if (!(await askConfirm({ ...removeRouteConfirm(route, { published: route.id === published?.id, pairedCount: pairedThrough(route.id) }), destructive: true }))) return;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await api(`/api/v1/connection/endpoints/${route.id}`, { method: "DELETE" });
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not remove this route.");
+      setError(apiErrorNotice(caught, "Could not remove this route."));
     } finally {
       setBusy(false);
       await onChange();
@@ -188,12 +190,12 @@ export function RemoteAccessCard({
   /** Asks FamilyFi to reach the published route now, as a phone would, and shows what it found. */
   async function checkPublished(route: ConnectionRoute) {
     setChecking(true);
-    setError("");
+    setError(null);
     try {
       const { reachability } = await api<{ reachability: RouteReachability }>(`/api/v1/connection/endpoints/${route.id}/check`, { method: "POST" });
       if (tunnel) onTunnel({ ...tunnel, reachability });
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not check this route.");
+      setError(apiErrorNotice(caught, "Could not check this route."));
     } finally {
       setChecking(false);
     }
@@ -357,7 +359,7 @@ export function RemoteAccessCard({
                 value={choice === "cloudflareAdvanced" ? "advanced" : ("automatic" as Cloudflare)}
                 grow
                 onChange={(next: Cloudflare) => {
-                  setError("");
+                  setError(null);
                   setChoice(next === "advanced" ? "cloudflareAdvanced" : "cloudflareAutomatic");
                 }}
                 segments={[
@@ -506,11 +508,7 @@ export function RemoteAccessCard({
           </div>
         ) : null}
         {tunnel?.error ? <div className="font-semibold text-[var(--ff-danger)]">{tunnel.error}</div> : null}
-        {error ? (
-          <div role="alert" className="font-semibold text-[var(--ff-danger)]">
-            {error}
-          </div>
-        ) : null}
+        {error ? <ErrorLine notice={error} className="font-semibold text-[var(--ff-danger)]" /> : null}
         {noBinary && tunnelChoice ? (
           <div className="text-[var(--ff-muted)]">
             This server doesn&rsquo;t have cloudflared. The FamilyFi Docker image includes it; for development, install it with Homebrew.

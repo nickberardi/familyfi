@@ -307,7 +307,7 @@ function RetryButton({ onRetry }: { onRetry: () => void }) {
 export function AppShell({ children, demo = false }: { children: React.ReactNode; demo?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, devices, sync, store, mutate, loading, stale, signedOut, error, notice, noticeAction, busy, dismissFeedback, reload } = useAppData();
+  const { session, devices, sync, store, mutate, loading, stale, signedOut, error, errorLink, notice, noticeAction, busy, dismissFeedback, reload } = useAppData();
   const [navOpen, setNavOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const railNav = useRef<HTMLElement>(null);
@@ -382,6 +382,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
             <div className="pointer-events-auto">
               <Toast
                 error={loading && stale ? "" : error}
+                errorLink={errorLink}
                 notice={notice}
                 actionLabel={noticeAction?.label}
                 onAction={() => {

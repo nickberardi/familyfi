@@ -1,4 +1,4 @@
-import { ApiError, TransportError, waitForChange as pollChange, type ApiRequest } from "./api-client";
+import { ApiError, apiErrorOf, TransportError, waitForChange as pollChange, type ApiRequest } from "./api-client";
 import { CSRF_COOKIE, CSRF_HEADER } from "./constants";
 
 export { ApiError };
@@ -21,15 +21,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     // No response at all: the server is down or restarting, or the network is.
     throw new TransportError(error);
   }
-  let json: { error?: { code?: string; message?: string } } | null = null;
+  let json: unknown = null;
   try {
-    json = (await response.json()) as { error?: { code?: string; message?: string } };
+    json = await response.json();
   } catch {
     json = null;
   }
-  if (!response.ok) {
-    throw new ApiError(json?.error?.message ?? "Request failed.", response.status, json?.error?.code);
-  }
+  if (!response.ok) throw apiErrorOf(json, response.status);
   return json as T;
 }
 

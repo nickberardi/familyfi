@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 0.43.1
+  version: 0.44.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 0.36.0
@@ -4487,6 +4487,16 @@ components:
           properties:
             code: { type: string }
             message: { type: string }
+            link:
+              type: object
+              additionalProperties: false
+              description: |
+                Where the person can go next, shown as a button beside `message`: a `demo_locked`
+                error points at installing FamilyFi at home. Omitted when there is nowhere to send them.
+              required: [label, url]
+              properties:
+                label: { type: string, description: "The button's words, such as \"Set up your own\"." }
+                url: { type: string, format: uri }
     UpstreamDomain:
       type: object
       additionalProperties: false

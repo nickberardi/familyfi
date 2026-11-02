@@ -1,5 +1,5 @@
 import { apiCompatibility, type ApiCompatibility, type HealthVersions } from "./api-compat";
-import { ApiError, TransportError, waitForChange as pollChange, type ApiRequest, type ChangeOutcome } from "./api-client";
+import { ApiError, TransportError, waitForChange as pollChange, type ApiRequest, type ChangeOutcome, type ErrorLink } from "./api-client";
 import {
   applyMutationResult,
   asMutationPayload,
@@ -47,6 +47,8 @@ export type HouseholdState = {
   /** The last refresh could not reach the server at all (no route answered), rather than being refused. */
   unreachable: boolean;
   error: string;
+  /** Where the error points next, such as the demo's "Set up your own"; shown as the toast's action. Cleared with the error. */
+  errorLink: ErrorLink | null;
   notice: string;
   noticeAction: NoticeAction | null;
   /** A write is in flight. */
@@ -138,6 +140,7 @@ export function createHouseholdStore(deps: {
     stale: false,
     unreachable: false,
     error: "",
+    errorLink: null,
     notice: "",
     noticeAction: null,
     busy: false,
@@ -157,7 +160,9 @@ export function createHouseholdStore(deps: {
   /** Why the first load failed, shown until a load works. */
   let loadFailure = "";
 
-  const set = (patch: Partial<HouseholdState>) => {
+  const set = (input: Partial<HouseholdState>) => {
+    // A new error, or none, takes its own link or none: a link never outlives the error it came with.
+    const patch = "error" in input && !("errorLink" in input) ? { ...input, errorLink: null } : input;
     // Nothing new: keep the state object, so no subscriber renders again.
     if ((Object.keys(patch) as (keyof HouseholdState)[]).every((key) => Object.is(state[key], patch[key]))) return;
     const before = state;
@@ -421,14 +426,15 @@ export function createHouseholdStore(deps: {
     } catch (error) {
       const lostConnection = offlineGuard && error instanceof TransportError;
       const message = lostConnection ? offlineGuard.maybeNotSent : error instanceof Error ? error.message : "Request failed.";
+      const errorLink = !lostConnection && error instanceof ApiError ? (error.link ?? null) : null;
       if (canCommitMutate(gate, token)) {
-        set({ groups: previous.groups, devices: previous.devices, error: message });
+        set({ groups: previous.groups, devices: previous.devices, error: message, errorLink });
         // Whether a write that lost its connection landed is unknown: read the truth, never retry it.
         if (lostConnection) void reload();
       } else {
         // A newer write's optimistic change is on top of this one: say it failed, and let the
         // reload once both end undo it.
-        set({ error: message });
+        set({ error: message, errorLink });
         reloadAfterWrites = true;
       }
       return undefined;
