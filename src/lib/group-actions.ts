@@ -26,7 +26,7 @@ import type { Actor, Group } from "./types";
 /** What a tap on the group's header button, or its More time link, does. */
 export type GroupRun = "block" | "moreBlock" | "unblock" | "unblockNow" | "resume" | "moreUnblock";
 
-export type GroupActionSpec = { label: string; run: GroupRun; menu?: GroupActionSpec[] };
+export type GroupActionSpec = { label: string; run: GroupRun; menu?: GroupActionSpec[]; rule?: { ruleIds: string[]; name: string } };
 
 /**
  * PROTOTYPE ONLY (thread "Rethink the Unblock button on cards"): which card design to draw.
@@ -287,8 +287,9 @@ export function groupHeaderActions(
     const ordered = [...all.filter((rule) => rule.until !== null), ...all.filter((rule) => rule.until === null)];
     const ruleName = (id: string) => rules.find((rule) => rule.id === id)?.name ?? "";
     const menu = ordered.map((rule): GroupActionSpec => ({
-      label: `Pause ${ruleName(rule.ruleId)}${rule.until ? ` until ${formatClock(new Date(rule.until), timezone)}` : ""}`,
+      label: `Pause ${ruleName(rule.ruleId)}`,
       run: "unblock",
+      rule: { ruleIds: [rule.ruleId], name: ruleName(rule.ruleId) },
     }));
     if (menu.length) return { action: { label: "Block", run: "block", menu }, more: null };
   }

@@ -24,7 +24,7 @@ export function groupCardControls(
     label: spec.label,
     strong,
     disabled: !enabled,
-    onPress: () => onRun({ kind: "header", run: spec.run }),
+    onPress: () => onRun(spec.rule ? { kind: "rule", run: "pause", ...spec.rule } : { kind: "header", run: spec.run }),
     testID: `group-action-${spec.run}-${group.id}`,
     menu: spec.menu?.map((item) => asHeader(item, false)),
   });
