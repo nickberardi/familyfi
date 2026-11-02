@@ -11,7 +11,9 @@ import {
   unifiMockEnabled,
   unifiMockWarning,
 } from "@/server/env";
+import { RECOVERY_USERNAME } from "@/lib/constants";
 import { DEMO_SET_UP_LINK } from "@/lib/demo";
+import { DEV_ADMIN } from "@/server/dev-household";
 import { DEMO_LOCKED, demoLocked, nextDemoResetAt } from "@/server/demo";
 import { findCloudflared } from "@/server/tunnel/cloudflared";
 import { envIssues as runtimeEnvIssues } from "../../scripts/runtime/env-issues.mjs";
@@ -125,6 +127,11 @@ describe("demo mode lock", () => {
     expect(locked?.status).toBe(403);
     // It says why, and points at setting FamilyFi up at home.
     expect(await locked?.json()).toEqual({ error: { code: "demo_locked", message: DEMO_LOCKED, link: DEMO_SET_UP_LINK } });
+  });
+
+  it("advertises a demo login a phone can pair as, never the recovery admin", () => {
+    // The login page shows DEV_ADMIN; phones never sign in as the recovery account.
+    expect(DEV_ADMIN.username).not.toBe(RECOVERY_USERNAME);
   });
 
   it("never finds cloudflared, so no tunnel opens from the demo host", () => {

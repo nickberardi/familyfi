@@ -23,8 +23,12 @@ async function downloadExport(): Promise<ErrorNotice | null> {
     const name = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1] ?? "familyfi-export.tar.gz";
     const url = URL.createObjectURL(await response.blob());
     const link = Object.assign(document.createElement("a"), { href: url, download: name });
+    // In the page while it is clicked, and the file's address kept a while: Firefox and Safari can
+    // cancel a download whose address is revoked straight away.
+    document.body.append(link);
     link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
     return null;
   } catch {
     return { text: fallback };
@@ -64,10 +68,11 @@ export function BackupCard({ onImported }: { onImported: (summary: ImportSummary
               download
               onClick={exportHousehold}
               aria-disabled={exporting || undefined}
-              className={PRIMARY_BUTTON}
+              // An anchor is never `disabled`, so it fades like a busy filled button through aria-disabled.
+              className={`${PRIMARY_BUTTON} aria-disabled:opacity-[var(--ff-disabled-opacity-filled)]`}
               data-testid="backup-export"
             >
-              {COPY.exportLabel}
+              {exporting ? COPY.exporting : COPY.exportLabel}
             </a>
           </div>
           {error ? <ErrorNote notice={error} testID="backup-export-error" /> : null}
