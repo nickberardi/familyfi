@@ -22,8 +22,8 @@ Bedtime, homework hours, and the new tablet nobody has claimed yet. FamilyFi let
 ## What you can do
 
 - **Organize by people, not by device.** Put everyone's phones, tablets and consoles into a group for that person. Things like the living room TV or the smart home kit get groups of their own.
-- **Set rules with schedules.** Turn off all internet, or just video, social media, gaming, certain apps or certain websites. Do it always, or only at times like *Bedtime* on school nights or *Homework* until six.
-- **Pause and allow.** Pause the internet for dinner, for an hour or until you resume it. Or let someone back online for a while during a scheduled block. Everyone can see who paused it and until when.
+- **Set rules with schedules.** Turn off all internet, or just video, social media, gaming, certain apps or certain websites. Do it always, or only at times like *Bedtime* or *Homework* on school days until six.
+- **Pause and allow.** Pause the internet for dinner, for an hour or until you resume it. Or let someone back online for a while during a scheduled block. You can always see who paused it and until when.
 - **Catch new devices.** New phones and tablets show up as unassigned. Turn on quarantine and they stay offline until you say whose they are, so a birthday present doesn't skip every rule in the house.
 - **Check on things.** Checkup points out anything that needs a look, such as a phone using a private Wi-Fi address that could slip out of its rules.
 
@@ -37,7 +37,7 @@ FamilyFi runs on a small computer in your home and connects to your UniFi consol
 
 - **Your gateway keeps the rules.** Schedules live on the gateway itself, so bedtime still starts on time while FamilyFi restarts or updates.
 - **Your own settings stay yours.** FamilyFi only changes the rules it creates. Anything you set up yourself in UniFi is never changed, turned off, deleted or reordered.
-- **Everything stays at home.** There is no FamilyFi cloud account, and your household's information never leaves your network. Your UniFi key is stored encrypted.
+- **Everything is kept at home.** There is no FamilyFi cloud account, and nothing about your household is sent to us. Your information is stored on your own computer, and your UniFi key is stored encrypted.
 - **Only parents sign in.** Only the adults you make admins can sign in. Children and teens never get a FamilyFi login.
 
 ## What you need
@@ -86,7 +86,7 @@ To connect it, open **Pair Device** in FamilyFi and scan the code with the app. 
 
 ## Updates and backups
 
-FamilyFi tells you when a new version is ready and installs it with one click, or on a schedule you choose. It backs itself up before every update, and your gateway keeps your rules running while it restarts. You can also download your whole household as one file from **Settings › Backup**. See [updates and backups](https://github.com/nickberardi/familyfi/wiki/Updates-and-backups).
+FamilyFi tells you when a new version is ready and installs it with one click, or on a schedule you choose. It backs itself up before every update, and your gateway keeps your rules running while it restarts. You can also download your whole household as one file from **Settings › Maintenance › Backup**. See [updates and backups](https://github.com/nickberardi/familyfi/wiki/Updates-and-backups).
 
 ## User guide
 
