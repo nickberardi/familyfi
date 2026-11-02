@@ -201,7 +201,6 @@ jobs:
       # A release an earlier attempt deleted when it failed (the `failed` job) comes back from its
       # issue, still a Pre-release, before the image is named in it.
       - name: Bring back a release a failed attempt deleted
-        id: restore
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/release-failed.mjs restore "$GITHUB_REF_NAME"
@@ -231,12 +230,12 @@ jobs:
           fi
           echo "::notice::$GITHUB_REF_NAME is $IMAGE_REF"
           echo "named=true" >> "$GITHUB_OUTPUT"
-      # A release restored above gets back the label the failed attempt found it with.
+      # A release restored above, or by an earlier attempt that failed before this step, gets back
+      # the label the failed attempt found it with.
       - name: Give a restored release its label
         env:
           GH_TOKEN: ${{ github.token }}
-          RESTORED: ${{ steps.restore.outputs.restored == 'true' }}
-        run: node scripts/ci/release-failed.mjs relabel "$GITHUB_REF_NAME" "$RESTORED"
+        run: node scripts/ci/release-failed.mjs relabel "$GITHUB_REF_NAME"
       # Read after the notes name the image: a label changed from here on fires promote.yml with the
       # image there to promote; one changed before, or a release published as a full release, did not.
       - name: Already a full release

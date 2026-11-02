@@ -11,9 +11,11 @@
 //   node scripts/ci/release-failed.mjs restore <tag>
 //     Before the run names its image: when the tag has no release and its open issue saved one,
 //     creates it again as a Pre-release with its name and notes.
-//   node scripts/ci/release-failed.mjs relabel <tag> <restored: true|false>
-//     After the run names its image: when `restore` recreated the release in this run, gives it
-//     back the label the issue saved, so the run's promote job promotes a full release.
+//   node scripts/ci/release-failed.mjs relabel <tag>
+//     After the run names its image: when `restore` recreated the release, in this attempt or an
+//     earlier one (its notes carry a mark until then), gives it back the label the issue saved, so
+//     the run's promote job promotes a full release. A release made by hand has no mark and keeps
+//     the label it was given.
 //   node scripts/ci/release-failed.mjs close <tag>
 //     Once every job of the run has passed: closes the tag's issue.
 //
@@ -23,7 +25,6 @@
 // Reads GH_TOKEN, GITHUB_REPOSITORY, GITHUB_API_URL, GITHUB_SERVER_URL, GITHUB_RUN_ID and
 // GITHUB_RUN_ATTEMPT, as a workflow sets them. curl and jq are not needed.
 
-import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import { compareTags, parseTag } from "./newest-tag.mjs";
@@ -31,6 +32,9 @@ import { compareTags, parseTag } from "./newest-tag.mjs";
 export const issueTitle = (tag) => `Release ${tag} failed`;
 
 const MARKER = /<!-- familyfi-release-failed (\S+) -->/;
+
+/** In the notes of a release `restore` made, until `relabel` has given it its label. */
+export const RESTORED = "<!-- familyfi-release-restored -->";
 
 /** The release `fail` removed, kept in the issue so `restore` and `relabel` can bring it back. */
 export function saveRelease(release) {
@@ -167,25 +171,24 @@ export async function restore(tag) {
   await github("POST", `${repo()}/releases`, {
     tag_name: tag,
     name: saved.name || tag,
-    body: saved.body,
+    body: `${saved.body}\n\n${RESTORED}`,
     prerelease: true,
     make_latest: "false",
   });
   console.log(`::notice::Created ${tag}'s release again from its failure issue.`);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, "restored=true\n");
 }
 
-export async function relabel(tag, restored) {
-  // Only a release restore made in this run: one the operator made by hand while the issue was
-  // open keeps the label they gave it.
-  if (!restored) return;
-  const saved = savedRelease((await openIssue(tag))?.body);
+export async function relabel(tag) {
   const release = await github("GET", `${repo()}/releases/tags/${encodeURIComponent(tag)}`);
-  if (saved?.prerelease === false && release?.prerelease) {
-    const latest = (await newestFull(tag)) ? "true" : "false";
-    await github("PATCH", `${repo()}/releases/${release.id}`, { prerelease: false, make_latest: latest });
-    console.log(`::notice::${tag} is a full release again.`);
+  if (!release?.body?.includes(RESTORED)) return;
+  const saved = savedRelease((await openIssue(tag))?.body);
+  // The mark goes with the label in one write, so an attempt that fails before it tries again.
+  const update = { body: release.body.replace(RESTORED, "").trimEnd() };
+  if (saved?.prerelease === false && release.prerelease) {
+    Object.assign(update, { prerelease: false, make_latest: (await newestFull(tag)) ? "true" : "false" });
   }
+  await github("PATCH", `${repo()}/releases/${release.id}`, update);
+  if (update.prerelease === false) console.log(`::notice::${tag} is a full release again.`);
 }
 
 export async function close(tag) {
@@ -201,12 +204,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const run = {
     fail: () => fail(tag, flag === "true"),
     restore: () => restore(tag),
-    relabel: () => relabel(tag, flag === "true"),
+    relabel: () => relabel(tag),
     close: () => close(tag),
   }[command];
-  const flagged = command === "fail" || command === "relabel";
+  const flagged = command === "fail";
   if (!run || !tag || (flagged && !["true", "false"].includes(flag))) {
-    console.error("usage: release-failed.mjs fail <tag> <built: true|false> | restore <tag> | relabel <tag> <restored: true|false> | close <tag>");
+    console.error("usage: release-failed.mjs fail <tag> <built: true|false> | restore <tag> | relabel <tag> | close <tag>");
     process.exit(2);
   }
   run().catch((error) => {

@@ -363,7 +363,6 @@ describe("a failed Release run", () => {
     expect(manifest).toContain("issues: write");
     expect(manifest).toContain("named: ${{ steps.named.outputs.named }}");
     expect(manifest.indexOf('echo "named=true" >> "$GITHUB_OUTPUT"')).toBeGreaterThan(named);
-    expect(manifest).toContain('release-failed.mjs relabel "$GITHUB_REF_NAME" "$RESTORED"');
 
     // Closed by the job that runs last, so a re-run of a failed promote or version-pr closes it too.
     const succeeded = workflow.split(/^  succeeded:$/m)[1]?.split(/^  [\w-]+:$/m)[0];
@@ -454,10 +453,11 @@ describe("release-failed.mjs against GitHub", () => {
     expect(github.calls.indexOf("POST /issues")).toBeLessThan(github.calls.indexOf("DELETE /releases/1"));
 
     await withGitHub(github, () => restore("v0.43.1"));
-    expect(github.releases).toMatchObject([{ tag_name: "v0.43.1", name: "v0.43.1", body: "## What's Changed", prerelease: true }]);
+    expect(github.releases).toMatchObject([{ tag_name: "v0.43.1", name: "v0.43.1", body: "## What's Changed\n\n<!-- familyfi-release-restored -->", prerelease: true }]);
 
-    await withGitHub(github, () => relabel("v0.43.1", true));
+    await withGitHub(github, () => relabel("v0.43.1"));
     expect(github.releases[0]).toMatchObject({ prerelease: false, make_latest: "true" });
+    expect(github.releases[0].body).toBe("## What's Changed");
     expect(github.issues[0].state).toBe("open");
     await withGitHub(github, () => close("v0.43.1"));
     expect(github.issues[0].state).toBe("closed");
@@ -473,7 +473,7 @@ describe("release-failed.mjs against GitHub", () => {
     const github = fakeGitHub([{ id: 1, tag_name: "v0.43.1", name: "v0.43.1", body: "", prerelease: false }]);
     await withGitHub(github, () => fail("v0.43.1", false));
     github.releases.push({ id: 9, tag_name: "v0.43.1", name: "by hand", body: "", prerelease: true });
-    await withGitHub(github, () => relabel("v0.43.1", false));
+    await withGitHub(github, () => relabel("v0.43.1"));
     expect(github.releases[0].prerelease).toBe(true);
   });
 
@@ -486,7 +486,19 @@ describe("release-failed.mjs against GitHub", () => {
     expect(github.issues).toHaveLength(1);
     expect(github.releases).toEqual([]);
     await withGitHub(github, () => restore("v0.43.1"));
-    expect(github.releases).toMatchObject([{ name: "v0.43.1", body: "notes", prerelease: true }]);
+    expect(github.releases).toMatchObject([{ name: "v0.43.1", body: expect.stringMatching(/^notes\n/), prerelease: true }]);
+  });
+
+  it("gives a restored release its label on a later attempt when relabelling failed", async () => {
+    const { fail, restore, relabel } = await import("../../scripts/ci/release-failed.mjs");
+    const github = fakeGitHub([{ id: 1, tag_name: "v0.43.1", name: "v0.43.1", body: "notes", prerelease: false }]);
+    await withGitHub(github, () => fail("v0.43.1", false));
+    await withGitHub(github, () => restore("v0.43.1"));
+    // That attempt failed before relabel; the next finds the release and restores nothing.
+    await withGitHub(github, () => restore("v0.43.1"));
+    expect(github.releases).toHaveLength(1);
+    await withGitHub(github, () => relabel("v0.43.1"));
+    expect(github.releases[0]).toMatchObject({ prerelease: false, body: "notes" });
   });
 
   it("restores a fix to an older line without GitHub's Latest badge", async () => {
@@ -497,7 +509,7 @@ describe("release-failed.mjs against GitHub", () => {
     ]);
     await withGitHub(github, () => fail("v0.39.1", false));
     await withGitHub(github, () => restore("v0.39.1"));
-    await withGitHub(github, () => relabel("v0.39.1", true));
+    await withGitHub(github, () => relabel("v0.39.1"));
     expect(github.releases.find((r) => r.tag_name === "v0.39.1")).toMatchObject({ prerelease: false, make_latest: "false" });
   });
 
