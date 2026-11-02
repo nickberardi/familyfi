@@ -8,7 +8,7 @@ Username `admin` with `FAMILYFI_DEFAULT_PASSWORD` remains available after person
 
 Back up PostgreSQL and `FAMILYFI_ENCRYPTION_KEY` together (it lives in `.env` after first setup). Restoring the database without that key cannot decrypt the stored UniFi credential or the persisted companion instance signing key. Ordinary `make docker-down` does not delete volumes. Do not regenerate `FAMILYFI_ENCRYPTION_KEY` once a UniFi key has been saved.
 
-**Export and import.** Settings → Backup downloads `familyfi-export-<date>.tar.gz` (`GET /api/v1/settings/export`), and imports one (`POST /api/v1/settings/import`), which first-time setup also offers as **Restore from an export**. The archive holds:
+**Export and import.** The Backup card on Settings → Maintenance downloads `familyfi-export-<date>.tar.gz` (`GET /api/v1/settings/export`), and imports one (`POST /api/v1/settings/import`), which first-time setup also offers as **Restore from an export**. The archive holds:
 
 - `manifest.json`: the export format, the FamilyFi version and install that wrote it, and its gateway.
 - `config.json`: groups, rules and their windows, device assignments, administrator accounts with their password hashes, DNS categories, the household's own routes and its settings. No UniFi key, tunnel credential or Access token, no sessions, pairings or paired devices, no history, and no record of the gateway's policies.

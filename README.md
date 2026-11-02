@@ -95,6 +95,7 @@ The [user guide](https://github.com/nickberardi/familyfi/wiki) covers everything
 - [Install](https://github.com/nickberardi/familyfi/wiki/Install) and [first-time setup](https://github.com/nickberardi/familyfi/wiki/First-time-setup)
 - [Family, Things and devices](https://github.com/nickberardi/familyfi/wiki/Family-Things-and-devices), including quarantine for new devices
 - [Rules, schedules, pause and allow](https://github.com/nickberardi/familyfi/wiki/Rules-schedules-pause-and-allow)
+- [Checkup](https://github.com/nickberardi/familyfi/wiki/Checkup) and [category reports](https://github.com/nickberardi/familyfi/wiki/Category-reports)
 - [Phone and Watch app](https://github.com/nickberardi/familyfi/wiki/Phone-and-Watch-app), and reaching home when you're out
 - [Updates and backups](https://github.com/nickberardi/familyfi/wiki/Updates-and-backups)
 - [Troubleshooting and FAQ](https://github.com/nickberardi/familyfi/wiki/Troubleshooting-and-FAQ)
