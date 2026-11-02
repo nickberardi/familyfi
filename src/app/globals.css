@@ -143,6 +143,16 @@
   --ff-schedule-5-line: #bd3f8a;
 
   /*
+   * A group card's badge beside its name, and the line under it when someone changed what the
+   * rules normally do: green while the group has the internet (or someone lifted a block), red
+   * while it is blocked (or someone blocked it). A state badge, so it is never a grey Tag.
+   */
+  --ff-status-online-ink: var(--ff-on-ink);
+  --ff-status-online-fill: var(--ff-on-tint);
+  --ff-status-blocked-ink: var(--ff-danger);
+  --ff-status-blocked-fill: var(--ff-danger-fill);
+
+  /*
    * Verdict chips and marks. Five states, each needing its own ink, fill and line,
    * because the design sets the border independently of the fill. `rule` is ours —
    * a FamilyFi rule blocking right now, which always wins over the upstream reading —

@@ -108,6 +108,10 @@ describe("interactive and status colours", () => {
     ["on-green text on a card", "var(--ff-on)", "var(--ff-card)", CARD],
     ["on-green text on the page", "var(--ff-on)", "var(--ff-page)", PAGE],
     ["a person monogram on its fill", "var(--ff-person-ink)", "var(--ff-person-fill)", CARD],
+    ["the Online badge", "var(--ff-status-online-ink)", "var(--ff-status-online-fill)", CARD],
+    ["the Blocked badge", "var(--ff-status-blocked-ink)", "var(--ff-status-blocked-fill)", CARD],
+    ["an unblock's line on a card", "var(--ff-status-online-ink)", "var(--ff-card)", CARD],
+    ["a block's line on a card", "var(--ff-status-blocked-ink)", "var(--ff-card)", CARD],
     ...(["--ff-ink-2", "--ff-ink-3", "--ff-ink-4", "--ff-locked"] as const).flatMap((ink) => [
       [`${ink} on a card`, `var(${ink})`, "var(--ff-card)", CARD] as const,
       [`${ink} on the page`, `var(${ink})`, "var(--ff-page)", PAGE] as const,

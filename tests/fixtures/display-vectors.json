@@ -13878,6 +13878,2322 @@
       "expected": "var(--ff-on)"
     },
     {
+      "fn": "groupStatusParts",
+      "name": "a category rule blocking now",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Video blocked until 6:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "an internet window blocking now",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "blocked",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T23:00:00.000Z"
+      },
+      "expected": {
+        "badge": "blocked",
+        "detail": "Dinner until 8:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "nothing blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Dinner at 6:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "blocked by an adult while a category rule blocks",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": true,
+            "until": "2026-10-15T21:00:00.000Z",
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "paused",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "blocked",
+        "detail": "Until 5:00 PM by Nick",
+        "change": "blocked"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "blocked by an adult with nothing else blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "paused",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "badge": "blocked",
+        "detail": "By Nick until you unblock",
+        "change": "blocked"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "unblocked until the category rule ends",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T22:00:00.000Z",
+                  "kind": "allow",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Unblocked until 6:00 PM by Nick",
+        "change": "unblocked"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "unblocked until resumed",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": true,
+            "until": null,
+            "by": {
+              "accountId": "a1",
+              "name": "Nick"
+            }
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "allowed",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": null,
+                  "kind": "allow",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": null,
+                  "kind": "allow",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T23:00:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Unblocked by Nick until you resume",
+        "change": "unblocked"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "a category rule paused for the group",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T22:00:00.000Z",
+                  "kind": "pause",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Dinner at 6:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "the internet rule paused for the group",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-16T00:00:00.000Z",
+                  "kind": "pause",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T23:00:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Internet rule paused until 8:00 PM",
+        "change": "unblocked"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "a category rule paused for everyone",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": true,
+              "until": "2026-10-15T22:00:00.000Z",
+              "kind": "pause",
+              "by": {
+                "accountId": "a1",
+                "name": "Nick"
+              }
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Dinner at 6:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "an always-on internet rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-grounded"
+          ],
+          "access": "blocked",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-grounded",
+            "name": "Grounded",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "badge": "blocked",
+        "detail": "Grounded · always",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "two category rules blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "No social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "19:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Social and Video blocked until 7:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "a rule that is off",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": false,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Dinner at 6:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "Block countries on for the group",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "countries",
+            "name": "Block countries",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "countries",
+            "countries": [
+              "KP"
+            ]
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "No internet rule",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "Lock DNS covering the group never blocks it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "dns",
+            "name": "Lock DNS",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "dns.google"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": "dns"
+          },
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Dinner at 6:00 PM",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "an internet rule switched off is not no rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": false,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Internet rule off",
+        "change": "none"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "an internet rule paused for everyone",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": true,
+              "until": "2026-10-15T22:00:00.000Z",
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Internet rule paused for everyone until 6:00 PM",
+        "change": "unblocked"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "an internet rule allowed for everyone",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": true,
+              "until": "2026-10-15T22:00:00.000Z",
+              "kind": "allow",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "badge": "online",
+        "detail": "Internet rule allowed for everyone until 6:00 PM",
+        "change": "unblocked"
+      }
+    },
+    {
+      "fn": "groupBadge",
+      "name": "online",
+      "input": {
+        "badge": "online"
+      },
+      "expected": {
+        "label": "Online",
+        "ink": "var(--ff-status-online-ink)",
+        "fill": "var(--ff-status-online-fill)"
+      }
+    },
+    {
+      "fn": "groupBadge",
+      "name": "blocked",
+      "input": {
+        "badge": "blocked"
+      },
+      "expected": {
+        "label": "Blocked",
+        "ink": "var(--ff-status-blocked-ink)",
+        "fill": "var(--ff-status-blocked-fill)"
+      }
+    },
+    {
+      "fn": "groupDetailColor",
+      "name": "the rules as set",
+      "input": {
+        "change": "none"
+      },
+      "expected": "var(--ff-ink-2)"
+    },
+    {
+      "fn": "groupDetailColor",
+      "name": "someone blocked it",
+      "input": {
+        "change": "blocked"
+      },
+      "expected": "var(--ff-status-blocked-ink)"
+    },
+    {
+      "fn": "groupDetailColor",
+      "name": "someone unblocked it",
+      "input": {
+        "change": "unblocked"
+      },
+      "expected": "var(--ff-status-online-ink)"
+    },
+    {
       "fn": "unblockSheetTitle",
       "name": "unblock",
       "input": {

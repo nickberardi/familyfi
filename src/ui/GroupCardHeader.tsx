@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { cardNoteLine, roleTag } from "@/lib/display";
-import { groupStatus, groupStatusColor } from "@/lib/group-actions";
+import { cardNoteLine } from "@/lib/display";
+import { groupBadge, groupDetailColor, groupStatusParts } from "@/lib/group-actions";
 import { groupMonogram, personMonogram } from "@/lib/internet-zone";
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Rule } from "@/lib/rules";
@@ -14,8 +13,9 @@ import { tokenOf, useUI } from "./UIContext";
 import { useWide } from "./use-wide";
 
 /**
- * A group card's identity, shared by every client: a things group's monogram tile, the name and
- * role, what is blocking it now (`groupStatus`, in its colour), and the note line. The card
+ * A group card's identity, shared by every client: a things group's monogram tile, the name with
+ * its Online or Blocked badge, the line saying why (`groupStatusParts`, grey unless someone blocked
+ * or unblocked it), and the note line. The card
  * around it (open or closed, marks, actions) belongs to the caller. A stacked card shows a person's
  * monogram too (`mark`), and its note in the card's body instead (`note={false}`).
  */
@@ -40,13 +40,10 @@ export function GroupCardHeader({
 }) {
   const ui = useUI();
   const monogram = groupMonogram(group);
-  const status = groupStatus(group, rules, timezone, now);
-  const stateColor = ui.color(tokenOf(groupStatusColor(status.tone)));
+  const status = groupStatusParts(group, rules, timezone, now);
+  const badge = groupBadge(status.badge);
   const body = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 };
   const wide = useWide();
-  const { fontScale } = useWindowDimensions();
-  // The status's first line as drawn (native), else its line height at this text size (web).
-  const [firstLine, setFirstLine] = useState<number | null>(null);
 
   return (
     <View style={styles.row}>
@@ -86,23 +83,14 @@ export function GroupCardHeader({
           >
             {group.name}
           </Text>
-          <Text style={[body, { color: ui.color("ink-2") }]}>{roleTag(group)}</Text>
-        </View>
-        <View style={styles.state}>
-          {/* One line high, so a status that wraps keeps its dot beside the first line. */}
-          <View style={[styles.dotLine, { height: firstLine ?? body.lineHeight * fontScale }]}>
-            <View style={[styles.dot, { backgroundColor: stateColor }]} />
-          </View>
           <Text
-            style={[body, styles.shrink, { color: stateColor }]}
-            onTextLayout={(event) => {
-              const height = event.nativeEvent.lines[0]?.height;
-              if (height && height > 0) setFirstLine(height);
-            }}
+            testID={`group-badge-${group.id}`}
+            style={[styles.badge, { fontFamily: ui.font, color: ui.color(tokenOf(badge.ink)), backgroundColor: ui.color(tokenOf(badge.fill)) }]}
           >
-            {status.label}
+            {badge.label}
           </Text>
         </View>
+        {status.detail ? <Text style={[body, styles.detail, { color: ui.color(tokenOf(groupDetailColor(status.change))) }]}>{status.detail}</Text> : null}
         {note ? <Text style={[body, { marginTop: 2, color: ui.color("ink-3") }]}>{cardNoteLine(group, windows)}</Text> : null}
       </View>
     </View>
@@ -114,9 +102,8 @@ const styles = StyleSheet.create({
   tile: { width: 44, height: 44, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   person: { borderRadius: 22 },
   words: { flex: 1, minWidth: 0 },
-  title: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8 },
-  state: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 2 },
-  dotLine: { justifyContent: "center" },
-  dot: { width: 7, height: 7, borderRadius: 3.5 },
-  shrink: { flexShrink: 1 },
+  title: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 2 },
+  // A state badge: tinted and round, never the grey square Tag that names a kind of thing.
+  badge: { flexShrink: 0, overflow: "hidden", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1, fontSize: 14, lineHeight: 20, fontWeight: "600" },
+  detail: { marginTop: 2 },
 });

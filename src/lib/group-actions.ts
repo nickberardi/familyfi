@@ -1,5 +1,5 @@
 import { cardStateLabel, formatClock } from "./display";
-import { isWindowActive, windowEndsAt, windowTitle } from "./rule-windows";
+import { internetState, isWindowActive, windowEndsAt, windowTitle } from "./rule-windows";
 import {
   activeWindowsEnd,
   CURATED_CATEGORY_SLOTS,
@@ -114,38 +114,121 @@ export type GroupStatus = {
 };
 
 /**
+ * A card's status as its badge and the line under it. The badge says whether the group has the
+ * internet; the line says why, in grey while its rules do what they always do, in red when someone
+ * blocked it, and in green when someone lifted a block (an unblock, or its internet rule paused).
+ */
+export type GroupStatusParts = {
+  badge: "online" | "blocked";
+  /** The line under the name, or empty when the badge says it all. */
+  detail: string;
+  /** Who changed what the rules normally do: nobody, a block, or a lift. */
+  change: "none" | "blocked" | "unblocked";
+};
+
+type FullStatus = GroupStatus & GroupStatusParts;
+
+/**
  * What a card's status line says the group is doing now: blocked, which rule blocks it, an
  * unblock, its internet rule paused or allowed (for it, or for everyone), or (with nothing of the
  * kind) its internet schedule.
  */
 export function groupStatus(group: Group, rules: Rule[], timezone: string, now: Date): GroupStatus {
+  const { tone, label } = fullStatus(group, rules, timezone, now);
+  return { tone, label };
+}
+
+/** The same status as `groupStatus`, as the card's badge and the line under it. */
+export function groupStatusParts(group: Group, rules: Rule[], timezone: string, now: Date): GroupStatusParts {
+  const { badge, detail, change } = fullStatus(group, rules, timezone, now);
+  return { badge, detail, change };
+}
+
+function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): FullStatus {
   const by = (actor: Actor) => (actor ? ` by ${actor.name}` : "");
   const until = (at: string | null, open: string) => (at ? `until ${formatClock(new Date(at), timezone)}` : open);
+  const online = (tone: GroupStatus["tone"], label: string, detail: string, change: GroupStatusParts["change"] = "none"): FullStatus => ({
+    tone,
+    label,
+    badge: "online",
+    detail: sentence(detail),
+    change,
+  });
+  const blocked = (tone: GroupStatus["tone"], label: string, detail: string, change: GroupStatusParts["change"] = "none"): FullStatus => ({
+    tone,
+    label,
+    badge: "blocked",
+    detail: sentence(detail),
+    change,
+  });
   if (group.suspension.active) {
     const { until: end, by: who } = group.suspension;
-    return { tone: "paused", label: end ? `Blocked ${until(end, "")}${by(who)}` : `Blocked${by(who)} until you unblock` };
+    return end
+      ? blocked("paused", `Blocked ${until(end, "")}${by(who)}`, `${until(end, "")}${by(who)}`, "blocked")
+      : blocked("paused", `Blocked${by(who)} until you unblock`, `${by(who).trim()} until you unblock`.trim(), "blocked");
   }
   const blocking = rulesBlockingGroup(group, rules, timezone, now);
   const internet = blocking.find((rule) => rule.kind === "internet");
-  if (internet) return { tone: "off", label: `Blocked · ${internet.name} ${until(internet.until, "· always")}` };
+  if (internet) {
+    const detail = `${internet.name} ${until(internet.until, "· always")}`;
+    return blocked("off", `Blocked · ${detail}`, detail);
+  }
   if (blocking.length) {
     const last = blocking[0]!.until;
-    return { tone: "rule", label: `Online · ${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}` };
+    const detail = `${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}`;
+    return online("rule", `Online · ${detail}`, detail);
   }
   const unblock = groupUnblock(group, rules, now);
   if (unblock) {
-    const label = unblock.until ? `Online · unblocked ${until(unblock.until, "")}${by(unblock.by)}` : `Online · unblocked${by(unblock.by)} until you resume`;
-    return { tone: "on", label };
+    const detail = unblock.until ? `unblocked ${until(unblock.until, "")}${by(unblock.by)}` : `unblocked${by(unblock.by)} until you resume`;
+    return online("on", `Online · ${detail}`, detail, "unblocked");
   }
   const internetRules = groupScopedRules(rules, group.id).filter((rule) => rule.kind === "internet");
   const paused = groupRulePause(group, internetRules, now);
-  if (paused) return { tone: "on", label: `Online · internet rule paused ${until(paused.until, "until you resume")}` };
-  const pausedForEveryone = internetRules.find((rule) => rule.enabled && rulePaused(rule, now));
-  if (pausedForEveryone && internetWindowsForGroup(rules, group.id, now).length === 0) {
-    const verb = pausedForEveryone.pause.kind === "allow" ? "allowed" : "paused";
-    return { tone: "on", label: `Online · internet rule ${verb} for everyone ${until(pausedForEveryone.pause.until, "until you resume")}` };
+  if (paused) {
+    const detail = `internet rule paused ${until(paused.until, "until you resume")}`;
+    return online("on", `Online · ${detail}`, detail, "unblocked");
   }
-  return { tone: "on", label: cardStateLabel(group, internetWindowsForGroup(rules, group.id, now), timezone, now) };
+  const windows = internetWindowsForGroup(rules, group.id, now);
+  const pausedForEveryone = internetRules.find((rule) => rule.enabled && rulePaused(rule, now));
+  if (pausedForEveryone && windows.length === 0) {
+    const verb = pausedForEveryone.pause.kind === "allow" ? "allowed" : "paused";
+    const detail = `internet rule ${verb} for everyone ${until(pausedForEveryone.pause.until, "until you resume")}`;
+    return online("on", `Online · ${detail}`, detail, "unblocked");
+  }
+  const label = cardStateLabel(group, windows, timezone, now);
+  const state = internetState(group, windows, now, timezone);
+  // cardStateLabel names the state; the badge takes its first word and the line keeps the rest.
+  const rest = label.includes(" · ") ? label.slice(label.indexOf(" · ") + 3) : "";
+  if (state.state === "paused") return blocked("on", label, label.replace(/^All internet paused /, "paused "), "blocked");
+  if (state.state === "blocked") return blocked("on", label, rest);
+  return online("on", label, rest, state.state === "allowed" ? "unblocked" : "none");
+}
+
+/** The line under a card's name starts like a sentence. */
+function sentence(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The `--ff-*` colour a status line is drawn in. */
+export function groupStatusColor(tone: GroupStatus["tone"]): string {
+  if (tone === "paused") return "var(--ff-paused)";
+  if (tone === "off") return "var(--ff-accent)";
+  if (tone === "rule") return "var(--ff-verdict-rule-ink)";
+  return "var(--ff-on)";
+}
+
+/** The badge beside a card's name: its word, and the `--ff-*` ink and fill it is drawn in. */
+export function groupBadge(badge: GroupStatusParts["badge"]): { label: string; ink: string; fill: string } {
+  if (badge === "blocked") return { label: "Blocked", ink: "var(--ff-status-blocked-ink)", fill: "var(--ff-status-blocked-fill)" };
+  return { label: "Online", ink: "var(--ff-status-online-ink)", fill: "var(--ff-status-online-fill)" };
+}
+
+/** The `--ff-*` colour of the line under a card's name: grey, or the colour of the change someone made. */
+export function groupDetailColor(change: GroupStatusParts["change"]): string {
+  if (change === "blocked") return "var(--ff-status-blocked-ink)";
+  if (change === "unblocked") return "var(--ff-status-online-ink)";
+  return "var(--ff-ink-2)";
 }
 
 /**
@@ -190,14 +273,6 @@ export function groupRuleActions(
   if (paused) return { action: { label: "Resume", run: "resume" }, more: paused.until ? { label: "More time", run: "extend" } : null };
   if (applying.some((rule) => groupLift(rule, group.id, now)?.kind === "allow")) return none;
   return { action: { label: "Pause", run: "pause" }, more: null };
-}
-
-/** The `--ff-*` colour a status line is drawn in. */
-export function groupStatusColor(tone: GroupStatus["tone"]): string {
-  if (tone === "paused") return "var(--ff-paused)";
-  if (tone === "off") return "var(--ff-accent)";
-  if (tone === "rule") return "var(--ff-verdict-rule-ink)";
-  return "var(--ff-on)";
 }
 
 /** A group's built-in rule, "this group has internet": pausing it blocks all internet. */
