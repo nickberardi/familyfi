@@ -50,6 +50,8 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   groupStatusParts: (i) => groupActionsModule.groupStatusParts(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
   groupBadge: (i) => groupActionsModule.groupBadge(i.badge),
   groupDetailColor: (i) => groupActionsModule.groupDetailColor(i.change),
+  rulesToUnblock: (i) => groupActionsModule.rulesToUnblock(i.group, i.rules as Rule[], i.timeZone, at(i.now)),
+  standingRule: (i) => groupActionsModule.standingRule(i.rule),
   groupHeaderActions: (i) => groupActionsModule.groupHeaderActions(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
   groupRuleActions: (i) => groupActionsModule.groupRuleActions(i.group as Group, i.rules as Rule[], at(i.now)),
   // A client without the gateway's catalog replays these, so a category or app is named only when FamilyFi knows it.

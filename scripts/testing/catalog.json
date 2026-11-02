@@ -948,7 +948,7 @@
         "schedules"
       ]
     },
-    "tests/browser/smoke.spec.ts > a group card's one button, its schedule link, Show less, and a rule paused on the details page": {
+    "tests/browser/smoke.spec.ts > a group card's one button and its rule dropdown, its schedule link, Show less, and a rule paused on the details page": {
       "categories": [
         "groups",
         "schedules"

@@ -57,15 +57,27 @@ const video = rule({ id: "r-video", name: "TV video evenings", kind: "category",
 describe("groupCardControls", () => {
   it("gives the group one button, its tap naming what it is for", () => {
     const onRun = vi.fn();
-    const controls = groupCardControls(group(), [downtime, video], TZ, NOW, onRun);
+    const controls = groupCardControls(group({ suspension: { active: true, until: null, by: null } }), [downtime, video], TZ, NOW, onRun);
     expect(controls.action).toMatchObject({ label: "Unblock", strong: true, testID: "group-action-unblock-g1" });
     expect(controls.more).toBeNull();
+    expect(controls.menu).toEqual([]);
     controls.action.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "unblock" }]);
   });
 
-  it("disables the button while the view is stale", () => {
-    expect(groupCardControls(group(), [downtime], TZ, NOW, vi.fn(), false).action.disabled).toBe(true);
+  it("keeps Block while a category rule blocks part of the group, and pauses that rule from the dropdown", () => {
+    const onRun = vi.fn();
+    const controls = groupCardControls(group(), [downtime, video], TZ, NOW, onRun);
+    expect(controls.action).toMatchObject({ label: "Block", testID: "group-action-block-g1" });
+    expect(controls.menu.map((item) => [item.label, item.testID])).toEqual([["Pause TV video evenings", "group-menu-pause-r-video-g1"]]);
+    controls.menu[0]!.onPress();
+    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "rule", run: "pause", ruleIds: ["r-video"], name: "TV video evenings" }]);
+  });
+
+  it("disables the button and its dropdown while the view is stale", () => {
+    const controls = groupCardControls(group(), [downtime, video], TZ, NOW, vi.fn(), false);
+    expect(controls.action.disabled).toBe(true);
+    expect(controls.menu.every((item) => item.disabled)).toBe(true);
   });
 });
 

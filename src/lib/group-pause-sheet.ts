@@ -1,4 +1,4 @@
-import { groupRulePause, groupUnblock, rulesBlockingGroup } from "./group-actions";
+import { groupRulePause, groupUnblock, rulesToUnblock } from "./group-actions";
 import {
   groupRuleSheetBody,
   groupRuleSheetTitle,
@@ -58,7 +58,7 @@ export function groupSheet(
     };
   } else if (target.kind === "unblock") {
     const unblock = groupUnblock(group, rules, now);
-    const blocking = rulesBlockingGroup(group, rules, timezone, now);
+    const blocking = rulesToUnblock(group, rules, timezone, now);
     sheet = {
       title: unblockSheetTitle(group, mode),
       body: unblockSheetBody(group, blocking, mode),
