@@ -78,7 +78,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  message: { flex: 1, minWidth: 0, gap: 4 },
+  // flex-start keeps the link only as wide as its label, so a tap beside it does not open it.
+  message: { flex: 1, minWidth: 0, gap: 4, alignItems: "flex-start" },
   link: { fontWeight: "600" },
   button: { flexShrink: 0, borderRadius: 4, paddingHorizontal: 6 },
 });
