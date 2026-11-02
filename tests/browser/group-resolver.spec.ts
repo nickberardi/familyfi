@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { ensureMockUpstreamChecks } from "@/server/dev-seed";
 
 const username = process.env.FAMILYFI_RECOVERY_USERNAME ?? "admin";

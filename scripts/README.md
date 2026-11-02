@@ -13,7 +13,8 @@ scripts/
 │   ├── testing/       catalog, planning, resources, runner adapters and reporting
 │   └── tests/         the harness's own tests (Python unittest; the host platform)
 ├── ci/                check-image, container-smoke, the OpenAPI checks, changed-line coverage,
-│                      the migration upgrade check, mutation helpers, runner-cleanup
+│                      the migration upgrade check, mutation helpers, runner-cleanup,
+│                      promotion and failed-release helpers
 ├── release.sh         checks and tests, then build, push and publish a release from this machine
 ├── doh-probe.mjs      ask a DNS-over-HTTPS endpoint which transports it actually serves
 ├── update-mac-vendors.py  rebuild the committed IEEE MAC registrant database; run on request

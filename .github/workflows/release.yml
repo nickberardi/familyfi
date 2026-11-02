@@ -139,8 +139,16 @@ jobs:
     needs: ghcr
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+      # The issue a failed attempt opened (scripts/ci/release-failed.mjs).
+      issues: write
     outputs:
       full: ${{ steps.full.outputs.full }}
+      # Set once the release's notes name the image, which the `failed` job reads: a step failing
+      # after that must not delete a release households can install.
+      named: ${{ steps.named.outputs.named }}
     # One at a time, so two releases never race to move :next. GitHub keeps one waiting job per
     # group, so a third release reaching here at once is cancelled: run its job again.
     concurrency:
@@ -190,10 +198,18 @@ jobs:
           docker buildx imagetools inspect "$image@$digest" >/dev/null ||
             { echo "::error::the list pushed for $GITHUB_REF_NAME is not $digest" >&2; exit 1; }
           echo "IMAGE_REF=$image@$digest" >> "$GITHUB_ENV"
+      # A release an earlier attempt deleted when it failed (the `failed` job) comes back from its
+      # issue, still a Pre-release, before the image is named in it.
+      - name: Bring back a release a failed attempt deleted
+        id: restore
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/release-failed.mjs restore "$GITHUB_REF_NAME"
       # The Release, created as a Pre-release, or the one made on GitHub that created this tag, with
       # the image named by digest. promote.yml reads it from there when the Release stops being a
       # Pre-release.
       - name: GitHub Release
+        id: named
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -214,6 +230,13 @@ jobs:
               api -X POST --data @- "$releases" >/dev/null
           fi
           echo "::notice::$GITHUB_REF_NAME is $IMAGE_REF"
+          echo "named=true" >> "$GITHUB_OUTPUT"
+      # A release restored above gets back the label the failed attempt found it with.
+      - name: Give a restored release its label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESTORED: ${{ steps.restore.outputs.restored == 'true' }}
+        run: node scripts/ci/release-failed.mjs relabel "$GITHUB_REF_NAME" "$RESTORED"
       # Read after the notes name the image: a label changed from here on fires promote.yml with the
       # image there to promote; one changed before, or a release published as a full release, did not.
       - name: Already a full release
@@ -235,6 +258,55 @@ jobs:
     uses: ./.github/workflows/promote.yml
     with:
       tag: ${{ github.ref_name }}
+
+  # Any job failing opens an issue naming it. When no image was built, the tag's GitHub release is
+  # deleted too, so it does not read as out while households cannot install it; the tag stays, and
+  # "Re-run failed jobs" builds it and brings the release back (scripts/ci/release-failed.mjs).
+  failed:
+    needs: [on-main, ci, container, ghcr, manifest, promote, version-pr]
+    if: always() && contains(needs.*.result, 'failure')
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - name: Report the failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Unknown counts as built: on-main failing never established that no image exists, and only
+          # manifest brings a deleted release back.
+          BUILT: ${{ needs.on-main.result != 'success' || needs.on-main.outputs.published == 'true' || needs.manifest.outputs.named == 'true' }}
+        run: node scripts/ci/release-failed.mjs fail "$GITHUB_REF_NAME" "$BUILT"
+
+  # A run, or a re-run of its failed jobs, that ends with the image named and nothing failed closes
+  # the issue an earlier attempt opened.
+  succeeded:
+    needs: [on-main, manifest, promote, version-pr]
+    if: >-
+      always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+      (needs.on-main.outputs.published == 'true' || needs.manifest.outputs.named == 'true')
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/runner-cleanup
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - name: Close the failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/release-failed.mjs close "$GITHUB_REF_NAME"
 
   # The image reports the tag's version whatever package.json says. When main's package.json
   # and OpenAPI info.version are behind a stable tag, open a PR that brings them up to it.
