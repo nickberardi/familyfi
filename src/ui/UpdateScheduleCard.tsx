@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import type { ApiRequest } from "@/lib/api-client";
+import { errorNotice, type ApiRequest, type ErrorNotice } from "@/lib/api-client";
 import type { UpdateSettings } from "@/lib/types";
 import { UPDATE_COPY as COPY, updateScheduleLine } from "@/lib/update-copy";
 import { saveUpdateSchedule } from "@/lib/update-writes";
 import { toggleProbeDay } from "@/lib/upstream";
 
+import { ErrorNote } from "./ErrorNote";
 import { useUI } from "./UIContext";
 
 /**
@@ -31,7 +32,7 @@ export function UpdateScheduleCard({
 }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const text = (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
   if (!settings) return null;
   const schedule = settings.schedule;
@@ -39,12 +40,12 @@ export function UpdateScheduleCard({
 
   async function save(next: UpdateSettings["schedule"]) {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await saveUpdateSchedule(request, next);
       onChanged();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : COPY.scheduleFailed);
+      setError(errorNotice(failure, COPY.scheduleFailed));
     } finally {
       setBusy(false);
     }
@@ -95,7 +96,7 @@ export function UpdateScheduleCard({
             testID="update-schedule-time"
           />
         </View>
-        {error ? <Text style={[text(14, 20, "danger"), styles.error]}>{error}</Text> : null}
+        {error ? <ErrorNote notice={error} style={[text(14, 20, "danger"), styles.error]} /> : null}
       </View>
     </View>
   );

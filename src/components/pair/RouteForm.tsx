@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { ErrorLine } from "@/components/ErrorLine";
 import { api, ApiError } from "@/lib/api";
+import { apiErrorNotice, type ErrorNotice } from "@/lib/api-client";
 import { addressConflict, canPin, routeForAddress } from "@/lib/connection-routes";
 import type { ConnectionRoute, CertificatePin, ConnectionTransport } from "@/lib/types";
 import { Segmented } from "@/components/ui/Segmented";
@@ -57,14 +59,14 @@ export function RouteForm({
   const [pasting, setPasting] = useState(false);
   const [pem, setPem] = useState("");
   const [reading, setReading] = useState(false);
-  const [readError, setReadError] = useState("");
-  const [error, setError] = useState("");
+  const [readError, setReadError] = useState<ErrorNotice | null>(null);
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const [saving, setSaving] = useState(false);
   const pinned = trust === "pinned" && canPin(transport);
   const pinDiffers = pinned && read !== null && pin.trim() !== read.spkiSha256;
 
   async function readPin(body: { url: string } | { certificate: string }) {
-    setReadError("");
+    setReadError(null);
     setReading(true);
     try {
       const result = await api<{ pin: CertificatePin }>("/api/v1/connection/pins", { method: "POST", body: JSON.stringify(body) });
@@ -73,7 +75,7 @@ export function RouteForm({
       setPasting(false);
     } catch (caught) {
       setRead(null);
-      setReadError(caught instanceof ApiError ? caught.message : "Could not read the certificate.");
+      setReadError(apiErrorNotice(caught, "Could not read the certificate."));
     } finally {
       setReading(false);
     }
@@ -84,7 +86,7 @@ export function RouteForm({
   }
 
   async function save() {
-    setError("");
+    setError(null);
     setSaving(true);
     const trustMode: Trust = pinned ? "pinned" : "system";
     const body = { url: url.trim(), transport, trustMode, spkiSha256: pinned ? pin.trim() : null, ...extraBody };
@@ -106,7 +108,7 @@ export function RouteForm({
           const existing = caught instanceof ApiError && caught.code === "endpoint_exists" ? routeForAddress(routes, url, transport) : null;
           if (!existing) throw caught;
           if ("conflict" in existing) {
-            setError(addressConflict(existing.conflict));
+            setError({ text: addressConflict(existing.conflict) });
             return;
           }
           saved = await update(existing.reuse.id, body);
@@ -114,7 +116,7 @@ export function RouteForm({
       }
       await onSaved(saved);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Could not save the route.");
+      setError(apiErrorNotice(caught, "Could not save the route."));
     } finally {
       setSaving(false);
     }
@@ -183,11 +185,7 @@ export function RouteForm({
               </button>
             </div>
           ) : null}
-          {readError ? (
-            <p role="alert" className="font-semibold text-[var(--ff-danger)]">
-              {readError}
-            </p>
-          ) : null}
+          {readError ? <ErrorLine notice={readError} className="font-semibold text-[var(--ff-danger)]" /> : null}
           {read ? (
             <p data-testid="certificate-read" className="leading-5">
               {read.subject} · issued by {read.issuer} · expires {expiry(read.validTo)}
@@ -222,11 +220,7 @@ export function RouteForm({
         </p>
       )}
       {extra}
-      {error ? (
-        <p role="alert" className="font-semibold text-[var(--ff-danger)]">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorLine notice={error} className="font-semibold text-[var(--ff-danger)]" /> : null}
       <div className="flex flex-wrap justify-end gap-2">
         {onCancel ? (
           <button type="button" className={CANCEL_BUTTON} onClick={onCancel}>

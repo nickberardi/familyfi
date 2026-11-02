@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { ApiRequest } from "@/lib/api-client";
+import { errorNotice, type ApiRequest, type ErrorNotice } from "@/lib/api-client";
 import {
   GROUP_RESOLVER_COPY as COPY,
   canSaveGroupResolver,
@@ -14,6 +14,7 @@ import {
   type GroupResolver,
 } from "@/lib/group-resolver";
 
+import { ErrorNote } from "./ErrorNote";
 import { PRESS_OPACITY, useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
@@ -45,19 +46,19 @@ export function GroupResolverCard({
   const [pasting, setPasting] = useState(false);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const off = busy || !enabled;
   const canSave = !off && canSaveGroupResolver(url);
   const small = (size: number, lineHeight: number) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color("ink-3") });
 
   async function run(work: () => Promise<unknown>, failure: string) {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await work();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : failure);
+      setError(errorNotice(err, failure));
     } finally {
       setBusy(false);
     }
@@ -115,7 +116,7 @@ export function GroupResolverCard({
               >
                 <Text style={[styles.mediumLabel, { fontFamily: ui.font, color: ui.color(canSave ? "ink-on-fill" : "locked") }]}>{COPY.save}</Text>
               </Pressable>
-              {outline(COPY.cancel, "ink-3", () => (setPasting(false), setUrl(""), setError("")), "group-resolver-cancel", "md")}
+              {outline(COPY.cancel, "ink-3", () => (setPasting(false), setUrl(""), setError(null)), "group-resolver-cancel", "md")}
             </View>
           </View>
         ) : dohOverrideUrl ? (
@@ -141,7 +142,7 @@ export function GroupResolverCard({
           </>
         )}
         {!pasting ? <Text style={[small(14, 20), styles.hostNote]}>{COPY.hostNote}</Text> : null}
-        {error ? <Text style={[styles.error, { fontFamily: ui.font, color: ui.color("danger") }]}>{error}</Text> : null}
+        {error ? <ErrorNote notice={error} style={[styles.error, { fontFamily: ui.font, color: ui.color("danger") }]} /> : null}
       </View>
     </View>
   );

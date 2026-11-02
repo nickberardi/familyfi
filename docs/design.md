@@ -123,6 +123,7 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 - An `Alert` has a tone icon, an optional 14px/600 title in the tone's ink, a 14px body in `--ff-ink-2`, and at most one accent text action. Its tint is painted over the card colour so it looks the same on the page and inside a card. One shared component for web and phone.
 - It sits above what it is about and stays until the condition clears. Warning and danger take no dismiss. One alert per condition, at most two per page. A static caution about a consequence (the Lock DNS caution) is a warning too.
 - A **Toast** is a receipt: bottom-centre, one at a time, about 4 seconds, may carry Undo, and is never the only copy of an error.
+- **An error may carry one outbound link** under its message, when the server's error names somewhere to go next (`error.link`, such as the demo's "Set up your own"): the shared `ExternalLink` in accent 14px/600 with its out-arrow, on its own line, with a 44pt touch target in the phone app (on the web the anchor's own box is its target). It is drawn by `ErrorNote` (`src/ui`) on shared cards, `ErrorLine` on web-only cards, as a danger `Alert`'s one action (an `href` action, which is a link, not a button), and under the toast's message, never in its action slot.
 - The **status cards** in the rail and on More (`src/ui/StatusCards.tsx`: sync status, devices to assign, the signed-in account; update available) are not `Alert`s.
 
 ## Forms
@@ -228,7 +229,7 @@ Places where the code and the design project disagree and the operator has not y
 | Group status | One coloured line, "● Online · internet rule paused for everyone until <time>", with the role beside the name | The operator chose a round Online/Blocked badge beside the name, no role, and a line under it that is grey unless someone blocked (red) or unblocked (green) the group; its wording drops "Online ·" ("Internet rule paused until <time>" for one group) (`src/lib/group-actions.ts`, `src/ui/StatusBadge.tsx`). The design project needs the badge, the line colours and the new wording; `groupStatus` labels (Watch, Live Activity) keep the old form |
 | Technical words on household pages | "UniFi policy", "reconcile", "desired state", "DPI" only on Sync and Diagnostics | A custom category's note says "no UniFi policy" (`src/lib/upstream.ts`) |
 | Rule, not schedule | "+ Add a rule", "Pause or change rules →" | "+ Add a schedule", "Pause or change schedules →" (`src/ui/GroupSchedule.tsx`) |
-| Toast | Bottom-centre, about 4 seconds, never the only copy of an error | Top-centre (`AppShell.tsx`), 6 seconds (`NOTICE_MS`), and it shows the store's error itself (`src/ui/Toast.tsx`) with a Dismiss button |
+| Toast | Bottom-centre, about 4 seconds, never the only copy of an error | Top-centre (`AppShell.tsx`), 6 seconds (`NOTICE_MS`), and it shows the store's error itself (`src/ui/Toast.tsx`) with a Dismiss button, and that error's link when it has one |
 | Editors | Leaving with unsaved changes asks first | Editors show "Unsaved" but don't ask on leaving |
 | Back link position | Above the title | Below the page header (`BackLink.tsx`, `RuleEditor.tsx`, `LockDnsPage.tsx`) |
 | Write preview colours | KEEP in `--ff-ink-2` | KEEP in `ink-3` and CHANGE in the accent (`src/ui/RuleEditorForm.tsx`) |

@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
-import type { ApiRequest } from "@/lib/api-client";
+import { errorNotice, type ApiRequest, type ErrorNotice } from "@/lib/api-client";
 import { resolverScheduleLine, toggleProbeDay, type UpstreamResolverSettings } from "@/lib/upstream";
 import { CATEGORIES_COPY, canSaveResolverUrl, clearResolver, saveResolverUrl, updateResolver } from "@/lib/upstream-writes";
 
 import { Button } from "./Button";
+import { ErrorNote } from "./ErrorNote";
 import { useUI } from "./UIContext";
 
 const COPY = CATEGORIES_COPY.resolver;
@@ -35,19 +36,19 @@ export function ResolverCard({
   const [pasting, setPasting] = useState(false);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const off = busy || !enabled;
   const canSave = !off && canSaveResolverUrl(url);
   const small = (size: number, lineHeight: number, token = "ink-3") => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
 
   async function run(work: () => Promise<unknown>, failure: string) {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await work();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : failure);
+      setError(errorNotice(err, failure));
     } finally {
       setBusy(false);
     }
@@ -148,7 +149,7 @@ export function ResolverCard({
                 onPress={() => {
                   setPasting(false);
                   setUrl("");
-                  setError("");
+                  setError(null);
                 }}
                 testID="resolver-cancel"
               />
@@ -162,7 +163,7 @@ export function ResolverCard({
           </View>
         )}
 
-        {error ? <Text style={[small(14, 20, "danger"), styles.error]}>{error}</Text> : null}
+        {error ? <ErrorNote notice={error} style={[small(14, 20, "danger"), styles.error]} /> : null}
       </View>
     </View>
   );

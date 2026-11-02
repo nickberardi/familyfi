@@ -2,7 +2,9 @@
 
 import { useRef, useState } from "react";
 import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SECONDARY_BUTTON } from "@/components/ui/buttons";
+import { ErrorLine } from "@/components/ErrorLine";
 import { api } from "@/lib/api";
+import { errorNotice, type ErrorNotice } from "@/lib/api-client";
 import { BACKUP_COPY as COPY, importSummaryLines } from "@/lib/backup-copy";
 import type { ImportSummary } from "@/lib/types";
 
@@ -24,7 +26,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportSummary | null>(null);
   const [busy, setBusy] = useState<"" | "reading" | "applying">("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorNotice | null>(null);
   const [done, setDone] = useState(false);
 
   async function choose(chosen: File | undefined) {
@@ -32,12 +34,12 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
     setFile(chosen);
     setPreview(null);
     setDone(false);
-    setError("");
+    setError(null);
     setBusy("reading");
     try {
       setPreview((await upload(chosen, "preview")).summary);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : COPY.readFailed);
+      setError(errorNotice(failure, COPY.readFailed));
     } finally {
       setBusy("");
       if (input.current) input.current.value = "";
@@ -47,7 +49,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
   async function apply() {
     if (!file) return;
     setBusy("applying");
-    setError("");
+    setError(null);
     try {
       const { summary } = await upload(file, "apply");
       setPreview(null);
@@ -55,7 +57,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
       setDone(true);
       await onImported(summary);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : COPY.applyFailed);
+      setError(errorNotice(failure, COPY.applyFailed));
     } finally {
       setBusy("");
     }
@@ -115,7 +117,7 @@ export function BackupImport({ onImported }: { onImported: (summary: ImportSumma
         </div>
       ) : null}
       {done ? <p className="text-[14px] text-[var(--ff-ink)]" role="status">{COPY.done}</p> : null}
-      {error ? <p className="text-[14px] text-[var(--ff-danger)]" role="alert">{error}</p> : null}
+      {error ? <ErrorLine notice={error} className="text-[14px] text-[var(--ff-danger)]" /> : null}
     </div>
   );
 }

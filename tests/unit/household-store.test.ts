@@ -5,7 +5,7 @@
  * stale view never sends or queues a write.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, TransportError, type ApiRequest } from "@/lib/api-client";
+import { ApiError, apiErrorOf, TransportError, type ApiRequest } from "@/lib/api-client";
 import {
   applyGroupPause,
   applyGroupSheet,
@@ -54,10 +54,7 @@ function fakeServer(routes: Record<string, Handler>) {
     const handler = routes[`${method} ${path}`];
     if (!handler) throw new ApiError("No route", 404, "not_found");
     const { status = 200, json } = await handler(init.body);
-    if (status >= 400) {
-      const error = (json as { error: { message: string; code?: string } }).error;
-      throw new ApiError(error.message, status, error.code);
-    }
+    if (status >= 400) throw apiErrorOf(json, status);
     return json as T;
   };
   return { request, calls };
@@ -324,6 +321,24 @@ describe("household store", () => {
     });
     expect(store.getState().groups[0]?.access).toBe("available");
     expect(store.getState().error).toBe("No internet window is blocking right now.");
+  });
+
+  it("keeps an error's link beside it, and drops it with the error", async () => {
+    const link = { label: "Set up your own", url: "https://github.com/nickberardi/familyfi#install" };
+    const { store } = setup({
+      ...reads(() => childGroup()),
+      "POST /api/v1/rules/quarantine/on": () => ({ status: 403, json: { error: { code: "demo_locked", message: "This is a shared demo.", link } } }),
+      "POST /api/v1/groups/group-child/rules/internet/allow": () => ({ status: 409, json: { error: { code: "not_in_window", message: "No internet window is blocking right now." } } }),
+    });
+    await store.reload();
+    await store.mutate((send) => send("/api/v1/rules/quarantine/on", { method: "POST" }));
+    expect(store.getState()).toMatchObject({ error: "This is a shared demo.", errorLink: link });
+    // The next error has no link, so none is left over from the last.
+    await store.mutate((send) => send("/api/v1/groups/group-child/rules/internet/allow", { method: "POST", body: {} }));
+    expect(store.getState()).toMatchObject({ error: "No internet window is blocking right now.", errorLink: null });
+    await store.mutate((send) => send("/api/v1/rules/quarantine/on", { method: "POST" }));
+    store.dismissFeedback();
+    expect(store.getState()).toMatchObject({ error: "", errorLink: null });
   });
 
   it("reports a failed change from the gateway", async () => {

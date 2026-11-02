@@ -2,6 +2,7 @@ import { ConnectionTransport, ConnectionTrustMode, RouteKind } from "@prisma/cli
 import { nextClockOnDays } from "@/lib/clock";
 import { assertEndpoint } from "./connection";
 import { prisma } from "./db";
+import { DEMO_SET_UP_LINK } from "@/lib/demo";
 import { jsonError } from "./http";
 import { demoModeEnabled } from "./env";
 
@@ -34,14 +35,14 @@ export async function startDemoReset(now = new Date(), exit: () => void = () => 
   return at;
 }
 
-export const DEMO_LOCKED = "Settings are locked in the demo. Groups, rules, devices and pairing work as they do at home.";
+export const DEMO_LOCKED = "Settings and setup are locked in this shared demo. You can still try groups, rules, devices and pairing a phone.";
 
 /**
  * Refuses a configuration write in demo mode, where every visitor shares one household: the gateway,
  * household settings, accounts, resolvers and how phones connect stay as the demo set them.
  */
 export function demoLocked(): Response | null {
-  return demoModeEnabled() ? jsonError(403, "demo_locked", DEMO_LOCKED) : null;
+  return demoModeEnabled() ? jsonError(403, "demo_locked", DEMO_LOCKED, DEMO_SET_UP_LINK) : null;
 }
 
 /**
