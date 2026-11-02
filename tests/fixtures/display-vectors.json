@@ -14554,7 +14554,7 @@
       },
       "expected": {
         "badge": "blocked",
-        "detail": "By Nick, until you unblock",
+        "detail": "Until you unblock, by Nick",
         "change": "blocked"
       }
     },
