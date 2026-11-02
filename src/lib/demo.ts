@@ -6,7 +6,8 @@ export const DEMO_NOTICE = "Demo, resets nightly. The household and gateway are 
 /**
  * The demo's shared login: the seed household's administrator (`DEV_ADMIN` in `src/server/dev-household.ts`),
  * whose password is `FAMILYFI_DEFAULT_PASSWORD`, as the recovery account's is. Not the recovery
- * account: no phone signs in as that, so a visitor signed in as it could not pair the app.
+ * account: no phone signs in as that, so a visitor signed in as it would have to pick another
+ * administrator to pair the app, and could not connect an agent.
  */
 export const DEMO_USERNAME = "nick";
 
