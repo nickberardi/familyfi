@@ -48,17 +48,20 @@ FamilyFi runs on a small computer in your home and connects to your UniFi consol
 
 ## Install
 
-On that computer, make a folder for FamilyFi and run these three commands in it:
+On that computer, run:
 
 ```bash
+# Get FamilyFi
+mkdir familyfi && cd familyfi
 curl -fsSLO https://raw.githubusercontent.com/nickberardi/familyfi/main/docker/docker-compose.yml
 echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" > .env
 docker compose up -d
+# Open http://<your-host>:7001
 ```
 
-The second line makes a random password for FamilyFi's database. You never need to type it, but keep the `.env` file.
+This makes a `familyfi` folder, downloads FamilyFi into it, makes a random password for its database, and starts it. You never need to type that password, but keep the `.env` file.
 
-Then open **http://&lt;that computer's address&gt;:7001** in a browser, for example `http://192.168.1.20:7001`. Keep this address on your home network; don't forward it from your router.
+Then open **http://&lt;your-host&gt;:7001** in a browser, where *your-host* is that computer's address, for example `http://192.168.1.20:7001`. Keep this address on your home network; don't forward it from your router.
 
 The [install guide](https://github.com/nickberardi/familyfi/wiki/Install) covers changing the port, stopping and starting, and finding your admin password again.
 
