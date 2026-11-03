@@ -28,7 +28,7 @@ import type { Device, Group } from "./types";
 export type GroupSheetTarget =
   | { kind: "block"; mode: PauseSheetMode }
   | { kind: "unblock"; mode: PauseSheetMode }
-  | { kind: "rule"; ruleIds: string[]; name: string; mode: PauseSheetMode };
+  | { kind: "rule"; ruleIds: string[]; name: string; mode: PauseSheetMode; wording?: "unblock" };
 
 /**
  * A group sheet as every client shows it: its title and body, the choices from the group's rules
@@ -46,7 +46,8 @@ export function groupSheet(
   recent: CustomPause | null = null,
 ) {
   const { mode } = target;
-  const confirm = mode === "extend" ? "Add time" : target.kind === "block" ? "Block" : target.kind === "unblock" ? "Unblock" : "Pause";
+  const unblocking = target.kind === "unblock" || (target.kind === "rule" && target.wording === "unblock");
+  const confirm = mode === "extend" ? "Add time" : target.kind === "block" ? "Block" : unblocking ? "Unblock" : "Pause";
   let sheet: { title: string; body: string; options: PauseSheetOption[]; custom: (custom: CustomPause, at?: Date) => PauseSheetOption | null };
   if (target.kind === "block") {
     const deviceNames = devices.filter((device) => device.groupId === group.id).map((device) => device.hostname ?? "");
@@ -70,7 +71,7 @@ export function groupSheet(
     const paused = groupRulePause(group, zone, now);
     const pause = { active: Boolean(paused), until: paused?.until ?? null, kind: "pause" as const, by: paused?.by ?? null };
     sheet = {
-      title: groupRuleSheetTitle(group, target.name, mode),
+      title: groupRuleSheetTitle(group, target.name, mode, target.wording),
       body: groupRuleSheetBody(group, target.name, mode),
       options: rulePauseSheetOptions({ pause }, zone.flatMap(ruleInternetWindows), mode, timezone, now),
       custom: (custom, at = now) => rulePauseSheetCustom({ pause }, custom, mode, timezone, at),

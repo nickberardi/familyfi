@@ -244,8 +244,10 @@ export function unblockSheetCustom(unblock: GroupLiftState | null, custom: Custo
  * for everyone else. Its choices are a rule's (`rulePauseSheetOptions`), from the group's lift.
  */
 
-export function groupRuleSheetTitle(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
-  return mode === "extend" ? `Keep ${name} paused for ${group.name} longer?` : `Pause ${name} for ${group.name}?`;
+/** A rule's sheet for one group; from the card's dropdown it reads as an unblock (`wording`), on the group's page as a pause. */
+export function groupRuleSheetTitle(group: Pick<Group, "name">, name: string, mode: PauseSheetMode, wording?: "unblock"): string {
+  if (mode === "extend") return `Keep ${name} paused for ${group.name} longer?`;
+  return wording === "unblock" ? `Unblock ${name} for ${group.name}?` : `Pause ${name} for ${group.name}?`;
 }
 
 export function groupRuleSheetBody(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {

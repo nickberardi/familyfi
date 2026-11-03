@@ -22,7 +22,7 @@ import type { Actor, Group } from "./types";
  * rule, which is how the group is set up rather than a block on it. A single rule under a group is
  * unblocked and blocked again, for that group alone, from the card's dropdown or the group's page. Either
  * way the rule itself never changes, and a place shows one button for its state, never its
- * opposite beside it.
+ * opposite beside it; the dropdown is where the other choices go (Block internet beside Unblock).
  */
 
 /** What a tap on the group's header button, or its More time link, does. */

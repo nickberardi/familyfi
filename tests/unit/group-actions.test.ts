@@ -87,8 +87,8 @@ describe("groupCardControls", () => {
     controls.menu[1]!.onPress();
     controls.menu[2]!.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([
-      { kind: "rule", run: "pause", ruleIds: ["r-tiktok"], name: "No TikTok" },
-      { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "TV video evenings" },
+      { kind: "rule", run: "pause", ruleIds: ["r-tiktok"], name: "No TikTok", wording: "unblock" },
+      { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "TV video evenings", wording: "unblock" },
     ]);
   });
 
@@ -115,6 +115,7 @@ describe("runGroupCardAction", () => {
     for (const run of ["block", "moreBlock", "unblock", "moreUnblock"] as const) runGroupCardAction(mutate, tv, { kind: "header", run }, openSheet);
     runGroupCardAction(mutate, tv, { kind: "rule", run: "pause", ruleIds: ["r-video"], name: "Video" }, openSheet);
     runGroupCardAction(mutate, tv, { kind: "rule", run: "extend", ruleIds: ["r-video"], name: "Video" }, openSheet);
+    runGroupCardAction(mutate, tv, { kind: "rule", run: "pause", ruleIds: ["r-video"], name: "Video", wording: "unblock" }, openSheet);
     expect(openSheet.mock.calls.map(([target]) => target)).toEqual([
       { kind: "block", mode: "pause" },
       { kind: "block", mode: "extend" },
@@ -122,6 +123,7 @@ describe("runGroupCardAction", () => {
       { kind: "unblock", mode: "extend" },
       { kind: "rule", ruleIds: ["r-video"], name: "Video", mode: "pause" },
       { kind: "rule", ruleIds: ["r-video"], name: "Video", mode: "extend" },
+      { kind: "rule", ruleIds: ["r-video"], name: "Video", mode: "pause", wording: "unblock" },
     ]);
     expect(mutate).not.toHaveBeenCalled();
 
@@ -129,6 +131,14 @@ describe("runGroupCardAction", () => {
     runGroupCardAction(mutate, tv, { kind: "header", run: "unblockNow" }, openSheet);
     runGroupCardAction(mutate, tv, { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video" }, openSheet);
     expect(mutate).toHaveBeenCalledTimes(3);
-    expect(openSheet).toHaveBeenCalledTimes(6);
+    expect(openSheet).toHaveBeenCalledTimes(7);
+  });
+});
+
+describe("Block <rule> again from the card", () => {
+  it("resumes the rule for the group at once and says so", () => {
+    const mutate = vi.fn((..._args: unknown[]) => Promise.resolve(undefined));
+    runGroupCardAction(mutate, group(), { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video", wording: "unblock" }, vi.fn());
+    expect(mutate.mock.calls[0]![1]).toMatchObject({ groupId: "g1", feedback: { notice: "Video blocked again for TV." } });
   });
 });
