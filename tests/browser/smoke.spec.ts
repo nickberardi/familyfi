@@ -1088,8 +1088,8 @@ test("a group card's one button and its rule dropdown, its schedule link, Show l
     await card.getByRole("button", { name: `More choices for ${name}` }).click();
     await expect(choice).toHaveText(`Unblock ${name} video`);
     await choice.click();
-    // The dropdown's choice opens the rule's own pause sheet, for this group alone.
-    const fromCard = page.getByRole("dialog", { name: `Pause ${name} video for ${name}?` });
+    // The dropdown's choice opens the rule's own sheet, for this group alone, worded as an unblock.
+    const fromCard = page.getByRole("dialog", { name: `Unblock ${name} video for ${name}?` });
     const pausedFromCard = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
     await fromCard.getByRole("button", { name: /For 30 minutes/ }).click();
     expect((await pausedFromCard).ok()).toBeTruthy();
@@ -1103,7 +1103,7 @@ test("a group card's one button and its rule dropdown, its schedule link, Show l
     await card.getByRole("button", { name: `More choices for ${name}` }).click();
     await card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`).click();
     const pausedAgain = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
-    await page.getByRole("dialog", { name: `Pause ${name} video for ${name}?` }).getByRole("button", { name: /For 30 minutes/ }).click();
+    await page.getByRole("dialog", { name: `Unblock ${name} video for ${name}?` }).getByRole("button", { name: /For 30 minutes/ }).click();
     expect((await pausedAgain).ok()).toBeTruthy();
     await card.getByTestId(`group-show-less-${group.id}`).click();
     await expect(card.getByTestId(`group-action-block-${group.id}`)).toHaveCount(0);

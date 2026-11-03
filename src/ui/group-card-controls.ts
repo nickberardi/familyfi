@@ -33,7 +33,7 @@ export function groupCardControls(
       label: item.label,
       disabled: !enabled,
       onPress: () =>
-        onRun(item.run === "blockInternet" ? { kind: "header", run: "block" } : { kind: "rule", run: item.run, ruleIds: item.ruleIds, name: item.name }),
+        onRun(item.run === "blockInternet" ? { kind: "header", run: "block" } : { kind: "rule", run: item.run, ruleIds: item.ruleIds, name: item.name, wording: "unblock" }),
       testID: item.run === "blockInternet" ? `group-menu-block-${group.id}` : `group-menu-${item.run}-${item.ruleIds.join("-")}-${group.id}`,
     }),
   );

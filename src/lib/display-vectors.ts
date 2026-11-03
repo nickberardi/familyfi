@@ -72,7 +72,7 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   withCustomChoices: (i) => pauseSheet.withCustomChoices(i.options, i.recent),
   // Each device keeps its last custom choice in this shape, so every client reads back the same.
   parseCustomPause: (i) => pauseSheet.parseCustomPause(i.stored),
-  groupRuleSheetTitle: (i) => pauseSheet.groupRuleSheetTitle(i.group, i.name, i.mode),
+  groupRuleSheetTitle: (i) => pauseSheet.groupRuleSheetTitle(i.group, i.name, i.mode, i.wording),
   groupRuleSheetBody: (i) => pauseSheet.groupRuleSheetBody(i.group, i.name, i.mode),
   ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),
   ruleStateLine: (i) => ruleActions.ruleStateLine(i.rule, i.timeZone, at(i.now)),
