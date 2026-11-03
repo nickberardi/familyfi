@@ -1073,27 +1073,38 @@ test("a group card's one button and its rule dropdown, its schedule link, Show l
     await page.goto("/family");
     const card = page.locator("article").filter({ has: page.getByTestId(`filter-marks-${group.id}`) });
     // Closed, the card shows no button. Open, an always-on Video rule is how the group is set up, not
-    // a block on it, so its one button is Block, with the rule's Pause in the dropdown beside it.
+    // a block on it, so its one button is Block, with Unblock for that rule in the dropdown beside it.
     await expect(card.getByTestId(`group-action-block-${group.id}`)).toHaveCount(0);
     await card.locator("button[aria-expanded=false]").first().click();
     await expect(card.getByTestId(`group-action-block-${group.id}`)).toBeVisible();
     await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toHaveCount(0);
     await expect(card.getByRole("heading", { name: "Today’s schedule" })).toBeVisible();
-    await card.getByRole("button", { name: `Pause a rule for ${name}` }).click();
+    await card.getByRole("button", { name: `More choices for ${name}` }).click();
     await page.keyboard.press("Escape");
     const choice = card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`);
     await expect(choice).toHaveCount(0);
     // Escape hands focus back to the caret.
-    await expect(card.getByRole("button", { name: `Pause a rule for ${name}` })).toBeFocused();
-    await card.getByRole("button", { name: `Pause a rule for ${name}` }).click();
-    await expect(choice).toHaveText(`Pause ${name} video`);
+    await expect(card.getByRole("button", { name: `More choices for ${name}` })).toBeFocused();
+    await card.getByRole("button", { name: `More choices for ${name}` }).click();
+    await expect(choice).toHaveText(`Unblock ${name} video`);
     await choice.click();
     // The dropdown's choice opens the rule's own pause sheet, for this group alone.
     const fromCard = page.getByRole("dialog", { name: `Pause ${name} video for ${name}?` });
     const pausedFromCard = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
     await fromCard.getByRole("button", { name: /For 30 minutes/ }).click();
     expect((await pausedFromCard).ok()).toBeTruthy();
-    await expect(card.getByRole("button", { name: `Pause a rule for ${name}` })).toHaveCount(0);
+    // The paused rule can be blocked again from the same dropdown, at once.
+    await card.getByRole("button", { name: `More choices for ${name}` }).click();
+    const again = card.getByTestId(`group-menu-resume-${rule.id}-${group.id}`);
+    await expect(again).toHaveText(`Block ${name} video again`);
+    const resumedFromCard = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/resume`));
+    await again.click();
+    expect((await resumedFromCard).ok()).toBeTruthy();
+    await card.getByRole("button", { name: `More choices for ${name}` }).click();
+    await card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`).click();
+    const pausedAgain = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
+    await page.getByRole("dialog", { name: `Pause ${name} video for ${name}?` }).getByRole("button", { name: /For 30 minutes/ }).click();
+    expect((await pausedAgain).ok()).toBeTruthy();
     await card.getByTestId(`group-show-less-${group.id}`).click();
     await expect(card.getByTestId(`group-action-block-${group.id}`)).toHaveCount(0);
 
@@ -1112,6 +1123,42 @@ test("a group card's one button and its rule dropdown, its schedule link, Show l
     await expect(page.getByTestId(`schedule-${group.id}`).getByText(/Paused until /)).toBeVisible();
     await page.getByTestId(`schedule-resume-${rule.id}-${group.id}`).click();
     await expect(page.getByTestId(`schedule-pause-${rule.id}-${group.id}`)).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
+    await page.request.delete(`/api/v1/groups/${group.id}`, { headers: await csrfHeaders(page) });
+  }
+});
+
+test("a scheduled category rule on now makes the card's button Unblock, with Block internet in its dropdown", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const name = `QA unblock ${test.info().project.name} ${Date.now() % 100000}`;
+  const made = await page.request.post("/api/v1/groups", { headers: await csrfHeaders(page), data: { name, kind: "family", familyRole: "child" } });
+  expect(made.ok()).toBeTruthy();
+  const { group } = (await made.json()) as { group: { id: string } };
+  // On every day but its last minute, so the rule is blocking whenever the test runs.
+  const created = await page.request.post("/api/v1/rules", {
+    headers: await csrfHeaders(page),
+    data: { name: `${name} video`, kind: "category", groupIds: [group.id], targetIds: [4], mode: "scheduled", windows: [{ name: "Day", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] },
+  });
+  expect(created.ok()).toBeTruthy();
+  const { rule } = (await created.json()) as { rule: { id: string } };
+
+  try {
+    await page.goto("/family");
+    const card = page.locator("article").filter({ has: page.getByTestId(`filter-marks-${group.id}`) });
+    await card.locator("button[aria-expanded=false]").first().click();
+    // The group still has the internet, but Video is blocked on its schedule: Unblock lifts it.
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toBeVisible();
+    await expect(card.getByTestId(`group-action-block-${group.id}`)).toHaveCount(0);
+    await card.getByRole("button", { name: `More choices for ${name}` }).click();
+    // The only rule is the one Unblock lifts, so the dropdown offers just Block internet.
+    await expect(card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`)).toHaveCount(0);
+    await card.getByTestId(`group-menu-block-${group.id}`).click();
+    const sheet = page.getByRole("dialog", { name: new RegExp(`^Block .*${name}`) });
+    const blocked = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/internet/pause`));
+    await sheet.getByRole("button", { name: /For 30 minutes/ }).click();
+    expect((await blocked).ok()).toBeTruthy();
+    await expect(card.getByTestId(`group-action-unblock-${group.id}`)).toBeVisible();
   } finally {
     await page.request.delete(`/api/v1/rules/${rule.id}`, { headers: await csrfHeaders(page) });
     await page.request.delete(`/api/v1/groups/${group.id}`, { headers: await csrfHeaders(page) });

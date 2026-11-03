@@ -7,8 +7,8 @@ import type { ZoneAction } from "./CardActions";
 
 /**
  * A group's one button, as every client draws it: Block, Unblock or Resume, with More time while
- * a timed block or unblock lasts, and, while a category, app or website rule blocks part of the
- * group's internet, a dropdown (`menu`) to pause each such rule for the group from its sheet. Each
+ * a timed block or unblock lasts, and, while a category, app or website rule blocks the group or is
+ * lifted for it, a dropdown (`menu`): Block internet, and unblock or block again one rule for the group. Each
  * tap goes to `onRun` (`runGroupCardAction`); `enabled` is false while the view is stale or a write
  * is in flight. On the group's page, its schedule (`GroupSchedule`) pauses each rule instead.
  */
@@ -32,8 +32,9 @@ export function groupCardControls(
     (item): ZoneAction => ({
       label: item.label,
       disabled: !enabled,
-      onPress: () => onRun({ kind: "rule", run: "pause", ruleIds: item.ruleIds, name: item.name }),
-      testID: `group-menu-pause-${item.ruleIds.join("-")}-${group.id}`,
+      onPress: () =>
+        onRun(item.run === "blockInternet" ? { kind: "header", run: "block" } : { kind: "rule", run: item.run, ruleIds: item.ruleIds, name: item.name }),
+      testID: item.run === "blockInternet" ? `group-menu-block-${group.id}` : `group-menu-${item.run}-${item.ruleIds.join("-")}-${group.id}`,
     }),
   );
   return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu };

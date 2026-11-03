@@ -60,18 +60,36 @@ describe("groupCardControls", () => {
     const controls = groupCardControls(group({ suspension: { active: true, until: null, by: null } }), [downtime, video], TZ, NOW, onRun);
     expect(controls.action).toMatchObject({ label: "Unblock", strong: true, testID: "group-action-unblock-g1" });
     expect(controls.more).toBeNull();
-    expect(controls.menu).toEqual([]);
     controls.action.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "unblock" }]);
   });
 
-  it("keeps Block while a category rule blocks part of the group, and pauses that rule from the dropdown", () => {
+  it("shows Unblock while a scheduled category rule blocks part of the group, with Block internet in its dropdown", () => {
     const onRun = vi.fn();
     const controls = groupCardControls(group(), [downtime, video], TZ, NOW, onRun);
-    expect(controls.action).toMatchObject({ label: "Block", testID: "group-action-block-g1" });
-    expect(controls.menu.map((item) => [item.label, item.testID])).toEqual([["Pause TV video evenings", "group-menu-pause-r-video-g1"]]);
+    expect(controls.action).toMatchObject({ label: "Unblock", testID: "group-action-unblock-g1" });
+    expect(controls.menu.map((item) => [item.label, item.testID])).toEqual([["Block internet", "group-menu-block-g1"]]);
     controls.menu[0]!.onPress();
-    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "rule", run: "pause", ruleIds: ["r-video"], name: "TV video evenings" }]);
+    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "block" }]);
+  });
+
+  it("unblocks one rule from its sheet, and blocks a lifted one again at once, from the dropdown", () => {
+    const onRun = vi.fn();
+    const social = rule({ id: "r-social", name: "No social", kind: "category", targetIds: [5], windows: [{ id: "w3", name: "", days: [1, 2, 3, 4, 5], start: "16:00", end: "19:00" }] });
+    const pausedVideo = { ...video, groupPauses: [{ groupId: "g1", pause: { active: true, until: null, kind: "pause" as const, by: null } }] };
+    const controls = groupCardControls(group(), [downtime, pausedVideo, social, rule({ id: "r-tiktok", name: "No TikTok", kind: "domain", mode: "always" })], TZ, NOW, onRun);
+    expect(controls.action).toMatchObject({ label: "Unblock" });
+    expect(controls.menu.map((item) => [item.label, item.testID])).toEqual([
+      ["Block internet", "group-menu-block-g1"],
+      ["Unblock No TikTok", "group-menu-pause-r-tiktok-g1"],
+      ["Block TV video evenings again", "group-menu-resume-r-video-g1"],
+    ]);
+    controls.menu[1]!.onPress();
+    controls.menu[2]!.onPress();
+    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([
+      { kind: "rule", run: "pause", ruleIds: ["r-tiktok"], name: "No TikTok" },
+      { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "TV video evenings" },
+    ]);
   });
 
   it("disables the button and its dropdown while the view is stale", () => {
