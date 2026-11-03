@@ -988,6 +988,12 @@
         "sync"
       ]
     },
+    "tests/unit/card-menu.test.ts": {
+      "categories": [
+        "display",
+        "groups"
+      ]
+    },
     "tests/unit/day-timeline.test.ts": {
       "categories": [
         "display",
