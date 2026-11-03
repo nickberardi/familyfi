@@ -1,6 +1,6 @@
 import { groupHeaderActions } from "@/lib/group-actions";
 import type { GroupCardRun } from "@/lib/group-writes";
-import type { Rule } from "@/lib/rules";
+import { groupLift, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
 import type { ZoneAction } from "./CardActions";
@@ -21,6 +21,10 @@ export function groupCardControls(
   enabled = true,
 ): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[] } {
   const header = groupHeaderActions(group, rules, timezone, now);
+  const liftedUntil = (ruleIds: string[]) => {
+    const rule = rules.find((candidate) => candidate.id === ruleIds[0]);
+    return (rule && groupLift(rule, group.id, now)?.until) ?? null;
+  };
   const asHeader = (spec: typeof header.action, strong: boolean): ZoneAction => ({
     label: spec.label,
     strong,
@@ -33,7 +37,7 @@ export function groupCardControls(
       label: item.label,
       disabled: !enabled,
       onPress: () =>
-        onRun(item.run === "blockInternet" ? { kind: "header", run: "block" } : { kind: "rule", run: item.run, ruleIds: item.ruleIds, name: item.name, wording: "unblock" }),
+        onRun(item.run === "blockInternet" ? { kind: "header", run: "block" } : { kind: "rule", run: item.run, ruleIds: item.ruleIds, name: item.name, wording: "unblock", ...(item.run === "resume" ? { liftedUntil: liftedUntil(item.ruleIds) } : {}) }),
       testID: item.run === "blockInternet" ? `group-menu-block-${group.id}` : `group-menu-${item.run}-${item.ruleIds.join("-")}-${group.id}`,
     }),
   );

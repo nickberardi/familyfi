@@ -91,12 +91,20 @@ export function runGroupHeaderAction(mutate: Mutate, group: Group, run: "unblock
   });
 }
 
-/** A rule area's Resume: its rules apply to the group again. From the card's dropdown (`blockedAgain`, the rule's name) it says so. */
-export function resumeGroupRules(mutate: Mutate, group: Group, ruleIds: string[], blockedAgain?: string) {
+/**
+ * A rule area's Resume: its rules apply to the group again. From the card's dropdown (`blockedAgain`:
+ * the rule's name, and until when it was lifted) it says so, and Undo lifts it again until then.
+ */
+export function resumeGroupRules(mutate: Mutate, group: Group, ruleIds: string[], blockedAgain?: { name: string; until: string | null }) {
   const paths = ruleIds.map((ruleId) => `/api/v1/groups/${group.id}/rules/${ruleId}`);
+  if (!blockedAgain) return mutate((send) => sendEach(send, paths, "resume"), { groupId: group.id });
+  const { name, until: lifted } = blockedAgain;
   return mutate((send) => sendEach(send, paths, "resume"), {
     groupId: group.id,
-    ...(blockedAgain ? { feedback: { notice: `${blockedAgain.charAt(0).toUpperCase()}${blockedAgain.slice(1)} blocked again for ${group.name}.` } } : {}),
+    feedback: {
+      notice: `${name.charAt(0).toUpperCase()}${name.slice(1)} blocked again for ${group.name}.`,
+      action: { label: "Undo", run: (send) => sendEach(send, paths, "pause", lifted === null ? {} : { until: lifted }) },
+    },
   });
 }
 
@@ -195,7 +203,15 @@ export function addInternetPreset(mutate: Mutate, group: Pick<Group, "id" | "nam
 /** A tap on a group card: its header's button or More time, or a rule area's (`ruleIds`, called `name`). */
 export type GroupCardRun =
   | { kind: "header"; run: GroupRun }
-  | { kind: "rule"; run: GroupRuleRun; ruleIds: string[]; name: string; wording?: "unblock" };
+  | {
+      kind: "rule";
+      run: GroupRuleRun;
+      ruleIds: string[];
+      name: string;
+      /** From the card's dropdown: its sheet and notices say unblock, and a Block again can be undone back to `liftedUntil`. */
+      wording?: "unblock";
+      liftedUntil?: string | null;
+    };
 
 /**
  * What a group card's tap does, the same on every client: Block, Unblock, Pause and every More
@@ -204,7 +220,9 @@ export type GroupCardRun =
  */
 export function runGroupCardAction(mutate: Mutate, group: Group, tap: GroupCardRun, openSheet: (target: GroupSheetTarget) => void) {
   if (tap.kind === "rule") {
-    if (tap.run === "resume") return void resumeGroupRules(mutate, group, tap.ruleIds, tap.wording === "unblock" ? tap.name : undefined);
+    if (tap.run === "resume") {
+      return void resumeGroupRules(mutate, group, tap.ruleIds, tap.wording === "unblock" ? { name: tap.name, until: tap.liftedUntil ?? null } : undefined);
+    }
     return openSheet({ kind: "rule", ruleIds: tap.ruleIds, name: tap.name, mode: tap.run === "extend" ? "extend" : "pause", ...(tap.wording ? { wording: tap.wording } : {}) });
   }
   switch (tap.run) {

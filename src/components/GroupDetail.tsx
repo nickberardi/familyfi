@@ -9,6 +9,7 @@ import { groupBadge, groupDetailColor, groupStatusParts } from "@/lib/group-acti
 import { StatusBadge } from "@/ui/StatusBadge";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
 import { groupCardControls } from "@/ui/group-card-controls";
+import { CardMenuButton } from "@/ui/CardActions";
 import { deviceName } from "@/lib/device-assign";
 import { DeviceLink } from "@/components/DeviceLink";
 import { internetRulesForGroup, internetWindowsForGroup } from "@/lib/rules";
@@ -56,8 +57,8 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
       {/* 960px of content, as the design has it, plus the page padding either side. */}
       <div className="flex max-w-[992px] flex-col gap-[18px] p-4 md:max-w-[1008px] md:p-6">
         <BackLink href={kind === "family" ? "/family" : "/things"} label={kind === "family" ? "Family" : "Things"} />
-        <section className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
-          <div className="flex items-start gap-3 px-[18px] pt-4 pb-3">
+        <section className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+          <div className="relative z-20 flex items-start gap-3 px-[18px] pt-4 pb-3">
             <div className="min-w-0 flex-1">
               {/* One name for the heading, "Blocked, Until 1:26 PM by Nick", not the badge and line run together. */}
               <h2
@@ -80,15 +81,20 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
                 </button>
               ) : null}
             </div>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={header.action.onPress}
-              data-testid={header.action.testID}
-              className={`shrink-0 ${PRIMARY_BUTTON}`}
-            >
-              {header.action.label}
-            </button>
+            {header.menu.length ? (
+              // The card's dropdown too, so the page can always block the internet or act on one rule.
+              <CardMenuButton action={header.action} menu={header.menu} menuLabel={`More choices for ${group.name}`} />
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={header.action.onPress}
+                data-testid={header.action.testID}
+                className={`shrink-0 ${PRIMARY_BUTTON}`}
+              >
+                {header.action.label}
+              </button>
+            )}
           </div>
           <div className="px-3 pb-3">
             <GroupSchedule

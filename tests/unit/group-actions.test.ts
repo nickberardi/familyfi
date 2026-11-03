@@ -88,7 +88,7 @@ describe("groupCardControls", () => {
     controls.menu[2]!.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([
       { kind: "rule", run: "pause", ruleIds: ["r-tiktok"], name: "No TikTok", wording: "unblock" },
-      { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "TV video evenings", wording: "unblock" },
+      { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "TV video evenings", wording: "unblock", liftedUntil: null },
     ]);
   });
 
@@ -138,8 +138,13 @@ describe("runGroupCardAction", () => {
 describe("Block <rule> again from the card", () => {
   it("resumes the rule for the group at once and says so", () => {
     const mutate = vi.fn((..._args: unknown[]) => Promise.resolve(undefined));
-    runGroupCardAction(mutate, group(), { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video", wording: "unblock" }, vi.fn());
-    expect(mutate.mock.calls[0]![1]).toMatchObject({ groupId: "g1", feedback: { notice: "Video blocked again for TV." } });
+    runGroupCardAction(mutate, group(), { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video", wording: "unblock", liftedUntil: "2026-10-15T22:00:00.000Z" }, vi.fn());
+    const options = mutate.mock.calls[0]![1] as { feedback: { notice: string; action: { label: string; run: (send: unknown) => Promise<unknown> } } };
+    expect(options).toMatchObject({ groupId: "g1", feedback: { notice: "Video blocked again for TV.", action: { label: "Undo" } } });
+    // Undo lifts the rule for the group again, until it was lifted before.
+    const send = vi.fn(() => Promise.resolve({ rule: {}, change: { changeId: "c" } }));
+    void options.feedback.action.run(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/pause", { method: "POST", body: { until: "2026-10-15T22:00:00.000Z" } });
     runGroupCardAction(mutate, group(), { kind: "rule", run: "resume", ruleIds: ["r-g"], name: "gaming", wording: "unblock" }, vi.fn());
     expect(mutate.mock.calls[1]![1]).toMatchObject({ feedback: { notice: "Gaming blocked again for TV." } });
   });
