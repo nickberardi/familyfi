@@ -320,7 +320,10 @@ function groupMenu(group: Group, rules: Rule[], run: GroupRun, timezone: string,
     items.push({ label: `Unblock ${name}`, run: "pause", ruleIds: [item.ruleId], name });
   }
   for (const rule of scoped) {
-    if (groupLift(rule, group.id, now)?.kind === "pause") items.push({ label: `Block ${rule.name} again`, run: "resume", ruleIds: [rule.id], name: rule.name });
+    if (groupLift(rule, group.id, now)?.kind !== "pause") continue;
+    // An internet rule goes by its window, as its Unblock did ("Block Dinner again").
+    const name = rule.kind === "internet" ? blockingName(rule, now, timezone) : rule.name;
+    items.push({ label: `Block ${name} again`, run: "resume", ruleIds: [rule.id], name });
   }
   return items;
 }

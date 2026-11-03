@@ -1100,7 +1100,9 @@ test("a group card's one button and its rule dropdown, its schedule link, Show l
     const resumedFromCard = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/resume`));
     await again.click();
     expect((await resumedFromCard).ok()).toBeTruthy();
+    await expect(card.getByTestId(`group-action-block-${group.id}`)).toBeVisible();
     await card.getByRole("button", { name: `More choices for ${name}` }).click();
+    await expect(card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`)).toBeVisible();
     await card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`).click();
     const pausedAgain = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/${rule.id}/pause`));
     await page.getByRole("dialog", { name: `Unblock ${name} video for ${name}?` }).getByRole("button", { name: /For 30 minutes/ }).click();
@@ -1153,6 +1155,16 @@ test("a scheduled category rule on now makes the card's button Unblock, with Blo
     await card.getByRole("button", { name: `More choices for ${name}` }).click();
     // The only rule is the one Unblock lifts, so the dropdown offers just Block internet.
     await expect(card.getByTestId(`group-menu-pause-${rule.id}-${group.id}`)).toHaveCount(0);
+    await expect(card.getByTestId(`group-menu-block-${group.id}`)).toBeVisible();
+    await page.keyboard.press("Escape");
+    // The group's page has the same button and dropdown, so it can block the internet too.
+    await page.goto(`/family/${group.id}`);
+    await expect(page.getByTestId(`group-action-unblock-${group.id}`)).toBeVisible();
+    await page.getByRole("button", { name: `More choices for ${name}` }).click();
+    await expect(page.getByTestId(`group-menu-block-${group.id}`)).toBeVisible();
+    await page.goto("/family");
+    await card.locator("button[aria-expanded=false]").first().click();
+    await card.getByRole("button", { name: `More choices for ${name}` }).click();
     await card.getByTestId(`group-menu-block-${group.id}`).click();
     const sheet = page.getByRole("dialog", { name: new RegExp(`^Block .*${name}`) });
     const blocked = page.waitForResponse((response) => response.url().endsWith(`/groups/${group.id}/rules/internet/pause`));
