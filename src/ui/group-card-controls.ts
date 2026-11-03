@@ -19,7 +19,7 @@ export function groupCardControls(
   now: Date,
   onRun: (tap: GroupCardRun) => void,
   enabled = true,
-): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[] } {
+): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; blockInternet: ZoneAction | null } {
   const header = groupHeaderActions(group, rules, timezone, now);
   const liftedUntil = (ruleIds: string[]) => {
     const rule = rules.find((candidate) => candidate.id === ruleIds[0]);
@@ -41,5 +41,7 @@ export function groupCardControls(
       testID: item.run === "blockInternet" ? `group-menu-block-${group.id}` : `group-menu-${item.run}-${item.ruleIds.join("-")}-${group.id}`,
     }),
   );
-  return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu };
+  // The group's page lists each rule with its own Pause, so its dropdown keeps only this one.
+  const blockInternet = menu[header.menu.findIndex((item) => item.run === "blockInternet")] ?? null;
+  return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu, blockInternet };
 }
