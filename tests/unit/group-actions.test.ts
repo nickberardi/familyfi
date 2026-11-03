@@ -69,7 +69,7 @@ describe("groupCardControls", () => {
     const controls = groupCardControls(group(), [downtime, video], TZ, NOW, onRun);
     expect(controls.action).toMatchObject({ label: "Unblock", testID: "group-action-unblock-g1" });
     expect(controls.menu.map((item) => [item.label, item.testID])).toEqual([["Block internet", "group-menu-block-g1"]]);
-    expect(controls.blockInternet?.testID).toBe("group-menu-block-g1");
+    expect(controls.pageMenu.map((item) => item.testID)).toEqual(["group-menu-block-g1"]);
     controls.menu[0]!.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "block" }]);
   });
@@ -85,6 +85,8 @@ describe("groupCardControls", () => {
       ["Unblock No TikTok", "group-menu-pause-r-tiktok-g1"],
       ["Block TV video evenings again", "group-menu-resume-r-video-g1"],
     ]);
+    // The group's page keeps only Block internet: its rules each have their own Pause or Resume.
+    expect(controls.pageMenu.map((item) => item.label)).toEqual(["Block internet"]);
     controls.menu[1]!.onPress();
     controls.menu[2]!.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([
@@ -96,7 +98,7 @@ describe("groupCardControls", () => {
   it("disables the button and its dropdown while the view is stale", () => {
     const controls = groupCardControls(group(), [downtime, video], TZ, NOW, vi.fn(), false);
     expect(controls.action.disabled).toBe(true);
-    expect(groupCardControls(group(), [downtime], TZ, NOW, vi.fn()).blockInternet).toBeNull();
+    expect(groupCardControls(group(), [downtime], TZ, NOW, vi.fn()).pageMenu).toEqual([]);
     expect(controls.menu.every((item) => item.disabled)).toBe(true);
   });
 });
