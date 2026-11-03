@@ -10,7 +10,8 @@ import type { ZoneAction } from "./CardActions";
  * a timed block or unblock lasts, and, while a category, app or website rule blocks the group or is
  * lifted for it, a dropdown (`menu`): Block internet, and unblock or block again one rule for the group. Each
  * tap goes to `onRun` (`runGroupCardAction`); `enabled` is false while the view is stale or a write
- * is in flight. On the group's page, its schedule (`GroupSchedule`) pauses each rule instead.
+ * is in flight. The group's page lists each rule with its own Pause or Resume (`GroupSchedule`), so its
+ * dropdown (`pageMenu`) holds only Block internet.
  */
 export function groupCardControls(
   group: Group,
@@ -19,7 +20,7 @@ export function groupCardControls(
   now: Date,
   onRun: (tap: GroupCardRun) => void,
   enabled = true,
-): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; blockInternet: ZoneAction | null } {
+): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; pageMenu: ZoneAction[] } {
   const header = groupHeaderActions(group, rules, timezone, now);
   const liftedUntil = (ruleIds: string[]) => {
     const rule = rules.find((candidate) => candidate.id === ruleIds[0]);
@@ -41,7 +42,6 @@ export function groupCardControls(
       testID: item.run === "blockInternet" ? `group-menu-block-${group.id}` : `group-menu-${item.run}-${item.ruleIds.join("-")}-${group.id}`,
     }),
   );
-  // The group's page lists each rule with its own Pause, so its dropdown keeps only this one.
-  const blockInternet = menu[header.menu.findIndex((item) => item.run === "blockInternet")] ?? null;
-  return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu, blockInternet };
+  const pageMenu = menu.filter((_, index) => header.menu[index]!.run === "blockInternet");
+  return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu, pageMenu };
 }

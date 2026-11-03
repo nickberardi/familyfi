@@ -81,9 +81,9 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
                 </button>
               ) : null}
             </div>
-            {header.blockInternet ? (
+            {header.pageMenu.length ? (
               // Its rules each have their own Pause below, so the dropdown only blocks the internet.
-              <CardMenuButton action={header.action} menu={[header.blockInternet]} menuLabel={`More choices for ${group.name}`} />
+              <CardMenuButton action={header.action} menu={header.pageMenu} menuLabel={`More choices for ${group.name}`} />
             ) : (
               <button
                 type="button"

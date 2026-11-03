@@ -65,7 +65,7 @@ export function ExpandingGroupCard({
       onToggle={() => setOpen(!open)}
       action={header.action}
       more={header.more}
-      menu={header.menu}
+      menu={onDetails ? header.menu : header.pageMenu}
       testID={group.id}
     >
       {open ? (
@@ -108,7 +108,7 @@ export type ExpandedGroupProps = {
   onRun: (tap: GroupCardRun) => void;
   /** A mark's filter sheet: add or change its rule. */
   onFilter: (target: FilterTarget) => void;
-  /** The group's page; absent on the page itself, where the schedule lists each rule with its Pause. */
+  /** The group's page; absent on the page itself, where the schedule lists each rule with its Pause and the dropdown holds only Block internet. */
   onDetails?: () => void;
   /** Blocks another app for the group; the detail offers it, as the web's member page does. */
   onAddApp?: () => void;
