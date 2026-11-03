@@ -96,7 +96,7 @@ export function resumeGroupRules(mutate: Mutate, group: Group, ruleIds: string[]
   const paths = ruleIds.map((ruleId) => `/api/v1/groups/${group.id}/rules/${ruleId}`);
   return mutate((send) => sendEach(send, paths, "resume"), {
     groupId: group.id,
-    ...(blockedAgain ? { feedback: { notice: `${blockedAgain} blocked again for ${group.name}.` } } : {}),
+    ...(blockedAgain ? { feedback: { notice: `${blockedAgain.charAt(0).toUpperCase()}${blockedAgain.slice(1)} blocked again for ${group.name}.` } } : {}),
   });
 }
 

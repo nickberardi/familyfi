@@ -140,5 +140,7 @@ describe("Block <rule> again from the card", () => {
     const mutate = vi.fn((..._args: unknown[]) => Promise.resolve(undefined));
     runGroupCardAction(mutate, group(), { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video", wording: "unblock" }, vi.fn());
     expect(mutate.mock.calls[0]![1]).toMatchObject({ groupId: "g1", feedback: { notice: "Video blocked again for TV." } });
+    runGroupCardAction(mutate, group(), { kind: "rule", run: "resume", ruleIds: ["r-g"], name: "gaming", wording: "unblock" }, vi.fn());
+    expect(mutate.mock.calls[1]![1]).toMatchObject({ feedback: { notice: "Gaming blocked again for TV." } });
   });
 });
