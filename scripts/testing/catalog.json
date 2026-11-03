@@ -948,6 +948,12 @@
         "schedules"
       ]
     },
+    "tests/browser/smoke.spec.ts > a scheduled category rule on now makes the card's button Unblock, with Block internet in its dropdown": {
+      "categories": [
+        "groups",
+        "schedules"
+      ]
+    },
     "tests/browser/smoke.spec.ts > a group card's one button and its rule dropdown, its schedule link, Show less, and a rule paused on the details page": {
       "categories": [
         "groups",

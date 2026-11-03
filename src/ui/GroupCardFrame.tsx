@@ -17,7 +17,7 @@ import { useWide } from "./use-wide";
  * A group card's frame, shared by every client: the card, and its header as the button that opens
  * and closes it. Closed, the header shows a caret. Open, the group's one button (`action`: Block,
  * Unblock or Resume) takes the caret's corner, with More time under the status line while a timed
- * block or unblock lasts (`more`), and a dropdown beside it while a rule can be paused from the card
+ * block or unblock lasts (`more`), and a dropdown beside it while it has choices for single rules
  * (`menu`); the caller then offers its own way to close. At large text sizes
  * the button would cover the name and badge, so it goes under the header instead. What the card shows
  * below the header, open or closed, is the caller's.
@@ -45,7 +45,7 @@ export function GroupCardFrame({
   onToggle: () => void;
   action?: ZoneAction | null;
   more?: ZoneAction | null;
-  /** Pauses for the group's rules, in a dropdown beside `action`. */
+  /** Block internet and single-rule choices for the group, in a dropdown beside `action`. */
   menu?: ZoneAction[];
   testID?: string;
   children?: ReactNode;
@@ -105,7 +105,7 @@ export function GroupCardFrame({
   );
 }
 
-/** The group's one button, with its dropdown when there are rules to pause. */
+/** The group's one button, with its dropdown when it has choices for single rules. */
 function HeaderButton({
   action,
   menu,
@@ -120,7 +120,7 @@ function HeaderButton({
   onMenu: (open: boolean) => void;
 }) {
   if (menu.length === 0) return <CardButton action={{ ...action, strong: true }} />;
-  return <CardMenuButton action={action} menu={menu} menuLabel={`Pause a rule for ${name}`} align={align} onOpenChange={onMenu} />;
+  return <CardMenuButton action={action} menu={menu} menuLabel={`More choices for ${name}`} align={align} onOpenChange={onMenu} />;
 }
 
 const HEADER_PAD = 18;

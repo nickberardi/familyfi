@@ -6706,17 +6706,16 @@
       },
       "expected": {
         "action": {
-          "label": "Block",
-          "run": "block"
+          "label": "Unblock",
+          "run": "unblock"
         },
         "more": null,
         "menu": [
           {
-            "label": "Pause TV video evenings",
-            "ruleIds": [
-              "r-video"
-            ],
-            "name": "TV video evenings"
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
           }
         ]
       }
@@ -7950,7 +7949,16 @@
           "label": "More time",
           "run": "moreBlock"
         },
-        "menu": []
+        "menu": [
+          {
+            "label": "Unblock TV video evenings",
+            "run": "pause",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video evenings"
+          }
+        ]
       }
     },
     {
@@ -8804,7 +8812,14 @@
           "label": "More time",
           "run": "moreUnblock"
         },
-        "menu": []
+        "menu": [
+          {
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
+          }
+        ]
       }
     },
     {
@@ -9278,7 +9293,14 @@
           "run": "resume"
         },
         "more": null,
-        "menu": []
+        "menu": [
+          {
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
+          }
+        ]
       }
     },
     {
@@ -9736,7 +9758,16 @@
           "run": "block"
         },
         "more": null,
-        "menu": []
+        "menu": [
+          {
+            "label": "Block TV video evenings again",
+            "run": "resume",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video evenings"
+          }
+        ]
       }
     },
     {
@@ -11278,20 +11309,28 @@
       },
       "expected": {
         "action": {
-          "label": "Block",
-          "run": "block"
+          "label": "Unblock",
+          "run": "unblock"
         },
         "more": null,
         "menu": [
           {
-            "label": "Pause No social",
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
+          },
+          {
+            "label": "Unblock No social",
+            "run": "pause",
             "ruleIds": [
               "r-social"
             ],
             "name": "No social"
           },
           {
-            "label": "Pause TV video evenings",
+            "label": "Unblock TV video evenings",
+            "run": "pause",
             "ruleIds": [
               "r-video"
             ],
@@ -20507,7 +20546,8 @@
         "more": null,
         "menu": [
           {
-            "label": "Pause No TikTok",
+            "label": "Unblock No TikTok",
+            "run": "pause",
             "ruleIds": [
               "r-tiktok"
             ],
@@ -20674,20 +20714,20 @@
       },
       "expected": {
         "action": {
-          "label": "Block",
-          "run": "block"
+          "label": "Unblock",
+          "run": "unblock"
         },
         "more": null,
         "menu": [
           {
-            "label": "Pause TV video evenings",
-            "ruleIds": [
-              "r-video"
-            ],
-            "name": "TV video evenings"
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
           },
           {
-            "label": "Pause No TikTok",
+            "label": "Unblock No TikTok",
+            "run": "pause",
             "ruleIds": [
               "r-tiktok"
             ],
@@ -20817,7 +20857,419 @@
           "run": "unblock"
         },
         "more": null,
-        "menu": []
+        "menu": [
+          {
+            "label": "Unblock No TikTok",
+            "run": "pause",
+            "ruleIds": [
+              "r-tiktok"
+            ],
+            "name": "No TikTok"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "an internet window and a category rule blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "No social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "20:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T23:15:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Unblock",
+          "run": "unblock"
+        },
+        "more": null,
+        "menu": [
+          {
+            "label": "Unblock Dinner",
+            "run": "pause",
+            "ruleIds": [
+              "r-downtime"
+            ],
+            "name": "Dinner"
+          },
+          {
+            "label": "Unblock No social",
+            "run": "pause",
+            "ruleIds": [
+              "r-social"
+            ],
+            "name": "No social"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "a category rule paused for the group while another blocks",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T22:00:00.000Z",
+                  "kind": "pause",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "No social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w4",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "19:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Unblock",
+          "run": "unblock"
+        },
+        "more": null,
+        "menu": [
+          {
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
+          },
+          {
+            "label": "Block TV video evenings again",
+            "run": "resume",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video evenings"
+          }
+        ]
       }
     },
     {
