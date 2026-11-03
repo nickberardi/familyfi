@@ -69,6 +69,7 @@ describe("groupCardControls", () => {
     const controls = groupCardControls(group(), [downtime, video], TZ, NOW, onRun);
     expect(controls.action).toMatchObject({ label: "Unblock", testID: "group-action-unblock-g1" });
     expect(controls.menu.map((item) => [item.label, item.testID])).toEqual([["Block internet", "group-menu-block-g1"]]);
+    expect(controls.blockInternet?.testID).toBe("group-menu-block-g1");
     controls.menu[0]!.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "block" }]);
   });
@@ -95,6 +96,7 @@ describe("groupCardControls", () => {
   it("disables the button and its dropdown while the view is stale", () => {
     const controls = groupCardControls(group(), [downtime, video], TZ, NOW, vi.fn(), false);
     expect(controls.action.disabled).toBe(true);
+    expect(groupCardControls(group(), [downtime], TZ, NOW, vi.fn()).blockInternet).toBeNull();
     expect(controls.menu.every((item) => item.disabled)).toBe(true);
   });
 });
