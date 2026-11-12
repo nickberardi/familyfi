@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountKind, SessionKind } from "@prisma/client";
 import { ACCESS_TOKEN_TTL_MS, REFRESH_REUSE_GRACE_MS, REFRESH_TOKEN_TTL_MS } from "@/lib/constants";
 import { createSession, hashPassword, revokeAccountSessions } from "@/server/auth";
@@ -140,6 +140,25 @@ describe("refresh tokens for paired devices", () => {
     expect(await signedIn(next.token)).toBe(false);
     expect(await errorCode(await refreshWith(next.refreshToken))).toBe("invalid_refresh");
     expect(REFRESH_REUSE_GRACE_MS).toBeLessThanOrEqual(10_000);
+  });
+
+  it("honours a retry whose window the new bearer's first use cut while it was being answered", async () => {
+    const pair = await phoneLogin();
+    const received = await refreshed(pair.refreshToken);
+    const sessions = prisma().session;
+    const original = sessions.updateMany.bind(sessions);
+    // The new bearer is used between the retry reading the row and rotating it.
+    const spy = vi.spyOn(sessions, "updateMany").mockImplementationOnce((async (args: Parameters<typeof original>[0]) => {
+      await signedIn(received.token);
+      return original(args);
+    }) as never);
+    try {
+      const retried = await refreshed(pair.refreshToken);
+      expect(await signedIn(retried.token)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await errorCode(await refreshWith(pair.refreshToken))).toBe("refresh_reused");
   });
 
   it("treats a token the device has refreshed past as invalid, without ending the sign-in", async () => {
