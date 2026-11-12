@@ -113,11 +113,11 @@ export const SIRI_SHORTCUTS_COPY = {
   phrasesTitle: "Things to say",
   /** Each action's example, with a group's name where `name` goes. */
   phrases: (name: string) => [
-    `"Block ${name} in FamilyFi"`,
-    `"Pause ${name} in FamilyFi"`,
-    `"Unblock ${name} in FamilyFi"`,
-    `"Give ${name} more time in FamilyFi"`,
-    `"Is ${name} blocked in FamilyFi?"`,
+    `“Block ${name} in FamilyFi”`,
+    `“Pause ${name} in FamilyFi”`,
+    `“Unblock ${name} in FamilyFi”`,
+    `“Give ${name} more time in FamilyFi”`,
+    `“Is ${name} blocked in FamilyFi?”`,
   ],
   /** The name in the examples when the household has no group yet. */
   anyGroup: "a group",
@@ -148,6 +148,7 @@ export function groupShortcuts(groups: readonly Pick<Group, "id" | "name">[], sc
 export const HOME_SHORTCUTS_COPY = {
   title: "Home screen shortcuts",
   section: "Block from your Home screen",
+  /** Names `GROUP_SHORTCUTS_MAX` in words; `tests/unit/app-controls.test.ts` keeps the two equal. */
   intro:
     "Press and hold the FamilyFi icon to block one of your first four groups, or add any group to your Home screen here. A shortcut opens FamilyFi at that group's Block choices.",
   groups: "Groups",

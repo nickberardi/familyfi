@@ -29,6 +29,7 @@ export function Button({
   busy = false,
   disabled = false,
   grow = false,
+  accessibilityLabel,
   testID,
   style,
   labelStyle,
@@ -41,6 +42,8 @@ export function Button({
   disabled?: boolean;
   /** Fills its row: a stacked dialog footer. */
   grow?: boolean;
+  /** The button's name for assistive tech when its label repeats down a list ("Add to Home screen" in each row). */
+  accessibilityLabel?: string;
   testID?: string;
   /** A platform's own shape and type on top of the web's (a phone's setup draws iOS's capsules). */
   style?: StyleProp<ViewStyle>;
@@ -54,6 +57,7 @@ export function Button({
   return (
     <Pressable
       role="button"
+      aria-label={accessibilityLabel}
       testID={testID}
       aria-disabled={off}
       aria-busy={busy}

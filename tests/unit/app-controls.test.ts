@@ -1,7 +1,7 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api-client";
-import { appControlsName, enrollAppControls, findAppControls, GROUP_SHORTCUTS_MAX, groupShortcuts, setUpAppControls, SIRI_SHORTCUTS_COPY, supportsAppControls } from "@/lib/app-controls";
+import { appControlsName, enrollAppControls, findAppControls, GROUP_SHORTCUTS_MAX, groupShortcuts, HOME_SHORTCUTS_COPY, setUpAppControls, SIRI_SHORTCUTS_COPY, supportsAppControls } from "@/lib/app-controls";
 import type { PairedPhone } from "@/lib/types";
 
 describe("app controls", () => {
@@ -104,19 +104,27 @@ describe("app controls", () => {
         throw new ApiError("That id belongs to another device.", 409, "client_id_in_use");
       });
       await expect(setUpAppControls({ bridge: bridge(false), request: refused.request, profile, platform: "apple" })).rejects.toThrow("another device");
+      // Only the schema's own refusal means an older server: another 400 is a failure like any other.
+      const other = server("1.1.0", () => {
+        throw new ApiError("Not allowed here.", 400, "demo_locked");
+      });
+      await expect(setUpAppControls({ bridge: bridge(false), request: other.request, profile, platform: "apple" })).rejects.toThrow("Not allowed here");
     });
   });
 
   it("gives an example phrase for each of the five actions, each naming FamilyFi", () => {
-    const phrases = SIRI_SHORTCUTS_COPY.phrases("Abby");
+    const phrases = SIRI_SHORTCUTS_COPY.phrases("Kids");
     expect(phrases).toHaveLength(5);
-    for (const phrase of phrases) expect(phrase).toMatch(/Abby.* in FamilyFi/);
+    for (const phrase of phrases) expect(phrase).toMatch(/^“.*Kids.* in FamilyFi\??”$/);
   });
 
   it("gives Android a shortcut to each of the first four groups' Block sheet, in the build's own scheme", () => {
     const groups = ["a", "b", "c", "d", "e"].map((id) => ({ id, name: `Group ${id}` }));
     const shortcuts = groupShortcuts(groups, "familyfi-dev");
     expect(shortcuts).toHaveLength(GROUP_SHORTCUTS_MAX);
+    // The screen's copy says the number in words.
+    expect(GROUP_SHORTCUTS_MAX).toBe(4);
+    expect(HOME_SHORTCUTS_COPY.intro).toContain("first four groups");
     expect(shortcuts[0]).toEqual({ id: "block-a", shortLabel: "Group a", longLabel: "Block Group a", url: "familyfi-dev://pause/a" });
     expect(groupShortcuts([], "familyfi")).toEqual([]);
   });
