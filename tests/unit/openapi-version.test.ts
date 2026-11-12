@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   bumpKind,
+  checkUnreleased,
   checkVersion,
   classifyChange,
   compareSemver,
@@ -155,5 +156,19 @@ describe("checkVersion", () => {
   it("needs a major increase for an approved break from 1.0.0 on", () => {
     expect(checkVersion({ baseSpec: spec("1.2.0"), headSpec: withPath(spec("1.3.0")), breakingApproved: true }).ok).toBe(false);
     expect(checkVersion({ baseSpec: spec("1.2.0"), headSpec: withPath(spec("2.0.0")), breakingApproved: true }).ok).toBe(true);
+  });
+
+  it("lets a change keep a version that is not released yet, measured from the latest release", () => {
+    const kept = checkUnreleased({ baseSpec: spec("1.1.0"), releaseSpec: spec("1.0.0"), headSpec: withPath(spec("1.1.0")) });
+    expect(kept?.ok).toBe(true);
+    expect(kept?.message).toContain("1.0.0");
+    // A patch above the release does not carry a contract change.
+    expect(checkUnreleased({ baseSpec: spec("1.0.1"), releaseSpec: spec("1.0.0"), headSpec: withPath(spec("1.0.1")) })?.ok).toBe(false);
+  });
+
+  it("leaves the base branch to decide once its version is released, or when the version moves", () => {
+    expect(checkUnreleased({ baseSpec: spec("1.1.0"), releaseSpec: spec("1.1.0"), headSpec: withPath(spec("1.1.0")) })).toBeNull();
+    expect(checkUnreleased({ baseSpec: spec("1.1.0"), releaseSpec: spec("1.0.0"), headSpec: withPath(spec("1.0.5")) })).toBeNull();
+    expect(checkUnreleased({ baseSpec: spec("1.1.0"), releaseSpec: null, headSpec: withPath(spec("1.1.0")) })).toBeNull();
   });
 });

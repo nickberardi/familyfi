@@ -1,8 +1,8 @@
 import { DeviceScope, PairedDeviceClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { deviceRouteAllowed, isValidScope } from "@/server/device-scope";
+import { deviceRouteAllowed, isFullApp, isValidScope } from "@/server/device-scope";
 
-const { phone, watch, agent } = PairedDeviceClient;
+const { app, watch, agent } = PairedDeviceClient;
 const { full, rulesOnly, readOnly } = DeviceScope;
 
 function allowed(client: PairedDeviceClient, scope: DeviceScope, method: string, path: string) {
@@ -36,19 +36,19 @@ const NEVER_FOR_AGENTS: [string, string][] = [
 ];
 
 describe("device scopes", () => {
-  it("names exactly four valid pairs", () => {
-    const valid = [phone, watch, agent].flatMap((client) => [full, rulesOnly, readOnly].filter((scope) => isValidScope(client, scope)).map((scope) => `${client}:${scope}`));
-    expect(valid.sort()).toEqual(["agent:full", "agent:readOnly", "phone:full", "watch:rulesOnly"]);
+  it("names exactly five valid pairs", () => {
+    const valid = [app, watch, agent].flatMap((client) => [full, rulesOnly, readOnly].filter((scope) => isValidScope(client, scope)).map((scope) => `${client}:${scope}`));
+    expect(valid.sort()).toEqual(["agent:full", "agent:readOnly", "app:full", "app:rulesOnly", "watch:rulesOnly"]);
   });
 
   it("refuses everything for a pair that is not one of them", () => {
-    for (const [client, scope] of [[watch, full], [agent, rulesOnly], [phone, readOnly]] as const) {
+    for (const [client, scope] of [[watch, full], [agent, rulesOnly], [app, readOnly], [watch, readOnly]] as const) {
       expect(allowed(client, scope, "GET", "/api/v1/groups"), `${client}:${scope}`).toBe(false);
     }
   });
 
-  it("phone:full allows whatever the account may", () => {
-    for (const [method, path] of [...HOUSEHOLD_WRITES, ...NEVER_FOR_AGENTS]) expect(allowed(phone, full, method, path)).toBe(true);
+  it("app:full allows whatever the account may", () => {
+    for (const [method, path] of [...HOUSEHOLD_WRITES, ...NEVER_FOR_AGENTS]) expect(allowed(app, full, method, path)).toBe(true);
   });
 
   it("watch:rulesOnly is the Watch's list: lists, the rule verbs, its manifest, nothing else", () => {
@@ -61,6 +61,30 @@ describe("device scopes", () => {
       expect(allowed(watch, rulesOnly, "GET", path), path).toBe(false);
     }
     for (const [method, path] of HOUSEHOLD_WRITES) expect(allowed(watch, rulesOnly, method, path), `${method} ${path}`).toBe(false);
+  });
+
+  it("app:rulesOnly is the Watch's list, call for call, and nothing more of app:full's", () => {
+    const calls: [string, string][] = [
+      ...["/api/v1/auth/session", "/api/v1/connection", "/api/v1/groups", "/api/v1/rules", "/api/v1/changes/c1", "/api/v1/groups/g1", "/api/v1/devices", "/api/v1/paired/devices"].map((path): [string, string] => ["GET", path]),
+      ...RULE_VERBS,
+      ...HOUSEHOLD_WRITES,
+      ...NEVER_FOR_AGENTS,
+      ["DELETE", "/api/v1/paired/devices/device-1"],
+      ["POST", "/api/v1/rules/quarantine/off"],
+    ];
+    for (const [method, path] of calls) {
+      expect(allowed(app, rulesOnly, method, path), `${method} ${path}`).toBe(allowed(watch, rulesOnly, method, path));
+    }
+    expect(allowed(app, rulesOnly, "POST", "/api/v1/groups/g1/unblock")).toBe(true);
+    expect(allowed(app, rulesOnly, "POST", "/api/v1/paired/invites")).toBe(false);
+  });
+
+  it("counts only app:full as the app itself, never the client alone", () => {
+    expect(isFullApp({ client: app, scope: full })).toBe(true);
+    expect(isFullApp({ client: app, scope: rulesOnly })).toBe(false);
+    expect(isFullApp({ client: watch, scope: rulesOnly })).toBe(false);
+    expect(isFullApp({ client: agent, scope: full })).toBe(false);
+    expect(isFullApp(null)).toBe(false);
   });
 
   it("agent:readOnly reads the household and the contract, and changes nothing", () => {
@@ -93,7 +117,7 @@ describe("device scopes", () => {
       for (const [method, path] of switches) expect(allowed(client, scope, method, path), `${client} ${method} ${path}`).toBe(false);
     }
     expect(allowed(agent, readOnly, "GET", "/api/v1/rules/quarantine")).toBe(true);
-    for (const [method, path] of switches) expect(allowed(phone, full, method, path), `phone ${method} ${path}`).toBe(true);
+    for (const [method, path] of switches) expect(allowed(app, full, method, path), `app ${method} ${path}`).toBe(true);
   });
 
   it("lets an agent disconnect only itself", () => {

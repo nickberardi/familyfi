@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ApiError, type ApiRequest } from "@/lib/api-client";
-import { defaultPairingAccount, pairingAccounts, pairingExpired, pairingSheetCopy } from "@/lib/pair-device";
+import { defaultPairingAccount, invitePhone, pairingAccounts, pairingExpired, pairingSheetCopy } from "@/lib/pair-device";
 import type { Account, ConnectionRoute, PairedPhone, PairingState } from "@/lib/types";
 
 export type IssuedPairing = { id: string; expiresAt: string; code: string };
@@ -93,10 +93,7 @@ export function usePairing({
     setBusy(true);
     try {
       if (pending.current) await request(`/api/v1/paired/invites/${encodeURIComponent(pending.current)}`, { method: "DELETE" }).catch(() => undefined);
-      const { invite } = await request<{ invite: IssuedPairing }>("/api/v1/paired/invites", {
-        method: "POST",
-        body: { client: "phone", endpointId: route.id, displayName: name.trim(), accountId, ...(replacing ? { replacesDeviceId: replacing.id } : {}) },
-      });
+      const { invite } = await invitePhone<{ invite: IssuedPairing }>(request, { endpointId: route.id, displayName: name.trim(), accountId, ...(replacing ? { replacesDeviceId: replacing.id } : {}) });
       pending.current = invite.id;
       setIssued(invite);
       setState(null);

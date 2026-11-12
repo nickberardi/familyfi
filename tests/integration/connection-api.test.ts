@@ -67,7 +67,7 @@ describe("companion connection API", () => {
     const pairingResponse = await createPairing(
       request("/api/v1/paired/invites", {
         method: "POST", auth, headers: { "content-type": "application/json" },
-        body: JSON.stringify({ client: "phone", endpointId: endpoint.endpoint.id, displayName: "Kitchen iPhone" }),
+        body: JSON.stringify({ client: "app", endpointId: endpoint.endpoint.id, displayName: "Kitchen iPhone" }),
       }),
     );
     expect(pairingResponse.status).toBe(201);
@@ -94,7 +94,7 @@ describe("companion connection API", () => {
     const claimed = (await claim.json()) as { device: { id: string; client: string; scope: string }; token: string; session: { username: string }; connection: { endpoint: { url: string }; manifest: { signature: string } } };
     // Pairing is the sign-in: no password, no device credential.
     expect(claimed).not.toHaveProperty("deviceCredential");
-    expect(claimed.device).toMatchObject({ client: "phone", scope: "full" });
+    expect(claimed.device).toMatchObject({ client: "app", scope: "full" });
     expect(claimed.session.username).toBe(PAIRING_ADMIN.username);
     expect(claimed.connection.endpoint.url).toBe("https://familyfi.local");
     expect(claimed.connection.manifest.signature).toBeTruthy();
@@ -132,7 +132,7 @@ async function addRoute(auth: SessionAuth, url = "https://familyfi.home:8443") {
 }
 
 async function issuePairing(auth: SessionAuth, endpointId: string) {
-  const response = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId, displayName: "Kitchen iPhone" })));
+  const response = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "app", endpointId, displayName: "Kitchen iPhone" })));
   return issuedPairing(response);
 }
 
@@ -374,7 +374,7 @@ describe("removing and re-pairing phones", () => {
   });
 
   async function pairPhone(auth: SessionAuth, route: string, body: Record<string, unknown> = {}) {
-    const response = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId: route, displayName: "Kitchen iPhone", ...body })));
+    const response = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "app", endpointId: route, displayName: "Kitchen iPhone", ...body })));
     const pairing = await issuedPairing(response);
     const claimed = (await (await claim(pairing.id, pairing.token)).json()) as { device: { id: string }; token: string };
     return { id: claimed.device.id, bearer: { cookie: "", csrf: "", token: claimed.token } };
@@ -415,7 +415,7 @@ describe("removing and re-pairing phones", () => {
     const old = await pairPhone(auth, route);
     await revoke(auth, old.id);
 
-    const unknown = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId: route, displayName: "x", replacesDeviceId: "missing" })));
+    const unknown = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "app", endpointId: route, displayName: "x", replacesDeviceId: "missing" })));
     expect(unknown.status).toBe(404);
 
     const fresh = await pairPhone(auth, route, { replacesDeviceId: old.id });

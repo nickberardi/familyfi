@@ -65,7 +65,7 @@ export async function pairingAdminAuth(): Promise<SessionAuth> {
 
 export async function invitePhoneRequest(auth: SessionAuth, body: Record<string, unknown>, headers: Record<string, string> = {}) {
   if (!("accountId" in body)) body = { ...body, accountId: (await pairingAdmin()).id };
-  return invite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ client: "phone", displayName: "iPhone", ...body }) }));
+  return invite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ client: "app", displayName: "iPhone", ...body }) }));
 }
 
 export function claimInvite(issued: { inviteId: string; token: string }, deviceName = "iPhone", headers: Record<string, string> = {}) {

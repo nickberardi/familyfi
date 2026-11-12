@@ -32,14 +32,16 @@ enum SessionKind {
   bearer
 }
 
+/// What a paired device is. `app` is the FamilyFi app on a phone, tablet or Mac; with the
+/// rulesOnly scope it is that app's Siri, Shortcuts and system controls, which sign in on their own.
 enum PairedDeviceClient {
-  phone
+  app
   watch
   agent
 }
 
 /// What a paired device may call. Each (client, scope) pair is one allowlist in src/server/device-scope.ts:
-/// phone:full, watch:rulesOnly, agent:full, agent:readOnly. It bounds the device whatever its account may do.
+/// app:full, app:rulesOnly, watch:rulesOnly, agent:full, agent:readOnly. It bounds the device whatever its account may do.
 enum DeviceScope {
   full
   rulesOnly
@@ -216,7 +218,7 @@ model ConnectionEndpoint {
 model PairedDevice {
   id              String         @id @default(cuid())
   displayName     String
-  client          PairedDeviceClient @default(phone)
+  client          PairedDeviceClient @default(app)
   clientId        String?        @unique
   scope           DeviceScope    @default(full)
   /// The account this device acts as, fixed by the invite it was paired with.
@@ -273,7 +275,7 @@ model Pairing {
   /// A phone this pairing re-pairs: when the pairing is claimed, that old record is revoked and removed.
   replacesDeviceId   String?
   /// The kind of client this pairing admits. An agent pairing has no route: its code carries the address it was made from.
-  client             PairedDeviceClient  @default(phone)
+  client             PairedDeviceClient  @default(app)
   /// The scope an agent pairing grants; a phone pairing always gives `full`.
   scope              DeviceScope?
   createdAt          DateTime            @default(now()) @db.Timestamptz(3)

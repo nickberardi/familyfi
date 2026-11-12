@@ -41,7 +41,7 @@ export async function invitePhone(input: { endpointId: string; displayName: stri
   const token = randomToken();
   const invite = await prisma().pairing.create({
     data: {
-      client: PairedDeviceClient.phone,
+      client: PairedDeviceClient.app,
       scope: DeviceScope.full,
       endpointId: input.endpointId,
       displayName: input.displayName,
@@ -107,7 +107,7 @@ async function join(db: Db, input: {
 }): Promise<Omit<Joined, "invite" | "account">> {
   const { invite, account, now } = input;
   if (!invite.scope || !isValidScope(invite.client, invite.scope)) throw new Error(`A ${invite.client} cannot hold the ${invite.scope} scope.`);
-  // A re-paired phone or a re-enrolled Watch retires the record it replaces, so it is never listed twice.
+  // A re-paired phone or a re-enrolled companion retires the record it replaces, so it is never listed twice.
   const replaces = invite.replacesDeviceId;
   if (input.clientId) {
     const previous = await db.pairedDevice.findUnique({ where: { clientId: input.clientId } });
@@ -144,10 +144,10 @@ async function join(db: Db, input: {
   return { device, bearer };
 }
 
-/** What a claim answers, the same for every client. Phones and Watches, which may work away from home, also get their manifest. */
+/** What a claim answers, the same for every client. Apps and Watches, which may work away from home, also get their manifest. */
 export async function claimResponse(joined: Joined, endpoint: Parameters<typeof publicEndpoint>[0] | null) {
   const { invite, device, account, bearer } = joined;
-  const remote = invite.client === PairedDeviceClient.phone || invite.client === PairedDeviceClient.watch;
+  const remote = invite.client !== PairedDeviceClient.agent;
   return {
     device: { id: device.id, displayName: device.displayName, client: device.client, scope: device.scope },
     session: toPublicSession({ username: account.username, expiresAt: bearer.expiresAt, account }),
@@ -161,11 +161,11 @@ export async function claimResponse(joined: Joined, endpoint: Parameters<typeof 
   };
 }
 
-/** Claims an invite with its single-use token; a phone takes its invite's name. A Watch invite is never claimable here: its phone claimed it already. */
+/** Claims an invite with its single-use token; a phone takes its invite's name. A companion's invite is never claimable here: its phone claimed it already. */
 export async function claimInvite(input: { id: string; token: string; displayName: string; userAgent?: string | null }) {
   const invite = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true, account: true } });
-  if (!invite || invite.client === PairedDeviceClient.watch || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
-  if (invite.client === PairedDeviceClient.phone && !invite.endpoint) return null;
+  if (!invite || !invite.scope || isCompanion(invite.client, invite.scope) || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
+  if (invite.client === PairedDeviceClient.app && !invite.endpoint) return null;
   const account = invite.account;
   // Only administrators' own accounts have paired devices: an invite for an adult who has since lost
   // that, or one made before the recovery account was refused, is void.
@@ -175,7 +175,7 @@ export async function claimInvite(input: { id: string; token: string; displayNam
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
     // A phone is called what the administrator named it when inviting it; what it calls itself is often just "iPhone".
-    const displayName = invite.client === PairedDeviceClient.phone ? invite.displayName : input.displayName;
+    const displayName = invite.client === PairedDeviceClient.app ? invite.displayName : input.displayName;
     return join(db, { invite, account, displayName, userAgent: input.userAgent, now });
   });
   if (!joined) return null;
@@ -183,15 +183,26 @@ export async function claimInvite(input: { id: string; token: string; displayNam
 }
 
 /**
- * A phone invites its Watch and claims it in one transaction. The Watch makes no network call to
- * join: the phone hands it the tokens and manifest. Re-enrolling the same `clientId` retires the old Watch.
+ * What an app sets up for itself: its Watch, and its own `rulesOnly` sign-in for Siri, Shortcuts and
+ * system controls. Both hold `rulesOnly`.
  */
-export async function inviteAndClaimWatch(input: { parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
+export type CompanionClient = typeof PairedDeviceClient.watch | typeof PairedDeviceClient.app;
+
+function isCompanion(client: PairedDeviceClient, scope: DeviceScope): boolean {
+  return scope === DeviceScope.rulesOnly && (client === PairedDeviceClient.watch || client === PairedDeviceClient.app);
+}
+
+/**
+ * An app invites its Watch, or its own `rulesOnly` sign-in, and claims it in one transaction. Neither
+ * makes a network call to join: the app hands it the tokens and manifest. Re-enrolling the same
+ * `clientId` retires the old record.
+ */
+export async function inviteAndClaimCompanion(input: { client: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const invite = await db.pairing.create({
       data: {
-        client: PairedDeviceClient.watch,
+        client: input.client,
         scope: DeviceScope.rulesOnly,
         displayName: input.displayName,
         accountId: input.account.id,

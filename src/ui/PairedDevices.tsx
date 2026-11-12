@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { remoteStatus, routeTrust, transportLabel } from "@/lib/connection-routes";
-import { canRepair, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
+import { canRepair, isApp, isAppControls, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
@@ -75,7 +75,7 @@ export function PairedPhoneRow({
         </Text>
         <Text style={[text(14, 21, "muted"), styles.line]}>{lines.dates}</Text>
         {lines.expired ? (
-          <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{phone.client === "phone" ? COPY.expired : COPY.expiredPairAgain}</Text>
+          <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{isApp(phone) ? COPY.expired : isAppControls(phone) ? COPY.expiredControls : COPY.expiredPairAgain}</Text>
         ) : null}
       </View>
       <View style={styles.actions}>
