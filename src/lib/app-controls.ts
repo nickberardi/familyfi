@@ -131,12 +131,16 @@ export const SIRI_SHORTCUTS_COPY = {
 /** How many shortcuts Android shows when the app's icon is pressed and held. */
 export const GROUP_SHORTCUTS_MAX = 4;
 
-/** One group's shortcut on Android: its words, and the app link it opens (the group's Block sheet). */
+/**
+ * One group's shortcut on Android: its words, and the app link it opens (the group's Block sheet).
+ * Both labels name the action: a launcher draws the short one under the icon and in its long-press
+ * list, where a bare group name would read as opening the group.
+ */
 export type GroupShortcut = { id: string; shortLabel: string; longLabel: string; url: string };
 
 /** A group's shortcut. `scheme` is the app's own link scheme, which differs between its builds. */
 export function groupShortcut(group: Pick<Group, "id" | "name">, scheme: string): GroupShortcut {
-  return { id: `block-${group.id}`, shortLabel: group.name, longLabel: `Block ${group.name}`, url: `${scheme}://pause/${group.id}` };
+  return { id: `block-${group.id}`, shortLabel: `Block ${group.name}`, longLabel: `Block ${group.name}`, url: `${scheme}://pause/${group.id}` };
 }
 
 /** The shortcuts under the app's icon: the first groups, in the household's order. */
