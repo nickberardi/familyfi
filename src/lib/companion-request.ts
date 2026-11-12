@@ -44,8 +44,9 @@ export function asTransport(send: (request: TransportRequest) => Promise<Transpo
  * sign-out or session refresh, which change nothing in the household) that finds a route unreachable,
  * or behind a Cloudflare Access wall, moves to the next route; a household write never does, since it
  * may have landed. A refresh that landed unanswered may be sent again: the server honours the token it
- * just replaced once, for `REFRESH_REUSE_GRACE_MS`, for exactly this, so a refresh gives up on a route
- * well within that grace, leaving the next route time to use it.
+ * just replaced until the device uses the pair that replaced it. Older servers honoured it only
+ * once, within `REFRESH_REUSE_GRACE_MS`, so a refresh still gives up on a route well within that
+ * grace, leaving the next route time to use it.
  */
 
 const TIMEOUT_MS = 15_000;

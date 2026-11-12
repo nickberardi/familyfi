@@ -266,9 +266,22 @@ export type RefreshResult =
 const INVALID_REFRESH = { ok: false as const, code: "invalid_refresh" as const, message: "This refresh token is invalid or expired. Sign in again." };
 
 /**
- * Trades a refresh token for a new token pair, retiring both old tokens. The refresh token just
- * replaced is honoured once for a few seconds, for a device that lost the response; any later use
- * of it means a copy exists, so the whole sign-in is revoked.
+ * A replaced refresh token is honoured until its successor pair is used: the deadline starts at the
+ * end of the refresh window and is cut to a few seconds the first time the new bearer or refresh
+ * token is presented. A deadline still beyond that grace means the new pair was never used.
+ */
+function awaitingUse(previousRefreshUntil: Date | null, now: Date) {
+  return Boolean(previousRefreshUntil && previousRefreshUntil.getTime() > now.getTime() + REFRESH_REUSE_GRACE_MS);
+}
+
+/**
+ * Trades a refresh token for a new token pair. The old bearer stops working at once; the refresh
+ * token just replaced keeps working until the device uses the pair that replaced it, and for a few seconds
+ * after: a device that lost the response (a timeout over a slow tunnel, or iOS suspending the app
+ * mid-request) refreshes with it again and gets another pair, however much later it does. Once the
+ * new bearer has been used, a retry within seconds is honoured once and any later use of the
+ * replaced token means a copy exists, so the whole sign-in is revoked. Once the new refresh token
+ * has been used, the replaced one is simply invalid.
  */
 export async function refreshSession(refreshToken: string, options: { tunnelled?: boolean; now?: Date } = {}): Promise<RefreshResult> {
   const now = options.now ?? new Date();
@@ -276,6 +289,8 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
   const include = { account: true, device: true } as const;
   let session = await prisma().session.findUnique({ where: { refreshTokenHash: presented }, include });
   let current = presented;
+  // Whether the replaced token's pair was never used, so the device may simply have lost it.
+  let unconfirmed = false;
   let grace = false;
   if (!session) {
     const replaced = await prisma().session.findUnique({ where: { previousRefreshHash: presented }, include });
@@ -287,6 +302,7 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
     session = replaced;
     current = replaced.refreshTokenHash!;
     grace = true;
+    unconfirmed = awaitingUse(replaced.previousRefreshUntil, now);
   }
   if (session.revokedAt || session.kind !== SessionKind.bearer || !session.refreshExpiresAt || session.refreshExpiresAt <= now || !session.device || session.device.revokedAt) return INVALID_REFRESH;
   // A device acting as an adult who is no longer an administrator, or as the recovery account, has no sign-in to renew.
@@ -296,12 +312,14 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
 
   const next = bearerSessionData(now);
   const rotated = await prisma().session.updateMany({
-    where: { id: session.id, refreshTokenHash: current, revokedAt: null },
+    // A retry of the replaced token rotates only if its window is still the one read here.
+    where: { id: session.id, refreshTokenHash: current, revokedAt: null, ...(grace ? { previousRefreshUntil: session.previousRefreshUntil } : {}) },
     data: {
       ...next.data,
-      // A grace retry closes the window, so the replaced token is honoured only once.
+      // The token presented stays good until the device uses the pair it gets now. A retry in the
+      // seconds after that pair was used closes the window, so then it is honoured only once.
       previousRefreshHash: presented,
-      previousRefreshUntil: grace ? now : new Date(now.getTime() + REFRESH_REUSE_GRACE_MS),
+      previousRefreshUntil: !grace || unconfirmed ? next.refreshExpiresAt : now,
     },
   });
   if (rotated.count !== 1) return INVALID_REFRESH;
@@ -339,6 +357,12 @@ export async function readSessionFromRequest(request: Request) {
   if (session.account && !isAdministratorAccount(session.account)) return null;
   // No paired device acts as the recovery account; one left over from before that rule is refused.
   if (session.device && !mayPairAs(session.account)) return null;
+  if (session.kind === SessionKind.bearer && awaitingUse(session.previousRefreshUntil, new Date())) {
+    // The device received the pair its last refresh issued, so the token that refresh replaced is spent.
+    // Only while the row still holds this bearer: a refresh committed meanwhile has a pair not yet used.
+    const until = new Date(Date.now() + REFRESH_REUSE_GRACE_MS);
+    await prisma().session.updateMany({ where: { id: session.id, tokenHash: session.tokenHash, previousRefreshUntil: { gt: until } }, data: { previousRefreshUntil: until } });
+  }
   if (session.device && (!session.device.lastSeenAt || session.device.lastSeenAt < new Date(Date.now() - 15 * 60 * 1000))) {
     await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date() } });
   }

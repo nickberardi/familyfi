@@ -332,7 +332,8 @@ model Session {
   /// A paired device's bearer is short-lived; this rotating token renews it. Null for cookie sessions.
   refreshTokenHash     String?   @unique
   refreshExpiresAt     DateTime? @db.Timestamptz(3)
-  /// The refresh token last replaced, honoured once until `previousRefreshUntil` so a lost response does not sign the device out.
+  /// The refresh token last replaced, honoured until `previousRefreshUntil` so a lost response does not sign the device out:
+  /// the end of the refresh window until the device uses the new pair, then a few seconds.
   previousRefreshHash  String?   @unique
   previousRefreshUntil DateTime? @db.Timestamptz(3)
   createdAt DateTime    @default(now()) @db.Timestamptz(3)

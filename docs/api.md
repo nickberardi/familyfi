@@ -187,9 +187,13 @@ record's place and keeps its parent.
 
 A paired device's bearer lasts one hour. Its claim also returns a `refreshToken`, which the device trades at `POST /api/v1/auth/refresh` for a new bearer and a new
 refresh token, before or after the bearer expires. The refresh token lasts 90 days from its last
-use and is spent by each refresh: the one just replaced is honoured once within ten seconds, for a
-device that lost the response, and presenting it after that ends the whole sign-in
-(403 `refresh_reused`), because a copy exists. Both tokens live on one session, so revoking the
+use and is spent by each refresh. The one just replaced keeps working until the device uses the
+new bearer or refresh token, so a device that lost the response (a timeout over a slow tunnel, or the
+app suspended mid-request) refreshes with it again, however much later, and gets another pair. Once
+the new bearer has been used, the replaced token is honoured once more within ten seconds, for a
+retry already on its way, and presenting it after that ends the whole sign-in (403 `refresh_reused`),
+because a copy exists. Once the new refresh token has been used, the replaced one is simply invalid
+(403 `invalid_refresh`). Both tokens live on one session, so revoking the
 device, signing out, a password change or removing the account ends them together. Removing an
 account also removes the paired devices that act as it.
 The iPhone invites and claims its reachable Watch in one call (`POST /paired/invites?claim=true`),
