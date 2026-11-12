@@ -417,6 +417,9 @@ export function deviceScopeRefusal(
   if (device.client === PairedDeviceClient.agent) {
     return jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.");
   }
+  if (device.client === PairedDeviceClient.app) {
+    return jsonError(403, "app_scope", "Siri, Shortcuts and system controls cannot use that endpoint.");
+  }
   return jsonError(403, "watch_scope", "This Watch session cannot use that endpoint.");
 }
 

@@ -48,7 +48,7 @@ async function protectedRoute(auth: SessionAuth) {
 }
 
 async function pairPhone(auth: SessionAuth, endpointId: string, name: string) {
-  const issued = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "phone", endpointId, displayName: name })));
+  const issued = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "app", endpointId, displayName: name })));
   const pairing = await issuedPairing(issued);
   const claim = await claimPairing(
     request(`/api/v1/paired/invites/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: name }) }),

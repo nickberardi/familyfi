@@ -239,7 +239,7 @@ describe("household export", () => {
     await buildHousehold();
     const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
     const phone = await prisma().pairedDevice.create({
-      data: { displayName: "Parent's iPhone", client: PairedDeviceClient.phone, scope: DeviceScope.full, accountId: parent.id },
+      data: { displayName: "Parent's iPhone", client: PairedDeviceClient.app, scope: DeviceScope.full, accountId: parent.id },
     });
     const issued = await createSession({ accountId: parent.id, username: "parent", kind: SessionKind.bearer, deviceId: phone.id });
     const bearer: SessionAuth = { cookie: "", csrf: "", token: issued.raw };

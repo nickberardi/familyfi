@@ -2,18 +2,20 @@ import { DeviceScope, PairedDeviceClient } from "@prisma/client";
 
 /**
  * What a paired device may call. Every paired device has a scope, and each (client, scope) pair is
- * one explicit allowlist, never a ladder: an agent's `full` is the agent list, not a phone's minus
+ * one explicit allowlist, never a ladder: an agent's `full` is the agent list, not an app's minus
  * exceptions. Only administrators use FamilyFi, so every device acts as one, and the scope bounds the
  * device whatever its account may do. A pair not named here allows nothing.
  *
- * - `phone:full`: everything its account may do.
+ * - `app:full`: the app on a phone, tablet or Mac: everything its account may do.
+ * - `app:rulesOnly`: the Watch's list, for the app's Siri, Shortcuts and system controls, which run
+ *   outside the app and so sign in as their own device, never with the app's tokens.
  * - `watch:rulesOnly`: lists, the rule verbs, a group's unblock, and `GET /connection` for the manifest it needs away from home.
  * - `agent:full`: household reads and controls; never accounts, UniFi settings, resolvers, household
  *   settings changes or connection management, including `GET /connection`, whose manifest carries
  *   Cloudflare Access tokens.
  * - `agent:readOnly`: household reads.
  *
- * The built-in quarantine rule's switch is the household's quarantine setting, so a Watch or an
+ * The built-in quarantine rule's switch is the household's quarantine setting, so a Watch, an `app:rulesOnly` device or an
  * agent may pause, extend and resume it, never switch, edit or delete it.
  */
 
@@ -33,7 +35,8 @@ function changesQuarantineSetting({ method, path }: ScopedCall): boolean {
   return method !== "GET" && method !== "HEAD" && QUARANTINE_SWITCH.test(path);
 }
 
-function watchRulesOnly({ method, path }: ScopedCall): boolean {
+/** The one list a Watch and an app's `rulesOnly` sign-in share. */
+function rulesOnly({ method, path }: ScopedCall): boolean {
   if (method === "GET") {
     return path === "/api/v1/auth/session"
       || path === "/api/v1/connection"
@@ -41,7 +44,7 @@ function watchRulesOnly({ method, path }: ScopedCall): boolean {
       || path === "/api/v1/rules"
       || /^\/api\/v1\/changes\/[^/]+$/.test(path);
   }
-  // The route itself lets a Watch revoke only itself.
+  // The route itself lets one of these revoke only itself.
   if (method === "DELETE" && /^\/api\/v1\/paired\/devices\/[^/]+$/.test(path)) return true;
   if (changesQuarantineSetting({ method, path, deviceId: "" })) return false;
   return method === "POST" && (RULE_VERBS.test(path) || GROUP_RULE_VERBS.test(path) || GROUP_UNBLOCK.test(path));
@@ -92,14 +95,23 @@ function agentFull(request: ScopedCall): boolean {
 }
 
 const ALLOWLISTS: Partial<Record<PairedDeviceClient, Partial<Record<DeviceScope, (request: ScopedCall) => boolean>>>> = {
-  [PairedDeviceClient.phone]: { [DeviceScope.full]: () => true },
-  [PairedDeviceClient.watch]: { [DeviceScope.rulesOnly]: watchRulesOnly },
+  [PairedDeviceClient.app]: { [DeviceScope.full]: () => true, [DeviceScope.rulesOnly]: rulesOnly },
+  [PairedDeviceClient.watch]: { [DeviceScope.rulesOnly]: rulesOnly },
   [PairedDeviceClient.agent]: { [DeviceScope.full]: agentFull, [DeviceScope.readOnly]: agentReadOnly },
 };
 
-/** Whether a device of this client may hold this scope: exactly the four pairs above. */
+/** Whether a device of this client may hold this scope: exactly the five pairs above. */
 export function isValidScope(client: PairedDeviceClient, scope: DeviceScope): boolean {
   return Boolean(ALLOWLISTS[client]?.[scope]);
+}
+
+/**
+ * Whether a device is the app itself, with everything its account may do: the only device that may
+ * administer, set up a Watch or its own `rulesOnly` sign-in, or be re-paired. Never ask for the
+ * client alone: an `app:rulesOnly` device is the same client.
+ */
+export function isFullApp<T extends { client: PairedDeviceClient; scope: DeviceScope }>(device: T | null | undefined): device is T {
+  return device?.client === PairedDeviceClient.app && device.scope === DeviceScope.full;
 }
 
 export function deviceRouteAllowed(input: { client: PairedDeviceClient; scope: DeviceScope } & ScopedCall): boolean {

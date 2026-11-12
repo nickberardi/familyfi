@@ -38,10 +38,10 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
  * - `tunnel-bearer`: the same browser's session token sent as a bearer through the tunnel,
  *   which keeps `Authorization`. A browser's session counts only from its cookie, so it fares
  *   no better than `tunnel`.
- * - `agent:full`, `agent:readOnly` and `watch:rulesOnly`: a paired device on the home network,
+ * - `agent:full`, `agent:readOnly`, `watch:rulesOnly` and `app:rulesOnly`: a paired device on the home network,
  *   signed in as the administrator, with that scope. Its scope bounds it, not the account.
  */
-const DEVICES = ["agent:full", "agent:readOnly", "watch:rulesOnly"] as const;
+const DEVICES = ["agent:full", "agent:readOnly", "watch:rulesOnly", "app:rulesOnly"] as const;
 type Device = (typeof DEVICES)[number];
 const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel", "tunnel-bearer", ...DEVICES] as const;
 type Caller = (typeof CALLERS)[number];
@@ -104,9 +104,9 @@ function expected(entry: Entry): Record<Caller, Outcome> {
 type Entry = { access: Access; devices?: readonly Device[]; question?: string };
 
 const READERS: readonly Device[] = ["agent:full", "agent:readOnly"];
-const READERS_AND_WATCH: readonly Device[] = ["agent:full", "agent:readOnly", "watch:rulesOnly"];
+const READERS_AND_WATCH: readonly Device[] = ["agent:full", "agent:readOnly", "watch:rulesOnly", "app:rulesOnly"];
 const CONTROLLERS: readonly Device[] = ["agent:full"];
-const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly"];
+const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly", "app:rulesOnly"];
 
 /**
  * Only administrators use FamilyFi: an adult without administrator access has no sign-in, session
@@ -134,7 +134,7 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/auth/refresh": { access: "refresh-token" },
   "GET /api/v1/auth/session": { access: "session", devices: READERS_AND_WATCH },
   "GET /api/v1/changes/{id}": { access: "session", devices: READERS_AND_WATCH },
-  "GET /api/v1/connection": { access: "session", devices: ["watch:rulesOnly"] },
+  "GET /api/v1/connection": { access: "session", devices: ["watch:rulesOnly", "app:rulesOnly"] },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
   "POST /api/v1/connection/endpoints": { access: "administrator" },
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
@@ -158,7 +158,7 @@ const ACCESS: Record<string, Entry> = {
   "DELETE /api/v1/paired/devices": { access: "administrator" },
   "GET /api/v1/paired/devices/{id}": { access: "administrator" },
   "PATCH /api/v1/paired/devices/{id}": { access: "administrator" },
-  "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["watch:rulesOnly"] },
+  "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["watch:rulesOnly", "app:rulesOnly"] },
   "GET /api/v1/checkup": { access: "session", devices: READERS },
   "POST /api/v1/checkup/run": { access: "session", devices: CONTROLLERS },
   "PATCH /api/v1/checkup/findings/{id}": { access: "session", devices: CONTROLLERS },

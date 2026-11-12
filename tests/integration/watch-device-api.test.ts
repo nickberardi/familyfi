@@ -108,7 +108,7 @@ describe("independent Watch device", () => {
     const listed = await listDevices(request("/api/v1/paired/devices", { auth: await administrator() }));
     const devices = (await listed.json() as { devices: { id: string; client: string }[] }).devices;
     expect(devices).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: phone.device.id, client: "phone", scope: "full" }),
+      expect.objectContaining({ id: phone.device.id, client: "app", scope: "full" }),
       expect.objectContaining({ id: watch.deviceId, client: "watch", scope: "rulesOnly" }),
     ]));
   });

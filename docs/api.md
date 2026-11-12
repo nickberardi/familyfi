@@ -45,7 +45,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. With `?gateway=true` it needs a session (an administrator or a `phone:full` device; a Watch or agent gets 403) and adds `gateway`: each site device's latest CPU, memory, load and uptime from the console, gateway first, and the requests this server sent the console in the last five minutes. That costs the console a request per device, so only Settings asks, when the card opens; never poll it. |
+| GET | `/api/v1/health` | No secrets; includes `version` from `package.json` and an additive cached GitHub update-check snapshot. `update.available` is `null`, never `false`, while checking or after a GitHub failure. With `?gateway=true` it needs a session (an administrator or an `app:full` device; a Watch, an agent or an `app:rulesOnly` device gets 403) and adds `gateway`: each site device's latest CPU, memory, load and uptime from the console, gateway first, and the requests this server sent the console in the last five minutes. That costs the console a request per device, so only Settings asks, when the card opens; never poll it. |
 | POST | `/api/v1/auth/login` | Browser cookie session only; paired devices join by invite. Administrators only (403 `administrator_account_required` otherwise). Refused through remote access |
 | POST | `/api/v1/auth/refresh` | A paired device trades its refresh token for a new one-hour bearer and a new refresh token; reuse of a replaced one ends the sign-in |
 | POST | `/api/v1/auth/logout` | CSRF for cookies; bearer for paired devices |
@@ -60,12 +60,12 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off. Any update clears the route's reachability evidence |
 | POST | `/api/v1/connection/endpoints/{id}/check` | Checks from home whether a route the household runs answers as this FamilyFi: it requests the route's `/api/v1/connection/identity` with the route's own trust and Access token and compares `instanceId`. Stores and returns `reachability`; a `quick` or `domain` route is 409 `managed_route` |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off. A published route you run always reports `status: running`; `reachability` says whether it works: `reachedAt`, the last request the remote-access port answered through it (written at most once a minute), and FamilyFi's own last check (`checkedAt`, `result`, `message`), run once on publish and on request. Publishing again clears it. Clients never show such a route as on without that evidence |
-| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone (`client: phone`, its route, the administrator it signs in as; five minutes) or an agent (`client: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired phone invites and claims its Watch in one call |
+| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone, tablet or Mac (`client: app`; `phone` is its deprecated alias; its route, the administrator it signs in as; five minutes) or an agent (`client: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired app invites and claims its Watch, or its own sign-in for Siri and shortcuts (`client: app`, `scope: rulesOnly`), in one call |
 | GET/PUT | `/api/v1/connection/home` | Administrator reads or sets the home network address: where FamilyFi is inside the home (an http or https origin, 400 `invalid_home_url` otherwise; `null` clears it), apart from the route remote access publishes. Both answer `current`, the address this request reached and whether it is `private`, which stands in while none is saved. Agents pair there |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/paired/invites/{id}/claim` | Join with the code: every client is signed in at once (bearer and refresh token, never a password or device credential); a phone also gets its route and signed manifest |
-| GET | `/api/v1/paired/devices` | Paired devices with each one's `scope`, the account it acts as (`actsAs`) and its parent: all of them for an administrator, itself and its Watch for a paired device; `?client=` and `?status=` narrow it; the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
+| GET | `/api/v1/paired/devices` | Paired devices with each one's `scope`, the account it acts as (`actsAs`) and its parent: all of them for an administrator, itself and what it set up for a paired device; `?client=` and `?status=` narrow it; the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
 | GET/PATCH/DELETE | `/api/v1/paired/devices/{id}` | Read one; an administrator renames it or changes an agent's scope; an administrator, the device itself or its parent phone revokes it and its sessions. Only an administrator may use `?remove=true` to delete its record |
 | DELETE | `/api/v1/paired/devices?status=revoked` | Administrator removes every revoked device's record; active ones are untouched |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds`. A key for a different console or site first removes FamilyFi's policies from the old one; if that fails, 409 `previous_gateway_unreachable` saves nothing, and `forgetPrevious: true` switches anyway, leaving those policies there |
@@ -207,6 +207,21 @@ create, edit or delete rules. A phone may set up several Watches. Revoking or re
 revokes its Watches too; signing the phone out does not. It renews its own bearer with its own
 refresh token.
 
+The app pairs as `app`, whether it runs on a phone, a tablet or a Mac. `phone` is the name it had
+before 1.1.0: the server still accepts it in an invite and in `?client=`, reads it as `app`, and
+never answers with it. It is deprecated.
+
+An app's Siri, Shortcuts and system controls (Control Center, Quick Settings) run outside the app.
+They never use the app's own tokens: two holders of one rotating refresh token end the sign-in
+(403 `refresh_reused`). The app instead sets up a second sign-in for them with the same call
+(`client: app`, `scope: rulesOnly`, and a `clientId` the app makes once and keeps), and stores the
+answer where its native code reads it. That is its own paired device, `app:rulesOnly`, with the
+Watch's list and the app as its parent, listed in System → Pair Device as "Siri and shortcuts on"
+the device. Setting it up again with the same `clientId` replaces the earlier record, so an app has
+one. It works over remote access as a Watch does, and revoking or removing the app revokes it. Only
+an `app:full` device administers, sets up a Watch or this sign-in, or is re-paired: the server asks
+for the pair, never the client alone (`isFullApp` in `src/server/device-scope.ts`).
+
 ### Agents
 
 An administrator connects an AI agent with **Connect an agent** on **System → Pair Device** (`/pair`): name it, choose a
@@ -241,12 +256,13 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 
 | Pair | May call |
 | --- | --- |
-| `phone:full` | Whatever its account may |
+| `app:full` | The app on a phone, tablet or Mac: whatever its account may |
 | `watch:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` beyond that) |
+| `app:rulesOnly` | The Watch's list, for an app's Siri, Shortcuts and system controls (403 `app_scope` beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
 
-No other pair is valid. A phone always pairs as `full` and a Watch enrolls as `rulesOnly`; an
+No other pair is valid. A phone, tablet or Mac always pairs as `app` with `full`, and a Watch and an app's Siri and shortcuts enroll as `rulesOnly`; an
 administrator chooses an agent's scope when connecting it.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
@@ -259,7 +275,7 @@ CI holds the implementation to this document: `pnpm test-api` fails when a route
 
 ## Versioning the contract
 
-The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile)) vendors this repository as its `vendor/familyfi` submodule and generates its API types from `openapi/familyfi.v1.yaml` (`pnpm run schema`), so `info.version` names which contract revision a pin carries. Every pull request that changes the document raises `info.version`, and `package.json`'s version and `API_VERSION` in `src/lib/api-compat.ts` with it (`tests/unit/version.test.ts` and `tests/unit/api-compat.test.ts` keep the three equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
+The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-mobile)) vendors this repository as its `vendor/familyfi` submodule and generates its API types from `openapi/familyfi.v1.yaml` (`pnpm run schema`), so `info.version` names which contract revision a pin carries. Every pull request that changes the document raises `info.version` (unless the version on the base branch is still unreleased, below), and `package.json`'s version and `API_VERSION` in `src/lib/api-compat.ts` with it (`tests/unit/version.test.ts` and `tests/unit/api-compat.test.ts` keep the three equal). `scripts/ci/check-openapi-version.mjs` enforces the rule against the base branch:
 
 | The pull request changes | `info.version` must |
 | --- | --- |
@@ -268,7 +284,7 @@ The companion app ([`familyfi-mobile`](https://github.com/nickberardi/familyfi-m
 | Anything else: a path, parameter, schema, enum value or status | Increase by at least a minor version |
 | Anything, with the `breaking_api` label | From 1.0.0 on, increase by a major version. Before 1.0.0 a minor increase carries the break, as semver allows for `0.y.z` |
 
-A major increase needs the `breaking_api` label, which only the operator adds. The version increases once per pull request, not once per release, so two contract changes merged between releases are two versions, and each pin carries the one it was taken at. The `OpenAPI` workflow's job summary names the old and new version as a reminder to re-pin `familyfi-mobile`'s `vendor/familyfi` submodule and regenerate its types; it posts nothing outside this repository.
+A major increase needs the `breaking_api` label, which only the operator adds. While the base branch's version is above the latest release tag's, it has not shipped: a pull request may then keep it, and is held to the same table against the latest release instead, so the contract changes between two releases share one increase. A pull request may still raise it. The `OpenAPI` workflow's job summary names the old and new version as a reminder to re-pin `familyfi-mobile`'s `vendor/familyfi` submodule and regenerate its types; it posts nothing outside this repository.
 
 Run the check locally with `make test-api-version`, or against any ref with `node scripts/ci/check-openapi-version.mjs <ref>`.
 
@@ -294,4 +310,4 @@ Pairing makes the same check after the household's identity verifies and before 
 
 ### Values that grow
 
-A list the server is expected to extend, such as `CheckupCheck`, is declared with `x-extensible-enum` instead of `enum`, so adding a value is a minor version and not a breaking change. A client must accept a value it does not know. Where such a value is shown to the user, the object also carries a `Message`: a `key` (for example `checkup.leftover_policies`) that the client looks up in its own localized copy, and `text`, a short English line. A client with no copy for the key shows `text` and adds its own note that a newer app shows more. Clients keep their copy and localization; the server's `text` is only the fallback.
+A list the server is expected to extend, such as `CheckupCheck` or a paired device's `client` (`PairedClient`), is declared with `x-extensible-enum` instead of `enum`, so adding a value is a minor version and not a breaking change. A client must accept a value it does not know. Where such a value is shown to the user, the object also carries a `Message`: a `key` (for example `checkup.leftover_policies`) that the client looks up in its own localized copy, and `text`, a short English line. A client with no copy for the key shows `text` and adds its own note that a newer app shows more. Clients keep their copy and localization; the server's `text` is only the fallback.
