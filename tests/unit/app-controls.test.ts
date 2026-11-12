@@ -1,7 +1,7 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api-client";
-import { appControlsName, enrollAppControls, findAppControls, setUpAppControls, SIRI_SHORTCUTS_COPY, supportsAppControls } from "@/lib/app-controls";
+import { appControlsName, enrollAppControls, findAppControls, GROUP_SHORTCUTS_MAX, groupShortcuts, setUpAppControls, SIRI_SHORTCUTS_COPY, supportsAppControls } from "@/lib/app-controls";
 import type { PairedPhone } from "@/lib/types";
 
 describe("app controls", () => {
@@ -111,5 +111,13 @@ describe("app controls", () => {
     const phrases = SIRI_SHORTCUTS_COPY.phrases("Abby");
     expect(phrases).toHaveLength(5);
     for (const phrase of phrases) expect(phrase).toMatch(/Abby.* in FamilyFi/);
+  });
+
+  it("gives Android a shortcut to each of the first four groups' Block sheet, in the build's own scheme", () => {
+    const groups = ["a", "b", "c", "d", "e"].map((id) => ({ id, name: `Group ${id}` }));
+    const shortcuts = groupShortcuts(groups, "familyfi-dev");
+    expect(shortcuts).toHaveLength(GROUP_SHORTCUTS_MAX);
+    expect(shortcuts[0]).toEqual({ id: "block-a", shortLabel: "Group a", longLabel: "Block Group a", url: "familyfi-dev://pause/a" });
+    expect(groupShortcuts([], "familyfi")).toEqual([]);
   });
 });

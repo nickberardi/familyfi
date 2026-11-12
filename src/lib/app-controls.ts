@@ -2,7 +2,7 @@ import { ApiError, type ApiRequest } from "./api-client";
 import type { ConnectionProfile } from "./companion-pairing";
 import { isAppControls } from "./pair-device";
 import { compareSemver, parseSemver } from "./semver";
-import type { PairedPhone } from "./types";
+import type { Group, PairedPhone } from "./types";
 import { watchProvisioning, type WatchEnrollment, type WatchProvisioning } from "./watch";
 
 /**
@@ -126,4 +126,35 @@ export const SIRI_SHORTCUTS_COPY = {
   needsUpdate: "To use Siri and Shortcuts, update your FamilyFi server from Settings on your computer.",
   /** The actions are not signed in yet: the app does that once it has read the household. */
   settingUp: "Setting up Siri and Shortcuts…",
+} as const;
+
+/** How many shortcuts Android shows when the app's icon is pressed and held. */
+export const GROUP_SHORTCUTS_MAX = 4;
+
+/** One group's shortcut on Android: its words, and the app link it opens (the group's Block sheet). */
+export type GroupShortcut = { id: string; shortLabel: string; longLabel: string; url: string };
+
+/** A group's shortcut. `scheme` is the app's own link scheme, which differs between its builds. */
+export function groupShortcut(group: Pick<Group, "id" | "name">, scheme: string): GroupShortcut {
+  return { id: `block-${group.id}`, shortLabel: group.name, longLabel: `Block ${group.name}`, url: `${scheme}://pause/${group.id}` };
+}
+
+/** The shortcuts under the app's icon: the first groups, in the household's order. */
+export function groupShortcuts(groups: readonly Pick<Group, "id" | "name">[], scheme: string): GroupShortcut[] {
+  return groups.slice(0, GROUP_SHORTCUTS_MAX).map((group) => groupShortcut(group, scheme));
+}
+
+/** The app's Home screen shortcuts screen on Android. */
+export const HOME_SHORTCUTS_COPY = {
+  title: "Home screen shortcuts",
+  section: "Block from your Home screen",
+  intro:
+    "Press and hold the FamilyFi icon to block one of your first four groups, or add any group to your Home screen here. A shortcut opens FamilyFi at that group's Block choices.",
+  groups: "Groups",
+  add: "Add to Home screen",
+  addFor: (name: string) => `Add ${name} to your Home screen`,
+  /** Android asks the person to confirm, so this only says it was asked. */
+  asked: "Check your Home screen to finish adding it.",
+  unsupported: "Your launcher can't add shortcuts this way. Press and hold the FamilyFi icon instead.",
+  noGroups: "No groups yet.",
 } as const;
