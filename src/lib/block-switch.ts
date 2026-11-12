@@ -47,11 +47,12 @@ export const QUICK_SETTINGS_COPY = {
   title: "Quick Settings",
   section: "Block from Quick Settings",
   intro:
-    "Add a Block switch for a group to your phone's Quick Settings, and block or unblock it without opening FamilyFi. Blocking works from the lock screen. Unblocking asks you to unlock your phone first.",
+    "Add a Block switch for a group to Quick Settings, and block or unblock it without opening FamilyFi. Blocking works from the lock screen. Unblocking asks you to unlock first.",
   tiles: "Tiles",
   tile: (number: number) => `Tile ${number}`,
   noGroup: "No group",
   choose: "Choose a group",
+  change: "Change",
   clear: "Clear",
   add: "Add to Quick Settings",
   added: "Added to Quick Settings.",
@@ -59,6 +60,6 @@ export const QUICK_SETTINGS_COPY = {
   addYourself: "Swipe down twice from the top of your screen, tap the pencil, then drag FamilyFi Block into your tiles.",
   /** The server is older than the first contract with a sign-in for tiles. */
   needsUpdate: "Update your FamilyFi server to use Quick Settings tiles.",
-  unavailable: "Couldn't set up Quick Settings tiles. Try again.",
-  tablet: "Quick Settings tiles need FamilyFi on an Android phone or tablet.",
+  /** The tiles are not signed in yet: the app does that once it has read the household. */
+  settingUp: "Setting up Quick Settings tiles…",
 } as const;
