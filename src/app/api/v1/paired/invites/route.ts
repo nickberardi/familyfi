@@ -6,11 +6,11 @@ import { prisma } from "@/server/db";
 import { readJson, withAdmin, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { isFullApp } from "@/server/device-scope";
-import { inviteAgent, inviteAndClaimCompanion, invitePhone } from "@/server/pairing";
+import { ClientIdInUseError, inviteAgent, inviteAndClaimCompanion, invitePhone } from "@/server/pairing";
 
 const Name = z.string().trim().min(1).max(80);
 const Invite = z.discriminatedUnion("client", [
-  // `phone` is what apps built before 1.2.0 send for `app`.
+  // `phone` is what apps built before 1.1.0 send for `app`.
   z.object({ client: z.enum(["app", "phone"]), displayName: Name, endpointId: z.string().min(1), accountId: z.string().min(1).optional(), replacesDeviceId: z.string().min(1).optional() }),
   z.object({ client: z.literal("agent"), displayName: Name, scope: z.enum(["full", "readOnly"]) }),
 ]);
@@ -90,14 +90,21 @@ async function claimCompanion(request: Request) {
     if (!body.ok) return body.response;
     const parsed = Companion.safeParse(body.value);
     if (!parsed.success) return jsonError(400, "invalid_request", "An identifier and optional name are required; only a Watch, or an app with the rulesOnly scope, is claimed this way.");
-    const { invite, claim } = await inviteAndClaimCompanion({
-      client: parsed.data.client,
-      parentDeviceId: session.device.id,
-      account: session.account,
-      clientId: parsed.data.clientId,
-      displayName: parsed.data.displayName ?? COMPANION_NAME[parsed.data.client],
-      userAgent: request.headers.get("user-agent"),
-    });
+    let joined: Awaited<ReturnType<typeof inviteAndClaimCompanion>>;
+    try {
+      joined = await inviteAndClaimCompanion({
+        client: parsed.data.client,
+        parentDeviceId: session.device.id,
+        account: session.account,
+        clientId: parsed.data.clientId,
+        displayName: parsed.data.displayName ?? COMPANION_NAME[parsed.data.client],
+        userAgent: request.headers.get("user-agent"),
+      });
+    } catch (caught) {
+      if (caught instanceof ClientIdInUseError) return jsonError(409, "client_id_in_use", caught.message);
+      throw caught;
+    }
+    const { invite, claim } = joined;
     return Response.json({ invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), status: "claimed" }, ...claim }, { status: 201 });
   });
 }

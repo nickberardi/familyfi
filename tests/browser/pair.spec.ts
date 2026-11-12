@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { request as playwrightRequest } from "@playwright/test";
 import { expect, test, type Page } from "./fixtures";
 
 import { answerConfirm, answerConfirms } from "./confirm-dialog";
@@ -427,10 +426,10 @@ test("lists an app's Siri and shortcuts as its own device, set up by its phone",
     phoneId = phone.device.id;
     // The app sets its controls up itself, with its own bearer: no browser can.
     await page.goto("/pair");
-    const app = await playwrightRequest.newContext({ baseURL: new URL(page.url()).origin, extraHTTPHeaders: { authorization: `Bearer ${phone.token}` } });
-    const controls = await app.post("/api/v1/paired/invites?claim=true", { data: { client: "app", scope: "rulesOnly", clientId: randomUUID(), displayName: `Siri and Shortcuts on ${name}` } });
+    const app = await page.context().browser()!.newContext({ extraHTTPHeaders: { authorization: `Bearer ${phone.token}` } });
+    const controls = await app.request.post(`${new URL(page.url()).origin}/api/v1/paired/invites?claim=true`, { data: { client: "app", scope: "rulesOnly", clientId: randomUUID(), displayName: `Siri and Shortcuts on ${name}` } });
     expect(controls.status()).toBe(201);
-    await app.dispose();
+    await app.close();
 
     await page.reload();
     const row = page.getByTestId("phone-row").filter({ hasText: `Siri and Shortcuts on ${name}` });

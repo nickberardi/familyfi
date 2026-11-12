@@ -94,6 +94,13 @@ export async function inviteAgent(input: { url: string; displayName: string; sco
   return { invite, code };
 }
 
+/** The `clientId` belongs to another kind of device. */
+export class ClientIdInUseError extends Error {
+  constructor() {
+    super("That identifier belongs to another kind of device.");
+  }
+}
+
 type Joined = { invite: Pairing; device: { id: string; displayName: string; client: PairedDeviceClient; scope: DeviceScope }; account: Account; bearer: ReturnType<typeof bearerSessionData> };
 
 /** Creates the device and signs it in, inside the caller's transaction. */
@@ -111,6 +118,8 @@ async function join(db: Db, input: {
   const replaces = invite.replacesDeviceId;
   if (input.clientId) {
     const previous = await db.pairedDevice.findUnique({ where: { clientId: input.clientId } });
+    // Only the same kind of device is replaced: an app's rulesOnly sign-in never retires a Watch, nor a Watch it.
+    if (previous && (previous.client !== invite.client || previous.scope !== invite.scope)) throw new ClientIdInUseError();
     if (previous) {
       await db.session.updateMany({ where: { deviceId: previous.id, revokedAt: null }, data: { revokedAt: now } });
       await db.pairedDevice.update({ where: { id: previous.id }, data: { revokedAt: now, clientId: null } });

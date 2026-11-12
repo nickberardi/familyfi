@@ -180,7 +180,8 @@ function latestReleaseSpec() {
     if (!tags[0]) return null;
     execFileSync("git", ["fetch", "--quiet", "--depth=1", "origin", `refs/tags/${tags[0].tag}`], { stdio: "ignore" });
     return YAML.parse(execFileSync("git", ["show", `FETCH_HEAD:${SPEC}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
-  } catch {
+  } catch (error) {
+    console.error(`Could not read the latest release's ${SPEC} (${error instanceof Error ? error.message.split("\n")[0] : error}); measuring from the base branch only.`);
     return null;
   }
 }

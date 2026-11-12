@@ -103,6 +103,16 @@ describe("/paired/devices", () => {
     expect(invalid.status).toBe(400);
     expect(((await invalid.json()) as { error: { code: string } }).error.code).toBe("invalid_scope");
     expect((await patch(phone.device.id, { scope: "readOnly" })).status).toBe(400);
+    // An app is `full` or its own `rulesOnly` sign-in from the start: neither ever becomes the other.
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly", clientId: "7b0c2f4e-5a1d-4c3b-9e8f-2d6a1b0c9e7f" })).json()) as Claim;
+    const promoted = await patch(controls.device.id, { scope: "full" });
+    expect(promoted.status).toBe(400);
+    expect(((await promoted.json()) as { error: { code: string } }).error.code).toBe("invalid_scope");
+    expect((await patch(phone.device.id, { scope: "rulesOnly" })).status).toBe(400);
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: controls.device.id } })).scope).toBe("rulesOnly");
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: phone.device.id } })).scope).toBe("full");
+    // Renaming it is still allowed.
+    expect((await patch(controls.device.id, { displayName: "Siri and Shortcuts on Den iPad" })).status).toBe(200);
     expect((await patch(phone.device.id, {})).status).toBe(400);
   });
 

@@ -1,3 +1,4 @@
+import { PairedDeviceClient } from "@prisma/client";
 import { z } from "zod";
 import { isAdministrator, removeDevice, revokeDevice } from "@/server/connection";
 import { prisma } from "@/server/db";
@@ -23,7 +24,10 @@ export async function GET(request: Request, context: Ctx) {
   });
 }
 
-/** Rename a paired device or change its scope; the scope must stay valid for its kind (in practice, an agent's). */
+/**
+ * Rename a paired device, or change an agent's scope. No other kind changes scope: an app is `full` or
+ * its own `rulesOnly` sign-in from the moment it joins, and one must never become the other.
+ */
 export async function PATCH(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
     const body = await readJson(request);
@@ -33,7 +37,7 @@ export async function PATCH(request: Request, context: Ctx) {
     const { id } = await context.params;
     const device = await prisma().pairedDevice.findUnique({ where: { id } });
     if (!device) return jsonError(404, "not_found", "Paired device not found.");
-    if (parsed.data.scope && !isValidScope(device.client, parsed.data.scope)) {
+    if (parsed.data.scope && parsed.data.scope !== device.scope && (device.client !== PairedDeviceClient.agent || !isValidScope(device.client, parsed.data.scope))) {
       return jsonError(400, "invalid_scope", `A ${device.client} cannot hold the ${parsed.data.scope} scope.`);
     }
     await prisma().pairedDevice.update({ where: { id }, data: parsed.data });
