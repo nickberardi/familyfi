@@ -100,7 +100,7 @@ export const SETTINGS_COPY = {
   keyIssuerElsewhere:
     "FamilyFi can’t issue or rotate this key — only a UniFi console admin can. Replace it in FamilyFi’s web Settings. Revoking the old key in UniFi is what actually retires it.",
   keyStored: "Stored encrypted · every UniFi call is made server-side, never from this browser.",
-  keyStoredPhone: "Stored encrypted · every UniFi call is made server-side, never from this phone.",
+  keyStoredPhone: "Stored encrypted · every UniFi call is made server-side, never from this device.",
   household: "Household",
   householdSub: "Everyone can be paused and given schedules · adults can be admins with their own login",
   admin: "Admin",

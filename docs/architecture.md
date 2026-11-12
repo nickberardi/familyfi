@@ -110,7 +110,7 @@ Every paired device joins through an invite (`/paired/invites`) and is managed t
 choosing the adult the phone signs in as; the companion claims it and is signed in, with no
 password. The code reaches the app as a QR, as text to paste, or, in a browser on a device the
 app runs on, as a link in the app's own scheme (`src/lib/pairing-link.ts`); all three are the
-same string, and the app confirms the household before it claims any of them. A phone invites and claims its Watch itself (`?claim=true`). Pairing establishes both
+same string, and the app confirms the household before it claims any of them. A code that carries a Cloudflare Access token is never offered as a link: a custom scheme belongs to whichever app registered it. A phone invites and claims its Watch itself (`?claim=true`). Pairing establishes both
 device trust and the account the device acts as; the device's scope bounds what that session may
 do, and the server checks it on each request. A Watch gets its own device identity and its
 narrower `rulesOnly` scope. Only administrators sign in or have paired devices: an adult without

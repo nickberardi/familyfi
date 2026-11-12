@@ -29,13 +29,13 @@ export function isOffline(failures: number): boolean {
 }
 
 export const HOP_COPY = {
-  phone: "This phone",
+  phone: "This device",
   familyfi: "FamilyFi",
   unifi: "UniFi",
-  note: "Two independently authenticated hops. Your phone never talks to UniFi.",
+  note: "Two independently authenticated hops. Your device never talks to UniFi.",
   offlineTitle: "Can't reach FamilyFi",
-  offlineBody: "FamilyFi isn't answering on any of this phone's routes. The app is paused until it does, and keeps trying by itself.",
-  offlineQuick: "If FamilyFi restarted, its Quick tunnel address changed. Re-pair this phone from Pair Device in FamilyFi on the web, then unpair here and scan the new code. For an address that stays the same, set up Cloudflare on your own domain.",
+  offlineBody: "FamilyFi isn't answering on any of this device's routes. The app is paused until it does, and keeps trying by itself.",
+  offlineQuick: "If FamilyFi restarted, its Quick tunnel address changed. Re-pair this device from Pair Device in FamilyFi on the web, then unpair here and scan the new code. For an address that stays the same, set up Cloudflare on your own domain.",
   offlineQuickGuide: "Set up Cloudflare on your domain",
   retrying: "Trying again…",
   tryAgain: "Try again now",
@@ -71,20 +71,20 @@ export function phoneHop(state: PhoneHopState, route: Pick<ConnectionRoute, "url
   if (state === "offline") {
     return {
       tone: "var(--ff-danger)",
-      section: "This phone → FamilyFi",
+      section: "This device → FamilyFi",
       status: "Not connected",
       detail: "No route answered. Check this device is on the home network or that remote access is on.",
       footnote: where,
     };
   }
   if (state === "checking") {
-    return { tone: "var(--ff-paused)", section: "This phone → FamilyFi", status: "Checking…", detail: "Measured from this phone.", footnote: where };
+    return { tone: "var(--ff-paused)", section: "This device → FamilyFi", status: "Checking…", detail: "Measured from this device.", footnote: where };
   }
   return {
     tone: "var(--ff-on)",
-    section: "This phone → FamilyFi",
+    section: "This device → FamilyFi",
     status: "Connected",
-    detail: route ? `${routeTrust(route)}. Measured from this phone, not reported by the server.` : "Measured from this phone.",
+    detail: route ? `${routeTrust(route)}. Measured from this device, not reported by the server.` : "Measured from this device.",
     footnote: where,
   };
 }
@@ -108,8 +108,8 @@ export function gatewayHop(
       section: "FamilyFi → UniFi console",
       status: "Unknown",
       detail: status
-        ? `This phone can't reach FamilyFi to ask. Last reported: ${connectionStatusLabel(status)}.`
-        : "This phone can't reach FamilyFi to ask.",
+        ? `This device can't reach FamilyFi to ask. Last reported: ${connectionStatusLabel(status)}.`
+        : "This device can't reach FamilyFi to ask.",
       footnote,
     };
   }
@@ -117,7 +117,7 @@ export function gatewayHop(
     tone: status === "connected" ? "var(--ff-on)" : status === "error" ? "var(--ff-danger)" : "var(--ff-muted)",
     section: "FamilyFi → UniFi console",
     status: status ? connectionStatusLabel(status) : "Unknown",
-    detail: unifi?.connectionError || "Local Network Integration API, key held by FamilyFi. Reported by the server, not measured from this phone.",
+    detail: unifi?.connectionError || "Local Network Integration API, key held by FamilyFi. Reported by the server, not measured from this device.",
     footnote,
   };
 }

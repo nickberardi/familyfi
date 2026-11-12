@@ -114,6 +114,7 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 - **Three actions** (primary, a secondary such as "Block on a schedule…" or "Edit rule and schedule", and Cancel) stack full-width, primary on top and Cancel last, on web and phone.
 - **Category sheet copy.** Creating: "Block <name>" / "Blocks <name> for <group> all day…". Re-enabling an off rule: "Turn on" / "Turns “<rule>” back on with its own schedule". "Turn off <name>" is a red fill and, for a rule several groups share, says it turns off for every group it covers.
 - **Remove device:** "FamilyFi forgets this device. While it's connected, it comes back unassigned and stays offline until you assign it." (the second sentence only while unassigned devices are kept offline).
+- **The pairing sheet's app link.** Under the pairing code, on its own line: "Open in the FamilyFi app" in the accent colour at 14px/600, with a 14px grey note under it. It has no out-arrow, because it opens the app and leaves the tab where it is. It shows only on the web, on a device the app runs on, and only until the code expires, and never for a code that carries a Cloudflare Access token; copying the code stays the fallback. Its copy is `src/lib/pairing-link.ts`.
 - On the phone the same content is the app's `Sheet` (familyfi-mobile), with the same anatomy and footer rules; shared dialog content draws its header and footer with `DialogParts`.
 
 ## Notices
@@ -173,6 +174,7 @@ The product writes like a careful sysadmin explaining something to their spouse:
 - **Lists** read "A, B and C", with no "only": "YouTube, Roblox and TikTok · everything else stays on".
 - **Status lines** (the design project still writes "Online · …" on one line; see Group status under [Open differences](#open-differences)). On a group card the badge says Online or Blocked and the line under it starts as a sentence. "No internet rule" only when the group really has none (its device line is then just the count, "4 devices"); "Internet rule off"; "Internet rule paused for everyone until <time>".
 - **State is named, not decorated.** "Paused until 6:00 PM", "Blocked upstream", "Unknown — quarantined". Never "Oops!" or "All good 🎉".
+- **This device, not this phone.** The app calls what it runs on "this device": the same app runs on a phone, a tablet and a Mac.
 - **Consequences up front.** Destructive copy says what will actually happen, in one sentence, before the button.
 
 ## Brand
@@ -205,6 +207,7 @@ The native app keeps the shared meaning above and adapts the presentation to eac
 - The card stack replaces the card grid on phones.
 - A one-tap Block switch (Control Center, Quick Settings, a widget) is another surface for group status: it is on exactly when the group's card badge reads Blocked, its state line is the badge's word, it offers no timed choices, and unblocking waits for the device to be unlocked. Its copy is `src/lib/block-switch.ts`.
 - An app's Siri, Shortcuts and system controls are their own row in Paired devices, named for the platform ("Siri and Shortcuts on …", "Quick Settings and shortcuts on …") with "Set up automatically by …" as its origin. The row has Revoke and never Re-pair, because the app sets it up again when it is next opened; revoking the app names it among what stops working.
+- A timed block made on a device gets one local notification five minutes before it ends: "Block for <name> ends in 5 minutes", with one action, More time, which opens the same sheet as the card's. It is scheduled by the device that made the block, never sent by the server, and is dropped when the block ends early. Its copy and lead time are `src/lib/pause-ending.ts`.
 - Siri and Shortcuts (iPhone, iPad) and Home screen shortcuts (Android) are More entries under System, never a tab. Their screens use the shared `SectionLabel`, `Button` and `Alert`: sentence-case section labels, one primary button, and a warning `Alert` when the person must act (update the server, a launcher that cannot add shortcuts). From Siri and Shortcuts, blocking and reading run from the lock screen; unblocking and adding time wait for the device to be unlocked. Example phrases are quoted with curly quotes and name one of the household's own groups. A group's Home screen shortcut on Android is labelled "Block <name>" wherever a launcher draws it, with a block glyph in the accent colour, never the shield: the launcher badges it with the app's own icon. Their copy is `src/lib/app-controls.ts`; Siri's spoken answers are written in the app's Swift, with statuses and times from the shared display port.
 
 ## Enforcement

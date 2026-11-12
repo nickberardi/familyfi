@@ -8,7 +8,7 @@ describe("pause ending notice", () => {
     const until = NOW + 30 * 60_000;
     expect(pauseEndingNotice({ name: "Gaming" }, until, NOW)).toEqual({
       at: until - PAUSE_ENDING_LEAD_MS,
-      title: "Gaming’s block ends in 5 minutes",
+      title: "Block for Gaming ends in 5 minutes",
       body: "Internet comes back then. Choose More time to keep it blocked.",
     });
   });

@@ -21,7 +21,7 @@ export function pauseEndingNotice(group: Pick<Group, "name">, until: number, now
   if (at <= now) return null;
   return {
     at,
-    title: `${group.name}’s block ends in 5 minutes`,
+    title: `Block for ${group.name} ends in ${PAUSE_ENDING_LEAD_MS / 60_000} minutes`,
     body: "Internet comes back then. Choose More time to keep it blocked.",
   };
 }
