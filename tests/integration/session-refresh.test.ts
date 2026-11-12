@@ -48,11 +48,13 @@ async function signedIn(token: string) {
   return (await currentSession(request("/api/v1/auth/session", { auth: bearer(token) }))).status === 200;
 }
 
-/** Moves the clock past a window by moving the stored timestamps back instead. */
-async function age(refreshToken: string, field: "previousRefreshUntil" | "refreshExpiresAt") {
+/** Moves the clock on by `byMs` (past the window by default) by moving the stored timestamp back instead. */
+async function age(refreshToken: string, field: "previousRefreshUntil" | "refreshExpiresAt", byMs?: number) {
   const hash = sha256(refreshToken);
   const where = field === "previousRefreshUntil" ? { previousRefreshHash: hash } : { refreshTokenHash: hash };
-  await prisma().session.updateMany({ where, data: { [field]: new Date(Date.now() - 1000) } });
+  const row = await prisma().session.findFirstOrThrow({ where });
+  const at = byMs === undefined ? new Date(Date.now() - 1000) : new Date(row[field]!.getTime() - byMs);
+  await prisma().session.updateMany({ where, data: { [field]: at } });
 }
 
 describe("refresh tokens for paired devices", () => {
@@ -104,23 +106,33 @@ describe("refresh tokens for paired devices", () => {
     expect(await signedIn(next.token)).toBe(true);
   });
 
-  it("honours a just-replaced refresh token once, for a lost response", async () => {
+  it("keeps a replaced refresh token working until its new pair is used, for a lost response", async () => {
     const pair = await phoneLogin();
+    // Responses lost to a slow tunnel or a suspended app, however long before the next try.
     const lost = await refreshed(pair.refreshToken);
+    await age(pair.refreshToken, "previousRefreshUntil", REFRESH_TOKEN_TTL_MS - 60_000);
+    const lostAgain = await refreshed(pair.refreshToken);
+    const received = await refreshed(pair.refreshToken);
+    // Only the pair the device holds now works.
+    expect(await signedIn(lost.token)).toBe(false);
+    expect(await signedIn(lostAgain.token)).toBe(false);
+    expect(await errorCode(await refreshWith(lost.refreshToken))).toBe("invalid_refresh");
+    expect(await signedIn(received.token)).toBe(true);
+    // Using the new pair spends the replaced token: a retry already on its way is honoured once.
     const retried = await refreshed(pair.refreshToken);
     expect(await signedIn(retried.token)).toBe(true);
-    // The pair the device never received is dead.
-    expect(await signedIn(lost.token)).toBe(false);
-    expect((await refreshWith(lost.refreshToken)).status).toBe(403);
-    // A second retry is reuse.
     const again = await refreshWith(pair.refreshToken);
     expect(again.status).toBe(403);
     expect(await errorCode(again)).toBe("refresh_reused");
+    expect(await signedIn(retried.token)).toBe(false);
   });
 
-  it("ends the whole sign-in when a replaced refresh token is used after the grace", async () => {
+  it("ends the whole sign-in when a replaced refresh token is used after its new pair was", async () => {
     const pair = await phoneLogin();
     const next = await refreshed(pair.refreshToken);
+    expect(await signedIn(next.token)).toBe(true);
+    const spent = await prisma().session.findUniqueOrThrow({ where: { previousRefreshHash: sha256(pair.refreshToken) } });
+    expect(spent.previousRefreshUntil!.getTime() - Date.now()).toBeLessThanOrEqual(REFRESH_REUSE_GRACE_MS);
     await age(pair.refreshToken, "previousRefreshUntil");
     const reused = await refreshWith(pair.refreshToken);
     expect(reused.status).toBe(403);
@@ -128,6 +140,15 @@ describe("refresh tokens for paired devices", () => {
     expect(await signedIn(next.token)).toBe(false);
     expect(await errorCode(await refreshWith(next.refreshToken))).toBe("invalid_refresh");
     expect(REFRESH_REUSE_GRACE_MS).toBeLessThanOrEqual(10_000);
+  });
+
+  it("treats a token the device has refreshed past as invalid, without ending the sign-in", async () => {
+    const pair = await phoneLogin();
+    const next = await refreshed(pair.refreshToken);
+    // Using the new refresh token, without its bearer, spends the replaced one at once.
+    const latest = await refreshed(next.refreshToken);
+    expect(await errorCode(await refreshWith(pair.refreshToken))).toBe("invalid_refresh");
+    expect(await signedIn(latest.token)).toBe(true);
   });
 
   it("refuses an expired or unknown refresh token", async () => {

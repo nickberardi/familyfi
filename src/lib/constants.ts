@@ -13,5 +13,8 @@ export const ROUTE_CHECK_HEADER = "x-familyfi-route-check";
 export const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
 /** A refresh token lives this long from its last use. */
 export const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-/** How long a just-replaced refresh token is honoured once, for a client that lost the response. */
+/**
+ * A just-replaced refresh token is honoured until the device uses the pair that replaced it (it may
+ * have lost the response), then once more within this, for a retry already on its way.
+ */
 export const REFRESH_REUSE_GRACE_MS = 10 * 1000;

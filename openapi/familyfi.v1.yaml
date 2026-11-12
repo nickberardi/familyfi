@@ -174,10 +174,12 @@ paths:
       summary: Renew a paired device's bearer
       description: |
         Trades a paired device's refresh token for a new one-hour bearer and a new refresh token;
-        both old tokens stop working. The refresh token lasts 90 days from its last use. The one
-        just replaced is honoured once within a few seconds, for a device that lost the response;
-        presenting it again after that means a copy exists, so the whole sign-in is revoked
-        (403 `refresh_reused`). An unknown, expired or revoked token, or a revoked device, is
+        the old bearer stops working. The refresh token lasts 90 days from its last use. The one
+        just replaced keeps working until the device uses the new bearer or refresh token, so a
+        device that lost the response refreshes with it again and gets another pair. Once the new
+        bearer has been used, presenting the replaced token again (after a few seconds' grace for a
+        retry already on its way) means a copy exists, so the whole sign-in is revoked
+        (403 `refresh_reused`); once the new refresh token has been used, it is simply invalid. An unknown, expired or revoked token, or a revoked device, is
         403 `invalid_refresh`: sign in again. An agent's refresh through remote access is 403
         `agent_remote`.
       security: []
