@@ -125,7 +125,7 @@ describe("app controls", () => {
     // The screen's copy says the number in words.
     expect(GROUP_SHORTCUTS_MAX).toBe(4);
     expect(HOME_SHORTCUTS_COPY.intro).toContain("first four groups");
-    expect(shortcuts[0]).toEqual({ id: "block-a", shortLabel: "Group a", longLabel: "Block Group a", url: "familyfi-dev://pause/a" });
+    expect(shortcuts[0]).toEqual({ id: "block-a", shortLabel: "Block Group a", longLabel: "Block Group a", url: "familyfi-dev://pause/a" });
     expect(groupShortcuts([], "familyfi")).toEqual([]);
   });
 });
