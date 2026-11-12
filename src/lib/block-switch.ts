@@ -64,7 +64,7 @@ export const QUICK_SETTINGS_COPY = {
   alreadyAdded: "This tile is already in Quick Settings.",
   addYourself: "Swipe down twice from the top of your screen, tap the pencil, then drag FamilyFi Block into your tiles.",
   /** The server is older than the first contract with a sign-in for tiles. */
-  needsUpdate: "Update your FamilyFi server to use Quick Settings tiles, from FamilyFi's Settings on your computer.",
+  needsUpdate: "To use Quick Settings tiles, update your FamilyFi server from Settings on your computer.",
   /** The tiles are not signed in yet: the app does that once it has read the household. */
   settingUp: "Setting up Quick Settings tiles…",
 } as const;

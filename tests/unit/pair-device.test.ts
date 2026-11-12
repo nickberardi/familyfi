@@ -69,7 +69,7 @@ describe("pair device", () => {
   });
 
   it("asks before revoking or removing, in the web's words", () => {
-    expect(revokeConfirm(phone())).toMatchObject({ title: "Revoke A phone?", message: "It is signed out now and must be paired again. Its Siri, shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." });
+    expect(revokeConfirm(phone())).toMatchObject({ title: "Revoke A phone?", message: "It is signed out now and must be paired again. Its shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." });
     expect(revokeConfirm(phone({ client: "watch", displayName: "A Watch" }))).toMatchObject({ title: "Revoke A Watch?", message: "It is signed out now and must be paired again." });
     expect(removeConfirm(phone())).toMatchObject({ title: "Remove A phone from the list?", message: "This can't be undone; setup would be needed again." });
     expect(removeAllConfirm(3)).toMatchObject({ title: "Remove all 3 revoked devices from the list?", message: "This can't be undone." });
