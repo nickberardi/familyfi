@@ -22,20 +22,25 @@ export function supportsAppControls(apiVersion: string | null | undefined): bool
   return Boolean(server) && compareSemver(server!, parseSemver(APP_CONTROLS_MIN_API)!) >= 0;
 }
 
-/** What the household's Pair Device list calls an app's controls. */
-export function appControlsName(deviceName: string | null | undefined): string {
+/** Where the app runs, for the names its system calls these by. */
+export type AppControlsPlatform = "apple" | "android";
+
+const CONTROLS_NOUN: Record<AppControlsPlatform, string> = { apple: "Siri and Shortcuts", android: "Quick Settings and shortcuts" };
+
+/** What the household's Pair Device list calls an app's controls, in its platform's own words, within the server's 80 characters. */
+export function appControlsName(platform: AppControlsPlatform, deviceName: string | null | undefined): string {
   const name = deviceName?.trim();
-  return (name ? `Siri and shortcuts on ${name}` : "Siri and shortcuts").slice(0, 80);
+  return (name ? `${CONTROLS_NOUN[platform]} on ${name}` : CONTROLS_NOUN[platform]).slice(0, 80);
 }
 
 /**
  * Enrolls this app's controls, in one call: the app invites and claims them. `controlsId` is an id
  * the app makes once and keeps; enrolling it again replaces the earlier record.
  */
-export function enrollAppControls(request: ApiRequest, controlsId: string, deviceName?: string | null): Promise<WatchEnrollment> {
+export function enrollAppControls(request: ApiRequest, controlsId: string, platform: AppControlsPlatform, deviceName?: string | null): Promise<WatchEnrollment> {
   return request<WatchEnrollment>("/api/v1/paired/invites?claim=true", {
     method: "POST",
-    body: { client: "app", scope: "rulesOnly", clientId: controlsId.toLowerCase(), displayName: appControlsName(deviceName) },
+    body: { client: "app", scope: "rulesOnly", clientId: controlsId.toLowerCase(), displayName: appControlsName(platform, deviceName) },
   });
 }
 

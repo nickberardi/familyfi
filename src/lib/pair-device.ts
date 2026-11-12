@@ -30,7 +30,7 @@ export const PAIR_COPY = {
   /** Watches and agents are not re-paired from the list. */
   expiredPairAgain: "Expired. Revoke it and pair again.",
   /** An app's Siri and shortcuts: the app sets them up again by itself. */
-  expiredControls: "Expired. Open FamilyFi on that phone to set it up again.",
+  expiredControls: "Expired. Open FamilyFi on that device to set it up again.",
   showRecent: "Show recent only",
   removeAllRevoked: "Remove all revoked",
   revoke: "Revoke",
@@ -115,7 +115,12 @@ export function publishedRoute(tunnel: Pick<RemoteAccess, "endpointId"> | null, 
 
 /** Revoking a phone also revokes the Watches, phones and agents it paired. */
 export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope">>) {
-  const paired = phone.client && phone.scope && isApp({ client: phone.client, scope: phone.scope }) ? " Any Watch, phone or agent it paired stops working too." : "";
+  const kind = phone.client && phone.scope ? { client: phone.client, scope: phone.scope } : null;
+  // Nothing pairs an app's Siri and shortcuts again: the app sets them up itself when it next opens.
+  if (kind && isAppControls(kind)) {
+    return { title: `Revoke ${phone.displayName}?`, message: "They stop working now, until FamilyFi is next opened on that device. The app itself stays paired.", confirmLabel: PAIR_COPY.revoke };
+  }
+  const paired = kind && isApp(kind) ? " Any Watch, phone or agent it paired stops working too." : "";
   return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
 }
 
@@ -134,7 +139,7 @@ function pairedDate(iso: string) {
 /** Where a device came from when it paired through no listed route: the phone that set it up, the home network, or a removed route. */
 function origin(device: Pick<PairedPhone, "client" | "scope">, parentName: string | null): string {
   if (device.client === "watch") return `Paired automatically from ${parentName ?? "an iPhone"}`;
-  if (isAppControls(device)) return `Set up automatically by ${parentName ?? "a phone"}`;
+  if (isAppControls(device)) return `Set up automatically by ${parentName ?? "the FamilyFi app"}`;
   if (device.client === "agent") return "On the home network";
   return "via a route that was removed";
 }

@@ -428,12 +428,12 @@ test("lists an app's Siri and shortcuts as its own device, set up by its phone",
     // The app sets its controls up itself, with its own bearer: no browser can.
     await page.goto("/pair");
     const app = await playwrightRequest.newContext({ baseURL: new URL(page.url()).origin, extraHTTPHeaders: { authorization: `Bearer ${phone.token}` } });
-    const controls = await app.post("/api/v1/paired/invites?claim=true", { data: { client: "app", scope: "rulesOnly", clientId: randomUUID(), displayName: `Siri and shortcuts on ${name}` } });
+    const controls = await app.post("/api/v1/paired/invites?claim=true", { data: { client: "app", scope: "rulesOnly", clientId: randomUUID(), displayName: `Siri and Shortcuts on ${name}` } });
     expect(controls.status()).toBe(201);
     await app.dispose();
 
     await page.reload();
-    const row = page.getByTestId("phone-row").filter({ hasText: `Siri and shortcuts on ${name}` });
+    const row = page.getByTestId("phone-row").filter({ hasText: `Siri and Shortcuts on ${name}` });
     await expect(row).toContainText(`Set up automatically by ${name}`);
     await expect(row).toContainText("Rules only");
     // It is revoked on its own, never re-paired: its phone sets it up again.

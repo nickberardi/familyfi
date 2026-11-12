@@ -216,8 +216,8 @@ They never use the app's own tokens: two holders of one rotating refresh token e
 (403 `refresh_reused`). The app instead sets up a second sign-in for them with the same call
 (`client: app`, `scope: rulesOnly`, and a `clientId` the app makes once and keeps), and stores the
 answer where its native code reads it. That is its own paired device, `app:rulesOnly`, with the
-Watch's list and the app as its parent, listed in System → Pair Device as "Siri and shortcuts on"
-the device. Setting it up again with the same `clientId` replaces the earlier record, so an app has
+Watch's list and the app as its parent, listed in System → Pair Device in its platform's words ("Siri and Shortcuts on" an
+iPhone, "Quick Settings and shortcuts on" an Android phone). Setting it up again with the same `clientId` replaces the earlier record, so an app has
 one. It works over remote access as a Watch does, and revoking or removing the app revokes it. Only
 an `app:full` device administers, sets up a Watch or this sign-in, or is re-paired: the server asks
 for the pair, never the client alone (`isFullApp` in `src/server/device-scope.ts`).

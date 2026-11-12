@@ -33,7 +33,7 @@ function TextButton({ label, token, onPress, disabled, testID }: { label: string
 }
 
 /**
- * One paired phone, Watch or agent, each the same: what it may do and whose account it acts as, how
+ * One paired device (an app, its Siri and shortcuts, a Watch or an agent), each the same: what it may do and whose account it acts as, how
  * it reaches home, when it paired and its sign-in ends, and what can be done to it on the right.
  */
 export function PairedPhoneRow({
@@ -45,7 +45,7 @@ export function PairedPhoneRow({
   disabled,
 }: {
   phone: PairedPhone;
-  /** The name of the phone that paired this Watch. */
+  /** The name of the app that set this device up: a Watch's, or its own Siri and shortcuts'. */
   parentName?: string | null;
   /** No changes while the phone's view of the household is stale. */
   disabled?: boolean;

@@ -3,11 +3,12 @@ import { appControlsName, enrollAppControls, findAppControls, supportsAppControl
 import type { PairedPhone } from "@/lib/types";
 
 describe("app controls", () => {
-  it("are named for their device, within the server's limit", () => {
-    expect(appControlsName("Nick's iPhone")).toBe("Siri and shortcuts on Nick's iPhone");
-    expect(appControlsName("  ")).toBe("Siri and shortcuts");
-    expect(appControlsName(null)).toBe("Siri and shortcuts");
-    expect(appControlsName("x".repeat(100))).toHaveLength(80);
+  it("are named for their device in its platform's words, within the server's limit", () => {
+    expect(appControlsName("apple", "Nick's iPhone")).toBe("Siri and Shortcuts on Nick's iPhone");
+    expect(appControlsName("android", "Pixel 9")).toBe("Quick Settings and shortcuts on Pixel 9");
+    expect(appControlsName("apple", "  ")).toBe("Siri and Shortcuts");
+    expect(appControlsName("android", null)).toBe("Quick Settings and shortcuts");
+    expect(appControlsName("apple", "x".repeat(100))).toHaveLength(80);
   });
 
   it("are offered only by a server whose contract has them", () => {
@@ -24,11 +25,11 @@ describe("app controls", () => {
       calls.push({ path, init });
       return {};
     }) as never;
-    await enrollAppControls(request, "ABCDEF12-0000-4000-8000-000000000000", "Kitchen iPad");
+    await enrollAppControls(request, "ABCDEF12-0000-4000-8000-000000000000", "apple", "Kitchen iPad");
     expect(calls).toEqual([
       {
         path: "/api/v1/paired/invites?claim=true",
-        init: { method: "POST", body: { client: "app", scope: "rulesOnly", clientId: "abcdef12-0000-4000-8000-000000000000", displayName: "Siri and shortcuts on Kitchen iPad" } },
+        init: { method: "POST", body: { client: "app", scope: "rulesOnly", clientId: "abcdef12-0000-4000-8000-000000000000", displayName: "Siri and Shortcuts on Kitchen iPad" } },
       },
     ]);
   });
