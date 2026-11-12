@@ -69,7 +69,7 @@ describe("pair device", () => {
   });
 
   it("asks before revoking or removing, in the web's words", () => {
-    expect(revokeConfirm(phone())).toMatchObject({ title: "Revoke A phone?", message: "It is signed out now and must be paired again. Any Watch, phone or agent it paired stops working too." });
+    expect(revokeConfirm(phone())).toMatchObject({ title: "Revoke A phone?", message: "It is signed out now and must be paired again. Its Siri, shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." });
     expect(revokeConfirm(phone({ client: "watch", displayName: "A Watch" }))).toMatchObject({ title: "Revoke A Watch?", message: "It is signed out now and must be paired again." });
     expect(removeConfirm(phone())).toMatchObject({ title: "Remove A phone from the list?", message: "This can't be undone; setup would be needed again." });
     expect(removeAllConfirm(3)).toMatchObject({ title: "Remove all 3 revoked devices from the list?", message: "This can't be undone." });
@@ -118,11 +118,12 @@ describe("pair device", () => {
     expect(isAppControls(phone({ scope: "rulesOnly" }))).toBe(true);
     expect(isAppControls(phone())).toBe(false);
     expect(isAppControls(phone({ client: "watch", scope: "rulesOnly" }))).toBe(false);
-    expect(revokeConfirm(phone({ client: "phone" })).message).toContain("stops working too");
+    expect(revokeConfirm(phone({ client: "phone" })).message).toContain("stop working too");
     expect(revokeConfirm(phone({ scope: "rulesOnly", displayName: "Siri and Shortcuts on A phone" }))).toMatchObject({
       title: "Revoke Siri and Shortcuts on A phone?",
-      message: "They stop working now, until FamilyFi is next opened on that device. The app itself stays paired.",
+      message: "They stop working now, until you next open FamilyFi on that device. The app itself stays paired.",
     });
+    expect(removeConfirm(phone({ scope: "rulesOnly" })).message).toBe("This can't be undone.");
   });
 
   it("invites a phone as the app, and as the deprecated phone only when an older server refuses app", async () => {

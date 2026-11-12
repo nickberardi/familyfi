@@ -11,7 +11,8 @@ import { ClientIdInUseError, inviteAgent, inviteAndClaimCompanion, invitePhone }
 const Name = z.string().trim().min(1).max(80);
 const Invite = z.discriminatedUnion("client", [
   // `phone` is what apps built before 1.1.0 send for `app`.
-  z.object({ client: z.enum(["app", "phone"]), displayName: Name, endpointId: z.string().min(1), accountId: z.string().min(1).optional(), replacesDeviceId: z.string().min(1).optional() }),
+  // Strict, so a `scope` here is refused rather than dropped: an invite always pairs the whole app.
+  z.object({ client: z.enum(["app", "phone"]), displayName: Name, endpointId: z.string().min(1), accountId: z.string().min(1).optional(), replacesDeviceId: z.string().min(1).optional() }).strict(),
   z.object({ client: z.literal("agent"), displayName: Name, scope: z.enum(["full", "readOnly"]) }),
 ]);
 const Companion = z.discriminatedUnion("client", [

@@ -203,6 +203,8 @@ The native app keeps the shared meaning above and adapts the presentation to eac
 - The tab bar holds Family, Things, Devices and More, never a fifth tab.
 - Dialogs are the app's own `Sheet` (in familyfi-mobile) with the same content and copy as the web's `Modal`.
 - The card stack replaces the card grid on phones.
+- A one-tap Block switch (Control Center, Quick Settings, a widget) is another surface for group status: it is on exactly when the group's card badge reads Blocked, its state line is the badge's word, it offers no timed choices, and unblocking waits for the device to be unlocked. Its copy is `src/lib/block-switch.ts`.
+- An app's Siri, Shortcuts and system controls are their own row in Paired devices, named for the platform ("Siri and Shortcuts on …", "Quick Settings and shortcuts on …") with "Set up automatically by …" as its origin. The row has Revoke and never Re-pair, because the app sets it up again when it is next opened; revoking the app names it among what stops working.
 
 ## Enforcement
 

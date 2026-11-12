@@ -22,7 +22,7 @@ export const PAIR_COPY = {
   loadFailed: "Could not load remote access.",
   actionFailed: "That didn't work.",
   paired: "Paired devices",
-  pairedSub: "Phones, Watches and agents; revoke any of them on its own",
+  pairedSub: "Phones, Watches, agents and what they set up; revoke any one of them",
   noPhones: "No paired devices yet. Pair a phone or connect an agent to add one.",
   remoteFirst: "Turn on remote access, then pair a phone. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a phone.",
@@ -118,14 +118,16 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   const kind = phone.client && phone.scope ? { client: phone.client, scope: phone.scope } : null;
   // Nothing pairs an app's Siri and shortcuts again: the app sets them up itself when it next opens.
   if (kind && isAppControls(kind)) {
-    return { title: `Revoke ${phone.displayName}?`, message: "They stop working now, until FamilyFi is next opened on that device. The app itself stays paired.", confirmLabel: PAIR_COPY.revoke };
+    return { title: `Revoke ${phone.displayName}?`, message: "They stop working now, until you next open FamilyFi on that device. The app itself stays paired.", confirmLabel: PAIR_COPY.revoke };
   }
-  const paired = kind && isApp(kind) ? " Any Watch, phone or agent it paired stops working too." : "";
+  const paired = kind && isApp(kind) ? " Its Siri, shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." : "";
   return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
 }
 
-export function removeConfirm(phone: Pick<PairedPhone, "displayName">) {
-  return { title: `Remove ${phone.displayName} from the list?`, message: "This can't be undone; setup would be needed again.", confirmLabel: PAIR_COPY.remove };
+export function removeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope">>) {
+  // An app sets its own Siri and shortcuts up again, so there is no setup to warn about.
+  const controls = phone.client && phone.scope && isAppControls({ client: phone.client, scope: phone.scope });
+  return { title: `Remove ${phone.displayName} from the list?`, message: controls ? "This can't be undone." : "This can't be undone; setup would be needed again.", confirmLabel: PAIR_COPY.remove };
 }
 
 export function removeAllConfirm(count: number) {
