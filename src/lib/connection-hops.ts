@@ -73,7 +73,7 @@ export function phoneHop(state: PhoneHopState, route: Pick<ConnectionRoute, "url
       tone: "var(--ff-danger)",
       section: "This phone → FamilyFi",
       status: "Not connected",
-      detail: "No route answered. Check this phone is on the home network or that remote access is on.",
+      detail: "No route answered. Check this device is on the home network or that remote access is on.",
       footnote: where,
     };
   }

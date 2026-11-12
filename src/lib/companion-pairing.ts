@@ -43,7 +43,7 @@ export type ConnectionProfile = {
 /** A signed-in phone's session: its one-hour bearer and the rotating refresh token that renews it. */
 export type StoredSession = { token: string; session: Session; refreshToken: string | null };
 
-export const PAIRING_UNREACHABLE = "Can't reach FamilyFi at the address in this code. Check this phone is on the home network, then try again.";
+export const PAIRING_UNREACHABLE = "Can't reach FamilyFi at the address in this code. Check this device is on the home network, then try again.";
 
 /** What to show when a pairing step fails: the check's own message, the server's, or that it could not be reached. */
 export function pairingErrorMessage(error: unknown): string {
