@@ -283,7 +283,7 @@ function awaitingUse(previousRefreshUntil: Date | null, now: Date) {
  * replaced token means a copy exists, so the whole sign-in is revoked. Once the new refresh token
  * has been used, the replaced one is simply invalid.
  */
-export async function refreshSession(refreshToken: string, options: { tunnelled?: boolean; now?: Date } = {}): Promise<RefreshResult> {
+export async function refreshSession(refreshToken: string, options: { tunnelled?: boolean; now?: Date; reread?: boolean } = {}): Promise<RefreshResult> {
   const now = options.now ?? new Date();
   const presented = sha256(refreshToken);
   const include = { account: true, device: true } as const;
@@ -322,7 +322,17 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
       previousRefreshUntil: !grace || unconfirmed ? next.refreshExpiresAt : now,
     },
   });
-  if (rotated.count !== 1) return INVALID_REFRESH;
+  if (rotated.count !== 1) {
+    // A retry that lost only to the new bearer's first use cutting the window is read again, once,
+    // under the cut window: the tokens did not rotate, so it is not refused as invalid.
+    if (grace && !options.reread) {
+      const after = await prisma().session.findUnique({ where: { id: session.id }, select: { refreshTokenHash: true, previousRefreshUntil: true } });
+      if (after?.refreshTokenHash === current && after.previousRefreshUntil?.getTime() !== session.previousRefreshUntil?.getTime()) {
+        return refreshSession(refreshToken, { ...options, reread: true });
+      }
+    }
+    return INVALID_REFRESH;
+  }
   await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: now } });
   return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
 }
