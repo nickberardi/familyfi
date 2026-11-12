@@ -6,7 +6,7 @@ import { jsonError } from "@/server/http";
 import { deviceInclude, publicPairedDevice, visibleDevices } from "@/server/paired-devices";
 
 const Filter = z.object({
-  client: z.array(z.enum(["phone", "watch", "agent"])),
+  client: z.array(z.enum(["app", "phone", "watch", "agent"])),
   status: z.enum(["active", "revoked"]).optional(),
 });
 
@@ -17,8 +17,10 @@ export async function GET(request: Request) {
     if (!visible) return jsonError(403, "administrator_required", "A FamilyFi administrator or a paired device is required.");
     const params = new URL(request.url).searchParams;
     const filter = Filter.safeParse({ client: params.getAll("client"), status: params.get("status") ?? undefined });
-    if (!filter.success) return jsonError(400, "invalid_request", "client must be phone, watch or agent, and status active or revoked.");
-    const { client, status } = filter.data;
+    if (!filter.success) return jsonError(400, "invalid_request", "client must be app, watch or agent, and status active or revoked.");
+    const { status } = filter.data;
+    // `phone` is the deprecated name for `app`.
+    const client = filter.data.client.map((kind) => (kind === "phone" ? "app" : kind));
     const devices = await prisma().pairedDevice.findMany({
       where: {
         AND: [

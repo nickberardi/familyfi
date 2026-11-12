@@ -142,7 +142,7 @@ describe("demo mode", () => {
     expect(tunnel).toMatchObject({ status: "running", reachability: null });
     // A phone pairs as a personal administrator, never the recovery admin.
     const accountId = (await pairingAdmin()).id;
-    const invite = await createInvite(write(auth, "/api/v1/paired/invites", "POST", { client: "phone", endpointId: route.id, accountId, displayName: "Reviewer iPhone" }));
+    const invite = await createInvite(write(auth, "/api/v1/paired/invites", "POST", { client: "app", endpointId: route.id, accountId, displayName: "Reviewer iPhone" }));
     expect(invite.status).toBe(201);
   });
 });

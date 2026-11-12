@@ -54,7 +54,7 @@ describe("/paired/devices", () => {
     expect(all.find((device) => device.id === watch.device.id)).toMatchObject({ client: "watch", scope: "rulesOnly", parentDeviceId: phone.device.id, actsAs: { username: PAIRING_ADMIN.username } });
 
     expect((await list(auth, "?client=agent")).map((device) => device.id)).toEqual([agent.device.id]);
-    expect((await list(auth, "?client=phone&client=watch")).map((device) => device.id).sort()).toEqual([phone.device.id, watch.device.id].sort());
+    expect((await list(auth, "?client=app&client=watch")).map((device) => device.id).sort()).toEqual([phone.device.id, watch.device.id].sort());
 
     expect((await revoke(agent.device.id, auth)).status).toBe(200);
     expect((await list(auth, "?status=active")).map((device) => device.id)).not.toContain(agent.device.id);
@@ -103,6 +103,16 @@ describe("/paired/devices", () => {
     expect(invalid.status).toBe(400);
     expect(((await invalid.json()) as { error: { code: string } }).error.code).toBe("invalid_scope");
     expect((await patch(phone.device.id, { scope: "readOnly" })).status).toBe(400);
+    // An app is `full` or its own `rulesOnly` sign-in from the start: neither ever becomes the other.
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly", clientId: "7b0c2f4e-5a1d-4c3b-9e8f-2d6a1b0c9e7f" })).json()) as Claim;
+    const promoted = await patch(controls.device.id, { scope: "full" });
+    expect(promoted.status).toBe(400);
+    expect(((await promoted.json()) as { error: { code: string } }).error.code).toBe("invalid_scope");
+    expect((await patch(phone.device.id, { scope: "rulesOnly" })).status).toBe(400);
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: controls.device.id } })).scope).toBe("rulesOnly");
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: phone.device.id } })).scope).toBe("full");
+    // Renaming it is still allowed.
+    expect((await patch(controls.device.id, { displayName: "Siri and Shortcuts on Den iPad" })).status).toBe(200);
     expect((await patch(phone.device.id, {})).status).toBe(400);
   });
 
@@ -228,7 +238,7 @@ describe("/paired/devices", () => {
     const watch = await prisma().pairedDevice.create({ data: { displayName: "Old Watch", client: "watch", scope: "rulesOnly", accountId: recovery.id, parentDeviceId: phone.id } });
     for (const device of [phone, watch]) await createSession({ accountId: recovery.id, username: recovery.username, kind: SessionKind.bearer, deviceId: device.id });
     const sessionIds = (await prisma().session.findMany({ where: { deviceId: { in: [phone.id, watch.id] } } })).map((session) => session.id);
-    const waiting = await prisma().pairing.create({ data: { client: "phone", scope: "full", displayName: "Spare", accountId: recovery.id, createdByAccountId: recovery.id, tokenHash: "unused", expiresAt: new Date(Date.now() + 60_000) } });
+    const waiting = await prisma().pairing.create({ data: { client: "app", scope: "full", displayName: "Spare", accountId: recovery.id, createdByAccountId: recovery.id, tokenHash: "unused", expiresAt: new Date(Date.now() + 60_000) } });
 
     const sql = readFileSync(path.join(__dirname, "../../prisma/migrations/20261026170000_no_devices_as_recovery/migration.sql"), "utf8");
     for (const statement of sql.split(/;\s*$/m).map((part) => part.replace(/^--.*$/gm, "").trim()).filter(Boolean)) await prisma().$executeRawUnsafe(statement);

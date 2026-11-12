@@ -5,6 +5,9 @@ import {
   PLAY_BETA,
   canRepair,
   defaultPairingAccount,
+  invitePhone,
+  isApp,
+  isAppControls,
   pairingAccounts,
   pairingExpired,
   pairingSheetCopy,
@@ -20,12 +23,13 @@ import {
   showAllLabel,
   splitPhones,
 } from "@/lib/pair-device";
+import { ApiError } from "@/lib/api-client";
 import type { Account, ConnectionRoute, PairedPhone } from "@/lib/types";
 
 const phone = (over: Partial<PairedPhone> = {}): PairedPhone => ({
   id: "p1",
   displayName: "A phone",
-  client: "phone",
+  client: "app",
   scope: "full",
   actsAs: { username: "admin", displayName: "An adult" },
   parentDeviceId: null,
@@ -65,7 +69,7 @@ describe("pair device", () => {
   });
 
   it("asks before revoking or removing, in the web's words", () => {
-    expect(revokeConfirm(phone())).toMatchObject({ title: "Revoke A phone?", message: "It is signed out now and must be paired again. Any Watch, phone or agent it paired stops working too." });
+    expect(revokeConfirm(phone())).toMatchObject({ title: "Revoke A phone?", message: "It is signed out now and must be paired again. Its shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." });
     expect(revokeConfirm(phone({ client: "watch", displayName: "A Watch" }))).toMatchObject({ title: "Revoke A Watch?", message: "It is signed out now and must be paired again." });
     expect(removeConfirm(phone())).toMatchObject({ title: "Remove A phone from the list?", message: "This can't be undone; setup would be needed again." });
     expect(removeAllConfirm(3)).toMatchObject({ title: "Remove all 3 revoked devices from the list?", message: "This can't be undone." });
@@ -76,7 +80,7 @@ describe("pair device", () => {
 
   it("describes every device the same way: access, how it reaches home, and its dates", () => {
     const now = new Date("2026-09-14T20:00:00Z");
-    const session = (id: string, expiresAt: string) => ({ id, username: "admin", client: "phone" as const, expiresAt, createdAt: "2026-09-14T12:00:00Z" });
+    const session = (id: string, expiresAt: string) => ({ id, username: "admin", client: "app" as const, expiresAt, createdAt: "2026-09-14T12:00:00Z" });
     const lines = phoneLines(phone({ actsAs: { username: "admin", displayName: "An adult" }, sessions: [session("s2", "2026-12-14T12:00:00Z"), session("s1", "2026-10-14T12:00:00Z")] }), now);
     expect(lines.access).toBe("Full access · acts as An adult · last seen 2m ago");
     expect(lines.via).toEqual({ url: "https://home.example", transport: "My domain" });
@@ -102,6 +106,47 @@ describe("pair device", () => {
     expect(canRepair(phone(), { canPair: false })).toBe(false);
     expect(canRepair(phone({ client: "watch" }), { canPair: true })).toBe(false);
     expect(canRepair(phone({ client: "agent" }), { canPair: true })).toBe(false);
+    // An app's own Siri and shortcuts sign-in is the app client too, and is never re-paired.
+    expect(canRepair(phone({ scope: "rulesOnly" }), { canPair: true })).toBe(false);
+  });
+
+  it("reads an older server's phone as the app, and tells an app from its Siri and shortcuts by scope", () => {
+    expect(isApp(phone())).toBe(true);
+    expect(isApp(phone({ client: "phone" }))).toBe(true);
+    expect(isApp(phone({ scope: "rulesOnly" }))).toBe(false);
+    expect(isApp(phone({ client: "watch", scope: "rulesOnly" }))).toBe(false);
+    expect(isAppControls(phone({ scope: "rulesOnly" }))).toBe(true);
+    expect(isAppControls(phone())).toBe(false);
+    expect(isAppControls(phone({ client: "watch", scope: "rulesOnly" }))).toBe(false);
+    expect(revokeConfirm(phone({ client: "phone" })).message).toContain("stop working too");
+    expect(revokeConfirm(phone({ scope: "rulesOnly", displayName: "Siri and Shortcuts on A phone" }))).toMatchObject({
+      title: "Revoke Siri and Shortcuts on A phone?",
+      message: "They stop working now, until you next open FamilyFi on that device. The app itself stays paired.",
+    });
+    expect(removeConfirm(phone({ scope: "rulesOnly" })).message).toBe("This can't be undone.");
+  });
+
+  it("invites a phone as the app, and as the deprecated phone only when an older server refuses app", async () => {
+    const sent: string[] = [];
+    const server = (accepts: string[]) =>
+      (async (_path: string, init: { body: { client: string } }) => {
+        sent.push(init.body.client);
+        if (!accepts.includes(init.body.client)) throw new ApiError("A phone needs its name and route.", 400, "invalid_request");
+        return { invite: { id: "i" } };
+      }) as never;
+    await invitePhone(server(["app", "phone"]), { endpointId: "r1", displayName: "iPhone" });
+    expect(sent).toEqual(["app"]);
+    sent.length = 0;
+    await invitePhone(server(["phone"]), { endpointId: "r1", displayName: "iPhone" });
+    expect(sent).toEqual(["app", "phone"]);
+    // Any other refusal is the answer: it is not sent twice.
+    sent.length = 0;
+    const refuses = (async (_path: string, init: { body: { client: string } }) => {
+      sent.push(init.body.client);
+      throw new ApiError("Connection endpoint not found.", 404, "not_found");
+    }) as never;
+    await expect(invitePhone(refuses, { endpointId: "gone", displayName: "iPhone" })).rejects.toThrow("Connection endpoint not found.");
+    expect(sent).toEqual(["app"]);
   });
 
   it("titles each step of the pairing sheet", () => {
@@ -162,6 +207,10 @@ describe("pair device", () => {
     expect(phoneLines(paired).dates).not.toContain(" from ");
     const watch = phone({ client: "watch", scope: "rulesOnly", pairedVia: null });
     expect(phoneLines(watch, new Date(), "Kitchen iPhone").dates).not.toContain(" from ");
+    const controls = phone({ client: "app", scope: "rulesOnly", pairedVia: null });
+    expect(phoneLines(controls, new Date(), "Kitchen iPhone").origin).toBe("Set up automatically by Kitchen iPhone");
+    expect(phoneLines(controls).origin).toBe("Set up automatically by the FamilyFi app");
+    expect(phoneLines(controls, new Date(), "Kitchen iPhone").dates).not.toContain(" from ");
   });
 
   it("offers a phone only personal administrators to sign in as, the one signed in here first", () => {

@@ -2697,7 +2697,7 @@ paths:
     post:
       operationId: createPairedInvite
       tags: [Paired]
-      summary: Invite a device to join, or (claim=true) invite and claim a phone's Watch
+      summary: Invite a device to join, or (claim=true) invite and claim an app's Watch or its rulesOnly sign-in
       description: |
         Every paired device joins with an invite. An administrator invites a phone (over a
         published route, five minutes) or an agent (on the home network, fifteen minutes) and gets
@@ -2715,8 +2715,16 @@ paths:
 
         With `?claim=true` a signed-in paired phone invites its Watch and claims it in one
         transaction, and the response is the claim: the phone hands the Watch its tokens and
-        manifest, and becomes its parent. Only a phone, and only for a Watch (403
-        `paired_phone_required` otherwise). A previous Watch with the same `clientId` is revoked.
+        manifest, and becomes its parent. Only an `app:full` device, and only for a Watch or the
+        sign-in below (403 `paired_phone_required` otherwise). A previous Watch with the same
+        `clientId` is revoked; a `clientId` that belongs to another kind of device answers 409
+        `client_id_in_use`.
+
+        The same call with `client: app` and `scope: rulesOnly` sets up the app's own second
+        sign-in: the paired device its Siri, Shortcuts and system controls act through, since they
+        run outside the app and cannot share its rotating refresh token. It holds the Watch's
+        list, the app is its parent, and the app keeps one `clientId` for it, so setting it up
+        again replaces the earlier record. Only an `app:full` device may make either.
 
         An agent invite is refused through remote access (403 `agent_remote`).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
@@ -2733,7 +2741,7 @@ paths:
                 - $ref: "#/components/schemas/PairedWatchCreate"
       responses:
         "201":
-          description: An invite and its code; with `?claim=true`, the claimed invite and the Watch's claim.
+          description: An invite and its code; with `?claim=true`, the claimed invite and the companion's claim.
           content:
             application/json:
               schema:
@@ -2744,6 +2752,7 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /api/v1/paired/invites/{id}:
     get:
       operationId: getPairedInvite
@@ -2790,10 +2799,10 @@ paths:
       operationId: listPairedDevices
       tags: [Paired]
       summary: Paired devices the caller may see
-      description: An administrator sees every paired device; a paired device sees itself and the companions it vouched for (a phone's Watch). Anyone else is refused.
+      description: An administrator sees every paired device; a paired device sees itself and the companions it vouched for (an app's Watch and its `rulesOnly` sign-in). Anyone else is refused.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
-        - { name: client, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [phone, watch, agent] } } }
+        - { name: client, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [app, phone, watch, agent] } }, description: "`phone` is deprecated: it is read as `app`." }
         - { name: status, in: query, required: false, schema: { type: string, enum: [active, revoked] } }
       responses:
         "200": { description: Devices, content: { application/json: { schema: { type: object, additionalProperties: false, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/PairedDevice" } } } } } } }
@@ -3477,14 +3486,26 @@ components:
         validTo: { type: string, format: date-time }
         systemTrusted: { type: [boolean, "null"], description: "Whether FamilyFi's CA store trusts the chain for this host; null for a pasted certificate. True means a pin is unnecessary." }
         source: { type: string, enum: [probe, certificate] }
+    PairedClient:
+      type: string
+      x-extensible-enum: [app, watch, agent]
+      description: |
+        What kind of paired device this is. `app` is the FamilyFi app on a phone, tablet or Mac
+        (`full`), or that app's Siri, Shortcuts and system controls (`rulesOnly`), which run
+        outside the app, so the app sets them up as their own device. A server older than 1.1.0
+        calls the app `phone`. New kinds may be added; a client lists a kind it does not know as a
+        paired device like any other.
     DeviceScope:
       type: string
       enum: [full, rulesOnly, readOnly]
       description: |
         What a paired device may call. Each (client, scope) pair is one explicit allowlist, not a
-        ladder, and only four exist. `phone:full` may do whatever its account may. `watch:rulesOnly`
+        ladder, and only five exist. `app:full`, the app on a phone, tablet or Mac, may do whatever
+        its account may. `watch:rulesOnly`
         reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
         extends, allows, disallows and turns rules on and off (403 `watch_scope` beyond that).
+        `app:rulesOnly` is the same list for an app's Siri, Shortcuts and system controls
+        (403 `app_scope` beyond that).
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
@@ -3500,7 +3521,7 @@ components:
         `replacesDeviceId` to re-pair a phone. An agent needs a `scope` of `full` or `readOnly`.
       required: [client, displayName]
       properties:
-        client: { type: string, enum: [phone, agent] }
+        client: { type: string, enum: [app, phone, agent], description: "`app` is the FamilyFi app on a phone, tablet or Mac. `phone` is deprecated: apps built before 1.1.0 send it, and it is read as `app`." }
         displayName: { type: string, minLength: 1, maxLength: 80 }
         endpointId: { type: string }
         accountId: { type: string }
@@ -3509,10 +3530,13 @@ components:
     PairedWatchCreate:
       type: object
       additionalProperties: false
-      description: A phone's Watch, invited and claimed at once with `?claim=true`.
+      description: |
+        An app's Watch (`client: watch`), or its own sign-in for Siri, Shortcuts and system
+        controls (`client: app` with `scope: rulesOnly`), invited and claimed at once with `?claim=true`.
       required: [client, clientId]
       properties:
-        client: { type: string, enum: [watch] }
+        client: { type: string, enum: [watch, app] }
+        scope: { type: string, enum: [rulesOnly], description: "Required with `client: app`." }
         clientId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 80 }
     HomeAddressResponse:
@@ -3599,7 +3623,7 @@ components:
       additionalProperties: false
       description: |
         What every claim answers, signed in as the account the invite named. `connection` is only
-        for clients that may work away from home — phones and Watches: the route a phone paired
+        for clients that may work away from home — apps and Watches: the route a phone paired
         through, and the signed manifest (with Cloudflare Access `edgeCredentials`). Never for agents.
       required: [device, session, token, tokenType, refreshToken, refreshExpiresAt]
       properties:
@@ -3610,7 +3634,7 @@ components:
           properties:
             id: { type: string }
             displayName: { type: string }
-            client: { type: string, enum: [phone, watch, agent] }
+            client: { $ref: "#/components/schemas/PairedClient" }
             scope: { $ref: "#/components/schemas/DeviceScope" }
         session: { $ref: "#/components/schemas/Session" }
         token: { type: string, description: The one-hour bearer. }
@@ -3627,7 +3651,7 @@ components:
     PairedWatchClaimed:
       type: object
       additionalProperties: false
-      description: "`?claim=true`: the Watch's invite, already claimed, with the same claim every client gets."
+      description: "`?claim=true`: the companion's invite, already claimed, with the same claim every client gets."
       required: [invite, device, session, token, tokenType, refreshToken, refreshExpiresAt, connection]
       properties:
         invite:
@@ -3669,7 +3693,7 @@ components:
       properties:
         id: { type: string }
         displayName: { type: string }
-        client: { type: string, enum: [phone, watch, agent] }
+        client: { $ref: "#/components/schemas/PairedClient" }
         scope: { $ref: "#/components/schemas/DeviceScope" }
         actsAs:
           type: [object, "null"]
@@ -3711,7 +3735,7 @@ components:
             properties:
               id: { type: string }
               username: { type: string }
-              client: { type: string, enum: [phone, watch, agent] }
+              client: { $ref: "#/components/schemas/PairedClient" }
               expiresAt: { type: string, format: date-time, description: "When this sign-in ends unless renewed: the refresh token's expiry." }
               createdAt: { type: string, format: date-time }
     PairedDeviceUpdate:

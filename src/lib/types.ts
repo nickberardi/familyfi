@@ -226,17 +226,27 @@ export type ConnectionRoute = {
   edgeTokenVersion: number | null;
 };
 
-/** What a paired device may call. Valid pairs: phone `full`, Watch `rulesOnly`, agent `full` or `readOnly`. */
+/** What a paired device may call. Valid pairs: app `full` or `rulesOnly`, Watch `rulesOnly`, agent `full` or `readOnly`. */
 export type DeviceScope = "full" | "rulesOnly" | "readOnly";
+
+/**
+ * What kind of paired device this is. `app` is the FamilyFi app on a phone, tablet or Mac (scope
+ * `full`), or that app's Siri, Shortcuts and system controls (scope `rulesOnly`), which run outside
+ * the app and so sign in as their own device, set up by the app. Read it with `isApp` and
+ * `isAppControls` in `pair-device.ts`: a server older than 1.1.0 calls the app `phone`.
+ */
+export type PairedClient = "app" | "watch" | "agent" | UnknownPairedClient;
+/** A kind this client does not know: `phone` from an older server, or one a newer server added (`x-extensible-enum`). */
+type UnknownPairedClient = string & {};
 
 export type PairedPhone = {
   id: string;
   displayName: string;
-  client: "phone" | "watch" | "agent";
+  client: PairedClient;
   scope: DeviceScope;
   /** The account this device acts as. */
   actsAs: { username: string; displayName: string } | null;
-  /** The device that vouched for this one: a Watch's phone. */
+  /** The device that vouched for this one: the app that set up a Watch or its own Siri and shortcuts. */
   parentDeviceId: string | null;
   enrolledAt: string;
   lastSeenAt: string | null;
@@ -244,7 +254,7 @@ export type PairedPhone = {
   pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
   /** The Access token version FamilyFi last handed this device, per protected route. */
   edgeTokens: { endpointId: string; version: number }[];
-  sessions: { id: string; username: string; client: "phone" | "watch" | "agent"; expiresAt: string; createdAt: string }[];
+  sessions: { id: string; username: string; client: PairedClient; expiresAt: string; createdAt: string }[];
 };
 
 export type PairingState = {

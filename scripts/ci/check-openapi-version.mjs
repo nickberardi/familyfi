@@ -12,6 +12,9 @@
 //   - A major increase only with the `breaking_api` label (BREAKING_API_APPROVED=true).
 //   - With that label from 1.0.0 on, a major increase. Before 1.0.0 a minor one carries
 //     the break, as semver allows for 0.y.z.
+//   - While the base branch's version has not been released (it is above the latest release
+//     tag's), a change may keep that version: it is then held to the same rule against the
+//     latest release instead, so the changes between two releases share one increase.
 //
 // Usage: node scripts/ci/check-openapi-version.mjs [base-ref]
 // Without a ref it fetches origin/$BASE_REF (default main), the way CI runs it.
@@ -145,8 +148,42 @@ export function checkVersion({ baseSpec, headSpec, breakingApproved = false }) {
   return result(true, `${what}; info.version ${fromText} -> ${toText} is a ${kind} increase.`);
 }
 
+/**
+ * The rule against the latest release, for a change that keeps the base branch's version while that
+ * version is still unreleased; null when that is not the case, and the base branch decides.
+ * @param {{ baseSpec: object, releaseSpec: object | null, headSpec: object, breakingApproved?: boolean }} input
+ */
+export function checkUnreleased({ baseSpec, releaseSpec, headSpec, breakingApproved = false }) {
+  const base = parseSemver(baseSpec?.info?.version);
+  const release = parseSemver(releaseSpec?.info?.version);
+  const head = parseSemver(headSpec?.info?.version);
+  if (!base || !release || !head) return null;
+  if (compareSemver(base, release) <= 0 || compareSemver(head, base) !== 0) return null;
+  const outcome = checkVersion({ baseSpec: releaseSpec, headSpec, breakingApproved });
+  return { ...outcome, message: `${outcome.message} (${outcome.to} is not released yet, so it is measured from the latest release, ${outcome.from}.)` };
+}
+
 function git(...args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+}
+
+/** The spec at the latest release tag (`vX.Y.Z`, no prerelease), or null when it cannot be read. */
+function latestReleaseSpec() {
+  try {
+    const tags = execFileSync("git", ["ls-remote", "--tags", "--refs", "origin", "v*"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+      .split("\n")
+      .map((line) => line.split("refs/tags/")[1])
+      .filter(Boolean)
+      .map((tag) => ({ tag, version: parseSemver(tag.slice(1)) }))
+      .filter((entry) => entry.version && !entry.version.prerelease.length)
+      .sort((a, b) => compareSemver(b.version, a.version));
+    if (!tags[0]) return null;
+    execFileSync("git", ["fetch", "--quiet", "--depth=1", "origin", `refs/tags/${tags[0].tag}`], { stdio: "ignore" });
+    return YAML.parse(execFileSync("git", ["show", `FETCH_HEAD:${SPEC}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+  } catch (error) {
+    console.error(`Could not read the latest release's ${SPEC} (${error instanceof Error ? error.message.split("\n")[0] : error}); measuring from the base branch only.`);
+    return null;
+  }
 }
 
 function main() {
@@ -164,11 +201,13 @@ function main() {
     console.log(`${SPEC} does not exist on ${baseName}; nothing to compare.`);
     return 0;
   }
-  const outcome = checkVersion({
+  const input = {
     baseSpec: YAML.parse(baseText),
     headSpec: YAML.parse(readFileSync(SPEC, "utf8")),
     breakingApproved: process.env.BREAKING_API_APPROVED === "true",
-  });
+  };
+  let outcome = checkVersion(input);
+  if (!outcome.ok) outcome = checkUnreleased({ ...input, releaseSpec: latestReleaseSpec() }) ?? outcome;
 
   if (outcome.change !== "none" && process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(

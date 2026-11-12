@@ -91,7 +91,7 @@ function household({
     ...(health ? { "GET /api/v1/health": () => json(200, { ok: true, ...health }) } : {}),
     "POST /api/v1/paired/invites/cm1/claim": () =>
       json(200, {
-        device: { id: "dev-1", displayName: "A phone", client: "phone", scope: "full" },
+        device: { id: "dev-1", displayName: "A phone", client: "app", scope: "full" },
         session: { username: "admin", displayName: "An adult", kind: "recovery", expiresAt: "2030-01-01T00:00:00Z" },
         token: "bearer-1",
         tokenType: "Bearer",

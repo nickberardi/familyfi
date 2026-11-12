@@ -5,14 +5,22 @@ import { isAdministratorAccount, mayPairAs, requestOrigin } from "@/server/auth"
 import { prisma } from "@/server/db";
 import { readJson, withAdmin, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { inviteAgent, inviteAndClaimWatch, invitePhone } from "@/server/pairing";
+import { isFullApp } from "@/server/device-scope";
+import { ClientIdInUseError, inviteAgent, inviteAndClaimCompanion, invitePhone } from "@/server/pairing";
 
 const Name = z.string().trim().min(1).max(80);
 const Invite = z.discriminatedUnion("client", [
-  z.object({ client: z.literal("phone"), displayName: Name, endpointId: z.string().min(1), accountId: z.string().min(1).optional(), replacesDeviceId: z.string().min(1).optional() }),
+  // `phone` is what apps built before 1.1.0 send for `app`.
+  // Strict, so a `scope` here is refused rather than dropped: an invite always pairs the whole app.
+  z.object({ client: z.enum(["app", "phone"]), displayName: Name, endpointId: z.string().min(1), accountId: z.string().min(1).optional(), replacesDeviceId: z.string().min(1).optional() }).strict(),
   z.object({ client: z.literal("agent"), displayName: Name, scope: z.enum(["full", "readOnly"]) }),
 ]);
-const Watch = z.object({ client: z.literal("watch"), clientId: z.string().uuid(), displayName: Name.optional() });
+const Companion = z.discriminatedUnion("client", [
+  z.object({ client: z.literal("watch"), clientId: z.string().uuid(), displayName: Name.optional() }),
+  z.object({ client: z.literal("app"), scope: z.literal("rulesOnly"), clientId: z.string().uuid(), displayName: Name.optional() }),
+]);
+/** What a companion is called when its app names none. */
+const COMPANION_NAME = { watch: "Apple Watch", app: "Shortcuts and controls" } as const;
 
 function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
   return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), code } };
@@ -23,7 +31,7 @@ const RECOVERY_REFUSED = "No device signs in as the recovery admin. Choose a per
 
 /**
  * Invite a device to join. An administrator invites a phone or an agent and gets a single-use code.
- * With `?claim=true`, a signed-in paired phone invites its Watch and claims it at once. An invite a
+ * With `?claim=true`, a signed-in paired app invites its Watch, or its own `rulesOnly` sign-in, and claims it at once. An invite a
  * paired phone makes names it as the device's parent, so revoking the phone revokes that device too.
  */
 export async function POST(request: Request) {
@@ -33,8 +41,8 @@ export async function POST(request: Request) {
     if (!body.ok) return body.response;
     const parsed = Invite.safeParse(body.value);
     if (!parsed.success) {
-      if (body.value && typeof body.value === "object" && "client" in body.value && body.value.client === "watch") {
-        return jsonError(400, "invalid_request", "A Watch is invited by its paired phone with ?claim=true.");
+      if (body.value && typeof body.value === "object" && "client" in body.value && (body.value.client === "watch" || ("scope" in body.value && body.value.scope === "rulesOnly"))) {
+        return jsonError(400, "invalid_request", "A Watch, or an app's rulesOnly sign-in, is invited by its paired phone with ?claim=true.");
       }
       return jsonError(400, "invalid_request", "A phone needs its name and route; an agent its name and scope (full or readOnly).");
     }
@@ -64,7 +72,7 @@ export async function POST(request: Request) {
     }
     if (!mayPairAs(account)) return jsonError(400, "personal_account_required", RECOVERY_REFUSED);
     // Only a phone is re-paired as a phone: a Watch or agent is never replaced, and so never removed, this way.
-    if (input.replacesDeviceId && (await prisma().pairedDevice.findUnique({ where: { id: input.replacesDeviceId } }))?.client !== PairedDeviceClient.phone) {
+    if (input.replacesDeviceId && !isFullApp(await prisma().pairedDevice.findUnique({ where: { id: input.replacesDeviceId } }))) {
       return jsonError(404, "not_found", "The phone to re-pair no longer exists.");
     }
     const { invite, code } = await invitePhone({ endpointId: endpoint.id, displayName: input.displayName, accountId, createdByAccountId: session.accountId, parentDeviceId, replacesDeviceId: input.replacesDeviceId });
@@ -72,24 +80,32 @@ export async function POST(request: Request) {
   });
 }
 
-/** Only a signed-in paired phone, and only for its Watch: no browser ever receives another device's tokens. */
+/** Only a signed-in paired app (`app:full`), and only for its Watch or its own `rulesOnly` sign-in: no browser ever receives another device's tokens. */
 async function claimCompanion(request: Request) {
   return withMutation(request, async (session) => {
-    if (session.kind !== SessionKind.bearer || session.device?.client !== PairedDeviceClient.phone || !session.account) {
-      return jsonError(403, "paired_phone_required", "Only a signed-in paired phone can invite and claim its Watch.");
+    if (session.kind !== SessionKind.bearer || !isFullApp(session.device) || !session.account) {
+      return jsonError(403, "paired_phone_required", "Only a signed-in paired phone can invite and claim its Watch or its Siri and shortcuts.");
     }
     if (!mayPairAs(session.account)) return jsonError(403, "personal_account_required", RECOVERY_REFUSED);
     const body = await readJson(request);
     if (!body.ok) return body.response;
-    const parsed = Watch.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "A Watch identifier and optional name are required; only a Watch is claimed this way.");
-    const { invite, claim } = await inviteAndClaimWatch({
-      parentDeviceId: session.device.id,
-      account: session.account,
-      clientId: parsed.data.clientId,
-      displayName: parsed.data.displayName ?? "Apple Watch",
-      userAgent: request.headers.get("user-agent"),
-    });
+    const parsed = Companion.safeParse(body.value);
+    if (!parsed.success) return jsonError(400, "invalid_request", "An identifier and optional name are required; only a Watch, or an app with the rulesOnly scope, is claimed this way.");
+    let joined: Awaited<ReturnType<typeof inviteAndClaimCompanion>>;
+    try {
+      joined = await inviteAndClaimCompanion({
+        client: parsed.data.client,
+        parentDeviceId: session.device.id,
+        account: session.account,
+        clientId: parsed.data.clientId,
+        displayName: parsed.data.displayName ?? COMPANION_NAME[parsed.data.client],
+        userAgent: request.headers.get("user-agent"),
+      });
+    } catch (caught) {
+      if (caught instanceof ClientIdInUseError) return jsonError(409, "client_id_in_use", caught.message);
+      throw caught;
+    }
+    const { invite, claim } = joined;
     return Response.json({ invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), status: "claimed" }, ...claim }, { status: 201 });
   });
 }

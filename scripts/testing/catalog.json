@@ -293,6 +293,11 @@
         "sessions"
       ]
     },
+    "tests/unit/app-controls.test.ts": {
+      "categories": [
+        "pairing"
+      ]
+    },
     "tests/unit/pair-device.test.ts": {
       "categories": [
         "pairing"

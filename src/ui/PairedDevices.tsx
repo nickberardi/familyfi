@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { remoteStatus, routeTrust, transportLabel } from "@/lib/connection-routes";
-import { canRepair, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
+import { canRepair, isApp, isAppControls, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
@@ -33,7 +33,7 @@ function TextButton({ label, token, onPress, disabled, testID }: { label: string
 }
 
 /**
- * One paired phone, Watch or agent, each the same: what it may do and whose account it acts as, how
+ * One paired device (an app, its Siri and shortcuts, a Watch or an agent), each the same: what it may do and whose account it acts as, how
  * it reaches home, when it paired and its sign-in ends, and what can be done to it on the right.
  */
 export function PairedPhoneRow({
@@ -45,7 +45,7 @@ export function PairedPhoneRow({
   disabled,
 }: {
   phone: PairedPhone;
-  /** The name of the phone that paired this Watch. */
+  /** The name of the app that set this device up: a Watch's, or its own Siri and shortcuts'. */
   parentName?: string | null;
   /** No changes while the phone's view of the household is stale. */
   disabled?: boolean;
@@ -75,7 +75,7 @@ export function PairedPhoneRow({
         </Text>
         <Text style={[text(14, 21, "muted"), styles.line]}>{lines.dates}</Text>
         {lines.expired ? (
-          <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{phone.client === "phone" ? COPY.expired : COPY.expiredPairAgain}</Text>
+          <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{isApp(phone) ? COPY.expired : isAppControls(phone) ? COPY.expiredControls : COPY.expiredPairAgain}</Text>
         ) : null}
       </View>
       <View style={styles.actions}>
