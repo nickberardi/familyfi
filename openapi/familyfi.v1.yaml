@@ -2715,8 +2715,10 @@ paths:
 
         With `?claim=true` a signed-in paired phone invites its Watch and claims it in one
         transaction, and the response is the claim: the phone hands the Watch its tokens and
-        manifest, and becomes its parent. Only a phone, and only for a Watch (403
-        `paired_phone_required` otherwise). A previous Watch with the same `clientId` is revoked.
+        manifest, and becomes its parent. Only an `app:full` device, and only for a Watch or the
+        sign-in below (403 `paired_phone_required` otherwise). A previous Watch with the same
+        `clientId` is revoked; a `clientId` that belongs to another kind of device answers 409
+        `client_id_in_use`.
 
         The same call with `client: app` and `scope: rulesOnly` sets up the app's own second
         sign-in: the paired device its Siri, Shortcuts and system controls act through, since they
@@ -2750,6 +2752,7 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /api/v1/paired/invites/{id}:
     get:
       operationId: getPairedInvite

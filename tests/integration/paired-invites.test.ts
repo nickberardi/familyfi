@@ -9,6 +9,7 @@ import { DELETE as cancelInvite, GET as inviteStatus } from "@/app/api/v1/paired
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 import { bearer, claimInvite, claimWatchRequest, homeRoute, invitePhoneRequest, issuedInvite, pairPhone, PAIRING_ADMIN, pairingAdminAuth, type Claim } from "../helpers/pairing";
+import { tunnelHeaders } from "@/server/tunnel/phone-gateway";
 import { POST as refresh } from "@/app/api/v1/auth/refresh/route";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -150,6 +151,24 @@ describe("POST /paired/invites", () => {
     const mine = await prisma().pairedDevice.findMany({ where: { parentDeviceId: phone.device.id, scope: DeviceScope.rulesOnly, revokedAt: null } });
     expect(mine.map((row) => row.id)).toEqual([again.device.id]);
     expect((await groups(request("/api/v1/groups", { auth: bearer(claimed.token) }))).status).toBe(401);
+  });
+
+  it("never lets an app's rulesOnly sign-in retire a Watch by reusing its identifier, or a Watch it", async () => {
+    const phone = await pairPhone(await admin());
+    const watch = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
+    const reused = await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly" });
+    expect(reused.status).toBe(409);
+    expect(await errorCode(reused)).toBe("client_id_in_use");
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.device.id } })).revokedAt).toBeNull();
+  });
+
+  it("lets an app's rulesOnly sign-in work over remote access, as a Watch does", async () => {
+    const phone = await pairPhone(await admin());
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly", clientId: "7c0d9a55-3c1a-4b0e-8a56-0f6a4b1f2e33" })).json()) as Claim;
+    const { GET: groups } = await import("@/app/api/v1/groups/route");
+    const lan = request("/api/v1/groups", { auth: bearer(controls.token) });
+    const tunnelled = new Request(lan.url, { headers: tunnelHeaders(Object.fromEntries(lan.headers.entries())) as Record<string, string> });
+    expect((await groups(tunnelled)).status).toBe(200);
   });
 
   it("ends an app's rulesOnly sign-in when the app is revoked", async () => {
