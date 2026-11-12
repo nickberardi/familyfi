@@ -303,6 +303,11 @@
         "pairing"
       ]
     },
+    "tests/unit/pairing-link.test.ts": {
+      "categories": [
+        "pairing"
+      ]
+    },
     "tests/unit/phone-gateway.test.ts": {
       "categories": [
         "trust"
@@ -1014,6 +1019,12 @@
       ]
     },
     "tests/unit/pause-sheet-custom.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
+    },
+    "tests/unit/pause-ending.test.ts": {
       "categories": [
         "groups",
         "display"
