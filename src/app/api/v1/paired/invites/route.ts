@@ -19,7 +19,7 @@ const Companion = z.discriminatedUnion("client", [
   z.object({ client: z.literal("app"), scope: z.literal("rulesOnly"), clientId: z.string().uuid(), displayName: Name.optional() }),
 ]);
 /** What a companion is called when its app names none. */
-const COMPANION_NAME = { watch: "Apple Watch", app: "Siri and shortcuts" } as const;
+const COMPANION_NAME = { watch: "Apple Watch", app: "Shortcuts and controls" } as const;
 
 function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
   return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), code } };

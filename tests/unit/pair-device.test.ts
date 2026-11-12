@@ -119,7 +119,10 @@ describe("pair device", () => {
     expect(isAppControls(phone())).toBe(false);
     expect(isAppControls(phone({ client: "watch", scope: "rulesOnly" }))).toBe(false);
     expect(revokeConfirm(phone({ client: "phone" })).message).toContain("stops working too");
-    expect(revokeConfirm(phone({ scope: "rulesOnly" })).message).toBe("It is signed out now and must be paired again.");
+    expect(revokeConfirm(phone({ scope: "rulesOnly", displayName: "Siri and Shortcuts on A phone" }))).toMatchObject({
+      title: "Revoke Siri and Shortcuts on A phone?",
+      message: "They stop working now, until FamilyFi is next opened on that device. The app itself stays paired.",
+    });
   });
 
   it("invites a phone as the app, and as the deprecated phone only when an older server refuses app", async () => {
@@ -205,7 +208,7 @@ describe("pair device", () => {
     expect(phoneLines(watch, new Date(), "Kitchen iPhone").dates).not.toContain(" from ");
     const controls = phone({ client: "app", scope: "rulesOnly", pairedVia: null });
     expect(phoneLines(controls, new Date(), "Kitchen iPhone").origin).toBe("Set up automatically by Kitchen iPhone");
-    expect(phoneLines(controls).origin).toBe("Set up automatically by a phone");
+    expect(phoneLines(controls).origin).toBe("Set up automatically by the FamilyFi app");
     expect(phoneLines(controls, new Date(), "Kitchen iPhone").dates).not.toContain(" from ");
   });
 

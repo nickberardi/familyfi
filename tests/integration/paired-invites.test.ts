@@ -127,11 +127,11 @@ describe("POST /paired/invites", () => {
     const parent = await adult("parent");
     const phone = await pairPhone(await admin(), { accountId: parent.id });
     const controls = { client: "app", scope: "rulesOnly", clientId: "0b1f6c0e-8f2e-4a55-9a0e-2f1f3f1c9d11" };
-    const response = await claimWatchRequest(bearer(phone.token), { ...controls, displayName: "Siri and shortcuts on Parent's iPhone" });
+    const response = await claimWatchRequest(bearer(phone.token), { ...controls, displayName: "Siri and Shortcuts on Parent's iPhone" });
     expect(response.status).toBe(201);
     const claimed = (await response.json()) as Claim & { invite: { status: string } };
     expect(claimed.invite.status).toBe("claimed");
-    expect(claimed.device).toMatchObject({ client: "app", scope: "rulesOnly", displayName: "Siri and shortcuts on Parent's iPhone" });
+    expect(claimed.device).toMatchObject({ client: "app", scope: "rulesOnly", displayName: "Siri and Shortcuts on Parent's iPhone" });
     expect(claimed.session.username).toBe("parent");
     // It may work away from home, as its app does.
     expect(claimed.connection?.manifest).toBeTruthy();
@@ -146,7 +146,7 @@ describe("POST /paired/invites", () => {
 
     // Setting it up again replaces the record, so the app never has two.
     const again = (await (await claimWatchRequest(bearer(phone.token), controls)).json()) as Claim;
-    expect(again.device.displayName).toBe("Siri and shortcuts");
+    expect(again.device.displayName).toBe("Shortcuts and controls");
     const mine = await prisma().pairedDevice.findMany({ where: { parentDeviceId: phone.device.id, scope: DeviceScope.rulesOnly, revokedAt: null } });
     expect(mine.map((row) => row.id)).toEqual([again.device.id]);
     expect((await groups(request("/api/v1/groups", { auth: bearer(claimed.token) }))).status).toBe(401);
