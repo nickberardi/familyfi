@@ -218,6 +218,9 @@ describe("POST /paired/invites", () => {
     expect(controlsByAdmin.status).toBe(400);
     expect((await invitePhoneRequest(auth, {})).status).toBe(400);
     expect((await invitePhoneRequest(auth, { endpointId: "missing-route" })).status).toBe(404);
+    // An invite pairs the whole app: a scope on it is refused, never dropped.
+    const scoped = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "app", scope: "rulesOnly", displayName: "A phone", endpointId: "missing-route" }) }));
+    expect(scoped.status).toBe(400);
   });
 
   it("pairs a phone only as an administrator, since only administrators have paired phones", async () => {

@@ -55,11 +55,16 @@ export const QUICK_SETTINGS_COPY = {
   change: "Change",
   clear: "Clear",
   add: "Add to Quick Settings",
+  /** What a screen reader says for each row's button, which shows only its verb. */
+  chooseFor: (number: number) => `Choose a group for Tile ${number}`,
+  changeFor: (number: number) => `Change group for Tile ${number}`,
+  clearFor: (number: number) => `Clear Tile ${number}`,
+  addFor: (number: number) => `Add Tile ${number} to Quick Settings`,
   added: "Added to Quick Settings.",
   alreadyAdded: "This tile is already in Quick Settings.",
   addYourself: "Swipe down twice from the top of your screen, tap the pencil, then drag FamilyFi Block into your tiles.",
   /** The server is older than the first contract with a sign-in for tiles. */
-  needsUpdate: "Update your FamilyFi server to use Quick Settings tiles.",
+  needsUpdate: "Update your FamilyFi server to use Quick Settings tiles, from FamilyFi's Settings on your computer.",
   /** The tiles are not signed in yet: the app does that once it has read the household. */
   settingUp: "Setting up Quick Settings tiles…",
 } as const;
