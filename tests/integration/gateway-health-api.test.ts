@@ -16,6 +16,7 @@ import { saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-setting
 import { DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, getSharedDevMockClient, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
 import { forgetSiteNetworks } from "@/server/unifi/network-cache";
 import type { GatewayHealth, UnifiSettings } from "@/lib/types";
+import type { SiteDeviceOverview } from "@/server/unifi/types";
 import { resetDatabase } from "../helpers/db";
 import { pairingAdmin } from "../helpers/pairing";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
@@ -98,7 +99,10 @@ describe("gateway health and the console's polled load", () => {
     // An offline or adopting device has no current statistics: the console answers 404 for it.
     const client = getSharedDevMockClient();
     client.state.deviceStatistics.delete("77777777-7777-4777-8777-777777777771");
+    const before = client.calls.length;
     const result = await health(auth);
+    // A console that marks its gateway costs no network reads.
+    expect(client.calls.slice(before).some((call) => call.path.includes("/networks"))).toBe(false);
     expect(result.devicesError).toBeNull();
     expect(result.devices?.[0]).toMatchObject({
       id: GATEWAY_ID,
@@ -116,6 +120,30 @@ describe("gateway health and the console's polled load", () => {
       ["Upstairs AP", false, null],
     ]);
     expect(result.devices?.[2]).toMatchObject({ gateway: false, uptimeSec: null, loadAverage1Min: null });
+  });
+
+  it("finds a gateway the console lists without the gateway feature by one of its addresses, and at worst by its model", async () => {
+    await saveUnifiConnection({ apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    const client = getSharedDevMockClient();
+    // A console that lists its gateway without the gateway feature.
+    const unmarked = (fields: Partial<SiteDeviceOverview>) => {
+      client.state.siteDevices = client.state.siteDevices.map((device) =>
+        device.id === GATEWAY_ID ? { ...device, model: "Unrecognised", features: ["switching"], ...fields } : device,
+      );
+    };
+    const gateways = async () => (await health(auth)).devices?.filter((device) => device.gateway).map((device) => device.id);
+
+    // The address FamilyFi reaches the console on.
+    unmarked({ ipAddress: new URL(DEV_MOCK_BASE_URL).hostname });
+    expect(await gateways()).toEqual([GATEWAY_ID]);
+    // The gateway's address on another of its networks (VLANs).
+    unmarked({ ipAddress: "198.51.100.1" });
+    expect(await gateways()).toEqual([GATEWAY_ID]);
+    // Neither address: the model, as a last resort.
+    unmarked({ ipAddress: "203.0.113.9", model: "UDM Pro SE" });
+    expect(await gateways()).toEqual([GATEWAY_ID]);
+    unmarked({ ipAddress: "203.0.113.9" });
+    expect(await gateways()).toEqual([]);
   });
 
   it("says why when the console cannot be asked", async () => {

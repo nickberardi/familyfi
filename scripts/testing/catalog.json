@@ -1186,6 +1186,12 @@
         "settings"
       ]
     },
+    "tests/unit/gateway-device.test.ts": {
+      "categories": [
+        "settings",
+        "unifi"
+      ]
+    },
     "tests/unit/diagnostics-copy.test.ts": {
       "categories": [
         "settings"
