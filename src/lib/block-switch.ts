@@ -1,6 +1,12 @@
 import { formatClock } from "./display";
-import { groupBadge, groupStatusParts, internetRulePath, rulesBlockingGroup, rulesToUnblock } from "./group-actions";
-import { CURATED_CATEGORY_SLOTS, type Rule } from "./rules";
+import {
+  groupBadge,
+  groupStatusParts,
+  internetRulePath,
+  rulesBlockingGroup,
+  rulesToUnblock,
+} from "./group-actions";
+import type { Rule } from "./rules";
 import type { Group } from "./types";
 
 /**
@@ -14,7 +20,12 @@ import type { Group } from "./types";
 export const QUICK_SETTINGS_TILES = 3;
 
 /** Whether the switch is on, and the word under the group's name (the card badge's own). */
-export function blockSwitch(group: Group, rules: Rule[], timezone: string, now: Date): { on: boolean; state: string } {
+export function blockSwitch(
+  group: Group,
+  rules: Rule[],
+  timezone: string,
+  now: Date,
+): { on: boolean; state: string } {
   const { badge } = groupStatusParts(group, rules, timezone, now);
   return { on: badge === "blocked", state: groupBadge(badge).label };
 }
@@ -26,7 +37,10 @@ export function blockSwitch(group: Group, rules: Rule[], timezone: string, now: 
  * phone unlocked. `needsUnlock` is what the write itself needs: a platform whose switch has one action
  * for both ways (the iPhone's Control Center control) asks for the unlock to block as well.
  */
-export function blockSwitchWrite(group: Pick<Group, "id">, turnOn: boolean): { path: string; needsUnlock: boolean } {
+export function blockSwitchWrite(
+  group: Pick<Group, "id">,
+  turnOn: boolean,
+): { path: string; needsUnlock: boolean } {
   return turnOn
     ? { path: `${internetRulePath(group)}/pause`, needsUnlock: false }
     : { path: `/api/v1/groups/${group.id}/unblock`, needsUnlock: true };
@@ -37,34 +51,58 @@ export function blockSwitchWrite(group: Pick<Group, "id">, turnOn: boolean): { p
  * and Shortcuts shows). Unblock is the group's unblock (`blockSwitchWrite` off): it ends the group's
  * block and lifts each rule blocking it now until that rule's window ends, but never an always-on
  * category, app or website rule, which is how the group is set up (`standingRule`). So with the
- * internet on and Video always blocked, there is nothing for it to do: `send` is false, and the
- * answer says so and why, instead of a bare "unblocked" that Video would contradict. A parent
- * changes an always-on rule in the app. A block that has already ended counts as none.
+ * internet on and only an always-on rule blocking, there is nothing for it to do: `send` is false,
+ * and the answer says so and names the rule, instead of a bare "unblocked" the rule would contradict.
+ * Rules go by their own names, as the card's dropdown names them ("Unblock No streaming"). A block
+ * that has already ended counts as none.
  */
-export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now: Date): UnblockAnswer {
+export function unblockAnswer(
+  group: Group,
+  rules: Rule[],
+  timezone: string,
+  now: Date,
+): UnblockAnswer {
   const lifts = rulesToUnblock(group, rules, timezone, now);
   const liftIds = new Set(lifts.map((rule) => rule.ruleId));
   const standing = rulesBlockingGroup(group, rules, timezone, now)
     .filter((rule) => !liftIds.has(rule.ruleId))
     .flatMap(({ ruleId }) => rules.filter((rule) => rule.id === ruleId));
-  const kept = standing.length ? ` ${standingClause(standing)}.` : "";
+  const names = [...new Set(standing.map((rule) => rule.name))];
+  const one = names.length === 1;
+  const its = names.length
+    ? ` Its ${listNames(names.map((name) => `“${name}”`))} ${one ? "rule is" : "rules are"} always on`
+    : "";
+  const kept = names.length
+    ? `${its}, so ${one ? "it stays" : "they stay"} on.`
+    : "";
   const { active, until: pauseEnd } = group.suspension;
-  const paused = active && (pauseEnd === null || Date.parse(pauseEnd) > now.getTime());
+  const paused =
+    active && (pauseEnd === null || Date.parse(pauseEnd) > now.getTime());
   if (!paused && lifts.length === 0) {
-    const change = standing.length ? " You can change that in FamilyFi." : "";
+    const change = names.length ? " You can change that in FamilyFi." : "";
     const say = `${group.name} isn't blocked, so there's nothing to unblock.${kept}${change}`;
     if (!standing.length) return { send: false, say };
-    // Siri can ask instead: lift one always-on rule for the group a while, as the card's "Unblock Video" does.
-    const choices = standing.map(standingChoice);
+    // Siri can ask instead: lift one always-on rule for the group a while, as the card's "Unblock <rule>" does.
+    const choices = standing.map((rule) => ({
+      ruleId: rule.id,
+      name: rule.name,
+    }));
     const question =
       choices.length === 1
-        ? `${group.name} isn't blocked.${kept} Should I unblock ${spoken(choices[0]!)} for a while?`
-        : `${group.name} isn't blocked.${kept} Which one should I unblock for a while?`;
-    return { send: false, say, offer: { question, choices, howLong: "For how long?" } };
+        ? `${group.name} isn't blocked.${its}. Should I unblock it for a while?`
+        : `${group.name} isn't blocked.${its}. Which one should I unblock for a while?`;
+    return {
+      send: false,
+      say,
+      offer: { question, choices, howLong: "For how long?" },
+    };
   }
   // Each lifted rule comes back when its window ends; the group is online until the last of them.
   const open = lifts.some((rule) => rule.until === null);
-  const last = open || lifts.length === 0 ? null : new Date(Math.max(...lifts.map((rule) => Date.parse(rule.until!))));
+  const last =
+    open || lifts.length === 0
+      ? null
+      : new Date(Math.max(...lifts.map((rule) => Date.parse(rule.until!))));
   const until = last ? ` until ${formatClock(last, timezone)}` : "";
   return { send: true, say: `${group.name} is unblocked${until}.${kept}` };
 }
@@ -80,71 +118,34 @@ export type UnblockAnswer = {
   offer?: { question: string; choices: UnblockChoice[]; howLong: string };
 };
 
-/** An always-on rule Siri offers to lift: `name` is its label as a choice; `named` when that is the rule's own name, not what it blocks. */
-export type UnblockChoice = { ruleId: string; name: string; named: boolean };
+/** An always-on rule Siri offers to lift, by its own name. */
+export type UnblockChoice = { ruleId: string; name: string };
 
-/** "Video", or "the “No TikTok” rule": a rule's own name never reads as the thing it blocks. */
-function spoken(choice: UnblockChoice): string {
-  return choice.named ? `the “${choice.name}” rule` : choice.name;
-}
-
-/**
- * What Siri says once it lifted one always-on rule for the group: "Video is unblocked for TV until
- * 3:15 PM.", or "The “No TikTok” rule is off for TV until 3:15 PM."
- */
-export function ruleUnblockAnswer(group: Pick<Group, "name">, choice: UnblockChoice, until: Date, timezone: string): string {
-  const at = `for ${group.name} until ${formatClock(until, timezone)}.`;
-  return choice.named ? `The “${choice.name}” rule is off ${at}` : `${choice.name} is unblocked ${at}`;
-}
-
-/** An always-on rule as a choice: "Video and Social" for familiar categories, else the rule's own name. */
-function standingChoice(rule: Rule): UnblockChoice {
-  const labels = curatedLabels(rule);
-  return { ruleId: rule.id, name: labels ? listNames(labels) : rule.name, named: !labels };
-}
-
-/** The familiar names of a category rule's every target, or null when it is not all familiar categories. */
-function curatedLabels(rule: Rule): string[] | null {
-  const labels = (rule.targetIds ?? []).map((id) => CURATED_CATEGORY_SLOTS.find((slot) => slot.categoryId === id)?.label);
-  return rule.kind === "category" && labels.length > 0 && labels.every(Boolean) ? (labels as string[]) : null;
-}
-
-/**
- * What the always-on rules keep doing, as a parent hears it: "Video and Gaming stay blocked" for
- * categories FamilyFi knows by a familiar name, and a rule by its own name otherwise ("The “No
- * TikTok” rule stays on"), which names the rule, never what it blocks.
- */
-function standingClause(standing: Rule[]): string {
-  const blocked: string[] = [];
-  const named: string[] = [];
-  for (const rule of standing) {
-    const labels = curatedLabels(rule);
-    if (labels) blocked.push(...labels);
-    else named.push(`“${rule.name}”`);
-  }
-  const things = [...new Set(blocked)];
-  const rulesNamed = [...new Set(named)];
-  const parts = [
-    things.length ? `${listNames(things)} ${things.length === 1 ? "stays" : "stay"} blocked` : "",
-    rulesNamed.length ? `the ${listNames(rulesNamed)} ${rulesNamed.length === 1 ? "rule stays" : "rules stay"} on` : "",
-  ].filter(Boolean);
-  // Siri says it aloud, so the reason is short: an unblock never turns off a rule that is always on.
-  const one = things.length + rulesNamed.length === 1;
-  const clause = `${parts.join(" and ")}, since ${one ? "it's" : "they're"} always on`;
-  return clause.charAt(0).toUpperCase() + clause.slice(1);
+/** What Siri says once it lifted one always-on rule for the group: "“No streaming” is unblocked for TV until 3:15 PM." */
+export function ruleUnblockAnswer(
+  group: Pick<Group, "name">,
+  choice: UnblockChoice,
+  until: Date,
+  timezone: string,
+): string {
+  return `“${choice.name}” is unblocked for ${group.name} until ${formatClock(until, timezone)}.`;
 }
 
 /** "Video", "Video and Gaming", "Video, Gaming and Social". */
 function listNames(items: string[]): string {
   const unique = [...new Set(items)];
-  return unique.length <= 1 ? (unique[0] ?? "") : `${unique.slice(0, -1).join(", ")} and ${unique.at(-1)}`;
+  return unique.length <= 1
+    ? (unique[0] ?? "")
+    : `${unique.slice(0, -1).join(", ")} and ${unique.at(-1)}`;
 }
 
 /** A Quick Settings tile's own words: its names in Android's tile editor, and the line under a tile. */
 export function quickSettingsTileCopy() {
   return {
     /** Each tile's name before the app gives it its group's name, in order. */
-    names: Array.from({ length: QUICK_SETTINGS_TILES }, (_, index) => (index === 0 ? "FamilyFi Block" : `FamilyFi Block ${index + 1}`)),
+    names: Array.from({ length: QUICK_SETTINGS_TILES }, (_, index) =>
+      index === 0 ? "FamilyFi Block" : `FamilyFi Block ${index + 1}`,
+    ),
     /** No sign-in or no group yet: a tap opens the app. */
     setUp: "Tap to set up",
     applying: "Applying…",
@@ -180,7 +181,8 @@ export const QUICK_SETTINGS_COPY = {
   /** The household has no groups to choose from. */
   noGroups: "No groups yet.",
   /** The server is older than the first contract with a sign-in for tiles. */
-  needsUpdate: "To use Quick Settings tiles, update your FamilyFi server from Settings on your computer.",
+  needsUpdate:
+    "To use Quick Settings tiles, update your FamilyFi server from Settings on your computer.",
   /** The tiles are not signed in yet: the app does that once it has read the household. */
   settingUp: "Setting up Quick Settings tiles…",
 } as const;
