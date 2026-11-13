@@ -245,7 +245,7 @@ export function RemoteAccessCard({
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
         <div className="min-w-[200px] flex-1">
           <div className="text-[14px] font-semibold">Remote access</div>
-          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">Choose how the FamilyFi app reaches home. Phones use this one address.</div>
+          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">Choose how the FamilyFi app reaches home. Every device uses this one address.</div>
         </div>
         {tunnel && tunnel.status !== "off" ? (
           <span data-testid="remote-status" className="text-[14px] font-semibold" style={{ color: status.ink }}>
@@ -485,20 +485,20 @@ export function RemoteAccessCard({
             {published.kind === "quick" ? (
               // Cloudflare picks this address, so it reads as a field nobody can edit, and wraps rather than cutting off on a phone.
               <div className="font-semibold text-[var(--ff-muted)]">
-                Phones reach home at
+                Devices reach home at
                 <div data-testid="remote-url" className={`${FIELD} bg-[var(--ff-note-fill)] font-mono break-all select-all`}>
                   {tunnel.url}
                 </div>
               </div>
             ) : (
               <>
-                Phones reach home at <span data-testid="remote-url" className="font-mono break-all">{tunnel.url}</span>{" "}
+                Devices reach home at <span data-testid="remote-url" className="font-mono break-all">{tunnel.url}</span>{" "}
               </>
             )}
             <span className={published.kind === "quick" ? "mt-1 block text-[var(--ff-muted)]" : "text-[var(--ff-muted)]"}>
               {published.kind === "quick" ? "" : "· "}
               {published.kind === "own" ? transportLabel(published.transport) : published.kind === "quick" ? "Quick tunnel" : "Cloudflare Tunnel"}
-              {pairedThrough(published.id) ? ` · ${pairedThrough(published.id)} phone${pairedThrough(published.id) === 1 ? "" : "s"} paired here` : ""}
+              {pairedThrough(published.id) ? ` · ${pairedThrough(published.id)} device${pairedThrough(published.id) === 1 ? "" : "s"} paired here` : ""}
             </span>
             {status.detail ? (
               <div data-testid="remote-detail" className="mt-0.5 text-[var(--ff-muted)]">

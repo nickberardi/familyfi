@@ -15,17 +15,17 @@ export const PHONES_SHOWN = 8;
 
 export const PAIR_COPY = {
   title: "Pair Device",
-  sub: "Pair the FamilyFi app on a phone and choose how it reaches home",
-  pairPhone: "Pair a phone",
+  sub: "Pair the FamilyFi app on a phone, tablet or Mac and choose how it reaches home",
+  pairPhone: "Pair a device",
   connectAgent: "Connect an agent",
-  adminOnly: "Only a household admin can pair phones or change remote access.",
+  adminOnly: "Only a household admin can pair devices or change remote access.",
   loadFailed: "Could not load remote access.",
   actionFailed: "That didn't work.",
   paired: "Paired devices",
   pairedSub: "Phones, Watches, agents and what they set up; revoke any one of them",
-  noPhones: "No paired devices yet. Pair a phone or connect an agent to add one.",
-  remoteFirst: "Turn on remote access, then pair a phone. Agents connect over the home network.",
-  remoteFirstPhones: "Turn on remote access, then pair a phone.",
+  noPhones: "No paired devices yet. Pair a device or connect an agent to add one.",
+  remoteFirst: "Turn on remote access, then pair a device. Agents connect over the home network.",
+  remoteFirstPhones: "Turn on remote access, then pair a device.",
   expired: "Expired. Re-pair it to sign it in again.",
   /** Watches and agents are not re-paired from the list. */
   expiredPairAgain: "Expired. Revoke it and pair again.",
@@ -37,12 +37,12 @@ export const PAIR_COPY = {
   repair: "Re-pair",
   remove: "Remove",
   remote: "Remote access",
-  remoteSub: "Choose how the FamilyFi app reaches home. Phones use this one address.",
-  remoteOff: "No route is published, so phones can’t reach home or pair.",
+  remoteSub: "Choose how the FamilyFi app reaches home. Every device uses this one address.",
+  remoteOff: "No route is published, so devices can’t reach home or pair.",
   /** Where a client that cannot change remote access sends the household instead. */
   remoteOnWeb: "Change remote access on FamilyFi’s web Pair Device page.",
   getApp: "Get the FamilyFi app",
-  getAppSub: "Install it on each phone before you pair it.",
+  getAppSub: "Install it on each device before you pair it.",
 } as const;
 
 /**
@@ -172,20 +172,20 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     name: {
       title: replacing ? `Re-pair ${replacing.displayName}` : PAIR_COPY.pairPhone,
       sub: replacing
-        ? "Makes a new single-use code for this phone. Its old pairing keeps working until the code is used, then is signed out and removed, and its Watch moves to the new pairing."
-        : "Makes a single-use code that pairs one phone and signs it in as the adult you choose. It expires in five minutes.",
+        ? "Makes a new single-use code for this device. Its old pairing keeps working until the code is used, then is signed out and removed, and its Watch moves to the new pairing."
+        : "Makes a single-use code that pairs one device and signs it in as the adult you choose. It expires in five minutes.",
     },
     code: claimed
-      ? { title: "Phone paired", sub: `${claimedName ?? "The phone"} is paired and signed in${replacing ? "; its old entry is gone" : ""}.` }
+      ? { title: "Device paired", sub: `${claimedName ?? "The device"} is paired and signed in${replacing ? "; its old entry is gone" : ""}.` }
       : {
           title: "Scan with the FamilyFi app",
-          sub: "Open FamilyFi on the phone and scan the QR, or copy the pairing code and paste it in the app. Then confirm the household it shows.",
+          sub: "Open FamilyFi on the device and scan the QR, or copy the pairing code and paste it in the app. Then confirm the household it shows.",
         },
     route: "Route",
-    routeNote: "The phone must reach this address while it pairs. Change it under Remote access.",
-    phone: "Phone",
+    routeNote: "The device must reach this address while it pairs. Change it under Remote access.",
+    phone: "Device name",
     signsInAs: "Signs in as",
-    defaultName: "Phone",
+    defaultName: "Device",
     cancel: "Cancel",
     show: "Show pairing code",
     newCode: "New code",
@@ -196,8 +196,8 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     expiredLine: "This code expired. Make a new one.",
     claimedLine: `Paired ${claimedName ?? ""} ✓`,
     issueFailed: "Could not create a pairing code.",
-    accountsFailed: "Could not load the administrators a phone can sign in as.",
-    noAccounts: "A phone signs in as an adult with administrator access, never as the built-in admin. Give an adult admin access under Settings › Household, then pair this phone.",
+    accountsFailed: "Could not load the administrators a device can sign in as.",
+    noAccounts: "A device signs in as an adult with administrator access, never as the built-in admin. Give an adult admin access under Settings › Household, then pair this device.",
     noAccountsLink: "Open Settings",
     copy: "Copy",
     copied: "Copied",

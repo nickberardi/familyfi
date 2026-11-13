@@ -1,6 +1,6 @@
 /**
  * What a phone's setup says, step by step, in the web's own names for where a code comes from
- * (Pair Device → Pair a phone), and the household details a person checks before trusting it. Each client lays the steps out natively.
+ * (Pair Device → Pair a device), and the household details a person checks before trusting it. Each client lays the steps out natively.
  */
 import type { PendingEnrollment } from "./companion-pairing";
 import { shortPin } from "./connection-routes";
@@ -16,11 +16,11 @@ export const SETUP_STEPS = {
   },
   scan: {
     title: "Scan the pairing code",
-    body: "On a computer at home, open FamilyFi → Pair Device → Pair a phone. The code is single-use and expires in five minutes.",
+    body: "On a computer at home, open FamilyFi → Pair Device → Pair a device. The code is single-use and expires in five minutes.",
   },
   paste: {
     title: "Paste the pairing code",
-    body: "In FamilyFi on the web, open Pair a phone, copy the pairing code, and paste it here. It is single-use and expires in five minutes.",
+    body: "In FamilyFi on the web, open Pair a device, copy the pairing code, and paste it here. It is single-use and expires in five minutes.",
   },
   confirm: {
     title: "Is this your household?",

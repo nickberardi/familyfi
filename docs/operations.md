@@ -65,7 +65,7 @@ Setup guides: [My domain (VPN or reverse proxy)](https://github.com/nickberardi/
 [Tailscale](https://github.com/nickberardi/familyfi/wiki/Remote-access-Tailscale) and
 [your own Cloudflare Tunnel](https://github.com/nickberardi/familyfi/wiki/Remote-access-Cloudflare-Tunnel).
 
-**Pair a phone** uses the published route: name the phone and show the QR. The sheet also shows the
+**Pair a device** pairs the app on a phone, tablet or Mac over the published route: name the device and show the QR. The sheet also shows the
 same pairing code as text, to copy and paste in the app when the phone can't scan it — for instance
 when the sheet is open on that phone. The code carries the server address, so nothing else is typed. The code expires in five minutes and is cancelled when you close it. Revoke a lost phone from
 the same page; it is signed out at once and must pair again. A revoked phone stays listed until you
