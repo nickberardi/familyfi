@@ -245,7 +245,7 @@ export function CardMenuButton({
               onLayout={(event) => setMenuHeight(event.nativeEvent.layout.height)}
               style={[
                 styles.menu,
-                cardMenuPlacement(anchor, screen, align, menuHeight ?? 0),
+                cardMenuPlacement(anchor, screen, align, menuHeight ?? 0, ui.safeInsets),
                 // Hidden for the one frame before its height is known, so it never jumps.
                 menuHeight === null && { opacity: 0 },
                 { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card"), boxShadow: ui.shadow("toast") },
