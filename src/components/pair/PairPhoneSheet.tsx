@@ -8,7 +8,7 @@ import { useAppData } from "@/components/AppDataProvider";
 import { SheetFrame } from "./SheetFrame";
 
 /**
- * Pair a phone through the published route: name the phone and choose the administrator it signs in
+ * Pair a device through the published route: name the device and choose the administrator it signs in
  * as, then show the single-use pairing code,
  * as a QR and as text to copy. Both are the same string, the only one the app accepts. Closing the sheet or
  * regenerating cancels a code nobody claimed, so a QR left on screen dies with it.

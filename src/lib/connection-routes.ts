@@ -186,10 +186,10 @@ export function savedRoutes(choice: RemoteChoice, routes: readonly ConnectionRou
 
 /** What removing a saved route asks first: the published one turns remote access off. */
 export function removeRouteConfirm(route: Pick<ConnectionRoute, "url">, { published, pairedCount }: { published: boolean; pairedCount: number }) {
-  const count = `${pairedCount} phone${pairedCount === 1 ? "" : "s"}`;
+  const count = `${pairedCount} device${pairedCount === 1 ? "" : "s"}`;
   const message = published
-    ? `Phones reach home through it now, so remote access turns off.${pairedCount ? ` ${count} paired through it can't reach home from outside until you publish another route.` : ""}`
-    : `Phones aren't using it now.${pairedCount ? ` ${count} first paired through it.` : ""}`;
+    ? `Devices reach home through it now, so remote access turns off.${pairedCount ? ` ${count} paired through it can't reach home from outside until you publish another route.` : ""}`
+    : `Devices aren't using it now.${pairedCount ? ` ${count} first paired through it.` : ""}`;
   return { title: `Remove ${route.url}?`, message, confirmLabel: "Remove" };
 }
 

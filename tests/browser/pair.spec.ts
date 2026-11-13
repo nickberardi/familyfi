@@ -90,7 +90,7 @@ test("going back to Off from an unsaved My domain choice switches the picker to 
     // Off is already what the server has, and the picker must still follow the click.
     await picker.getByRole("button", { name: "Off" }).click();
     await expect(picker.getByRole("button", { name: "Off" })).toHaveAttribute("aria-pressed", "true");
-    await expect(card.getByText("No route is published, so phones can’t reach home or pair.")).toBeVisible();
+    await expect(card.getByText("No route is published, so devices can’t reach home or pair.")).toBeVisible();
   } finally {
     await cleanUp(page, []);
   }
@@ -108,8 +108,8 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     await expect(page.getByRole("heading", { name: "Pair Device" })).toBeVisible();
     await page.getByTestId("remote-access").getByRole("button", { name: "Off" }).click();
     // Nothing is published while Off, so there is nothing to pair through yet.
-    await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
-    await expect(page.getByText("Turn on remote access, then pair a phone.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Pair a device" })).toBeDisabled();
+    await expect(page.getByText("Turn on remote access, then pair a device.")).toBeVisible();
 
     const card = await publishMyDomain(page, url);
     await expect(card.getByRole("link", { name: /Set up a reverse proxy/ })).toHaveAttribute("href", /\/wiki\/Remote-access-home-network$/);
@@ -129,8 +129,8 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
       const { accounts } = (await (await route.fetch()).json()) as { accounts: { kind: string }[] };
       await route.fulfill({ json: { accounts: accounts.filter((account) => account.kind === "recovery") } });
     });
-    await page.getByRole("button", { name: "Pair a phone" }).click();
-    const noAdmins = page.getByRole("dialog", { name: "Pair a phone" });
+    await page.getByRole("button", { name: "Pair a device" }).click();
+    const noAdmins = page.getByRole("dialog", { name: "Pair a device" });
     await expect(noAdmins.getByTestId("pairing-no-accounts")).toContainText("never as the built-in admin");
     await expect(noAdmins.getByTestId("pairing-no-accounts").getByRole("link", { name: "Open Settings" })).toHaveAttribute("href", "/settings");
     await expect(noAdmins.getByTestId("pairing-account")).toHaveCount(0);
@@ -139,11 +139,11 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     await noAdmins.getByTestId("pairing-cancel").click();
     await page.unroute("**/api/v1/accounts");
 
-    await page.getByRole("button", { name: "Pair a phone" }).click();
-    const pairSheet = page.getByRole("dialog", { name: "Pair a phone" });
+    await page.getByRole("button", { name: "Pair a device" }).click();
+    const pairSheet = page.getByRole("dialog", { name: "Pair a device" });
     await expect(pairSheet.getByTestId("pairing-route")).toContainText(url);
     // The phone keeps the name given here, not the one it calls itself when it claims the code.
-    await pairSheet.getByLabel("Phone", { exact: true }).fill("Kitchen iPhone");
+    await pairSheet.getByLabel("Device name", { exact: true }).fill("Kitchen iPhone");
     await pairSheet.getByRole("button", { name: "Show pairing code" }).click();
 
     const qrSheet = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
@@ -168,8 +168,8 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     const bearer = { authorization: `Bearer ${token}` };
     expect((await page.request.get("/api/v1/connection", { headers: bearer })).status()).toBe(200);
 
-    await page.getByRole("dialog", { name: "Phone paired" }).getByRole("button", { name: "Done" }).click();
-    await expect(card.getByTestId("published-route")).toContainText("1 phone paired here");
+    await page.getByRole("dialog", { name: "Device paired" }).getByRole("button", { name: "Done" }).click();
+    await expect(card.getByTestId("published-route")).toContainText("1 device paired here");
     const row = page.getByTestId("phone-row").filter({ hasText: "Kitchen iPhone" }).filter({ hasText: url });
     await expect(row).toBeVisible();
     await shot(page, "paired");
@@ -212,8 +212,8 @@ test("pins a My domain certificate from a pasted PEM and puts the pin in the pai
     await saved.getByRole("button", { name: "Check" }).click();
     await expect(card.getByTestId("remote-status")).toHaveText("Not reached", { timeout: 10_000 });
 
-    await page.getByRole("button", { name: "Pair a phone" }).click();
-    await page.getByRole("dialog", { name: "Pair a phone" }).getByRole("button", { name: "Show pairing code" }).click();
+    await page.getByRole("button", { name: "Pair a device" }).click();
+    await page.getByRole("dialog", { name: "Pair a device" }).getByRole("button", { name: "Show pairing code" }).click();
     const qr = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
     const { payload } = decodePairingCode((await qr.getByTestId("pairing-code").textContent()) ?? "");
     expect(payload.pin).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -255,7 +255,7 @@ test("switches between saved routes and Off, publishing exactly one at a time", 
     await card.getByRole("button", { name: "Off" }).click();
     await expect(card.getByTestId("remote-url")).toHaveCount(0);
     expect(await enabledUrls(page)).toEqual([]);
-    await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Pair a device" })).toBeDisabled();
 
   } finally {
     await cleanUp(page, [home, tailnet]);
@@ -291,7 +291,7 @@ test("lists every saved Tailscale route and removes them, turning remote access 
 
     await saved.filter({ hasText: second }).getByRole("button", { name: "Remove" }).click();
     await expect(saved).toHaveCount(1);
-    expect(asked.pop()).toBe(`Remove ${second}? Phones aren't using it now.`);
+    expect(asked.pop()).toBe(`Remove ${second}? Devices aren't using it now.`);
     await shot(page, "removed-unpublished");
     expect((await routes(page)).map((route) => route.url)).not.toContain(second);
 
@@ -306,10 +306,10 @@ test("lists every saved Tailscale route and removes them, turning remote access 
 
     await saved.getByRole("button", { name: "Remove" }).click();
     await expect(card.getByRole("button", { name: "Off" })).toHaveAttribute("aria-pressed", "true");
-    expect(asked.pop()).toBe(`Remove ${first}? Phones reach home through it now, so remote access turns off.`);
+    expect(asked.pop()).toBe(`Remove ${first}? Devices reach home through it now, so remote access turns off.`);
     await expect(card.getByTestId("remote-url")).toHaveCount(0);
     expect(await enabledUrls(page)).toEqual([]);
-    await expect(page.getByRole("button", { name: "Pair a phone" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Pair a device" })).toBeDisabled();
     await shot(page, "removed-published");
   } finally {
     if (invite) await page.request.delete(`/api/v1/paired/invites/${invite}`, { headers });
@@ -381,9 +381,9 @@ test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a 
     await expect(page.locator("body")).not.toContainText(first.secret);
 
     // The pairing code carries the token, so a phone can get past Access to pair.
-    await page.getByRole("button", { name: "Pair a phone" }).click();
-    const pairSheet = page.getByRole("dialog", { name: "Pair a phone" });
-    await pairSheet.getByLabel("Phone", { exact: true }).fill(phone);
+    await page.getByRole("button", { name: "Pair a device" }).click();
+    const pairSheet = page.getByRole("dialog", { name: "Pair a device" });
+    await pairSheet.getByLabel("Device name", { exact: true }).fill(phone);
     await pairSheet.getByRole("button", { name: "Show pairing code" }).click();
     const qrSheet = page.getByRole("dialog", { name: "Scan with the FamilyFi app" });
     const { payload, pairingId, token: pairingToken } = decodePairingCode((await qrSheet.getByTestId("pairing-code").textContent()) ?? "");
@@ -391,7 +391,7 @@ test("publishes your own Cloudflare Tunnel, puts it behind Access, and tracks a 
     const claim = await page.request.post(`/api/v1/paired/invites/${pairingId}/claim`, { data: { token: pairingToken, deviceName: phone } });
     expect(claim.ok()).toBe(true);
     const claimed = (await claim.json()) as { device: { id: string }; token: string };
-    await page.getByRole("dialog", { name: "Phone paired" }).getByRole("button", { name: "Done" }).click();
+    await page.getByRole("dialog", { name: "Device paired" }).getByRole("button", { name: "Done" }).click();
     const bearer = { authorization: `Bearer ${claimed.token}` };
 
     // Replacing the token: the phone is waited for until its next manifest carries the new one.
@@ -473,7 +473,7 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
     const old = page.getByTestId("phone-row").filter({ hasText: `Old phone ${tag}` });
     await old.getByRole("button", { name: "Re-pair" }).click();
     const sheet = page.getByRole("dialog", { name: `Re-pair Old phone ${tag}` });
-    await expect(sheet.getByLabel("Phone", { exact: true })).toHaveValue(`Old phone ${tag}`);
+    await expect(sheet.getByLabel("Device name", { exact: true })).toHaveValue(`Old phone ${tag}`);
     await expect(sheet.getByTestId("pairing-route")).toContainText(url);
     await sheet.getByRole("button", { name: "Show pairing code" }).click();
     const { pairingId, token: pairingToken } = decodePairingCode((await page.getByTestId("pairing-code").textContent()) ?? "");

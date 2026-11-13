@@ -150,15 +150,15 @@ describe("pair device", () => {
   });
 
   it("titles each step of the pairing sheet", () => {
-    expect(pairingSheetCopy().name.title).toBe("Pair a phone");
+    expect(pairingSheetCopy().name.title).toBe("Pair a device");
     expect(pairingSheetCopy({ replacing: { displayName: "Old phone" } }).name.title).toBe("Re-pair Old phone");
     expect(pairingSheetCopy({ replacing: { displayName: "Old phone" } }).name.sub).toBe(
-      "Makes a new single-use code for this phone. Its old pairing keeps working until the code is used, then is signed out and removed, and its Watch moves to the new pairing.",
+      "Makes a new single-use code for this device. Its old pairing keeps working until the code is used, then is signed out and removed, and its Watch moves to the new pairing.",
     );
     expect(pairingSheetCopy().code.title).toBe("Scan with the FamilyFi app");
-    expect(pairingSheetCopy().name.sub).toBe("Makes a single-use code that pairs one phone and signs it in as the adult you choose. It expires in five minutes.");
-    expect(pairingSheetCopy({ claimed: true, claimedName: "New phone" }).code).toEqual({ title: "Phone paired", sub: "New phone is paired and signed in." });
-    expect(pairingSheetCopy({ claimed: true, replacing: { displayName: "Old" } }).code.sub).toBe("The phone is paired and signed in; its old entry is gone.");
+    expect(pairingSheetCopy().name.sub).toBe("Makes a single-use code that pairs one device and signs it in as the adult you choose. It expires in five minutes.");
+    expect(pairingSheetCopy({ claimed: true, claimedName: "New phone" }).code).toEqual({ title: "Device paired", sub: "New phone is paired and signed in." });
+    expect(pairingSheetCopy({ claimed: true, replacing: { displayName: "Old" } }).code.sub).toBe("The device is paired and signed in; its old entry is gone.");
   });
 
   it("speaks of any phone, not only an iPhone, since the app runs on Android too", () => {
