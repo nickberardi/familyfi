@@ -22,7 +22,8 @@ export function blockSwitch(group: Group, rules: Rule[], timezone: string, now: 
  * The write a tap sends, with an empty body. Turning the switch on blocks the group until someone
  * unblocks it. Turning it off is the group's unblock, which ends its block and allows each rule
  * blocking it now until that rule's window ends; only that lifts a block, so only that needs the
- * phone unlocked.
+ * phone unlocked. `needsUnlock` is what the write itself needs: a platform whose switch has one action
+ * for both ways (the iPhone's Control Center control) asks for the unlock to block as well.
  */
 export function blockSwitchWrite(group: Pick<Group, "id">, turnOn: boolean): { path: string; needsUnlock: boolean } {
   return turnOn
