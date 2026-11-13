@@ -22,7 +22,8 @@ export function blockSwitch(group: Group, rules: Rule[], timezone: string, now: 
  * The write a tap sends, with an empty body. Turning the switch on blocks the group until someone
  * unblocks it. Turning it off is the group's unblock, which ends its block and allows each rule
  * blocking it now until that rule's window ends; only that lifts a block, so only that needs the
- * phone unlocked.
+ * phone unlocked. `needsUnlock` is what the write itself needs: a platform whose switch has one action
+ * for both ways (the iPhone's Control Center control) asks for the unlock to block as well.
  */
 export function blockSwitchWrite(group: Pick<Group, "id">, turnOn: boolean): { path: string; needsUnlock: boolean } {
   return turnOn
@@ -39,6 +40,8 @@ export function quickSettingsTileCopy() {
     setUp: "Tap to set up",
     applying: "Applying…",
     failed: "Couldn't reach FamilyFi",
+    /** An unblock asked for on the lock screen, when the phone was still locked after the PIN prompt. */
+    stillLocked: "Unlock to unblock",
   };
 }
 
@@ -62,9 +65,25 @@ export const QUICK_SETTINGS_COPY = {
   addFor: (number: number) => `Add Tile ${number} to Quick Settings`,
   added: "Added to Quick Settings.",
   alreadyAdded: "This tile is already in Quick Settings.",
-  addYourself: "Swipe down twice from the top of your screen, tap the pencil, then drag FamilyFi Block into your tiles.",
+  /** Android could not offer to add the tile: the person adds it from Quick Settings' own edit view, where it carries its slot's name. */
+  addYourself: (number: number) =>
+    `Open Quick Settings, open its edit view, then drag ${quickSettingsTileCopy().names[number - 1]} into your tiles.`,
+  /** The household has no groups to choose from. */
+  noGroups: "No groups yet.",
   /** The server is older than the first contract with a sign-in for tiles. */
   needsUpdate: "To use Quick Settings tiles, update your FamilyFi server from Settings on your computer.",
   /** The tiles are not signed in yet: the app does that once it has read the household. */
   settingUp: "Setting up Quick Settings tiles…",
+} as const;
+
+/**
+ * The iPhone's Block control's own words, in the controls gallery and its settings. A control has one
+ * action, which asks for the device to be unlocked both ways, so they promise no single tap.
+ */
+export const BLOCK_CONTROL_COPY = {
+  /** Its name in the gallery, and its title before a group is chosen. */
+  name: "Block internet",
+  description: "Block or unblock a group from Control Center.",
+  /** What the system asks when the control is added. */
+  configure: "Choose the group this switch blocks and unblocks.",
 } as const;
