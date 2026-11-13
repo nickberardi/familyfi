@@ -102,6 +102,8 @@ export type SiteDeviceOverview = {
   name: string;
   model?: string;
   state?: string;
+  /** The address the console knows the device by. */
+  ipAddress?: string;
   /** What the device does on the site: `gateway`, `switching`, `accessPoint`. */
   features?: string[];
 };
