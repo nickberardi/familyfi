@@ -1,4 +1,5 @@
-import { groupBadge, groupStatusParts, internetRulePath } from "./group-actions";
+import { formatClock } from "./display";
+import { groupBadge, groupStatusParts, internetRulePath, rulesBlockingGroup, rulesToUnblock } from "./group-actions";
 import type { Rule } from "./rules";
 import type { Group } from "./types";
 
@@ -29,6 +30,41 @@ export function blockSwitchWrite(group: Pick<Group, "id">, turnOn: boolean): { p
   return turnOn
     ? { path: `${internetRulePath(group)}/pause`, needsUnlock: false }
     : { path: `/api/v1/groups/${group.id}/unblock`, needsUnlock: true };
+}
+
+/**
+ * What Unblock outside the app does for a group now, and the words it answers with (what Siri says,
+ * and Shortcuts shows). Unblock is the group's unblock (`blockSwitchWrite` off): it ends the group's
+ * block and lifts each rule blocking it now until that rule's window ends, but never an always-on
+ * category, app or website rule, which is how the group is set up (`standingRule`). So with the
+ * internet on and Video always blocked, there is nothing for it to do: `send` is false, and the
+ * answer says so and why, instead of a bare "unblocked" that Video would contradict. A parent
+ * changes an always-on rule in the app.
+ */
+export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now: Date): { send: boolean; say: string } {
+  const lifts = rulesToUnblock(group, rules, timezone, now);
+  const liftIds = new Set(lifts.map((rule) => rule.ruleId));
+  const standing = rulesBlockingGroup(group, rules, timezone, now).filter((rule) => !liftIds.has(rule.ruleId));
+  const kept = listNames(standing.map((rule) => rule.name));
+  const names = new Set(standing.map((rule) => rule.name)).size;
+  const verb = names === 1 ? "is" : "are";
+  const owner = standing.length === 1 ? "one of its rules" : "its rules";
+  if (!group.suspension.active && lifts.length === 0) {
+    const why = standing.length ? ` ${kept} ${verb} always blocked by ${owner}, which Unblock leaves on. You can change that in FamilyFi.` : "";
+    return { send: false, say: `${group.name} isn't blocked, so there's nothing to unblock.${why}` };
+  }
+  const still = standing.length ? ` ${kept} ${verb} still always blocked by ${owner}.` : "";
+  // Each lifted rule comes back when its window ends; the group is online until the last of them.
+  const open = lifts.some((rule) => rule.until === null);
+  const last = open || lifts.length === 0 ? null : new Date(Math.max(...lifts.map((rule) => Date.parse(rule.until!))));
+  const until = last ? ` until ${formatClock(last, timezone)}` : "";
+  return { send: true, say: `${group.name} is unblocked${until}.${still}` };
+}
+
+/** "Video", "Video and Gaming", "Video, Gaming and Social". */
+function listNames(items: string[]): string {
+  const unique = [...new Set(items)];
+  return unique.length <= 1 ? (unique[0] ?? "") : `${unique.slice(0, -1).join(", ")} and ${unique.at(-1)}`;
 }
 
 /** A Quick Settings tile's own words: its names in Android's tile editor, and the line under a tile. */
