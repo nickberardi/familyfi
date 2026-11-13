@@ -39,6 +39,8 @@ export function quickSettingsTileCopy() {
     setUp: "Tap to set up",
     applying: "Applying…",
     failed: "Couldn't reach FamilyFi",
+    /** An unblock asked for on the lock screen, when the phone was still locked after the PIN prompt. */
+    stillLocked: "Unlock to unblock",
   };
 }
 
