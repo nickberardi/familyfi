@@ -100,6 +100,8 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
   await signIn(page);
   const url = `https://pair-e2e-${Date.now()}.home`;
   await answerConfirms(page);
+  // A browser on a Mac, where the app can be: the sheet offers the code as a link too.
+  await page.addInitScript(() => Object.defineProperty(navigator, "userAgent", { get: () => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15" }));
 
   try {
     await page.goto("/pair");
@@ -154,6 +156,7 @@ test("publishes a My domain route, pairs a phone through it, and revokes it", { 
     expect(payload.url).toBe(url);
     expect(payload.pin).toBeUndefined();
     expect(payload.access).toBeUndefined();
+    await expect(qrSheet.getByRole("link", { name: "Open in the FamilyFi app" })).toBeVisible();
     const claim = await page.request.post(`/api/v1/paired/invites/${pairingId}/claim`, {
       data: { token: pairingToken, deviceName: "Playwright iPhone" },
     });

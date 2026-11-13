@@ -12,7 +12,7 @@ export type SetupProgressStep = (typeof SETUP_PROGRESS)[number];
 export const SETUP_STEPS = {
   welcome: {
     title: "Connect to FamilyFi",
-    body: "FamilyFi already runs on the Pi in your house. This phone is a control surface for it — nothing moves off the household.",
+    body: "FamilyFi already runs on the Pi in your house. This device is a control surface for it — nothing moves off the household.",
   },
   scan: {
     title: "Scan the pairing code",
@@ -24,7 +24,7 @@ export const SETUP_STEPS = {
   },
   confirm: {
     title: "Is this your household?",
-    body: "Check the household details before trusting this server. Your one-time key is not used until you confirm; trusting it signs this phone in.",
+    body: "Check the household details before trusting this server. Your one-time key is not used until you confirm; trusting it signs this device in.",
   },
 } as const;
 
@@ -33,7 +33,7 @@ export const SETUP_ACTIONS = {
   scan: "Scan pairing code",
   paste: "Paste pairing code",
   pasteInstead: "Paste the code instead",
-  pair: "Pair this phone",
+  pair: "Pair this device",
   pasteFromClipboard: "Paste",
   back: "Back",
   scanAgain: "Scan again",
@@ -107,10 +107,10 @@ export const CONNECTION_COPY = {
   off: "Off",
   check: "Check routes again",
   checking: "Checking routes…",
-  unpair: "Unpair this phone",
-  unpairTitle: "Unpair this phone?",
+  unpair: "Unpair this device",
+  unpairTitle: "Unpair this device?",
   unpairBody:
-    "This phone stops working with this household, and so do the Watches it set up. To use FamilyFi again, pair with a new code from FamilyFi on the web.",
+    "This device stops working with this household, and so do the Watches it set up. To use FamilyFi again, pair with a new code from FamilyFi on the web.",
   unpairConfirm: "Unpair",
   cancel: "Cancel",
 } as const;

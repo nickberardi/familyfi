@@ -37,7 +37,7 @@ describe("connection hops", () => {
 
   it("reports this phone's hop as measured", () => {
     expect(phoneHop("connected", route)).toMatchObject({ tone: "var(--ff-on)", status: "Connected", footnote: "My domain · https://home.example" });
-    expect(phoneHop("connected", route).detail).toMatch(/^Pinned certificate .+\. Measured from this phone/);
+    expect(phoneHop("connected", route).detail).toMatch(/^Pinned certificate .+\. Measured from this device/);
     expect(phoneHop("offline", null)).toMatchObject({ tone: "var(--ff-danger)", status: "Not connected", footnote: null });
     expect(phoneHop("checking", null).status).toBe("Checking…");
   });
@@ -55,10 +55,10 @@ describe("connection hops", () => {
     expect(gatewayHop({ connectionStatus: "connected", connectionError: null }, sync(), "offline", now)).toMatchObject({
       tone: "var(--ff-muted)",
       status: "Unknown",
-      detail: "This phone can't reach FamilyFi to ask. Last reported: Connected.",
+      detail: "This device can't reach FamilyFi to ask. Last reported: Connected.",
       footnote: "Last sweep 2m",
     });
-    expect(gatewayHop(null, null, "offline", now)).toMatchObject({ status: "Unknown", detail: "This phone can't reach FamilyFi to ask.", footnote: null });
+    expect(gatewayHop(null, null, "offline", now)).toMatchObject({ status: "Unknown", detail: "This device can't reach FamilyFi to ask.", footnote: null });
   });
 
   it("shows the latest change's outcome", () => {

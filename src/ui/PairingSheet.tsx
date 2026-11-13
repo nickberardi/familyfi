@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { countdown, transportLabel } from "@/lib/connection-routes";
 import { expiresLine } from "@/lib/pair-device";
+import { PAIRING_LINK_LABEL, PAIRING_LINK_NOTE, pairingLink, pairingLinkAllowed, runsFamilyFiApp } from "@/lib/pairing-link";
 
 import { PairingAccountField } from "./PairingAccountField";
 import { PairingNameField } from "./PairingNameField";
@@ -47,6 +48,34 @@ function CopyRow({ label, value, copyLabel, copiedLabel }: { label: string; valu
           <Text style={[text(14, 21, "accent"), styles.bold]}>{copied ? copiedLabel : copyLabel}</Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+/**
+ * The pairing code as a link the app opens, in a browser on a device the app runs on: a Mac has no
+ * camera to scan with, and a phone cannot scan its own screen. The app's own sheet never shows it.
+ */
+/** react-native-web's `href`, which React Native's own types do not know. */
+const WEB_LINK = (href: string): object => ({ href });
+
+function AppLink({ code }: { code: string }) {
+  const text = useText();
+  // The server's render knows no browser, so it draws none; the browser adds it.
+  const shown = useSyncExternalStore(
+    () => () => undefined,
+    () => Platform.OS === "web" && runsFamilyFiApp(navigator.userAgent),
+    () => false,
+  );
+  if (!shown) return null;
+  return (
+    <View style={styles.appLink}>
+      {/* In this tab: the system hands the link to the app, and a new tab would stay behind, empty. */}
+      {/* A real anchor on the web (react-native-web draws one for `href`), so the keyboard opens it too. */}
+      <Pressable role="link" {...WEB_LINK(pairingLink(code))} testID="pairing-link" style={({ pressed }) => pressed && { opacity: PRESS_OPACITY }}>
+        <Text style={[text(14, 21, "accent"), styles.bold]}>{PAIRING_LINK_LABEL}</Text>
+      </Pressable>
+      <Text style={text(14, 21, "muted")}>{PAIRING_LINK_NOTE}</Text>
     </View>
   );
 }
@@ -112,6 +141,7 @@ export function PairingBody({ pairing }: { pairing: Pairing }) {
             {pairing.expired ? copy.expiredLine : expiresLine(countdown(new Date(issued.expiresAt).getTime() - pairing.now))}
           </Text>
           <CopyRow label={copy.codeLabel} value={issued.code} copyLabel={copy.copy} copiedLabel={copy.copied} />
+          {pairing.expired || !pairingLinkAllowed(issued.code) ? null : <AppLink code={issued.code} />}
         </>
       )}
       {error}
@@ -169,6 +199,7 @@ const styles = StyleSheet.create({
   copyRow: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 },
   code: { flex: 1, minWidth: 0, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden" },
   copy: { flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  appLink: { gap: 2, alignItems: "flex-start" },
   qr: { alignSelf: "center" },
   veil: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" },
   center: { textAlign: "center" },

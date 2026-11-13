@@ -40,7 +40,7 @@ export const IDENTITY_FINGERPRINT_INVALID = "The server signing-key fingerprint 
 export const IDENTITY_MISMATCH = "The server signing key does not match the pairing code.";
 export const MANIFEST_SIGNATURE_INVALID = "The endpoint manifest signature is invalid.";
 export const MANIFEST_WRONG_HOUSEHOLD = "The endpoint manifest belongs to a different FamilyFi household.";
-export const MANIFEST_MISSING_ENDPOINT = "The endpoint manifest does not include the route this phone paired over.";
+export const MANIFEST_MISSING_ENDPOINT = "The endpoint manifest does not include the route this device paired over.";
 export const EDGE_CREDENTIAL_INVALID = "FamilyFi returned an invalid Access credential binding.";
 
 /** base64url SHA-256 of some bytes: a key fingerprint or a certificate pin. */
