@@ -50,6 +50,12 @@ describe("which device is the gateway", () => {
     }
   });
 
+  it("reads the console's address only from a local integration URL", () => {
+    expect(consoleAddress("https://[FD00::1]/proxy/network/integration")).toBe("fd00::1");
+    expect(consoleAddress(null)).toBeNull();
+    expect(consoleAddress("not a url")).toBeNull();
+  });
+
   it("names no gateway when nothing points to one", () => {
     expect(findGatewayDevice([ap, switcher], BASE)).toBeNull();
     expect(findGatewayDevice([], BASE)).toBeNull();
