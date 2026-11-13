@@ -41,7 +41,7 @@ export function blockSwitchWrite(group: Pick<Group, "id">, turnOn: boolean): { p
  * answer says so and why, instead of a bare "unblocked" that Video would contradict. A parent
  * changes an always-on rule in the app. A block that has already ended counts as none.
  */
-export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now: Date): { send: boolean; say: string } {
+export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now: Date): UnblockAnswer {
   const lifts = rulesToUnblock(group, rules, timezone, now);
   const liftIds = new Set(lifts.map((rule) => rule.ruleId));
   const standing = rulesBlockingGroup(group, rules, timezone, now)
@@ -52,13 +52,61 @@ export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now
   const paused = active && (pauseEnd === null || Date.parse(pauseEnd) > now.getTime());
   if (!paused && lifts.length === 0) {
     const change = standing.length ? " You can change that in FamilyFi." : "";
-    return { send: false, say: `${group.name} isn't blocked, so there's nothing to unblock.${kept}${change}` };
+    const say = `${group.name} isn't blocked, so there's nothing to unblock.${kept}${change}`;
+    if (!standing.length) return { send: false, say };
+    // Siri can ask instead: lift one always-on rule for the group a while, as the card's "Unblock Video" does.
+    const choices = standing.map(standingChoice);
+    const question =
+      choices.length === 1
+        ? `${group.name} isn't blocked.${kept} Should I unblock ${spoken(choices[0]!)} for a while?`
+        : `${group.name} isn't blocked.${kept} Which one should I unblock for a while?`;
+    return { send: false, say, offer: { question, choices, howLong: "For how long?" } };
   }
   // Each lifted rule comes back when its window ends; the group is online until the last of them.
   const open = lifts.some((rule) => rule.until === null);
   const last = open || lifts.length === 0 ? null : new Date(Math.max(...lifts.map((rule) => Date.parse(rule.until!))));
   const until = last ? ` until ${formatClock(last, timezone)}` : "";
   return { send: true, say: `${group.name} is unblocked${until}.${kept}` };
+}
+
+/**
+ * Unblock's answer. `offer`, when only always-on rules block the group, is the follow-up Siri asks
+ * instead of stopping there: which rule to lift for the group (one: whether to), then for how long.
+ * The rule is then paused for the group alone until that time (`/groups/{id}/rules/{ruleId}/pause`).
+ */
+export type UnblockAnswer = {
+  send: boolean;
+  say: string;
+  offer?: { question: string; choices: UnblockChoice[]; howLong: string };
+};
+
+/** An always-on rule Siri offers to lift: `name` is its label as a choice; `named` when that is the rule's own name, not what it blocks. */
+export type UnblockChoice = { ruleId: string; name: string; named: boolean };
+
+/** "Video", or "the “No TikTok” rule": a rule's own name never reads as the thing it blocks. */
+function spoken(choice: UnblockChoice): string {
+  return choice.named ? `the “${choice.name}” rule` : choice.name;
+}
+
+/**
+ * What Siri says once it lifted one always-on rule for the group: "Video is unblocked for TV until
+ * 3:15 PM.", or "The “No TikTok” rule is off for TV until 3:15 PM."
+ */
+export function ruleUnblockAnswer(group: Pick<Group, "name">, choice: UnblockChoice, until: Date, timezone: string): string {
+  const at = `for ${group.name} until ${formatClock(until, timezone)}.`;
+  return choice.named ? `The “${choice.name}” rule is off ${at}` : `${choice.name} is unblocked ${at}`;
+}
+
+/** An always-on rule as a choice: "Video and Social" for familiar categories, else the rule's own name. */
+function standingChoice(rule: Rule): UnblockChoice {
+  const labels = curatedLabels(rule);
+  return { ruleId: rule.id, name: labels ? listNames(labels) : rule.name, named: !labels };
+}
+
+/** The familiar names of a category rule's every target, or null when it is not all familiar categories. */
+function curatedLabels(rule: Rule): string[] | null {
+  const labels = (rule.targetIds ?? []).map((id) => CURATED_CATEGORY_SLOTS.find((slot) => slot.categoryId === id)?.label);
+  return rule.kind === "category" && labels.length > 0 && labels.every(Boolean) ? (labels as string[]) : null;
 }
 
 /**
@@ -70,8 +118,8 @@ function standingClause(standing: Rule[]): string {
   const blocked: string[] = [];
   const named: string[] = [];
   for (const rule of standing) {
-    const labels = (rule.targetIds ?? []).map((id) => CURATED_CATEGORY_SLOTS.find((slot) => slot.categoryId === id)?.label);
-    if (rule.kind === "category" && labels.length > 0 && labels.every(Boolean)) blocked.push(...(labels as string[]));
+    const labels = curatedLabels(rule);
+    if (labels) blocked.push(...labels);
     else named.push(`“${rule.name}”`);
   }
   const things = [...new Set(blocked)];
