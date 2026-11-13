@@ -26044,7 +26044,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked because Unblock leaves rules that are always on alone. You can change it in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26135,7 +26135,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked because Unblock leaves rules that are always on alone. You can change them in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26236,7 +26236,250 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked because Unblock leaves rules that are always on alone. You can change it in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "a familiar category and a named rule",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-app",
+            "name": "No TikTok",
+            "kind": "app",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": false,
+        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked and the “No TikTok” rule stays on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "two named rules",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-app",
+            "name": "No TikTok",
+            "kind": "app",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-site",
+            "name": "Homework blockers",
+            "kind": "domain",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [
+              "example.com"
+            ],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": false,
+        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” and “Homework blockers” rules stay on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "a category rule with an unfamiliar target",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-mixed",
+            "name": "Evenings off",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4,
+              5
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": false,
+        "say": "TV isn't blocked, so there's nothing to unblock. The “Evenings off” rule stays on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26298,7 +26541,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” rule stays on because Unblock leaves rules that are always on alone. You can change it in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” rule stays on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26362,7 +26605,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. The “Homework blockers” rule stays on because Unblock leaves rules that are always on alone."
+        "say": "TV is unblocked. The “Homework blockers” rule stays on because Unblock never turns off a rule that is always on."
       }
     },
     {
@@ -26462,7 +26705,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. Video stays blocked because Unblock leaves rules that are always on alone."
+        "say": "TV is unblocked. Video stays blocked because Unblock never turns off a rule that is always on."
       }
     },
     {
@@ -26624,7 +26867,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. Video stays blocked because Unblock leaves rules that are always on alone."
+        "say": "TV is unblocked. Video stays blocked because Unblock never turns off a rule that is always on."
       }
     },
     {
@@ -26744,7 +26987,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked until 8:00 PM. Video stays blocked because Unblock leaves rules that are always on alone."
+        "say": "TV is unblocked until 8:00 PM. Video stays blocked because Unblock never turns off a rule that is always on."
       }
     },
     {

@@ -47,11 +47,11 @@ export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now
   const standing = rulesBlockingGroup(group, rules, timezone, now)
     .filter((rule) => !liftIds.has(rule.ruleId))
     .flatMap(({ ruleId }) => rules.filter((rule) => rule.id === ruleId));
-  const kept = standing.length ? ` ${standingClause(standing)} because Unblock leaves rules that are always on alone.` : "";
+  const kept = standing.length ? ` ${standingClause(standing)} because Unblock never turns off a rule that is always on.` : "";
   const { active, until: pauseEnd } = group.suspension;
   const paused = active && (pauseEnd === null || Date.parse(pauseEnd) > now.getTime());
   if (!paused && lifts.length === 0) {
-    const change = standing.length ? ` You can change ${standing.length === 1 ? "it" : "them"} in FamilyFi.` : "";
+    const change = standing.length ? " You can change that in FamilyFi." : "";
     return { send: false, say: `${group.name} isn't blocked, so there's nothing to unblock.${kept}${change}` };
   }
   // Each lifted rule comes back when its window ends; the group is online until the last of them.
