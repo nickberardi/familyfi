@@ -47,7 +47,7 @@ export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now
   const standing = rulesBlockingGroup(group, rules, timezone, now)
     .filter((rule) => !liftIds.has(rule.ruleId))
     .flatMap(({ ruleId }) => rules.filter((rule) => rule.id === ruleId));
-  const kept = standing.length ? ` ${standingClause(standing)} because Unblock never turns off a rule that is always on.` : "";
+  const kept = standing.length ? ` ${standingClause(standing)}.` : "";
   const { active, until: pauseEnd } = group.suspension;
   const paused = active && (pauseEnd === null || Date.parse(pauseEnd) > now.getTime());
   if (!paused && lifts.length === 0) {
@@ -80,7 +80,9 @@ function standingClause(standing: Rule[]): string {
     things.length ? `${listNames(things)} ${things.length === 1 ? "stays" : "stay"} blocked` : "",
     rulesNamed.length ? `the ${listNames(rulesNamed)} ${rulesNamed.length === 1 ? "rule stays" : "rules stay"} on` : "",
   ].filter(Boolean);
-  const clause = parts.join(" and ");
+  // Siri says it aloud, so the reason is short: an unblock never turns off a rule that is always on.
+  const one = things.length + rulesNamed.length === 1;
+  const clause = `${parts.join(" and ")}, since ${one ? "it's" : "they're"} always on`;
   return clause.charAt(0).toUpperCase() + clause.slice(1);
 }
 
