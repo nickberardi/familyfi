@@ -50,7 +50,7 @@ one route at a time, and turns every other route off:
 
 | Choice | Who runs it | The route phones get |
 | --- | --- | --- |
-| **Off** | — | none: phones can't reach home, and none can pair |
+| **Off** | — | none: devices can't reach home, and none can pair |
 | **Quick tunnel** | FamilyFi (`cloudflared`) | a `…trycloudflare.com` address that changes on restart |
 | **Tailscale** | you (a Tailscale Serve sidecar) | `https://…ts.net`, trusted |
 | **Cloudflare → Automatic** | FamilyFi (`cloudflared`) | `https://<your hostname>` on your Cloudflare domain |

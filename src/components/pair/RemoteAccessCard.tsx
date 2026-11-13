@@ -20,6 +20,7 @@ import {
   transportLabel,
   type RemoteChoice,
 } from "@/lib/connection-routes";
+import { PAIR_COPY } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess, RouteReachability } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
@@ -99,7 +100,7 @@ export function RemoteAccessCard({
     if (!count) return true;
     return askConfirm({
       title: `Switch away from ${published.url}?`,
-      message: `${count} phone${count === 1 ? "" : "s"} paired through it. They can't reach FamilyFi once you switch, and must be paired again over the new route.`,
+      message: `${count} device${count === 1 ? "" : "s"} paired through it. They can't reach FamilyFi once you switch, and must be paired again over the new route.`,
       confirmLabel: "Switch",
     });
   }
@@ -245,7 +246,7 @@ export function RemoteAccessCard({
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--ff-hairline-card)] px-[18px] py-[15px]">
         <div className="min-w-[200px] flex-1">
           <div className="text-[14px] font-semibold">Remote access</div>
-          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">Choose how the FamilyFi app reaches home. Every device uses this one address.</div>
+          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">{PAIR_COPY.remoteSub}</div>
         </div>
         {tunnel && tunnel.status !== "off" ? (
           <span data-testid="remote-status" className="text-[14px] font-semibold" style={{ color: status.ink }}>
@@ -269,7 +270,7 @@ export function RemoteAccessCard({
           ]}
         />
 
-        {choice === "off" ? <p className="text-[var(--ff-muted)]">No route is published, so phones can&rsquo;t reach home or pair.</p> : null}
+        {choice === "off" ? <p className="text-[var(--ff-muted)]">{PAIR_COPY.remoteOff}</p> : null}
         {choice === "off" && (settingUp || tunnel?.status === "starting") ? (
           // Forget domain's last step: one more sign-in, so FamilyFi can delete its tunnel and DNS record.
           <div data-testid="remote-login" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[9px] bg-[var(--ff-note-fill)] px-3 py-2.5">
@@ -317,7 +318,7 @@ export function RemoteAccessCard({
             ) : null}
             {choice === "tailscale" ? (
               <p className="text-[var(--ff-muted)]">
-                A <span className="font-mono">https://…ts.net</span> address from Tailscale Serve. The phone needs the Tailscale app in the
+                A <span className="font-mono">https://…ts.net</span> address from Tailscale Serve. Each device needs the Tailscale app in the
                 same tailnet. Use Serve, never Funnel. <Guide href={TAILSCALE_GUIDE}>Set up the Tailscale sidecar</Guide>
               </p>
             ) : null}

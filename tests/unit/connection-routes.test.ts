@@ -117,7 +117,7 @@ describe("connection routes", () => {
     expect(savedRoutes("quick", routes)).toEqual([]);
   });
 
-  it("warns that removing the published route turns remote access off, and counts the phones paired through it", () => {
+  it("warns that removing the published route turns remote access off, and counts the devices paired through it", () => {
     const home = { url: "https://familyfi.home" };
     expect(removeRouteConfirm(home, { published: false, pairedCount: 0 })).toEqual({ title: "Remove https://familyfi.home?", message: "Devices aren't using it now.", confirmLabel: "Remove" });
     expect(removeRouteConfirm(home, { published: false, pairedCount: 1 }).message).toBe("Devices aren't using it now. 1 device first paired through it.");
