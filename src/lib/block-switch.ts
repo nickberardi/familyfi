@@ -1,6 +1,6 @@
 import { formatClock } from "./display";
 import { groupBadge, groupStatusParts, internetRulePath, rulesBlockingGroup, rulesToUnblock } from "./group-actions";
-import type { Rule } from "./rules";
+import { CURATED_CATEGORY_SLOTS, type Rule } from "./rules";
 import type { Group } from "./types";
 
 /**
@@ -39,26 +39,49 @@ export function blockSwitchWrite(group: Pick<Group, "id">, turnOn: boolean): { p
  * category, app or website rule, which is how the group is set up (`standingRule`). So with the
  * internet on and Video always blocked, there is nothing for it to do: `send` is false, and the
  * answer says so and why, instead of a bare "unblocked" that Video would contradict. A parent
- * changes an always-on rule in the app.
+ * changes an always-on rule in the app. A block that has already ended counts as none.
  */
 export function unblockAnswer(group: Group, rules: Rule[], timezone: string, now: Date): { send: boolean; say: string } {
   const lifts = rulesToUnblock(group, rules, timezone, now);
   const liftIds = new Set(lifts.map((rule) => rule.ruleId));
-  const standing = rulesBlockingGroup(group, rules, timezone, now).filter((rule) => !liftIds.has(rule.ruleId));
-  const kept = listNames(standing.map((rule) => rule.name));
-  const names = new Set(standing.map((rule) => rule.name)).size;
-  const verb = names === 1 ? "is" : "are";
-  const owner = standing.length === 1 ? "one of its rules" : "its rules";
-  if (!group.suspension.active && lifts.length === 0) {
-    const why = standing.length ? ` ${kept} ${verb} always blocked by ${owner}, which Unblock leaves on. You can change that in FamilyFi.` : "";
-    return { send: false, say: `${group.name} isn't blocked, so there's nothing to unblock.${why}` };
+  const standing = rulesBlockingGroup(group, rules, timezone, now)
+    .filter((rule) => !liftIds.has(rule.ruleId))
+    .flatMap(({ ruleId }) => rules.filter((rule) => rule.id === ruleId));
+  const kept = standing.length ? ` ${standingClause(standing)} because Unblock leaves rules that are always on alone.` : "";
+  const { active, until: pauseEnd } = group.suspension;
+  const paused = active && (pauseEnd === null || Date.parse(pauseEnd) > now.getTime());
+  if (!paused && lifts.length === 0) {
+    const change = standing.length ? ` You can change ${standing.length === 1 ? "it" : "them"} in FamilyFi.` : "";
+    return { send: false, say: `${group.name} isn't blocked, so there's nothing to unblock.${kept}${change}` };
   }
-  const still = standing.length ? ` ${kept} ${verb} still always blocked by ${owner}.` : "";
   // Each lifted rule comes back when its window ends; the group is online until the last of them.
   const open = lifts.some((rule) => rule.until === null);
   const last = open || lifts.length === 0 ? null : new Date(Math.max(...lifts.map((rule) => Date.parse(rule.until!))));
   const until = last ? ` until ${formatClock(last, timezone)}` : "";
-  return { send: true, say: `${group.name} is unblocked${until}.${still}` };
+  return { send: true, say: `${group.name} is unblocked${until}.${kept}` };
+}
+
+/**
+ * What the always-on rules keep doing, as a parent hears it: "Video and Gaming stay blocked" for
+ * categories FamilyFi knows by a familiar name, and a rule by its own name otherwise ("The “No
+ * TikTok” rule stays on"), which names the rule, never what it blocks.
+ */
+function standingClause(standing: Rule[]): string {
+  const blocked: string[] = [];
+  const named: string[] = [];
+  for (const rule of standing) {
+    const labels = (rule.targetIds ?? []).map((id) => CURATED_CATEGORY_SLOTS.find((slot) => slot.categoryId === id)?.label);
+    if (rule.kind === "category" && labels.length > 0 && labels.every(Boolean)) blocked.push(...(labels as string[]));
+    else named.push(`“${rule.name}”`);
+  }
+  const things = [...new Set(blocked)];
+  const rulesNamed = [...new Set(named)];
+  const parts = [
+    things.length ? `${listNames(things)} ${things.length === 1 ? "stays" : "stay"} blocked` : "",
+    rulesNamed.length ? `the ${listNames(rulesNamed)} ${rulesNamed.length === 1 ? "rule stays" : "rules stay"} on` : "",
+  ].filter(Boolean);
+  const clause = parts.join(" and ");
+  return clause.charAt(0).toUpperCase() + clause.slice(1);
 }
 
 /** "Video", "Video and Gaming", "Video, Gaming and Social". */
