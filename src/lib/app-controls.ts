@@ -109,7 +109,7 @@ export const SIRI_SHORTCUTS_COPY = {
   title: "Siri and Shortcuts",
   section: "Block and pause with Siri",
   intro:
-    "Ask Siri to block, pause or unblock a group, or add these actions to a shortcut or automation, without opening FamilyFi. Blocking works from the lock screen. Unblocking and adding time ask you to unlock first.",
+    "Ask Siri to block, pause or unblock a group, or add these actions to a shortcut or automation, without opening FamilyFi. Unblocking leaves rules that are always on in place. Blocking works from the lock screen. Unblocking and adding time ask you to unlock first.",
   phrasesTitle: "Things to say",
   /** Each action's example, with a group's name where `name` goes. */
   phrases: (name: string) => [

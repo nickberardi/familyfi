@@ -26044,7 +26044,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked, since it's always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26135,7 +26135,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26236,7 +26236,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26325,7 +26325,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked and the “No TikTok” rule stays on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked and the “No TikTok” rule stays on, since they're always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26414,7 +26414,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” and “Homework blockers” rules stay on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” and “Homework blockers” rules stay on, since they're always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26479,7 +26479,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “Evenings off” rule stays on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. The “Evenings off” rule stays on, since it's always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26541,7 +26541,7 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” rule stays on because Unblock never turns off a rule that is always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” rule stays on, since it's always on. You can change that in FamilyFi."
       }
     },
     {
@@ -26605,7 +26605,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. The “Homework blockers” rule stays on because Unblock never turns off a rule that is always on."
+        "say": "TV is unblocked. The “Homework blockers” rule stays on, since it's always on."
       }
     },
     {
@@ -26705,7 +26705,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. Video stays blocked because Unblock never turns off a rule that is always on."
+        "say": "TV is unblocked. Video stays blocked, since it's always on."
       }
     },
     {
@@ -26867,7 +26867,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. Video stays blocked because Unblock never turns off a rule that is always on."
+        "say": "TV is unblocked. Video stays blocked, since it's always on."
       }
     },
     {
@@ -26987,7 +26987,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked until 8:00 PM. Video stays blocked because Unblock never turns off a rule that is always on."
+        "say": "TV is unblocked until 8:00 PM. Video stays blocked, since it's always on."
       }
     },
     {
