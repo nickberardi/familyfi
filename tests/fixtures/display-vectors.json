@@ -25985,6 +25985,113 @@
     },
     {
       "fn": "unblockAnswer",
+      "name": "internet on, video and social always blocked",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "No social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": false,
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Social stay blocked, since they're always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. Video and Social stay blocked, since they're always on. Which one should I unblock for a while?",
+          "choices": [
+            {
+              "ruleId": "r-video",
+              "name": "Video",
+              "named": false
+            },
+            {
+              "ruleId": "r-social",
+              "name": "Social",
+              "named": false
+            }
+          ],
+          "howLong": "For how long?"
+        }
+      }
+    },
+    {
+      "fn": "unblockAnswer",
       "name": "internet on, video always blocked",
       "input": {
         "group": {
@@ -26044,7 +26151,18 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked, since it's always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked, since it's always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. Video stays blocked, since it's always on. Should I unblock Video for a while?",
+          "choices": [
+            {
+              "ruleId": "r-video",
+              "name": "Video",
+              "named": false
+            }
+          ],
+          "howLong": "For how long?"
+        }
       }
     },
     {
@@ -26135,7 +26253,23 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. Video and Gaming stay blocked, since they're always on. Which one should I unblock for a while?",
+          "choices": [
+            {
+              "ruleId": "r-video",
+              "name": "Video",
+              "named": false
+            },
+            {
+              "ruleId": "r-gaming",
+              "name": "Gaming",
+              "named": false
+            }
+          ],
+          "howLong": "For how long?"
+        }
       }
     },
     {
@@ -26236,7 +26370,18 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. Video and Gaming stay blocked, since they're always on. Should I unblock Video and Gaming for a while?",
+          "choices": [
+            {
+              "ruleId": "r-both",
+              "name": "Video and Gaming",
+              "named": false
+            }
+          ],
+          "howLong": "For how long?"
+        }
       }
     },
     {
@@ -26325,7 +26470,23 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked and the “No TikTok” rule stays on, since they're always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked and the “No TikTok” rule stays on, since they're always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. Video stays blocked and the “No TikTok” rule stays on, since they're always on. Which one should I unblock for a while?",
+          "choices": [
+            {
+              "ruleId": "r-video",
+              "name": "Video",
+              "named": false
+            },
+            {
+              "ruleId": "r-app",
+              "name": "No TikTok",
+              "named": true
+            }
+          ],
+          "howLong": "For how long?"
+        }
       }
     },
     {
@@ -26414,7 +26575,23 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” and “Homework blockers” rules stay on, since they're always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” and “Homework blockers” rules stay on, since they're always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. The “No TikTok” and “Homework blockers” rules stay on, since they're always on. Which one should I unblock for a while?",
+          "choices": [
+            {
+              "ruleId": "r-app",
+              "name": "No TikTok",
+              "named": true
+            },
+            {
+              "ruleId": "r-site",
+              "name": "Homework blockers",
+              "named": true
+            }
+          ],
+          "howLong": "For how long?"
+        }
       }
     },
     {
@@ -26479,7 +26656,18 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “Evenings off” rule stays on, since it's always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. The “Evenings off” rule stays on, since it's always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. The “Evenings off” rule stays on, since it's always on. Should I unblock the “Evenings off” rule for a while?",
+          "choices": [
+            {
+              "ruleId": "r-mixed",
+              "name": "Evenings off",
+              "named": true
+            }
+          ],
+          "howLong": "For how long?"
+        }
       }
     },
     {
@@ -26541,7 +26729,18 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” rule stays on, since it's always on. You can change that in FamilyFi."
+        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” rule stays on, since it's always on. You can change that in FamilyFi.",
+        "offer": {
+          "question": "TV isn't blocked. The “No TikTok” rule stays on, since it's always on. Should I unblock the “No TikTok” rule for a while?",
+          "choices": [
+            {
+              "ruleId": "r-app",
+              "name": "No TikTok",
+              "named": true
+            }
+          ],
+          "howLong": "For how long?"
+        }
       }
     },
     {
@@ -27123,6 +27322,40 @@
         "send": true,
         "say": "TV is unblocked until 6:00 PM."
       }
+    },
+    {
+      "fn": "ruleUnblockAnswer",
+      "name": "video for half an hour",
+      "input": {
+        "group": {
+          "name": "TV"
+        },
+        "choice": {
+          "ruleId": "r-video",
+          "name": "Video",
+          "named": false
+        },
+        "until": "2026-10-15T19:15:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "Video is unblocked for TV until 3:15 PM."
+    },
+    {
+      "fn": "ruleUnblockAnswer",
+      "name": "a named rule",
+      "input": {
+        "group": {
+          "name": "TV"
+        },
+        "choice": {
+          "ruleId": "r-app",
+          "name": "No TikTok",
+          "named": true
+        },
+        "until": "2026-10-15T19:15:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": "The “No TikTok” rule is off for TV until 3:15 PM."
     },
     {
       "fn": "quickSettingsTileCopy",
