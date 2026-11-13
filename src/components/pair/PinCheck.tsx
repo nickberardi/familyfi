@@ -13,7 +13,7 @@ async function checkPin(route: ConnectionRoute): Promise<Check> {
     const { pin } = await api<{ pin: CertificatePin }>("/api/v1/connection/pins", { method: "POST", body: JSON.stringify({ url: route.url }) });
     return pin.spkiSha256 === route.spkiSha256
       ? { tone: "ok", text: "Matches the certificate this address serves now." }
-      : { tone: "bad", text: `Doesn't match — this address now serves ${shortPin(pin.spkiSha256)}. Phones will refuse this route until you update the pin.` };
+      : { tone: "bad", text: `Doesn't match — this address now serves ${shortPin(pin.spkiSha256)}. Devices will refuse this route until you update the pin.` };
   } catch (caught) {
     // Could not look is not the same as fine: say so, never imply a match.
     return { tone: "unknown", text: `Couldn't check from FamilyFi: ${caught instanceof ApiError ? caught.message : "request failed."}` };

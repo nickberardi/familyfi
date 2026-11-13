@@ -22,7 +22,7 @@ export const PAIR_COPY = {
   loadFailed: "Could not load remote access.",
   actionFailed: "That didn't work.",
   paired: "Paired devices",
-  pairedSub: "Phones, Watches, agents and what they set up; revoke any one of them",
+  pairedSub: "Apps, Watches, agents and what they set up; revoke any one of them",
   noPhones: "No paired devices yet. Pair a device or connect an agent to add one.",
   remoteFirst: "Turn on remote access, then pair a device. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a device.",

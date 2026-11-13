@@ -137,7 +137,7 @@ export function RouteForm({
           spellCheck={false}
           placeholder={PLACEHOLDER[transport]}
         />
-        <span className="mt-1 block font-normal">HTTPS origin only — no path. Phones must type it exactly as saved.</span>
+        <span className="mt-1 block font-normal">HTTPS origin only — no path. Devices must type it exactly as saved.</span>
       </label>
 
       {canPin(transport) ? (
@@ -149,7 +149,7 @@ export function RouteForm({
             grow
             onChange={setTrust}
             segments={[
-              { value: "system", label: "Trusted by phones" },
+              { value: "system", label: "Trusted by devices" },
               { value: "pinned", label: "Pin this certificate" },
             ]}
           />
@@ -193,7 +193,7 @@ export function RouteForm({
           ) : null}
           {read?.systemTrusted ? (
             <p className="font-semibold text-[var(--ff-paused)]">
-              This certificate is already trusted by devices. Choose Trusted by phones instead, so renewals don&rsquo;t break
+              This certificate is already trusted by devices. Choose Trusted by devices instead, so renewals don&rsquo;t break
               the pin.
             </p>
           ) : null}
