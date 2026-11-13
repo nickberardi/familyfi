@@ -40,6 +40,8 @@ export type UI = {
   confirm: (request: UIConfirmRequest) => Promise<boolean>;
   /** Puts text on the clipboard: a pairing code to paste on another phone. */
   copyText: (value: string) => Promise<void>;
+  /** On a phone, the system bars' insets (status bar or Dynamic Island, home indicator or navigation bar), which a layer over the whole screen keeps clear of. The web has none. */
+  safeInsets?: { top: number; bottom: number };
 };
 
 export type UIToggleProps = {
