@@ -111,7 +111,8 @@ export function unblockAnswer(
 /**
  * Unblock's answer. `offer`, when only always-on rules block the group, is the follow-up Siri asks
  * instead of stopping there: which rule to lift for the group (one: whether to), then for how long.
- * `declined` is the answer when the person says no; `say` is for when nobody can be asked.
+ * `declined` is the answer when the offer isn't taken (a no, or nobody to ask); `say` is for a client that
+ * can't make the offer.
  * The rule is then paused for the group alone until that time (`/groups/{id}/rules/{ruleId}/pause`).
  */
 export type UnblockAnswer = {
