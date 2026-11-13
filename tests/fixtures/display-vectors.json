@@ -26071,19 +26071,17 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Social stay blocked, since they're always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “No streaming” and “No social” rules are always on, so they stay on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. Video and Social stay blocked, since they're always on. Which one should I unblock for a while?",
+          "question": "TV isn't blocked. Its “No streaming” and “No social” rules are always on. Which one should I unblock for a while?",
           "choices": [
             {
               "ruleId": "r-video",
-              "name": "Video",
-              "named": false
+              "name": "No streaming"
             },
             {
               "ruleId": "r-social",
-              "name": "Social",
-              "named": false
+              "name": "No social"
             }
           ],
           "howLong": "For how long?"
@@ -26151,14 +26149,13 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked, since it's always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “No streaming” rule is always on, so it stays on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. Video stays blocked, since it's always on. Should I unblock Video for a while?",
+          "question": "TV isn't blocked. Its “No streaming” rule is always on. Should I unblock it for a while?",
           "choices": [
             {
               "ruleId": "r-video",
-              "name": "Video",
-              "named": false
+              "name": "No streaming"
             }
           ],
           "howLong": "For how long?"
@@ -26253,19 +26250,17 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “No streaming” and “No games” rules are always on, so they stay on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. Video and Gaming stay blocked, since they're always on. Which one should I unblock for a while?",
+          "question": "TV isn't blocked. Its “No streaming” and “No games” rules are always on. Which one should I unblock for a while?",
           "choices": [
             {
               "ruleId": "r-video",
-              "name": "Video",
-              "named": false
+              "name": "No streaming"
             },
             {
               "ruleId": "r-gaming",
-              "name": "Gaming",
-              "named": false
+              "name": "No games"
             }
           ],
           "howLong": "For how long?"
@@ -26370,14 +26365,13 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming stay blocked, since they're always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “Screens” rule is always on, so it stays on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. Video and Gaming stay blocked, since they're always on. Should I unblock Video and Gaming for a while?",
+          "question": "TV isn't blocked. Its “Screens” rule is always on. Should I unblock it for a while?",
           "choices": [
             {
               "ruleId": "r-both",
-              "name": "Video and Gaming",
-              "named": false
+              "name": "Screens"
             }
           ],
           "howLong": "For how long?"
@@ -26386,7 +26380,7 @@
     },
     {
       "fn": "unblockAnswer",
-      "name": "a familiar category and a named rule",
+      "name": "a category rule and an app rule",
       "input": {
         "group": {
           "id": "g1",
@@ -26470,19 +26464,17 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. Video stays blocked and the “No TikTok” rule stays on, since they're always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “No streaming” and “No TikTok” rules are always on, so they stay on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. Video stays blocked and the “No TikTok” rule stays on, since they're always on. Which one should I unblock for a while?",
+          "question": "TV isn't blocked. Its “No streaming” and “No TikTok” rules are always on. Which one should I unblock for a while?",
           "choices": [
             {
               "ruleId": "r-video",
-              "name": "Video",
-              "named": false
+              "name": "No streaming"
             },
             {
               "ruleId": "r-app",
-              "name": "No TikTok",
-              "named": true
+              "name": "No TikTok"
             }
           ],
           "howLong": "For how long?"
@@ -26491,7 +26483,7 @@
     },
     {
       "fn": "unblockAnswer",
-      "name": "two named rules",
+      "name": "two rules",
       "input": {
         "group": {
           "id": "g1",
@@ -26575,19 +26567,17 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” and “Homework blockers” rules stay on, since they're always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “No TikTok” and “Homework blockers” rules are always on, so they stay on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. The “No TikTok” and “Homework blockers” rules stay on, since they're always on. Which one should I unblock for a while?",
+          "question": "TV isn't blocked. Its “No TikTok” and “Homework blockers” rules are always on. Which one should I unblock for a while?",
           "choices": [
             {
               "ruleId": "r-app",
-              "name": "No TikTok",
-              "named": true
+              "name": "No TikTok"
             },
             {
               "ruleId": "r-site",
-              "name": "Homework blockers",
-              "named": true
+              "name": "Homework blockers"
             }
           ],
           "howLong": "For how long?"
@@ -26656,14 +26646,13 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “Evenings off” rule stays on, since it's always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “Evenings off” rule is always on, so it stays on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. The “Evenings off” rule stays on, since it's always on. Should I unblock the “Evenings off” rule for a while?",
+          "question": "TV isn't blocked. Its “Evenings off” rule is always on. Should I unblock it for a while?",
           "choices": [
             {
               "ruleId": "r-mixed",
-              "name": "Evenings off",
-              "named": true
+              "name": "Evenings off"
             }
           ],
           "howLong": "For how long?"
@@ -26729,14 +26718,13 @@
       },
       "expected": {
         "send": false,
-        "say": "TV isn't blocked, so there's nothing to unblock. The “No TikTok” rule stays on, since it's always on. You can change that in FamilyFi.",
+        "say": "TV isn't blocked, so there's nothing to unblock. Its “No TikTok” rule is always on, so it stays on. You can change that in FamilyFi.",
         "offer": {
-          "question": "TV isn't blocked. The “No TikTok” rule stays on, since it's always on. Should I unblock the “No TikTok” rule for a while?",
+          "question": "TV isn't blocked. Its “No TikTok” rule is always on. Should I unblock it for a while?",
           "choices": [
             {
               "ruleId": "r-app",
-              "name": "No TikTok",
-              "named": true
+              "name": "No TikTok"
             }
           ],
           "howLong": "For how long?"
@@ -26804,7 +26792,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. The “Homework blockers” rule stays on, since it's always on."
+        "say": "TV is unblocked. Its “Homework blockers” rule is always on, so it stays on."
       }
     },
     {
@@ -26904,7 +26892,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. Video stays blocked, since it's always on."
+        "say": "TV is unblocked. Its “No streaming” rule is always on, so it stays on."
       }
     },
     {
@@ -27066,7 +27054,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked. Video stays blocked, since it's always on."
+        "say": "TV is unblocked. Its “No streaming” rule is always on, so it stays on."
       }
     },
     {
@@ -27186,7 +27174,7 @@
       },
       "expected": {
         "send": true,
-        "say": "TV is unblocked until 8:00 PM. Video stays blocked, since it's always on."
+        "say": "TV is unblocked until 8:00 PM. Its “No streaming” rule is always on, so it stays on."
       }
     },
     {
@@ -27325,37 +27313,35 @@
     },
     {
       "fn": "ruleUnblockAnswer",
-      "name": "video for half an hour",
+      "name": "a category rule for half an hour",
       "input": {
         "group": {
           "name": "TV"
         },
         "choice": {
           "ruleId": "r-video",
-          "name": "Video",
-          "named": false
+          "name": "No streaming"
         },
         "until": "2026-10-15T19:15:00.000Z",
         "timeZone": "America/New_York"
       },
-      "expected": "Video is unblocked for TV until 3:15 PM."
+      "expected": "“No streaming” is unblocked for TV until 3:15 PM."
     },
     {
       "fn": "ruleUnblockAnswer",
-      "name": "a named rule",
+      "name": "a rule by its own name",
       "input": {
         "group": {
           "name": "TV"
         },
         "choice": {
           "ruleId": "r-app",
-          "name": "No TikTok",
-          "named": true
+          "name": "No TikTok"
         },
         "until": "2026-10-15T19:15:00.000Z",
         "timeZone": "America/New_York"
       },
-      "expected": "The “No TikTok” rule is off for TV until 3:15 PM."
+      "expected": "“No TikTok” is unblocked for TV until 3:15 PM."
     },
     {
       "fn": "quickSettingsTileCopy",
