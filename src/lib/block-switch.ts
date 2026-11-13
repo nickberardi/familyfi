@@ -91,10 +91,11 @@ export function unblockAnswer(
       choices.length === 1
         ? `${group.name} isn't blocked.${its}. Should I unblock it for a while?`
         : `${group.name} isn't blocked.${its}. Which one should I unblock for a while?`;
+    const declined = `OK, ${listNames(names.map((name) => `“${name}”`))} ${one ? "stays" : "stay"} on for ${group.name}.`;
     return {
       send: false,
       say,
-      offer: { question, choices, howLong: "For how long?" },
+      offer: { question, choices, howLong: "For how long?", declined },
     };
   }
   // Each lifted rule comes back when its window ends; the group is online until the last of them.
@@ -110,12 +111,18 @@ export function unblockAnswer(
 /**
  * Unblock's answer. `offer`, when only always-on rules block the group, is the follow-up Siri asks
  * instead of stopping there: which rule to lift for the group (one: whether to), then for how long.
+ * `declined` is the answer when the person says no; `say` is for when nobody can be asked.
  * The rule is then paused for the group alone until that time (`/groups/{id}/rules/{ruleId}/pause`).
  */
 export type UnblockAnswer = {
   send: boolean;
   say: string;
-  offer?: { question: string; choices: UnblockChoice[]; howLong: string };
+  offer?: {
+    question: string;
+    choices: UnblockChoice[];
+    howLong: string;
+    declined: string;
+  };
 };
 
 /** An always-on rule Siri offers to lift, by its own name. */

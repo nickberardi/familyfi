@@ -26084,7 +26084,8 @@
               "name": "No social"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “No streaming” and “No social” stay on for TV."
         }
       }
     },
@@ -26158,7 +26159,8 @@
               "name": "No streaming"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “No streaming” stays on for TV."
         }
       }
     },
@@ -26263,7 +26265,8 @@
               "name": "No games"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “No streaming” and “No games” stay on for TV."
         }
       }
     },
@@ -26374,7 +26377,8 @@
               "name": "Screens"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “Screens” stays on for TV."
         }
       }
     },
@@ -26477,7 +26481,8 @@
               "name": "No TikTok"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “No streaming” and “No TikTok” stay on for TV."
         }
       }
     },
@@ -26580,7 +26585,8 @@
               "name": "Homework blockers"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “No TikTok” and “Homework blockers” stay on for TV."
         }
       }
     },
@@ -26655,7 +26661,8 @@
               "name": "Evenings off"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “Evenings off” stays on for TV."
         }
       }
     },
@@ -26727,7 +26734,8 @@
               "name": "No TikTok"
             }
           ],
-          "howLong": "For how long?"
+          "howLong": "For how long?",
+          "declined": "OK, “No TikTok” stays on for TV."
         }
       }
     },
