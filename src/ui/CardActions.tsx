@@ -104,6 +104,8 @@ export function CardMenuButton({
   // for the dropdown to leave the screen, so the sheet it opens never races its dismissal on iOS.
   const [anchor, setAnchor] = useState<(Box & { screen: { width: number; height: number } }) | null>(null);
   const pending = useRef<(() => void) | null>(null);
+  // The dropdown's own height, measured once it lays out, so it can open above a button low on the screen.
+  const [menuHeight, setMenuHeight] = useState<number | null>(null);
   const native = Platform.OS !== "web";
   const setOpen = (next: boolean) => {
     setOpenState(next);
@@ -141,6 +143,7 @@ export function CardMenuButton({
     if (!native || placed) return setOpen(!open);
     split.current?.measureInWindow((x, y, width, height) => {
       setAnchor({ x, y, width, height, screen: { width: screen.width, height: screen.height } });
+      setMenuHeight(null);
       setOpen(true);
     });
   };
@@ -239,9 +242,12 @@ export function CardMenuButton({
           {anchor ? (
             <View
               onAccessibilityEscape={() => setOpen(false)}
+              onLayout={(event) => setMenuHeight(event.nativeEvent.layout.height)}
               style={[
                 styles.menu,
-                cardMenuPlacement(anchor, screen, align),
+                cardMenuPlacement(anchor, screen, align, menuHeight ?? 0),
+                // Hidden for the one frame before its height is known, so it never jumps.
+                menuHeight === null && { opacity: 0 },
                 { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card"), boxShadow: ui.shadow("toast") },
               ]}
             >
