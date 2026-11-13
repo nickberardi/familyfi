@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ComponentRef } from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { CARD_MENU_ROW_MIN, cardMenuPlacement, type Box } from "@/lib/card-menu";
 
@@ -251,7 +251,10 @@ export function CardMenuButton({
                 { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card"), boxShadow: ui.shadow("toast") },
               ]}
             >
-              {items}
+              {/* Taller than the screen allows (a landscape phone at large text), it scrolls. */}
+              <ScrollView style={{ flexGrow: 0 }} alwaysBounceVertical={false} showsVerticalScrollIndicator>
+                {items}
+              </ScrollView>
             </View>
           ) : null}
         </Modal>
