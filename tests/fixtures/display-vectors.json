@@ -25984,6 +25984,515 @@
       }
     },
     {
+      "fn": "unblockAnswer",
+      "name": "internet on, video always blocked",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": false,
+        "say": "TV isn't blocked, so there's nothing to unblock. Video is always blocked by one of its rules, which Unblock leaves on. You can change that in FamilyFi."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "internet on, video and gaming always blocked",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-gaming",
+            "name": "No games",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              8
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": false,
+        "say": "TV isn't blocked, so there's nothing to unblock. Video and Gaming are always blocked by its rules, which Unblock leaves on. You can change that in FamilyFi."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "nothing blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": false,
+        "say": "TV isn't blocked, so there's nothing to unblock."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "blocked until unblocked, video always blocked",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T16:00:00.000Z"
+      },
+      "expected": {
+        "send": true,
+        "say": "TV is unblocked. Video is still always blocked by one of its rules."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "an internet window blocking now",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T22:30:00.000Z"
+      },
+      "expected": {
+        "send": true,
+        "say": "TV is unblocked until 8:00 PM. Video is still always blocked by one of its rules."
+      }
+    },
+    {
+      "fn": "unblockAnswer",
+      "name": "a scheduled category rule blocking now",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "id": "r-downtime",
+            "name": "TV downtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              },
+              {
+                "id": "w2",
+                "name": "Overnight",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "23:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-video",
+            "name": "TV video evenings",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w3",
+                "name": "",
+                "days": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "start": "16:00",
+                "end": "18:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "send": true,
+        "say": "TV is unblocked until 6:00 PM."
+      }
+    },
+    {
       "fn": "quickSettingsTileCopy",
       "name": "the tiles' words",
       "input": {},
