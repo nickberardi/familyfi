@@ -112,9 +112,11 @@ describe("app controls", () => {
     });
   });
 
-  it("gives an example phrase for each of the five actions, each naming FamilyFi", () => {
+  it("gives an example phrase for each of the six actions, each naming FamilyFi", () => {
     const phrases = SIRI_SHORTCUTS_COPY.phrases("Kids");
-    expect(phrases).toHaveLength(5);
+    expect(phrases).toHaveLength(6);
+    // Siri hears "Block <name>" as blocking a contact, so Block names the internet.
+    expect(phrases[0]).toBe("“Block internet for Kids in FamilyFi”");
     for (const phrase of phrases) expect(phrase).toMatch(/^“.*Kids.* in FamilyFi\??”$/);
   });
 
