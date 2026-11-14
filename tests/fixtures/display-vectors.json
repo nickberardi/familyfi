@@ -27352,6 +27352,1397 @@
       "expected": "“No TikTok” is unblocked for TV until 3:15 PM."
     },
     {
+      "fn": "resumeAnswer",
+      "name": "a group with an unblock and a rule paused for it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T23:30:00.000Z",
+                  "kind": "allow",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T23:30:00.000Z",
+                  "kind": "pause",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [
+          "/api/v1/groups/g1/unblock/end",
+          "/api/v1/groups/g1/rules/r-video/resume"
+        ],
+        "say": "“No streaming” and “Dinner” are blocking Cassie again."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group whose unblock ended outside the rule's window",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T23:30:00.000Z",
+                  "kind": "allow",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T16:00:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [
+          "/api/v1/groups/g1/unblock/end"
+        ],
+        "say": "Cassie's rules apply again."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group with nothing lifted",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [],
+        "say": "Nothing is unblocked for Cassie, so there's nothing to resume."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group with a lift for another group only",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g2",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T23:30:00.000Z",
+                  "kind": "pause",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [],
+        "say": "Nothing is unblocked for Cassie, so there's nothing to resume."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group and a rule paused for it",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "ruleId": "r-video",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": null,
+                  "kind": "pause",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [
+          "/api/v1/groups/g1/rules/r-video/resume"
+        ],
+        "say": "“No streaming” is blocking Cassie again."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group and a rule its unblock allows",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "ruleId": "r-downtime",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T23:30:00.000Z",
+                  "kind": "allow",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [
+          "/api/v1/groups/g1/rules/r-downtime/disallow"
+        ],
+        "say": "“Dinner” is blocking Cassie again."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group and a rule paused for everyone",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "ruleId": "r-video",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": true,
+              "until": "2026-10-15T23:30:00.000Z",
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [
+          "/api/v1/rules/r-video/resume"
+        ],
+        "say": "“No streaming” is blocking Cassie again."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group and a rule not lifted",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "family",
+          "name": "Cassie",
+          "monogram": "C",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "ruleId": "r-video",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [],
+        "say": "“No streaming” isn't unblocked for Cassie, so there's nothing to resume."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a group and a rule that doesn't cover it",
+      "input": {
+        "group": {
+          "id": "g3",
+          "kind": "family",
+          "name": "TV",
+          "monogram": "T",
+          "familyRole": "child",
+          "deviceCount": 2,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "ruleId": "r-video",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [],
+        "say": "“No streaming” doesn't apply to TV."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a rule alone, paused for everyone and for one group",
+      "input": {
+        "ruleId": "r-video",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": true,
+              "until": null,
+              "kind": "allow",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g2",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T23:30:00.000Z",
+                  "kind": "pause",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [
+          "/api/v1/rules/r-video/disallow",
+          "/api/v1/groups/g2/rules/r-video/resume"
+        ],
+        "say": "“No streaming” applies again."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a rule alone, not lifted",
+      "input": {
+        "ruleId": "r-video",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [],
+        "say": "“No streaming” isn't paused or unblocked, so there's nothing to resume."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "a rule no longer there",
+      "input": {
+        "ruleId": "r-gone",
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [],
+        "say": "That rule is no longer in FamilyFi."
+      }
+    },
+    {
+      "fn": "resumeAnswer",
+      "name": "neither a group nor a rule",
+      "input": {
+        "rules": [
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-downtime",
+            "name": "Downtime",
+            "kind": "internet",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "Dinner",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "18:00",
+                "end": "20:00"
+              }
+            ]
+          },
+          {
+            "scope": "group",
+            "networkIds": [],
+            "domains": [],
+            "enabled": true,
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null,
+            "id": "r-video",
+            "name": "No streaming",
+            "kind": "category",
+            "groupIds": [
+              "g1",
+              "g2"
+            ],
+            "targetIds": [
+              4
+            ],
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": []
+          }
+        ],
+        "now": "2026-10-15T22:30:00.000Z",
+        "timeZone": "America/New_York"
+      },
+      "expected": {
+        "writes": [],
+        "say": "Which group or rule should I resume?"
+      }
+    },
+    {
       "fn": "quickSettingsTileCopy",
       "name": "the tiles' words",
       "input": {},
