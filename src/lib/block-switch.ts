@@ -6,7 +6,7 @@ import {
   rulesBlockingGroup,
   rulesToUnblock,
 } from "./group-actions";
-import type { Rule } from "./rules";
+import { groupLift, groupScopedRules, rulePaused, type Rule } from "./rules";
 import type { Group } from "./types";
 
 /**
@@ -138,6 +138,154 @@ export function ruleUnblockAnswer(
 ): string {
   return `“${choice.name}” is unblocked for ${group.name} until ${formatClock(until, timezone)}.`;
 }
+
+/**
+ * What Resume outside the app does, and what it answers: it puts back what someone lifted, as the
+ * card's Resume button and its "Block <rule> again" items do. For a group alone it ends the group's
+ * unblock (`/unblock/end`) and puts back each rule paused for that group. For a group and a rule it
+ * puts back that rule for the group: a pause is resumed, an unblock's allowance on it is ended
+ * (`disallow`), and a rule paused for everyone is resumed for everyone, since the ask was to have it
+ * block again. For a rule alone it is put back for everyone and for each group it was lifted for.
+ * A group's own block is not a lift, and built-in rules are never touched. `writes` are the API
+ * paths to POST, with empty bodies, in order; none when nothing is lifted, and the answer says so.
+ * The answer names the rules that block the group again now: an internet rule by its window.
+ */
+export function resumeAnswer(
+  target: { group?: Group; ruleId?: string },
+  rules: Rule[],
+  timezone: string,
+  now: Date,
+): ResumeAnswer {
+  const { group } = target;
+  const rule =
+    target.ruleId === undefined
+      ? undefined
+      : rules.find((item) => item.id === target.ruleId && !item.builtIn);
+  const quoted = (item: Pick<Rule, "name">) => `“${item.name}”`;
+  if (target.ruleId !== undefined && !rule)
+    return { writes: [], say: "That rule is no longer in FamilyFi." };
+  if (
+    group &&
+    rule &&
+    !groupScopedRules(rules, group.id).some((item) => item.id === rule.id)
+  ) {
+    return {
+      writes: [],
+      say: `${quoted(rule)} doesn't apply to ${group.name}.`,
+    };
+  }
+
+  // Each lift to put back, and the write that does it.
+  const writes: string[] = [];
+  const restored = new Set<string>();
+  const groupPath = (groupId: string, ruleId: string, verb: string) =>
+    `/api/v1/groups/${groupId}/rules/${ruleId}/${verb}`;
+  const everyone = (item: Rule) => {
+    if (!rulePaused(item, now)) return;
+    writes.push(
+      `/api/v1/rules/${item.id}/${item.pause.kind === "allow" ? "disallow" : "resume"}`,
+    );
+    restored.add(item.id);
+  };
+  const forGroup = (item: Rule, groupId: string) => {
+    const lift = groupLift(item, groupId, now);
+    if (!lift) return;
+    writes.push(
+      groupPath(
+        groupId,
+        item.id,
+        lift.kind === "allow" ? "disallow" : "resume",
+      ),
+    );
+    restored.add(item.id);
+  };
+
+  if (group && !rule) {
+    const scoped = groupScopedRules(rules, group.id).filter(
+      (item) => !item.builtIn && item.enabled,
+    );
+    // The group's unblock is one write that ends every allowance it made; pauses go one by one.
+    if (
+      scoped.some((item) => groupLift(item, group.id, now)?.kind === "allow")
+    ) {
+      writes.push(`/api/v1/groups/${group.id}/unblock/end`);
+      for (const item of scoped)
+        if (groupLift(item, group.id, now)?.kind === "allow")
+          restored.add(item.id);
+    }
+    for (const item of scoped)
+      if (groupLift(item, group.id, now)?.kind === "pause")
+        forGroup(item, group.id);
+    if (!writes.length)
+      return {
+        writes,
+        say: `Nothing is unblocked for ${group.name}, so there's nothing to resume.`,
+      };
+  } else if (group && rule) {
+    forGroup(rule, group.id);
+    everyone(rule);
+    if (!writes.length)
+      return {
+        writes,
+        say: `${quoted(rule)} isn't unblocked for ${group.name}, so there's nothing to resume.`,
+      };
+  } else if (rule) {
+    everyone(rule);
+    for (const item of rule.groupPauses ?? []) forGroup(rule, item.groupId);
+    if (!writes.length)
+      return {
+        writes,
+        say: `${quoted(rule)} isn't paused or unblocked, so there's nothing to resume.`,
+      };
+    return { writes, say: `${quoted(rule)} applies again.` };
+  } else {
+    return { writes, say: "Which group or rule should I resume?" };
+  }
+
+  // What blocks the group once its lifts are gone: the restored rules that are in force now.
+  const after = rules.map((item) =>
+    restored.has(item.id)
+      ? {
+          ...item,
+          pause:
+            rule && item.id === rule.id
+              ? { ...item.pause, active: false }
+              : item.pause,
+          groupPauses: (item.groupPauses ?? []).filter(
+            (lift) => lift.groupId !== group.id,
+          ),
+        }
+      : item,
+  );
+  // An internet rule goes by its window, as the card's "Block Dinner again" does; others by their own names.
+  const names = [
+    ...new Set(
+      rulesBlockingGroup(group, after, timezone, now)
+        .filter((item) => restored.has(item.ruleId))
+        .map((item) =>
+          item.kind === "internet"
+            ? item.name
+            : (after.find((each) => each.id === item.ruleId)?.name ??
+              item.name),
+        ),
+    ),
+  ];
+  if (names.length) {
+    return {
+      writes,
+      say: `${listNames(names.map((name) => `“${name}”`))} ${names.length === 1 ? "is" : "are"} blocking ${group.name} again.`,
+    };
+  }
+  return {
+    writes,
+    say: rule
+      ? `${quoted(rule)} applies to ${group.name} again.`
+      : `${group.name}'s rules apply again.`,
+  };
+}
+
+/** Resume's writes (API paths, POSTed with empty bodies, in order) and what it answers. */
+export type ResumeAnswer = { writes: string[]; say: string };
 
 /** "Video", "Video and Gaming", "Video, Gaming and Social". */
 function listNames(items: string[]): string {

@@ -94,6 +94,7 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   blockSwitch: (i) => blockSwitchModule.blockSwitch(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
   blockSwitchWrite: (i) => blockSwitchModule.blockSwitchWrite(i.group, i.turnOn),
   unblockAnswer: (i) => blockSwitchModule.unblockAnswer(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
+  resumeAnswer: (i) => blockSwitchModule.resumeAnswer({ group: i.group as Group | undefined, ruleId: i.ruleId }, i.rules as Rule[], i.timeZone, at(i.now)),
   ruleUnblockAnswer: (i) => blockSwitchModule.ruleUnblockAnswer(i.group, i.choice, at(i.until), i.timeZone),
   quickSettingsTileCopy: () => blockSwitchModule.quickSettingsTileCopy(),
   // The watches decide from `/health` whether to show the household, so each ports the check.
