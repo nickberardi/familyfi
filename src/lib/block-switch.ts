@@ -143,10 +143,10 @@ export function ruleUnblockAnswer(
  * What Resume outside the app does, and what it answers: it puts back what someone lifted, as the
  * card's Resume button and its "Block <rule> again" items do. For a group alone it ends the group's
  * unblock (`/unblock/end`) and puts back each rule paused for that group. For a group and a rule it
- * puts back that rule for the group: a pause is resumed, an unblock's allowance on it is ended
- * (`disallow`), and a rule paused for everyone is resumed for everyone, since the ask was to have it
- * block again. For a rule alone it is put back for everyone and for each group it was lifted for.
- * A group's own block is not a lift, and built-in rules are never touched. `writes` are the API
+ * puts back that rule for that group alone: a pause is resumed, an unblock's allowance on it is ended
+ * (`disallow`); a rule paused for everyone stays so, and the answer says how to resume it. For a rule
+ * alone it is put back for everyone and for each group it was lifted for. A group's own block is not
+ * a lift; built-in and switched-off rules are never touched, and the answer says why. `writes` are the API
  * paths to POST, with empty bodies, in order; none when nothing is lifted, and the answer says so.
  * The answer names the rules that block the group again now: an internet rule by its window.
  */
@@ -160,10 +160,14 @@ export function resumeAnswer(
   const rule =
     target.ruleId === undefined
       ? undefined
-      : rules.find((item) => item.id === target.ruleId && !item.builtIn);
+      : rules.find((item) => item.id === target.ruleId);
   const quoted = (item: Pick<Rule, "name">) => `“${item.name}”`;
   if (target.ruleId !== undefined && !rule)
     return { writes: [], say: "That rule is no longer in FamilyFi." };
+  if (rule?.builtIn)
+    return { writes: [], say: `${quoted(rule)} can't be resumed from Siri. Open FamilyFi instead.` };
+  if (rule && !rule.enabled)
+    return { writes: [], say: `${quoted(rule)} is turned off. You can turn it on in FamilyFi.` };
   if (
     group &&
     rule &&
@@ -222,12 +226,14 @@ export function resumeAnswer(
         say: `Nothing is unblocked for ${group.name}, so there's nothing to resume.`,
       };
   } else if (group && rule) {
+    // Only this group, as the card's "Block <rule> again": a pause for everyone stays for the rule's Resume.
     forGroup(rule, group.id);
-    everyone(rule);
     if (!writes.length)
       return {
         writes,
-        say: `${quoted(rule)} isn't unblocked for ${group.name}, so there's nothing to resume.`,
+        say: rulePaused(rule, now)
+          ? `${quoted(rule)} is paused for everyone, not just ${group.name}. To put it back for everyone, say “Resume blocking ${rule.name}”.`
+          : `${quoted(rule)} isn't unblocked for ${group.name}, so there's nothing to resume.`,
       };
   } else if (rule) {
     everyone(rule);
@@ -247,10 +253,6 @@ export function resumeAnswer(
     restored.has(item.id)
       ? {
           ...item,
-          pause:
-            rule && item.id === rule.id
-              ? { ...item.pause, active: false }
-              : item.pause,
           groupPauses: (item.groupPauses ?? []).filter(
             (lift) => lift.groupId !== group.id,
           ),
@@ -276,16 +278,35 @@ export function resumeAnswer(
       say: `${listNames(names.map((name) => `“${name}”`))} ${names.length === 1 ? "is" : "are"} blocking ${group.name} again.`,
     };
   }
+  // A rule paused for everyone stays paused: Resume put back only the group's own lift on it.
+  const still = [
+    ...new Set(
+      after
+        .filter((item) => restored.has(item.id) && rulePaused(item, now))
+        .map((item) => item.name),
+    ),
+  ];
+  if (still.length) {
+    return {
+      writes,
+      say: `Resumed for ${group.name}, but ${listNames(still.map((name) => `“${name}”`))} ${still.length === 1 ? "is" : "are"} still paused for everyone.`,
+    };
+  }
   return {
     writes,
     say: rule
       ? `${quoted(rule)} applies to ${group.name} again.`
-      : `${group.name}'s rules apply again.`,
+      : `${possessive(group.name)} rules apply again.`,
   };
 }
 
 /** Resume's writes (API paths, POSTed with empty bodies, in order) and what it answers. */
 export type ResumeAnswer = { writes: string[]; say: string };
+
+/** "Cassie's", and "Kids'" for a name ending in s, as it is said. */
+function possessive(name: string): string {
+  return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
 
 /** "Video", "Video and Gaming", "Video, Gaming and Social". */
 function listNames(items: string[]): string {
