@@ -16,7 +16,9 @@ Set `FAMILYFI_MODE=dev` to use a mock gateway and a seeded household instead of 
 | --- | --- |
 | [Setup](docs/setup.md) | Every environment setting, modes, running from source, sidecars |
 | [Operations](docs/operations.md) | Backup and restore, remote access, upgrades, releases |
-| [Architecture](docs/architecture.md) | How enforcement, schedules and DNS reports work |
+| [Architecture](docs/architecture.md) | How enforcement, schedules and sync work |
+| [Group states](docs/group-states.md) | What a group card says and does |
+| [DNS categories](docs/dns-categories.md) | How DNS filtering reports work |
 | [API](docs/api.md) | The HTTP contract and authentication ([OpenAPI](openapi/familyfi.v1.yaml)) |
 | [Development](docs/development.md) and [testing](docs/testing.md) | Conventions, commands and checks |
 | [Design system](docs/design.md) | How FamilyFi looks and reads, kept in step with the design project |
