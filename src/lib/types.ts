@@ -27,8 +27,6 @@ export type Group = {
    * category, app or website rules (its Block button default). Absent: all internet.
    */
   blockButtonRuleId?: string;
-  /** The group's own block of one of its rules, whatever that rule's schedule says, until `until` or until ended. */
-  ruleBlock?: { ruleId: string; until: string | null; by: Actor };
 };
 
 export type Device = {

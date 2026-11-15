@@ -3,7 +3,6 @@ import { z } from "zod";
 import { AssignmentState, RuleLiftKind } from "@prisma/client";
 import { enqueueChange } from "@/server/changes";
 import { blockButtonCandidate, groupInclude, publicGroup } from "@/server/groups";
-import { BLOCK_CLEARED } from "@/server/group-internet";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -49,7 +48,7 @@ export async function PUT(request: Request, ctx: Ctx) {
       return jsonError(400, "invalid_block_button_rule", "The Block button can stand for one of this group's own category, app or website rules.");
     }
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    const update = prisma().group.update({
+    const group = await prisma().group.update({
       where: { id },
       data: {
         name: parsed.data.name,
@@ -59,20 +58,6 @@ export async function PUT(request: Request, ctx: Ctx) {
       },
       include: groupInclude,
     });
-    // A block of the rule the button stood for ends with the change, or no button would be left to end it.
-    const group =
-      blockButtonRuleId === undefined || blockButtonRuleId === existing.blockButtonRuleId
-        ? await update
-        : (
-            await prisma().$transaction([
-              prisma().rule.updateMany({
-                where: { systemGroupId: id, enabled: true, blocksRuleId: blockButtonRuleId ? { not: null, notIn: [blockButtonRuleId] } : { not: null } },
-                data: BLOCK_CLEARED,
-              }),
-              // Read after the block ends, so the answer shows it ended.
-              update,
-            ])
-          )[1];
     const change = await enqueueChange("group");
     return Response.json({ group: publicGroup(group, household.timezone), change });
   });

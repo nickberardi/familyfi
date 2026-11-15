@@ -11,7 +11,7 @@ import { pauseRuleName } from "./unifi/names";
 /** The reserved `ruleId` for a group's built-in rule: "this group has internet". */
 export const INTERNET_RULE_ID = "internet";
 
-export const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null };
+const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null };
 
 /**
  * The five verbs on a group's built-in `internet` rule. They do to it what they do to any
@@ -37,9 +37,7 @@ export async function runGroupInternet(
   const now = new Date();
   const actor = sessionActor(session);
   const block = blockRuleOf(existing);
-  // A block of one of the group's rules is not a pause of its internet: these verbs leave it be.
-  const blocking = Boolean(block?.enabled && block.blocksRuleId === null && (block.expiresAt === null || now < block.expiresAt));
-  const pauseOnly = { systemGroupId: groupId, enabled: true, blocksRuleId: null };
+  const blocking = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
   const lifts = { groupId, rule: { kind: RuleKind.internet, systemGroupId: null } };
   const clearAllowances = () =>
     prisma().ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
@@ -54,14 +52,14 @@ export async function runGroupInternet(
     if (end instanceof Response) return end;
     const fields = { enabled: true, expiresAt: end, blockedByAccountId: actor.accountId, blockedByName: actor.name };
     await prisma().$transaction(async (tx) => {
-      // A pause blocks all internet, so it replaces a block of one of the group's rules.
-      const data = { ...fields, name: pauseRuleName(existing), kind: RuleKind.internet, targetIds: [], domains: [], blocksRuleId: null };
+      const data = { ...fields, name: pauseRuleName(existing) };
       // Upserted on the unique group id, so two first pauses at once do not collide.
       await tx.rule.upsert({
         where: { systemGroupId: groupId },
         update: data,
         create: {
           ...data,
+          kind: RuleKind.internet,
           scope: RuleScope.group,
           mode: RuleMode.always,
           systemGroupId: groupId,
@@ -71,7 +69,7 @@ export async function runGroupInternet(
       await tx.ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
     });
   } else if (action === "resume") {
-    await prisma().rule.updateMany({ where: pauseOnly, data: BLOCK_CLEARED });
+    await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
   } else if (action === "extend") {
     if (!block || !blocking) return jsonError(409, "not_paused", "Extend requires an active pause.");
     if (!block.expiresAt) return jsonError(409, "indefinite", "An indefinite pause has no expiry to extend.");
@@ -107,7 +105,7 @@ export async function runGroupInternet(
         });
       }
       // Read and cleared here, so a pause that lands meanwhile is replaced, not left beside the allow.
-      await tx.rule.updateMany({ where: pauseOnly, data: BLOCK_CLEARED });
+      await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     });
   } else {
     await clearAllowances();

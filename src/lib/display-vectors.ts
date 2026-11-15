@@ -79,8 +79,6 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   parseCustomPause: (i) => pauseSheet.parseCustomPause(i.stored),
   groupRuleSheetTitle: (i) => pauseSheet.groupRuleSheetTitle(i.group, i.name, i.mode, i.wording),
   groupRuleSheetBody: (i) => pauseSheet.groupRuleSheetBody(i.group, i.name, i.mode, i.wording),
-  ruleBlockSheetTitle: (i) => pauseSheet.ruleBlockSheetTitle(i.group, i.name, i.mode),
-  ruleBlockSheetBody: (i) => pauseSheet.ruleBlockSheetBody(i.group, i.name, i.mode),
   ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),
   ruleStateLine: (i) => ruleActions.ruleStateLine(i.rule, i.timeZone, at(i.now)),
   ruleGroupStateLines: (i) => ruleActions.ruleGroupStateLines(i.rule, i.groupNames, i.timeZone, at(i.now)),

@@ -69,8 +69,7 @@ export function groupAccess(group: GroupWithRules, now: Date, timezone: string):
  */
 function internetGroup(group: GroupWithRules, now: Date, timezone: string) {
   const block = blockRuleOf(group);
-  // A block of the group's Block button rule is not a pause: the group keeps its internet.
-  const blocking = Boolean(block?.enabled && block.blocksRuleId === null && (block.expiresAt === null || now < block.expiresAt));
+  const blocking = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
   const links = internetLinks(group).filter(({ rule }) => rule.enabled);
   const allows = links.filter(({ link }) => link.pauseKind === "allow" && lifted(link, now));
   const stillBlocked = internetWindows(group, now).some((window) => isWindowActive(window, now, timezone));
@@ -107,23 +106,9 @@ export function blockButtonCandidate(rule: Pick<GroupWithRules["rules"][number][
   return rule.kind !== "internet" && rule.systemGroupId === null && !BUILT_IN_RULE_IDS.has(rule.id);
 }
 
-/**
- * The group's own block of its Block button rule: the built-in block rule while enabled and
- * blocking that rule's categories, apps or websites. Null when there is none, or when the rule it
- * blocked no longer covers the group.
- */
-function ruleBlockOf(group: GroupWithRules, now: Date) {
-  const block = blockRuleOf(group);
-  if (!block?.enabled || block.blocksRuleId === null || (block.expiresAt !== null && now >= block.expiresAt)) return null;
-  const blocked = group.rules.find((link) => link.rule.id === block.blocksRuleId && blockButtonCandidate(link.rule));
-  if (!blocked) return null;
-  return { ruleId: blocked.rule.id, until: block.expiresAt?.toISOString() ?? null, by: actor(block.blockedByAccountId, block.blockedByName) };
-}
-
 export function publicGroup(group: GroupWithRules, timezone: string, now = new Date()) {
   const internet = internetGroup(group, now, timezone);
   const blockButton = blockButtonRuleOf(group);
-  const ruleBlock = ruleBlockOf(group, now);
   return {
     id: group.id,
     kind: group.kind as GroupKind,
@@ -143,7 +128,5 @@ export function publicGroup(group: GroupWithRules, timezone: string, now = new D
     access: groupAccess(group, now, timezone),
     /** The rule the group's Block button blocks and unblocks; absent for all internet. */
     ...(blockButton ? { blockButtonRuleId: blockButton.id } : {}),
-    /** The group's own block of one of its rules' categories, apps or websites; absent when there is none. */
-    ...(ruleBlock ? { ruleBlock } : {}),
   };
 }
