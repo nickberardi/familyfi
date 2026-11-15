@@ -16990,7 +16990,7 @@
         "mode": "extend",
         "wording": "unblock"
       },
-      "expected": "Video stays unblocked for longer. Block Video brings it back sooner."
+      "expected": "Video stays unblocked for longer. Block brings it back sooner."
     },
     {
       "fn": "groupScheduleRuleRows",
@@ -31034,7 +31034,7 @@
         "name": "Video",
         "mode": "extend"
       },
-      "expected": "Video stays blocked for longer. Unblock Video ends it sooner."
+      "expected": "Video stays blocked for longer. Unblock ends it sooner."
     }
   ]
 }

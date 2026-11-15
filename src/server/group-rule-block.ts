@@ -40,6 +40,10 @@ export async function runGroupRuleBlock(
   const thisBlock = { systemGroupId: groupId, enabled: true, blocksRuleId: ruleId };
 
   if (action === "block") {
+    // Only the Block button can end a block, so only its rule can be blocked.
+    if (existing.blockButtonRuleId !== ruleId) {
+      return jsonError(409, "not_block_button_default", "Only the group's Block button default can be blocked this way.");
+    }
     const end = body.until ? new Date(body.until) : null;
     if (end && end.getTime() <= now.getTime()) return jsonError(400, "invalid_request", "until must be in the future.");
     const actor = sessionActor(session);
