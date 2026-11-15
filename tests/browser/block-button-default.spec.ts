@@ -16,7 +16,7 @@ async function csrf(page: Page): Promise<Record<string, string>> {
   return { "x-csrf-token": value, "content-type": "application/json" };
 }
 
-test("a group's Block button default makes the card's button block and unblock that rule", { tag: "@desktop" }, async ({ page }) => {
+test("a group's Block button default is saved and names the card's button for that rule", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groups = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
   const tv = groups.groups.find((group) => group.kind === "things" && group.name === "TV");
