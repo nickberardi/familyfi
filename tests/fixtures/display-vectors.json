@@ -6442,6 +6442,87 @@
       ]
     },
     {
+      "fn": "rulePauseSheetOptions",
+      "name": "always-on rule has no window option, worded as an unblock",
+      "input": {
+        "rule": {
+          "id": "r1",
+          "name": "TV Video",
+          "kind": "category",
+          "scope": "group",
+          "groupIds": [
+            "g1",
+            "g2"
+          ],
+          "networkIds": [],
+          "targetIds": [
+            4
+          ],
+          "domains": [],
+          "enabled": true,
+          "pause": {
+            "active": false,
+            "until": null,
+            "kind": "pause",
+            "by": null
+          },
+          "groupPauses": [],
+          "mode": "always",
+          "windows": [],
+          "useGeneratedName": false,
+          "policyNames": []
+        },
+        "windows": [
+          {
+            "name": "",
+            "days": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "00:00",
+            "end": "00:00",
+            "always": true,
+            "ruleName": "TV Video"
+          }
+        ],
+        "mode": "pause",
+        "timeZone": "America/New_York",
+        "now": "2026-09-15T16:00:00Z",
+        "wording": "unblock"
+      },
+      "expected": [
+        {
+          "label": "For 30 minutes",
+          "note": "blocks again at 12:30 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 30
+          }
+        },
+        {
+          "label": "For an hour",
+          "note": "blocks again at 1:00 PM",
+          "request": {
+            "kind": "pauseFor",
+            "minutes": 60
+          }
+        },
+        {
+          "label": "Until I block it again",
+          "note": "no end time",
+          "request": {
+            "kind": "pauseUntil",
+            "until": null
+          }
+        }
+      ]
+    },
+    {
       "fn": "groupStatus",
       "name": "a category rule blocking now",
       "input": {
@@ -16877,6 +16958,39 @@
         "mode": "extend"
       },
       "expected": "The rule stays lifted for longer. Resume brings it back sooner."
+    },
+    {
+      "fn": "groupRuleSheetBody",
+      "name": "more time worded as an unblock",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [
+            "r-downtime"
+          ],
+          "access": "available",
+          "dohOverrideUrl": null
+        },
+        "name": "Video",
+        "mode": "extend",
+        "wording": "unblock"
+      },
+      "expected": "Video stays unblocked for longer. Block Video brings it back sooner."
     },
     {
       "fn": "groupScheduleRuleRows",
@@ -30920,7 +31034,7 @@
         "name": "Video",
         "mode": "extend"
       },
-      "expected": "Video stays blocked for longer. Unblock brings it back sooner."
+      "expected": "Video stays blocked for longer. Unblock Video ends it sooner."
     }
   ]
 }

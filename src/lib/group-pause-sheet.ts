@@ -87,8 +87,8 @@ export function groupSheet(
     const pause = { active: Boolean(paused), until: paused?.until ?? null, kind: "pause" as const, by: paused?.by ?? null };
     sheet = {
       title: groupRuleSheetTitle(group, target.name, mode, target.wording),
-      body: groupRuleSheetBody(group, target.name, mode),
-      options: rulePauseSheetOptions({ pause }, zone.flatMap(ruleInternetWindows), mode, timezone, now),
+      body: groupRuleSheetBody(group, target.name, mode, target.wording),
+      options: rulePauseSheetOptions({ pause }, zone.flatMap(ruleInternetWindows), mode, timezone, now, target.wording),
       custom: (custom, at = now) => rulePauseSheetCustom({ pause }, custom, mode, timezone, at),
     };
   }
