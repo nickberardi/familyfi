@@ -103,11 +103,11 @@ RUN apt-get update \
 # downloads it at runtime. scripts/update-cloudflared.sh bumps the version and both hashes
 # together, and .github/workflows/cloudflared.yml opens a PR with it twice a month.
 ARG TARGETARCH
-ARG CLOUDFLARED_VERSION=2026.10.7
+ARG CLOUDFLARED_VERSION=2026.11.0
 ADD --chmod=755 https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-${TARGETARCH} /usr/local/bin/cloudflared
 RUN case "${TARGETARCH}" in \
-    amd64) sum=1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872 ;; \
-    arm64) sum=3df43aedc9ff291d1735b5cb576cb97e0b157488796db2e32b28aecabb445775 ;; \
+    amd64) sum=51f7c68b57ed7269164075d7e789efce5b59355982f06392deeb037d982a51fd ;; \
+    arm64) sum=abe54a006acf9faf2d19ee9d953cb0d0804e92f59c5382a162e57b84d086f56f ;; \
     *) echo "no cloudflared hash for ${TARGETARCH}" >&2; exit 1 ;; \
   esac \
   && echo "${sum}  /usr/local/bin/cloudflared" | sha256sum -c - \
