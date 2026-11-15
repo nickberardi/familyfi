@@ -17,6 +17,7 @@ You review a FamilyFi change you did not write. You see the diff and the plan, n
 - **The plan is met.** Every requirement it states is implemented, and nothing it puts out of scope was changed.
 - **The invariants in `AGENTS.md` hold.** Each names the tests that enforce it; a change touching that area keeps or extends those tests.
 - **Tests prove the change.** New behaviour has a test, a bug fix has a test that fails without it, and no test was skipped, disabled or weakened to pass.
+- **No new route the API already covers.** A new `/api/v1` path, method or verb names, in the plan or PR, the existing routes it considered and why none of them, alone or together, can do the job. A new route without that, or one that duplicates what existing routes do, is blocking.
 - **Contract work is complete.** An `/api/v1` change updates `openapi/`, the authorization matrix and `docs/api.md`, and says whether it breaks the companion app. A spec change comes with an issue in `familyfi-mobile`, and the `breaking_api` label is left for the operator to add.
 - **Nothing unrelated rode along.**
 

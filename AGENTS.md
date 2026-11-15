@@ -124,6 +124,7 @@ PRs include validation appropriate to the change. Behaviour changes include test
 
 ## OpenAPI consumer coordination
 
+- Reuse the API before extending it. Before a plan adds an `/api/v1` path, method or verb, read `openapi/familyfi.v1.yaml` and `docs/api.md` for the routes that already act on the same resource (for a group: its rule verbs, pause, allow, unblock, resume and extend), and build the feature on them, with new fields if it needs any. Add a route only when no combination of existing ones can do the job, and say in the plan which routes you considered and why each falls short, so the operator approves the new route knowingly.
 - Whenever a change modifies the OpenAPI specification, open an issue in `familyfi-mobile` for the companion app to adopt that contract change. Describe the affected endpoints and schemas, the expected client work, and any rollout or compatibility considerations.
 - Assess every requested contract change for compatibility. If the requested change would be breaking, call that out clearly before making the change. The human operator—not the agent—decides whether the breaking change is warranted or whether a compatible approach is needed; do not make that product decision on the operator's behalf.
 - Do not raise a breaking-change warning for additive or otherwise compatible contract changes. The agent's role is to identify a breaking impact when the requested work would cause one, not to speculate about or independently choose breaking changes.
