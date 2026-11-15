@@ -345,6 +345,11 @@
         "devices"
       ]
     },
+    "tests/unit/publish-release.test.ts": {
+      "categories": [
+        "test-infrastructure"
+      ]
+    },
     "tests/unit/quarantine.test.ts": {
       "categories": [
         "devices",
