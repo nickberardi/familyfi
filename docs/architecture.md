@@ -162,6 +162,8 @@ then read its callers and focused tests. Native feature details belong in its ow
 
 ## Desired internet block
 
+What a group card shows and does from these blocks (badge, status line, Block/Unblock button, dropdown) is its own rule set: [Group states](group-states.md).
+
 A group's internet is shaped by three things, in this order ([internetState](../src/lib/rule-windows.ts)):
 
 ```text
