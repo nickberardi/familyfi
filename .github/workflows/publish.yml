@@ -5,7 +5,7 @@ name: Publish release
 # It creates the GitHub Release, which creates the tag, then starts release.yml for that tag. A
 # tag created with the workflow's own token starts no workflows of its own, so release.yml is
 # started by dispatch and runs once. Publishing on GitHub's "Draft a new release" page works as
-# before.
+# before. The steps are scripts/ci/publish-release.mjs.
 on:
   workflow_dispatch:
     inputs:
@@ -35,6 +35,9 @@ jobs:
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
       - name: Create the release and start release.yml
         uses: actions/github-script@v9
         env:
@@ -43,48 +46,8 @@ jobs:
           NOTES: ${{ inputs.notes }}
         with:
           script: |
-            const { TAG: tag, TARGET: target, NOTES: notes } = process.env;
+            const { publishRelease } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/publish-release.mjs`);
             const { owner, repo } = context.repo;
-            if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
-              core.setFailed(`${tag} is not vX.Y.Z`);
-              return;
-            }
-            // The target must be main or behind it: compare reads "ahead" or "identical" then.
-            const { data: compare } = await github.rest.repos.compareCommitsWithBasehead({
-              owner, repo, basehead: `${target}...main`,
-            });
-            if (!["ahead", "identical"].includes(compare.status)) {
-              core.setFailed(`${target} is not a commit on main (${compare.status})`);
-              return;
-            }
-            const sha = compare.base_commit.sha;
-            const existing = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` }).catch((error) => {
-              if (error.status === 404) return null;
-              throw error;
-            });
-            if (existing) {
-              core.setFailed(`${tag} already exists`);
-              return;
-            }
-            // GitHub runs release.yml as it is at the tag, so the target must have its dispatch trigger.
-            const { data: file } = await github.rest.repos.getContent({
-              owner, repo, path: ".github/workflows/release.yml", ref: sha,
-            });
-            if (!/^  workflow_dispatch:/m.test(Buffer.from(file.content, "base64").toString())) {
-              core.setFailed(`release.yml at ${sha} cannot be dispatched; publish this one on GitHub's release page`);
-              return;
-            }
-            const { data: release } = await github.rest.repos.createRelease({
-              owner, repo, tag_name: tag, target_commitish: sha, name: tag, body: notes, make_latest: "true",
-            });
-            core.notice(`Published ${release.html_url} at ${sha}`);
-            try {
-              await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: "release.yml", ref: tag });
-            } catch (error) {
-              // Nothing will build this release, so take it and its tag back rather than leave it Latest.
-              await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
-              await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag}` });
-              core.setFailed(`Could not start release.yml for ${tag}, so the release and tag were removed: ${error.message}`);
-              return;
-            }
-            core.notice(`Started release.yml for ${tag}`);
+            const { TAG: tag, TARGET: target, NOTES: notes } = process.env;
+            const url = await publishRelease({ github, owner, repo, tag, target, notes });
+            core.notice(`Published ${url} and started release.yml for ${tag}`);
