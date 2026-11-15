@@ -202,8 +202,11 @@ export function addInternetPreset(mutate: Mutate, group: Pick<Group, "id" | "nam
 
 /** A tap on a group card: its header's button or More time, or a rule area's (`ruleIds`, called `name`). */
 export type GroupCardRun =
-  /** `ruleId` and `name`: the Block button rule a rule run acts on. */
-  | { kind: "header"; run: GroupRun; ruleId?: string; name?: string }
+  /**
+   * `ruleId` and `name`: the Block button rule a rule run acts on. `liftedUntil`: when its lift for
+   * the group ended, so the Undo of `resumeRule` lifts it until then again.
+   */
+  | { kind: "header"; run: GroupRun; ruleId?: string; name?: string; liftedUntil?: string | null }
   | {
       kind: "rule";
       run: GroupRuleRun;
@@ -225,7 +228,7 @@ export function runGroupCardAction(mutate: Mutate, group: Group, tap: GroupCardR
     // The Block button rule's lift for the group is one rule's, as its dropdown item would be.
     if (tap.run === "pauseRule") return runGroupCardAction(mutate, group, { kind: "rule", run: "pause", ...rule }, openSheet);
     if (tap.run === "moreRule") return runGroupCardAction(mutate, group, { kind: "rule", run: "extend", ...rule }, openSheet);
-    if (tap.run === "resumeRule") return void resumeGroupRules(mutate, group, rule.ruleIds, { name: tap.name, until: null });
+    if (tap.run === "resumeRule") return void resumeGroupRules(mutate, group, rule.ruleIds, { name: tap.name, until: tap.liftedUntil ?? null });
   }
   if (tap.kind === "rule") {
     if (tap.run === "resume") {
