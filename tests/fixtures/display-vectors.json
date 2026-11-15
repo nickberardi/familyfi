@@ -22570,6 +22570,130 @@
     },
     {
       "fn": "groupHeaderActions",
+      "name": "Block button default switched off while unblocked for a while",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null,
+          "blockButtonRuleId": "r-video"
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "TV video",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": false,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T16:00:00.000Z",
+                  "kind": "pause",
+                  "by": {
+                    "accountId": "a1",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "Social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T15:00:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Block",
+          "run": "blockRule",
+          "ruleId": "r-video",
+          "name": "Video"
+        },
+        "more": null,
+        "menu": [
+          {
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
+          },
+          {
+            "label": "Unblock Social",
+            "run": "pause",
+            "ruleIds": [
+              "r-social"
+            ],
+            "name": "Social"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
       "name": "Block button default outside its window",
       "input": {
         "group": {
