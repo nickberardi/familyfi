@@ -6,8 +6,8 @@ import type { Group } from "@/lib/types";
 import type { ZoneAction } from "./CardActions";
 
 /**
- * A group's one button, as every client draws it: Block, Unblock or Resume (or, with a Block button
- * default, Block Video and Unblock Video), with More time while
+ * A group's one button, as every client draws it: Block, Unblock or Resume (with a Block button
+ * default, Block and Unblock act on that rule), with More time while
  * a timed block or unblock lasts, and, while a category, app or website rule blocks the group or is
  * lifted for it, a dropdown (`menu`): Block internet, and unblock or block again one rule for the group. Each
  * tap goes to `onRun` (`runGroupCardAction`); `enabled` is false while the view is stale or a write

@@ -22415,7 +22415,7 @@
       },
       "expected": {
         "action": {
-          "label": "Unblock Video",
+          "label": "Unblock",
           "run": "pauseRule",
           "ruleId": "r-video",
           "name": "Video"
@@ -22539,7 +22539,7 @@
       },
       "expected": {
         "action": {
-          "label": "Block Video",
+          "label": "Block",
           "run": "resumeRule",
           "ruleId": "r-video",
           "name": "Video"
@@ -22644,7 +22644,7 @@
       },
       "expected": {
         "action": {
-          "label": "Block Video",
+          "label": "Block",
           "run": "blockRule",
           "ruleId": "r-video",
           "name": "Video"
@@ -22744,7 +22744,7 @@
       },
       "expected": {
         "action": {
-          "label": "Unblock Video",
+          "label": "Unblock",
           "run": "endRuleBlock",
           "ruleId": "r-video",
           "name": "Video"

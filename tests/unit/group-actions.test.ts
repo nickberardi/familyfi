@@ -173,7 +173,7 @@ describe("the Block button rule's runs", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("puts the rule back at once with Block Video, and ends the group's block of it with Unblock Video, each with Undo", async () => {
+  it("puts the rule back at once with Block, and ends the group's block of it with Unblock, each with Undo", async () => {
     const mutate = vi.fn((..._args: unknown[]) => Promise.resolve(undefined));
     const send = vi.fn((..._args: unknown[]) => Promise.resolve({ rule: {}, group: {}, change: { changeId: "c" } }));
     runGroupCardAction(mutate, tv(), tap("resumeRule"), vi.fn());
@@ -229,11 +229,11 @@ describe("the Block button rule's runs", () => {
     expect(more.options[0]).toMatchObject({ request: { kind: "extend", minutes: 30 } });
   });
 
-  it("taps Block Video after an unblock as a resume that can go back to when the lift ended", () => {
+  it("taps Block after an unblock of the Block button rule as a resume that can go back to when the lift ended", () => {
     const video = rule({ id: "r-video", name: "TV video", kind: "category", targetIds: [4], mode: "always", groupPauses: [{ groupId: "g1", pause: { active: true, until: "2026-10-15T22:00:00.000Z", kind: "pause", by: null } }] });
     const onTap = vi.fn();
     const controls = groupCardControls(tv(), [video], TZ, NOW, onTap);
-    expect(controls.action.label).toBe("Block Video");
+    expect(controls.action.label).toBe("Block");
     controls.action.onPress();
     expect(onTap).toHaveBeenCalledWith({ kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video", wording: "unblock", liftedUntil: "2026-10-15T22:00:00.000Z" });
   });

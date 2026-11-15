@@ -16,7 +16,7 @@ async function csrf(page: Page): Promise<Record<string, string>> {
   return { "x-csrf-token": value, "content-type": "application/json" };
 }
 
-test("a group's Block button default is saved and names the card's button for that rule", { tag: "@desktop" }, async ({ page }) => {
+test("a group's Block button default is saved and the card's Unblock lifts that rule", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const groups = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
   const tv = groups.groups.find((group) => group.kind === "things" && group.name === "TV");
@@ -35,13 +35,17 @@ test("a group's Block button default is saved and names the card's button for th
     const sheet = page.getByRole("dialog", { name: `Edit ${tv!.name}` });
     const picker = sheet.getByLabel("Block button default");
     await expect(picker).toHaveValue("");
-    await expect(picker).toHaveAccessibleDescription(/The Block button on TV’s card blocks and unblocks this/);
+    await expect(picker).toHaveAccessibleDescription(/Choose what the Block button on TV’s card blocks and unblocks/);
     await picker.selectOption(ruleId);
     const label = (await picker.locator(`option[value="${ruleId}"]`).textContent())!;
     await sheet.getByRole("button", { name: "Save" }).click();
     await expect(sheet).toHaveCount(0);
 
-    await expect(page.getByRole("button", { name: `Unblock ${label}`, exact: true })).toBeVisible();
+    // The button keeps its plain label and lifts the chosen rule for TV from the rule's sheet.
+    await page.getByRole("button", { name: "Unblock", exact: true }).click();
+    const unblock = page.getByRole("dialog", { name: `Unblock ${label} for ${tv!.name}?` });
+    await expect(unblock).toBeVisible();
+    await unblock.getByRole("button", { name: "Cancel" }).click();
     await page.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(page.getByRole("dialog", { name: `Edit ${tv!.name}` }).getByLabel("Block button default")).toHaveValue(ruleId);
   } finally {
