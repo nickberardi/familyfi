@@ -54,6 +54,7 @@ pass. Keep these distinctions when naming features and choosing data owners.
 | --- | --- |
 | Code or naming | [Implementation and review](docs/development.md#implementation-and-review), [naming](docs/development.md#naming) when adding or renaming symbols, relevant tests |
 | Enforcement, schedules, DNS or server boundaries | [Architecture](docs/architecture.md) |
+| A group's badge, status line, Block/Unblock button or dropdown | [Group states](docs/group-states.md), the key rule set for what a group card says and does |
 | UI | [Design system](docs/design.md), existing `src/ui` and `src/components/ui` primitives, local `designs/` references when present |
 | HTTP contract or authentication | [API](docs/api.md), `openapi/familyfi.v1.yaml`, authorization matrix in `tests/integration/authorization-matrix.test.ts` |
 | Database, environment or deployment | [Setup](docs/setup.md), [operations](docs/operations.md), [naming and migration rules](docs/development.md#naming) |
