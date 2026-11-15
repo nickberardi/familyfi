@@ -9,7 +9,7 @@ import { AssignmentState, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getGroup, PUT as putGroup } from "@/app/api/v1/groups/[id]/route";
 import { POST as createRule } from "@/app/api/v1/rules/route";
-import { DELETE as deleteRule } from "@/app/api/v1/rules/[id]/route";
+import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
 import { POST as pauseGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
 import { POST as resumeGroupRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/resume/route";
 import { POST as blockRule } from "@/app/api/v1/groups/[id]/rules/[ruleId]/block/route";
@@ -130,6 +130,24 @@ describe("a group's Block button default", () => {
     await deleteRule(request(`/api/v1/rules/${video}`, { method: "DELETE", auth }), { params: Promise.resolve({ id: video }) });
     expect((await read(auth, tv.id)).blockButtonRuleId).toBeUndefined();
     expect((await prisma().group.findUniqueOrThrow({ where: { id: tv.id } })).blockButtonRuleId).toBeNull();
+  });
+
+  it("goes back to all internet, and its block ends, when the rule stops covering the group, so neither comes back with it", async () => {
+    await edit(auth, tv.id, { blockButtonRuleId: video });
+    expect((await verb(blockRule, auth, tv.id, video)).status).toBe(200);
+    const pc = await prisma().group.create({ data: { kind: GroupKind.things, name: "PC" } });
+    const groups = async (groupIds: string[]) => {
+      const response = await patchRule(
+        request(`/api/v1/rules/${video}`, { method: "PATCH", auth, headers: json, body: JSON.stringify({ groupIds }) }),
+        { params: Promise.resolve({ id: video }) },
+      );
+      expect(response.status).toBe(200);
+    };
+    await groups([pc.id]);
+    await groups([pc.id, tv.id]);
+    const group = await read(auth, tv.id);
+    expect([group.blockButtonRuleId, group.ruleBlock]).toEqual([undefined, undefined]);
+    expect((await prisma().rule.findUniqueOrThrow({ where: { systemGroupId: tv.id } })).enabled).toBe(false);
   });
 
   it("blocks the rule's category now with the group's own block, until ended, leaving the internet on", async () => {

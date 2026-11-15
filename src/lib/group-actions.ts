@@ -44,9 +44,17 @@ export function blockButtonChoice(rule: Pick<Rule, "kind" | "builtIn">): boolean
   return rule.kind !== "internet" && !rule.builtIn;
 }
 
-/** What the group's Block button default is called, as the button and the settings list say it: "Video". */
-export function blockButtonName(rule: Rule, timezone: string, now: Date): string {
-  return blockingName(rule, now, timezone);
+/**
+ * What the group's Block button default is called, as the button and the settings list say it:
+ * "Video". When another of the group's choices would read the same, the rule's own name, so no two
+ * look alike.
+ */
+export function blockButtonName(rule: Rule, rules: Rule[], groupId: string, timezone: string, now: Date): string {
+  const name = blockingName(rule, now, timezone);
+  const twin = groupScopedRules(rules, groupId).some(
+    (other) => other.id !== rule.id && blockButtonChoice(other) && blockingName(other, now, timezone) === name,
+  );
+  return twin ? rule.name : name;
 }
 
 /** What a tap on the group's header button, or its More time link, does. */
@@ -241,7 +249,8 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
   const ruleBlock = group.ruleBlock && rules.find((rule) => rule.id === group.ruleBlock!.ruleId);
   if (group.ruleBlock && ruleBlock) {
     const { until: end, by: who } = group.ruleBlock;
-    const detail = `${blockingName(ruleBlock, now, timezone)} blocked ${end ? until(end, "") : "until you unblock"}${by(who)}`;
+    const name = blockButtonName(ruleBlock, rules, group.id, timezone, now);
+    const detail = end ? `${name} blocked ${until(end, "")}${by(who)}` : `${name} blocked${by(who)} until you unblock`;
     return online("rule", `Online · ${detail}`, detail, "blocked");
   }
   if (blocking.length) {
@@ -252,7 +261,8 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
   const button = blockButtonRule(group, rules);
   const buttonLift = button && groupLift(button, group.id, now);
   if (button && buttonLift?.kind === "pause") {
-    const detail = `${blockingName(button, now, timezone)} unblocked ${until(buttonLift.until, "until you block it again")}${by(buttonLift.by)}`;
+    const name = blockButtonName(button, rules, group.id, timezone, now);
+    const detail = buttonLift.until ? `${name} unblocked ${until(buttonLift.until, "")}${by(buttonLift.by)}` : `${name} unblocked${by(buttonLift.by)} until you block it again`;
     return online("on", `Online · ${detail}`, detail, "unblocked");
   }
   const unblock = groupUnblock(group, rules, now);
@@ -285,7 +295,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
       return online("on", label, state.next ? `${state.next.window} at ${formatClock(new Date(state.next.at), timezone)}` : "");
     case "no_rule":
       // With nothing limiting its internet, a Block button rule says when it blocks next instead.
-      if (button) return online("on", label, blockButtonNext(button, timezone, now));
+      if (button) return online("on", label, blockButtonNext(blockButtonName(button, rules, group.id, timezone, now), button, timezone, now));
       return online("on", label, group.internetRuleIds.length === 0 ? "no internet rule" : "internet rule off");
     default:
       // A pause is the group's suspension, handled first.
@@ -294,8 +304,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
 }
 
 /** A Block button rule that blocks nothing now: when it next does today or tomorrow ("Video at 9:00 PM"), or that it doesn't. */
-function blockButtonNext(rule: Rule, timezone: string, now: Date): string {
-  const name = blockingName(rule, now, timezone);
+function blockButtonNext(name: string, rule: Rule, timezone: string, now: Date): string {
   const day = 24 * 60 * 60_000;
   const next = rule.enabled && !rulePaused(rule, now)
     ? ruleInternetWindows(rule)
@@ -358,7 +367,7 @@ export function groupHeaderActions(
   }
   const button = blockButtonRule(group, rules);
   if (button && !blocking.some((rule) => rule.kind === "internet")) {
-    const name = blockingName(button, now, timezone);
+    const name = blockButtonName(button, rules, group.id, timezone, now);
     const spec = (label: string, run: GroupRun): GroupActionSpec => ({ label, run, ruleId: button.id, name });
     if (group.ruleBlock?.ruleId === button.id) {
       return header(spec(`Unblock ${name}`, "endRuleBlock"), group.ruleBlock.until ? spec("More time", "moreRuleBlock") : null);
