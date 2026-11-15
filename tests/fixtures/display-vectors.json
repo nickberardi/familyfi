@@ -22581,6 +22581,14 @@
             "name": ""
           },
           {
+            "label": "Unblock Gaming",
+            "run": "pause",
+            "ruleIds": [
+              "r-gaming"
+            ],
+            "name": "Gaming"
+          },
+          {
             "label": "Unblock TV video",
             "run": "pause",
             "ruleIds": [
@@ -23327,6 +23335,14 @@
         },
         "more": null,
         "menu": [
+          {
+            "label": "Unblock Dinner",
+            "run": "pause",
+            "ruleIds": [
+              "r-downtime"
+            ],
+            "name": "Dinner"
+          },
           {
             "label": "Unblock TV video",
             "run": "pause",

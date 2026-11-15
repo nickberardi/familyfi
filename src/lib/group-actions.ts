@@ -407,7 +407,7 @@ export function groupHeaderActions(
  * while a category, app or website rule blocks the group now or is lifted for it alone, and lists:
  * Block internet while the group has the internet and the button is not Block; "Unblock <rule>"
  * for each rule blocking it now (its internet window first, then scheduled rules, then always-on
- * ones), leaving out the one the button already lifts on its own; and "Block <rule> again" for each
+ * ones), leaving out the button's own rule and the one rule its Unblock lifts when it lifts exactly one; and "Block <rule> again" for each
  * rule paused for this group alone.
  */
 function groupMenu(group: Group, rules: Rule[], action: GroupActionSpec, timezone: string, now: Date): GroupMenuItem[] {
@@ -431,8 +431,9 @@ function groupMenu(group: Group, rules: Rule[], action: GroupActionSpec, timezon
     ...scheduled.filter((rule) => rule.kind !== "internet"),
     ...blocking.filter((rule) => standing.has(rule.ruleId)),
   ];
-  // With nothing else blocking, the button's Unblock lifts exactly this one rule.
-  const sameAsButton = !buttonRule && !group.suspension.active && scheduled.length === 1 ? scheduled[0]!.ruleId : null;
+  // When the button's Unblock lifts exactly one rule, the dropdown doesn't offer it again.
+  const unblocks = buttonRule ? [] : rulesToUnblock(group, rules, timezone, now);
+  const sameAsButton = !group.suspension.active && unblocks.length === 1 ? unblocks[0]!.ruleId : null;
   for (const item of ordered) {
     if (item.ruleId === sameAsButton) continue;
     const name = item.kind === "internet" ? item.name : (rules.find((rule) => rule.id === item.ruleId)?.name ?? item.name);
