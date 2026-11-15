@@ -90,6 +90,16 @@ describe("editing a group", () => {
     expect(GROUP_EDIT_COPY.blockButton).toBe("Block button default");
   });
 
+  it("names two choices that would read alike by their own rule names", () => {
+    const video = (id: string, name: string) =>
+      ({ id, name, kind: "category", scope: "group", groupIds: ["g1"], targetIds: [4], domains: [], builtIn: null }) as never;
+    expect(blockButtonChoices(group(), [video("r-a", "No streaming"), video("r-b", "School nights")], "UTC", new Date()).map((choice) => choice.label)).toEqual([
+      GROUP_EDIT_COPY.blockButtonAll,
+      "No streaming",
+      "School nights",
+    ]);
+  });
+
   it("locks the role of a member with a personal login, not the recovery account's", () => {
     expect(roleLocked(group(), [{ recovery: false, groupId: "g1" }])).toBe(true);
     expect(roleLocked(group(), [{ recovery: true, groupId: "g1" }, { recovery: false, groupId: "g2" }])).toBe(false);

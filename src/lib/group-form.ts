@@ -79,7 +79,7 @@ export function groupEditDraft(group: Group): GroupEditDraft {
 export function blockButtonChoices(group: Pick<Group, "id">, rules: Rule[], timezone: string, now: Date): { value: string; label: string }[] {
   const own = groupScopedRules(rules, group.id)
     .filter(blockButtonChoice)
-    .map((rule) => ({ value: rule.id, label: blockButtonName(rule, timezone, now) }));
+    .map((rule) => ({ value: rule.id, label: blockButtonName(rule, rules, group.id, timezone, now) }));
   return [{ value: "", label: GROUP_EDIT_COPY.blockButtonAll }, ...own];
 }
 
@@ -158,7 +158,7 @@ export const GROUP_EDIT_COPY = {
   title: (name: string) => `Edit ${name}`,
   blockButton: "Block button default",
   blockButtonAll: "All internet",
-  blockButtonHelp: (name: string) => `What the Block button on ${name}’s card blocks and unblocks, with the same timers. All internet stays in its menu.`,
+  blockButtonHelp: (name: string) => `What the Block button on ${name}’s card blocks and unblocks, with the same timers. All internet stays in the button’s menu.`,
   doh: "DNS-over-HTTPS",
   dohModes: [
     { value: "default", label: "Household default" },

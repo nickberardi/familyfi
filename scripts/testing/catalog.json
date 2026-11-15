@@ -804,6 +804,12 @@
         "categories"
       ]
     },
+    "tests/browser/block-button-default.spec.ts": {
+      "categories": [
+        "groups",
+        "rules"
+      ]
+    },
     "tests/browser/dialogs.spec.ts": {
       "categories": [
         "categories",

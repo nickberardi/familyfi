@@ -50,7 +50,8 @@ export function GroupEditSheet({
   onDeleted: () => void;
 }) {
   const { store, busy, accounts, rules, household } = useAppData();
-  const buttonChoices = blockButtonChoices(group, rules, household?.timezone ?? "America/New_York", new Date());
+  // The choices are named on the household's clock, so the setting waits for it.
+  const buttonChoices = household ? blockButtonChoices(group, rules, household.timezone, new Date()) : [];
   const lockedRole = roleLocked(group, accounts);
   const [draft, setDraft] = useState<GroupEditSheetDraft>(() => groupEditSheetDraft(group));
   const [error, setError] = useState("");
@@ -193,22 +194,27 @@ export function GroupEditSheet({
           </label>
         )}
         {buttonChoices.length > 1 ? (
-          <label className={LABEL}>
-            {GROUP_EDIT_COPY.blockButton}
-            <select
-              className={FIELD}
-              value={buttonChoices.some((choice) => choice.value === draft.blockButtonRuleId) ? draft.blockButtonRuleId : ""}
-              onChange={(e) => set({ blockButtonRuleId: e.target.value })}
-              data-testid="group-block-button"
-            >
-              {buttonChoices.map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {choice.label}
-                </option>
-              ))}
-            </select>
-            <span className="font-normal">{GROUP_EDIT_COPY.blockButtonHelp(draft.name.trim() || group.name)}</span>
-          </label>
+          <div className="flex flex-col gap-1">
+            <label className={LABEL}>
+              {GROUP_EDIT_COPY.blockButton}
+              <select
+                className={FIELD}
+                value={buttonChoices.some((choice) => choice.value === draft.blockButtonRuleId) ? draft.blockButtonRuleId : ""}
+                onChange={(e) => set({ blockButtonRuleId: e.target.value })}
+                aria-describedby="group-block-button-help"
+                data-testid="group-block-button"
+              >
+                {buttonChoices.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p id="group-block-button-help" className="text-[14px] leading-5 text-[var(--ff-ink-2)]">
+              {GROUP_EDIT_COPY.blockButtonHelp(draft.name.trim() || group.name)}
+            </p>
+          </div>
         ) : null}
         <div className={LABEL}>
           <span>{GROUP_EDIT_COPY.doh}</span>
