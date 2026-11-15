@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleScope, type Household } from "@prisma/client";
+import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleKind, RuleScope, type Household } from "@prisma/client";
 import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
 import { randomToken } from "./crypto";
@@ -529,6 +529,7 @@ async function tick(owner: string): Promise<boolean> {
       lockDnsExemptions: lockDnsExempt ?? undefined,
       rules: rules.filter((rule) => !(rule.id === LOCK_DNS_RULE_ID && lockDnsExempt === null)).map((rule) => ({
         ...rule,
+        ...blockedRuleTargets(rule, rules),
         groupIds: rule.groups.map((link) => link.groupId),
         paused: isSuspended({ active: rule.pauseActive, until: rule.pauseUntil }, now),
         system: rule.systemGroupId !== null,
@@ -1071,4 +1072,25 @@ async function removeOrphanedPolicies(
     }
   }
   return errors;
+}
+
+/**
+ * A group's own block of one of its rules blocks what that rule blocks now, so an edit to the rule
+ * reaches the block too. When that rule is gone or no longer covers the group, the block blocks
+ * nothing: it is left off. A block of all internet, and every other rule, keeps its own fields.
+ */
+export function blockedRuleTargets<
+  T extends { systemGroupId: string | null; blocksRuleId: string | null; enabled: boolean },
+  R extends { id: string; kind: RuleKind; targetIds: number[]; domains: string[]; systemGroupId: string | null; groups: { groupId: string }[] },
+>(rule: T, rules: R[]): Partial<Pick<R, "kind" | "targetIds" | "domains">> & { enabled?: boolean } {
+  if (rule.systemGroupId === null || rule.blocksRuleId === null) return {};
+  const blocked = rules.find(
+    (other) =>
+      other.id === rule.blocksRuleId &&
+      other.kind !== RuleKind.internet &&
+      other.systemGroupId === null &&
+      other.groups.some((link) => link.groupId === rule.systemGroupId),
+  );
+  if (!blocked) return { enabled: false };
+  return { kind: blocked.kind, targetIds: blocked.targetIds, domains: blocked.domains };
 }

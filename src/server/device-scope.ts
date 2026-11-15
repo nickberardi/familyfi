@@ -21,8 +21,8 @@ import { DeviceScope, PairedDeviceClient } from "@prisma/client";
 
 /** Pause, resume, extend, allow, disallow, on and off on one rule, for every group it covers. */
 const RULE_VERBS = /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/;
-/** The same verbs for one group alone, including its built-in `internet` rule. */
-const GROUP_RULE_VERBS = /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/;
+/** The same verbs for one group alone, including its built-in `internet` rule, and its own block of one rule. */
+const GROUP_RULE_VERBS = /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|block(\/(end|extend))?)$/;
 /** A group's unblock, which lifts whatever blocks it now, and its end and extend. */
 const GROUP_UNBLOCK = /^\/api\/v1\/groups\/[^/]+\/unblock(\/(end|extend))?$/;
 

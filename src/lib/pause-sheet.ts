@@ -246,13 +246,23 @@ export function unblockSheetCustom(unblock: GroupLiftState | null, custom: Custo
 
 /** A rule's sheet for one group; from the card's dropdown it reads as an unblock (`wording`), on the group's page as a pause. */
 export function groupRuleSheetTitle(group: Pick<Group, "name">, name: string, mode: PauseSheetMode, wording?: "unblock"): string {
-  if (mode === "extend") return `Keep ${name} paused for ${group.name} longer?`;
+  if (mode === "extend") return `Keep ${name} ${wording === "unblock" ? "unblocked" : "paused"} for ${group.name} longer?`;
   return wording === "unblock" ? `Unblock ${name} for ${group.name}?` : `Pause ${name} for ${group.name}?`;
 }
 
 export function groupRuleSheetBody(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
   if (mode === "extend") return "The rule stays lifted for longer. Resume brings it back sooner.";
   return `${name} stops blocking ${group.name}. Other groups, and the rule itself, stay as they are.`;
+}
+
+/** The sheet for blocking a group's Block button rule now, whatever its schedule says. */
+export function ruleBlockSheetTitle(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
+  return mode === "extend" ? `Keep ${name} blocked for ${group.name} longer?` : `Block ${name} for ${group.name}?`;
+}
+
+export function ruleBlockSheetBody(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
+  if (mode === "extend") return `${name} stays blocked for longer. Unblock brings it back sooner.`;
+  return `${name} is blocked for ${group.name} now, whatever its schedule says. The rest of the internet, other groups and the rule itself stay as they are.`;
 }
 
 function listNames(items: string[]): string {

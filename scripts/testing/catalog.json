@@ -608,6 +608,12 @@
         "rules"
       ]
     },
+    "tests/integration/block-button-default.test.ts": {
+      "categories": [
+        "rules",
+        "groups"
+      ]
+    },
     "tests/integration/rules-api.test.ts": {
       "categories": [
         "rules",

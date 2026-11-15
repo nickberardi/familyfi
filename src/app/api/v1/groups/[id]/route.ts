@@ -2,7 +2,7 @@ import { FamilyRole } from "@prisma/client";
 import { z } from "zod";
 import { AssignmentState, RuleLiftKind } from "@prisma/client";
 import { enqueueChange } from "@/server/changes";
-import { groupInclude, publicGroup } from "@/server/groups";
+import { blockButtonCandidate, groupInclude, publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -15,6 +15,8 @@ const Update = z.object({
   name: z.string().min(1).optional(),
   monogram: z.string().max(4).nullable().optional(),
   familyRole: z.enum(["child", "teen", "adult"]).nullable().optional(),
+  /** One of the group's own category, app or website rules, or null for all internet. */
+  blockButtonRuleId: z.string().min(1).nullable().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -39,8 +41,12 @@ export async function PUT(request: Request, ctx: Ctx) {
     if (!body.ok) return body.response;
     const parsed = Update.safeParse(body.value);
     if (!parsed.success) return jsonError(400, "invalid_request", "Invalid group update.");
-    const existing = await prisma().group.findUnique({ where: { id } });
+    const existing = await prisma().group.findUnique({ where: { id }, include: groupInclude });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
+    const { blockButtonRuleId } = parsed.data;
+    if (blockButtonRuleId && !existing.rules.some((link) => link.rule.id === blockButtonRuleId && blockButtonCandidate(link.rule))) {
+      return jsonError(400, "invalid_block_button_rule", "The Block button can stand for one of this group's own category, app or website rules.");
+    }
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const group = await prisma().group.update({
       where: { id },
@@ -48,6 +54,7 @@ export async function PUT(request: Request, ctx: Ctx) {
         name: parsed.data.name,
         monogram: parsed.data.monogram === undefined ? undefined : parsed.data.monogram,
         familyRole: parsed.data.familyRole === undefined ? undefined : (parsed.data.familyRole as FamilyRole | null),
+        blockButtonRuleId,
       },
       include: groupInclude,
     });

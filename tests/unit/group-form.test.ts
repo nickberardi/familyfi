@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  blockButtonChoices,
   rulesNeedDevice,
   deleteGroupConfirm,
   rulesOnlyFor,
@@ -59,6 +60,34 @@ describe("editing a group", () => {
     expect(groupEditBody(sam, { ...groupEditDraft(sam), familyRole: "teen" })).toEqual({ name: "Sam", familyRole: "teen" });
     const tv = group({ kind: "things", familyRole: null, monogram: "TV", name: "TVs" });
     expect(groupEditBody(tv, { ...groupEditDraft(tv), monogram: "" })).toEqual({ name: "TVs", monogram: null });
+  });
+
+  it("sends the Block button default only when it changes, and null for all internet", () => {
+    const tv = group({ kind: "things", familyRole: null, monogram: "TV", name: "TV", blockButtonRuleId: "r-video" });
+    expect(groupEditBody(tv, groupEditDraft(tv))).toBeNull();
+    // A client that does not show the setting leaves it out of its draft, and it stays as it is.
+    const { blockButtonRuleId: _left, ...without } = groupEditDraft(tv);
+    expect(groupEditBody(tv, { ...without, name: "Den TV" })).toEqual({ name: "Den TV", monogram: "TV" });
+    expect(groupEditBody(tv, { ...groupEditDraft(tv), blockButtonRuleId: "" })).toEqual({ name: "TV", monogram: "TV", blockButtonRuleId: null });
+    expect(groupEditBody(group(), { ...groupEditDraft(group()), blockButtonRuleId: "r-social" })).toEqual({ name: "Sam", familyRole: "child", blockButtonRuleId: "r-social" });
+  });
+
+  it("offers all internet, then each of the group's own category, app or website rules by its button name", () => {
+    const rule = (id: string, name: string, kind: string, extra: object = {}) =>
+      ({ id, name, kind, scope: "group", groupIds: ["g1"], targetIds: [], domains: [], builtIn: null, ...extra }) as never;
+    const rules = [
+      rule("r-downtime", "Downtime", "internet"),
+      rule("r-video", "TV video", "category", { targetIds: [4] }),
+      rule("r-tiktok", "No TikTok", "domain"),
+      rule("r-other", "Other", "category", { groupIds: ["g2"], targetIds: [4] }),
+      rule("countries", "Block countries", "domain", { builtIn: "countries" }),
+    ];
+    expect(blockButtonChoices(group(), rules, "UTC", new Date())).toEqual([
+      { value: "", label: GROUP_EDIT_COPY.blockButtonAll },
+      { value: "r-video", label: "Video" },
+      { value: "r-tiktok", label: "No TikTok" },
+    ]);
+    expect(GROUP_EDIT_COPY.blockButton).toBe("Block button default");
   });
 
   it("locks the role of a member with a personal login, not the recovery account's", () => {

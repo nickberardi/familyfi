@@ -6,7 +6,8 @@ import type { Group } from "@/lib/types";
 import type { ZoneAction } from "./CardActions";
 
 /**
- * A group's one button, as every client draws it: Block, Unblock or Resume, with More time while
+ * A group's one button, as every client draws it: Block, Unblock or Resume (or, with a Block button
+ * default, Block Video and Unblock Video), with More time while
  * a timed block or unblock lasts, and, while a category, app or website rule blocks the group or is
  * lifted for it, a dropdown (`menu`): Block internet, and unblock or block again one rule for the group. Each
  * tap goes to `onRun` (`runGroupCardAction`); `enabled` is false while the view is stale or a write
@@ -30,7 +31,13 @@ export function groupCardControls(
     label: spec.label,
     strong,
     disabled: !enabled,
-    onPress: () => onRun({ kind: "header", run: spec.run }),
+    onPress: () =>
+      // Putting the Block button rule back is the dropdown's Block again: its Undo lifts it until when it was.
+      onRun(
+        spec.run === "resumeRule" && spec.ruleId
+          ? { kind: "rule", run: "resume", ruleIds: [spec.ruleId], name: spec.name ?? "", wording: "unblock", liftedUntil: liftedUntil([spec.ruleId]) }
+          : { kind: "header", run: spec.run, ...(spec.ruleId ? { ruleId: spec.ruleId, name: spec.name ?? "" } : {}) },
+      ),
     testID: `group-action-${spec.run}-${group.id}`,
   });
   const menu = header.menu.map(

@@ -53,6 +53,10 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   groupDetailColor: (i) => groupActionsModule.groupDetailColor(i.change),
   rulesToUnblock: (i) => groupActionsModule.rulesToUnblock(i.group, i.rules as Rule[], i.timeZone, at(i.now)),
   standingRule: (i) => groupActionsModule.standingRule(i.rule),
+  // The Block button default: which rule the button stands for (its id, or null for all internet), what may be picked, and its name.
+  blockButtonRule: (i) => groupActionsModule.blockButtonRule(i.group, i.rules as Rule[])?.id ?? null,
+  blockButtonChoice: (i) => groupActionsModule.blockButtonChoice(i.rule),
+  blockButtonName: (i) => groupActionsModule.blockButtonName(i.rule as Rule, i.timeZone, at(i.now)),
   groupHeaderActions: (i) => groupActionsModule.groupHeaderActions(i.group as Group, i.rules as Rule[], i.timeZone, at(i.now)),
   groupRuleActions: (i) => groupActionsModule.groupRuleActions(i.group as Group, i.rules as Rule[], at(i.now)),
   // A client without the gateway's catalog replays these, so a category or app is named only when FamilyFi knows it.
@@ -75,6 +79,8 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   parseCustomPause: (i) => pauseSheet.parseCustomPause(i.stored),
   groupRuleSheetTitle: (i) => pauseSheet.groupRuleSheetTitle(i.group, i.name, i.mode, i.wording),
   groupRuleSheetBody: (i) => pauseSheet.groupRuleSheetBody(i.group, i.name, i.mode),
+  ruleBlockSheetTitle: (i) => pauseSheet.ruleBlockSheetTitle(i.group, i.name, i.mode),
+  ruleBlockSheetBody: (i) => pauseSheet.ruleBlockSheetBody(i.group, i.name, i.mode),
   ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),
   ruleStateLine: (i) => ruleActions.ruleStateLine(i.rule, i.timeZone, at(i.now)),
   ruleGroupStateLines: (i) => ruleActions.ruleGroupStateLines(i.rule, i.groupNames, i.timeZone, at(i.now)),

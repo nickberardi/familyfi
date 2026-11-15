@@ -22,6 +22,13 @@ export type Group = {
    * A card passes itself to `effectiveCheck` so it reports its own resolver's verdict.
    */
   dohOverrideUrl: string | null;
+  /**
+   * The rule its Block button blocks and unblocks instead of all internet: one of its own
+   * category, app or website rules (its Block button default). Absent: all internet.
+   */
+  blockButtonRuleId?: string;
+  /** The group's own block of one of its rules, whatever that rule's schedule says, until `until` or until ended. */
+  ruleBlock?: { ruleId: string; until: string | null; by: Actor };
 };
 
 export type Device = {

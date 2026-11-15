@@ -1,5 +1,5 @@
 import { cardStateLabel, formatClock } from "./display";
-import { internetState, isWindowActive, windowEndsAt, windowTitle } from "./rule-windows";
+import { internetState, isWindowActive, nextWindowStart, windowEndsAt, windowTitle } from "./rule-windows";
 import {
   activeWindowsEnd,
   CURATED_CATEGORY_SLOTS,
@@ -23,12 +23,51 @@ import type { Actor, Group } from "./types";
  * unblocked and blocked again, for that group alone, from the card's dropdown or the group's page. Either
  * way the rule itself never changes, and a place shows one button for its state, never its
  * opposite beside it; the dropdown is where the other choices go (Block internet beside Unblock).
+ *
+ * A group can pick one of its own category, app or website rules as its Block button default
+ * (`blockButtonRule`): its button then blocks and unblocks that rule for it ("Block Video",
+ * "Unblock Video"), even an always-on one, while all internet stays in the dropdown. The badge still
+ * says whether the group has the internet.
  */
 
-/** What a tap on the group's header button, or its More time link, does. */
-export type GroupRun = "block" | "moreBlock" | "unblock" | "unblockNow" | "resume" | "moreUnblock";
+/**
+ * The rule the group's Block button blocks and unblocks: its Block button default while that is
+ * still one of its own category, app or website rules. Undefined: all internet.
+ */
+export function blockButtonRule(group: Pick<Group, "id" | "blockButtonRuleId">, rules: Rule[]): Rule | undefined {
+  if (!group.blockButtonRuleId) return undefined;
+  return groupScopedRules(rules, group.id).find((rule) => rule.id === group.blockButtonRuleId && blockButtonChoice(rule));
+}
 
-export type GroupActionSpec = { label: string; run: GroupRun };
+/** A rule a group's Block button can stand for: a category, app or website rule, not built in. */
+export function blockButtonChoice(rule: Pick<Rule, "kind" | "builtIn">): boolean {
+  return rule.kind !== "internet" && !rule.builtIn;
+}
+
+/** What the group's Block button default is called, as the button and the settings list say it: "Video". */
+export function blockButtonName(rule: Rule, timezone: string, now: Date): string {
+  return blockingName(rule, now, timezone);
+}
+
+/** What a tap on the group's header button, or its More time link, does. */
+export type GroupRun =
+  | "block"
+  | "moreBlock"
+  | "unblock"
+  | "unblockNow"
+  | "resume"
+  | "moreUnblock"
+  // The group's Block button rule (`ruleId`, called `name`): lift it for the group from a sheet,
+  // put it back at once, or give its lift more time; or block it now whatever its schedule says,
+  // give that block more time, or end it at once.
+  | "pauseRule"
+  | "resumeRule"
+  | "moreRule"
+  | "blockRule"
+  | "moreRuleBlock"
+  | "endRuleBlock";
+
+export type GroupActionSpec = { label: string; run: GroupRun; ruleId?: string; name?: string };
 
 /**
  * A choice in the dropdown beside the card's button: block all internet (`blockInternet`, the Block
@@ -73,9 +112,12 @@ export function standingRule(rule: Pick<Rule, "kind" | "mode">): boolean {
   return rule.kind !== "internet" && rule.mode === "always";
 }
 
-/** The rules blocking the group now that its Unblock lifts: `rulesBlockingGroup` without its standing rules. */
-export function rulesToUnblock(group: Pick<Group, "id">, rules: Rule[], timezone: string, now: Date): BlockingRule[] {
-  const standing = new Set(rules.filter(standingRule).map((rule) => rule.id));
+/**
+ * The rules blocking the group now that its Unblock lifts: `rulesBlockingGroup` without its standing
+ * rules, but with its Block button rule even when that is always on, since its Unblock is for it.
+ */
+export function rulesToUnblock(group: Pick<Group, "id" | "blockButtonRuleId">, rules: Rule[], timezone: string, now: Date): BlockingRule[] {
+  const standing = new Set(rules.filter((rule) => standingRule(rule) && rule.id !== group.blockButtonRuleId).map((rule) => rule.id));
   return rulesBlockingGroup(group, rules, timezone, now).filter((rule) => !standing.has(rule.ruleId));
 }
 
@@ -196,10 +238,22 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     const detail = `${internet.name} ${until(internet.until, "· always")}`;
     return blocked("off", `Blocked · ${detail}`, detail);
   }
+  const ruleBlock = group.ruleBlock && rules.find((rule) => rule.id === group.ruleBlock!.ruleId);
+  if (group.ruleBlock && ruleBlock) {
+    const { until: end, by: who } = group.ruleBlock;
+    const detail = `${blockingName(ruleBlock, now, timezone)} blocked ${end ? until(end, "") : "until you unblock"}${by(who)}`;
+    return online("rule", `Online · ${detail}`, detail, "blocked");
+  }
   if (blocking.length) {
     const last = blocking[0]!.until;
     const detail = `${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}`;
     return online("rule", `Online · ${detail}`, detail);
+  }
+  const button = blockButtonRule(group, rules);
+  const buttonLift = button && groupLift(button, group.id, now);
+  if (button && buttonLift?.kind === "pause") {
+    const detail = `${blockingName(button, now, timezone)} unblocked ${until(buttonLift.until, "until you block it again")}${by(buttonLift.by)}`;
+    return online("on", `Online · ${detail}`, detail, "unblocked");
   }
   const unblock = groupUnblock(group, rules, now);
   if (unblock) {
@@ -230,11 +284,26 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     case "online":
       return online("on", label, state.next ? `${state.next.window} at ${formatClock(new Date(state.next.at), timezone)}` : "");
     case "no_rule":
+      // With nothing limiting its internet, a Block button rule says when it blocks next instead.
+      if (button) return online("on", label, blockButtonNext(button, timezone, now));
       return online("on", label, group.internetRuleIds.length === 0 ? "no internet rule" : "internet rule off");
     default:
       // A pause is the group's suspension, handled first.
       return online("on", label, "");
   }
+}
+
+/** A Block button rule that blocks nothing now: when it next does today or tomorrow ("Video at 9:00 PM"), or that it doesn't. */
+function blockButtonNext(rule: Rule, timezone: string, now: Date): string {
+  const name = blockingName(rule, now, timezone);
+  const day = 24 * 60 * 60_000;
+  const next = rule.enabled && !rulePaused(rule, now)
+    ? ruleInternetWindows(rule)
+        .map((window) => nextWindowStart(window, now, timezone))
+        .filter((start): start is Date => start !== null && start.getTime() - now.getTime() < day)
+        .sort((a, b) => a.getTime() - b.getTime())[0]
+    : undefined;
+  return next ? `${name} at ${formatClock(next, timezone)}` : `${name} not blocked`;
 }
 
 /** The line under a card's name starts like a sentence. */
@@ -269,6 +338,12 @@ export function groupDetailColor(change: GroupStatusParts["change"]): string {
  * rules: its own block, an internet rule, or a scheduled category, app or website rule even while
  * it has the internet. It lifts all of them (at once when only its own block does, otherwise from
  * a sheet). Resume ends an unblock; otherwise Block blocks all internet.
+ *
+ * With a Block button rule (Video), the button is that rule's while no block of all internet holds
+ * the group: "Unblock Video" while it blocks (lifting it for the group from a sheet, or ending at
+ * once the group's own block of it), "Block Video" with More time while it is lifted for the group
+ * (putting it back at once), and otherwise "Block Video" (blocking it now from a sheet), after a
+ * Resume for an unblock. Other rules blocking the group go to the dropdown.
  */
 export function groupHeaderActions(
   group: Group,
@@ -277,9 +352,29 @@ export function groupHeaderActions(
   now: Date,
 ): { action: GroupActionSpec; more: GroupActionSpec | null; menu: GroupMenuItem[] } {
   const blocking = rulesToUnblock(group, rules, timezone, now);
-  const header = (action: GroupActionSpec, more: GroupActionSpec | null) => ({ action, more, menu: groupMenu(group, rules, action.run, timezone, now) });
+  const header = (action: GroupActionSpec, more: GroupActionSpec | null) => ({ action, more, menu: groupMenu(group, rules, action, timezone, now) });
   if (group.suspension.active) {
     return header({ label: "Unblock", run: blocking.length ? "unblock" : "unblockNow" }, group.suspension.until ? { label: "More time", run: "moreBlock" } : null);
+  }
+  const button = blockButtonRule(group, rules);
+  if (button && !blocking.some((rule) => rule.kind === "internet")) {
+    const name = blockingName(button, now, timezone);
+    const spec = (label: string, run: GroupRun): GroupActionSpec => ({ label, run, ruleId: button.id, name });
+    if (group.ruleBlock?.ruleId === button.id) {
+      return header(spec(`Unblock ${name}`, "endRuleBlock"), group.ruleBlock.until ? spec("More time", "moreRuleBlock") : null);
+    }
+    if (blocking.some((rule) => rule.ruleId === button.id)) return header(spec(`Unblock ${name}`, "pauseRule"), null);
+    const lift = groupLift(button, group.id, now);
+    if (lift?.kind === "pause") return header(spec(`Block ${name}`, "resumeRule"), lift.until ? spec("More time", "moreRule") : null);
+    const unblocked = groupUnblock(group, rules, now);
+    if (unblocked) return header({ label: "Resume", run: "resume" }, unblocked.until ? { label: "More time", run: "moreUnblock" } : null);
+    return header(spec(`Block ${name}`, "blockRule"), null);
+  }
+  // A block of a rule that is no longer the Block button's still ends from the button.
+  const blocked = group.ruleBlock && !blocking.length ? rules.find((rule) => rule.id === group.ruleBlock!.ruleId) : undefined;
+  if (blocked) {
+    const name = blockingName(blocked, now, timezone);
+    return header({ label: `Unblock ${name}`, run: "endRuleBlock", ruleId: blocked.id, name }, null);
   }
   if (blocking.length) return header({ label: "Unblock", run: "unblock" }, null);
   const unblock = groupUnblock(group, rules, now);
@@ -295,11 +390,15 @@ export function groupHeaderActions(
  * ones), leaving out the one the button already lifts on its own; and "Block <rule> again" for each
  * rule paused for this group alone.
  */
-function groupMenu(group: Group, rules: Rule[], run: GroupRun, timezone: string, now: Date): GroupMenuItem[] {
+function groupMenu(group: Group, rules: Rule[], action: GroupActionSpec, timezone: string, now: Date): GroupMenuItem[] {
+  const { run } = action;
+  // The button already blocks and unblocks the group's Block button rule: the dropdown leaves it out.
+  const buttonRule = action.ruleId ?? null;
   const scoped = groupScopedRules(rules, group.id).filter((rule) => !rule.builtIn && rule.enabled && !rulePaused(rule, now));
-  const blocking = rulesBlockingGroup(group, rules, timezone, now);
+  const blocking = rulesBlockingGroup(group, rules, timezone, now).filter((rule) => rule.ruleId !== buttonRule);
   const blockingIds = new Set(blocking.map((rule) => rule.ruleId));
-  if (!scoped.some((rule) => rule.kind !== "internet" && (blockingIds.has(rule.id) || groupLift(rule, group.id, now)))) return [];
+  // With a Block button rule on the button, all internet is always one choice away.
+  if (!buttonRule && !scoped.some((rule) => rule.kind !== "internet" && (blockingIds.has(rule.id) || groupLift(rule, group.id, now)))) return [];
 
   const internetBlocked = group.suspension.active || blocking.some((rule) => rule.kind === "internet");
   const items: GroupMenuItem[] = [];
@@ -313,14 +412,14 @@ function groupMenu(group: Group, rules: Rule[], run: GroupRun, timezone: string,
     ...blocking.filter((rule) => standing.has(rule.ruleId)),
   ];
   // With nothing else blocking, the button's Unblock lifts exactly this one rule.
-  const sameAsButton = !group.suspension.active && scheduled.length === 1 ? scheduled[0]!.ruleId : null;
+  const sameAsButton = !buttonRule && !group.suspension.active && scheduled.length === 1 ? scheduled[0]!.ruleId : null;
   for (const item of ordered) {
     if (item.ruleId === sameAsButton) continue;
     const name = item.kind === "internet" ? item.name : (rules.find((rule) => rule.id === item.ruleId)?.name ?? item.name);
     items.push({ label: `Unblock ${name}`, run: "pause", ruleIds: [item.ruleId], name });
   }
   for (const rule of scoped) {
-    if (groupLift(rule, group.id, now)?.kind !== "pause") continue;
+    if (rule.id === buttonRule || groupLift(rule, group.id, now)?.kind !== "pause") continue;
     // An internet rule goes by its window, as its Unblock did ("Block Dinner again").
     const name = rule.kind === "internet" ? blockingName(rule, now, timezone) : rule.name;
     items.push({ label: `Block ${name} again`, run: "resume", ruleIds: [rule.id], name });
