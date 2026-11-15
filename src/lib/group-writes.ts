@@ -47,7 +47,6 @@ export function applyGroupPause(mutate: Mutate, group: Group, request: PauseShee
  */
 export function applyGroupSheet(mutate: Mutate, group: Group, target: GroupSheetTarget, request: PauseSheetRequest, timezone: string, now: Date = new Date()) {
   if (target.kind === "block") return applyGroupPause(mutate, group, request, timezone, now);
-  if (target.kind === "ruleBlock") return applyRuleBlock(mutate, group, target, request, timezone, now);
   if (target.kind === "unblock") {
     const path = `/api/v1/groups/${group.id}/unblock`;
     if (request.kind === "extend") {
@@ -74,45 +73,6 @@ export function applyGroupSheet(mutate: Mutate, group: Group, target: GroupSheet
     feedback: {
       notice: `${target.name.charAt(0).toUpperCase()}${target.name.slice(1)} ${target.wording === "unblock" ? "unblocked" : "paused"} for ${group.name} ${until(to, timezone)}.`,
       action: { label: "Undo", run: (send) => sendEach(send, paths, "resume") },
-    },
-  });
-}
-
-const capital = (name: string) => `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-
-/** The group's block of its Block button rule, from its sheet: more time, or block it until a time or until unblocked. */
-function applyRuleBlock(
-  mutate: Mutate,
-  group: Group,
-  target: { ruleId: string; name: string },
-  request: PauseSheetRequest,
-  timezone: string,
-  now: Date,
-) {
-  const path = `/api/v1/groups/${group.id}/rules/${target.ruleId}/block`;
-  if (request.kind === "extend") {
-    return mutate((send) => send(`${path}/extend`, { method: "POST", body: { minutes: request.minutes } }), { groupId: group.id });
-  }
-  if (request.kind === "current") return Promise.resolve(undefined);
-  const to = pauseUntil(request, now);
-  return mutate((send) => send(path, { method: "POST", body: to === null ? {} : { until: to } }), {
-    groupId: group.id,
-    feedback: {
-      notice: `${capital(target.name)} blocked for ${group.name} ${to ? until(to, timezone) : "until you unblock"}.`,
-      action: { label: "Undo", run: (send) => send(`${path}/end`, { method: "POST" }) },
-    },
-  });
-}
-
-/** The card's Unblock of its Block button rule while the group's own block holds it: ends that block at once, with Undo. */
-export function endRuleBlock(mutate: Mutate, group: Group, target: { ruleId: string; name: string }) {
-  const path = `/api/v1/groups/${group.id}/rules/${target.ruleId}/block`;
-  const until = group.ruleBlock?.ruleId === target.ruleId ? group.ruleBlock.until : null;
-  return mutate((send) => send(`${path}/end`, { method: "POST" }), {
-    groupId: group.id,
-    feedback: {
-      notice: `${capital(target.name)} unblocked for ${group.name}.`,
-      action: { label: "Undo", run: (send) => send(path, { method: "POST", body: until === null ? {} : { until } }) },
     },
   });
 }
@@ -266,10 +226,6 @@ export function runGroupCardAction(mutate: Mutate, group: Group, tap: GroupCardR
     if (tap.run === "pauseRule") return runGroupCardAction(mutate, group, { kind: "rule", run: "pause", ...rule }, openSheet);
     if (tap.run === "moreRule") return runGroupCardAction(mutate, group, { kind: "rule", run: "extend", ...rule }, openSheet);
     if (tap.run === "resumeRule") return void resumeGroupRules(mutate, group, rule.ruleIds, { name: tap.name, until: null });
-    const target = { ruleId: tap.ruleId, name: tap.name };
-    if (tap.run === "blockRule") return openSheet({ kind: "ruleBlock", ...target, mode: "pause" });
-    if (tap.run === "moreRuleBlock") return openSheet({ kind: "ruleBlock", ...target, mode: "extend" });
-    if (tap.run === "endRuleBlock") return void endRuleBlock(mutate, group, target);
   }
   if (tap.kind === "rule") {
     if (tap.run === "resume") {

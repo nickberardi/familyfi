@@ -7,8 +7,6 @@ import {
   pauseSheetOptions,
   pauseSheetTitle,
   rulePauseSheetCustom,
-  ruleBlockSheetBody,
-  ruleBlockSheetTitle,
   rulePauseSheetOptions,
   unblockSheetBody,
   unblockSheetCustom,
@@ -30,9 +28,7 @@ import type { Device, Group } from "./types";
 export type GroupSheetTarget =
   | { kind: "block"; mode: PauseSheetMode }
   | { kind: "unblock"; mode: PauseSheetMode }
-  | { kind: "rule"; ruleIds: string[]; name: string; mode: PauseSheetMode; wording?: "unblock" }
-  /** The group's own block of its Block button rule (`ruleId`, called `name`), whatever that rule's schedule says. */
-  | { kind: "ruleBlock"; ruleId: string; name: string; mode: PauseSheetMode };
+  | { kind: "rule"; ruleIds: string[]; name: string; mode: PauseSheetMode; wording?: "unblock" };
 
 /**
  * A group sheet as every client shows it: its title and body, the choices from the group's rules
@@ -51,7 +47,7 @@ export function groupSheet(
 ) {
   const { mode } = target;
   const unblocking = target.kind === "unblock" || (target.kind === "rule" && target.wording === "unblock");
-  const confirm = mode === "extend" ? "Add time" : target.kind === "block" || target.kind === "ruleBlock" ? "Block" : unblocking ? "Unblock" : "Pause";
+  const confirm = mode === "extend" ? "Add time" : target.kind === "block" ? "Block" : unblocking ? "Unblock" : "Pause";
   let sheet: { title: string; body: string; options: PauseSheetOption[]; custom: (custom: CustomPause, at?: Date) => PauseSheetOption | null };
   if (target.kind === "block") {
     const deviceNames = devices.filter((device) => device.groupId === group.id).map((device) => device.hostname ?? "");
@@ -60,17 +56,6 @@ export function groupSheet(
       body: pauseSheetBody(group, mode, deviceNames),
       options: pauseSheetOptions(group, internetWindowsForGroup(rules, group.id, now), mode, timezone, now),
       custom: (custom, at = now) => pauseSheetCustom(group, custom, mode, timezone, at),
-    };
-  } else if (target.kind === "ruleBlock") {
-    // The same choices as the group's block, counted from this block's end when it has one.
-    const block = group.ruleBlock?.ruleId === target.ruleId ? group.ruleBlock : null;
-    const state = { suspension: { active: Boolean(block), until: block?.until ?? null, by: block?.by ?? null } };
-    const windows = rules.filter((rule) => rule.id === target.ruleId).flatMap(ruleInternetWindows);
-    sheet = {
-      title: ruleBlockSheetTitle(group, target.name, mode),
-      body: ruleBlockSheetBody(group, target.name, mode),
-      options: pauseSheetOptions(state, windows, mode, timezone, now),
-      custom: (custom, at = now) => pauseSheetCustom(state, custom, mode, timezone, at),
     };
   } else if (target.kind === "unblock") {
     const unblock = groupUnblock(group, rules, now);

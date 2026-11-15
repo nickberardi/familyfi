@@ -259,16 +259,6 @@ export function groupRuleSheetBody(group: Pick<Group, "name">, name: string, mod
   return `${name} stops blocking ${group.name}. Other groups, and the rule itself, stay as they are.`;
 }
 
-/** The sheet for blocking a group's Block button rule now, whatever its schedule says. */
-export function ruleBlockSheetTitle(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
-  return mode === "extend" ? `Keep ${name} blocked for ${group.name} longer?` : `Block ${name} for ${group.name}?`;
-}
-
-export function ruleBlockSheetBody(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
-  if (mode === "extend") return `${name} stays blocked for longer. Unblock ends it sooner.`;
-  return `${name} is blocked for ${group.name} now, whatever its schedule says. The rest of the internet, other groups and the rule itself stay as they are.`;
-}
-
 function listNames(items: string[]): string {
   const unique = [...new Set(items)];
   return unique.length <= 1 ? (unique[0] ?? "") : `${unique.slice(0, -1).join(", ")} and ${unique.at(-1)}`;

@@ -1,6 +1,5 @@
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
-import { BLOCK_CLEARED } from "@/server/group-internet";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { mapLimited } from "@/lib/concurrency";
@@ -134,12 +133,11 @@ export async function DELETE(request: Request, ctx: Ctx) {
         // Desired-state delete still proceeds; Sync will surface connection errors.
       }
     }
-    // A group whose Block button stood for it goes back to all internet, and its block of it ends.
+    // A group whose Block button stood for it goes back to all internet.
     await prisma().$transaction([
       prisma().rulePolicy.deleteMany({ where: { ruleId: id } }),
       prisma().rule.delete({ where: { id } }),
       prisma().group.updateMany({ where: { blockButtonRuleId: id }, data: { blockButtonRuleId: null } }),
-      prisma().rule.updateMany({ where: { blocksRuleId: id, enabled: true }, data: BLOCK_CLEARED }),
     ]);
     const change = await enqueueChange("rule");
     return Response.json({ change });
@@ -148,14 +146,8 @@ export async function DELETE(request: Request, ctx: Ctx) {
 
 /**
  * A group the rule no longer covers goes back to all internet if its Block button stood for the
- * rule, and its own block of the rule ends, so neither comes back if the group is added again.
+ * rule, so it doesn't come back if the group is added again.
  */
 async function releaseUncoveredGroups(ruleId: string, groupIds: string[]) {
-  await prisma().$transaction([
-    prisma().group.updateMany({ where: { blockButtonRuleId: ruleId, id: { notIn: groupIds } }, data: { blockButtonRuleId: null } }),
-    prisma().rule.updateMany({
-      where: { blocksRuleId: ruleId, enabled: true, systemGroupId: { notIn: groupIds } },
-      data: BLOCK_CLEARED,
-    }),
-  ]);
+  await prisma().group.updateMany({ where: { blockButtonRuleId: ruleId, id: { notIn: groupIds } }, data: { blockButtonRuleId: null } });
 }

@@ -539,9 +539,6 @@ model Rule {
   systemGroupId    String?      @unique
   systemGroup      Group?       @relation("SystemRule", fields: [systemGroupId], references: [id], onDelete: Cascade)
   expiresAt        DateTime? @db.Timestamptz(3)
-  /// On a group's built-in block rule: the rule whose categories, apps or websites it blocks,
-  /// the group's Block button default when the block began. Null: it blocks all internet.
-  blocksRuleId     String?
   /// Who started the block, as they were named then.
   blockedByAccountId String?
   blockedByName    String?

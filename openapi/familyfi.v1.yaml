@@ -1753,155 +1753,13 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/rules/{ruleId}/block:
-    post:
-      operationId: blockGroupRule
-      tags: [Rules]
-      summary: Block one of a group's rules now
-      description: |
-        Blocks the rule's categories, apps or websites for this group now, whatever the rule's schedule says, until `until`, or until ended when it is left out or null. It is the group's own block (the same hidden always-on rule as a pause of all internet), so a pause and this block replace each other, and the group's unblock ends it. It blocks what the rule blocks now, so an edit to the rule reaches it, and it ends when the rule is deleted or no longer covers the group. The rule itself is untouched, and it blocks even while the rule is off or paused. What a card's Block button does when the rule is the group's Block button default, and only that rule: 409 `not_block_button_default` for any other. 404 when the group does not have the rule, or it is an internet or built-in rule.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-        - name: ruleId
-          in: path
-          required: true
-          description: One of the group's own category, app or website rules.
-          schema: { type: string }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                until: { type: [string, "null"], format: date-time }
-      responses:
-        "200":
-          description: Done
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/rules/{ruleId}/block/end:
-    post:
-      operationId: endGroupRuleBlock
-      tags: [Rules]
-      summary: End a group's block of one of its rules
-      description: |
-        Ends the group's own block of the rule, so the rule's schedule applies again. Nothing to end is not an error. A pause of all internet is ended by `/groups/{id}/rules/internet/resume`, not here.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-        - name: ruleId
-          in: path
-          required: true
-          description: One of the group's own category, app or website rules.
-          schema: { type: string }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      responses:
-        "200":
-          description: Done
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/rules/{ruleId}/block/extend:
-    post:
-      operationId: extendGroupRuleBlock
-      tags: [Rules]
-      summary: Add time to a group's block of one of its rules
-      description: |
-        Adds `minutes` to the group's timed block of the rule. 409 `not_blocked` when the group has no block of this rule, `indefinite` when it has no end time.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-        - name: ruleId
-          in: path
-          required: true
-          description: One of the group's own category, app or website rules.
-          schema: { type: string }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [minutes]
-              properties:
-                minutes: { type: integer, minimum: 1 }
-      responses:
-        "200":
-          description: Done
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
   /api/v1/groups/{id}/unblock:
     post:
       operationId: unblockGroup
       tags: [Rules]
       summary: Unblock a group
       description: |
-        Lifts whatever blocks the group now, for this group alone, whatever kind of rule it is, except an always-on category, app or website rule: that is how the group is set up rather than a block on it, so an unblock never lifts it (pause or allow it for the group from its rule instead). The group's pause ends, and each rule blocking it now is allowed for the group until that rule's active windows end; an always-on rule until the unblock is ended. Given `until`, every other enabled rule the group has is allowed until then, including windows that start meanwhile. Each lift is the rule's allowance for this group, as `/groups/{id}/rules/{ruleId}/allow` makes: its devices leave the rule's policies and the rule is unchanged for everyone else. A rule paused for everyone or for this group is left as it is. Only rules that name the group are lifted: a rule for whole networks has no allowance per group and is paused for everyone instead. 409 `not_blocked` when nothing is blocking the group and no `until` is given.
+        Lifts whatever blocks the group now, for this group alone, whatever kind of rule it is, except an always-on category, app or website rule: that is how the group is set up rather than a block on it, so an unblock never lifts it (pause or allow it for the group from its rule instead), unless it is the group's Block button default (`Group.blockButtonRuleId`). The group's pause ends, and each rule blocking it now is allowed for the group until that rule's active windows end; an always-on rule until the unblock is ended. Given `until`, every other enabled rule the group has is allowed until then, including windows that start meanwhile. Each lift is the rule's allowance for this group, as `/groups/{id}/rules/{ruleId}/allow` makes: its devices leave the rule's policies and the rule is unchanged for everyone else. A rule paused for everyone or for this group is left as it is. Only rules that name the group are lifted: a rule for whole networks has no allowance per group and is paused for everyone instead. 409 `not_blocked` when nothing is blocking the group and no `until` is given.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -4359,25 +4217,11 @@ components:
           type: string
           description: |
             The group's Block button default: one of its own category, app or website rules,
-            which its card's Block button (still labelled Block and Unblock) blocks and unblocks
-            instead of all internet. Absent for all internet, and whenever the rule it named no
-            longer covers the group or was deleted. Set with `PUT /groups/{id}`.
-        ruleBlock:
-          $ref: "#/components/schemas/RuleBlock"
-    RuleBlock:
-      type: object
-      additionalProperties: false
-      required: [ruleId, until, by]
-      description: |
-        Read-only. The group's own block of one of its category, app or website rules, whatever
-        that rule's schedule says (`POST /groups/{id}/rules/{ruleId}/block`), until `until`, or
-        until ended when null. It is not a pause: the group keeps its internet, and `suspension`
-        and `access` do not change. Absent when there is none. A pause of all internet and this
-        block replace each other.
-      properties:
-        ruleId: { type: string }
-        until: { type: [string, "null"], format: date-time }
-        by: { $ref: "#/components/schemas/Actor" }
+            which its card's Block button (still labelled Block and Unblock) unblocks for the
+            group and puts back (`/groups/{id}/rules/{ruleId}/pause` and `/resume`) instead of
+            blocking all internet. The group's unblock lifts it even when it is always on. Absent
+            for all internet, and whenever the rule it named no longer covers the group or was
+            deleted. Set with `PUT /groups/{id}`.
     GroupCreate:
       type: object
       additionalProperties: false

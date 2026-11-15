@@ -25,10 +25,10 @@ examples, the TV group has **Video** and **Social** blocked all day, and **Gamin
 | 5 | have all-day rules treated as setup, not as a block | a TV that never gets Social doesn't read "blocked" all day | At 9 AM with no default, TV reads Online and the button reads **Block** (all internet). Unblock never lifts Video or Social. |
 | 6 | choose one all-day rule that the card's button controls | I can let the TV play video tonight without switching the rule off for everyone | With Video as the **Block button default**: at 9 AM the button reads **Unblock** and opens "Unblock Video for TV?". After an hour's unblock it reads **Block** + More time, and Block puts Video back at once. |
 | 7 | still clear everything with one Unblock when a default is set | the default never hides other blocks | With Video as default, at 11 AM Unblock lifts Video and Gaming together. Social stays. |
-| 8 | block the default rule now, outside its schedule | I can stop video early tonight | With Video scheduled 7 to 9 PM as the default, at 3 PM the button reads **Block** and opens "Block Video for TV?". The line reads "Video blocked until 5:00 PM by Sam", the badge stays Online, and Unblock ends it at once. |
+| 8 | have Block still mean all internet when the default isn't blocking | the button never does nothing | With Video scheduled 7 to 9 PM as the default, at 3 PM the button reads **Block** and pauses all internet, as with no default. The line says when Video blocks next ("Video at 7:00 PM"). |
 | 9 | keep blocking all internet one tap away when a default is set | the default doesn't take that away | The dropdown shows **Block internet**. |
 | 10 | have a button I can always read the same way | I never have to wonder what it does | The button only ever reads **Block**, **Unblock** or **Resume**. It never names a rule. Only the sheets and the status line name one. |
-| 11 | have Siri and the Control Center / Quick Settings switch agree with the badge | "Block TV" means the internet | Siri's Block and turning the switch on pause all internet. Siri's Unblock and turning the switch off send the group unblock with no time (`POST /groups/{id}/unblock`), so they lift the default too. Unlike the card's B2, this is an unblock, so the card then reads Resume. When nothing can be lifted, Siri offers to lift one all-day rule for a while. The switch is on exactly when the badge reads Blocked. |
+| 11 | have Siri and the Control Center / Quick Settings switch agree with the badge | "Block TV" means the internet | Siri's Block and turning the switch on pause all internet. Siri's Unblock and turning the switch off send the group unblock with no time (`POST /groups/{id}/unblock`), so they lift the default too. Unlike the card's B1, this is an unblock, so the card then reads Resume. When nothing can be lifted, Siri offers to lift one all-day rule for a while. The switch is on exactly when the badge reads Blocked. |
 
 ## 2. Design
 
@@ -41,13 +41,12 @@ examples, the TV group has **Video** and **Social** blocked all day, and **Gamin
 | **All-day rule** | A category, app or website rule that is always on. It is how the group is set up. | Rules page | `kind` ≠ internet, `mode: "always"` (`standingRule`) |
 | **Block button default** | One of the group's own category, app or website rules, picked so the button controls it. Optional. | Group's Edit sheet | `Group.blockButtonRuleId`, read through `blockButtonRule()` |
 | **Pause** | The group's own block of all internet. | Block | `Group.suspension` |
-| **Rule block** | The group's own block of the default rule, whatever that rule's schedule says. It shares one hidden rule with the pause, so only one of the two can be on. | Block, with a default | `Group.ruleBlock` |
 | **Unblock** | Every rule that was blocking is lifted for this group, until a time. They are put back together. | Unblock | `groupPauses` entries of kind `allow` |
 | **Rule lift** | One rule is lifted for this group, until a time. | The dropdown's Unblock <rule>, or Unblock on the default | `groupPauses` entries of kind `pause` |
 
 A rule that is switched off or paused for everyone does not block any group, so it is not
-blocking (3.1). Two exceptions: a rule block keeps blocking while its rule is off or paused, and an
-internet rule paused for everyone is reported on the status line (3.5 case 7).
+blocking (3.1). An internet rule paused for everyone is still reported on the status line (3.5
+case 6).
 
 ### What the card shows
 
@@ -69,29 +68,23 @@ flowchart TD
   start([Group card]) --> paused{Paused?}
   paused -- yes --> A["<b>Unblock</b> + More time<br/>ends the pause and anything else blocking"]
   paused -- no --> hasD{Default set, and nothing<br/>but the default blocking?}
-  hasD -- yes --> rb{Rule block on?}
-  rb -- yes --> B1["<b>Unblock</b> + More time<br/>ends the rule block"]
-  rb -- no --> dBlocks{Default blocking now?}
-  dBlocks -- yes --> B2["<b>Unblock</b><br/>sheet: Unblock Video for TV?"]
+  hasD -- yes --> dBlocks{Default blocking now?}
+  dBlocks -- yes --> B1["<b>Unblock</b><br/>sheet: Unblock Video for TV?"]
   dBlocks -- no --> dLifted{Default lifted<br/>for this group?}
-  dLifted -- yes --> B3["<b>Block</b> + More time<br/>puts the default back"]
-  dLifted -- no --> unb1{Unblock running?}
-  unb1 -- yes --> B4["<b>Resume</b> + More time"]
-  unb1 -- no --> B5["<b>Block</b><br/>sheet: Block Video for TV?"]
-  hasD -- no --> stale{Rule block on, for a rule<br/>that is no longer the default?}
-  stale -- "yes, and nothing blocking" --> C["<b>Unblock</b><br/>ends that rule block"]
-  stale -- no --> any{Anything blocking?}
-  any -- yes --> D["<b>Unblock</b><br/>sheet: lifts everything blocking"]
-  any -- no --> unb2{Unblock running?}
-  unb2 -- yes --> E["<b>Resume</b> + More time"]
-  unb2 -- no --> F["<b>Block</b><br/>sheet: pauses all internet"]
+  dLifted -- yes --> B2["<b>Block</b> + More time<br/>puts the default back"]
+  dLifted -- no --> any
+  hasD -- no --> any{Anything blocking?}
+  any -- yes --> C["<b>Unblock</b><br/>sheet: lifts everything blocking"]
+  any -- no --> unb{Unblock running?}
+  unb -- yes --> D["<b>Resume</b> + More time"]
+  unb -- no --> E["<b>Block</b><br/>sheet: pauses all internet"]
 ```
 
 ## 3. Spec
 
 Code: `src/lib/group-actions.ts` (`rulesToUnblock`, `groupHeaderActions`, `groupMenu`,
 `groupStatusParts`), `src/lib/group-writes.ts` (`runGroupCardAction`), and on the server
-`src/server/group-unblock.ts`, `group-internet.ts` and `group-rule-block.ts`. These functions are
+`src/server/group-unblock.ts` and `group-internet.ts`. These functions are
 tested through the vectors in `tests/fixtures/display-vectors.json`, which the web, the app, the
 Apple Watch (`Display.swift`) and Wear OS (`Display.kt`) all replay. Add a case there, not a separate
 test. Change the spec, the code and the vectors together, then port
@@ -107,14 +100,14 @@ A rule is **blocking** a group when all of these hold:
 - one of its windows is active now (an always-on rule's window always is);
 - it is not an all-day rule, **unless** it is the default.
 
-In code this is `rulesToUnblock(G)`. The pause and the rule block are not rules in this list; they are
-read from the group.
+In code this is `rulesToUnblock(G)`. The pause is not a rule in this list; it is read from the
+group.
 
 ### 3.2 Badge
 
 **Blocked** when the group is paused or an internet rule is blocking. **Online** in every other
-case, including a rule block or a blocking category rule. (The code has one more path: the status
-line's fallback, 3.5 case 8, reads Blocked for an internet window that 3.1 skipped. Only a built-in
+case, including while a category rule or the default blocks. (The code has one more path: the status
+line's fallback, 3.5 case 7, reads Blocked for an internet window that 3.1 skipped. Only a built-in
 internet rule covering the group could reach it, and none does today.) The Block switch outside the app is on
 exactly when the badge reads Blocked.
 
@@ -125,18 +118,17 @@ This is the diagram above, as a table. The first matching row wins.
 | # | When | Button | Request |
 | --- | --- | --- | --- |
 | A | Paused | Unblock (+ More time if timed) | Sheet, `POST /groups/{id}/unblock`. If nothing else is blocking, that request is sent at once. |
-| B1 | Default set and nothing else blocking, and the rule block is on | Unblock (+ More time if timed) | At once, `POST /groups/{id}/rules/{default}/block/end` |
-| B2 | …, and the default is blocking | Unblock | Sheet, `POST /groups/{id}/rules/{default}/pause` (a rule lift) |
-| B3 | …, and the default has a rule lift | Block (+ More time if timed) | At once, `POST /groups/{id}/rules/{default}/resume` |
-| B4 | …, and an unblock is running | Resume (+ More time if timed) | At once, `POST /groups/{id}/unblock/end` |
-| B5 | …, otherwise | Block | Sheet, `POST /groups/{id}/rules/{default}/block` |
-| C | The rule block is on for a rule that is no longer the default, and nothing is blocking | Unblock | At once, `.../rules/{that rule}/block/end`. This is a fallback: changing the default already ends the old block. |
-| D | Anything blocking | Unblock | Sheet, `POST /groups/{id}/unblock` |
-| E | An unblock is running | Resume (+ More time if timed) | At once, `POST /groups/{id}/unblock/end` |
-| F | Otherwise | Block | Sheet, `POST /groups/{id}/rules/internet/pause` |
+| B1 | A default is set, nothing but the default is blocking, and the default is blocking | Unblock | Sheet "Unblock Video for TV?", `POST /groups/{id}/rules/{default}/pause` (a rule lift) |
+| B2 | A default is set, nothing is blocking, and the default has a rule lift | Block (+ More time if timed) | At once, `POST /groups/{id}/rules/{default}/resume` |
+| C | Anything blocking | Unblock | Sheet, `POST /groups/{id}/unblock` |
+| D | An unblock is running | Resume (+ More time if timed) | At once, `POST /groups/{id}/unblock/end` |
+| E | Otherwise | Block | Sheet, `POST /groups/{id}/rules/internet/pause` |
 
-A request from a sheet, and B1, B3 and C, are followed by a notice with Undo. Row A's at-once request
-and Resume (B4, E) show "Saved." with no Undo.
+With a default set, rows B1 and B2 are the only difference. Every other state falls through to C, D
+or E as if there were no default, so Block always means all internet.
+
+A request from a sheet, and B2, are followed by a notice with Undo. Row A's at-once request and
+Resume (D) show "Saved." with no Undo.
 
 **What Unblock lifts** (`runGroupUnblock`). A rule covering the group is a candidate unless it is:
 
@@ -152,20 +144,20 @@ A rule the group has already unblocked stays a candidate, so its time is renewed
 - **With a time**, it lifts every candidate until then, including scheduled rules whose window has not
   started yet.
 
-It also ends the pause or the rule block. It answers 409 `not_blocked` only when there is no
-candidate to lift and neither the pause nor the rule block is on.
+It also ends the pause. It answers 409 `not_blocked` only when there is no candidate to lift and
+the group isn't paused.
 
 ### 3.4 Dropdown
 
-The dropdown appears while the button carries a rule (rows B1, B2, B3, B5 and C), or while a
+The dropdown appears while the button acts on the default (rows B1 and B2), or while a
 category, app or website rule other than the button's is blocking or lifted for the group. Here
 "blocking" includes all-day rules. It lists:
 
 1. **Block internet**, unless the internet is already blocked, or the button is already Block for
-   all internet (row F).
+   all internet (row E).
 2. **Unblock <rule>** for each rule blocking now, all-day rules included: internet rules first, then
    scheduled rules, then all-day rules (the default among them). Each one lifts only that rule.
-   Two rules are left out: the button's own rule, and, when the button's Unblock (row D)
+   Two rules are left out: the button's own rule, and, when the button's Unblock (row C)
    would lift exactly one rule, that rule, since the button already does it.
 3. **Block <rule> again** for each rule with a rule lift, other than the button's rule.
 
@@ -177,12 +169,11 @@ The first matching case wins.
 | --- | --- | --- | --- |
 | 1 | Paused | "Until 6:00 PM by Sam" / "Until you unblock, by Sam" | red |
 | 2 | An internet rule is blocking | "Dinner until 8:00 PM" / "Dinner · always" | grey |
-| 3 | The rule block is on | "Video blocked until 5:00 PM by Sam" / "Video blocked by Sam until you unblock" | red |
-| 4 | Anything is blocking | "Gaming blocked until 12:00 PM". Several rules are joined as "Video and Gaming blocked", with the latest end time, and with no time when one never ends. | grey |
-| 5 | The default has a rule lift | "Video unblocked until 10:00 AM by Sam" / "… until you block it again" | green |
-| 6 | An unblock is running | "Unblocked until 12:00 PM by Sam" | green |
-| 7 | Every internet rule that applies is paused for this group; or an internet rule is paused or allowed for everyone and no internet window is in effect | "Internet rule paused until …" / "Internet rule paused for everyone until …" / "Internet rule allowed for everyone until …" | green |
-| 8 | Otherwise: the internet schedule | The next internet window ("Dinner at 6:00 PM"), or empty if none. "Allowed until … by Sam" (green) while the schedule is allowed. "No internet rule", or "Internet rule off" when the group's internet rules are all off. With a default and no internet window in effect, it says when the default next blocks instead: "Video at 7:00 PM" if its next window starts within 24 hours, otherwise "Video not blocked". | grey |
+| 3 | Anything is blocking | "Gaming blocked until 12:00 PM". Several rules are joined as "Video and Gaming blocked", with the latest end time, and with no time when one never ends. | grey |
+| 4 | The default has a rule lift | "Video unblocked until 10:00 AM by Sam" / "… until you block it again" | green |
+| 5 | An unblock is running | "Unblocked until 12:00 PM by Sam" | green |
+| 6 | Every internet rule that applies is paused for this group; or an internet rule is paused or allowed for everyone and no internet window is in effect | "Internet rule paused until …" / "Internet rule paused for everyone until …" / "Internet rule allowed for everyone until …" | green |
+| 7 | Otherwise: the internet schedule | The next internet window ("Dinner at 6:00 PM"), or empty if none. "Allowed until … by Sam" (green) while the schedule is allowed. "No internet rule", or "Internet rule off" when the group's internet rules are all off. With a default and no internet window in effect, it says when the default next blocks instead: "Video at 7:00 PM" if its next window starts within 24 hours, otherwise "Video not blocked". | grey |
 
 The button's sheets and the status line name the default by its categories when it blocks only
 categories FamilyFi knows ("Video", or "Video and Social"), and by the rule's own name otherwise. If
@@ -195,13 +186,12 @@ The TV group from section 1.
 
 | Default | Time and state | Badge | Line | Button (row) | Dropdown |
 | --- | --- | --- | --- | --- | --- |
-| none | 9 AM | Online | No internet rule | Block (F) | Unblock Video, Unblock Social |
+| none | 9 AM | Online | No internet rule | Block (E) | Unblock Video, Unblock Social |
 | none | 9 AM, paused until 6 PM | Blocked | Until 6:00 PM by Sam | Unblock + More time (A) | Unblock Video, Unblock Social |
-| none | 11 AM | Online | Gaming blocked until 12:00 PM | Unblock (D) | Block internet, Unblock Video, Unblock Social |
-| none | 11 AM, unblocked | Online | Unblocked until 12:00 PM by Sam | Resume + More time (E) | Block internet, Unblock Video, Unblock Social |
-| Video | 9 AM | Online | Video blocked | Unblock (B2) | Block internet, Unblock Social |
-| Video | 9 AM, Video lifted for an hour | Online | Video unblocked until 10:00 AM by Sam | Block + More time (B3) | Block internet, Unblock Social |
-| Video | 11 AM | Online | Video and Gaming blocked | Unblock (D) | Block internet, Unblock Gaming, Unblock Video, Unblock Social |
-| Video | 11 AM, Video already lifted | Online | Gaming blocked until 12:00 PM | Unblock (D) | Block internet, Unblock Social, Block Video again |
-| Video, scheduled 7 to 9 PM | 3 PM | Online | Video at 7:00 PM | Block (B5) | Block internet, Unblock Social |
-| Video, scheduled 7 to 9 PM | 3 PM, rule block until 5 PM | Online | Video blocked until 5:00 PM by Sam | Unblock + More time (B1) | Block internet, Unblock Social |
+| none | 11 AM | Online | Gaming blocked until 12:00 PM | Unblock (C) | Block internet, Unblock Video, Unblock Social |
+| none | 11 AM, unblocked | Online | Unblocked until 12:00 PM by Sam | Resume + More time (D) | Block internet, Unblock Video, Unblock Social |
+| Video | 9 AM | Online | Video blocked | Unblock (B1) | Block internet, Unblock Social |
+| Video | 9 AM, Video lifted for an hour | Online | Video unblocked until 10:00 AM by Sam | Block + More time (B2) | Block internet, Unblock Social |
+| Video | 11 AM | Online | Video and Gaming blocked | Unblock (C) | Block internet, Unblock Gaming, Unblock Video, Unblock Social |
+| Video | 11 AM, Video already lifted | Online | Gaming blocked until 12:00 PM | Unblock (C) | Block internet, Unblock Social, Block Video again |
+| Video, scheduled 7 to 9 PM | 3 PM | Online | Video at 7:00 PM | Block (E): pauses all internet | Unblock Social |

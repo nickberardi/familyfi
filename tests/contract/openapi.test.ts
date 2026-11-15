@@ -65,7 +65,6 @@ describe("openapi contract", () => {
       "CheckupFinding.details.drift.changes.familyfi", // every change but `other`
       "CheckupFinding.details.drift.changes.gateway", // every change but `other`
       "Group.blockButtonRuleId", // only when the group's Block button blocks one of its rules, not all internet
-      "Group.ruleBlock", // only while the group blocks its Block button rule on its own
       "Rule.groupIds", // only when scope is group, never on quarantine
       "Rule.groupPauses", // only when scope is group, never on quarantine
       "Rule.networkIds", // only when scope is network

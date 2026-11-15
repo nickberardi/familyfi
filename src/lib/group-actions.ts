@@ -74,14 +74,10 @@ export type GroupRun =
   | "resume"
   | "moreUnblock"
   // The group's Block button rule (`ruleId`, called `name`): lift it for the group from a sheet,
-  // put it back at once, or give its lift more time; or block it now whatever its schedule says,
-  // give that block more time, or end it at once.
+  // put it back at once, or give its lift more time.
   | "pauseRule"
   | "resumeRule"
-  | "moreRule"
-  | "blockRule"
-  | "moreRuleBlock"
-  | "endRuleBlock";
+  | "moreRule";
 
 export type GroupActionSpec = { label: string; run: GroupRun; ruleId?: string; name?: string };
 
@@ -254,13 +250,6 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     const detail = `${internet.name} ${until(internet.until, "· always")}`;
     return blocked("off", `Blocked · ${detail}`, detail);
   }
-  const ruleBlock = group.ruleBlock && rules.find((rule) => rule.id === group.ruleBlock!.ruleId);
-  if (group.ruleBlock && ruleBlock) {
-    const { until: end, by: who } = group.ruleBlock;
-    const name = blockButtonName(ruleBlock, rules, group.id, timezone, now);
-    const detail = end ? `${name} blocked ${until(end, "")}${by(who)}` : `${name} blocked${by(who)} until you unblock`;
-    return online("rule", `Online · ${detail}`, detail, "blocked");
-  }
   if (blocking.length) {
     const last = blocking[0]!.until;
     const detail = `${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}`;
@@ -359,9 +348,9 @@ export function groupDetailColor(change: GroupStatusParts["change"]): string {
  * A Block button rule (Video) counts like a scheduled rule even when it is always on, so Unblock
  * shows while it blocks and the group's Unblock lifts it with the rest. While nothing else blocks the
  * group, the button acts on that rule alone, still reading Block and Unblock: Unblock while it
- * blocks (lifting it for the group from a sheet, or ending at once the group's own block of it),
- * Block with More time while it is lifted for the group (putting it back at once), and otherwise
- * Block (blocking it now from a sheet), after a Resume for an unblock.
+ * blocks (lifting it for the group from a sheet), and Block with More time while it is lifted for
+ * the group (putting it back at once). Otherwise the button is as without one: Resume for an
+ * unblock, and Block for all internet.
  */
 export function groupHeaderActions(
   group: Group,
@@ -380,21 +369,9 @@ export function groupHeaderActions(
   if (button && blocking.every((rule) => rule.ruleId === button.id)) {
     const name = blockButtonName(button, rules, group.id, timezone, now);
     const spec = (label: string, run: GroupRun): GroupActionSpec => ({ label, run, ruleId: button.id, name });
-    if (group.ruleBlock?.ruleId === button.id) {
-      return header(spec("Unblock", "endRuleBlock"), group.ruleBlock.until ? spec("More time", "moreRuleBlock") : null);
-    }
     if (blocking.some((rule) => rule.ruleId === button.id)) return header(spec("Unblock", "pauseRule"), null);
     const lift = buttonRuleLift(button, group.id, now);
     if (lift?.kind === "pause") return header(spec("Block", "resumeRule"), lift.until ? spec("More time", "moreRule") : null);
-    const unblocked = groupUnblock(group, rules, now);
-    if (unblocked) return header({ label: "Resume", run: "resume" }, unblocked.until ? { label: "More time", run: "moreUnblock" } : null);
-    return header(spec("Block", "blockRule"), null);
-  }
-  // A block of a rule that is no longer the Block button's still ends from the button.
-  const blocked = group.ruleBlock && !blocking.length ? rules.find((rule) => rule.id === group.ruleBlock!.ruleId) : undefined;
-  if (blocked) {
-    const name = blockingName(blocked, now, timezone);
-    return header({ label: "Unblock", run: "endRuleBlock", ruleId: blocked.id, name }, null);
   }
   if (blocking.length) return header({ label: "Unblock", run: "unblock" }, null);
   const unblock = groupUnblock(group, rules, now);
