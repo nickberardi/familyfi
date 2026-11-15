@@ -66,7 +66,7 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   pauseSheetOptions: (i) => pauseSheet.pauseSheetOptions(i.group, i.windows, i.mode, i.timeZone, at(i.now)),
   rulePauseSheetTitle: (i) => pauseSheet.rulePauseSheetTitle(i.rule, i.mode),
   rulePauseSheetBody: (i) => pauseSheet.rulePauseSheetBody(i.rule, i.mode),
-  rulePauseSheetOptions: (i) => pauseSheet.rulePauseSheetOptions(i.rule, i.windows, i.mode, i.timeZone, at(i.now)),
+  rulePauseSheetOptions: (i) => pauseSheet.rulePauseSheetOptions(i.rule, i.windows, i.mode, i.timeZone, at(i.now), i.wording),
   unblockSheetTitle: (i) => pauseSheet.unblockSheetTitle(i.group, i.mode),
   unblockSheetBody: (i) => pauseSheet.unblockSheetBody(i.group, i.blocking, i.mode),
   unblockSheetOptions: (i) => pauseSheet.unblockSheetOptions(i.unblock, i.blocking, i.mode, i.timeZone, at(i.now)),
@@ -78,7 +78,7 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   // Each device keeps its last custom choice in this shape, so every client reads back the same.
   parseCustomPause: (i) => pauseSheet.parseCustomPause(i.stored),
   groupRuleSheetTitle: (i) => pauseSheet.groupRuleSheetTitle(i.group, i.name, i.mode, i.wording),
-  groupRuleSheetBody: (i) => pauseSheet.groupRuleSheetBody(i.group, i.name, i.mode),
+  groupRuleSheetBody: (i) => pauseSheet.groupRuleSheetBody(i.group, i.name, i.mode, i.wording),
   ruleBlockSheetTitle: (i) => pauseSheet.ruleBlockSheetTitle(i.group, i.name, i.mode),
   ruleBlockSheetBody: (i) => pauseSheet.ruleBlockSheetBody(i.group, i.name, i.mode),
   ruleActionSpecs: (i) => ruleActions.ruleActionSpecs(i.rule as Rule, i.timeZone, at(i.now)),

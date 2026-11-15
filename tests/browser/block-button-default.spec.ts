@@ -35,7 +35,7 @@ test("a group's Block button default makes the card's button block and unblock t
     const sheet = page.getByRole("dialog", { name: `Edit ${tv!.name}` });
     const picker = sheet.getByLabel("Block button default");
     await expect(picker).toHaveValue("");
-    await expect(picker).toHaveAccessibleDescription(/What the Block button on TV’s card blocks and unblocks/);
+    await expect(picker).toHaveAccessibleDescription(/The Block button on TV’s card blocks and unblocks this/);
     await picker.selectOption(ruleId);
     const label = (await picker.locator(`option[value="${ruleId}"]`).textContent())!;
     await sheet.getByRole("button", { name: "Save" }).click();
