@@ -478,7 +478,8 @@ describe("remote access", () => {
   async function heldQuickTunnel(): Promise<number> {
     writeFileSync(path.join(dir, "quick-hold"), "");
     await put({ mode: "quick" });
-    await waitFor(() => existsSync(log) && readFileSync(log, "utf8").includes("pid: "), "the held quick tunnel");
+    // "held: " is logged once its traps are set; a signal sent before then would end it silently.
+    await waitFor(() => existsSync(log) && readFileSync(log, "utf8").includes("held: "), "the held quick tunnel");
     return lastTunnelPid();
   }
 

@@ -88,6 +88,8 @@ case " $* " in
       sleep 600 &
       trap 'echo "$url" >&2' USR1
       trap 'echo "$url" >&2; echo "late: $$" >> "$log"; kill $!; exit 0' TERM
+      # Only now can the tunnel be signalled: a signal before its traps would stop it silently.
+      echo "held: $$" >> "$log"
       while kill -0 $! 2>/dev/null; do wait $!; done
       exit 0
     fi
