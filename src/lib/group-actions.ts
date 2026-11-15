@@ -25,9 +25,9 @@ import type { Actor, Group } from "./types";
  * opposite beside it; the dropdown is where the other choices go (Block internet beside Unblock).
  *
  * A group can pick one of its own category, app or website rules as its Block button default
- * (`blockButtonRule`): its button then blocks and unblocks that rule for it ("Block Video",
- * "Unblock Video"), even an always-on one, while all internet stays in the dropdown. The badge still
- * says whether the group has the internet.
+ * (`blockButtonRule`): its button, still Block and Unblock, then blocks and unblocks that rule for
+ * it, even an always-on one, while all internet stays in the dropdown. The badge still says whether
+ * the group has the internet.
  */
 
 /**
@@ -348,11 +348,11 @@ export function groupDetailColor(change: GroupStatusParts["change"]): string {
  * it has the internet. It lifts all of them (at once when only its own block does, otherwise from
  * a sheet). Resume ends an unblock; otherwise Block blocks all internet.
  *
- * With a Block button rule (Video), the button is that rule's while no block of all internet holds
- * the group: "Unblock Video" while it blocks (lifting it for the group from a sheet, or ending at
- * once the group's own block of it), "Block Video" with More time while it is lifted for the group
- * (putting it back at once), and otherwise "Block Video" (blocking it now from a sheet), after a
- * Resume for an unblock. Other rules blocking the group go to the dropdown.
+ * With a Block button rule (Video), the button still reads Block and Unblock, but acts on that rule
+ * while no block of all internet holds the group: Unblock while it blocks (lifting it for the group
+ * from a sheet, or ending at once the group's own block of it), Block with More time while it is
+ * lifted for the group (putting it back at once), and otherwise Block (blocking it now from a
+ * sheet), after a Resume for an unblock. Other rules blocking the group go to the dropdown.
  */
 export function groupHeaderActions(
   group: Group,
@@ -370,20 +370,20 @@ export function groupHeaderActions(
     const name = blockButtonName(button, rules, group.id, timezone, now);
     const spec = (label: string, run: GroupRun): GroupActionSpec => ({ label, run, ruleId: button.id, name });
     if (group.ruleBlock?.ruleId === button.id) {
-      return header(spec(`Unblock ${name}`, "endRuleBlock"), group.ruleBlock.until ? spec("More time", "moreRuleBlock") : null);
+      return header(spec("Unblock", "endRuleBlock"), group.ruleBlock.until ? spec("More time", "moreRuleBlock") : null);
     }
-    if (blocking.some((rule) => rule.ruleId === button.id)) return header(spec(`Unblock ${name}`, "pauseRule"), null);
+    if (blocking.some((rule) => rule.ruleId === button.id)) return header(spec("Unblock", "pauseRule"), null);
     const lift = groupLift(button, group.id, now);
-    if (lift?.kind === "pause") return header(spec(`Block ${name}`, "resumeRule"), lift.until ? spec("More time", "moreRule") : null);
+    if (lift?.kind === "pause") return header(spec("Block", "resumeRule"), lift.until ? spec("More time", "moreRule") : null);
     const unblocked = groupUnblock(group, rules, now);
     if (unblocked) return header({ label: "Resume", run: "resume" }, unblocked.until ? { label: "More time", run: "moreUnblock" } : null);
-    return header(spec(`Block ${name}`, "blockRule"), null);
+    return header(spec("Block", "blockRule"), null);
   }
   // A block of a rule that is no longer the Block button's still ends from the button.
   const blocked = group.ruleBlock && !blocking.length ? rules.find((rule) => rule.id === group.ruleBlock!.ruleId) : undefined;
   if (blocked) {
     const name = blockingName(blocked, now, timezone);
-    return header({ label: `Unblock ${name}`, run: "endRuleBlock", ruleId: blocked.id, name }, null);
+    return header({ label: "Unblock", run: "endRuleBlock", ruleId: blocked.id, name }, null);
   }
   if (blocking.length) return header({ label: "Unblock", run: "unblock" }, null);
   const unblock = groupUnblock(group, rules, now);

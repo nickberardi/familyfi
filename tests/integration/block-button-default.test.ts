@@ -150,6 +150,22 @@ describe("a group's Block button default", () => {
     expect((await prisma().rule.findUniqueOrThrow({ where: { systemGroupId: tv.id } })).enabled).toBe(false);
   });
 
+  it("ends a block of its rule when it changes, so the old block is never left with no button to end it", async () => {
+    const social = await rule(auth, { name: "TV social", kind: "category", groupIds: [tv.id], targetIds: [24], mode: "always" });
+    await edit(auth, tv.id, { blockButtonRuleId: video });
+    expect((await verb(blockRule, auth, tv.id, video)).status).toBe(200);
+    // Saving the same choice keeps the block.
+    await edit(auth, tv.id, { name: "TV", blockButtonRuleId: video });
+    expect((await read(auth, tv.id)).ruleBlock?.ruleId).toBe(video);
+
+    await edit(auth, tv.id, { blockButtonRuleId: social });
+    expect((await read(auth, tv.id)).ruleBlock).toBeUndefined();
+    expect((await verb(blockRule, auth, tv.id, social)).status).toBe(200);
+    await edit(auth, tv.id, { blockButtonRuleId: null });
+    const group = await read(auth, tv.id);
+    expect([group.blockButtonRuleId, group.ruleBlock]).toEqual([undefined, undefined]);
+  });
+
   it("blocks the rule's category now with the group's own block, until ended, leaving the internet on", async () => {
     await edit(auth, tv.id, { blockButtonRuleId: video });
     await runReconcileOnce();
@@ -165,7 +181,7 @@ describe("a group's Block button default", () => {
     expect([group.access, group.suspension.active]).toEqual(["available", false]);
 
     await runReconcileOnce();
-    const block = mine().find((policy) => policy.name === "FamilyFi TV TV video Block");
+    const block = mine().find((policy) => policy.name === "FamilyFi TV video Block");
     expect([block?.enabled, block?.destination.trafficFilter?.type]).toEqual([true, "APPLICATION_CATEGORY"]);
 
     await verb(endRuleBlock, auth, tv.id, video, null);

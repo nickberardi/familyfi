@@ -14,8 +14,11 @@ export function pauseRuleName(input: { name: string; kind: "family" | "things" }
 
 /** The same rule's name while the group's own block blocks one of its rules ("TV Video Block"). */
 export function ruleBlockName(input: { name: string; kind: "family" | "things" }, ruleName: string): string {
+  const rule = ruleName.trim() || "Rule";
+  // A rule already named for the group ("TV video") is not named for it twice.
+  if (input.name.trim() && rule.toLowerCase().startsWith(`${input.name.trim().toLowerCase()} `)) return `${rule} Block`;
   const subject = input.kind === "family" ? possessive(input.name) : input.name.trim() || "Group";
-  return `${subject} ${ruleName.trim() || "Rule"} Block`;
+  return `${subject} ${rule} Block`;
 }
 
 function possessive(name: string): string {
