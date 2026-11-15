@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+  # publish.yml starts it for the tag it publishes, since that tag starts no workflows itself.
+  workflow_dispatch:
 
 env:
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
@@ -19,6 +21,13 @@ jobs:
     outputs:
       published: ${{ steps.local.outputs.published }}
     steps:
+      # Dispatched by hand (or by publish.yml), the run must still be for a vX tag.
+      - name: Run for a release tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          [[ "$REF_TYPE" == tag && "$GITHUB_REF_NAME" == v* ]] ||
+            { echo "::error::Release runs for a v* tag, not the $REF_TYPE $GITHUB_REF_NAME"; exit 1; }
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
