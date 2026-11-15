@@ -181,7 +181,7 @@ export function rulePauseSheetOptions(
           },
         ]
       : []),
-    // Worded as an unblock, the card's button that ends it is Block <rule>.
+    // Worded as an unblock, the card's button that ends it is Block (or Block <rule> again in its dropdown).
     { label: wording === "unblock" ? "Until I block it again" : "Until I resume", note: NO_END_TIME, request: { kind: "pauseUntil", until: null } },
   ];
 }
@@ -254,7 +254,7 @@ export function groupRuleSheetTitle(group: Pick<Group, "name">, name: string, mo
 
 export function groupRuleSheetBody(group: Pick<Group, "name">, name: string, mode: PauseSheetMode, wording?: "unblock"): string {
   if (mode === "extend") {
-    return wording === "unblock" ? `${name} stays unblocked for longer. Block ${name} brings it back sooner.` : "The rule stays lifted for longer. Resume brings it back sooner.";
+    return wording === "unblock" ? `${name} stays unblocked for longer. Block brings it back sooner.` : "The rule stays lifted for longer. Resume brings it back sooner.";
   }
   return `${name} stops blocking ${group.name}. Other groups, and the rule itself, stay as they are.`;
 }
@@ -265,7 +265,7 @@ export function ruleBlockSheetTitle(group: Pick<Group, "name">, name: string, mo
 }
 
 export function ruleBlockSheetBody(group: Pick<Group, "name">, name: string, mode: PauseSheetMode): string {
-  if (mode === "extend") return `${name} stays blocked for longer. Unblock ${name} ends it sooner.`;
+  if (mode === "extend") return `${name} stays blocked for longer. Unblock ends it sooner.`;
   return `${name} is blocked for ${group.name} now, whatever its schedule says. The rest of the internet, other groups and the rule itself stay as they are.`;
 }
 

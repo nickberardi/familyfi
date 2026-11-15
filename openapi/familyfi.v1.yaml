@@ -1759,7 +1759,7 @@ paths:
       tags: [Rules]
       summary: Block one of a group's rules now
       description: |
-        Blocks the rule's categories, apps or websites for this group now, whatever the rule's schedule says, until `until`, or until ended when it is left out or null. It is the group's own block (the same hidden always-on rule as a pause of all internet), so a pause and this block replace each other, and the group's unblock ends it. It blocks what the rule blocks now, so an edit to the rule reaches it, and it ends when the rule is deleted or no longer covers the group. The rule itself is untouched, and it blocks even while the rule is off or paused. What a card's Block button does when the rule is the group's Block button default. 404 when the group does not have the rule, or it is an internet or built-in rule.
+        Blocks the rule's categories, apps or websites for this group now, whatever the rule's schedule says, until `until`, or until ended when it is left out or null. It is the group's own block (the same hidden always-on rule as a pause of all internet), so a pause and this block replace each other, and the group's unblock ends it. It blocks what the rule blocks now, so an edit to the rule reaches it, and it ends when the rule is deleted or no longer covers the group. The rule itself is untouched, and it blocks even while the rule is off or paused. What a card's Block button does when the rule is the group's Block button default, and only that rule: 409 `not_block_button_default` for any other. 404 when the group does not have the rule, or it is an internet or built-in rule.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id

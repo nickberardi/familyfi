@@ -191,6 +191,7 @@ describe("a group's Block button default", () => {
   });
 
   it("extends a timed block, and a pause of all internet and the block replace each other", async () => {
+    await edit(auth, tv.id, { blockButtonRuleId: video });
     expect(await errorCode(await verb(extendRuleBlock, auth, tv.id, video, { minutes: 15 }))).toEqual([409, "not_blocked"]);
     const until = new Date(Date.now() + 30 * 60_000);
     await verb(blockRule, auth, tv.id, video, { until: until.toISOString() });
@@ -216,7 +217,7 @@ describe("a group's Block button default", () => {
     const always = await rule(auth, { name: "Video", kind: "category", groupIds: [tv.id], targetIds: [4], mode: "always" });
     const social = await rule(auth, { name: "Social", kind: "category", groupIds: [tv.id], targetIds: [24], mode: "always" });
     await edit(auth, tv.id, { blockButtonRuleId: always });
-    await verb(blockRule, auth, tv.id, video);
+    expect((await verb(blockRule, auth, tv.id, always)).status).toBe(200);
     const response = await unblockGroup(request(`/api/v1/groups/${tv.id}/unblock`, { method: "POST", auth, headers: json }), { params: Promise.resolve({ id: tv.id }) });
     expect(response.status).toBe(200);
     expect((await read(auth, tv.id)).ruleBlock).toBeUndefined();
@@ -226,7 +227,9 @@ describe("a group's Block button default", () => {
     expect(lifted).toEqual({ video: true, social: false });
   });
 
-  it("answers 404 for a rule the group does not have, or an internet rule", async () => {
+  it("answers 404 for a rule the group does not have, or an internet rule, and 409 for a rule that is not its default", async () => {
+    // Only the Block button can end a block, so a block of any other rule would have nothing to end it.
+    expect(await errorCode(await verb(blockRule, auth, tv.id, video))).toEqual([409, "not_block_button_default"]);
     const downtime = await rule(auth, { name: "Downtime", kind: "internet", groupIds: [tv.id], mode: "always" });
     expect(await errorCode(await verb(blockRule, auth, tv.id, downtime))).toEqual([404, "not_found"]);
     expect(await errorCode(await verb(blockRule, auth, tv.id, "missing"))).toEqual([404, "not_found"]);
