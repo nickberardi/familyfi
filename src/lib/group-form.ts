@@ -158,7 +158,7 @@ export const GROUP_EDIT_COPY = {
   title: (name: string) => `Edit ${name}`,
   blockButton: "Block button default",
   blockButtonAll: "All internet",
-  blockButtonHelp: (name: string) => `Choose what Block and Unblock on the card do for ${name}, with the same timers. With a rule chosen, Block internet stays in the menu beside the button.`,
+  blockButtonHelp: (name: string) => `Choose the rule that Unblock on the card lifts for ${name}, with the same timers, and Block puts back. When that rule isn't blocking, Block still blocks all internet.`,
   doh: "DNS-over-HTTPS",
   dohModes: [
     { value: "default", label: "Household default" },

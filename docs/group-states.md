@@ -173,7 +173,7 @@ The first matching case wins.
 | 4 | The default has a rule lift | "Video unblocked until 10:00 AM by Sam" / "… until you block it again" | green |
 | 5 | An unblock is running | "Unblocked until 12:00 PM by Sam" | green |
 | 6 | Every internet rule that applies is paused for this group; or an internet rule is paused or allowed for everyone and no internet window is in effect | "Internet rule paused until …" / "Internet rule paused for everyone until …" / "Internet rule allowed for everyone until …" | green |
-| 7 | Otherwise: the internet schedule | The next internet window ("Dinner at 6:00 PM"), or empty if none. "Allowed until … by Sam" (green) while the schedule is allowed. "No internet rule", or "Internet rule off" when the group's internet rules are all off. With a default and no internet window in effect, it says when the default next blocks instead: "Video at 7:00 PM" if its next window starts within 24 hours, otherwise "Video not blocked". | grey |
+| 7 | Otherwise: the internet schedule | The next internet window ("Dinner at 6:00 PM"), or empty if none. "Allowed until … by Sam" (green) while the schedule is allowed. "No internet rule", or "Internet rule off" when the group's internet rules are all off. With a default and no internet rule (or all of them off), it says when the default next blocks instead: "Video at 7:00 PM" if its next window starts within 24 hours, otherwise "Video not blocked". | grey |
 
 The button's sheets and the status line name the default by its categories when it blocks only
 categories FamilyFi knows ("Video", or "Video and Social"), and by the rule's own name otherwise. If

@@ -23,7 +23,7 @@ export type Group = {
    */
   dohOverrideUrl: string | null;
   /**
-   * The rule its Block button blocks and unblocks instead of all internet: one of its own
+   * The rule the card's Unblock lifts and Block puts back (its Block button default): one of its own
    * category, app or website rules (its Block button default). Absent: all internet.
    */
   blockButtonRuleId?: string;

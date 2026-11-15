@@ -298,7 +298,7 @@ model Group {
   appPolicies      AppPolicy[]
   rules            RuleGroup[]
   systemRule       Rule?           @relation("SystemRule")
-  /// The rule the group's Block button blocks and unblocks instead of all internet: one of its
+  /// The group's Block button default, which the card's Unblock lifts and Block puts back: one of its
   /// own category, app or website rules. Null: all internet. No foreign key, since a group's own
   /// block rule already points the other way; deleting the rule clears it, and a rule that no
   /// longer covers the group reads as all internet.
