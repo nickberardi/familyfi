@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { rulesBlockingGroup } from "@/lib/group-actions";
-import { runGroupCardAction } from "@/lib/group-writes";
+import { groupSheet } from "@/lib/group-pause-sheet";
+import { applyGroupSheet, runGroupCardAction } from "@/lib/group-writes";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 import { groupCardControls } from "@/ui/group-card-controls";
@@ -151,5 +152,89 @@ describe("Block <rule> again from the card", () => {
     expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/pause", { method: "POST", body: { until: "2026-10-15T22:00:00.000Z" } });
     runGroupCardAction(mutate, group(), { kind: "rule", run: "resume", ruleIds: ["r-g"], name: "gaming", wording: "unblock" }, vi.fn());
     expect(mutate.mock.calls[1]![1]).toMatchObject({ feedback: { notice: "Gaming blocked again for TV." } });
+  });
+});
+
+describe("the Block button rule's runs", () => {
+  type Options = { groupId?: string; feedback?: { notice: string; action?: { label: string; run: (send: unknown) => Promise<unknown> } } };
+  const tv = (overrides: Partial<Group> = {}) => group({ blockButtonRuleId: "r-video", ...overrides });
+  const tap = (run: "pauseRule" | "moreRule" | "resumeRule" | "blockRule" | "moreRuleBlock" | "endRuleBlock") => ({ kind: "header" as const, run, ruleId: "r-video", name: "Video" });
+
+  it("opens the rule's unblock sheet or the Block <rule> sheet, each first or for More time", () => {
+    const mutate = vi.fn(() => Promise.resolve(undefined));
+    const openSheet = vi.fn();
+    for (const run of ["pauseRule", "moreRule", "blockRule", "moreRuleBlock"] as const) runGroupCardAction(mutate, tv(), tap(run), openSheet);
+    expect(openSheet.mock.calls.map(([target]) => target)).toEqual([
+      { kind: "rule", ruleIds: ["r-video"], name: "Video", mode: "pause", wording: "unblock" },
+      { kind: "rule", ruleIds: ["r-video"], name: "Video", mode: "extend", wording: "unblock" },
+      { kind: "ruleBlock", ruleId: "r-video", name: "Video", mode: "pause" },
+      { kind: "ruleBlock", ruleId: "r-video", name: "Video", mode: "extend" },
+    ]);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("puts the rule back at once with Block Video, and ends the group's block of it with Unblock Video, each with Undo", async () => {
+    const mutate = vi.fn((..._args: unknown[]) => Promise.resolve(undefined));
+    const send = vi.fn((..._args: unknown[]) => Promise.resolve({ rule: {}, group: {}, change: { changeId: "c" } }));
+    runGroupCardAction(mutate, tv(), tap("resumeRule"), vi.fn());
+    await (mutate.mock.calls[0]![0] as (send: unknown) => Promise<unknown>)(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/resume", { method: "POST" });
+    expect(mutate.mock.calls[0]![1]).toMatchObject({ feedback: { notice: "Video blocked again for TV." } });
+
+    const blocked = tv({ ruleBlock: { ruleId: "r-video", until: "2026-10-15T22:00:00.000Z", by: null } });
+    runGroupCardAction(mutate, blocked, tap("endRuleBlock"), vi.fn());
+    send.mockClear();
+    await (mutate.mock.calls[1]![0] as (send: unknown) => Promise<unknown>)(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/block/end", { method: "POST" });
+    const options = mutate.mock.calls[1]![1] as Options;
+    expect(options).toMatchObject({ groupId: "g1", feedback: { notice: "Video unblocked for TV.", action: { label: "Undo" } } });
+    // Undo blocks it again until the block it ended would have.
+    send.mockClear();
+    await options.feedback!.action!.run(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/block", { method: "POST", body: { until: "2026-10-15T22:00:00.000Z" } });
+  });
+
+  it("blocks the rule now from its sheet, with Undo, and gives a timed block more time", async () => {
+    const mutate = vi.fn((..._args: unknown[]) => Promise.resolve(undefined));
+    const send = vi.fn((..._args: unknown[]) => Promise.resolve({ group: {}, change: { changeId: "c" } }));
+    const target = { kind: "ruleBlock" as const, ruleId: "r-video", name: "Video", mode: "pause" as const };
+    void applyGroupSheet(mutate, tv(), target, { kind: "pauseUntil", until: null }, TZ, NOW);
+    await (mutate.mock.calls[0]![0] as (send: unknown) => Promise<unknown>)(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/block", { method: "POST", body: {} });
+    const options = mutate.mock.calls[0]![1] as Options;
+    expect(options.feedback).toMatchObject({ notice: "Video blocked for TV until you unblock.", action: { label: "Undo" } });
+    send.mockClear();
+    await options.feedback!.action!.run(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/block/end", { method: "POST" });
+
+    void applyGroupSheet(mutate, tv(), target, { kind: "pauseFor", minutes: 30 }, TZ, NOW);
+    send.mockClear();
+    await (mutate.mock.calls[1]![0] as (send: unknown) => Promise<unknown>)(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/block", { method: "POST", body: { until: new Date(NOW.getTime() + 30 * 60_000).toISOString() } });
+
+    void applyGroupSheet(mutate, tv(), { ...target, mode: "extend" }, { kind: "extend", minutes: 15 }, TZ, NOW);
+    send.mockClear();
+    await (mutate.mock.calls[2]![0] as (send: unknown) => Promise<unknown>)(send);
+    expect(send).toHaveBeenCalledWith("/api/v1/groups/g1/rules/r-video/block/extend", { method: "POST", body: { minutes: 15 } });
+  });
+
+  it("names the Block <rule> sheet, confirms with Block, and counts More time from the block's end", () => {
+    const video = rule({ id: "r-video", name: "TV video", kind: "category", targetIds: [4], mode: "always" });
+    const sheet = groupSheet(tv(), [video], [], { kind: "ruleBlock", ruleId: "r-video", name: "Video", mode: "pause" }, TZ, NOW);
+    expect([sheet.title, sheet.confirm]).toEqual(["Block Video for TV?", "Block"]);
+    expect(sheet.options.at(-1)).toMatchObject({ label: "Until I unblock", request: { kind: "pauseUntil", until: null } });
+    const end = new Date(NOW.getTime() + 60 * 60_000).toISOString();
+    const more = groupSheet(tv({ ruleBlock: { ruleId: "r-video", until: end, by: null } }), [video], [], { kind: "ruleBlock", ruleId: "r-video", name: "Video", mode: "extend" }, TZ, NOW);
+    expect([more.title, more.confirm]).toEqual(["Keep Video blocked for TV longer?", "Add time"]);
+    expect(more.options[0]).toMatchObject({ request: { kind: "extend", minutes: 30 } });
+  });
+
+  it("taps Block Video after an unblock as a resume that can go back to when the lift ended", () => {
+    const video = rule({ id: "r-video", name: "TV video", kind: "category", targetIds: [4], mode: "always", groupPauses: [{ groupId: "g1", pause: { active: true, until: "2026-10-15T22:00:00.000Z", kind: "pause", by: null } }] });
+    const onTap = vi.fn();
+    const controls = groupCardControls(tv(), [video], TZ, NOW, onTap);
+    expect(controls.action.label).toBe("Block Video");
+    controls.action.onPress();
+    expect(onTap).toHaveBeenCalledWith({ kind: "rule", run: "resume", ruleIds: ["r-video"], name: "Video", wording: "unblock", liftedUntil: "2026-10-15T22:00:00.000Z" });
   });
 });

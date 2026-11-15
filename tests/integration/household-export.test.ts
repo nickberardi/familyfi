@@ -1,4 +1,4 @@
-import { AccountKind, AssignmentState, DeviceScope, FamilyRole, GroupKind, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { AccountKind, AssignmentState, DeviceScope, FamilyRole, GroupKind, PairedDeviceClient, RuleKind, RuleMode, SessionKind } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as exportRoute } from "@/app/api/v1/settings/export/route";
@@ -138,6 +138,11 @@ afterEach(() => {
 describe("household export", () => {
   it("carries the configuration without secrets, and imports back to the same household", async () => {
     const built = await buildHousehold();
+    // The TVs' Block button stands for their video rule; Block countries never can, even on import.
+    const video = await prisma().rule.create({
+      data: { name: "TV video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: built.things.id } } },
+    });
+    await prisma().group.update({ where: { id: built.things.id }, data: { blockButtonRuleId: video.id } });
     const auth = await recoveryAuth();
     const files = readArchive(await exportArchive(auth), FILES);
     const manifest = JSON.parse(files.get("manifest.json")!.toString()) as { format: string; appVersion: string; instanceId: string | null };
@@ -150,6 +155,7 @@ describe("household export", () => {
     expect(JSON.parse(text)).toEqual(JSON.parse(JSON.stringify(before)));
     expect(before.household.lockDns).toEqual({ enabled: true, scope: "group", groupIds: [built.child.id], networkIds: [], blockPrivateRelay: true });
     expect(before.rules.map((rule) => rule.id)).not.toContain("dns");
+    expect(before.groups.find((group) => group.id === built.things.id)?.blockButtonRuleId).toBe(video.id);
 
     // Undo most of it, as a mistake would, then restore.
     await prisma().rule.deleteMany({ where: { id: { not: "quarantine" } } });
@@ -163,7 +169,7 @@ describe("household export", () => {
     // The old household's checkup goes with it.
     expect(await prisma().checkupFinding.count()).toBe(0);
     expect(summary).toMatchObject({
-      counts: { groups: 3, accounts: 1, devices: 3, rules: 2, endpoints: 2 },
+      counts: { groups: 3, accounts: 1, devices: 3, rules: 3, endpoints: 2 },
       gateway: "imported",
       unifiKey: "kept",
       endpointsNeedingToken: [],

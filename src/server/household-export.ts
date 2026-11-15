@@ -691,7 +691,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       for (const group of config.groups) {
         const rule = group.blockButtonRuleId && config.rules.find((item) => item.id === group.blockButtonRuleId);
         // Only one of the group's own category, app or website rules, as the groups API allows.
-        if (rule && rule.kind !== RuleKind.internet && rule.groupIds.includes(group.id)) {
+        if (rule && rule.kind !== RuleKind.internet && rule.id !== COUNTRIES_RULE_ID && rule.groupIds.includes(group.id)) {
           await tx.group.update({ where: { id: group.id }, data: { blockButtonRuleId: rule.id } });
         }
       }
