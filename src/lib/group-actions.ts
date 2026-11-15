@@ -255,16 +255,17 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     const detail = `${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}`;
     return online("rule", `Online · ${detail}`, detail);
   }
+  // An unblock comes first, as on the button: its Resume is the one way to end it from the card.
+  const unblock = groupUnblock(group, rules, now);
+  if (unblock) {
+    const detail = unblock.until ? `unblocked ${until(unblock.until, "")}${by(unblock.by)}` : `unblocked${by(unblock.by)} until you resume`;
+    return online("on", `Online · ${detail}`, detail, "unblocked");
+  }
   const button = blockButtonRule(group, rules);
   const buttonLift = button && buttonRuleLift(button, group.id, now);
   if (button && buttonLift?.kind === "pause") {
     const name = blockButtonName(button, rules, group.id, timezone, now);
     const detail = buttonLift.until ? `${name} unblocked ${until(buttonLift.until, "")}${by(buttonLift.by)}` : `${name} unblocked${by(buttonLift.by)} until you block it again`;
-    return online("on", `Online · ${detail}`, detail, "unblocked");
-  }
-  const unblock = groupUnblock(group, rules, now);
-  if (unblock) {
-    const detail = unblock.until ? `unblocked ${until(unblock.until, "")}${by(unblock.by)}` : `unblocked${by(unblock.by)} until you resume`;
     return online("on", `Online · ${detail}`, detail, "unblocked");
   }
   const internetRules = groupScopedRules(rules, group.id).filter((rule) => rule.kind === "internet");
@@ -292,7 +293,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
       return online("on", label, state.next ? `${state.next.window} at ${formatClock(new Date(state.next.at), timezone)}` : "");
     case "no_rule":
       // With nothing limiting its internet, a Block button rule says when it blocks next instead.
-      if (button) return online("on", label, blockButtonNext(blockButtonName(button, rules, group.id, timezone, now), button, timezone, now));
+      if (button && group.internetRuleIds.length === 0) return online("on", label, blockButtonNext(blockButtonName(button, rules, group.id, timezone, now), button, timezone, now));
       return online("on", label, group.internetRuleIds.length === 0 ? "no internet rule" : "internet rule off");
     default:
       // A pause is the group's suspension, handled first.
@@ -370,8 +371,9 @@ export function groupHeaderActions(
     const name = blockButtonName(button, rules, group.id, timezone, now);
     const spec = (label: string, run: GroupRun): GroupActionSpec => ({ label, run, ruleId: button.id, name });
     if (blocking.some((rule) => rule.ruleId === button.id)) return header(spec("Unblock", "pauseRule"), null);
+    // While an unblock runs, the button is its Resume, and the dropdown puts the default back.
     const lift = buttonRuleLift(button, group.id, now);
-    if (lift?.kind === "pause") return header(spec("Block", "resumeRule"), lift.until ? spec("More time", "moreRule") : null);
+    if (lift?.kind === "pause" && !groupUnblock(group, rules, now)) return header(spec("Block", "resumeRule"), lift.until ? spec("More time", "moreRule") : null);
   }
   if (blocking.length) return header({ label: "Unblock", run: "unblock" }, null);
   const unblock = groupUnblock(group, rules, now);

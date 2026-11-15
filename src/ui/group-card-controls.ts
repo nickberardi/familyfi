@@ -32,12 +32,13 @@ export function groupCardControls(
     strong,
     disabled: !enabled,
     onPress: () =>
-      // Putting the Block button rule back is the dropdown's Block again: its Undo lifts it until when it was.
-      onRun(
-        spec.run === "resumeRule" && spec.ruleId
-          ? { kind: "rule", run: "resume", ruleIds: [spec.ruleId], name: spec.name ?? "", wording: "unblock", liftedUntil: liftedUntil([spec.ruleId]) }
-          : { kind: "header", run: spec.run, ...(spec.ruleId ? { ruleId: spec.ruleId, name: spec.name ?? "" } : {}) },
-      ),
+      // Putting the Block button rule back can be undone to when its lift ended.
+      onRun({
+        kind: "header",
+        run: spec.run,
+        ...(spec.ruleId ? { ruleId: spec.ruleId, name: spec.name ?? "" } : {}),
+        ...(spec.run === "resumeRule" && spec.ruleId ? { liftedUntil: liftedUntil([spec.ruleId]) } : {}),
+      }),
     testID: `group-action-${spec.run}-${group.id}`,
   });
   const menu = header.menu.map(

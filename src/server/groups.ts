@@ -1,10 +1,7 @@
 import { FamilyRole, GroupKind, Prisma } from "@prisma/client";
 import { internetState, isWindowActive, type InternetWindow } from "@/lib/rule-windows";
 import { isSuspended } from "@/lib/schedule";
-import { ruleInternetWindows } from "./rules";
-import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
-
-const BUILT_IN_RULE_IDS = new Set([QUARANTINE_RULE_ID, LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID]);
+import { builtInRule, ruleInternetWindows } from "./rules";
 
 export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
@@ -103,7 +100,7 @@ export function blockButtonRuleOf(group: Pick<GroupWithRules, "rules" | "blockBu
 
 /** A rule a group's Block button can stand for: a category, app or website rule of its own, not built in. */
 export function blockButtonCandidate(rule: Pick<GroupWithRules["rules"][number]["rule"], "id" | "kind" | "systemGroupId">): boolean {
-  return rule.kind !== "internet" && rule.systemGroupId === null && !BUILT_IN_RULE_IDS.has(rule.id);
+  return rule.kind !== "internet" && rule.systemGroupId === null && builtInRule(rule) === null;
 }
 
 export function publicGroup(group: GroupWithRules, timezone: string, now = new Date()) {

@@ -23,6 +23,7 @@ import { APP_VERSION } from "@/lib/version";
 import { ArchiveError, readArchive, writeArchive } from "./archive";
 import { assertEndpoint, ensureConnectionIdentity, removeAccountDevices } from "./connection";
 import { dumpDatabase } from "./database-dump";
+import { blockButtonCandidate } from "./groups";
 import { assertManagedNetworkIds, ensureCountriesRule, normalizeCountries, normalizeNetworkIds, RuleInputError, validateRuleShape } from "./rules";
 import { normalizeResolverUrl, ResolverConfigError } from "./upstream/resolver-settings";
 import { customSlugFor } from "./upstream-seed";
@@ -691,7 +692,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       for (const group of config.groups) {
         const rule = group.blockButtonRuleId && config.rules.find((item) => item.id === group.blockButtonRuleId);
         // Only one of the group's own category, app or website rules, as the groups API allows.
-        if (rule && rule.kind !== RuleKind.internet && rule.id !== COUNTRIES_RULE_ID && rule.groupIds.includes(group.id)) {
+        if (rule && blockButtonCandidate({ id: rule.id, kind: rule.kind, systemGroupId: null }) && rule.groupIds.includes(group.id)) {
           await tx.group.update({ where: { id: group.id }, data: { blockButtonRuleId: rule.id } });
         }
       }

@@ -91,7 +91,6 @@ export async function PATCH(request: Request, ctx: Ctx) {
         patch.networkIds ? householdNetworkScope : async () => ({ scope: { manageAllNetworks: true, managedNetworkIds: [] } }),
       );
       const rule = await saveRule(input, id);
-      if (existing.scope === "group") await releaseUncoveredGroups(id, input.groupIds);
       const change = await enqueueChange("rule");
       return Response.json({ rule: await presentRule(rule), change });
     } catch (error) {
@@ -142,12 +141,4 @@ export async function DELETE(request: Request, ctx: Ctx) {
     const change = await enqueueChange("rule");
     return Response.json({ change });
   });
-}
-
-/**
- * A group the rule no longer covers goes back to all internet if its Block button stood for the
- * rule, so it doesn't come back if the group is added again.
- */
-async function releaseUncoveredGroups(ruleId: string, groupIds: string[]) {
-  await prisma().group.updateMany({ where: { blockButtonRuleId: ruleId, id: { notIn: groupIds } }, data: { blockButtonRuleId: null } });
 }

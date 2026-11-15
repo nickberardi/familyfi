@@ -4,7 +4,7 @@ import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
-import { blockRuleOf, groupInclude, lifted, publicGroup, sessionActor } from "./groups";
+import { blockButtonRuleOf, blockRuleOf, groupInclude, lifted, publicGroup, sessionActor } from "./groups";
 import { jsonError } from "./http";
 import { CLEARED, readLiftBody } from "./rule-lifts";
 import { activeWindowsEnd, isLockDnsRule, presentRules, ruleInclude, ruleInternetWindows } from "./rules";
@@ -48,9 +48,10 @@ export async function runGroupUnblock(
     // already allowed is included, so an unblock can be given a new time. An always-on category,
     // app or website rule is how the group is set up, not a block on it: an unblock leaves it on,
     // unless it is the group's Block button rule, which its Unblock is for.
+    const buttonRuleId = blockButtonRuleOf(existing)?.id;
     const candidates = links.filter(
       ({ rule, ...link }) =>
-        rule.enabled && (!standingRule(rule) || rule.id === existing.blockButtonRuleId) && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
+        rule.enabled && (!standingRule(rule) || rule.id === buttonRuleId) && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
     );
     const ends = new Map(candidates.map(({ rule }) => [rule.id, activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone)] as const));
     // By default only the rules blocking now, each until its own windows end; given a time, every rule.

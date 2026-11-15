@@ -532,6 +532,9 @@ export async function saveRule(input: RuleInput, existingId?: string): Promise<R
       ? await tx.rule.update({ where: { id: existingId }, data })
       : await tx.rule.create({ data });
     await tx.ruleGroup.deleteMany({ where: { ruleId: rule.id, groupId: { notIn: input.groupIds } } });
+    // A group the rule no longer covers goes back to all internet if its Block button stood for the
+    // rule, in the same transaction, so the default doesn't come back if the group is added again.
+    if (existingId) await tx.group.updateMany({ where: { blockButtonRuleId: rule.id, id: { notIn: input.groupIds } }, data: { blockButtonRuleId: null } });
     await tx.ruleGroup.createMany({
       data: input.groupIds.map((groupId) => ({ ruleId: rule.id, groupId })),
       skipDuplicates: true,

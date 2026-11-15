@@ -72,8 +72,8 @@ flowchart TD
   hasD -- yes --> dBlocks{Default blocking now?}
   dBlocks -- yes --> B1["<b>Unblock</b><br/>sheet: Unblock Video for TV?"]
   dBlocks -- no --> dLifted{Default lifted<br/>for this group?}
-  dLifted -- yes --> B2["<b>Block</b> + More time<br/>puts the default back"]
-  dLifted -- no --> any
+  dLifted -- "yes, and no unblock running" --> B2["<b>Block</b> + More time<br/>puts the default back"]
+  dLifted -- otherwise --> any
   hasD -- no --> any{Anything blocking?}
   any -- yes --> C["<b>Unblock</b><br/>sheet: lifts everything blocking"]
   any -- no --> unb{Unblock running?}
@@ -120,7 +120,7 @@ This is the diagram above, as a table. The first matching row wins.
 | --- | --- | --- | --- |
 | A | Paused | Unblock (+ More time if timed) | Sheet, `POST /groups/{id}/unblock`. If nothing else is blocking, that request is sent at once. |
 | B1 | A default is set, nothing but the default is blocking, and the default is blocking | Unblock | Sheet "Unblock Video for TV?", `POST /groups/{id}/rules/{default}/pause` (a rule lift) |
-| B2 | A default is set, nothing is blocking, and the default has a rule lift | Block (+ More time if timed) | At once, `POST /groups/{id}/rules/{default}/resume` |
+| B2 | A default is set, nothing is blocking, the default has a rule lift, and no unblock is running | Block (+ More time if timed) | At once, `POST /groups/{id}/rules/{default}/resume` |
 | C | Anything blocking | Unblock | Sheet, `POST /groups/{id}/unblock` |
 | D | An unblock is running | Resume (+ More time if timed) | At once, `POST /groups/{id}/unblock/end` |
 | E | Otherwise | Block | Sheet, `POST /groups/{id}/rules/internet/pause` |
@@ -171,10 +171,10 @@ The first matching case wins.
 | 1 | Paused | "Until 6:00 PM by Sam" / "Until you unblock, by Sam" | red |
 | 2 | An internet rule is blocking | "Dinner until 8:00 PM" / "Dinner · always" | grey |
 | 3 | Anything is blocking | "Gaming blocked until 12:00 PM". Several rules are joined as "Video and Gaming blocked", with the latest end time, and with no time when one never ends. | grey |
-| 4 | The default has a rule lift | "Video unblocked until 10:00 AM by Sam" / "… until you block it again" | green |
-| 5 | An unblock is running | "Unblocked until 12:00 PM by Sam" | green |
+| 4 | An unblock is running | "Unblocked until 12:00 PM by Sam" | green |
+| 5 | The default has a rule lift | "Video unblocked until 10:00 AM by Sam" / "… until you block it again" | green |
 | 6 | Every internet rule that applies is paused for this group; or an internet rule is paused or allowed for everyone and no internet window is in effect | "Internet rule paused until …" / "Internet rule paused for everyone until …" / "Internet rule allowed for everyone until …" | green |
-| 7 | Otherwise: the internet schedule | The next internet window ("Dinner at 6:00 PM"), or empty if none. "Allowed until … by Sam" (green) while the schedule is allowed. "No internet rule", or "Internet rule off" when the group's internet rules are all off. With a default and no internet rule (or all of them off), it says when the default next blocks instead: "Video at 7:00 PM" if its next window starts within 24 hours, otherwise "Video not blocked". | grey |
+| 7 | Otherwise: the internet schedule | The next internet window ("Dinner at 6:00 PM"), or empty if none. "Allowed until … by Sam" (green) while the schedule is allowed. "No internet rule", or "Internet rule off" when the group's internet rules are all off. With a default and no internet rule, it says when the default next blocks instead: "Video at 7:00 PM" if its next window starts within 24 hours, otherwise "Video not blocked". | grey |
 
 The button's sheets and the status line name the default by its categories when it blocks only
 categories FamilyFi knows ("Video", or "Video and Social"), and by the rule's own name otherwise. If
@@ -195,6 +195,7 @@ The TV group from section 1.
 | Video | 9 AM, Video lifted for an hour | Online | Video unblocked until 10:00 AM by Sam | Block + More time (B2) | Block internet, Unblock Social |
 | Video | 11 AM | Online | Video and Gaming blocked | Unblock (C) | Block internet, Unblock Gaming, Unblock Video, Unblock Social |
 | Video | 11 AM, Video already lifted | Online | Gaming blocked until 12:00 PM | Unblock (C) | Block internet, Unblock Social, Block Video again |
+| Video | 11 AM, Video already lifted, then unblocked | Online | Unblocked until 12:00 PM by Sam | Resume + More time (D) | Block internet, Unblock Social, Block Video again |
 | Video, scheduled 7 to 9 PM | 3 PM | Online | Video at 7:00 PM | Block (E): pauses all internet | Unblock Social |
 
 ### 3.7 What each request does on the gateway
