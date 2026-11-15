@@ -6,7 +6,8 @@ status line, Block/Unblock button, More time link or dropdown on any client. It 
 1. **User stories**: what a parent needs from the card.
 2. **Design**: the state a group can be in, what the card shows, and a diagram of how the button
    decides what to do.
-3. **Spec**: the exact rules, followed by examples that have been checked against the code.
+3. **Spec**: the exact rules, examples that have been checked against the code, and what each
+   request does on the gateway.
 
 If the code and this file disagree, one of them is a bug. Fix it, or change both in the same commit.
 
@@ -195,3 +196,14 @@ The TV group from section 1.
 | Video | 11 AM | Online | Video and Gaming blocked | Unblock (C) | Block internet, Unblock Gaming, Unblock Video, Unblock Social |
 | Video | 11 AM, Video already lifted | Online | Gaming blocked until 12:00 PM | Unblock (C) | Block internet, Unblock Social, Block Video again |
 | Video, scheduled 7 to 9 PM | 3 PM | Online | Video at 7:00 PM | Block (E): pauses all internet | Unblock Social |
+
+### 3.7 What each request does on the gateway
+
+What the requests in 3.3 and 3.4 change in UniFi. Reconciliation writes it; the tests named by the pause invariant in [AGENTS.md](../AGENTS.md#invariants) hold it.
+
+- **Pause** (`POST /groups/{id}/rules/internet/pause`) blocks all internet for every device in the group now, until a time or until resumed. `internet` is the group's built-in rule, "this group has internet": pausing it enables a hidden always-on internet rule (`Rule.systemGroupId`) whose one unscheduled BLOCK policy exists only while it is enabled; resume (or expiry) switches it off and the policy is deleted. It records who paused.
+- **Internet rules** are optional, and apply to chosen people and things, never a whole network. Each window of an enabled internet rule is its own UniFi policy carrying that window's recurring `schedule`; UniFi starts and ends it, never a clock-driven `enabled` write. An always-on internet rule is one unscheduled policy that keeps the group offline until it is changed or an allowance lifts it. A group with no internet rule is not limited.
+- **An allowance** (`allow` on `internet`) is an allowance lift on each of the group's internet rules that is blocking now, until a time (by default when each rule's active windows end); a second allow gives the lifts a new time: its devices leave those rules' policies. A policy left with nobody keeps its devices and is disabled, so ending the allowance does not create it again. A pause replaces an allowance.
+- **A rule pause or allowance** lifts one rule, for every group it covers or for one group alone, until a time. For every group the rule's policies are disabled and keep their devices; for one group that group's devices leave the rule's policies (a policy left with nobody stays disabled with its devices). Pause, resume and extend act on a pause; allow and disallow on an allowance, at either scope.
+- **Unblock** (`POST /groups/{id}/unblock`) is an allowance for this group alone on each rule 3.3 lists under *What Unblock lifts*, until a time: the group's devices leave those rules' policies. Resume (`/unblock/end`) puts them all back; `/unblock/extend` gives them a new time.
+- **Category, app and website rules** are separate policies, and neither a pause nor an allowance changes them. While an internet window is active they are covered anyway.
