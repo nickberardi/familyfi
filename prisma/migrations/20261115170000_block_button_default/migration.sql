@@ -1,4 +1,4 @@
 -- A group's Block button default: one of its category, app or website rules, which the card's
--- Block button blocks and unblocks instead of all internet. Null keeps all internet. No foreign
+-- Unblock lifts and Block puts back. Null keeps all internet. No foreign
 -- key: a group's own block rule already points from Rule to Group, and deleting the rule clears it.
 ALTER TABLE "Group" ADD COLUMN "blockButtonRuleId" TEXT;
