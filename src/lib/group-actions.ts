@@ -39,6 +39,14 @@ export function blockButtonRule(group: Pick<Group, "id" | "blockButtonRuleId">, 
   return groupScopedRules(rules, group.id).find((rule) => rule.id === group.blockButtonRuleId && blockButtonChoice(rule));
 }
 
+/**
+ * The Block button rule's lift for the group, while the rule is on for everyone. A lift left on a
+ * rule since switched off or paused for everyone puts nothing back, so the button blocks it now.
+ */
+function buttonRuleLift(rule: Rule, groupId: string, now: Date) {
+  return rule.enabled && !rulePaused(rule, now) ? groupLift(rule, groupId, now) : undefined;
+}
+
 /** A rule a group's Block button can stand for: a category, app or website rule, not built in. */
 export function blockButtonChoice(rule: Pick<Rule, "kind" | "builtIn">): boolean {
   return rule.kind !== "internet" && !rule.builtIn;
@@ -259,7 +267,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     return online("rule", `Online · ${detail}`, detail);
   }
   const button = blockButtonRule(group, rules);
-  const buttonLift = button && groupLift(button, group.id, now);
+  const buttonLift = button && buttonRuleLift(button, group.id, now);
   if (button && buttonLift?.kind === "pause") {
     const name = blockButtonName(button, rules, group.id, timezone, now);
     const detail = buttonLift.until ? `${name} unblocked ${until(buttonLift.until, "")}${by(buttonLift.by)}` : `${name} unblocked${by(buttonLift.by)} until you block it again`;
@@ -373,7 +381,7 @@ export function groupHeaderActions(
       return header(spec("Unblock", "endRuleBlock"), group.ruleBlock.until ? spec("More time", "moreRuleBlock") : null);
     }
     if (blocking.some((rule) => rule.ruleId === button.id)) return header(spec("Unblock", "pauseRule"), null);
-    const lift = groupLift(button, group.id, now);
+    const lift = buttonRuleLift(button, group.id, now);
     if (lift?.kind === "pause") return header(spec("Block", "resumeRule"), lift.until ? spec("More time", "moreRule") : null);
     const unblocked = groupUnblock(group, rules, now);
     if (unblocked) return header({ label: "Resume", run: "resume" }, unblocked.until ? { label: "More time", run: "moreUnblock" } : null);

@@ -158,7 +158,9 @@ describe("a group's Block button default", () => {
     await edit(auth, tv.id, { name: "TV", blockButtonRuleId: video });
     expect((await read(auth, tv.id)).ruleBlock?.ruleId).toBe(video);
 
-    await edit(auth, tv.id, { blockButtonRuleId: social });
+    // The answer itself shows the block ended, so a client that adopts it draws no stale Unblock.
+    const changed = await edit(auth, tv.id, { blockButtonRuleId: social });
+    expect(((await changed.json()) as { group: PublicGroup }).group.ruleBlock).toBeUndefined();
     expect((await read(auth, tv.id)).ruleBlock).toBeUndefined();
     expect((await verb(blockRule, auth, tv.id, social)).status).toBe(200);
     await edit(auth, tv.id, { blockButtonRuleId: null });

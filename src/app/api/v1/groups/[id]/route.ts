@@ -65,13 +65,14 @@ export async function PUT(request: Request, ctx: Ctx) {
         ? await update
         : (
             await prisma().$transaction([
-              update,
               prisma().rule.updateMany({
                 where: { systemGroupId: id, enabled: true, blocksRuleId: blockButtonRuleId ? { not: null, notIn: [blockButtonRuleId] } : { not: null } },
                 data: BLOCK_CLEARED,
               }),
+              // Read after the block ends, so the answer shows it ended.
+              update,
             ])
-          )[0];
+          )[1];
     const change = await enqueueChange("group");
     return Response.json({ group: publicGroup(group, household.timezone), change });
   });
