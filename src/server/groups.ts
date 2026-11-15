@@ -2,6 +2,9 @@ import { FamilyRole, GroupKind, Prisma } from "@prisma/client";
 import { internetState, isWindowActive, type InternetWindow } from "@/lib/rule-windows";
 import { isSuspended } from "@/lib/schedule";
 import { ruleInternetWindows } from "./rules";
+import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
+
+const BUILT_IN_RULE_IDS = new Set([QUARANTINE_RULE_ID, LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID]);
 
 export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
@@ -66,7 +69,8 @@ export function groupAccess(group: GroupWithRules, now: Date, timezone: string):
  */
 function internetGroup(group: GroupWithRules, now: Date, timezone: string) {
   const block = blockRuleOf(group);
-  const blocking = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
+  // A block of the group's Block button rule is not a pause: the group keeps its internet.
+  const blocking = Boolean(block?.enabled && block.blocksRuleId === null && (block.expiresAt === null || now < block.expiresAt));
   const links = internetLinks(group).filter(({ rule }) => rule.enabled);
   const allows = links.filter(({ link }) => link.pauseKind === "allow" && lifted(link, now));
   const stillBlocked = internetWindows(group, now).some((window) => isWindowActive(window, now, timezone));
@@ -87,8 +91,39 @@ function internetGroup(group: GroupWithRules, now: Date, timezone: string) {
   };
 }
 
+/**
+ * The rule the group's Block button blocks and unblocks: its Block button default while that is
+ * still one of its own category, app or website rules. Undefined: all internet.
+ */
+export function blockButtonRuleOf(group: Pick<GroupWithRules, "rules" | "blockButtonRuleId">) {
+  if (!group.blockButtonRuleId) return undefined;
+  return group.rules
+    .map((link) => link.rule)
+    .find((rule) => rule.id === group.blockButtonRuleId && blockButtonCandidate(rule));
+}
+
+/** A rule a group's Block button can stand for: a category, app or website rule of its own, not built in. */
+export function blockButtonCandidate(rule: Pick<GroupWithRules["rules"][number]["rule"], "id" | "kind" | "systemGroupId">): boolean {
+  return rule.kind !== "internet" && rule.systemGroupId === null && !BUILT_IN_RULE_IDS.has(rule.id);
+}
+
+/**
+ * The group's own block of its Block button rule: the built-in block rule while enabled and
+ * blocking that rule's categories, apps or websites. Null when there is none, or when the rule it
+ * blocked no longer covers the group.
+ */
+function ruleBlockOf(group: GroupWithRules, now: Date) {
+  const block = blockRuleOf(group);
+  if (!block?.enabled || block.blocksRuleId === null || (block.expiresAt !== null && now >= block.expiresAt)) return null;
+  const blocked = group.rules.find((link) => link.rule.id === block.blocksRuleId && blockButtonCandidate(link.rule));
+  if (!blocked) return null;
+  return { ruleId: blocked.rule.id, until: block.expiresAt?.toISOString() ?? null, by: actor(block.blockedByAccountId, block.blockedByName) };
+}
+
 export function publicGroup(group: GroupWithRules, timezone: string, now = new Date()) {
   const internet = internetGroup(group, now, timezone);
+  const blockButton = blockButtonRuleOf(group);
+  const ruleBlock = ruleBlockOf(group, now);
   return {
     id: group.id,
     kind: group.kind as GroupKind,
@@ -106,5 +141,9 @@ export function publicGroup(group: GroupWithRules, timezone: string, now = new D
     /** The group's internet rules. Empty means nothing limits its internet. */
     internetRuleIds: internetRules(group).map((rule) => rule.id),
     access: groupAccess(group, now, timezone),
+    /** The rule the group's Block button blocks and unblocks; absent for all internet. */
+    ...(blockButton ? { blockButtonRuleId: blockButton.id } : {}),
+    /** The group's own block of one of its rules' categories, apps or websites; absent when there is none. */
+    ...(ruleBlock ? { ruleBlock } : {}),
   };
 }

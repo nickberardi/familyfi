@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 1.2.0
+  version: 1.3.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 0.36.0
@@ -1752,6 +1752,148 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/block:
+    post:
+      operationId: blockGroupRule
+      tags: [Rules]
+      summary: Block one of a group's rules now
+      description: |
+        Blocks the rule's categories, apps or websites for this group now, whatever the rule's schedule says, until `until`, or until ended when it is left out or null. It is the group's own block (the same hidden always-on rule as a pause of all internet), so a pause and this block replace each other, and the group's unblock ends it. It blocks what the rule blocks now, so an edit to the rule reaches it, and it ends when the rule is deleted or no longer covers the group. The rule itself is untouched, and it blocks even while the rule is off or paused. What a card's Block button does when the rule is the group's Block button default. 404 when the group does not have the rule, or it is an internet or built-in rule.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          description: One of the group's own category, app or website rules.
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until: { type: [string, "null"], format: date-time }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/block/end:
+    post:
+      operationId: endGroupRuleBlock
+      tags: [Rules]
+      summary: End a group's block of one of its rules
+      description: |
+        Ends the group's own block of the rule, so the rule's schedule applies again. Nothing to end is not an error. A pause of all internet is ended by `/groups/{id}/rules/internet/resume`, not here.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          description: One of the group's own category, app or website rules.
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/rules/{ruleId}/block/extend:
+    post:
+      operationId: extendGroupRuleBlock
+      tags: [Rules]
+      summary: Add time to a group's block of one of its rules
+      description: |
+        Adds `minutes` to the group's timed block of the rule. 409 `not_blocked` when the group has no block of this rule, `indefinite` when it has no end time.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ruleId
+          in: path
+          required: true
+          description: One of the group's own category, app or website rules.
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /api/v1/groups/{id}/unblock:
     post:
@@ -4213,6 +4355,29 @@ components:
           description: |
             This group's own DoH endpoint, or null to read the household default. A card
             uses it to resolve its own upstream verdict rather than the household's.
+        blockButtonRuleId:
+          type: string
+          description: |
+            The group's Block button default: one of its own category, app or website rules,
+            which its card's Block button blocks and unblocks instead of all internet ("Block
+            Video", "Unblock Video"). Absent for all internet, and whenever the rule it named no
+            longer covers the group or was deleted. Set with `PUT /groups/{id}`.
+        ruleBlock:
+          $ref: "#/components/schemas/RuleBlock"
+    RuleBlock:
+      type: object
+      additionalProperties: false
+      required: [ruleId, until, by]
+      description: |
+        Read-only. The group's own block of one of its category, app or website rules, whatever
+        that rule's schedule says (`POST /groups/{id}/rules/{ruleId}/block`), until `until`, or
+        until ended when null. It is not a pause: the group keeps its internet, and `suspension`
+        and `access` do not change. Absent when there is none. A pause of all internet and this
+        block replace each other.
+      properties:
+        ruleId: { type: string }
+        until: { type: [string, "null"], format: date-time }
+        by: { $ref: "#/components/schemas/Actor" }
     GroupCreate:
       type: object
       additionalProperties: false
@@ -4229,6 +4394,11 @@ components:
         name: { type: string }
         monogram: { type: [string, "null"] }
         familyRole: { type: [string, "null"], enum: [child, teen, adult, null] }
+        blockButtonRuleId:
+          type: [string, "null"]
+          description: |
+            One of the group's own category, app or website rules for its Block button, or null
+            for all internet. 400 `invalid_block_button_rule` for any other rule.
     Device:
       type: object
       additionalProperties: false

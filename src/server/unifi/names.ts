@@ -12,6 +12,12 @@ export function pauseRuleName(input: { name: string; kind: "family" | "things" }
   return `${subject} Internet Pause`;
 }
 
+/** The same rule's name while the group's own block blocks one of its rules ("TV Video Block"). */
+export function ruleBlockName(input: { name: string; kind: "family" | "things" }, ruleName: string): string {
+  const subject = input.kind === "family" ? possessive(input.name) : input.name.trim() || "Group";
+  return `${subject} ${ruleName.trim() || "Rule"} Block`;
+}
+
 function possessive(name: string): string {
   const trimmed = name.trim() || "Group";
   if (/s$/i.test(trimmed)) return `${trimmed}'`;

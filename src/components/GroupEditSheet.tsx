@@ -11,6 +11,7 @@ import {
   GROUP_DETAIL_COPY,
   GROUP_EDIT_COPY,
   MONOGRAM_MAX,
+  blockButtonChoices,
   deleteGroupConfirm,
   rulesOnlyFor,
   groupEditBody,
@@ -48,7 +49,8 @@ export function GroupEditSheet({
   onClose: () => void;
   onDeleted: () => void;
 }) {
-  const { store, busy, accounts, rules } = useAppData();
+  const { store, busy, accounts, rules, household } = useAppData();
+  const buttonChoices = blockButtonChoices(group, rules, household?.timezone ?? "America/New_York", new Date());
   const lockedRole = roleLocked(group, accounts);
   const [draft, setDraft] = useState<GroupEditSheetDraft>(() => groupEditSheetDraft(group));
   const [error, setError] = useState("");
@@ -190,6 +192,24 @@ export function GroupEditSheet({
             <input maxLength={MONOGRAM_MAX} className={FIELD} value={draft.monogram} onChange={(e) => set({ monogram: e.target.value })} />
           </label>
         )}
+        {buttonChoices.length > 1 ? (
+          <label className={LABEL}>
+            {GROUP_EDIT_COPY.blockButton}
+            <select
+              className={FIELD}
+              value={buttonChoices.some((choice) => choice.value === draft.blockButtonRuleId) ? draft.blockButtonRuleId : ""}
+              onChange={(e) => set({ blockButtonRuleId: e.target.value })}
+              data-testid="group-block-button"
+            >
+              {buttonChoices.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+            <span className="font-normal">{GROUP_EDIT_COPY.blockButtonHelp(draft.name.trim() || group.name)}</span>
+          </label>
+        ) : null}
         <div className={LABEL}>
           <span>{GROUP_EDIT_COPY.doh}</span>
           <Segmented<GroupDohMode>

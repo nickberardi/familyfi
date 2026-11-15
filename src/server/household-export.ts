@@ -104,6 +104,8 @@ const Config = z
         monogram: z.string().nullable(),
         familyRole: z.enum(FamilyRole).nullable(),
         dohOverrideUrl: z.string().nullable(),
+        /** Older exports have no Block button default: all internet. */
+        blockButtonRuleId: Id.nullable().default(null),
       }),
     ),
     accounts: z.array(
@@ -273,6 +275,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
       monogram: group.monogram,
       familyRole: group.familyRole,
       dohOverrideUrl: group.dohOverrideUrl,
+      blockButtonRuleId: group.blockButtonRuleId,
     })),
     accounts: accounts.map((account) => ({
       username: account.username,
@@ -625,7 +628,8 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       // The built-in rules stay: Lock DNS loses its groups with them and takes the export's below.
       await tx.rule.deleteMany({ where: { systemGroupId: null, id: { notIn: [QUARANTINE_RULE_ID, LOCK_DNS_RULE_ID] } } });
       await tx.group.deleteMany({});
-      for (const group of config.groups) await tx.group.create({ data: group });
+      // A group's Block button default names one of its rules, made below: it is set once they are.
+      for (const { blockButtonRuleId: _rule, ...group } of config.groups) await tx.group.create({ data: group });
 
       // A login links only to an adult in the family. A group's role can change after its login was
       // linked, so a link that no longer fits is dropped, as the accounts API would refuse to make it.
@@ -683,6 +687,13 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
             windows: { create: windows },
           },
         });
+      }
+      for (const group of config.groups) {
+        const rule = group.blockButtonRuleId && config.rules.find((item) => item.id === group.blockButtonRuleId);
+        // Only one of the group's own category, app or website rules, as the groups API allows.
+        if (rule && rule.kind !== RuleKind.internet && rule.groupIds.includes(group.id)) {
+          await tx.group.update({ where: { id: group.id }, data: { blockButtonRuleId: rule.id } });
+        }
       }
       const lockDns = config.household.lockDns;
       await tx.rule.upsert({

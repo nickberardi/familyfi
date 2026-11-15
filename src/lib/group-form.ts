@@ -4,7 +4,8 @@
  * /groups/{id}`). The writes themselves are in `group-writes.ts`.
  */
 import type { Account, Group } from "./types";
-import type { Rule } from "./rules";
+import { blockButtonChoice, blockButtonName } from "./group-actions";
+import { groupScopedRules, type Rule } from "./rules";
 import { roleLabel } from "./display";
 
 export type FamilyRole = "child" | "teen" | "adult";
@@ -63,10 +64,23 @@ export function monogramPlaceholder(name: string): string {
   return name.trim().slice(0, 2).toUpperCase() || "e.g. TV";
 }
 
-export type GroupEditDraft = { name: string; familyRole: FamilyRole; monogram: string };
+/** `blockButtonRuleId`: the rule the card's Block button blocks, or "" for all internet; absent leaves it as it is. */
+export type GroupEditDraft = { name: string; familyRole: FamilyRole; monogram: string; blockButtonRuleId?: string };
 
 export function groupEditDraft(group: Group): GroupEditDraft {
-  return { name: group.name, familyRole: group.familyRole ?? "child", monogram: group.monogram ?? "" };
+  return { name: group.name, familyRole: group.familyRole ?? "child", monogram: group.monogram ?? "", blockButtonRuleId: group.blockButtonRuleId ?? "" };
+}
+
+/**
+ * The Block button default's choices: all internet, then each of the group's own category, app or
+ * website rules by the name its button would use ("Video"). Only all internet when it has none, and
+ * then the setting is not shown.
+ */
+export function blockButtonChoices(group: Pick<Group, "id">, rules: Rule[], timezone: string, now: Date): { value: string; label: string }[] {
+  const own = groupScopedRules(rules, group.id)
+    .filter(blockButtonChoice)
+    .map((rule) => ({ value: rule.id, label: blockButtonName(rule, timezone, now) }));
+  return [{ value: "", label: GROUP_EDIT_COPY.blockButtonAll }, ...own];
 }
 
 /**
@@ -81,13 +95,16 @@ export function roleLocked(group: Pick<Group, "id">, accounts: readonly Pick<Acc
 export function groupEditBody(group: Group, draft: GroupEditDraft) {
   const name = draft.name.trim();
   if (!name) return null;
+  // Sent only when it changes, so a client that does not show the setting never clears it.
+  const blockButtonRuleId = draft.blockButtonRuleId === undefined ? (group.blockButtonRuleId ?? null) : draft.blockButtonRuleId || null;
+  const button = blockButtonRuleId === (group.blockButtonRuleId ?? null) ? {} : { blockButtonRuleId };
   if (group.kind === "family") {
-    if (name === group.name && draft.familyRole === group.familyRole) return null;
-    return { name, familyRole: draft.familyRole };
+    if (name === group.name && draft.familyRole === group.familyRole && !("blockButtonRuleId" in button)) return null;
+    return { name, familyRole: draft.familyRole, ...button };
   }
   const monogram = draft.monogram.trim() || null;
-  if (name === group.name && monogram === (group.monogram ?? null)) return null;
-  return { name, monogram };
+  if (name === group.name && monogram === (group.monogram ?? null) && !("blockButtonRuleId" in button)) return null;
+  return { name, monogram, ...button };
 }
 
 /** Whether a group with no devices is told its rules cannot apply until it has one. */
@@ -139,6 +156,9 @@ export function groupEditSheetDraft(group: Group): GroupEditSheetDraft {
 export const GROUP_EDIT_COPY = {
   open: "Edit",
   title: (name: string) => `Edit ${name}`,
+  blockButton: "Block button default",
+  blockButtonAll: "All internet",
+  blockButtonHelp: (name: string) => `What the Block button on ${name}’s card blocks and unblocks, with the same timers. All internet stays in its menu.`,
   doh: "DNS-over-HTTPS",
   dohModes: [
     { value: "default", label: "Household default" },

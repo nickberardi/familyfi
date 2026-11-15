@@ -298,6 +298,11 @@ model Group {
   appPolicies      AppPolicy[]
   rules            RuleGroup[]
   systemRule       Rule?           @relation("SystemRule")
+  /// The rule the group's Block button blocks and unblocks instead of all internet: one of its
+  /// own category, app or website rules. Null: all internet. No foreign key, since a group's own
+  /// block rule already points the other way; deleting the rule clears it, and a rule that no
+  /// longer covers the group reads as all internet.
+  blockButtonRuleId String?
   upstreamChecks   UpstreamCheck[]
 }
 
@@ -534,6 +539,9 @@ model Rule {
   systemGroupId    String?      @unique
   systemGroup      Group?       @relation("SystemRule", fields: [systemGroupId], references: [id], onDelete: Cascade)
   expiresAt        DateTime? @db.Timestamptz(3)
+  /// On a group's built-in block rule: the rule whose categories, apps or websites it blocks,
+  /// the group's Block button default when the block began. Null: it blocks all internet.
+  blocksRuleId     String?
   /// Who started the block, as they were named then.
   blockedByAccountId String?
   blockedByName    String?

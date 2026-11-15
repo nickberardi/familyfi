@@ -1,5 +1,6 @@
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
+import { BLOCK_CLEARED } from "@/server/group-internet";
 import { readJson, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { mapLimited } from "@/lib/concurrency";
@@ -134,6 +135,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
     }
     await prisma().rulePolicy.deleteMany({ where: { ruleId: id } });
     await prisma().rule.delete({ where: { id } });
+    // A group whose Block button stood for it goes back to all internet, and its block of it ends.
+    await prisma().group.updateMany({ where: { blockButtonRuleId: id }, data: { blockButtonRuleId: null } });
+    await prisma().rule.updateMany({ where: { blocksRuleId: id, enabled: true }, data: BLOCK_CLEARED });
     const change = await enqueueChange("rule");
     return Response.json({ change });
   });

@@ -46,10 +46,11 @@ export async function runGroupUnblock(
     const blockedByPause = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
     // A rule paused for everyone, or paused for this group, is not blocking it. One this group is
     // already allowed is included, so an unblock can be given a new time. An always-on category,
-    // app or website rule is how the group is set up, not a block on it: an unblock leaves it on.
+    // app or website rule is how the group is set up, not a block on it: an unblock leaves it on,
+    // unless it is the group's Block button rule, which its Unblock is for.
     const candidates = links.filter(
       ({ rule, ...link }) =>
-        rule.enabled && !standingRule(rule) && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
+        rule.enabled && (!standingRule(rule) || rule.id === existing.blockButtonRuleId) && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
     );
     const ends = new Map(candidates.map(({ rule }) => [rule.id, activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone)] as const));
     // By default only the rules blocking now, each until its own windows end; given a time, every rule.

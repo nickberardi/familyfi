@@ -76,8 +76,9 @@ export function unblockAnswer(
     ? `${its}, so ${one ? "it stays" : "they stay"} on.`
     : "";
   const { active, until: pauseEnd } = group.suspension;
-  const paused =
-    active && (pauseEnd === null || Date.parse(pauseEnd) > now.getTime());
+  const live = (end: string | null) => end === null || Date.parse(end) > now.getTime();
+  // The group's own block of one of its rules is a block the unblock ends too.
+  const paused = (active && live(pauseEnd)) || Boolean(group.ruleBlock && live(group.ruleBlock.until));
   if (!paused && lifts.length === 0) {
     const change = names.length ? " You can change that in FamilyFi." : "";
     const say = `${group.name} isn't blocked, so there's nothing to unblock.${kept}${change}`;
