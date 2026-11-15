@@ -356,11 +356,12 @@ export function groupDetailColor(change: GroupStatusParts["change"]): string {
  * it has the internet. It lifts all of them (at once when only its own block does, otherwise from
  * a sheet). Resume ends an unblock; otherwise Block blocks all internet.
  *
- * With a Block button rule (Video), the button still reads Block and Unblock, but acts on that rule
- * while no block of all internet holds the group: Unblock while it blocks (lifting it for the group
- * from a sheet, or ending at once the group's own block of it), Block with More time while it is
- * lifted for the group (putting it back at once), and otherwise Block (blocking it now from a
- * sheet), after a Resume for an unblock. Other rules blocking the group go to the dropdown.
+ * A Block button rule (Video) counts like a scheduled rule even when it is always on, so Unblock
+ * shows while it blocks and the group's Unblock lifts it with the rest. While nothing else blocks the
+ * group, the button acts on that rule alone, still reading Block and Unblock: Unblock while it
+ * blocks (lifting it for the group from a sheet, or ending at once the group's own block of it),
+ * Block with More time while it is lifted for the group (putting it back at once), and otherwise
+ * Block (blocking it now from a sheet), after a Resume for an unblock.
  */
 export function groupHeaderActions(
   group: Group,
@@ -374,7 +375,9 @@ export function groupHeaderActions(
     return header({ label: "Unblock", run: blocking.length ? "unblock" : "unblockNow" }, group.suspension.until ? { label: "More time", run: "moreBlock" } : null);
   }
   const button = blockButtonRule(group, rules);
-  if (button && !blocking.some((rule) => rule.kind === "internet")) {
+  // The button acts on the Block button rule alone only while nothing else (an internet rule or a
+  // scheduled rule) blocks the group: then Unblock lifts all of them, the default's rule included.
+  if (button && blocking.every((rule) => rule.ruleId === button.id)) {
     const name = blockButtonName(button, rules, group.id, timezone, now);
     const spec = (label: string, run: GroupRun): GroupActionSpec => ({ label, run, ruleId: button.id, name });
     if (group.ruleBlock?.ruleId === button.id) {

@@ -22441,6 +22441,336 @@
     },
     {
       "fn": "groupHeaderActions",
+      "name": "Block button default blocking with a scheduled rule also blocking",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null,
+          "blockButtonRuleId": "r-video"
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "TV video",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "Social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-gaming",
+            "name": "Gaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              8
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "10:00",
+                "end": "12:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T15:00:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Unblock",
+          "run": "unblock"
+        },
+        "more": null,
+        "menu": [
+          {
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
+          },
+          {
+            "label": "Unblock TV video",
+            "run": "pause",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video"
+          },
+          {
+            "label": "Unblock Social",
+            "run": "pause",
+            "ruleIds": [
+              "r-social"
+            ],
+            "name": "Social"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
+      "name": "Block button default unblocked while a scheduled rule blocks",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null,
+          "blockButtonRuleId": "r-video"
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "TV video",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T16:00:00.000Z",
+                  "kind": "pause",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "Social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-gaming",
+            "name": "Gaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              8
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "10:00",
+                "end": "12:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T15:00:00.000Z"
+      },
+      "expected": {
+        "action": {
+          "label": "Unblock",
+          "run": "unblock"
+        },
+        "more": null,
+        "menu": [
+          {
+            "label": "Block internet",
+            "run": "blockInternet",
+            "ruleIds": [],
+            "name": ""
+          },
+          {
+            "label": "Unblock Social",
+            "run": "pause",
+            "ruleIds": [
+              "r-social"
+            ],
+            "name": "Social"
+          },
+          {
+            "label": "Block TV video again",
+            "run": "resume",
+            "ruleIds": [
+              "r-video"
+            ],
+            "name": "TV video"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "groupHeaderActions",
       "name": "Block button default unblocked for a while",
       "input": {
         "group": {
