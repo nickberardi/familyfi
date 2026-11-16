@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { parseHm } from "@/lib/schedule";
 import { prisma } from "../db";
 import { ApiError } from "../http";
@@ -7,6 +8,15 @@ import { refreshResolverContexts, type ResolverContext } from "./discovery";
 import { ResolverConfigError, normalizeResolverUrl } from "./resolver-settings";
 import { rescheduleUpstreamProbe } from "./schedule";
 import { withUpstreamLock } from "./transaction";
+
+/** What `PUT /upstream/resolver` may carry. */
+export const HouseholdResolverBody = z.object({
+  url: z.string().min(1).optional(),
+  probeEnabled: z.boolean().optional(),
+  probeTime: z.string().optional(),
+  probeDays: z.array(z.number().int().min(0).max(6)).optional(),
+  timeoutMs: z.number().int().min(500).max(30000).optional(),
+});
 
 const SELECT = {
   dohUrl: true,

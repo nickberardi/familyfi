@@ -28,7 +28,14 @@ import { POST as ruleOff } from "@/app/api/v1/rules/[id]/off/route";
 import { POST as ruleOn } from "@/app/api/v1/rules/[id]/on/route";
 import { POST as rulePause } from "@/app/api/v1/rules/[id]/pause/route";
 import { POST as ruleResume } from "@/app/api/v1/rules/[id]/resume/route";
+import { GET as listCategoriesRoute, POST as createCategoryRoute } from "@/app/api/v1/upstream/categories/route";
+import { DELETE as deleteCategoryRoute, GET as getCategoryRoute, PATCH as patchCategoryRoute } from "@/app/api/v1/upstream/categories/[id]/route";
+import { POST as checkCategoryRoute } from "@/app/api/v1/upstream/categories/[id]/check/route";
+import { GET as listChecksRoute } from "@/app/api/v1/upstream/checks/route";
+import { POST as runChecksRoute } from "@/app/api/v1/upstream/checks/run/route";
+import { DELETE as clearHouseholdResolver, GET as getHouseholdResolver, PUT as setHouseholdResolver } from "@/app/api/v1/upstream/resolver/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { prisma } from "@/server/db";
 import { createRule, RuleCreateBody } from "@/server/rules";
 import { createFamilyGroup, resetDatabase } from "../helpers/db";
 
@@ -110,5 +117,104 @@ describe("route responses match the contract", () => {
     expect((await unblockExtend(send(`${unblockPath}/extend`, "POST", { minutes: 15 }), id(group.id))).status).toBe(200);
     expect((await unblockEnd(send(`${unblockPath}/end`, "POST"), id(group.id))).status).toBe(200);
     expect((await deleteRuleRoute(send(path, "DELETE"), rule)).status).toBe(200);
+  });
+
+  it("a rule's create and update carry every field through to what is stored", async () => {
+    const group = await createFamilyGroup("Betsy");
+    const created = await createRuleRoute(
+      send("/api/v1/rules", "POST", {
+        name: "Video evenings",
+        kind: "category",
+        scope: "group",
+        groupIds: [group.id],
+        networkIds: [],
+        targetIds: [4],
+        domains: [],
+        enabled: false,
+        mode: "scheduled",
+        windows: [{ name: "Evenings", days: [1, 2, 3], start: "18:00", end: "20:00" }],
+        useGeneratedName: false,
+      }),
+    );
+    expect(created.status).toBe(201);
+    const ruleId = ((await created.json()) as { rule: { id: string } }).rule.id;
+    const stored = () => prisma().rule.findUniqueOrThrow({ where: { id: ruleId }, include: { windows: true, groups: true } });
+    expect(await stored()).toMatchObject({
+      name: "Video evenings",
+      kind: "category",
+      scope: "group",
+      targetIds: [4],
+      enabled: false,
+      mode: "scheduled",
+      useGeneratedName: false,
+      groups: [{ groupId: group.id }],
+      windows: [{ name: "Evenings", days: [1, 2, 3], start: "18:00", end: "20:00" }],
+    });
+
+    const other = await createFamilyGroup("Abby");
+    const window = (await stored()).windows[0];
+    const patched = await patchRuleRoute(
+      send(`/api/v1/rules/${ruleId}`, "PATCH", {
+        name: "Video nights",
+        groupIds: [group.id, other.id],
+        targetIds: [4, 24],
+        enabled: true,
+        mode: "scheduled",
+        windows: [{ id: window.id, name: "Nights", days: [0, 6], start: "21:00", end: "23:00" }],
+        useGeneratedName: false,
+      }),
+      id(ruleId),
+    );
+    expect(patched.status).toBe(200);
+    const after = await stored();
+    expect(after).toMatchObject({
+      name: "Video nights",
+      targetIds: [4, 24],
+      enabled: true,
+      windows: [{ id: window.id, name: "Nights", days: [0, 6], start: "21:00", end: "23:00" }],
+    });
+    expect(after.groups.map((link) => link.groupId).sort()).toEqual([group.id, other.id].sort());
+  });
+
+  it("DNS categories, their checks and the household resolver", async () => {
+    // A run on record a day ahead, so saving the resolver starts no sweep of its own.
+    await prisma().household.update({ where: { id: "default" }, data: { dohProbeLastRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } });
+    const created = await createCategoryRoute(
+      send("/api/v1/upstream/categories", "POST", { label: "Homework", monogram: "HW", domains: ["chegg.com"], enabled: true }),
+    );
+    expect(created.status).toBe(201);
+    const categoryId = ((await created.json()) as { category: { id: string } }).category.id;
+    const path = `/api/v1/upstream/categories/${categoryId}`;
+    expect((await listCategoriesRoute(send("/api/v1/upstream/categories"))).status).toBe(200);
+    expect((await getCategoryRoute(send(path), id(categoryId))).status).toBe(200);
+    const patched = await patchCategoryRoute(send(path, "PATCH", { label: "Study", monogram: "ST", enabled: false, domains: ["quizlet.com"] }), id(categoryId));
+    expect(patched.status).toBe(200);
+    expect(await prisma().upstreamCategory.findUniqueOrThrow({ where: { id: categoryId }, include: { domains: true } })).toMatchObject({
+      label: "Study",
+      monogram: "ST",
+      enabled: false,
+      domains: [{ domain: "quizlet.com" }],
+    });
+    // With no resolver set the check answers unknown: a result to show, never an error.
+    expect((await checkCategoryRoute(send(`${path}/check`, "POST"), id(categoryId))).status).toBe(200);
+    expect((await runChecksRoute(send("/api/v1/upstream/checks/run", "POST"))).status).toBe(200);
+    expect((await listChecksRoute(send("/api/v1/upstream/checks"))).status).toBe(200);
+    expect((await deleteCategoryRoute(send(path, "DELETE"), id(categoryId))).status).toBe(200);
+
+    const resolver = "/api/v1/upstream/resolver";
+    expect((await getHouseholdResolver(send(resolver))).status).toBe(200);
+    const saved = await setHouseholdResolver(
+      send(resolver, "PUT", { url: "https://dns.example.com/dns-query", probeEnabled: false, probeTime: "09:30", probeDays: [1, 3], timeoutMs: 2000 }),
+    );
+    expect(saved.status).toBe(200);
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({
+      dohUrl: "https://dns.example.com/dns-query",
+      dohProbeEnabled: false,
+      dohProbeTime: "09:30",
+      dohProbeDays: [1, 3],
+      dohProbeTimeoutMs: 2000,
+    });
+    expect((await getHouseholdResolver(send(resolver))).status).toBe(200);
+    expect((await clearHouseholdResolver(send(resolver, "DELETE"))).status).toBe(200);
   });
 });
