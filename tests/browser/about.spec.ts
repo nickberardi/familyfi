@@ -19,6 +19,10 @@ test("opens About from the rail's version and its lockup, and closes on Done and
   const openers = page.getByRole("button", { name: "About FamilyFi" });
   await expect(openers).toHaveCount(2);
   await expect(openers.last()).toHaveText(/^v\d+\.\d+\.\d+/);
+  // The version, Star us and Report issue fit on one line at 14px in the rail.
+  const versionTop = (await openers.last().boundingBox())?.y;
+  const reportTop = (await page.locator(".ff-sidebar").getByRole("link", { name: "Report issue" }).boundingBox())?.y;
+  expect(reportTop).toBe(versionTop);
 
   await openers.last().click();
   const about = page.getByRole("dialog", { name: "About FamilyFi" });
