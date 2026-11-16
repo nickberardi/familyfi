@@ -25,28 +25,31 @@ export function GroupDevicesCard({ group, members }: { group: Group; members: De
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="group-devices">
       <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
-        <Text role="heading" style={[text, styles.title, { color: ui.color("ink") }]}>
+        <Text role="heading" aria-level={2} style={[text, styles.title, { color: ui.color("ink") }]}>
           {GROUP_DETAIL_COPY.devices[group.kind]}
         </Text>
         <ui.Link href={assignHref}>
-          <Text style={[text, accent]}>{GROUP_DETAIL_COPY.assignDevices}</Text>
+          <View style={styles.touch}>
+            <Text style={[text, accent]}>{GROUP_DETAIL_COPY.assignDevices}</Text>
+          </View>
         </ui.Link>
       </View>
       {members.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={[text, { color: ui.color("muted") }]}>
-            {GROUP_DETAIL_COPY.noDevices}
-            {rulesNeedDevice(group) ? ` ${GROUP_DETAIL_COPY.rulesNeedDevice.before} ` : null}
-          </Text>
-          {rulesNeedDevice(group) ? (
-            <View style={styles.inline}>
-              <ui.Link href={assignHref}>
-                <Text style={[text, accent]}>{GROUP_DETAIL_COPY.rulesNeedDevice.link}</Text>
-              </ui.Link>
-              <Text style={[text, { color: ui.color("muted") }]}>{GROUP_DETAIL_COPY.rulesNeedDevice.after}</Text>
+        rulesNeedDevice(group) ? (
+          // One link for the whole sentence, so it reads as one and is tall enough to touch; a link can't sit inside text here.
+          <ui.Link href={assignHref}>
+            <View style={[styles.empty, styles.touch]}>
+              <Text style={[text, { color: ui.color("muted") }]}>
+                {GROUP_DETAIL_COPY.noDevices} {GROUP_DETAIL_COPY.rulesNeedDevice.before} <Text style={accent}>{GROUP_DETAIL_COPY.rulesNeedDevice.link}</Text>
+                {GROUP_DETAIL_COPY.rulesNeedDevice.after}
+              </Text>
             </View>
-          ) : null}
-        </View>
+          </ui.Link>
+        ) : (
+          <View style={styles.empty}>
+            <Text style={[text, { color: ui.color("muted") }]}>{GROUP_DETAIL_COPY.noDevices}</Text>
+          </View>
+        )
       ) : (
         members.map((device, index) => (
           // The heading row draws the first hairline.
@@ -77,10 +80,10 @@ export function GroupDevicesCard({ group, members }: { group: Group; members: De
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
-  head: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
+  head: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 18, paddingVertical: 4, borderBottomWidth: 1 },
   title: { flex: 1, fontWeight: "600" },
   empty: { paddingHorizontal: 18, paddingVertical: 16 },
-  inline: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline" },
+  touch: { minHeight: 44, justifyContent: "center" },
   rowEdge: { borderTopWidth: 1 },
   row: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44, paddingHorizontal: 18, paddingVertical: 10 },
   words: { flex: 1, minWidth: 0 },
