@@ -7,6 +7,7 @@ import { remoteStatus, routeTrust, transportLabel } from "@/lib/connection-route
 import { canRepair, isApp, isAppControls, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
+import { Tag } from "./Tag";
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
@@ -62,7 +63,14 @@ export function PairedPhoneRow({
         <ui.Icon name={phone.client === "watch" ? "watch" : phone.client === "agent" ? "robot" : "device-mobile"} size={18} color={ui.color("ink")} />
       </View>
       <View style={styles.phoneWords}>
-        <Text style={[text(14, 21, "ink"), styles.bold]}>{phone.displayName}</Text>
+        <View style={styles.nameRow}>
+          <Text style={[text(14, 21, "ink"), styles.bold, styles.name]}>{phone.displayName}</Text>
+          {lines.tags.map((tag) => (
+            <Tag key={tag.name} label={tag.label === tag.name ? undefined : tag.name}>
+              {tag.label}
+            </Tag>
+          ))}
+        </View>
         <Text style={[text(14, 21, "muted"), styles.line]}>{lines.access}</Text>
         <Text style={[text(14, 21, "muted"), styles.line]}>
           {lines.via ? (
@@ -232,6 +240,8 @@ const styles = StyleSheet.create({
   phone: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
   phoneIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   phoneWords: { flex: 1, minWidth: 0 },
+  nameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
+  name: { flexShrink: 1 },
   actions: { flexShrink: 0, alignItems: "flex-end", gap: 4 },
   listButton: { paddingHorizontal: 18, paddingVertical: 10 },
   remoteBody: { gap: 12, paddingHorizontal: 18, paddingVertical: 12 },

@@ -148,18 +148,22 @@ function origin(device: Pick<PairedPhone, "client" | "scope">, parentName: strin
 }
 
 /**
- * A paired device's lines, the same for phones, Watches and agents: what it may do, whose account it
- * acts as and when it was last seen; how it reaches home; and when it paired and its sign-in ends.
+ * A paired device's tags and lines, the same for phones, Watches and agents. Tags beside its name say
+ * what it may do, whose account it acts as and, for an app, whether it takes alerts; the lines say
+ * when it was last seen, how it reaches home, and when it paired and its sign-in ends.
  */
 export function phoneLines(phone: PairedPhone, now = new Date(), parentName: string | null = null) {
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt, now) : "never";
-  const actsAs = phone.actsAs ? ` · acts as ${phone.actsAs.displayName}` : "";
   const ends = phone.sessions.map((session) => session.expiresAt).sort()[0];
-  const alerts = phone.alerts === undefined || phone.revokedAt ? "" : ` · ${phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff}`;
+  const tags: { label: string; name: string }[] = [{ label: scopeLabel(phone.scope), name: scopeLabel(phone.scope) }];
+  if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}` });
+  if (phone.alerts !== undefined && !phone.revokedAt) {
+    const alerts = phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff;
+    tags.push({ label: alerts, name: alerts });
+  }
   return {
-    access: `${scopeLabel(phone.scope)}${actsAs} · ${
-      phone.revokedAt ? `revoked ${pairedDate(phone.revokedAt)}` : `last seen ${seen === "now" || seen === "never" ? seen : `${seen} ago`}`
-    }${alerts}`,
+    tags,
+    access: phone.revokedAt ? `Revoked ${pairedDate(phone.revokedAt)}` : `Last seen ${seen === "now" || seen === "never" ? seen : `${seen} ago`}`,
     via: phone.pairedVia ? { url: phone.pairedVia.url, transport: transportLabel(phone.pairedVia.transport) } : null,
     origin: origin(phone, parentName),
     // A phone or agent another phone paired goes when that phone is revoked; a Watch or an app's Siri and shortcuts says so in its origin.

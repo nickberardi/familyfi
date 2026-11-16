@@ -82,14 +82,16 @@ describe("pair device", () => {
     const now = new Date("2026-09-14T20:00:00Z");
     const session = (id: string, expiresAt: string) => ({ id, username: "admin", client: "app" as const, expiresAt, createdAt: "2026-09-14T12:00:00Z" });
     const lines = phoneLines(phone({ actsAs: { username: "admin", displayName: "An adult" }, sessions: [session("s2", "2026-12-14T12:00:00Z"), session("s1", "2026-10-14T12:00:00Z")] }), now);
-    expect(lines.access).toBe("Full access · acts as An adult · last seen 2m ago");
+    expect(lines.tags.map((tag) => tag.label)).toEqual(["Full access", "An adult"]);
+    expect(lines.tags[1].name).toBe("Acts as An adult");
+    expect(lines.access).toBe("Last seen 2m ago");
     expect(lines.via).toEqual({ url: "https://home.example", transport: "My domain" });
     // The sign-in that ends first is the one that matters.
     expect(lines.dates).toMatch(/^Paired .+ · expires Oct 1[45], 2026$/);
     expect(lines.expired).toBe(false);
-    expect(phoneLines(phone({ lastSeenAt: null }), now).access).toMatch(/last seen never$/);
+    expect(phoneLines(phone({ lastSeenAt: null }), now).access).toBe("Last seen never");
     const revoked = phoneLines(phone({ revokedAt: "2026-09-10T00:00:00Z" }), now);
-    expect(revoked.access).toMatch(/ · revoked /);
+    expect(revoked.access).toMatch(/^Revoked /);
     expect(revoked.expired).toBe(false);
     expect(phoneLines(phone(), now)).toMatchObject({ dates: expect.not.stringContaining("expires"), expired: true });
     // An expired phone is re-paired in place; Watches and agents, which have no Re-pair, pair again.
@@ -98,13 +100,14 @@ describe("pair device", () => {
     expect(phoneLines(phone({ pairedVia: null }), now).origin).toBe("via a route that was removed");
   });
 
-  it("says on an app's access line whether it gets alerts", () => {
+  it("tags an app with whether it gets alerts", () => {
     const now = new Date("2026-09-14T20:00:00Z");
-    expect(phoneLines(phone({ alerts: true }), now).access).toMatch(/ · alerts on$/);
-    expect(phoneLines(phone({ alerts: false }), now).access).toMatch(/ · alerts off$/);
+    const labels = (alerts: boolean | undefined, revokedAt: string | null = null) => phoneLines(phone({ alerts, revokedAt }), now).tags.map((tag) => tag.label);
+    expect(labels(true)).toEqual(["Full access", "An adult", "Alerts on"]);
+    expect(labels(false)).toEqual(["Full access", "An adult", "Alerts off"]);
     // Watches, Siri's sign-in and agents have no alerts field, and a revoked phone says nothing of them.
-    expect(phoneLines(phone(), now).access).not.toMatch(/alerts/);
-    expect(phoneLines(phone({ alerts: true, revokedAt: "2026-09-10T00:00:00Z" }), now).access).not.toMatch(/alerts/);
+    expect(labels(undefined)).toEqual(["Full access", "An adult"]);
+    expect(labels(true, "2026-09-10T00:00:00Z")).toEqual(["Full access", "An adult"]);
   });
 
   it("offers Re-pair on any phone, active or revoked, but not the one showing the list", () => {
@@ -201,9 +204,9 @@ describe("pair device", () => {
   });
 
   it("names a device's scope, the adult it acts as, and where it came from", () => {
-    expect(phoneLines(phone({ actsAs: null })).access).toMatch(/^Full access · last seen /);
+    expect(phoneLines(phone({ actsAs: null })).tags.map((tag) => tag.label)).toEqual(["Full access"]);
     const agent = phone({ client: "agent", scope: "readOnly", pairedVia: null, actsAs: { username: "admin", displayName: "An adult" } });
-    expect(phoneLines(agent).access).toMatch(/^Read only · acts as An adult · /);
+    expect(phoneLines(agent).tags.map((tag) => tag.label)).toEqual(["Read only", "An adult"]);
     expect(phoneLines(agent).origin).toBe("On the home network");
     const watch = phone({ client: "watch", scope: "rulesOnly", pairedVia: null });
     expect(phoneLines(watch).origin).toBe("Paired automatically from an iPhone");

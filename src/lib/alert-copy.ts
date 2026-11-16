@@ -58,6 +58,6 @@ export const ALERTS_CARD_COPY = {
     "Apple or Google see that a device got an alert and when, not what it says or what kind it is.",
   ],
   /** Each paired app's own choice, on its access line in Pair Device. */
-  accessOn: "alerts on",
-  accessOff: "alerts off",
+  accessOn: "Alerts on",
+  accessOff: "Alerts off",
 } as const;
