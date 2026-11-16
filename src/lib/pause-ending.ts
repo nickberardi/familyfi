@@ -26,7 +26,7 @@ export function pauseEndingNotice(group: Pick<Group, "name">, until: number, now
   };
 }
 
-/** The notice for an unblock (the group's allowance) ending at `until`, or null when it ends too soon for one. */
+/** The notice for an unblock (the group's `groupUnblock`) ending at `until`, or null when it ends too soon for one. */
 export function allowanceEndingNotice(group: Pick<Group, "name">, until: number, now: number): PauseEndingNotice | null {
   const at = until - PAUSE_ENDING_LEAD_MS;
   if (at <= now) return null;
