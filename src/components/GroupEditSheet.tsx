@@ -1,39 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { request } from "@/lib/api";
 import { useAppData } from "@/components/AppDataProvider";
-import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, FIELD, PRIMARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
-import { Segmented } from "@/components/ui/Segmented";
-import { Alert } from "@/ui/Alert";
-import {
-  FAMILY_ROLES,
-  GROUP_DETAIL_COPY,
-  GROUP_EDIT_COPY,
-  MONOGRAM_MAX,
-  blockButtonChoices,
-  deleteGroupConfirm,
-  rulesOnlyFor,
-  groupEditBody,
-  groupEditError,
-  groupEditSheetDraft,
-  groupResolverEdit,
-  roleLocked,
-  type FamilyRole,
-  type GroupDohMode,
-  type GroupEditSheetDraft,
-} from "@/lib/group-form";
-import { GROUP_RESOLVER_COPY, groupResolverNetworkLine, groupResolverSummary, loadGroupResolver, type GroupResolver } from "@/lib/group-resolver";
-import { deleteGroup, updateGroup } from "@/lib/group-writes";
+import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, PRIMARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
+import { GROUP_EDIT_COPY, deleteGroupConfirm, rulesOnlyFor } from "@/lib/group-form";
+import { deleteGroup } from "@/lib/group-writes";
 import type { Group } from "@/lib/types";
-
-const LABEL = "flex flex-col gap-1 text-[14px] font-semibold text-[var(--ff-muted)]";
+import { GroupEditForm } from "@/ui/GroupEditForm";
+import { useGroupEdit } from "@/ui/use-group-edit";
 
 /**
- * The group detail's Edit sheet, as the design's "Edit <name>" modal has it: name, then role for a
- * person or monogram for a Things group, then where its category checks reach DNS. Deleting the
- * group starts here too and asks first. Saving sends the group's fields, then its resolver, so a
- * resolver that fails leaves the name saved and the sheet open to try that part again.
+ * The group detail's Edit sheet: the shared `GroupEditForm` in the web's dialog frame, with Save,
+ * Cancel and Delete in its footer. Deleting the group starts here too and asks first.
  */
 export function GroupEditSheet({
   group,
@@ -50,27 +29,15 @@ export function GroupEditSheet({
   onDeleted: () => void;
 }) {
   const { store, busy, accounts, rules, household } = useAppData();
-  // The choices are named on the household's clock, so the setting waits for it.
-  const buttonChoices = household ? blockButtonChoices(group, rules, household.timezone, new Date()) : [];
-  const lockedRole = roleLocked(group, accounts);
-  const [draft, setDraft] = useState<GroupEditSheetDraft>(() => groupEditSheetDraft(group));
-  const [error, setError] = useState("");
+  // The Block button's choices are named on the household's clock, so the setting waits for it.
+  const edit = useGroupEdit({ group, store, request, accounts, rules, timezone: household?.timezone ?? null, demo });
   const [confirming, setConfirming] = useState(false);
-  // Undefined while it loads, so the sheet never says "unavailable" before it has asked.
-  const [resolver, setResolver] = useState<GroupResolver | null | undefined>(undefined);
-  // An edit clears the last refusal, which no longer describes what the sheet holds.
-  const set = (patch: Partial<GroupEditSheetDraft>) => {
-    setError("");
-    setDraft((current) => ({ ...current, ...patch }));
-  };
+  const form = useRef<HTMLFormElement>(null);
 
+  // The sheet opens in its name field, and comes back to it from the delete question.
   useEffect(() => {
-    let live = true;
-    void loadGroupResolver(request, group.id).then((next) => live && setResolver(next));
-    return () => {
-      live = false;
-    };
-  }, [group.id]);
+    if (!confirming) form.current?.querySelector("input")?.focus();
+  }, [confirming]);
 
   // Focus goes back to the Edit button that opened the sheet (the dialog frame closes it on Escape).
   useEffect(() => {
@@ -81,33 +48,6 @@ export function GroupEditSheet({
       }, 0);
     };
   }, [opener]);
-
-  // Measured against the group as saved now, not as the sheet opened: after a save that only partly
-  // landed, putting a field back to how it was is still a change to send.
-  const saved = groupEditSheetDraft(group);
-  const dirty = (Object.keys(saved) as (keyof GroupEditSheetDraft)[]).some((key) => draft[key] !== saved[key]);
-  const failure = () => store.getState().error || GROUP_RESOLVER_COPY.saveFailed;
-
-  async function save() {
-    const problem = groupEditError(draft);
-    if (problem) return setError(problem);
-    setError("");
-    const name = draft.name.trim();
-    if (groupEditBody(group, draft)) {
-      const saved = await updateGroup(store.mutate, group, draft, { notice: GROUP_EDIT_COPY.saved(name) });
-      if (!saved) return setError(failure());
-    }
-    const resolverEdit = demo ? ({ kind: "none" } as const) : groupResolverEdit(group.dohOverrideUrl, draft);
-    if (resolverEdit.kind !== "none") {
-      const path = `/api/v1/groups/${group.id}/resolver`;
-      const saved = await store.mutate(
-        (send) => (resolverEdit.kind === "set" ? send(path, { method: "PUT", body: { url: resolverEdit.url } }) : send(path, { method: "DELETE" })),
-        { groupId: group.id, feedback: { notice: GROUP_EDIT_COPY.saved(name) } },
-      );
-      if (!saved) return setError(failure());
-    }
-    onClose();
-  }
 
   if (confirming) {
     const copy = deleteGroupConfirm(group, rulesOnlyFor(group, rules));
@@ -136,7 +76,6 @@ export function GroupEditSheet({
     );
   }
 
-  const custom = draft.doh === "custom";
   return (
     <SheetFrame
       title={GROUP_EDIT_COPY.title(group.name)}
@@ -155,7 +94,7 @@ export function GroupEditSheet({
           <button type="button" onClick={onClose} className={CANCEL_BUTTON}>
             {GROUP_EDIT_COPY.cancel}
           </button>
-          <button type="submit" form="group-edit-form" disabled={busy || !dirty} className={PRIMARY_BUTTON}>
+          <button type="submit" form="group-edit-form" disabled={busy || !edit.dirty} className={PRIMARY_BUTTON}>
             {busy ? GROUP_EDIT_COPY.saving : GROUP_EDIT_COPY.save}
           </button>
         </>
@@ -163,104 +102,14 @@ export function GroupEditSheet({
     >
       <form
         id="group-edit-form"
-        className="flex flex-col gap-3.5"
+        ref={form}
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void save();
+          void edit.save().then((saved) => saved && onClose());
         }}
       >
-        <label className={LABEL}>
-          {GROUP_DETAIL_COPY.name}
-          <input autoFocus className={FIELD} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
-        </label>
-        {group.kind === "family" ? (
-          <div className={LABEL}>
-            <span id="group-edit-role">{GROUP_DETAIL_COPY.role}</span>
-            <Segmented<FamilyRole>
-              name={GROUP_DETAIL_COPY.role}
-              value={draft.familyRole}
-              segments={FAMILY_ROLES.map((role) => ({ ...role, disabled: lockedRole && role.value !== "adult" }))}
-              onChange={(familyRole) => set({ familyRole })}
-              size="lg"
-              grow
-            />
-            {lockedRole ? <span className="font-normal">{GROUP_DETAIL_COPY.roleLocked}</span> : null}
-          </div>
-        ) : (
-          <label className={LABEL}>
-            {GROUP_DETAIL_COPY.monogram}
-            <input maxLength={MONOGRAM_MAX} className={FIELD} value={draft.monogram} onChange={(e) => set({ monogram: e.target.value })} />
-          </label>
-        )}
-        {buttonChoices.length > 1 ? (
-          <div className="flex flex-col gap-1">
-            <label className={LABEL}>
-              {GROUP_EDIT_COPY.blockButton}
-              <select
-                className={FIELD}
-                value={buttonChoices.some((choice) => choice.value === draft.blockButtonRuleId) ? draft.blockButtonRuleId : ""}
-                onChange={(e) => set({ blockButtonRuleId: e.target.value })}
-                aria-describedby="group-block-button-help"
-                data-testid="group-block-button"
-              >
-                {buttonChoices.map((choice) => (
-                  <option key={choice.value} value={choice.value}>
-                    {choice.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p id="group-block-button-help" className="text-[14px] leading-5 text-[var(--ff-ink-2)]">
-              {GROUP_EDIT_COPY.blockButtonHelp(draft.name.trim() || group.name)}
-            </p>
-          </div>
-        ) : null}
-        <div className={LABEL}>
-          <span>{GROUP_EDIT_COPY.doh}</span>
-          <Segmented<GroupDohMode>
-            name={GROUP_EDIT_COPY.doh}
-            value={draft.doh}
-            segments={GROUP_EDIT_COPY.dohModes.map((mode) => ({ ...mode, disabled: demo }))}
-            onChange={(doh) => set({ doh })}
-            size="lg"
-            grow
-          />
-        </div>
-        {custom ? (
-          <label className={LABEL}>
-            {GROUP_EDIT_COPY.url}
-            <input
-              type="url"
-              inputMode="url"
-              spellCheck={false}
-              disabled={demo}
-              className={`${FIELD} font-mono break-all`}
-              placeholder={GROUP_EDIT_COPY.urlPlaceholder}
-              value={draft.url}
-              onChange={(e) => set({ url: e.target.value })}
-              data-testid="group-edit-url"
-            />
-          </label>
-        ) : null}
-        <div className="flex flex-col gap-1 text-[14px] leading-5 text-[var(--ff-ink-2)]" data-testid="group-edit-dns-help">
-          {demo ? (
-            <p>{GROUP_EDIT_COPY.demoLocked}</p>
-          ) : custom ? (
-            <p>{GROUP_RESOLVER_COPY.overrideNote(draft.name.trim() || group.name)}</p>
-          ) : (
-            <>
-              {resolver !== undefined ? <p>{groupResolverSummary(resolver)}</p> : null}
-              {resolver?.networks.map((network) => <p key={network.id}>{groupResolverNetworkLine(network)}</p>)}
-            </>
-          )}
-          <p>{GROUP_RESOLVER_COPY.hostNote}</p>
-        </div>
-        {error ? (
-          <Alert tone="danger" role="alert">
-            {error}
-          </Alert>
-        ) : null}
+        <GroupEditForm edit={edit} />
       </form>
     </SheetFrame>
   );

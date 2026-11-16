@@ -15,7 +15,7 @@ export const defaultUI: UI = {
   font: "var(--ff-font)",
   Icon,
   // The web's fields keep its own font, a URL's included.
-  TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled, mono, search }) =>
+  TextField: ({ label, value, onChange, placeholder, maxLength, onSubmit, disabled, mono, url, search }) =>
     search ? (
       <input
         type="search"
@@ -27,7 +27,7 @@ export const defaultUI: UI = {
         className="ff-input"
       />
     ) : (
-      <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={mono} />
+      <TextField label={label} value={value} onChange={onChange} placeholder={placeholder} maxLength={maxLength} onSubmit={onSubmit} disabled={disabled} mono={mono} url={url} />
     ),
   // A disabled control disables each of its segments, as the web's segmented control draws it.
   Segmented: ({ name, value, segments, onChange, disabled, fit }) => (

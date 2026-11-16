@@ -47,6 +47,7 @@ export function TextField({
   maxLength,
   onSubmit,
   mono = false,
+  url = false,
 }: {
   label: string;
   value: string;
@@ -57,10 +58,14 @@ export function TextField({
   /** Fires on Enter, so an add-row works without a surrounding form. */
   onSubmit?: () => void;
   mono?: boolean;
+  /** A URL: the URL keyboard on a phone, and no spelling marks. */
+  url?: boolean;
 }) {
   return (
     <input
       type="text"
+      inputMode={url ? "url" : undefined}
+      spellCheck={url ? false : undefined}
       aria-label={label}
       disabled={disabled}
       value={value}
