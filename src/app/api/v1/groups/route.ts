@@ -1,12 +1,7 @@
-import { FamilyRole, GroupKind } from "@prisma/client";
 import { z } from "zod";
-import { enqueueChange } from "@/server/changes";
-import { groupInclude, publicGroup } from "@/server/groups";
-import { joinCountriesRule, lockHousehold } from "@/server/rules";
-import { prisma } from "@/server/db";
+import { createGroup, listGroups } from "@/server/groups";
 import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { loadHousehold } from "@/server/household";
 
 const Create = z.object({
   kind: z.enum(["family", "things"]),
@@ -16,11 +11,7 @@ const Create = z.object({
 });
 
 export async function GET(request: Request) {
-  return withSession(request, async () => {
-    const household = await loadHousehold();
-    const groups = await prisma().group.findMany({ include: groupInclude, orderBy: { createdAt: "asc" } });
-    return Response.json({ groups: groups.map((group) => publicGroup(group, household.timezone)) });
-  });
+  return withSession(request, async () => Response.json({ groups: await listGroups() }));
 }
 
 export async function POST(request: Request) {
@@ -30,23 +21,6 @@ export async function POST(request: Request) {
     if (parsed.data.kind === "family" && !parsed.data.familyRole) {
       return jsonError(400, "invalid_request", "Family groups need a role.");
     }
-    const household = await loadHousehold();
-    const created = await prisma().$transaction(async (tx) => {
-      // Serialized with other group creates and Block countries saves, so "covers every group" holds.
-      await lockHousehold(tx);
-      const group = await tx.group.create({
-        data: {
-          kind: parsed.data.kind as GroupKind,
-          name: parsed.data.name,
-          monogram: parsed.data.monogram,
-          familyRole: parsed.data.familyRole as FamilyRole | undefined,
-        },
-      });
-      await joinCountriesRule(tx, group.id);
-      return group;
-    });
-    const group = await prisma().group.findUniqueOrThrow({ where: { id: created.id }, include: groupInclude });
-    const change = await enqueueChange("group");
-    return Response.json({ group: publicGroup(group, household.timezone), change }, { status: 201 });
+    return Response.json(await createGroup(parsed.data), { status: 201 });
   });
 }

@@ -361,6 +361,11 @@
         "repository"
       ]
     },
+    "tests/unit/route-boundary.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
     "tests/unit/rules.test.ts": {
       "categories": [
         "rules"
