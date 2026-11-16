@@ -81,7 +81,8 @@ test("Devices points out private Wi-Fi addresses and shows only them on request"
  * with this message rather than a locator timeout on a finding that can no longer appear.
  */
 async function expectRoguePolicyOnGateway(page: Page) {
-  const run = await page.request.post("/api/v1/checkup/run");
+  const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "familyfi_csrf")?.value ?? "";
+  const run = await page.request.post("/api/v1/checkup/run", { headers: { "x-csrf-token": csrf } });
   expect(run.ok(), `checkup run failed (${run.status()})`).toBe(true);
   const body = (await run.json()) as { checkup: { findings: { check: string }[] } };
   if (!body.checkup.findings.some((finding) => finding.check === "leftover_policies")) {
