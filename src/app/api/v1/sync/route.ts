@@ -6,10 +6,11 @@ import { deviceScope } from "@/server/devices";
 import { withSession } from "@/server/guard";
 import { isWriteFailure, storedCoverage } from "@/server/policy-coverage";
 import { networkInScope } from "@/server/unifi/scope";
+import { loadHousehold } from "@/server/household";
 
 export async function GET(request: Request) {
   return withSession(request, async () => {
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await loadHousehold();
     const scope = deviceScope(household);
     // Every policy FamilyFi owns: pause and quarantine policies, and one per rule window. Counted, not
     // loaded: every open page and phone polls this.

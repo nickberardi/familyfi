@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { readJson, withMutation } from "@/server/guard";
+import { readBody, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { testStoredUnifiConnection, testUnifiConnection } from "@/server/unifi-settings";
 import { UnifiConfigError } from "@/server/unifi/errors";
@@ -21,10 +21,8 @@ const Body = z
 
 export async function POST(request: Request) {
   return withMutation(request, async () => {
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Provide an API key and a UniFi target, or test the saved connection.");
+    const parsed = await readBody(request, Body, "Provide an API key and a UniFi target, or test the saved connection.");
+    if (!parsed.ok) return parsed.response;
     try {
       const result = parsed.data.apiKey
         ? await testUnifiConnection({

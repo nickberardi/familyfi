@@ -3,7 +3,7 @@ import { z } from "zod";
 import { isAdministrator, removeDevice, revokeDevice } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { isValidScope } from "@/server/device-scope";
-import { readJson, withAdmin, withMutation, withSession } from "@/server/guard";
+import { readBody, withAdmin, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { deviceInclude, publicPairedDevice, visibleDevices } from "@/server/paired-devices";
 
@@ -15,7 +15,7 @@ const Update = z
 
 export async function GET(request: Request, context: Ctx) {
   return withSession(request, async (session) => {
-    const visible = visibleDevices(session as never);
+    const visible = visibleDevices(session);
     if (!visible) return jsonError(403, "administrator_required", "A FamilyFi administrator or a paired device is required.");
     const { id } = await context.params;
     const device = await prisma().pairedDevice.findFirst({ where: { AND: [visible, { id }] }, include: deviceInclude() });
@@ -30,10 +30,8 @@ export async function GET(request: Request, context: Ctx) {
  */
 export async function PATCH(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Update.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Send a displayName or a scope.");
+    const parsed = await readBody(request, Update, "Send a displayName or a scope.");
+    if (!parsed.ok) return parsed.response;
     const { id } = await context.params;
     const device = await prisma().pairedDevice.findUnique({ where: { id } });
     if (!device) return jsonError(404, "not_found", "Paired device not found.");
@@ -53,7 +51,7 @@ export async function PATCH(request: Request, context: Ctx) {
 export async function DELETE(request: Request, context: Ctx) {
   return withMutation(request, async (session) => {
     const { id } = await context.params;
-    const administrator = isAdministrator(session as never);
+    const administrator = isAdministrator(session);
     const device = await prisma().pairedDevice.findUnique({ where: { id }, select: { parentDeviceId: true } });
     const own = Boolean(session.deviceId) && session.deviceId === id;
     const parent = Boolean(session.deviceId) && device?.parentDeviceId === session.deviceId;

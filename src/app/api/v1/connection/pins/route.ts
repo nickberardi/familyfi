@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { jsonError } from "@/server/http";
-import { readJson, withAdmin } from "@/server/guard";
+import { readBody, withAdmin } from "@/server/guard";
 import { demoLocked } from "@/server/demo";
 import { ProbeError, pinFromCertificate, probeCertificate } from "@/server/spki";
 
@@ -12,10 +12,8 @@ export async function POST(request: Request) {
     // Routes are locked in the demo, and a probe would reach any address from the demo's host.
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Send either a route url or a PEM certificate.");
+    const parsed = await readBody(request, Body, "Send either a route url or a PEM certificate.");
+    if (!parsed.ok) return parsed.response;
     try {
       const pin = "url" in parsed.data ? await probeCertificate(parsed.data.url) : pinFromCertificate(parsed.data.certificate);
       return Response.json({ pin });

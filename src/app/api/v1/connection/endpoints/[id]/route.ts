@@ -4,7 +4,7 @@ import { publicEndpoint, assertEndpoint, hasPendingPairing, isManagedRoute, isUn
 import { prisma } from "@/server/db";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
-import { readJson, withAdmin } from "@/server/guard";
+import { readBody, withAdmin } from "@/server/guard";
 import { demoLocked } from "@/server/demo";
 import { forgetRouteReached } from "@/server/tunnel/remote-access";
 import { NO_EVIDENCE } from "@/server/tunnel/route-check";
@@ -20,10 +20,8 @@ export async function PUT(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Provide a valid endpoint update.");
+    const parsed = await readBody(request, Body, "Provide a valid endpoint update.");
+    if (!parsed.ok) return parsed.response;
     const { id } = await context.params;
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");

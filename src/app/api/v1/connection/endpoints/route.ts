@@ -4,7 +4,7 @@ import { publicEndpoint, assertEndpoint, isUniqueViolation } from "@/server/conn
 import { prisma } from "@/server/db";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
-import { readJson, withAdmin } from "@/server/guard";
+import { readBody, withAdmin } from "@/server/guard";
 import { demoLocked } from "@/server/demo";
 
 const Body = z.object({
@@ -24,10 +24,8 @@ export async function POST(request: Request) {
   return withAdmin(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Provide a valid connection endpoint.");
+    const parsed = await readBody(request, Body, "Provide a valid connection endpoint.");
+    if (!parsed.ok) return parsed.response;
     const { edgeAuth, serviceToken, ...route } = parsed.data;
     let url: string;
     try {

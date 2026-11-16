@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { checkupState, runCheckup } from "@/server/checkup";
-import { prisma } from "@/server/db";
 import { demoLocked } from "@/server/demo";
-import { readJson, withAdmin } from "@/server/guard";
+import { readBody, withAdmin } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { removeLeftoverPolicies } from "@/server/leftover-policies";
 import { LockLostError, syncClient, withReconcileLock } from "@/server/reconciliation";
+import { loadHousehold } from "@/server/household";
 
 class SyncRunning extends Error {}
 
@@ -22,11 +22,9 @@ export async function POST(request: Request) {
     // Every demo visitor shares one gateway.
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "policyIds must list the policies to remove.");
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const parsed = await readBody(request, Body, "policyIds must list the policies to remove.");
+    if (!parsed.ok) return parsed.response;
+    const household = await loadHousehold();
     if (household.connectionStatus === "unconfigured" || !household.unifiSiteId) {
       return jsonError(409, "unifi_not_configured", "Connect FamilyFi to UniFi in Settings first.");
     }

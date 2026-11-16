@@ -3,9 +3,10 @@ import { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { publicDevice, deviceScope } from "@/server/devices";
 import { prisma } from "@/server/db";
-import { readJson, withMutation } from "@/server/guard";
+import { readBody, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { normalizeMac } from "@/server/mac";
+import { loadHousehold } from "@/server/household";
 
 const Body = z.object({
   groupId: z.string().nullable(),
@@ -22,10 +23,8 @@ export async function PUT(request: Request, ctx: Ctx) {
     } catch {
       return jsonError(400, "invalid_mac", "MAC address must contain 12 hex digits.");
     }
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "groupId is required (null for quarantine).");
+    const parsed = await readBody(request, Body, "groupId is required (null for quarantine).");
+    if (!parsed.ok) return parsed.response;
     const existing = await prisma().device.findUnique({ where: { mac } });
     if (!existing) return jsonError(404, "not_found", "Device not found.");
     if (parsed.data.groupId) {
@@ -40,7 +39,7 @@ export async function PUT(request: Request, ctx: Ctx) {
       },
     });
     const change = await enqueueChange("assignment", mac);
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await loadHousehold();
     return Response.json({ device: publicDevice(device, deviceScope(household), new Date(), household.presenceCheckedAt), change });
   });
 }

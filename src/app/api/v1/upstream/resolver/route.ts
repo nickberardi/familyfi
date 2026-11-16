@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { parseHm } from "@/lib/schedule";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
@@ -88,10 +88,8 @@ export async function PUT(request: Request) {
   return withMutation(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = PutBody.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Invalid resolver settings.");
+    const parsed = await readBody(request, PutBody, "Invalid resolver settings.");
+    if (!parsed.ok) return parsed.response;
 
     let url: string | undefined;
     if (parsed.data.url !== undefined) {

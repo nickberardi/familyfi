@@ -406,6 +406,9 @@ export async function requireSession(request: Request) {
   return { session, error: null };
 }
 
+/** The session a guard hands its handler: the row with its account and paired device. */
+export type SignedInSession = NonNullable<Awaited<ReturnType<typeof requireSession>>["session"]>;
+
 /** The 403 a paired device gets for a call its scope does not cover, or null when it may make it. */
 export function deviceScopeRefusal(
   device: { id: string; client: PairedDeviceClient; scope: DeviceScope },

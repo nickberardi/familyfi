@@ -58,7 +58,7 @@ foreign key.
 
 ### Code boundaries
 
-- [Route handlers](../src/app/api/v1) validate requests and apply [authentication guards](../src/server/guard.ts). Authorization is specified per method in the [authorization matrix](../tests/integration/authorization-matrix.test.ts).
+- [Route handlers](../src/app/api/v1) apply [authentication guards](../src/server/guard.ts) (`withSession`, `withMutation`, `withAdmin`), read their JSON body with `readBody` and the household with [`loadHousehold`](../src/server/household.ts). Authorization is specified per method in the [authorization matrix](../tests/integration/authorization-matrix.test.ts).
 - [src/server](../src/server) owns database access, secrets and external effects. [src/lib](../src/lib) holds client-safe types and logic; the [boundary test](../tests/unit/client-boundary.test.ts) checks transitive imports.
 - The [household store](../src/lib/household-store.ts) owns shared household state and mutation feedback for every client; [AppDataProvider](../src/components/AppDataProvider.tsx) wraps it for the browser, and the native app wraps it in its own provider. Pages compose it with domain components; feature-specific data may have a page-owned lifecycle.
 - [Reconciliation](../src/server/reconciliation.ts) coordinates enforcement. [Policy ownership](../src/server/unifi/policy-ownership.ts) guards all updates and deletes; planners and the UniFi client live under [src/server/unifi](../src/server/unifi).

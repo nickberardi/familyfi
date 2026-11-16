@@ -1,7 +1,7 @@
 import { UpstreamSource } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import {
   assertCategoryDeletable,
@@ -46,10 +46,8 @@ const PatchBody = z.object({
 export async function PATCH(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = PatchBody.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Invalid category update.");
+    const parsed = await readBody(request, PatchBody, "Invalid category update.");
+    if (!parsed.ok) return parsed.response;
 
     const existing = await prisma().upstreamCategory.findUnique({
       where: { id },
