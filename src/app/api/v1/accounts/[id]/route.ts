@@ -1,12 +1,6 @@
-import { AccountKind } from "@prisma/client";
 import { z } from "zod";
-import { assertAdultFamilyGroup, publicAccount } from "@/server/accounts";
-import { enqueueChange } from "@/server/changes";
-import { revokeAccountSessions } from "@/server/auth";
-import { removeAccountDevices } from "@/server/connection";
-import { prisma } from "@/server/db";
+import { deleteAccount, getAccount, updateAccount } from "@/server/accounts";
 import { readBody, withMutation, withSession } from "@/server/guard";
-import { jsonError } from "@/server/http";
 
 const Update = z.object({
   displayName: z.string().min(1).optional(),
@@ -19,9 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {
     const { id } = await ctx.params;
-    const account = await prisma().account.findUnique({ where: { id } });
-    if (!account) return jsonError(404, "not_found", "Account not found.");
-    return Response.json({ account: publicAccount(account) });
+    return Response.json({ account: await getAccount(id) });
   });
 }
 
@@ -30,53 +22,14 @@ export async function PUT(request: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const parsed = await readBody(request, Update, "Invalid account update.");
     if (!parsed.ok) return parsed.response;
-    const existing = await prisma().account.findUnique({ where: { id } });
-    if (!existing) return jsonError(404, "not_found", "Account not found.");
-    if (existing.kind === AccountKind.recovery) {
-      return jsonError(409, "recovery_account", "The recovery admin cannot be edited here.");
-    }
-    if (parsed.data.groupId) {
-      const group = await prisma().group.findUnique({ where: { id: parsed.data.groupId } });
-      try {
-        assertAdultFamilyGroup(group);
-      } catch (error) {
-        return jsonError(400, "invalid_group", error instanceof Error ? error.message : "Invalid group.");
-      }
-    }
-    // Only administrators use FamilyFi: losing it signs them out and unpairs and removes their devices, in one step.
-    const demoted = existing.isAdmin && parsed.data.isAdmin === false;
-    const account = await prisma().$transaction(async (db) => {
-      const updated = await db.account.update({
-        where: { id },
-        data: {
-          displayName: parsed.data.displayName,
-          groupId: parsed.data.groupId,
-          isAdmin: parsed.data.isAdmin,
-        },
-      });
-      if (demoted) {
-        await removeAccountDevices(id, db as never);
-        // Nor do they sign in: their browser sessions end too.
-        await db.session.updateMany({ where: { accountId: id, revokedAt: null }, data: { revokedAt: new Date() } });
-      }
-      return updated;
-    });
-    const change = await enqueueChange("account");
-    return Response.json({ account: publicAccount(account), change });
+    return Response.json(await updateAccount(id, parsed.data));
   }, { demoLock: true });
 }
 
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const existing = await prisma().account.findUnique({ where: { id } });
-    if (!existing) return jsonError(404, "not_found", "Account not found.");
-    if (existing.kind === AccountKind.recovery) {
-      return jsonError(409, "recovery_account", "The recovery admin cannot be removed.");
-    }
-    await revokeAccountSessions(id);
-    await prisma().account.delete({ where: { id } });
-    const change = await enqueueChange("account");
+    const { change } = await deleteAccount(id);
     return Response.json({ ok: true, change });
   }, { demoLock: true });
 }

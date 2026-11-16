@@ -1,11 +1,6 @@
-import { PairedDeviceClient } from "@prisma/client";
 import { z } from "zod";
-import { isAdministrator, removeDevice, revokeDevice } from "@/server/connection";
-import { prisma } from "@/server/db";
-import { isValidScope } from "@/server/device-scope";
 import { readBody, withAdmin, withMutation, withSession } from "@/server/guard";
-import { jsonError } from "@/server/http";
-import { deviceInclude, publicPairedDevice, visibleDevices } from "@/server/paired-devices";
+import { getPairedDevice, revokePairedDevice, updatePairedDevice } from "@/server/paired-devices";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -15,54 +10,25 @@ const Update = z
 
 export async function GET(request: Request, context: Ctx) {
   return withSession(request, async (session) => {
-    const visible = visibleDevices(session);
-    if (!visible) return jsonError(403, "administrator_required", "A FamilyFi administrator or a paired device is required.");
     const { id } = await context.params;
-    const device = await prisma().pairedDevice.findFirst({ where: { AND: [visible, { id }] }, include: deviceInclude() });
-    if (!device) return jsonError(404, "not_found", "Paired device not found.");
-    return Response.json({ device: publicPairedDevice(device) });
+    return Response.json({ device: await getPairedDevice(session, id) });
   });
 }
 
-/**
- * Rename a paired device, or change an agent's scope. No other kind changes scope: an app is `full` or
- * its own `rulesOnly` sign-in from the moment it joins, and one must never become the other.
- */
 export async function PATCH(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
     const parsed = await readBody(request, Update, "Send a displayName or a scope.");
     if (!parsed.ok) return parsed.response;
     const { id } = await context.params;
-    const device = await prisma().pairedDevice.findUnique({ where: { id } });
-    if (!device) return jsonError(404, "not_found", "Paired device not found.");
-    if (parsed.data.scope && parsed.data.scope !== device.scope && (device.client !== PairedDeviceClient.agent || !isValidScope(device.client, parsed.data.scope))) {
-      return jsonError(400, "invalid_scope", `A ${device.client} cannot hold the ${parsed.data.scope} scope.`);
-    }
-    await prisma().pairedDevice.update({ where: { id }, data: parsed.data });
-    const updated = await prisma().pairedDevice.findUniqueOrThrow({ where: { id }, include: deviceInclude() });
-    return Response.json({ device: publicPairedDevice(updated) });
+    return Response.json({ device: await updatePairedDevice(id, parsed.data) });
   });
 }
 
-/**
- * Revoke a paired device: an administrator, the device itself, or the phone that vouched for it.
- * Revoking a device revokes everything paired from it: a phone's Watches, and the phones and agents its invites paired, in turn. `?remove=true` (administrator only) deletes the record.
- */
+/** `?remove=true` (administrator only) deletes the record instead of revoking it. */
 export async function DELETE(request: Request, context: Ctx) {
   return withMutation(request, async (session) => {
     const { id } = await context.params;
-    const administrator = isAdministrator(session);
-    const device = await prisma().pairedDevice.findUnique({ where: { id }, select: { parentDeviceId: true } });
-    const own = Boolean(session.deviceId) && session.deviceId === id;
-    const parent = Boolean(session.deviceId) && device?.parentDeviceId === session.deviceId;
-    if (!administrator && !own && !parent) return jsonError(403, "administrator_required", "An administrator, this paired device or its phone is required.");
-    if (new URL(request.url).searchParams.get("remove") === "true") {
-      if (!administrator) return jsonError(403, "administrator_required", "Only an administrator can remove a device record.");
-      if (!(await removeDevice(id))) return jsonError(404, "not_found", "Paired device not found.");
-      return Response.json({ ok: true });
-    }
-    const revoked = await prisma().$transaction((db) => revokeDevice(id, db as never));
-    if (!revoked) return jsonError(404, "not_found", "Paired device not found.");
+    await revokePairedDevice(session, id, new URL(request.url).searchParams.get("remove") === "true");
     return Response.json({ ok: true });
   });
 }
