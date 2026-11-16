@@ -25,6 +25,8 @@ export type AlertChannel = "release" | "development";
 
 /** Each kind on or off for this device. */
 export type AlertChoices = { kinds: Record<string, boolean> };
+/** How the push and alerts routes answer: the device's choices under `alerts`. */
+export type AlertChoicesResponse = { alerts: AlertChoices };
 
 export type AlertRegistration = {
   platform: AlertPlatform;
@@ -41,11 +43,12 @@ const path = (deviceId: string, leaf: "push" | "alerts") => `/api/v1/paired/devi
  * Signs this app up, or replaces its token or key; the kinds it can show are the ones this build
  * knows. Choices it made before are kept.
  */
-export function registerAlerts(request: ApiRequest, deviceId: string, registration: AlertRegistration): Promise<AlertChoices> {
-  return request<AlertChoices>(path(deviceId, "push"), {
+export async function registerAlerts(request: ApiRequest, deviceId: string, registration: AlertRegistration): Promise<AlertChoices> {
+  const answer = await request<AlertChoicesResponse>(path(deviceId, "push"), {
     method: "PUT",
     body: { ...registration, format: ALERT_FORMAT, kinds: [...ALERT_KINDS] },
   });
+  return answer.alerts;
 }
 
 /** Forgets this app's token and key: its server sends it nothing more. */
@@ -53,13 +56,13 @@ export function unregisterAlerts(request: ApiRequest, deviceId: string): Promise
   return request<void>(path(deviceId, "push"), { method: "DELETE" });
 }
 
-export function readAlertChoices(request: ApiRequest, deviceId: string): Promise<AlertChoices> {
-  return request<AlertChoices>(path(deviceId, "alerts"));
+export async function readAlertChoices(request: ApiRequest, deviceId: string): Promise<AlertChoices> {
+  return (await request<AlertChoicesResponse>(path(deviceId, "alerts"))).alerts;
 }
 
 /** Turns one kind on or off for this app, leaving the rest. */
-export function setAlertChoice(request: ApiRequest, deviceId: string, kind: AlertKind, on: boolean): Promise<AlertChoices> {
-  return request<AlertChoices>(path(deviceId, "alerts"), { method: "PUT", body: { kinds: { [kind]: on } } });
+export async function setAlertChoice(request: ApiRequest, deviceId: string, kind: AlertKind, on: boolean): Promise<AlertChoices> {
+  return (await request<AlertChoicesResponse>(path(deviceId, "alerts"), { method: "PUT", body: { kinds: { [kind]: on } } })).alerts;
 }
 
 /**
@@ -91,4 +94,7 @@ export const ALERTS_SCREEN_COPY = {
   unsupported: "Your FamilyFi server is too old to send alerts. Update it to get them.",
   kindsTitle: "Alert me about",
   failed: "Couldn't change alerts. Try again.",
+  /** This device's alerts could not be read from the server. */
+  unreadable: "Couldn't read this device's alerts.",
+  tryAgain: "Try again",
 } as const;
