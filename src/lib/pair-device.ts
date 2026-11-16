@@ -147,13 +147,6 @@ function origin(device: Pick<PairedPhone, "client" | "scope">, parentName: strin
   return "via a route that was removed";
 }
 
-/** The paired apps that can get phone alerts, for the Alerts card: active `app:full` devices. */
-export function alertPhones(devices: PairedPhone[]): { id: string; displayName: string; alerts: boolean }[] {
-  return devices
-    .filter((device) => !device.revokedAt && device.alerts !== undefined)
-    .map((device) => ({ id: device.id, displayName: device.displayName, alerts: device.alerts === true }));
-}
-
 /**
  * A paired device's lines, the same for phones, Watches and agents: what it may do, whose account it
  * acts as and when it was last seen; how it reaches home; and when it paired and its sign-in ends.

@@ -1213,7 +1213,7 @@
         "settings"
       ]
     },
-    "tests/browser/smoke.spec.ts > Settings turns phone alerts on for the household and lists which phones get them": {
+    "tests/browser/smoke.spec.ts > Settings turns alerts on for the household": {
       "categories": [
         "settings"
       ]
@@ -1293,6 +1293,11 @@
       ]
     },
     "tests/unit/alert-copy.test.ts": {
+      "categories": [
+        "display"
+      ]
+    },
+    "tests/unit/alert-registration.test.ts": {
       "categories": [
         "display"
       ]

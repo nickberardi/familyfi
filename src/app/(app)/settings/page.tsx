@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, api, request } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
@@ -9,11 +9,10 @@ import { useAppData } from "@/components/AppDataProvider";
 import { BackupCard } from "@/components/BackupCard";
 import { SETTINGS_COPY, createLoginLede, createLoginTitle, loginFormState, settingsTab, usernameFromName, type SettingsTab } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
-import type { Group, PairedPhone } from "@/lib/types";
+import type { Group } from "@/lib/types";
 import { installedVersion } from "@/lib/update-copy";
 import { APP_VERSION } from "@/lib/version";
 import { NewLoginFields } from "@/ui/NewLoginFields";
-import { alertPhones } from "@/lib/pair-device";
 import { AlertsCard, GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
 import { SettingsTabs } from "@/ui/SettingsTabs";
 import { UpdateContent } from "@/ui/UpdateContent";
@@ -35,36 +34,10 @@ export default function SettingsPage() {
   );
 }
 
-/**
- * The paired apps the Alerts card lists, read when the household tab opens and again on `retry`:
- * null while loading, "error" when it could not be read.
- */
-function useAlertPhones(active: boolean) {
-  const [phones, setPhones] = useState<ReturnType<typeof alertPhones> | null | "error">(null);
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    request<{ devices: PairedPhone[] }>("/api/v1/paired/devices?client=app&status=active").then(
-      ({ devices }) => !cancelled && setPhones(alertPhones(devices)),
-      () => !cancelled && setPhones("error"),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [active, attempt]);
-  const retry = () => {
-    setPhones(null);
-    setAttempt((count) => count + 1);
-  };
-  return { phones, retry };
-}
-
 function Settings() {
   const { unifi, household, accounts, groups, sync, mutate, store } = useAppData();
   const router = useRouter();
   const tab = settingsTab(useSearchParams().get("tab"));
-  const alertPhonesList = useAlertPhones(tab === "household");
   const showTab = (next: SettingsTab) => router.replace(next === "household" ? "/settings" : `/settings?tab=${next}`, { scroll: false });
   const [mode, setMode] = useState<"local" | "cloud">("local");
   const [apiKey, setApiKey] = useState("");
@@ -185,13 +158,7 @@ function Settings() {
                 setPw2("");
               }}
             />
-            <AlertsCard
-              enabled={household?.alertsRelay === true}
-              phones={alertPhonesList.phones}
-              onRetry={alertPhonesList.retry}
-              mutate={store.mutate}
-              disabled={household?.alertsRelay === undefined}
-            />
+<AlertsCard enabled={household?.alertsRelay === true} mutate={store.mutate} disabled={household?.alertsRelay === undefined} />
           </div>
         ) : null}
 
