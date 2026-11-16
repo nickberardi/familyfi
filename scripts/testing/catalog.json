@@ -422,6 +422,11 @@
         "runtime"
       ]
     },
+    "tests/unit/nav-badges.test.ts": {
+      "categories": [
+        "display"
+      ]
+    },
     "tests/unit/sync-copy.test.ts": {
       "categories": [
         "sync",
