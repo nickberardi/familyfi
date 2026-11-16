@@ -1213,6 +1213,11 @@
         "settings"
       ]
     },
+    "tests/browser/smoke.spec.ts > Settings turns phone alerts on for the household and lists which phones get them": {
+      "categories": [
+        "settings"
+      ]
+    },
     "tests/browser/smoke.spec.ts > Diagnostics leads with the gateway, listed in System after Settings": {
       "categories": [
         "settings"

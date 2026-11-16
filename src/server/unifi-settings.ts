@@ -191,6 +191,9 @@ async function switchUnifiTarget(
       unifiKeyLastFour: input.apiKey.slice(-4),
       connectionStatus: "connected",
       connectionError: null,
+      // The gateway answered just now: trouble counted before it was changed starts over. Once phones
+      // were told, the next pass that reaches it says sync is back.
+      ...(household.syncTroubleAlertedAt ? {} : { syncFailingSince: null }),
     },
   });
   return scope;

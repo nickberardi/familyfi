@@ -73,8 +73,6 @@ export async function registerPush(session: Caller, id: string, input: PushRegis
     supportedKinds,
   };
   const registration = await prisma().pushRegistration.upsert({ where: { deviceId: id }, create: { deviceId: id, ...data }, update: data });
-  // A new key cannot read alerts sealed for the old one.
-  await prisma().alertEvent.deleteMany({ where: { deviceId: id, sentAt: null } });
   return choices(registration);
 }
 

@@ -160,6 +160,8 @@ describe("household export", () => {
       data: { name: "TV video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: built.things.id } } },
     });
     await prisma().group.update({ where: { id: built.things.id }, data: { blockButtonRuleId: video.id } });
+    // Phone alerts belong to this install and its phones: never exported, never imported.
+    await prisma().household.update({ where: { id: "default" }, data: { alertsRelayEnabled: true, alertsInstallId: "relay-install-1" } });
     const auth = await recoveryAuth();
     const files = readArchive(await downloadedArchive(auth), FILES);
     const manifest = JSON.parse(files.get("manifest.json")!.toString()) as { format: string; appVersion: string; instanceId: string | null };
@@ -167,7 +169,7 @@ describe("household export", () => {
     expect(manifest.instanceId).toMatch(/^ff_/);
     expect(files.get("database.dump")?.equals(DUMP)).toBe(true);
     const text = files.get("config.json")!.toString();
-    for (const secret of ["Ciphertext", "AuthTag", "abcd", "tokenHash", "edgeToken", "instancePrivateKey"]) expect(text).not.toContain(secret);
+    for (const secret of ["Ciphertext", "AuthTag", "abcd", "tokenHash", "edgeToken", "instancePrivateKey", "alerts", "relay-install-1"]) expect(text).not.toContain(secret);
     const before = await householdConfig();
     expect(JSON.parse(text)).toEqual(JSON.parse(JSON.stringify(before)));
     expect(before.household.lockDns).toEqual({ enabled: true, scope: "group", groupIds: [built.child.id], networkIds: [], blockPrivateRelay: true });
@@ -178,7 +180,7 @@ describe("household export", () => {
     await prisma().rule.deleteMany({ where: { id: { not: "quarantine" } } });
     await prisma().group.deleteMany({ where: { id: { in: [built.child.id, built.things.id] } } });
     await prisma().upstreamCategory.deleteMany({ where: { slug: "homework" } });
-    await prisma().household.update({ where: { id: "default" }, data: { timezone: "UTC", updateScheduleEnabled: false } });
+    await prisma().household.update({ where: { id: "default" }, data: { timezone: "UTC", updateScheduleEnabled: false, alertsRelayEnabled: false } });
     await prisma().account.create({ data: { username: "stranger", displayName: "Stranger", kind: AccountKind.personal, isAdmin: true } });
 
     await prisma().checkupFinding.create({ data: { key: "private_addresses", check: "private_addresses", details: {}, subject: "x", firstSeenAt: new Date(), lastSeenAt: new Date() } });
@@ -201,6 +203,7 @@ describe("household export", () => {
     // Secrets this install holds stay where they were.
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     expect(household.unifiKeyLastFour).toBe("abcd");
+    expect(household).toMatchObject({ alertsRelayEnabled: false, alertsInstallId: "relay-install-1" });
     const protectedRoute = await prisma().connectionEndpoint.findUniqueOrThrow({ where: { url: "https://familyfi.example.com" } });
     expect(protectedRoute).toMatchObject({ enabled: true, edgeTokenVersion: 1 });
     expect(protectedRoute.edgeTokenCiphertext).not.toBeNull();

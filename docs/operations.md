@@ -313,7 +313,8 @@ A self-hosted server cannot hold Apple's and Google's push credentials, so alert
 project's push relay, `https://push.getfamilyfi.com` (`FAMILYFI_ALERTS_RELAY_URL` to change it).
 Allow outbound HTTPS from the app container to it. FamilyFi encrypts each alert for its phone before
 it leaves, with a key only that phone and this server hold, so the relay sees the phone's push
-token, the encrypted alert, this server's relay install id and the time, and keeps none of them.
+token, whether it is an iPhone or an Android phone, the encrypted alert, this server's relay install
+id and the time, and keeps none of them.
 On the first alert FamilyFi asks the relay for an install id and secret and keeps the secret
 encrypted with `FAMILYFI_ENCRYPTION_KEY`; it is not in a household export. A relay that cannot be
 reached costs only alerts: they are retried with backoff for a day and then dropped, and the app

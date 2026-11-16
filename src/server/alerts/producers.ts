@@ -76,7 +76,7 @@ export async function recordNewDevices(found: { hostname: string | null }[], opt
 /**
  * The outcome of a sync pass: `ok` when it reached the gateway (a partial pass did). After
  * `SYNC_TROUBLE_AFTER_MS` with no pass reaching it, phones are told once; the next pass that does
- * tells the same phones once that sync is back.
+ * tells the phones that got that alert once that sync is back.
  */
 export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<void> {
   try {
@@ -93,8 +93,11 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
         data: { syncFailingSince: null, syncTroubleAlertedAt: null },
       });
       if (!cleared.count || !household.syncTroubleAlertedAt || !household.alertsRelayEnabled) return;
+      // A phone the trouble alert never reached (the gateway is often the router too, so the relay
+      // was out of reach) hears neither: the unsent alert goes, and only phones that got it are told.
+      await prisma().alertEvent.deleteMany({ where: { kind: "sync.down", sentAt: null } });
       const told = await prisma().alertEvent.findMany({
-        where: { kind: "sync.down", createdAt: { gte: household.syncTroubleAlertedAt } },
+        where: { kind: "sync.down", createdAt: { gte: household.syncTroubleAlertedAt }, sentAt: { not: null } },
         select: { deviceId: true },
         distinct: ["deviceId"],
       });

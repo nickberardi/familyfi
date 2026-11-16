@@ -27,8 +27,11 @@ const MAX_BACKOFF_MS = 60 * 60_000;
 export const GIVE_UP_AFTER_MS = 24 * 60 * 60_000;
 /** Sent rows are kept a week: the hourly new-device cap and "sync is back" read them. */
 const KEEP_SENT_MS = 7 * 24 * 60 * 60_000;
-/** How long Apple or Google hold an alert for a phone that is off, by kind. */
-const TTL_SECONDS: Record<string, number> = { "device.new": 6 * 3600, "sync.down": 12 * 3600, "sync.up": 3600 };
+/**
+ * How long Apple or Google hold an alert for a phone that is off: the same for every kind, so the
+ * relay and the push services cannot tell the kinds apart by it.
+ */
+export const ALERT_TTL_SECONDS = 12 * 3600;
 
 export function alertsRelayUrl(source: Record<string, string | undefined> = process.env): string {
   return (source["FAMILYFI_ALERTS_RELAY_URL"]?.trim() || DEFAULT_ALERTS_RELAY_URL).replace(/\/+$/, "");
@@ -183,7 +186,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
           token: unseal(registration.tokenCiphertext, registration.tokenIv, registration.tokenAuthTag),
           ciphertext,
           collapse: event.dedupeKey,
-          ttl: TTL_SECONDS[event.kind] ?? 3600,
+          ttl: ALERT_TTL_SECONDS,
         }, credential.secret);
       } catch {
         await retryLater(event, at);

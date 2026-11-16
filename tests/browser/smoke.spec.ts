@@ -1444,3 +1444,41 @@ test("Phase 4: card marks, filter sheets, soft polish, no upstream claim without
     }
   }
 });
+
+test("Settings turns phone alerts on for the household and lists which phones get them", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const phone = (id: string, displayName: string, alerts: boolean) => ({
+    id,
+    displayName,
+    client: "app",
+    scope: "full",
+    status: "active",
+    pairedAt: "2026-11-01T12:00:00Z",
+    lastSeenAt: null,
+    revokedAt: null,
+    pairedVia: null,
+    actsAs: null,
+    sessions: [],
+    alerts,
+  });
+  await page.route("**/api/v1/paired/devices?client=app&status=active", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ devices: [phone("p1", "Mia's iPhone", true), phone("p2", "Kitchen iPad", false)] }) }),
+  );
+  await page.goto("/settings");
+  const card = page.getByRole("region", { name: "Page content" }).getByTestId("settings-alerts");
+  await expect(card.getByTestId("settings-alerts-phones")).toContainText("Mia's iPhoneAlerts on");
+  await expect(card.getByTestId("settings-alerts-phones")).toContainText("Kitchen iPadAlerts off");
+
+  const toggle = card.getByRole("switch", { name: "Send alerts to phones" });
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  const saved = page.waitForRequest((request) => request.url().endsWith("/api/v1/settings/household") && request.method() === "PUT");
+  await toggle.click();
+  expect((await saved).postDataJSON()).toEqual({ alertsRelay: true });
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to phones" })).toHaveAttribute("aria-checked", "true");
+
+  // Back off, so the shared household is as the other tests expect.
+  await page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to phones" }).click();
+  await expect(page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to phones" })).toHaveAttribute("aria-checked", "false");
+});

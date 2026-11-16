@@ -161,7 +161,7 @@ export function AlertsCard({
   return (
     <Card title={COPY.title} testID="settings-alerts">
       <View style={styles.alertsBody}>
-        <View style={styles.row}>
+        <View style={styles.alertsRow}>
           <View style={styles.grow}>
             <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.switchLabel}</Text>
             <Text style={text(14, 20, "muted")}>{COPY.description}</Text>
@@ -170,9 +170,10 @@ export function AlertsCard({
         </View>
         <Disclosure title={COPY.disclosureTitle} testID="settings-alerts-disclosure">
           {COPY.disclosure.map((line) => (
-            <Text key={line} style={[text(14, 20, "ink-2"), styles.alertsLine]}>
-              {line}
-            </Text>
+            // One paragraph each: on the web a bare Text is inline and runs into the next.
+            <View key={line} style={styles.alertsLine}>
+              <Text style={text(14, 20, "ink-2")}>{line}</Text>
+            </View>
           ))}
         </Disclosure>
         {phones ? (
@@ -180,7 +181,7 @@ export function AlertsCard({
             <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.phonesTitle}</Text>
             {phones.length === 0 ? <Text style={text(14, 20, "muted")}>{COPY.noPhones}</Text> : null}
             {phones.map((phone) => (
-              <View key={phone.id} style={[styles.row, styles.alertsPhone, { borderTopColor: ui.color("hairline") }]}>
+              <View key={phone.id} style={[styles.alertsRow, styles.alertsPhone, { borderTopColor: ui.color("hairline") }]}>
                 <Text style={[text(14, 21, "ink"), styles.grow]}>{phone.displayName}</Text>
                 <Text style={text(14, 21, phone.alerts ? "ink-2" : "muted")}>{phone.alerts ? COPY.phoneOn : COPY.phoneOff}</Text>
               </View>
@@ -294,6 +295,7 @@ export function HouseholdCard({
 const styles = StyleSheet.create({
   alertsBody: { paddingHorizontal: 18, paddingVertical: 14 },
   alertsLine: { marginTop: 4 },
+  alertsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   alertsPhones: { marginTop: 14, gap: 6 },
   alertsPhone: { borderTopWidth: 1, paddingTop: 8 },
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
