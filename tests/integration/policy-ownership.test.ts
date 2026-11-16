@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleKind, type Household } from "@prisma/client";
+import { POST as login } from "@/app/api/v1/auth/login/route";
+import { PUT as putUnifiSettings } from "@/app/api/v1/settings/unifi/route";
 import { prisma } from "@/server/db";
 import { setReconcileLockForTests } from "@/server/reconciliation";
-import { saveUnifiConnection, UnifiSettingsBody, updateUnifiSettings } from "@/server/unifi-settings";
+import { saveUnifiConnection } from "@/server/unifi-settings";
 import { clientForHousehold, connectionIdentity, ownershipScope } from "@/server/unifi/connection";
 import {
   DEV_MOCK_ADMIN_POLICY_ID,
@@ -17,7 +19,7 @@ import { internetBlockPolicy } from "@/server/unifi/payloads";
 import { withPolicyOwnership } from "@/server/unifi/policy-ownership";
 import type { FirewallPolicy } from "@/server/unifi/types";
 import { INTERNAL_ZONE, SITE_ID, configureConnectedHousehold, resetDatabase } from "../helpers/db";
-import { answered } from "../helpers/answered";
+import { authFromLogin, request } from "../helpers/http";
 import { fixtureUnifiClient } from "../helpers/unifi-world";
 
 const EXTERNAL_ZONE = "33333333-3333-4333-8333-333333333399";
@@ -292,7 +294,17 @@ describe("switching to another gateway", () => {
   it("answers previous_gateway_unreachable over the API, and switches when told to forget the old gateway", async () => {
     await recordedRulePolicy();
     vi.spyOn(getSharedDevMockClient(), "deletePolicy").mockRejectedValue(new UnifiHttpError(503, "DELETE", "/v1/sites/x/firewall/policies/y", "unreachable"));
-    const save = (body: object) => answered("PUT /api/v1/settings/unifi", () => updateUnifiSettings(UnifiSettingsBody.parse(body)));
+    const auth = authFromLogin(
+      await login(
+        request("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password", client: "browser" }),
+        }),
+      ),
+    );
+    const save = (body: object) =>
+      putUnifiSettings(request("/api/v1/settings/unifi", { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
 
     const refused = await save({ apiKey: DEV_MOCK_API_KEY, baseUrl: NEW_TARGET });
     expect(refused.status).toBe(409);

@@ -59,7 +59,7 @@ async function exportArchive(): Promise<Buffer> {
   return (await exportHousehold()).archive;
 }
 
-function importRoute_(auth: SessionAuth, mode: string, body: Buffer) {
+function uploadedImport(auth: SessionAuth, mode: string, body: Buffer) {
   return importRoute(
     request(`/api/v1/settings/import?mode=${mode}`, { method: "POST", auth, headers: { "content-type": "application/gzip" }, body: new Uint8Array(body) }),
   );
@@ -67,12 +67,12 @@ function importRoute_(auth: SessionAuth, mode: string, body: Buffer) {
 
 /** Previews or applies an import as `importer`. A mode the route refuses, or a caller who is no browser, goes through the route. */
 function importRequest(importer: SessionAuth & { accountId?: string }, mode: string, body: Buffer) {
-  if ((mode !== "preview" && mode !== "apply") || !importer.accountId) return importRoute_(importer, mode, body);
+  if ((mode !== "preview" && mode !== "apply") || !importer.accountId) return uploadedImport(importer, mode, body);
   const accountId = importer.accountId;
   return answered("POST /api/v1/settings/import", () => importHousehold(mode, body, { accountId }));
 }
 
-async function imported(importer: SessionAuth & { accountId?: string }, body: Buffer): Promise<ImportSummary> {
+async function imported(importer: Importer, body: Buffer): Promise<ImportSummary> {
   const response = await importRequest(importer, "apply", body);
   expect(response.status).toBe(200);
   const json = (await response.json()) as { summary: ImportSummary; change: { changeId: string } };
@@ -183,7 +183,10 @@ describe("household export", () => {
 
     await prisma().checkupFinding.create({ data: { key: "private_addresses", check: "private_addresses", details: {}, subject: "x", firstSeenAt: new Date(), lastSeenAt: new Date() } });
     // Through the real upload route, as the browser sends it.
-    const summary = await imported({ cookie: auth.cookie, csrf: auth.csrf }, writeArchive([...files].map(([name, data]) => ({ name, data }))));
+    const applied = await uploadedImport(auth, "apply", writeArchive([...files].map(([name, data]) => ({ name, data }))));
+    expect(applied.status).toBe(200);
+    const { summary, change } = (await applied.json()) as { summary: ImportSummary; change: { changeId: string } };
+    expect(change.changeId).toBeTruthy();
     // The old household's checkup goes with it.
     expect(await prisma().checkupFinding.count()).toBe(0);
     expect(summary).toMatchObject({
@@ -210,7 +213,8 @@ describe("household export", () => {
     await resetDatabase();
     await ensureUpstreamCategories();
     const auth = await recoveryAuth();
-    const preview = await importRequest(auth, "preview", archive);
+    // Through the real upload route: a preview answers with no change.
+    const preview = await uploadedImport(auth, "preview", archive);
     expect(preview.status).toBe(200);
     const { summary } = (await preview.json()) as { summary: ImportSummary };
     expect(summary).toMatchObject({
