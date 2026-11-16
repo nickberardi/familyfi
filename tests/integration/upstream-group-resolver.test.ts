@@ -132,7 +132,10 @@ describe("group resolver override", () => {
     expect(await refusal(getGroupResolver("nope"))).toEqual([404, "not_found"]);
     expect(await refusal(clearGroupResolver("nope"))).toEqual([404, "not_found"]);
   });
+});
 
+/** What only the route decides: who may call it. */
+describe("PUT /api/v1/groups/{id}/resolver", () => {
   it("requires a session", async () => {
     const response = await setResolverRoute(
       request("/api/v1/groups/whatever/resolver", {
