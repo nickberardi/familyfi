@@ -1,4 +1,5 @@
 import { UpstreamSource } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "../db";
 import { ApiError } from "../http";
 import {
@@ -22,6 +23,22 @@ import { withUpstreamLock } from "./transaction";
  */
 
 const WITH_CHILDREN = { domains: true, checks: true } as const;
+
+/** What `POST /upstream/categories` may carry. */
+export const UpstreamCategoryCreateBody = z.object({
+  label: z.string().min(1).max(60),
+  monogram: z.string().min(1).max(4).optional(),
+  domains: z.array(z.string()).optional(),
+  enabled: z.boolean().optional(),
+});
+
+/** What `PATCH /upstream/categories/{id}` may carry. `domains` is the whole active list, replacing what is there. */
+export const UpstreamCategoryUpdateBody = z.object({
+  label: z.string().min(1).max(60).optional(),
+  monogram: z.string().min(1).max(4).optional(),
+  enabled: z.boolean().optional(),
+  domains: z.array(z.string()).optional(),
+});
 
 function categoryNotFound() {
   return new ApiError(404, "not_found", "Category not found.");

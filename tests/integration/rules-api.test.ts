@@ -74,13 +74,13 @@ let session: Awaited<ReturnType<typeof adminSession>>;
 /** Creates a rule. A body the request schema refuses goes through the route, whose refusal that is. */
 async function postRule(body: object) {
   const parsed = RuleCreateBody.safeParse(body);
-  if (parsed.success) return answered(() => createRule(parsed.data), 201);
+  if (parsed.success) return answered("POST /api/v1/rules", () => createRule(parsed.data), 201);
   return createRuleRoute(request("/api/v1/rules", { method: "POST", auth: await signedIn(), headers: json, body: JSON.stringify(body) }));
 }
 
 async function patch(id: string, body: object) {
   const parsed = RuleUpdateBody.safeParse(body);
-  if (parsed.success) return answered(() => updateRule(session, id, parsed.data));
+  if (parsed.success) return answered("PATCH /api/v1/rules/{id}", () => updateRule(session, id, parsed.data));
   return patchRuleRoute(request(`/api/v1/rules/${id}`, { method: "PATCH", auth: await signedIn(), headers: json, body: JSON.stringify(body) }), {
     params: Promise.resolve({ id }),
   });
@@ -109,14 +109,14 @@ async function groupAction(action: LiftAction, id: string, body = "{}") {
 async function groupRuleBody(action: LiftAction, groupId: string, ruleId: string, body: string | undefined) {
   const read = await readLiftBody(sent(body), action);
   if (!read.ok) return read.response;
-  return answered(() => liftGroupRule(session, action, { groupId, ruleId }, read.body));
+  return answered(`POST /api/v1/groups/{id}/rules/{ruleId}/${action}`, () => liftGroupRule(session, action, { groupId, ruleId }, read.body));
 }
 
 async function ruleAction(action: LiftAction | "on" | "off", id: string, body: object | null = {}) {
-  if (action === "on" || action === "off") return answered(() => switchRule(session, id, action === "on"));
+  if (action === "on" || action === "off") return answered(`POST /api/v1/rules/{id}/${action}`, () => switchRule(session, id, action === "on"));
   const read = await readLiftBody(sent(body === null ? undefined : JSON.stringify(body)), action);
   if (!read.ok) return read.response;
-  return answered(() => liftRule(session, action, { ruleId: id }, read.body));
+  return answered(`POST /api/v1/rules/{id}/${action}`, () => liftRule(session, action, { ruleId: id }, read.body));
 }
 
 async function groupRuleAction(action: LiftAction, groupId: string, ruleId: string, body: object | null = {}) {
@@ -126,13 +126,13 @@ async function groupRuleAction(action: LiftAction, groupId: string, ruleId: stri
 async function unblockAction(action: UnblockAction, id: string, body: object | null = null) {
   const read = await readUnblockBody(sent(body === null ? undefined : JSON.stringify(body)), action);
   if (!read.ok) return read.response;
-  return answered(() => unblockGroupFn(session, action, id, read.body));
+  return answered(`POST /api/v1/groups/{id}/unblock${action === "unblock" ? "" : `/${action}`}`, () => unblockGroupFn(session, action, id, read.body));
 }
 
-const listRules = (groupId?: string) => answered(async () => ({ rules: await listRulesFn(groupId) }));
-const getRule = (id: string) => answered(async () => ({ rule: await getRuleFn(id) }));
-const deleteRule = (id: string) => answered(() => deleteRuleFn(id));
-const deleteGroup = (id: string) => answered(async () => ({ ok: true, ...(await deleteGroupFn(id)) }));
+const listRules = (groupId?: string) => answered("GET /api/v1/rules", async () => ({ rules: await listRulesFn(groupId) }));
+const getRule = (id: string) => answered("GET /api/v1/rules/{id}", async () => ({ rule: await getRuleFn(id) }));
+const deleteRule = (id: string) => answered("DELETE /api/v1/rules/{id}", () => deleteRuleFn(id));
+const deleteGroup = (id: string) => answered("DELETE /api/v1/groups/{id}", async () => ({ ok: true, ...(await deleteGroupFn(id)) }));
 
 async function ruleOf(response: Response): Promise<PublicRule> {
   return ((await response.json()) as { rule: PublicRule }).rule;
@@ -143,7 +143,7 @@ async function errorCode(response: Response): Promise<[number, string]> {
 }
 
 async function readGroup(id: string): Promise<PublicGroup> {
-  return ((await (await answered(async () => ({ group: await getGroupFn(id) }))).json()) as { group: PublicGroup }).group;
+  return ((await (await answered("GET /api/v1/groups/{id}", async () => ({ group: await getGroupFn(id) }))).json()) as { group: PublicGroup }).group;
 }
 
 /** HH:MM in UTC, `minutes` from now: a window around now, whatever time the test runs. */
@@ -226,7 +226,7 @@ describe("household rules", () => {
     await ruleOf(await postRule({ name: "Hers", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows }));
     await runReconcileOnce();
 
-    // In test mode the routes reach the console through the shared mock, once a key is stored;
+    // In test mode the server reaches the console through the shared mock, once a key is stored;
     // each delete is held so overlap shows.
     process.env.FAMILYFI_MODE = "test";
     await prisma().household.update({
@@ -984,7 +984,7 @@ describe("household rules", () => {
 
       const deleted = await deleteGroup(emma.id);
       expect(deleted.status).toBe(200);
-      // The route deletes through the household's own client; the next pass clears anything the fixture gateway kept.
+      // The delete goes through the household's own client; the next pass clears anything the fixture gateway kept.
       await runReconcileOnce();
       expect(policiesNamed(client, "FamilyFi Emma's Internet Pause")).toEqual([]);
       expect(await prisma().rule.count({ where: { systemGroupId: { not: null } } })).toBe(0);
@@ -1315,7 +1315,7 @@ describe("household rules", () => {
       expect(quarantinePolicy()?.enabled).toBe(true);
 
       await ruleAction(pauseRule, "quarantine");
-      const saved = await answered(() => updateHouseholdSettings({ quarantineEnforced: true, displayName: "Home" }));
+      const saved = await answered("PUT /api/v1/settings/household", () => updateHouseholdSettings({ quarantineEnforced: true, displayName: "Home" }));
       expect(saved.status).toBe(200);
       expect((await prisma().rule.findUniqueOrThrow({ where: { id: "quarantine" } })).pauseActive).toBe(true);
     });
@@ -1324,7 +1324,7 @@ describe("household rules", () => {
       expect(await errorCode(await ruleAction(pauseRule, "quarantine"))).toEqual([409, "rule_off"]);
       await quarantining();
       await ruleAction(pauseRule, "quarantine");
-      const put = await answered(() => updateHouseholdSettings({ quarantineEnforced: false }));
+      const put = await answered("PUT /api/v1/settings/household", () => updateHouseholdSettings({ quarantineEnforced: false }));
       expect(put.status).toBe(200);
       const rule = await ruleOf(await getRule("quarantine"));
       expect([rule.enabled, rule.pause.active]).toEqual([false, false]);

@@ -1,19 +1,21 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { UpstreamSource, UpstreamVerdict } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import {
-  GET as listCategories,
-  POST as createCategory,
-} from "@/app/api/v1/upstream/categories/route";
-import {
-  DELETE as deleteCategory,
-  GET as getCategory,
-  PATCH as patchCategory,
-} from "@/app/api/v1/upstream/categories/[id]/route";
+import { POST as createCategoryRoute } from "@/app/api/v1/upstream/categories/route";
+import { GET as getCategoryRoute, PATCH as patchCategoryRoute } from "@/app/api/v1/upstream/categories/[id]/route";
 import { prisma } from "@/server/db";
+import {
+  createUpstreamCategory,
+  deleteUpstreamCategory,
+  listUpstreamCategories,
+  updateUpstreamCategory,
+  UpstreamCategoryCreateBody,
+  UpstreamCategoryUpdateBody,
+} from "@/server/upstream/categories";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
 import { refreshResolverContexts } from "@/server/upstream/discovery";
 import { domainVerdict, effectiveCheck, type UpstreamCheckRow } from "@/lib/upstream";
+import { answered } from "../helpers/answered";
 import { authFromLogin, request } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -44,35 +46,40 @@ type PublicCategory = {
   checks: UpstreamCheckRow[];
 };
 
-async function categories(auth: Awaited<ReturnType<typeof signedIn>>) {
-  const response = await listCategories(request("/api/v1/upstream/categories", { auth }));
-  expect(response.status).toBe(200);
-  const body = (await response.json()) as { categories: PublicCategory[] };
-  return body.categories;
+const json = { "content-type": "application/json" };
+
+async function categories() {
+  const response = await answered("GET /api/v1/upstream/categories", async () => ({ categories: await listUpstreamCategories() }));
+  return ((await response.json()) as { categories: PublicCategory[] }).categories;
 }
 
-async function bySlug(auth: Awaited<ReturnType<typeof signedIn>>, slug: string) {
-  const all = await categories(auth);
+async function bySlug(slug: string) {
+  const all = await categories();
   const found = all.find((category) => category.slug === slug);
   expect(found, slug).toBeTruthy();
   return found!;
 }
 
-async function patch(
-  auth: Awaited<ReturnType<typeof signedIn>>,
-  id: string,
-  body: Record<string, unknown>,
-) {
-  return patchCategory(
-    request(`/api/v1/upstream/categories/${id}`, {
-      method: "PATCH",
-      auth,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-    { params: Promise.resolve({ id }) },
-  );
+/** Creates a category. A body the request schema refuses goes through the route, whose refusal that is. */
+async function createCategory(body: Record<string, unknown>) {
+  const parsed = UpstreamCategoryCreateBody.safeParse(body);
+  if (parsed.success) return answered("POST /api/v1/upstream/categories", async () => ({ category: await createUpstreamCategory(parsed.data) }), 201);
+  return createCategoryRoute(request("/api/v1/upstream/categories", { method: "POST", auth: await signedIn(), headers: json, body: JSON.stringify(body) }));
 }
+
+async function patch(id: string, body: Record<string, unknown>) {
+  const parsed = UpstreamCategoryUpdateBody.safeParse(body);
+  if (parsed.success) return answered("PATCH /api/v1/upstream/categories/{id}", async () => ({ category: await updateUpstreamCategory(id, parsed.data) }));
+  return patchCategoryRoute(request(`/api/v1/upstream/categories/${id}`, { method: "PATCH", auth: await signedIn(), headers: json, body: JSON.stringify(body) }), {
+    params: Promise.resolve({ id }),
+  });
+}
+
+const deleteCategory = (id: string) =>
+  answered("DELETE /api/v1/upstream/categories/{id}", async () => {
+    await deleteUpstreamCategory(id);
+    return { ok: true };
+  });
 
 describe("upstream categories API", () => {
   beforeEach(async () => {
@@ -82,8 +89,7 @@ describe("upstream categories API", () => {
   });
 
   it("lists seeded categories with their domains and a cost note", async () => {
-    const auth = await signedIn();
-    const video = await bySlug(auth, "video");
+    const video = await bySlug("video");
     expect(video.source).toBe("seed");
     expect(video.monogram).toBe("VID");
     expect(video.activeDomainCount).toBe(20);
@@ -94,16 +100,8 @@ describe("upstream categories API", () => {
   });
 
   it("accepts a monogram of up to four characters and refuses five", async () => {
-    const auth = await signedIn();
     const create = (monogram: string) =>
-      createCategory(
-        request("/api/v1/upstream/categories", {
-          method: "POST",
-          auth,
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ label: `Mono ${monogram}`, monogram }),
-        }),
-      );
+      createCategory({ label: `Mono ${monogram}`, monogram });
     const four = await create("abcd");
     expect(four.status).toBe(201);
     expect(((await four.json()) as { category: PublicCategory }).category.monogram).toBe("ABCD");
@@ -111,15 +109,7 @@ describe("upstream categories API", () => {
   });
 
   it("creates a custom category, deriving the slug and monogram", async () => {
-    const auth = await signedIn();
-    const response = await createCategory(
-      request("/api/v1/upstream/categories", {
-        method: "POST",
-        auth,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ label: "Homework Help", domains: ["https://chegg.com/study"] }),
-      }),
-    );
+    const response = await createCategory({ label: "Homework Help", domains: ["https://chegg.com/study"] });
     expect(response.status).toBe(201);
     const { category } = (await response.json()) as { category: PublicCategory };
     expect(category.slug).toBe("homework-help");
@@ -130,26 +120,16 @@ describe("upstream categories API", () => {
   });
 
   it("refuses a duplicate name", async () => {
-    const auth = await signedIn();
-    const body = JSON.stringify({ label: "Video" });
-    const response = await createCategory(
-      request("/api/v1/upstream/categories", {
-        method: "POST",
-        auth,
-        headers: { "content-type": "application/json" },
-        body,
-      }),
-    );
+    const response = await createCategory({ label: "Video" });
     expect(response.status).toBe(409);
     expect((await response.json()).error.code).toBe("slug_taken");
   });
 
   it("strikes a seeded domain out of the list and restores it when included again", async () => {
-    const auth = await signedIn();
-    const video = await bySlug(auth, "video");
+    const video = await bySlug("video");
     const kept = video.domains.map((domain) => domain.domain).filter((domain) => domain !== "youtube.com");
 
-    const struck = await patch(auth, video.id, { domains: kept });
+    const struck = await patch(video.id, { domains: kept });
     expect(struck.status).toBe(200);
     let after = (await struck.json()).category as PublicCategory;
     let youtube = after.domains.find((domain) => domain.domain === "youtube.com");
@@ -158,7 +138,7 @@ describe("upstream categories API", () => {
     // Still on record, so it can come back.
     expect(after.domains).toHaveLength(20);
 
-    const restored = await patch(auth, video.id, {
+    const restored = await patch(video.id, {
       domains: after.domains.map((domain) => domain.domain),
     });
     expect(restored.status).toBe(200);
@@ -169,16 +149,15 @@ describe("upstream categories API", () => {
   });
 
   it("deletes a customer-added domain outright rather than striking it", async () => {
-    const auth = await signedIn();
-    const video = await bySlug(auth, "video");
-    const withAdded = await patch(auth, video.id, {
+    const video = await bySlug("video");
+    const withAdded = await patch(video.id, {
       domains: [...video.domains.map((domain) => domain.domain), "mubi.com"],
     });
     expect(withAdded.status).toBe(200);
     const added = (await withAdded.json()).category as PublicCategory;
     expect(added.domains.find((domain) => domain.domain === "mubi.com")?.source).toBe("user");
 
-    const removed = await patch(auth, video.id, {
+    const removed = await patch(video.id, {
       domains: video.domains.map((domain) => domain.domain),
     });
     const after = (await removed.json()).category as PublicCategory;
@@ -187,12 +166,11 @@ describe("upstream categories API", () => {
   });
 
   it("rejects a wildcard, a port and a bare word with a usable message", async () => {
-    const auth = await signedIn();
-    const video = await bySlug(auth, "video");
+    const video = await bySlug("video");
     const keep = video.domains.map((domain) => domain.domain);
 
     for (const bad of ["*.example.com", "example.com:8080", "notadomain"]) {
-      const response = await patch(auth, video.id, { domains: [...keep, bad] });
+      const response = await patch(video.id, { domains: [...keep, bad] });
       expect(response.status, bad).toBe(400);
       const body = await response.json();
       expect(body.error.code, bad).toBe("invalid_domain");
@@ -201,8 +179,7 @@ describe("upstream categories API", () => {
   });
 
   it("clears the last verdict when checking is turned off", async () => {
-    const auth = await signedIn();
-    const video = await bySlug(auth, "video");
+    const video = await bySlug("video");
     await prisma().upstreamCheck.create({
       data: {
         categoryId: video.id,
@@ -214,7 +191,7 @@ describe("upstream categories API", () => {
       },
     });
 
-    const response = await patch(auth, video.id, { enabled: false });
+    const response = await patch(video.id, { enabled: false });
     expect(response.status).toBe(200);
     const after = (await response.json()).category as PublicCategory;
     expect(after.enabled).toBe(false);
@@ -222,23 +199,18 @@ describe("upstream categories API", () => {
   });
 
   it("refuses to rename or delete a built-in category", async () => {
-    const auth = await signedIn();
-    const video = await bySlug(auth, "video");
+    const video = await bySlug("video");
 
-    const renamed = await patch(auth, video.id, { label: "Streaming" });
+    const renamed = await patch(video.id, { label: "Streaming" });
     expect(renamed.status).toBe(409);
     expect((await renamed.json()).error.code).toBe("seed_category");
 
-    const removed = await deleteCategory(
-      request(`/api/v1/upstream/categories/${video.id}`, { method: "DELETE", auth }),
-      { params: Promise.resolve({ id: video.id }) },
-    );
+    const removed = await deleteCategory(video.id);
     expect(removed.status).toBe(409);
     expect((await removed.json()).error.code).toBe("seed_category");
   });
 
   it("deletes a custom category and cascades its domains", async () => {
-    const auth = await signedIn();
     const created = await prisma().upstreamCategory.create({
       data: {
         slug: "homework",
@@ -249,10 +221,7 @@ describe("upstream categories API", () => {
       },
     });
 
-    const response = await deleteCategory(
-      request(`/api/v1/upstream/categories/${created.id}`, { method: "DELETE", auth }),
-      { params: Promise.resolve({ id: created.id }) },
-    );
+    const response = await deleteCategory(created.id);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     expect(await prisma().upstreamCategory.findUnique({ where: { id: created.id } })).toBeNull();
@@ -260,7 +229,7 @@ describe("upstream categories API", () => {
   });
 
   it("requires a session", async () => {
-    const response = await getCategory(request("/api/v1/upstream/categories/whatever"), {
+    const response = await getCategoryRoute(request("/api/v1/upstream/categories/whatever"), {
       params: Promise.resolve({ id: "whatever" }),
     });
     expect(response.status).toBe(401);
@@ -268,7 +237,6 @@ describe("upstream categories API", () => {
 
   describe("per-domain results", () => {
     it("carries the sweep's own per-domain results through the check row", async () => {
-      const auth = await signedIn();
       const created = await prisma().upstreamCategory.create({
         data: {
           slug: "homework", label: "Homework", monogram: "HW", source: UpstreamSource.user,
@@ -291,7 +259,7 @@ describe("upstream categories API", () => {
         },
       });
 
-      const category = await bySlug(auth, "homework");
+      const category = await bySlug("homework");
       const check = effectiveCheck(category.checks)!;
       expect(check.results).toEqual(
         expect.arrayContaining([
@@ -302,7 +270,6 @@ describe("upstream categories API", () => {
     });
 
     it("drops a malformed results entry rather than throwing", async () => {
-      const auth = await signedIn();
       const created = await prisma().upstreamCategory.create({
         data: {
           slug: "homework", label: "Homework", monogram: "HW", source: UpstreamSource.user,
@@ -318,7 +285,7 @@ describe("upstream categories API", () => {
         },
       });
 
-      const category = await bySlug(auth, "homework");
+      const category = await bySlug("homework");
       const check = effectiveCheck(category.checks)!;
       expect(check.results).toEqual([]);
     });
@@ -332,7 +299,6 @@ describe("upstream categories API", () => {
       // A seed domain, not a user one: removing a user domain deletes the row
       // outright, but a seed domain is struck through (`removedAt` set) — the case
       // that leaves a stale check result sitting next to a `removed: true` row.
-      const auth = await signedIn();
       const created = await prisma().upstreamCategory.create({
         data: {
           slug: "homework", label: "Homework", monogram: "HW", source: UpstreamSource.seed,
@@ -347,9 +313,9 @@ describe("upstream categories API", () => {
         },
       });
 
-      await patch(auth, created.id, { domains: [] });
+      await patch(created.id, { domains: [] });
 
-      const category = await bySlug(auth, "homework");
+      const category = await bySlug("homework");
       const chegg = category.domains.find((d) => d.domain === "chegg.com")!;
       expect(chegg.removed).toBe(true);
       expect(domainVerdict(chegg, effectiveCheck(category.checks))).toBe("unknown");

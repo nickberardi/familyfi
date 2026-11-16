@@ -1,16 +1,28 @@
 import { ApiError, jsonError, ResponseRefusal } from "@/server/http";
+import { assertDocumentedResponse } from "./openapi-responses";
+
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /**
- * Calls a `src/server` function and gives back what its route answers with: the result as JSON
- * with `status`, or the refusal it threw. Cases written against a response keep their assertions
- * while calling the function with plain arguments. Anything else it throws is the test's failure.
+ * Calls a `src/server` function and gives back the status and JSON its route answers with: the
+ * result with `status`, or the refusal it threw. The caller supplies the route's envelope and
+ * status; anything else the function throws is the test's failure.
+ *
+ * `operation` names the route the function serves, as the OpenAPI file spells it. The answer is
+ * checked against that operation exactly as a handler's is: its status must be documented and its
+ * body must match the schema. So a case that calls the function keeps the contract check it had
+ * when it called the route.
  */
-export async function answered(work: () => Promise<unknown>, status = 200): Promise<Response> {
+export async function answered(operation: `${Method} /api/v1/${string}`, work: () => Promise<unknown>, status = 200): Promise<Response> {
+  let response: Response;
   try {
-    return Response.json(await work(), { status });
+    response = Response.json(await work(), { status });
   } catch (error) {
-    if (error instanceof ApiError) return jsonError(error.status, error.code, error.message);
-    if (error instanceof ResponseRefusal) return error.response;
-    throw error;
+    if (error instanceof ApiError) response = jsonError(error.status, error.code, error.message);
+    else if (error instanceof ResponseRefusal) response = error.response;
+    else throw error;
   }
+  const space = operation.indexOf(" ");
+  await assertDocumentedResponse(operation.slice(0, space), operation.slice(space + 1), response);
+  return response;
 }
