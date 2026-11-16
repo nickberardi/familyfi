@@ -195,3 +195,15 @@ export async function removeRevokedDevices(): Promise<number> {
     return removed.count;
   });
 }
+
+/** What anyone may read to recognise this household's server: its name, instance id and public key. */
+export async function publicIdentity() {
+  const household = await ensureConnectionIdentity();
+  return {
+    protocolVersion: 1,
+    householdName: household.displayName,
+    instanceId: household.instanceId,
+    publicKey: JSON.parse(household.instancePublicKey!),
+    keyFingerprint: instanceFingerprint(household.instancePublicKey!),
+  };
+}

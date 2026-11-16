@@ -13,7 +13,7 @@ import {
   suggestedMonogram,
 } from "../upstream-categories";
 import { refreshResolverContexts } from "./discovery";
-import { probeCategory } from "./probe";
+import { probeCategory, probeEnabledCategories } from "./probe";
 import { withUpstreamLock } from "./transaction";
 
 /**
@@ -181,4 +181,16 @@ export async function listUpstreamChecks() {
   return checks
     .filter((check) => checkIsFresh(check))
     .map((check) => ({ categoryId: check.categoryId, slug: check.category.slug, label: check.category.label, ...publicUpstreamCheck(check) }));
+}
+
+/** One sweep over every category with checking on. Disabled ones keep their result. */
+export async function runUpstreamChecks() {
+  const outcomes = await probeEnabledCategories();
+  return outcomes.map((outcome) => ({
+    categoryId: outcome.categoryId,
+    slug: outcome.slug,
+    verdict: outcome.verdict,
+    blockedCount: outcome.blockedCount,
+    totalCount: outcome.totalCount,
+  }));
 }

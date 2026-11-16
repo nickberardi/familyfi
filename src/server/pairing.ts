@@ -341,3 +341,8 @@ export async function isAgentInvite(id: string): Promise<boolean> {
   const invite = await prisma().pairing.findUnique({ where: { id }, select: { client: true } });
   return invite?.client === PairedDeviceClient.agent;
 }
+
+/** Cancels an invite nobody has claimed yet. */
+export async function cancelPendingInvite(id: string) {
+  if (!(await cancelInvite(id))) throw new ApiError(404, "not_found", "No pending invite with that id.");
+}

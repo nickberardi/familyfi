@@ -45,7 +45,7 @@ describe("route boundary", () => {
     expect(routeFiles(apiRoot).length).toBeGreaterThan(50);
   });
 
-  it("lets no route file reach the database or a UniFi client", () => {
+  it("lets no route file reach the database, a UniFi client, the household row or the site's networks", () => {
     expect(reaching).toEqual([]);
   });
 });

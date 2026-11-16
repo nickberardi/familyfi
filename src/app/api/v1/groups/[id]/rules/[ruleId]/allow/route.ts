@@ -1,6 +1,5 @@
 import { withMutation } from "@/server/guard";
-import { INTERNET_RULE_ID, runGroupInternet } from "@/server/group-internet";
-import { runLift } from "@/server/rule-lifts";
+import { runGroupRuleLift } from "@/server/group-internet";
 
 type Ctx = { params: Promise<{ id: string; ruleId: string }> };
 
@@ -8,7 +7,6 @@ type Ctx = { params: Promise<{ id: string; ruleId: string }> };
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async (session) => {
     const { id, ruleId } = await ctx.params;
-    if (ruleId === INTERNET_RULE_ID) return runGroupInternet(request, session, "allow", id);
-    return runLift(request, session, "allow", { ruleId, groupId: id });
+    return runGroupRuleLift(request, session, "allow", { groupId: id, ruleId });
   });
 }
