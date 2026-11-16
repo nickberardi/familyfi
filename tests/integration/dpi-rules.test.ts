@@ -62,6 +62,27 @@ describe("Phase 2 DPI rules", () => {
     ).toBe(401);
   });
 
+  it("answers 409 until UniFi is connected, and when its saved key is missing", async () => {
+    const auth = await signedIn();
+    for (const list of [listApplications, listCategories]) {
+      const path = list === listApplications ? "/api/v1/dpi/applications" : "/api/v1/dpi/categories";
+      await prisma().household.update({
+        where: { id: "default" },
+        data: { connectionStatus: "unconfigured", unifiKeyCiphertext: null, unifiKeyIv: null, unifiKeyAuthTag: null },
+      });
+      const unconfigured = await list(request(path, { auth }));
+      expect(unconfigured.status).toBe(409);
+      expect(await unconfigured.json()).toEqual({
+        error: { code: "unifi_unconfigured", message: `Configure UniFi in Settings before listing DPI ${path.split("/").pop()}.` },
+      });
+      // Connected on record, but with no key to make a client from.
+      await prisma().household.update({ where: { id: "default" }, data: { connectionStatus: "connected" } });
+      const keyless = await list(request(path, { auth }));
+      expect(keyless.status).toBe(409);
+      expect(await keyless.json()).toEqual({ error: { code: "unifi_unconfigured", message: "UniFi is not configured." } });
+    }
+  });
+
   it("reads the whole catalog from the gateway once, and a filtered search every time", async () => {
     const auth = await signedIn();
     await prisma().household.update({

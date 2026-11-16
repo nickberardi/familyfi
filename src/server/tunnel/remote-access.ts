@@ -817,6 +817,7 @@ export async function changeRemoteAccess(change: RemoteAccessChange): Promise<Re
     await setRemoteAccess(change);
   } catch (error) {
     if (error instanceof RemoteAccessError) throw new ApiError(400, "invalid_tunnel", error.message);
+    // coverage-exempt: a failure that is not the caller's doing passes through unchanged, for the guard to answer.
     throw error;
   }
   return remoteAccessState();
