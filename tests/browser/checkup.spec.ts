@@ -196,9 +196,12 @@ test("a link that arrives while Devices is open applies again", { tag: "@desktop
   });
   expect(made.ok()).toBeTruthy();
   const { group } = (await made.json()) as { group: { id: string } };
-  await page.goto(`/devices?assign=${group.id}`);
-  await expect(page.getByTestId("assign-needed")).toBeVisible();
-  await page.request.delete(`/api/v1/groups/${group.id}`, { headers: { "x-csrf-token": csrf } });
+  try {
+    await page.goto(`/devices?assign=${group.id}`);
+    await expect(page.getByTestId("assign-needed")).toBeVisible();
+  } finally {
+    expect((await page.request.delete(`/api/v1/groups/${group.id}`, { headers: { "x-csrf-token": csrf } })).ok()).toBeTruthy();
+  }
   await page.goto("/devices");
 
   // Checkup's "Show on Devices": back to every device with a private address.
