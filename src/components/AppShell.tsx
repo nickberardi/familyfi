@@ -9,9 +9,7 @@ import { DeviceDetailModal } from "@/components/DeviceDetailModal";
 import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api, request } from "@/lib/api";
-import { unassignedBadgeCount } from "@/lib/device-list";
-import { NAV } from "@/lib/nav";
-import { familyNeedsDevices as familyNeedsDevicesCount, syncFailed as syncNeedsAttention } from "@/lib/sync-copy";
+import { NAV, navBadge, navBadgeTone, navCounts, navGroupBadge } from "@/lib/nav";
 import { reconcileNow } from "@/lib/sync-writes";
 import { AccountCard } from "@/ui/StatusCards";
 import { SidebarStatus } from "@/components/SidebarStatus";
@@ -117,14 +115,6 @@ function useCollapsedSections(): [ReadonlySet<string>, (titles: readonly string[
   return [collapsed, writeCollapsed];
 }
 
-/** The count beside a destination: devices waiting, family members without a device, a failed sync. */
-function navBadge(href: string, counts: { unassignedCount: number; familyNeedsDevices: number; syncFailed: boolean; checkupProblems: number }) {
-  if (href === "/devices") return counts.unassignedCount;
-  if (href === "/family") return counts.familyNeedsDevices;
-  if (href === "/checkup") return counts.checkupProblems;
-  return href === "/sync" && counts.syncFailed ? 1 : 0;
-}
-
 function NavBadge({ count, tone, label }: { count: number; tone: "paused" | "danger"; label?: string }) {
   return (
     <span
@@ -182,8 +172,7 @@ function NavGroups({
       {NAV.map((group) => {
         const closed = collapsed.has(group.title);
         const id = `${idPrefix}-${group.title.toLowerCase()}`;
-        const total = group.items.reduce((sum, item) => sum + navBadge(item.href, counts), 0);
-        const urgent = group.items.some((item) => item.href !== "/family" && item.href !== "/checkup" && navBadge(item.href, counts) > 0);
+        const { total, tone } = navGroupBadge(group.title, counts);
         return (
           <div key={group.title} className={closed ? "mb-2 last:mb-0" : "mb-5 last:mb-0"}>
             <button
@@ -196,7 +185,7 @@ function NavGroups({
               className="flex w-full items-center gap-1.5 rounded-[7px] border-0 bg-transparent px-2.5 pb-1.5 text-left text-[14px] font-semibold tracking-wide text-[var(--ff-muted)] uppercase"
             >
               <span className="min-w-0 flex-1">{group.title}</span>
-              {closed && total ? <NavBadge count={total} tone={urgent ? "danger" : "paused"} label={`${total} need attention`} /> : null}
+              {closed && total ? <NavBadge count={total} tone={tone} label={`${total} need attention`} /> : null}
               <Icon name={closed ? "caret-right" : "caret-down"} size={14} />
             </button>
             <div id={id} hidden={closed} className="flex flex-col gap-px">
@@ -217,7 +206,7 @@ function NavGroups({
                   >
                     <Icon name={item.icon} size={16} />
                     <span className="min-w-0 flex-1">{item.label}</span>
-                    {badge ? <NavBadge count={badge} tone={item.href === "/family" || item.href === "/checkup" ? "paused" : "danger"} /> : null}
+                    {badge ? <NavBadge count={badge} tone={navBadgeTone(item.href)} /> : null}
                   </Link>
                 );
               })}
@@ -322,10 +311,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
     setOpenedAtPathname(pathname);
     if (navOpen) setNavOpen(false);
   }
-  const unassignedCount = unassignedBadgeCount(devices);
-  const familyNeedsDevices = familyNeedsDevicesCount(sync);
-  const syncFailed = syncNeedsAttention(sync);
-  const checkupProblems = sync?.checkupProblems ?? 0;
+  const { unassignedCount, familyNeedsDevices, syncFailed, checkupProblems } = navCounts(devices, sync);
 
   const navDrawer = useMemo(() => ({ toggle: () => setNavOpen((open) => !open) }), []);
 

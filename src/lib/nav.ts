@@ -1,4 +1,7 @@
+import { unassignedBadgeCount } from "./device-list";
 import type { IconName } from "./icons";
+import { familyNeedsDevices, syncFailed } from "./sync-copy";
+import type { Device, SyncStatus } from "./types";
 
 export type NavItem = {
   href: string;
@@ -41,3 +44,50 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
 ];
+
+/** What the navigation counts beside its destinations. */
+export type NavCounts = {
+  /** Unassigned devices on a managed network. */
+  unassignedCount: number;
+  /** Family members whose rules wait for a device. */
+  familyNeedsDevices: number;
+  syncFailed: boolean;
+  /** Open problems the network checkup found. */
+  checkupProblems: number;
+};
+
+export function navCounts(
+  devices: Pick<Device, "assignment" | "inScope">[],
+  sync: Pick<SyncStatus, "lastRun" | "connectionStatus" | "failingCount" | "issues" | "checkupProblems"> | null | undefined,
+): NavCounts {
+  return {
+    unassignedCount: unassignedBadgeCount(devices),
+    familyNeedsDevices: familyNeedsDevices(sync),
+    syncFailed: syncFailed(sync),
+    checkupProblems: sync?.checkupProblems ?? 0,
+  };
+}
+
+/** The count beside a destination: devices waiting, family members without a device, Checkup's open problems, a failed sync. */
+export function navBadge(href: string, counts: NavCounts): number {
+  if (href === "/devices") return counts.unassignedCount;
+  if (href === "/family") return counts.familyNeedsDevices;
+  if (href === "/checkup") return counts.checkupProblems;
+  return href === "/sync" && counts.syncFailed ? 1 : 0;
+}
+
+/** A badge's tone: a family member without a device and Checkup's problems are never urgent. */
+export function navBadgeTone(href: string): "paused" | "danger" {
+  return href === "/family" || href === "/checkup" ? "paused" : "danger";
+}
+
+/**
+ * A group's badges as one: their total, urgent when any urgent one counts. `skip` leaves out
+ * destinations badged somewhere else, as the app's Devices tab is.
+ */
+export function navGroupBadge(title: string, counts: NavCounts, skip: readonly string[] = []): { total: number; tone: "paused" | "danger" } {
+  const items = (NAV.find((group) => group.title === title)?.items ?? []).filter((item) => !skip.includes(item.href));
+  const total = items.reduce((sum, item) => sum + navBadge(item.href, counts), 0);
+  const urgent = items.some((item) => navBadgeTone(item.href) === "danger" && navBadge(item.href, counts) > 0);
+  return { total, tone: urgent ? "danger" : "paused" };
+}
