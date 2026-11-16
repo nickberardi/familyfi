@@ -62,36 +62,36 @@ function DevicesBody() {
           list={list}
           disabled={busy}
           filter={
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
-                  {DEVICE_FILTERS.map((item) => {
-                    const on = filter === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setFilter(item.id)}
-                        className="rounded-md px-2.5 py-1.5 text-[14px] md:px-3.5"
-                        style={{
-                          fontWeight: on ? 600 : 500,
-                          background: on ? "var(--ff-ink-on-fill)" : "transparent",
-                          color: on ? "var(--ff-ink)" : "var(--ff-muted)",
-                          boxShadow: on ? "var(--ff-shadow-knob)" : "none",
-                        }}
-                      >
-                        {deviceFilterLabel(item, devices)}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex-1" />
-                <input
-                  className="w-full max-w-[260px] rounded-[7px] border border-[var(--ff-input-line)] px-2.5 py-2 text-[16px] md:text-[14px]"
-                  placeholder={COPY.search}
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
+                {DEVICE_FILTERS.map((item) => {
+                  const on = filter === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFilter(item.id)}
+                      className="rounded-md px-2.5 py-1.5 text-[14px] md:px-3.5"
+                      style={{
+                        fontWeight: on ? 600 : 500,
+                        background: on ? "var(--ff-ink-on-fill)" : "transparent",
+                        color: on ? "var(--ff-ink)" : "var(--ff-muted)",
+                        boxShadow: on ? "var(--ff-shadow-knob)" : "none",
+                      }}
+                    >
+                      {deviceFilterLabel(item, devices)}
+                    </button>
+                  );
+                })}
               </div>
+              <div className="flex-1" />
+              <input
+                className="w-full max-w-[260px] rounded-[7px] border border-[var(--ff-input-line)] px-2.5 py-2 text-[16px] md:text-[14px]"
+                placeholder={COPY.search}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
           }
         />
 
