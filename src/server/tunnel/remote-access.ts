@@ -8,6 +8,7 @@ import { ConnectionTransport, ConnectionTrustMode, RouteKind, type ConnectionEnd
 import { ensureConnectionIdentity, isUniqueViolation } from "../connection";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { prisma } from "../db";
+import { ApiError } from "../http";
 import { demoModeEnabled } from "../env";
 import {
   findCloudflared,
@@ -808,4 +809,15 @@ export async function resumeRemoteAccess() {
   if (!route || route.kind === RouteKind.own) return;
   runtime.wanted = route.kind;
   if (!runtime.child) await launch();
+}
+
+/** Switches remote access and answers with its state as it now stands. */
+export async function changeRemoteAccess(change: RemoteAccessChange): Promise<RemoteAccessState> {
+  try {
+    await setRemoteAccess(change);
+  } catch (error) {
+    if (error instanceof RemoteAccessError) throw new ApiError(400, "invalid_tunnel", error.message);
+    throw error;
+  }
+  return remoteAccessState();
 }

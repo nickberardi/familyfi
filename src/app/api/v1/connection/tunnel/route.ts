@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { jsonError } from "@/server/http";
 import { readBody, withAdmin } from "@/server/guard";
-import { RemoteAccessError, remoteAccessState, setRemoteAccess } from "@/server/tunnel/remote-access";
+import { changeRemoteAccess, remoteAccessState } from "@/server/tunnel/remote-access";
 
 const Body = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("off"), forget: z.boolean().optional() }).strict(),
@@ -20,12 +19,6 @@ export async function PUT(request: Request) {
   return withAdmin(request, async () => {
     const parsed = await readBody(request, Body, "Mode must be off, quick, or named with a hostname or a route id.");
     if (!parsed.ok) return parsed.response;
-    try {
-      await setRemoteAccess(parsed.data);
-    } catch (error) {
-      if (error instanceof RemoteAccessError) return jsonError(400, "invalid_tunnel", error.message);
-      throw error;
-    }
-    return Response.json({ tunnel: await remoteAccessState() });
+    return Response.json({ tunnel: await changeRemoteAccess(parsed.data) });
   }, { demoLock: true });
 }
