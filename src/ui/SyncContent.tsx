@@ -37,10 +37,11 @@ export function SyncContent({
   const text = (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const rows = syncLogRows(sync, timezone);
-  // The window's width until the log has measured itself, so a phone starts without the column.
+  // Until the log has measured itself: the window's width natively, so a phone starts without the
+  // column, and wide on the web, whose server render has no window (as UpdateContent starts).
   const screen = useWindowDimensions();
   const [logWidth, setLogWidth] = useState<number | null>(null);
-  const whoColumn = (logWidth ?? screen.width) >= WHO_COLUMN_AT;
+  const whoColumn = (logWidth ?? (Platform.OS === "web" ? WHO_COLUMN_AT : screen.width)) >= WHO_COLUMN_AT;
   const problem = syncProblem(sync);
 
   return (
@@ -143,8 +144,8 @@ const styles = StyleSheet.create({
   // The web's grid columns minmax(92px, 128px) and minmax(80px, 96px): their widest unless the row is narrow.
   when: { flexBasis: 128, flexGrow: 0, flexShrink: 1, minWidth: 92 },
   action: { flex: 1, minWidth: 0 },
-  // Wide enough for "Siri and Shortcuts on" a device's name over two lines.
-  who: { flexBasis: 200, flexGrow: 0, flexShrink: 1, minWidth: 120 },
+  // Grows to fit "Siri and Shortcuts on" a device's name on one line where the log is wide.
+  who: { flexBasis: 200, flexGrow: 1, flexShrink: 1, minWidth: 120, maxWidth: 320 },
   result: { flexBasis: 96, flexGrow: 0, flexShrink: 1, minWidth: 80, textAlign: "right" },
   bold: { fontWeight: "600" },
   detail: { marginTop: 2 },
