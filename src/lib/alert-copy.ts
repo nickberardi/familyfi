@@ -32,17 +32,25 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
     case "sync.down":
       return { title: "Can't reach your gateway", body: "Your rules may not apply until FamilyFi reaches it again." };
     case "sync.up":
-      return { title: "Gateway reached", body: "FamilyFi can reach your gateway again, and your rules apply." };
+      return { title: "Gateway reached", body: "FamilyFi can reach your gateway again." };
     default:
       return null;
   }
 }
 
+/**
+ * The button an alert of a kind carries beside a tap, by kind. Each opens the app where the tap does,
+ * so nothing changes the household from outside the app: Assign opens Unassigned.
+ */
+export const ALERT_ACTIONS: Partial<Record<string, string>> = {
+  "device.new": "Assign",
+};
+
 /** The name of each kind on an Alerts screen or card, where a parent turns it on or off. */
 export const ALERT_KIND_LABELS: Record<string, string> = {
   "device.new": "New devices",
   "sync.down": "Can't reach your gateway",
-  "sync.up": "Gateway reached",
+  "sync.up": "Gateway back",
 };
 
 /** The Alerts card in Settings. */
@@ -57,7 +65,7 @@ export const ALERTS_CARD_COPY = {
     "Each alert is locked with a key that only that device and your FamilyFi hold. The relay sees an address for the device, whether it is an Apple or Android device, the locked alert, a random number for your FamilyFi and the time. It can't read the alert, and it keeps nothing.",
     "Apple or Google see that a device got an alert and when, not what it says or what kind it is.",
   ],
-  /** Each paired app's own choice, on its access line in Pair Device. */
+  /** Each paired app's own choice, as its tag on Pair Device. */
   accessOn: "Alerts on",
   accessOff: "Alerts off",
 } as const;

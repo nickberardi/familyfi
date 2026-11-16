@@ -110,6 +110,9 @@
   --ff-paused-fill: rgba(192, 76, 0, 0.08);
   --ff-paused-fill-strong: rgba(192, 76, 0, 0.12);
 
+  /* A yellow tint for a choice left off (Pair Device's "Alerts off" tag), always with --ff-ink text. */
+  --ff-caution-fill: rgba(255, 204, 0, 0.3);
+
   /* Status-pill tints, each derived from its state ink. */
   --ff-field-strong: rgba(120, 120, 128, 0.16);
   --ff-danger-tint: rgba(200, 16, 10, 0.12);

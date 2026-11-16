@@ -151,7 +151,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
     if (!household?.alertsRelayEnabled) return;
     const due = await prisma().alertEvent.findMany({
       where: { sentAt: null, nextAttemptAt: { lte: at } },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: BATCH,
     });
     if (!due.length) return;
@@ -175,7 +175,9 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
       if (!current) continue;
       const registration = current.device.pushRegistration;
       const signedIn = registration && (await prisma().pairedDevice.count({ where: { id: event.deviceId, ...signedInDevice(now()) } }));
-      if (!registration || !signedIn) {
+      // A phone that registered again since this was queued may no longer take this kind.
+      const wanted = registration && registration.supportedKinds.includes(event.kind) && !registration.mutedKinds.includes(event.kind);
+      if (!registration || !signedIn || !wanted) {
         await prisma().alertEvent.deleteMany({ where: { id: event.id } });
         continue;
       }
@@ -217,8 +219,11 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
         if (!marked.count && event.kind === "sync.down") await recordSyncBackFor(event.deviceId, now());
       } else if (response.status === 410) {
         // Apple or Google no longer know this token: the phone registers again when it next opens.
-        await prisma().alertEvent.deleteMany({ where: { deviceId: event.deviceId, sentAt: null } });
-        await prisma().pushRegistration.deleteMany({ where: { deviceId: event.deviceId } });
+        // Only the registration this send used: one the phone made meanwhile has a new token.
+        const gone = await prisma().pushRegistration.deleteMany({
+          where: { deviceId: event.deviceId, tokenCiphertext: registration.tokenCiphertext, updatedAt: registration.updatedAt },
+        });
+        await prisma().alertEvent.deleteMany({ where: gone.count ? { deviceId: event.deviceId, sentAt: null } : { id: event.id } });
       } else if (response.status === 401) {
         // The relay no longer knows this install: ask for a new one next round.
         await forgetInstall();

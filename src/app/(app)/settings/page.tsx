@@ -158,7 +158,7 @@ function Settings() {
                 setPw2("");
               }}
             />
-<AlertsCard enabled={household?.alertsRelay === true} mutate={store.mutate} disabled={household?.alertsRelay === undefined} />
+            <AlertsCard enabled={household?.alertsRelay === true} mutate={store.mutate} disabled={household?.alertsRelay === undefined} />
           </div>
         ) : null}
 

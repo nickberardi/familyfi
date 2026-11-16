@@ -38,8 +38,8 @@ async function recipients(kind: AlertKind, now = new Date(), db: Db = prisma()):
   return rows.map((row) => row.deviceId);
 }
 
-async function relayEnabled(): Promise<boolean> {
-  const household = await prisma().household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true } });
+async function relayEnabled(db: Db = prisma()): Promise<boolean> {
+  const household = await db.household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true } });
   return household?.alertsRelayEnabled === true;
 }
 
@@ -110,7 +110,7 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
           where: { id: "default", syncFailingSince: household.syncFailingSince, syncTroubleAlertedAt: alerted },
           data: { syncFailingSince: null, syncTroubleAlertedAt: null },
         });
-        if (!cleared.count || !alerted || !household.alertsRelayEnabled) return 0;
+        if (!cleared.count || !alerted || !(await relayEnabled(tx))) return 0;
         // A phone the trouble alert never reached (the gateway is often the router too, so the relay
         // was out of reach) hears neither: the unsent alert goes, and only phones that got it are told.
         await tx.alertEvent.deleteMany({ where: { kind: "sync.down", sentAt: null } });
@@ -138,7 +138,8 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
         where: { id: "default", syncTroubleAlertedAt: null },
         data: { syncTroubleAlertedAt: now },
       });
-      if (!claimed.count) return 0;
+      // Read again inside: a switch turned off since has already dropped what was waiting.
+      if (!claimed.count || !(await relayEnabled(tx))) return 0;
       return writeEvents("sync.down", await recipients("sync.down", now, tx), {}, now, tx);
     });
     if (written) wakeAlertSender();

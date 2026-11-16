@@ -147,6 +147,12 @@ function origin(device: Pick<PairedPhone, "client" | "scope">, parentName: strin
   return "via a route that was removed";
 }
 
+/** A tag's colour: grey, or one of the system's state tints (`TAG_TONES` in src/ui/Tag.tsx). */
+export type TagTone = "neutral" | "green" | "yellow" | "red" | "blue";
+
+/** Each access in its colour, as the operator chose: full green, rules only blue, read only red. */
+const SCOPE_TONES: Record<PairedPhone["scope"], TagTone> = { full: "green", rulesOnly: "blue", readOnly: "red" };
+
 /**
  * A paired device's tags and lines, the same for phones, Watches and agents. Tags beside its name say
  * what it may do, whose account it acts as and, for an app, whether it takes alerts; the lines say
@@ -155,11 +161,13 @@ function origin(device: Pick<PairedPhone, "client" | "scope">, parentName: strin
 export function phoneLines(phone: PairedPhone, now = new Date(), parentName: string | null = null) {
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt, now) : "never";
   const ends = phone.sessions.map((session) => session.expiresAt).sort()[0];
-  const tags: { label: string; name: string }[] = [{ label: scopeLabel(phone.scope), name: scopeLabel(phone.scope) }];
-  if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}` });
+  const tags: { label: string; name: string; tone: TagTone }[] = [
+    { label: scopeLabel(phone.scope), name: scopeLabel(phone.scope), tone: SCOPE_TONES[phone.scope] },
+  ];
+  if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}`, tone: "neutral" });
   if (phone.alerts !== undefined && !phone.revokedAt) {
     const alerts = phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff;
-    tags.push({ label: alerts, name: alerts });
+    tags.push({ label: alerts, name: alerts, tone: phone.alerts ? "green" : "yellow" });
   }
   return {
     tags,

@@ -66,7 +66,7 @@ export function PairedPhoneRow({
         <View style={styles.nameRow}>
           <Text style={[text(14, 21, "ink"), styles.bold, styles.name]}>{phone.displayName}</Text>
           {lines.tags.map((tag) => (
-            <Tag key={tag.name} label={tag.label === tag.name ? undefined : tag.name}>
+            <Tag key={tag.name} label={tag.label === tag.name ? undefined : tag.name} tone={tag.tone}>
               {tag.label}
             </Tag>
           ))}
