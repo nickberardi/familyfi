@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { parseHm } from "@/lib/schedule";
-import { demoLocked } from "@/server/demo";
 import { prisma } from "@/server/db";
 import { readBody, withAdmin } from "@/server/guard";
 import { jsonError } from "@/server/http";
@@ -17,8 +16,6 @@ const Body = z
 
 export async function PUT(request: Request) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Body, "Send enabled, at least one day (0 Sunday to 6 Saturday) and an HH:MM time.");
     if (!parsed.ok) return parsed.response;
     try {
@@ -32,5 +29,5 @@ export async function PUT(request: Request) {
     });
     rescheduleAutoUpdate();
     return Response.json(await updateSettings());
-  });
+  }, { demoLock: true });
 }

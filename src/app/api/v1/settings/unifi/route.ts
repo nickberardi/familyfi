@@ -3,7 +3,6 @@ import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { listSiteNetworks, publicUnifiSettings, saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
 import { PreviousTargetError, UnifiConfigError } from "@/server/unifi/errors";
-import { demoLocked } from "@/server/demo";
 import { loadHousehold } from "@/server/household";
 
 const UnifiBody = z
@@ -44,8 +43,6 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, UnifiBody, "Provide an API key and UniFi target, or a managed network selection.");
     if (!parsed.ok) return parsed.response;
     try {
@@ -77,5 +74,5 @@ export async function PUT(request: Request) {
       const message = error instanceof UnifiConfigError || error instanceof Error ? error.message : "UniFi probe failed.";
       return jsonError(400, "unifi_invalid", message);
     }
-  });
+  }, { demoLock: true });
 }

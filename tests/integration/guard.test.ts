@@ -124,6 +124,40 @@ describe("route guards", () => {
   });
 });
 
+describe("the demoLock option", () => {
+  const mode = process.env.FAMILYFI_MODE;
+
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  afterEach(() => {
+    if (mode === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = mode;
+  });
+
+  it.each(Object.keys(GUARDS) as (keyof typeof GUARDS)[])("%s refuses a locked request in the demo only, and only once the caller is let in", async (guard) => {
+    const auth = await pairingAdminAuth();
+    const run = async (incoming: Request, options?: { demoLock: boolean }) => {
+      let ran = false;
+      const response = await GUARDS[guard](incoming, async () => {
+        ran = true;
+        return Response.json({ ok: true });
+      }, options);
+      return { response, ran };
+    };
+    expect((await run(request(PATH, { method: "POST", auth }), { demoLock: true })).ran).toBe(true);
+
+    process.env.FAMILYFI_MODE = "demo";
+    const locked = await run(request(PATH, { method: "POST", auth }), { demoLock: true });
+    expect(locked.response.status).toBe(403);
+    expect(await errorCode(locked.response)).toBe("demo_locked");
+    expect(locked.ran).toBe(false);
+    expect((await run(request(PATH, { method: "POST", auth }))).ran).toBe(true);
+    expect((await run(request(PATH, { method: "POST" }), { demoLock: true })).response.status).toBe(401);
+  });
+});
+
 describe("readBody", () => {
   const Body = z.object({ name: z.string().min(1) });
   const post = (body: string) => request(PATH, { method: "POST", headers: { "content-type": "application/json" }, body });

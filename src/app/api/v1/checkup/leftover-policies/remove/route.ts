@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { checkupState, runCheckup } from "@/server/checkup";
-import { demoLocked } from "@/server/demo";
 import { readBody, withAdmin } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { removeLeftoverPolicies } from "@/server/leftover-policies";
@@ -18,10 +17,8 @@ const Body = z.object({ policyIds: z.array(z.string().min(1).max(200)).min(1).ma
  * so the finding follows. Locked in the demo, whose visitors share one gateway.
  */
 export async function POST(request: Request) {
+  // Every demo visitor shares one gateway.
   return withAdmin(request, async () => {
-    // Every demo visitor shares one gateway.
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Body, "policyIds must list the policies to remove.");
     if (!parsed.ok) return parsed.response;
     const household = await loadHousehold();
@@ -46,5 +43,5 @@ export async function POST(request: Request) {
     }
     await runCheckup(household, client);
     return Response.json({ checkup: await checkupState(), ...result });
-  });
+  }, { demoLock: true });
 }

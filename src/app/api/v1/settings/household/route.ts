@@ -8,7 +8,6 @@ import { setQuarantineEnforced } from "@/server/rules";
 import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 import { rescheduleAutoUpdate } from "@/server/updater";
 import type { Household } from "@prisma/client";
-import { demoLocked } from "@/server/demo";
 import { loadHousehold } from "@/server/household";
 
 const Body = z
@@ -42,8 +41,6 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Body, "timezone or quarantineEnforced is required.");
     if (!parsed.ok) return parsed.response;
     if (parsed.data.timezone) {
@@ -72,5 +69,5 @@ export async function PUT(request: Request) {
       household: await publicHousehold(household),
       change,
     });
-  });
+  }, { demoLock: true });
 }

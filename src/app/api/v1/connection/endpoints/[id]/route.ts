@@ -5,7 +5,6 @@ import { prisma } from "@/server/db";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readBody, withAdmin } from "@/server/guard";
-import { demoLocked } from "@/server/demo";
 import { forgetRouteReached } from "@/server/tunnel/remote-access";
 import { NO_EVIDENCE } from "@/server/tunnel/route-check";
 
@@ -18,8 +17,6 @@ const MANAGED = "This route follows FamilyFi's own tunnel. Change it from Remote
 
 export async function PUT(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Body, "Provide a valid endpoint update.");
     if (!parsed.ok) return parsed.response;
     const { id } = await context.params;
@@ -56,13 +53,11 @@ export async function PUT(request: Request, context: Ctx) {
       if (isUniqueViolation(error)) return jsonError(409, "endpoint_exists", "A route with this address already exists.");
       throw error;
     }
-  });
+  }, { demoLock: true });
 }
 
 export async function DELETE(request: Request, context: Ctx) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await context.params;
     const current = await prisma().connectionEndpoint.findUnique({ where: { id } });
     if (!current) return jsonError(404, "not_found", "Connection endpoint not found.");
@@ -77,5 +72,5 @@ export async function DELETE(request: Request, context: Ctx) {
     });
     if (!deleted.count) return jsonError(404, "not_found", "Connection endpoint not found.");
     return Response.json({ ok: true });
-  });
+  }, { demoLock: true });
 }

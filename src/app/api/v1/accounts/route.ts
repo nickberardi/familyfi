@@ -6,7 +6,6 @@ import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { demoLocked } from "@/server/demo";
 
 const Create = z.object({
   username: z.string().min(2),
@@ -25,8 +24,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Create, "username, displayName, password, and groupId are required.");
     if (!parsed.ok) return parsed.response;
     const username = normalizeUsername(parsed.data.username);
@@ -55,5 +52,5 @@ export async function POST(request: Request) {
     });
     const change = await enqueueChange("account");
     return Response.json({ account: publicAccount(account), change }, { status: 201 });
-  });
+  }, { demoLock: true });
 }

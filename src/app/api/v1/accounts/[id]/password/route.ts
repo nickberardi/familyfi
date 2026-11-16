@@ -6,7 +6,6 @@ import { publicAccount } from "@/server/accounts";
 import { prisma } from "@/server/db";
 import { readBody, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { demoLocked } from "@/server/demo";
 
 const Body = z.object({
   password: z.string().min(8),
@@ -16,8 +15,6 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await ctx.params;
     const parsed = await readBody(request, Body, "password must be at least 8 characters.");
     if (!parsed.ok) return parsed.response;
@@ -33,5 +30,5 @@ export async function PUT(request: Request, ctx: Ctx) {
     await revokeAccountSessions(id);
     const change = await enqueueChange("account");
     return Response.json({ account: publicAccount(account), change });
-  });
+  }, { demoLock: true });
 }

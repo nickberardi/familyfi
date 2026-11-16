@@ -5,7 +5,6 @@ import { prisma } from "@/server/db";
 import { EdgeAuthError, edgeTokenUpdate } from "@/server/edge-auth";
 import { jsonError } from "@/server/http";
 import { readBody, withAdmin } from "@/server/guard";
-import { demoLocked } from "@/server/demo";
 
 const Body = z.object({
   url: z.string().min(1), transport: z.nativeEnum(ConnectionTransport), trustMode: z.nativeEnum(ConnectionTrustMode),
@@ -22,8 +21,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Body, "Provide a valid connection endpoint.");
     if (!parsed.ok) return parsed.response;
     const { edgeAuth, serviceToken, ...route } = parsed.data;
@@ -51,5 +48,5 @@ export async function POST(request: Request) {
       if (isUniqueViolation(error)) return jsonError(409, "endpoint_exists", "A route with this address already exists.");
       throw error;
     }
-  });
+  }, { demoLock: true });
 }

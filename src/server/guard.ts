@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { requireCsrf, requireSession, type SignedInSession } from "./auth";
 import { isAdministrator } from "./connection";
 import { withChangeActor } from "./changes";
+import { demoLocked } from "./demo";
 import { jsonCaughtError, jsonError } from "./http";
 
 export async function readJson(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; response: Response }> {
@@ -26,7 +27,10 @@ type Handler = (session: SignedInSession) => Promise<Response>;
 /** Which requests must carry the CSRF token, and whether the caller must be an administrator. */
 type Checks = { csrf: "never" | "always" | "writes"; administrator: boolean };
 
-async function guarded(request: Request, checks: Checks, handler: Handler): Promise<Response> {
+/** `demoLock` refuses the request in the shared demo, once the caller has passed the guard's own checks. */
+type Options = { demoLock?: boolean };
+
+async function guarded(request: Request, checks: Checks & Options, handler: Handler): Promise<Response> {
   try {
     const { session, error } = await requireSession(request);
     if (error || !session) return error!;
@@ -35,20 +39,22 @@ async function guarded(request: Request, checks: Checks, handler: Handler): Prom
     const csrf = checks.csrf === "never" || (checks.csrf === "writes" && safe) ? null : await requireCsrf(request);
     if (csrf) return csrf;
     if (checks.administrator && !isAdministrator(session)) return jsonError(403, "administrator_required", "A FamilyFi administrator is required.");
+    const locked = checks.demoLock ? demoLocked() : null;
+    if (locked) return locked;
     return await withChangeActor({ accountId: session.accountId, deviceId: session.deviceId }, () => handler(session));
   } catch (error) {
     return jsonCaughtError(error);
   }
 }
 
-export function withSession(request: Request, handler: Handler): Promise<Response> {
-  return guarded(request, { csrf: "never", administrator: false }, handler);
+export function withSession(request: Request, handler: Handler, options: Options = {}): Promise<Response> {
+  return guarded(request, { csrf: "never", administrator: false, ...options }, handler);
 }
 
-export function withMutation(request: Request, handler: Handler): Promise<Response> {
-  return guarded(request, { csrf: "always", administrator: false }, handler);
+export function withMutation(request: Request, handler: Handler, options: Options = {}): Promise<Response> {
+  return guarded(request, { csrf: "always", administrator: false, ...options }, handler);
 }
 
-export function withAdmin(request: Request, handler: Handler): Promise<Response> {
-  return guarded(request, { csrf: "writes", administrator: true }, handler);
+export function withAdmin(request: Request, handler: Handler, options: Options = {}): Promise<Response> {
+  return guarded(request, { csrf: "writes", administrator: true, ...options }, handler);
 }
