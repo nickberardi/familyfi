@@ -336,10 +336,20 @@ export async function getInvite(id: string) {
   };
 }
 
-/** Whether the invite is an agent's: an agent never joins through the tunnel. */
-export async function isAgentInvite(id: string): Promise<boolean> {
-  const invite = await prisma().pairing.findUnique({ where: { id }, select: { client: true } });
-  return invite?.client === PairedDeviceClient.agent;
+/**
+ * Joins with an invite's single-use code, the way every device does. An agent never joins through
+ * the tunnel. A refusal comes back as a result, not a throw: the claim route has no guard to answer one.
+ */
+export async function claimInviteFrom(input: Parameters<typeof claimInvite>[0] & { tunnelled: boolean }) {
+  if (input.tunnelled) {
+    const invite = await prisma().pairing.findUnique({ where: { id: input.id }, select: { client: true } });
+    if (invite?.client === PairedDeviceClient.agent) {
+      return { ok: false as const, status: 403, code: "agent_remote", message: "Agents connect from the home network only." };
+    }
+  }
+  const claim = await claimInvite(input);
+  if (!claim) return { ok: false as const, status: 403, code: "invalid_pairing", message: "This invite is invalid, expired, or already used." };
+  return { ok: true as const, claim };
 }
 
 /** Cancels an invite nobody has claimed yet. */
