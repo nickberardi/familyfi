@@ -40,6 +40,7 @@ The authorization matrix runs with the integration suite. When you add a route, 
 
 ## Rules
 
+- Test household logic on its `src/server` function, with plain arguments, and assert its result or the status and code it refuses with (`tests/helpers/refusal.ts`). Call a route handler only for what the route decides: who may call it, what a request may carry, and the shape of its answer. `tests/integration/route-responses.test.ts` calls each such route once so its success response stays checked against the OpenAPI file.
 - **A bug fix ships with a test that fails without it.** Write the test first and watch it fail for the reason in the bug report.
 - Assert outcomes and meaningful failure cases. Test a fix through its public boundary when practical; do not mirror its algorithm in the assertion or mock the behaviour being fixed.
 - Do not change expected values, delete assertions, broaden mocks, add exclusions or insert suppressions merely to pass. A changed expectation must trace to an intentional behaviour change. Explain any new coverage exemption, CI exclusion or lint/type suppression in the PR and include the remaining risk.

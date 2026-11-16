@@ -619,6 +619,11 @@
         "groups"
       ]
     },
+    "tests/integration/route-responses.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
     "tests/integration/rules-api.test.ts": {
       "categories": [
         "rules",
