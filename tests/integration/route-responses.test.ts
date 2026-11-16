@@ -1,9 +1,10 @@
 /**
- * One call per route and method whose logic is tested on its `src/server` function instead of
+ * One call per response variant of each route whose logic is tested on its `src/server` function instead of
  * through the handler. Every response an integration test gets from a handler is checked against
  * `openapi/familyfi.v1.yaml` (tests/openapi-responses-plugin.ts), so these calls are what keeps
- * each route's success response matched to the contract. They assert the status and nothing else:
- * what the route does is asserted where its function is tested.
+ * each route's success response matched to the contract: with its optional fields present and
+ * absent, and each alternative its schema allows. They assert the status and nothing else: what
+ * the route does is asserted where its function is tested.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
@@ -11,6 +12,7 @@ import { GET as listGroups, POST as createGroup } from "@/app/api/v1/groups/rout
 import { DELETE as deleteGroup, GET as getGroup, PUT as updateGroup } from "@/app/api/v1/groups/[id]/route";
 import { DELETE as clearResolver, GET as getResolver, PUT as setResolver } from "@/app/api/v1/groups/[id]/resolver/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { createRule, RuleCreateBody } from "@/server/rules";
 import { createFamilyGroup, resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -38,9 +40,20 @@ describe("route responses match the contract", () => {
     expect((await createGroup(send("/api/v1/groups", "POST", { kind: "things", name: "TV" }))).status).toBe(201);
     expect((await getGroup(send(path), id(group.id))).status).toBe(200);
     expect((await updateGroup(send(path, "PUT", { name: "Elizabeth" }), id(group.id))).status).toBe(200);
-    expect((await getResolver(send(`${path}/resolver`), id(group.id))).status).toBe(200);
-    expect((await setResolver(send(`${path}/resolver`, "PUT", { url: "https://dns.example.com/dns-query" }), id(group.id))).status).toBe(200);
-    expect((await clearResolver(send(`${path}/resolver`, "DELETE"), id(group.id))).status).toBe(200);
+    // With its Block button default set, the group carries the optional `blockButtonRuleId`.
+    const video = await createRule(RuleCreateBody.parse({ name: "Video", kind: "category", groupIds: [group.id], targetIds: [4], mode: "always" }));
+    expect((await updateGroup(send(path, "PUT", { blockButtonRuleId: video.rule.id }), id(group.id))).status).toBe(200);
+    expect((await getGroup(send(path), id(group.id))).status).toBe(200);
+    expect((await listGroups(send("/api/v1/groups"))).status).toBe(200);
     expect((await deleteGroup(send(path, "DELETE"), id(group.id))).status).toBe(200);
+  });
+
+  it("a group's resolver, on the household's and on its own", async () => {
+    const group = await createFamilyGroup("Betsy");
+    const path = `/api/v1/groups/${group.id}/resolver`;
+    expect((await getResolver(send(path), id(group.id))).status).toBe(200);
+    expect((await setResolver(send(path, "PUT", { url: "https://dns.example.com/dns-query" }), id(group.id))).status).toBe(200);
+    expect((await getResolver(send(path), id(group.id))).status).toBe(200);
+    expect((await clearResolver(send(path, "DELETE"), id(group.id))).status).toBe(200);
   });
 });

@@ -3,6 +3,7 @@ import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getGroupRoute, PUT as putGroup } from "@/app/api/v1/groups/[id]/route";
 import { prisma } from "@/server/db";
 import { getGroup, updateGroup } from "@/server/groups";
+import { createRule, RuleCreateBody } from "@/server/rules";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { createFamilyGroup, resetDatabase, seedDevice } from "../helpers/db";
 import { refusal } from "../helpers/refusal";
@@ -49,7 +50,6 @@ describe("reading and updating a group", () => {
     const group = await createFamilyGroup("Betsy");
     const updated = await updateGroup(group.id, { name: "Elizabeth", monogram: "EL", familyRole: "teen" });
     expect(updated.group).toMatchObject({ name: "Elizabeth" });
-    expect(updated.group).not.toHaveProperty("protected");
     expect(updated.change.changeId).toBeTruthy();
 
     const stored = await prisma().group.findUniqueOrThrow({ where: { id: group.id } });
@@ -97,6 +97,28 @@ describe("GET and PUT /api/v1/groups/{id}", () => {
     expect(body.group).toMatchObject({ name: "Elizabeth" });
     expect(body.group).not.toHaveProperty("protected");
     expect(body.change.changeId).toBeTruthy();
+  });
+
+  it("accepts every field a group update may carry, and both of the ones that can be cleared", async () => {
+    const group = await createFamilyGroup("Betsy");
+    const video = await createRule(RuleCreateBody.parse({ name: "Video", kind: "category", groupIds: [group.id], targetIds: [4], mode: "always" }));
+    const set = await put(auth, group.id, { name: "Elizabeth", monogram: "EL", familyRole: "teen", blockButtonRuleId: video.rule.id });
+    expect(set.status).toBe(200);
+    expect(((await set.json()) as { group: { blockButtonRuleId?: string } }).group.blockButtonRuleId).toBe(video.rule.id);
+    expect(await prisma().group.findUniqueOrThrow({ where: { id: group.id } })).toMatchObject({
+      name: "Elizabeth",
+      monogram: "EL",
+      familyRole: "teen",
+      blockButtonRuleId: video.rule.id,
+    });
+
+    expect((await put(auth, group.id, { monogram: null, blockButtonRuleId: null })).status).toBe(200);
+    expect(await prisma().group.findUniqueOrThrow({ where: { id: group.id } })).toMatchObject({
+      name: "Elizabeth",
+      monogram: null,
+      familyRole: "teen",
+      blockButtonRuleId: null,
+    });
   });
 
   it("refuses an invalid update, an unknown group, and a write without CSRF", async () => {
