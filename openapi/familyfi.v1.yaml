@@ -4407,7 +4407,8 @@ components:
           additionalProperties: false
           description: |
             Who asked for the change: the adult, and the paired device they used (the app, its Siri
-            and Shortcuts, a Watch or an agent), which is left out for a web sign-in. Left out when
+            and Shortcuts, a Watch or an agent), which is left out for a web sign-in and once that
+            device has been removed. Left out when
             that adult's account has since been removed, and always for an agent reading it, which
             never sees the household's adults. Servers before API 1.5.0 leave it out.
           required: [displayName]

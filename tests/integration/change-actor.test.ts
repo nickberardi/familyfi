@@ -4,11 +4,20 @@ import { GET as getSync } from "@/app/api/v1/sync/route";
 import { GET as getChange } from "@/app/api/v1/changes/[id]/route";
 import { POST as createGroup } from "@/app/api/v1/groups/route";
 import { POST as createInvite } from "@/app/api/v1/paired/invites/route";
-import { request, type SessionAuth } from "../helpers/http";
+import { DELETE as deleteAccount } from "@/app/api/v1/accounts/[id]/route";
+import { POST as login } from "@/app/api/v1/auth/login/route";
+import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 import { bearer, claimInvite, issuedInvite, pairingAdmin, pairingAdminAuth, pairPhone, PAIRING_ADMIN, type Claim } from "../helpers/pairing";
 
 const json = { "content-type": "application/json" };
+
+async function recoveryAuth(): Promise<SessionAuth> {
+  const password = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
+  const response = await login(request("/api/v1/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password, client: "browser" }) }));
+  expect(response.status).toBe(200);
+  return authFromLogin(response);
+}
 
 type Change = { id: string; actor?: { displayName: string; device?: { displayName: string } } };
 
@@ -70,13 +79,19 @@ describe("who asked for each change", () => {
     expect("actor" in (await oneChange(bearer(agent.token), fromWeb))).toBe(false);
   });
 
-  it("leaves actor out once the adult's account is gone", async () => {
+  it("leaves actor out once the adult's account is removed", async () => {
     const admin = await pairingAdminAuth();
     const fromWeb = await newGroup(admin, "Kids");
-    // Removing an account leaves its changes in the log, with nobody on record.
-    await prisma().changeResult.updateMany({ where: { actorAccountId: (await pairingAdmin()).id }, data: { actorAccountId: null } });
-    const change = await oneChange(admin, fromWeb);
+    const recovery = await recoveryAuth();
+    const removed = await deleteAccount(request(`/api/v1/accounts/${(await pairingAdmin()).id}`, { method: "DELETE", auth: recovery }), {
+      params: Promise.resolve({ id: (await pairingAdmin()).id }),
+    });
+    expect(removed.status).toBe(200);
+    const change = await oneChange(recovery, fromWeb);
     expect(change).toMatchObject({ actorAccountId: null });
     expect("actor" in change).toBe(false);
+    // The removal itself is the recovery admin's.
+    const latest = (await syncChanges(recovery))[0]!;
+    expect(latest.actor).toEqual({ displayName: (await prisma().account.findUniqueOrThrow({ where: { username: "admin" } })).displayName });
   });
 });
