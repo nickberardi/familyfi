@@ -193,4 +193,10 @@ test("a link that arrives while Devices is open applies again", { tag: "@desktop
   await expect(show).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Galaxy S24")).toBeVisible();
   await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
+
+  // An alert's "Unassigned" link: the filter turns to Unassigned on the open list.
+  await page.goto("/devices");
+  await expect(page.getByText("Living Room Apple TV")).toBeVisible();
+  await page.evaluate(() => window.history.pushState(null, "", "/devices?filter=loose"));
+  await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
 });
