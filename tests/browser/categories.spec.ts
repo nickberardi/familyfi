@@ -100,6 +100,32 @@ test("a custom category is created report-only and can be deleted", { tag: "@des
   await expect(page.getByText(label, { exact: true })).toHaveCount(0);
 });
 
+test("a list that could not load says so, and stops saying so once it loads", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  // The first read fails; every later one reaches the server.
+  let failed = false;
+  await page.route("**/api/v1/upstream/categories", async (route) => {
+    if (failed || route.request().method() !== "GET") return route.fallback();
+    failed = true;
+    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "internal", message: "Categories could not be read." } }) });
+  });
+  await page.goto("/categories");
+  await expect(page.getByText("Categories could not be read.")).toBeVisible();
+
+  // Adding a category reloads the list: the list shows and the old failure goes.
+  const label = `Zz Reload ${Date.now()}`;
+  await page.getByRole("button", { name: "New category" }).click();
+  await page.getByLabel("Category name").fill(label);
+  await page.getByRole("button", { name: "Create category" }).click();
+  await expect(page.getByText(label, { exact: true })).toBeVisible();
+  await expect(page.getByText("Categories could not be read.")).toHaveCount(0);
+
+  await page.getByText(label, { exact: true }).click();
+  await page.getByRole("button", { name: "Delete category" }).click();
+  await answerConfirm(page);
+  await expect(page.getByText(label, { exact: true })).toHaveCount(0);
+});
+
 test("a built-in category offers no delete", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/categories");
