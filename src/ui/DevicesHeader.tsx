@@ -30,7 +30,7 @@ export function DevicesHeader({
   const { quarantine } = list;
   return (
     <View style={styles.header}>
-      {list.assignGroup ? <AssignNeededBanner group={list.assignGroup} /> : null}
+      {list.needsDevices ? <AssignNeededBanner group={list.needsDevices} /> : null}
       {quarantine ? <QuarantineCard enforced={quarantine.enforced} disabled={disabled} onToggle={quarantine.toggle} pausedLine={quarantine.pausedLine} onResume={quarantine.resume} /> : null}
       {list.privates.length ? <PrivateAddressNotice count={list.privates.length} showing={list.privateOnly} onShow={list.togglePrivateOnly} /> : null}
       {filter ?? (

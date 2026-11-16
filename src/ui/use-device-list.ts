@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { privateAddressDevices } from "@/lib/checkup";
+import { groupNeedingDevices } from "@/lib/device-assign";
 import { DEVICE_FILTERS, DEVICES_COPY, deviceRemoveCopy, filterDevices, type DeviceFilterId } from "@/lib/device-list";
 import { deleteDevice, setQuarantineEnforced } from "@/lib/device-writes";
 import { runRuleAction } from "@/lib/group-writes";
@@ -46,6 +47,8 @@ export function useDeviceList({
 }) {
   const ui = useUI();
   const assignGroup = groups.find((group) => group.id === params.assign) ?? null;
+  // Only a group that still has no devices is told it needs one; any group's link opens Unassigned.
+  const needsDevices = groupNeedingDevices(groups, devices, params.assign);
   const [filter, setFilter] = useState<DeviceFilterId>(isFilter(params.filter) ? params.filter : assignGroup ? "loose" : "all");
   // The list can stay open while a link arrives (the navigation's "needs a device" link on the
   // web, a tab behind another screen in the app): a group's link shows the Unassigned devices again.
@@ -89,7 +92,7 @@ export function useDeviceList({
 
   return {
     devices,
-    assignGroup,
+    needsDevices,
     filter,
     setFilter,
     query,

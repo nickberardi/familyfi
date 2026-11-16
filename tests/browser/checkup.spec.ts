@@ -182,11 +182,11 @@ test("a link that arrives while Devices is open applies again", { tag: "@desktop
   await expect(show).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByText("Living Room Apple TV")).toBeVisible();
 
-  // Followed without leaving the page, as the navigation's "needs a device" link is: the group's
-  // banner shows and the list turns to the Unassigned devices.
+  // Followed without leaving the page, as the navigation's "needs a device" link is: the list turns
+  // to the Unassigned devices. A group that has devices (every seed group does) is not told it needs one.
   await page.evaluate((id) => window.history.pushState(null, "", `/devices?assign=${id}`), groups[0]!.id);
-  await expect(page.getByTestId("assign-needed")).toBeVisible();
   await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
+  await expect(page.getByTestId("assign-needed")).toHaveCount(0);
 
   // Checkup's "Show on Devices": back to every device with a private address.
   await page.evaluate(() => window.history.pushState(null, "", "/devices?private=1"));
@@ -199,4 +199,19 @@ test("a link that arrives while Devices is open applies again", { tag: "@desktop
   await expect(page.getByText("Living Room Apple TV")).toBeVisible();
   await page.evaluate(() => window.history.pushState(null, "", "/devices?filter=loose"));
   await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
+
+  // A group with no devices is told it needs one. Last, so no link above lands before the reload hydrates.
+  const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "familyfi_csrf")?.value ?? "";
+  const made = await page.request.post("/api/v1/groups", {
+    headers: { "x-csrf-token": csrf, "content-type": "application/json" },
+    data: { name: `Empty ${Date.now()}`, kind: "family", familyRole: "child" },
+  });
+  expect(made.ok()).toBeTruthy();
+  const { group } = (await made.json()) as { group: { id: string } };
+  try {
+    await page.goto(`/devices?assign=${group.id}`);
+    await expect(page.getByTestId("assign-needed")).toBeVisible();
+  } finally {
+    expect((await page.request.delete(`/api/v1/groups/${group.id}`, { headers: { "x-csrf-token": csrf } })).ok()).toBeTruthy();
+  }
 });

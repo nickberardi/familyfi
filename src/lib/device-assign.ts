@@ -22,6 +22,15 @@ export function networkLabel(device: Device, networks: { id: string; name: strin
   return device.networkId ?? "Unknown network";
 }
 
+/**
+ * The group a Devices link (`?assign=<group>`) asked devices for, when it still has none: only then
+ * is it told it needs one. Every group's "Assign devices" link uses the same parameter.
+ */
+export function groupNeedingDevices(groups: Group[], devices: Pick<Device, "groupId">[], assign: string | null | undefined): Group | null {
+  const group = groups.find((item) => item.id === assign);
+  return group && !devices.some((device) => device.groupId === group.id) ? group : null;
+}
+
 /** What a group with no devices is told on the Devices list, opened with `?assign=<group>`. */
 export function assignDevicesCopy(group: Pick<Group, "name">) {
   return {
