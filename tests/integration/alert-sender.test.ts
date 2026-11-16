@@ -127,6 +127,36 @@ describe("alert sender", () => {
     expect(await prisma().alertEvent.count()).toBe(0);
   });
 
+  it("keeps a registration the phone replaced while its old token was being refused", async () => {
+    const id = await registeredPhone();
+    await recordNewDevices([{ hostname: null }], { firstPass: false, now });
+    const replacing = createAlertSender({
+      fetchImpl: (async (input: string | URL | Request, init?: RequestInit) => {
+        if (String(input).endsWith("/v1/send")) {
+          // The phone registers a new token while the old one's send is on its way.
+          await registerPush({ deviceId: id }, id, { platform: "ios", channel: "development", token: "push-token-new", key: KEY.toString("base64"), format: 1, kinds: ["device.new", "sync.down", "sync.up"] });
+          await recordNewDevices([{ hostname: "tablet" }], { firstPass: false, now });
+          relay.statuses.push(410);
+        }
+        return relay.fetchImpl(input, init);
+      }) as typeof fetch,
+      now: () => now,
+      relayUrl: () => "https://relay.test",
+    });
+    await replacing.flush();
+    expect(await prisma().pushRegistration.count({ where: { deviceId: id } })).toBe(1);
+    expect(await prisma().alertEvent.count({ where: { deviceId: id, sentAt: null } })).toBe(1);
+  });
+
+  it("drops a queued alert of a kind the phone no longer takes", async () => {
+    const id = await registeredPhone();
+    await recordNewDevices([{ hostname: null }], { firstPass: false, now });
+    await registerPush({ deviceId: id }, id, { platform: "ios", channel: "development", token: TOKEN, key: KEY.toString("base64"), format: 1, kinds: ["sync.down", "sync.up"] });
+    await sender.flush();
+    expect(relay.sent).toHaveLength(0);
+    expect(await prisma().alertEvent.count()).toBe(0);
+  });
+
   it("asks for a new install when the relay no longer knows this one", async () => {
     await registeredPhone();
     await recordNewDevices([{ hostname: null }], { firstPass: false, now });

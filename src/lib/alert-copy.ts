@@ -32,7 +32,7 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
     case "sync.down":
       return { title: "Can't reach your gateway", body: "Your rules may not apply until FamilyFi reaches it again." };
     case "sync.up":
-      return { title: "Gateway reached", body: "FamilyFi can reach your gateway again, and your rules apply." };
+      return { title: "Gateway reached", body: "FamilyFi can reach your gateway again." };
     default:
       return null;
   }
