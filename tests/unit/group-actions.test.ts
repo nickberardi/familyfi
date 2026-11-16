@@ -183,6 +183,6 @@ describe("the Block button rule's runs", () => {
     const onTap = vi.fn();
     const controls = groupCardControls(tv(), [video], TZ, NOW, onTap);
     controls.action.onPress();
-    expect(onTap).toHaveBeenCalledWith({ kind: "header", run: "resumeRule", ruleId: "r-video", name: "Video", liftedUntil: "2026-10-15T22:00:00.000Z" });
+    expect(onTap).toHaveBeenCalledWith({ kind: "header", run: "resumeRule", ruleId: "r-video", name: "TV video", liftedUntil: "2026-10-15T22:00:00.000Z" });
   });
 });

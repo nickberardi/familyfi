@@ -4,7 +4,7 @@
  * /groups/{id}`). The writes themselves are in `group-writes.ts`.
  */
 import type { Account, Group } from "./types";
-import { blockButtonChoice, blockButtonName } from "./group-actions";
+import { blockButtonChoice } from "./group-actions";
 import { groupScopedRules, type Rule } from "./rules";
 import { roleLabel } from "./display";
 
@@ -73,13 +73,13 @@ export function groupEditDraft(group: Group): GroupEditDraft {
 
 /**
  * The Block button default's choices: all internet, then each of the group's own category, app or
- * website rules by the name its button would use ("Video"). Only all internet when it has none, and
- * then the setting is not shown.
+ * website rules by its own name, since one rule can block several categories. Only all internet
+ * when it has none, and then the setting is not shown.
  */
-export function blockButtonChoices(group: Pick<Group, "id">, rules: Rule[], timezone: string, now: Date): { value: string; label: string }[] {
+export function blockButtonChoices(group: Pick<Group, "id">, rules: Rule[]): { value: string; label: string }[] {
   const own = groupScopedRules(rules, group.id)
     .filter(blockButtonChoice)
-    .map((rule) => ({ value: rule.id, label: blockButtonName(rule, rules, group.id, timezone, now) }));
+    .map((rule) => ({ value: rule.id, label: rule.name }));
   return [{ value: "", label: GROUP_EDIT_COPY.blockButtonAll }, ...own];
 }
 

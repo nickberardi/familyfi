@@ -28,9 +28,8 @@ export function GroupEditSheet({
   onClose: () => void;
   onDeleted: () => void;
 }) {
-  const { store, busy, accounts, rules, household } = useAppData();
-  // The Block button's choices are named on the household's clock, so the setting waits for it.
-  const edit = useGroupEdit({ group, store, request, accounts, rules, timezone: household?.timezone ?? null, demo });
+  const { store, busy, accounts, rules } = useAppData();
+  const edit = useGroupEdit({ group, store, request, accounts, rules, demo });
   const [confirming, setConfirming] = useState(false);
   const form = useRef<HTMLFormElement>(null);
 

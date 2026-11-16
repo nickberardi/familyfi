@@ -52,19 +52,6 @@ export function blockButtonChoice(rule: Pick<Rule, "kind" | "builtIn">): boolean
   return rule.kind !== "internet" && !rule.builtIn;
 }
 
-/**
- * What the group's Block button default is called, as the button and the settings list say it:
- * "Video". When another of the group's choices would read the same, the rule's own name, so no two
- * look alike.
- */
-export function blockButtonName(rule: Rule, rules: Rule[], groupId: string, timezone: string, now: Date): string {
-  const name = blockingName(rule, now, timezone);
-  const twin = groupScopedRules(rules, groupId).some(
-    (other) => other.id !== rule.id && blockButtonChoice(other) && blockingName(other, now, timezone) === name,
-  );
-  return twin ? rule.name : name;
-}
-
 /** What a tap on the group's header button, or its More time link, does. */
 export type GroupRun =
   | "block"
@@ -264,7 +251,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
   const button = blockButtonRule(group, rules);
   const buttonLift = button && buttonRuleLift(button, group.id, now);
   if (button && buttonLift?.kind === "pause") {
-    const name = blockButtonName(button, rules, group.id, timezone, now);
+    const name = button.name;
     const detail = buttonLift.until ? `${name} unblocked ${until(buttonLift.until, "")}${by(buttonLift.by)}` : `${name} unblocked${by(buttonLift.by)} until you block it again`;
     return online("on", `Online · ${detail}`, detail, "unblocked");
   }
@@ -293,7 +280,7 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
       return online("on", label, state.next ? `${state.next.window} at ${formatClock(new Date(state.next.at), timezone)}` : "");
     case "no_rule":
       // With nothing limiting its internet, a Block button rule says when it blocks next instead.
-      if (button && group.internetRuleIds.length === 0) return online("on", label, blockButtonNext(blockButtonName(button, rules, group.id, timezone, now), button, timezone, now));
+      if (button && group.internetRuleIds.length === 0) return online("on", label, blockButtonNext(button.name, button, timezone, now));
       return online("on", label, group.internetRuleIds.length === 0 ? "no internet rule" : "internet rule off");
     default:
       // A pause is the group's suspension, handled first.
@@ -368,7 +355,7 @@ export function groupHeaderActions(
   // The button acts on the Block button rule alone only while nothing else (an internet rule or a
   // scheduled rule) blocks the group: then Unblock lifts all of them, the default's rule included.
   if (button && blocking.every((rule) => rule.ruleId === button.id)) {
-    const name = blockButtonName(button, rules, group.id, timezone, now);
+    const name = button.name;
     const spec = (label: string, run: GroupRun): GroupActionSpec => ({ label, run, ruleId: button.id, name });
     if (blocking.some((rule) => rule.ruleId === button.id)) return header(spec("Unblock", "pauseRule"), null);
     // While an unblock runs, the button is its Resume, and the dropdown puts the default back.

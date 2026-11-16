@@ -22418,7 +22418,7 @@
           "label": "Unblock",
           "run": "pauseRule",
           "ruleId": "r-video",
-          "name": "Video"
+          "name": "TV video"
         },
         "more": null,
         "menu": [
@@ -23053,13 +23053,13 @@
           "label": "Block",
           "run": "resumeRule",
           "ruleId": "r-video",
-          "name": "Video"
+          "name": "TV video"
         },
         "more": {
           "label": "More time",
           "run": "moreRule",
           "ruleId": "r-video",
-          "name": "Video"
+          "name": "TV video"
         },
         "menu": [
           {
@@ -23968,7 +23968,7 @@
       },
       "expected": {
         "badge": "online",
-        "detail": "Video unblocked until 12:00 PM by Nick",
+        "detail": "TV video unblocked until 12:00 PM by Nick",
         "change": "unblocked"
       }
     },
@@ -24048,7 +24048,7 @@
       },
       "expected": {
         "badge": "online",
-        "detail": "Video at 7:00 PM",
+        "detail": "TV video at 7:00 PM",
         "change": "none"
       }
     },
@@ -31346,244 +31346,6 @@
         }
       },
       "expected": false
-    },
-    {
-      "fn": "blockButtonName",
-      "name": "a known category by its own name",
-      "input": {
-        "rule": {
-          "id": "r-video",
-          "name": "TV video",
-          "kind": "category",
-          "scope": "group",
-          "groupIds": [
-            "g1"
-          ],
-          "networkIds": [],
-          "targetIds": [
-            4
-          ],
-          "domains": [],
-          "enabled": true,
-          "pause": {
-            "active": false,
-            "until": null,
-            "kind": "pause",
-            "by": null
-          },
-          "groupPauses": [],
-          "mode": "always",
-          "windows": [],
-          "useGeneratedName": false,
-          "policyNames": [],
-          "builtIn": null
-        },
-        "rules": [
-          {
-            "id": "r-video",
-            "name": "TV video",
-            "kind": "category",
-            "scope": "group",
-            "groupIds": [
-              "g1"
-            ],
-            "networkIds": [],
-            "targetIds": [
-              4
-            ],
-            "domains": [],
-            "enabled": true,
-            "pause": {
-              "active": false,
-              "until": null,
-              "kind": "pause",
-              "by": null
-            },
-            "groupPauses": [],
-            "mode": "always",
-            "windows": [],
-            "useGeneratedName": false,
-            "policyNames": [],
-            "builtIn": null
-          }
-        ],
-        "groupId": "g1",
-        "timeZone": "America/New_York",
-        "now": "2026-10-15T15:00:00.000Z"
-      },
-      "expected": "Video"
-    },
-    {
-      "fn": "blockButtonName",
-      "name": "any other rule by its name",
-      "input": {
-        "rule": {
-          "id": "r-tiktok",
-          "name": "No TikTok",
-          "kind": "domain",
-          "scope": "group",
-          "groupIds": [
-            "g1"
-          ],
-          "networkIds": [],
-          "targetIds": [],
-          "domains": [
-            "tiktok.com"
-          ],
-          "enabled": true,
-          "pause": {
-            "active": false,
-            "until": null,
-            "kind": "pause",
-            "by": null
-          },
-          "groupPauses": [],
-          "mode": "always",
-          "windows": [],
-          "useGeneratedName": false,
-          "policyNames": [],
-          "builtIn": null
-        },
-        "rules": [
-          {
-            "id": "r-tiktok",
-            "name": "No TikTok",
-            "kind": "domain",
-            "scope": "group",
-            "groupIds": [
-              "g1"
-            ],
-            "networkIds": [],
-            "targetIds": [],
-            "domains": [
-              "tiktok.com"
-            ],
-            "enabled": true,
-            "pause": {
-              "active": false,
-              "until": null,
-              "kind": "pause",
-              "by": null
-            },
-            "groupPauses": [],
-            "mode": "always",
-            "windows": [],
-            "useGeneratedName": false,
-            "policyNames": [],
-            "builtIn": null
-          }
-        ],
-        "groupId": "g1",
-        "timeZone": "America/New_York",
-        "now": "2026-10-15T15:00:00.000Z"
-      },
-      "expected": "No TikTok"
-    },
-    {
-      "fn": "blockButtonName",
-      "name": "two choices that would read the same by their own names",
-      "input": {
-        "rule": {
-          "id": "r-video",
-          "name": "TV video",
-          "kind": "category",
-          "scope": "group",
-          "groupIds": [
-            "g1"
-          ],
-          "networkIds": [],
-          "targetIds": [
-            4
-          ],
-          "domains": [],
-          "enabled": true,
-          "pause": {
-            "active": false,
-            "until": null,
-            "kind": "pause",
-            "by": null
-          },
-          "groupPauses": [],
-          "mode": "always",
-          "windows": [],
-          "useGeneratedName": false,
-          "policyNames": [],
-          "builtIn": null
-        },
-        "rules": [
-          {
-            "id": "r-video",
-            "name": "TV video",
-            "kind": "category",
-            "scope": "group",
-            "groupIds": [
-              "g1"
-            ],
-            "networkIds": [],
-            "targetIds": [
-              4
-            ],
-            "domains": [],
-            "enabled": true,
-            "pause": {
-              "active": false,
-              "until": null,
-              "kind": "pause",
-              "by": null
-            },
-            "groupPauses": [],
-            "mode": "always",
-            "windows": [],
-            "useGeneratedName": false,
-            "policyNames": [],
-            "builtIn": null
-          },
-          {
-            "id": "r-school",
-            "name": "School nights",
-            "kind": "category",
-            "scope": "group",
-            "groupIds": [
-              "g1"
-            ],
-            "networkIds": [],
-            "targetIds": [
-              4
-            ],
-            "domains": [],
-            "enabled": true,
-            "pause": {
-              "active": false,
-              "until": null,
-              "kind": "pause",
-              "by": null
-            },
-            "groupPauses": [],
-            "mode": "scheduled",
-            "windows": [
-              {
-                "name": "School nights",
-                "days": [
-                  0,
-                  1,
-                  2,
-                  3,
-                  4
-                ],
-                "start": "19:00",
-                "end": "21:00"
-              }
-            ],
-            "useGeneratedName": false,
-            "policyNames": [],
-            "builtIn": null
-          }
-        ],
-        "groupId": "g1",
-        "timeZone": "America/New_York",
-        "now": "2026-10-15T15:00:00.000Z"
-      },
-      "expected": "TV video"
     }
   ]
 }
