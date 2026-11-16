@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assignDevicesCopy, byDeviceName, deviceName, networkLabel } from "@/lib/device-assign";
-import type { Device } from "@/lib/types";
+import { assignDevicesCopy, byDeviceName, groupNeedingDevices, deviceName, networkLabel } from "@/lib/device-assign";
+import type { Device, Group } from "@/lib/types";
 
 const device = (over: Partial<Device>) => ({ mac: "02:00:00:00:00:01", hostname: null, assignment: "quarantined", inScope: true, networkId: null, ...over }) as Device;
 
@@ -13,6 +13,15 @@ describe("device assignment", () => {
     ].sort(byDeviceName);
     expect(list.map((item) => item.mac)).toEqual(["02:00:00:00:00:01", "02:00:00:00:00:04", "02:00:00:00:00:03"]);
     expect(deviceName(list[0]!)).toBe("Unnamed device");
+  });
+
+  it("tells a group it needs devices only while it has none", () => {
+    const groups = [{ id: "tv", name: "TV" }, { id: "cassie", name: "Cassie" }] as Group[];
+    const devices = [device({ groupId: "tv", assignment: "assigned" }), device({ mac: "02:00:00:00:00:02", groupId: null })];
+    expect(groupNeedingDevices(groups, devices, "tv")).toBeNull();
+    expect(groupNeedingDevices(groups, devices, "cassie")?.name).toBe("Cassie");
+    expect(groupNeedingDevices(groups, devices, "gone")).toBeNull();
+    expect(groupNeedingDevices(groups, devices, null)).toBeNull();
   });
 
   it("names a device's network", () => {

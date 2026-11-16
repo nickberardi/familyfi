@@ -58,10 +58,11 @@ export function GroupDevicesCard({ group, members }: { group: Group; members: De
               <View style={styles.row}>
                 <DeviceMark hostname={device.hostname} />
                 <View style={styles.words}>
-                  <Text numberOfLines={1} style={[text, { color: ui.color("ink") }]}>
+                  {/* Both lines wrap rather than cut off, so a long name and the MAC stay whole at large text. */}
+                  <Text style={[text, { color: ui.color("ink") }]}>
                     {deviceName(device)}
                   </Text>
-                  <Text numberOfLines={1} style={[text, { color: ui.color("muted") }]}>
+                  <Text style={[text, { color: ui.color("muted") }]}>
                     {deviceKindLabel(device.hostname)}
                     <Text style={{ fontFamily: MONO }}> · {device.mac.toUpperCase()}</Text>
                   </Text>
@@ -80,8 +81,9 @@ export function GroupDevicesCard({ group, members }: { group: Group; members: De
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
-  head: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 18, paddingVertical: 4, borderBottomWidth: 1 },
-  title: { flex: 1, fontWeight: "600" },
+  // At large text the heading takes the row and "Assign devices" wraps under it, rather than squeezing it.
+  head: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 10, paddingHorizontal: 18, paddingVertical: 4, borderBottomWidth: 1 },
+  title: { flexGrow: 1, flexShrink: 1, fontWeight: "600" },
   empty: { paddingHorizontal: 18, paddingVertical: 16 },
   touch: { minHeight: 44, justifyContent: "center" },
   rowEdge: { borderTopWidth: 1 },
