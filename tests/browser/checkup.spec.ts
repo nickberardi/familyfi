@@ -188,7 +188,13 @@ test("a link that arrives while Devices is open applies again", { tag: "@desktop
   await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
   await expect(page.getByTestId("assign-needed")).toHaveCount(0);
 
-  // A group with none is.
+  // Checkup's "Show on Devices": back to every device with a private address.
+  await page.evaluate(() => window.history.pushState(null, "", "/devices?private=1"));
+  await expect(show).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Galaxy S24")).toBeVisible();
+  await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
+
+  // A group with no devices is told it needs one. Last, so no link above lands before the reload hydrates.
   const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "familyfi_csrf")?.value ?? "";
   const made = await page.request.post("/api/v1/groups", {
     headers: { "x-csrf-token": csrf, "content-type": "application/json" },
@@ -202,11 +208,4 @@ test("a link that arrives while Devices is open applies again", { tag: "@desktop
   } finally {
     expect((await page.request.delete(`/api/v1/groups/${group.id}`, { headers: { "x-csrf-token": csrf } })).ok()).toBeTruthy();
   }
-  await page.goto("/devices");
-
-  // Checkup's "Show on Devices": back to every device with a private address.
-  await page.evaluate(() => window.history.pushState(null, "", "/devices?private=1"));
-  await expect(show).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("Galaxy S24")).toBeVisible();
-  await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
 });
