@@ -19,8 +19,10 @@ updates:
         patterns: ["prisma", "@prisma/*"]
       next:
         patterns: ["next", "eslint-config-next"]
+  # Workflows and the composite actions they call; every action is pinned to a commit SHA with
+  # its version in a comment, which Dependabot updates together.
   - package-ecosystem: github-actions
-    directory: "/"
+    directories: ["/", "/.github/actions/*"]
     schedule:
       interval: weekly
     groups:

@@ -123,6 +123,22 @@ describe("reusable workflows", () => {
   });
 });
 
+describe("actions", () => {
+  // A tag can be moved to other code; a commit cannot. Dependabot updates the SHA and the comment together.
+  it("are pinned to a commit SHA with the version in a comment", () => {
+    const files = [...workflows, ".github/actions/setup-buildx/action.yml", ".github/actions/runner-cleanup/action.yml"];
+    let external = 0;
+    for (const file of files) {
+      for (const [, ref] of read(file).matchAll(/^\s*(?:- )?uses: (.+)$/gm)) {
+        if (ref.startsWith("./")) continue;
+        external += 1;
+        expect(ref, file).toMatch(/^[\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
+      }
+    }
+    expect(external).toBeGreaterThan(0);
+  });
+});
+
 describe("Buildx setup", () => {
   // v0.32.0's container job lost its moby/buildkit pull to a sibling job on the same daemon:
   // "failed to lease content: NotFound: lease ... not found".
@@ -134,7 +150,7 @@ describe("Buildx setup", () => {
     }
     const action = read(".github/actions/setup-buildx/action.yml");
     expect(action.match(/uses: docker\/setup-buildx-action@/g)).toHaveLength(2);
-    expect(action).toMatch(/id: first\s+uses: docker\/setup-buildx-action@\S+\s+continue-on-error: true/);
+    expect(action).toMatch(/id: first\s+uses: docker\/setup-buildx-action@\S+(?: # \S+)?\s+continue-on-error: true/);
     expect(action).toContain("if: steps.first.outcome == 'failure'");
   });
 });

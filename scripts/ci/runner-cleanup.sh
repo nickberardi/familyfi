@@ -69,9 +69,15 @@ if command -v docker >/dev/null 2>&1 && [ "$others" -eq 0 ]; then
   docker system prune --all --force --volumes >/dev/null || true
 fi
 
-# pnpm's store only grows; pnpm/action-setup restores it from the Actions cache on every install.
+# pnpm's store only grows. A runner's own store (npm_config_store_dir, set per runner service)
+# is kept between jobs, so an install links from it instead of restoring ~450 MB from the
+# Actions cache (the workflows turn that cache off on self-hosted runners); it is removed once
+# it passes 4 GiB, or when the disk is short.
 if [ -n "${npm_config_store_dir:-}" ]; then
-  remove_tree "$npm_config_store_dir"
+  if [ -d "$npm_config_store_dir" ] && { [ "$(du -sk "$npm_config_store_dir" | cut -f1)" -gt $((4 * 1024 * 1024)) ] ||
+    [ "$(free_kib)" -lt $((20 * 1024 * 1024)) ]; }; then
+    remove_tree "$npm_config_store_dir"
+  fi
 else
   [ "$others" -eq 0 ] && rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/pnpm/store"
 fi
