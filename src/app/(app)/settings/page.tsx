@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, api, request } from "@/lib/api";
 import { consoleHostFromBaseUrl, localIntegrationBaseFromHost } from "@/lib/unifi-host";
@@ -9,11 +9,12 @@ import { useAppData } from "@/components/AppDataProvider";
 import { BackupCard } from "@/components/BackupCard";
 import { SETTINGS_COPY, createLoginLede, createLoginTitle, loginFormState, settingsTab, usernameFromName, type SettingsTab } from "@/lib/settings-copy";
 import { createLogin } from "@/lib/settings-writes";
-import type { Group } from "@/lib/types";
+import type { Group, PairedPhone } from "@/lib/types";
 import { installedVersion } from "@/lib/update-copy";
 import { APP_VERSION } from "@/lib/version";
 import { NewLoginFields } from "@/ui/NewLoginFields";
-import { GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
+import { alertPhones } from "@/lib/pair-device";
+import { AlertsCard, GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
 import { SettingsTabs } from "@/ui/SettingsTabs";
 import { UpdateContent } from "@/ui/UpdateContent";
 import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
@@ -34,10 +35,28 @@ export default function SettingsPage() {
   );
 }
 
+/** The paired apps the Alerts card lists, read once when the household tab opens; null until then or if it cannot be read. */
+function useAlertPhones(active: boolean) {
+  const [phones, setPhones] = useState<ReturnType<typeof alertPhones> | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    request<{ devices: PairedPhone[] }>("/api/v1/paired/devices?client=app&status=active").then(
+      ({ devices }) => !cancelled && setPhones(alertPhones(devices)),
+      () => !cancelled && setPhones(null),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [active]);
+  return phones;
+}
+
 function Settings() {
   const { unifi, household, accounts, groups, sync, mutate, store } = useAppData();
   const router = useRouter();
   const tab = settingsTab(useSearchParams().get("tab"));
+  const alertPhonesList = useAlertPhones(tab === "household");
   const showTab = (next: SettingsTab) => router.replace(next === "household" ? "/settings" : `/settings?tab=${next}`, { scroll: false });
   const [mode, setMode] = useState<"local" | "cloud">("local");
   const [apiKey, setApiKey] = useState("");
@@ -146,17 +165,20 @@ function Settings() {
         </div>
 
         {tab === "household" ? (
-          <HouseholdCard
-            groups={groups}
-            accounts={accounts}
-            mutate={store.mutate}
-            onCreateLogin={(group) => {
-              setLoginFor(group);
-              setLoginUser(usernameFromName(group.name));
-              setPw1("");
-              setPw2("");
-            }}
-          />
+          <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
+            <HouseholdCard
+              groups={groups}
+              accounts={accounts}
+              mutate={store.mutate}
+              onCreateLogin={(group) => {
+                setLoginFor(group);
+                setLoginUser(usernameFromName(group.name));
+                setPw1("");
+                setPw2("");
+              }}
+            />
+            <AlertsCard enabled={household?.alertsRelay === true} phones={alertPhonesList} mutate={store.mutate} disabled={household?.alertsRelay === undefined} />
+          </div>
         ) : null}
 
         {tab === "gateway" ? (

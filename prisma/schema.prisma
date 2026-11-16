@@ -170,6 +170,18 @@ model Household {
   /// Where FamilyFi is on the home network (an http or https origin), apart from the route Remote
   /// access publishes. Agents pair here; null pairs them at the address the code was made at.
   homeUrl                String?
+  /// Phone alerts through the project relay (src/server/alerts): off until an administrator turns
+  /// them on. The install id and secret are this server's credential at the relay, issued on the
+  /// first send; the secret is encrypted with FAMILYFI_ENCRYPTION_KEY and never served or exported.
+  alertsRelayEnabled     Boolean   @default(false)
+  alertsInstallId        String?
+  alertsInstallSecretCiphertext Bytes?
+  alertsInstallSecretIv  Bytes?
+  alertsInstallSecretAuthTag Bytes?
+  /// The first sync pass that failed since the last one that reached the gateway, and when phones
+  /// were told sync is in trouble; both clear on the next pass that reaches it.
+  syncFailingSince       DateTime? @db.Timestamptz(3)
+  syncTroubleAlertedAt   DateTime? @db.Timestamptz(3)
   revision               Int       @default(0)
   createdAt              DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
@@ -237,6 +249,8 @@ model PairedDevice {
   parentedPairings Pairing[]     @relation("pairingParentDevice")
   authoredChanges ChangeResult[] @relation("changeActorDevice")
   edgeTokens      DeviceEdgeToken[]
+  pushRegistration PushRegistration?
+  alertEvents     AlertEvent[]
 }
 
 /// The last Access token version a device was handed for a route, so rotation can tell who still has the old one.
@@ -250,6 +264,58 @@ model DeviceEdgeToken {
 
   @@id([deviceId, endpointId])
   @@index([endpointId])
+}
+
+enum PushPlatform {
+  ios
+  android
+}
+
+/// Which build of the app registered: `release` (App Store, TestFlight, Play) or `development`,
+/// which picks the APNs topic and environment at the relay.
+enum PushChannel {
+  release
+  development
+}
+
+/// A paired app's push token and alert key, which only that app sets (src/server/alerts/registrations.ts).
+/// The token and the 32-byte key are encrypted with FAMILYFI_ENCRYPTION_KEY and never served. Kinds
+/// are strings checked against src/lib/alert-kinds.ts, so a new kind needs no migration.
+model PushRegistration {
+  deviceId          String       @id
+  device            PairedDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  platform          PushPlatform
+  channel           PushChannel
+  tokenCiphertext   Bytes
+  tokenIv           Bytes
+  tokenAuthTag      Bytes
+  keyCiphertext     Bytes
+  keyIv             Bytes
+  keyAuthTag        Bytes
+  /// The highest alert envelope version the app reads.
+  format            Int
+  supportedKinds    String[]
+  mutedKinds        String[]     @default([])
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
+}
+
+/// The alert outbox: one row per event and phone, written by the code that saw the change and
+/// sent by src/server/alerts/sender.ts. `dedupeKey` is the event's id, shared by its phones.
+model AlertEvent {
+  id            String       @id @default(cuid())
+  kind          String
+  deviceId      String
+  device        PairedDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  detail        Json
+  dedupeKey     String
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  sentAt        DateTime?    @db.Timestamptz(3)
+  attempts      Int          @default(0)
+  nextAttemptAt DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@unique([deviceId, dedupeKey])
+  @@index([sentAt, nextAttemptAt])
 }
 
 model Pairing {

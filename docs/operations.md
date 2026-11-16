@@ -301,6 +301,24 @@ Draft releases and malformed tags are ignored. Without GHCR's answer, which rele
 
 Allow outbound HTTPS from the app container to `api.github.com`, and to `ghcr.io` for the tag check. A GitHub timeout, rate limit, or other failure does not degrade FamilyFi readiness or enforcement, but health reports `update.status: error` and `update.available: null`; it is never presented as up to date. The release check sends no credentials and has a 10-second timeout.
 
+### Phone alerts
+
+Settings' **Phone alerts** card turns on alerts to the administrators' paired phones: a new device
+waiting in Unassigned, and FamilyFi unable to reach the gateway for ten minutes (then once that it is
+back). It is off in every household until an administrator turns it on, and never on in demo mode.
+Each phone turns alerts on for itself in the FamilyFi app; reminders that a pause or allowance is
+ending are scheduled on the phone and need none of this.
+
+A self-hosted server cannot hold Apple's and Google's push credentials, so alerts go through the
+project's push relay, `https://push.getfamilyfi.com` (`FAMILYFI_ALERTS_RELAY_URL` to change it).
+Allow outbound HTTPS from the app container to it. FamilyFi encrypts each alert for its phone before
+it leaves, with a key only that phone and this server hold, so the relay sees the phone's push
+token, the encrypted alert, this server's relay install id and the time, and keeps none of them.
+On the first alert FamilyFi asks the relay for an install id and secret and keeps the secret
+encrypted with `FAMILYFI_ENCRYPTION_KEY`; it is not in a household export. A relay that cannot be
+reached costs only alerts: they are retried with backoff for a day and then dropped, and the app
+shows the same state when opened. The wire format is in [the API guide](api.md#phone-alerts).
+
 ### Automatic updates
 
 With the Watchtower sidecar answering ([setup](setup.md#automatic-updates)), the Maintenance tab's **Install** asks it to replace FamilyFi with the release the check found (`POST /api/v1/settings/update/install`), and **Automatic updates** does the same on household-local days and a time, Sunday at midnight unless changed (`PUT /api/v1/settings/update/schedule`). The schedule is stored as cron on the household, `Household.updateSchedule` (`0 0 * * 0` by default), in the one form the page's day and time pickers produce: `minute hour * * days`. A scheduled install runs only when the check finds a newer release and Watchtower answers to the token; one missed by more than an hour, because FamilyFi was down, waits for the next scheduled time; when the release check itself fails it is tried again every 15 minutes within that hour; and each scheduled instant is claimed once (`Household.updateScheduleLastRunAt`), so the restart an install causes never installs again.

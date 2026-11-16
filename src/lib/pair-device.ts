@@ -1,3 +1,4 @@
+import { ALERTS_CARD_COPY } from "./alert-copy";
 import { scopeLabel } from "./agent-prompt";
 import { ApiError, type ApiRequest } from "./api-client";
 import { relativeSweep } from "./sync-copy";
@@ -150,14 +151,22 @@ function origin(device: Pick<PairedPhone, "client" | "scope">, parentName: strin
  * A paired device's lines, the same for phones, Watches and agents: what it may do, whose account it
  * acts as and when it was last seen; how it reaches home; and when it paired and its sign-in ends.
  */
+/** The paired apps that can get phone alerts, for the Alerts card: active `app:full` devices. */
+export function alertPhones(devices: PairedPhone[]): { id: string; displayName: string; alerts: boolean }[] {
+  return devices
+    .filter((device) => !device.revokedAt && device.alerts !== undefined)
+    .map((device) => ({ id: device.id, displayName: device.displayName, alerts: device.alerts === true }));
+}
+
 export function phoneLines(phone: PairedPhone, now = new Date(), parentName: string | null = null) {
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt, now) : "never";
   const actsAs = phone.actsAs ? ` · acts as ${phone.actsAs.displayName}` : "";
   const ends = phone.sessions.map((session) => session.expiresAt).sort()[0];
+  const alerts = phone.alerts === undefined || phone.revokedAt ? "" : ` · ${phone.alerts ? ALERTS_CARD_COPY.phoneOn : ALERTS_CARD_COPY.phoneOff}`;
   return {
     access: `${scopeLabel(phone.scope)}${actsAs} · ${
       phone.revokedAt ? `revoked ${pairedDate(phone.revokedAt)}` : `last seen ${seen === "now" || seen === "never" ? seen : `${seen} ago`}`
-    }`,
+    }${alerts}`,
     via: phone.pairedVia ? { url: phone.pairedVia.url, transport: transportLabel(phone.pairedVia.transport) } : null,
     origin: origin(phone, parentName),
     // A phone or agent another phone paired goes when that phone is revoked; a Watch or an app's Siri and shortcuts says so in its origin.

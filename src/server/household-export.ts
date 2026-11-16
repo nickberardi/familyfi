@@ -41,7 +41,9 @@ import { parseWeeklyCron, weeklyCron } from "./weekly-schedule";
  * device assignments, administrator accounts, DNS categories, routes and settings) as JSON that import
  * applies, beside a `pg_dump` for an exact restore from the command line. Nothing secret is in the JSON:
  * no UniFi key, tunnel credential or Access token, no sessions, pairings or paired devices, no
- * history, and no record of the gateway's policies, which reconciliation rebuilds. Import keeps a
+ * history, and no record of the gateway's policies, which reconciliation rebuilds. Phone alerts are
+ * left out too: the relay switch is chosen per deployment, the relay's install secret belongs to
+ * this server, and push registrations to paired devices, which are not exported. Import keeps a
  * secret this install already holds, so it asks only for the ones it lacks.
  */
 export const EXPORT_FORMAT = "familyfi-export";

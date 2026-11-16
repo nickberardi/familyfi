@@ -13,6 +13,8 @@ export type HouseholdPublic = {
   quarantineEnforced: boolean;
   quarantineObservedEnabled: boolean | null;
   quarantinePolicyCount: number;
+  /** Phone alerts through the push relay; servers before API 1.4.0 leave it out. */
+  alertsRelay?: boolean;
 };
 
 export type MutationPayload = {

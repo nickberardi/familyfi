@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "aad": "familyfi-alert-v1",
+  "cases": [
+    {
+      "name": "one new device, named",
+      "nonce": "000102030405060708090a0b",
+      "envelope": {
+        "v": 1,
+        "i": "k3f9x2",
+        "t": 1794787200,
+        "k": "device.new",
+        "d": {
+          "n": 1,
+          "h": "Kids-iPad"
+        }
+      },
+      "ciphertext": "AQABAgMEBQYHCAkKCzwgoDn_1O455GOtqdraHlT75KUY0g99RglQ3LEqUTeAMSCC3sTjKLoQwQmE6-IGVosuQqF4soHgRLVEOyLS2cyYHvxYmLhCEjE9-g-LrXOVnHoK7MH9b3rhBpQ_RCBKYw",
+      "text": {
+        "title": "New device",
+        "body": "Kids-iPad is waiting in Unassigned."
+      }
+    },
+    {
+      "name": "three new devices",
+      "nonce": "0c0d0e0f1011121314151617",
+      "envelope": {
+        "v": 1,
+        "i": "a1b2c3",
+        "t": 1794787260,
+        "k": "device.new",
+        "d": {
+          "n": 3
+        }
+      },
+      "ciphertext": "AQwNDg8QERITFBUWF-PcH_pFR9BxXghy9_C6RNU2MM_C1AkZkKqVw9TTmPfIGsdGB4rnHEN7lng7jck0tOkhmf2LkDaJNd0UfoDeN8U0QSMDZLOMT6LF0SxRnc7_",
+      "text": {
+        "title": "New devices",
+        "body": "3 new devices are waiting in Unassigned."
+      }
+    },
+    {
+      "name": "sync down",
+      "nonce": "18191a1b1c1d1e1f20212223",
+      "envelope": {
+        "v": 1,
+        "i": "q9w8e7",
+        "t": 1794788000,
+        "k": "sync.down",
+        "d": {}
+      },
+      "ciphertext": "ARgZGhscHR4fICEiI2g9NjLheEltaCGH6yLit3Z1zthquSbXPlJAGbS7B_paQl8C-ciqHv7ViIdAi7skopMVwnS8TjHXBkORBnOIzx6U519sj9eecePS",
+      "text": {
+        "title": "Can't reach your gateway",
+        "body": "FamilyFi can't reach your gateway. Rules may not be applied."
+      }
+    },
+    {
+      "name": "sync up, with a key the reader does not know",
+      "nonce": "2425262728292a2b2c2d2e2f",
+      "envelope": {
+        "v": 1,
+        "i": "z0y9x8",
+        "t": 1794789000,
+        "k": "sync.up",
+        "d": {},
+        "x": "ignored"
+      },
+      "ciphertext": "ASQlJicoKSorLC0uL4it1fwZf3ELUMVfN2-kPyy7rlmGdHnwAusBUHOmzudeJdqwSsF2v-TgOV5byaaxGxqT9O1LvdoqzQBeDMbM7xR4L9TNlyraYJC_4DQoL-QyNNu2h4zK",
+      "text": {
+        "title": "Back in touch",
+        "body": "FamilyFi is syncing again."
+      }
+    }
+  ]
+}

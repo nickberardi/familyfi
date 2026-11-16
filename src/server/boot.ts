@@ -25,6 +25,7 @@ export async function boot() {
   const { startUnifiRequestLog } = await import("./unifi/request-meter");
   const { startUpstreamProbe } = await import("./upstream/schedule");
   const { startAutoUpdate } = await import("./updater");
+  const { startAlertSender } = await import("./alerts/sender");
   try {
     await ensureRecoveryAccount();
     if (await settleRecoveryPassword()) console.log("The recovery admin password changed, so its sessions were signed out.");
@@ -54,6 +55,8 @@ export async function boot() {
   startUnifiRequestLog();
   startUpstreamProbe();
   startAutoUpdate();
+  // Phone alerts never leave the shared demo.
+  if (settings.FAMILYFI_MODE !== "demo") startAlertSender();
   const { resumeRemoteAccess, startRemoteAccessPort } = await import("./tunnel/remote-access");
   const remotePort = Number(process.env.FAMILYFI_REMOTE_ACCESS_PORT?.trim() || "7002");
   // The demo publishes its own public route and is reached through it, never this port.

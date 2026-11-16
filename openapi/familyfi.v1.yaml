@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 1.3.0
+  version: 1.4.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 0.36.0
@@ -24,7 +24,7 @@ info:
     A server in demo mode (the hosted public demo, where every visitor shares one
     household) refuses configuration writes with 403 `demo_locked`: household and
     UniFi settings, accounts and passwords, the household's and groups' resolvers,
-    connection routes and their certificate pins, and remote access. Groups, rules, pauses, devices and pairing
+    connection routes and their certificate pins, remote access, and a phone's alert registration. Groups, rules, pauses, devices and pairing
     work as usual.
   license:
     name: Business Source License 1.1
@@ -477,6 +477,9 @@ paths:
                   description: |
                     When false, app-owned quarantine policies are PUT enabled false (emergency override).
                     Assignment is unchanged. When true, unassigned in-scope MACs are blocked again.
+                alertsRelay:
+                  type: boolean
+                  description: Turns phone alerts through the push relay on or off. Off drops alerts still waiting to be sent.
       responses:
         "200":
           description: Updated
@@ -2867,6 +2870,71 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /api/v1/paired/devices/{id}/push:
+    put:
+      operationId: registerPush
+      tags: [Paired]
+      summary: Turn on phone alerts for this app
+      description: |
+        The FamilyFi app on a phone, tablet or Mac (`app:full`) stores its own push token and alert key,
+        replacing any earlier ones; its alert choices stay as they were. Only the app on device `id` may
+        call it: anyone else, an administrator's browser included, gets 403 `own_device_required`. The
+        token and key are encrypted with `FAMILYFI_ENCRYPTION_KEY` and never returned. `key` is 32
+        random bytes the app made, in base64; FamilyFi encrypts each alert for this app with it, so the
+        push relay, Apple and Google cannot read it. `kinds` lists the alert kinds the app understands;
+        FamilyFi never sends it another, and drops kinds it does not know itself. 403 `demo_locked` in
+        the demo. Alerts are sent only while the household's `alertsRelay` is on.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PushRegistration" } } } }
+      responses:
+        "200": { description: Registered, content: { application/json: { schema: { type: object, additionalProperties: false, required: [alerts], properties: { alerts: { $ref: "#/components/schemas/AlertChoices" } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: removePush
+      tags: [Paired]
+      summary: Turn off phone alerts for this app
+      description: Forgets the app's push token and key, and any alert still waiting for it. The app on device `id` only (403 `own_device_required`). Revoking or removing the device does the same. 403 `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      responses:
+        "200": { description: Removed, content: { application/json: { schema: { type: object, required: [ok], properties: { ok: { type: boolean } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/paired/devices/{id}/alerts:
+    get:
+      operationId: getAlertChoices
+      tags: [Paired]
+      summary: Which alert kinds this app gets
+      description: The app on device `id` only (403 `own_device_required`); 404 `push_not_registered` before it has turned on alerts.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Choices, content: { application/json: { schema: { type: object, additionalProperties: false, required: [alerts], properties: { alerts: { $ref: "#/components/schemas/AlertChoices" } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: setAlertChoices
+      tags: [Paired]
+      summary: Turn alert kinds on or off for this app
+      description: |
+        A kind left out keeps its choice, and a kind this server does not know is ignored, so a newer app
+        can send its own list. The app on device `id` only (403 `own_device_required`); 404
+        `push_not_registered` before it has turned on alerts. 403 `demo_locked` in the demo.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AlertChoices" } } } }
+      responses:
+        "200": { description: Saved, content: { application/json: { schema: { type: object, additionalProperties: false, required: [alerts], properties: { alerts: { $ref: "#/components/schemas/AlertChoices" } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/v1/upstream/resolver:
     get:
       operationId: getUpstreamResolver
@@ -3368,6 +3436,11 @@ components:
             pass saw them (about every 30 seconds). True if any is enabled; null when none could be
             seen, such as a policy missing from the gateway at that pass.
         quarantinePolicyCount: { type: integer, minimum: 0 }
+        alertsRelay:
+          type: boolean
+          description: >-
+            Whether FamilyFi sends phone alerts through the project push relay. Off until an
+            administrator turns it on. Servers before API 1.4.0 leave it out.
     ConnectionIdentity:
       type: object
       additionalProperties: false
@@ -3726,6 +3799,9 @@ components:
             properties:
               endpointId: { type: string }
               version: { type: integer, minimum: 1 }
+        alerts:
+          type: boolean
+          description: Whether this app has turned on phone alerts. Present only for `app` devices with the `full` scope, the only ones that can.
         sessions:
           type: array
           items:
@@ -3738,6 +3814,37 @@ components:
               client: { $ref: "#/components/schemas/PairedClient" }
               expiresAt: { type: string, format: date-time, description: "When this sign-in ends unless renewed: the refresh token's expiry." }
               createdAt: { type: string, format: date-time }
+    AlertKind:
+      type: string
+      description: |
+        An alert a phone can get. `device.new`: devices joined a managed network and wait in Unassigned.
+        `sync.down`: no sync pass has reached the gateway for 10 minutes. `sync.up`: one has again, sent
+        only to phones told `sync.down`. New kinds may be added; FamilyFi sends a phone only the kinds it registered.
+      x-extensible-enum: [device.new, sync.down, sync.up]
+    PushRegistration:
+      type: object
+      additionalProperties: false
+      required: [platform, channel, token, key, format, kinds]
+      properties:
+        platform: { type: string, enum: [ios, android] }
+        channel:
+          type: string
+          enum: [release, development]
+          description: "`release` for App Store, TestFlight and Play builds; `development` for development builds, which use Apple's sandbox."
+        token: { type: string, minLength: 1, maxLength: 4096, description: The APNs device token or FCM registration token. }
+        key: { type: string, minLength: 1, maxLength: 64, description: "32 random bytes in base64 (standard or URL-safe): this app's alert key." }
+        format: { type: integer, minimum: 1, description: The highest alert envelope version the app reads. }
+        kinds: { type: array, maxItems: 64, items: { $ref: "#/components/schemas/AlertKind" }, description: The alert kinds the app understands. }
+    AlertChoices:
+      type: object
+      additionalProperties: false
+      required: [kinds]
+      properties:
+        kinds:
+          type: object
+          description: Each alert kind the app understands, true when it gets it.
+          propertyNames: { $ref: "#/components/schemas/AlertKind" }
+          additionalProperties: { type: boolean }
     PairedDeviceUpdate:
       type: object
       additionalProperties: false

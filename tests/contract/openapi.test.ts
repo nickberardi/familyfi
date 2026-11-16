@@ -45,6 +45,8 @@ describe("openapi contract", () => {
       "Health.revision", // only when the database answered
       "Health.error", // only when degraded by configuration
       "Health.gateway", // only with ?gateway=true, for a session, while ready
+      "Household.alertsRelay", // always sent, but servers before 1.4.0 leave it out: required would raise x-min-server
+      "PairedDevice.alerts", // only for app:full devices, the only ones that register for alerts
       "Error.error.link", // only where there is somewhere to go next, such as demo_locked
       "PairedClaim.connection", // never for agents
       "PairedClaim.connection.endpoint", // only when the invite named a route
