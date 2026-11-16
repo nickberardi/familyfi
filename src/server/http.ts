@@ -16,7 +16,22 @@ export function jsonError(status: number, code: string, message: string, link?: 
   return NextResponse.json({ error: link ? { code, message, link } : { code, message } }, { status });
 }
 
+/**
+ * A refusal a `src/server` function throws for its caller to read: the status, code and message
+ * the API answers with. A guard turns it into that response, so a route only calls the function.
+ */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export function jsonCaughtError(error: unknown): NextResponse<ApiErrorBody> {
+  if (error instanceof ApiError) return jsonError(error.status, error.code, error.message);
   console.error(error);
   if (error instanceof ConfigurationError) {
     return jsonError(
