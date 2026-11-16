@@ -5,35 +5,19 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AssignmentState, GroupKind } from "@prisma/client";
-import { POST as login } from "@/app/api/v1/auth/login/route";
-import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
-import { POST as unblockGroup } from "@/app/api/v1/groups/[id]/unblock/route";
 import { prisma } from "@/server/db";
+import { unblockGroup } from "@/server/group-unblock";
 import { getGroup, updateGroup } from "@/server/groups";
+import { deleteRule, updateRule } from "@/server/rule-lifts";
 import { createRule, RuleCreateBody } from "@/server/rules";
 import { setReconcileClientForTests } from "@/server/reconciliation";
-import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { INTERNAL_ZONE, configureConnectedHousehold, resetDatabase, seedDevice } from "../helpers/db";
 import { refusal } from "../helpers/refusal";
+import { adminSession } from "../helpers/session";
 import { fixtureUnifiClient } from "../helpers/unifi-world";
 
-const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const MAC = "02:00:00:00:00:01";
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
-
-async function signedIn() {
-  const response = await login(
-    request("/api/v1/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }),
-    }),
-  );
-  expect(response.status).toBe(200);
-  return authFromLogin(response);
-}
-
-const json = { "content-type": "application/json" };
 
 async function rule(body: object): Promise<string> {
   return (await createRule(RuleCreateBody.parse(body))).rule.id;
@@ -43,7 +27,7 @@ const edit = (id: string, body: Parameters<typeof updateGroup>[1]) => updateGrou
 
 describe("a group's Block button default", () => {
   let client: ReturnType<typeof fixtureUnifiClient>;
-  let auth: SessionAuth;
+  let session: Awaited<ReturnType<typeof adminSession>>;
   let tv: { id: string };
   let video: string;
 
@@ -53,7 +37,7 @@ describe("a group's Block button default", () => {
     await prisma().household.update({ where: { id: "default" }, data: { timezone: "UTC" } });
     client = fixtureUnifiClient();
     setReconcileClientForTests(client);
-    auth = await signedIn();
+    session = await adminSession();
     tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV", monogram: "TV" } });
     await seedDevice({ mac: MAC, groupId: tv.id, zoneId: INTERNAL_ZONE, assignment: AssignmentState.assigned });
     // Video outside its window all day: the hour before now never comes round until tomorrow.
@@ -92,7 +76,7 @@ describe("a group's Block button default", () => {
 
   it("goes back to all internet when its rule is deleted", async () => {
     await edit(tv.id, { blockButtonRuleId: video });
-    await deleteRule(request(`/api/v1/rules/${video}`, { method: "DELETE", auth }), { params: Promise.resolve({ id: video }) });
+    await deleteRule(video);
     expect((await getGroup(tv.id)).blockButtonRuleId).toBeUndefined();
     expect((await prisma().group.findUniqueOrThrow({ where: { id: tv.id } })).blockButtonRuleId).toBeNull();
   });
@@ -100,13 +84,7 @@ describe("a group's Block button default", () => {
   it("goes back to all internet when the rule stops covering the group, so it doesn't come back with it", async () => {
     await edit(tv.id, { blockButtonRuleId: video });
     const pc = await prisma().group.create({ data: { kind: GroupKind.things, name: "PC" } });
-    const groups = async (groupIds: string[]) => {
-      const response = await patchRule(
-        request(`/api/v1/rules/${video}`, { method: "PATCH", auth, headers: json, body: JSON.stringify({ groupIds }) }),
-        { params: Promise.resolve({ id: video }) },
-      );
-      expect(response.status).toBe(200);
-    };
+    const groups = (groupIds: string[]) => updateRule(session, video, { groupIds });
     await groups([pc.id]);
     await groups([pc.id, tv.id]);
     expect((await getGroup(tv.id)).blockButtonRuleId).toBeUndefined();
@@ -116,8 +94,7 @@ describe("a group's Block button default", () => {
     const always = await rule({ name: "Video", kind: "category", groupIds: [tv.id], targetIds: [4], mode: "always" });
     const social = await rule({ name: "Social", kind: "category", groupIds: [tv.id], targetIds: [24], mode: "always" });
     await edit(tv.id, { blockButtonRuleId: always });
-    const response = await unblockGroup(request(`/api/v1/groups/${tv.id}/unblock`, { method: "POST", auth, headers: json }), { params: Promise.resolve({ id: tv.id }) });
-    expect(response.status).toBe(200);
+    await unblockGroup(session, "unblock", tv.id, {});
     const links = await prisma().ruleGroup.findMany({ where: { groupId: tv.id, ruleId: { in: [always, social] } } });
     const lifted = Object.fromEntries(links.map((link) => [link.ruleId === always ? "video" : "social", link.pauseActive]));
     // Social is how the TV is set up and stays on; Video is what its button is for.

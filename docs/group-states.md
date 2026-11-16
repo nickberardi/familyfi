@@ -131,7 +131,7 @@ or E as if there were no default, so Block always means all internet.
 A request from a sheet, and B2, are followed by a notice with Undo. Row A's at-once request and
 Resume (D) show "Saved." with no Undo.
 
-**What Unblock lifts** (`runGroupUnblock`). A rule covering the group is a candidate unless it is:
+**What Unblock lifts** (`unblockGroup`). A rule covering the group is a candidate unless it is:
 
 - switched off or paused for everyone;
 - an all-day rule that is not the default;
