@@ -5,24 +5,15 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as getUpdate } from "@/app/api/v1/settings/update/route";
-import { POST as checkNow } from "@/app/api/v1/settings/update/check/route";
-import { POST as install } from "@/app/api/v1/settings/update/install/route";
-import { PUT as putSchedule } from "@/app/api/v1/settings/update/schedule/route";
-import { PUT as putHousehold } from "@/app/api/v1/settings/household/route";
+import { POST as checkNowRoute } from "@/app/api/v1/settings/update/check/route";
+import { PUT as putScheduleRoute } from "@/app/api/v1/settings/update/schedule/route";
 import { APP_VERSION } from "@/lib/version";
 import type { UpdateCheck, UpdateRun, UpdateSettings } from "@/lib/types";
 import { prisma } from "@/server/db";
-import { getUpdateCheckSnapshot, refreshUpdateCheck } from "@/server/update-check";
-import {
-  autoUpdateArmedForTests,
-  rescheduleAutoUpdate,
-  runAutoUpdateCatchUpForTests,
-  setBackupFailureFileForTests,
-  setUpdaterTokenFileForTests,
-  settleUpdateRun,
-  stopAutoUpdateForTests,
-} from "@/server/updater";
+import { updateHouseholdSettings } from "@/server/household";
+import { checkForUpdateNow, getUpdateCheckSnapshot, refreshUpdateCheck } from "@/server/update-check";
+import { autoUpdateArmedForTests, rescheduleAutoUpdate, runAutoUpdateCatchUpForTests, setBackupFailureFileForTests, setUpdaterTokenFileForTests, settleUpdateRun, stopAutoUpdateForTests, installUpdate, setUpdateSchedule, UpdateScheduleBody, viewUpdateSettings } from "@/server/updater";
+import { answered } from "../helpers/answered";
 import { resetDatabase } from "../helpers/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 
@@ -64,10 +55,20 @@ async function adminAuth(): Promise<SessionAuth> {
 const write = (auth: SessionAuth, path: string, method: string, body?: unknown) =>
   request(path, { method, auth, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
 
-async function settings(auth: SessionAuth): Promise<UpdateSettings> {
-  const response = await getUpdate(request("/api/v1/settings/update", { auth }));
+async function settings(): Promise<UpdateSettings> {
+  const response = await answered("GET /api/v1/settings/update", () => viewUpdateSettings());
   expect(response.status).toBe(200);
   return (await response.json()) as UpdateSettings;
+}
+
+const install = () => answered("POST /api/v1/settings/update/install", async () => ({ run: await installUpdate() }), 202);
+const checkNow = () => answered("POST /api/v1/settings/update/check", async () => ({ update: await checkForUpdateNow() }));
+
+/** Saves the schedule. A body the request schema refuses goes through the route, whose refusal that is. */
+async function putSchedule(body: unknown) {
+  const parsed = UpdateScheduleBody.safeParse(body);
+  if (parsed.success) return answered("PUT /api/v1/settings/update/schedule", () => setUpdateSchedule(parsed.data));
+  return putScheduleRoute(write(await adminAuth(), "/api/v1/settings/update/schedule", "PUT", body));
 }
 
 beforeAll(async () => {
@@ -113,27 +114,25 @@ afterEach(async () => {
 
 describe("update settings", () => {
   it("installs on Sunday at midnight by default, and is set up only while Watchtower answers to the token", async () => {
-    const auth = await adminAuth();
-    expect(await settings(auth)).toMatchObject({
+    expect(await settings()).toMatchObject({
       updater: { configured: true },
       schedule: { enabled: true, days: [0], time: "00:00" },
       lastRun: null,
     });
-    expect((await settings(auth)).nextRunAt).not.toBeNull();
+    expect((await settings()).nextRunAt).not.toBeNull();
     // A token alone, as every image has, is not an updater: Watchtower must answer to it.
     process.env.FAMILYFI_UPDATER_URL = "http://127.0.0.1:1";
     setUpdaterTokenFileForTests(tokenFile);
-    expect(await settings(auth)).toMatchObject({ updater: { configured: false }, nextRunAt: null });
+    expect(await settings()).toMatchObject({ updater: { configured: false }, nextRunAt: null });
     process.env.FAMILYFI_UPDATER_URL = watchtower.url;
     writeToken("not-the-token");
     setUpdaterTokenFileForTests(tokenFile);
-    expect((await settings(auth)).updater.configured).toBe(false);
+    expect((await settings()).updater.configured).toBe(false);
     setUpdaterTokenFileForTests(path.join(tokenDir, "missing"));
-    expect(await settings(auth)).toMatchObject({ updater: { configured: false }, nextRunAt: null });
+    expect(await settings()).toMatchObject({ updater: { configured: false }, nextRunAt: null });
   });
 
   it("saves a schedule and refuses one it cannot keep", async () => {
-    const auth = await adminAuth();
     for (const body of [
       { enabled: true, days: [1], time: "25:00" },
       { enabled: true, days: [], time: "03:00" },
@@ -142,14 +141,14 @@ describe("update settings", () => {
       { enabled: true, days: [7], time: "03:00" },
       { enabled: true, days: [1] },
     ]) {
-      expect((await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", body))).status).toBe(400);
+      expect((await putSchedule(body)).status).toBe(400);
     }
-    const saved = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: true, days: [3, 1, 3], time: "02:30" }));
+    const saved = await putSchedule({ enabled: true, days: [3, 1, 3], time: "02:30" });
     expect(saved.status).toBe(200);
     expect(((await saved.json()) as UpdateSettings).schedule).toEqual({ enabled: true, days: [1, 3], time: "02:30" });
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     expect(household).toMatchObject({ updateScheduleEnabled: true, updateSchedule: "30 2 * * 1,3" });
-    const off = await putSchedule(write(auth, "/api/v1/settings/update/schedule", "PUT", { enabled: false, days: [1, 3], time: "02:30" }));
+    const off = await putSchedule({ enabled: false, days: [1, 3], time: "02:30" });
     expect(((await off.json()) as UpdateSettings)).toMatchObject({ schedule: { enabled: false, days: [1, 3], time: "02:30" }, nextRunAt: null });
   });
 });
@@ -157,26 +156,25 @@ describe("update settings", () => {
 describe("checking now", () => {
   it("answers with the release check, as health reports it, and needs the CSRF token", async () => {
     const auth = await adminAuth();
-    const response = await checkNow(write(auth, "/api/v1/settings/update/check", "POST"));
+    const response = await checkNow();
     expect(response.status).toBe(200);
     const { update } = (await response.json()) as { update: UpdateCheck };
     expect(update).toEqual(getUpdateCheckSnapshot());
     expect(update).toMatchObject({ status: "ok", available: true, latestVersion: NEWER });
-    const forged = await checkNow(request("/api/v1/settings/update/check", { method: "POST", auth: { ...auth, csrf: "" } }));
+    const forged = await checkNowRoute(request("/api/v1/settings/update/check", { method: "POST", auth: { ...auth, csrf: "" } }));
     expect(forged.status).toBe(403);
   });
 });
 
 describe("installing", () => {
   it("asks Watchtower once with its token, and refuses a second install meanwhile", async () => {
-    const auth = await adminAuth();
-    const response = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const response = await install();
     expect(response.status).toBe(202);
     const { run } = (await response.json()) as { run: UpdateRun };
     expect(run).toEqual({ targetVersion: NEWER, status: "requested", requestedAt: expect.any(String), error: null });
     expect(watchtower.seen.filter((call) => call.method === "POST")).toEqual([{ method: "POST", url: "/v1/update?async=true", authorization: `Bearer ${TOKEN}` }]);
 
-    const again = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const again = await install();
     expect(again.status).toBe(409);
     expect(((await again.json()) as { error: { code: string } }).error.code).toBe("update_in_progress");
     expect(watchtower.seen.filter((call) => call.method === "POST")).toHaveLength(1);
@@ -189,14 +187,13 @@ describe("installing", () => {
   });
 
   it("settles from Watchtower's history while the old release keeps running", async () => {
-    const auth = await adminAuth();
-    expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
-    expect((await settings(auth)).lastRun?.status).toBe("requested");
+    expect((await install()).status).toBe(202);
+    expect((await settings()).lastRun?.status).toBe("requested");
     // A scan that ended before this request belongs to an earlier one and settles nothing.
     watchtower.history = { entries: [{ timestamp: "2020-01-01T00:00:00.000000001Z", updated: 0, failed: 1, skipped: 0 }] };
-    expect((await settings(auth)).lastRun?.status).toBe("requested");
+    expect((await settings()).lastRun?.status).toBe("requested");
     watchtower.history = { entries: [{ timestamp: new Date(Date.now() + 1000).toISOString().replace("Z", "+00:00"), updated: 0, failed: 0, skipped: 1 }] };
-    const { lastRun } = await settings(auth);
+    const { lastRun } = await settings();
     expect(lastRun).toMatchObject({ status: "skipped", error: "Watchtower skipped the update; its log says why." });
     expect(watchtower.seen.some((call) => call.method === "GET" && call.url.startsWith("/v1/history?since="))).toBe(true);
   });
@@ -205,11 +202,10 @@ describe("installing", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "familyfi-backups-"));
     setBackupFailureFileForTests(path.join(dir, "last-failure"));
     try {
-      const auth = await adminAuth();
-      expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
+      expect((await install()).status).toBe(202);
       writeFileSync(path.join(dir, "last-failure"), "pg_dump failed\n");
       watchtower.history = { entries: [{ timestamp: new Date(Date.now() + 1000).toISOString(), scanned: 1, updated: 0, failed: 0, skipped: 1 }] };
-      expect((await settings(auth)).lastRun).toMatchObject({
+      expect((await settings()).lastRun).toMatchObject({
         status: "failed",
         error: `The backup before installing failed (pg_dump failed), so FamilyFi kept running v${APP_VERSION}. The FamilyFi log says more.`,
       });
@@ -220,8 +216,7 @@ describe("installing", () => {
   });
 
   it("calls a run settled before the release arrived a success once it runs", async () => {
-    const auth = await adminAuth();
-    expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
+    expect((await install()).status).toBe(202);
     const { updateRequestedAt } = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     const late = new Date(updateRequestedAt!.getTime() + 31 * 60_000);
     expect(await settleUpdateRun({ now: () => late })).toMatchObject({ status: "failed" });
@@ -233,16 +228,14 @@ describe("installing", () => {
   });
 
   it("succeeds when the new release starts", async () => {
-    const auth = await adminAuth();
-    expect((await install(write(auth, "/api/v1/settings/update/install", "POST"))).status).toBe(202);
+    expect((await install()).status).toBe(202);
     const settled = await settleUpdateRun({ currentVersion: NEWER });
     expect(settled).toMatchObject({ status: "succeeded", error: null });
   });
 
   it("treats Watchtower refusing the token, or not answering, as no updater, and a busy one as in progress", async () => {
-    const auth = await adminAuth();
     writeToken("not-the-token");
-    const refused = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const refused = await install();
     expect(refused.status).toBe(409);
     expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
 
@@ -250,23 +243,22 @@ describe("installing", () => {
     // Busy with an install an earlier request asked for, which the time limit settled: that install is
     // this one, so the request stays open for it to settle.
     watchtower.updateStatus = 429;
-    const busy = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const busy = await install();
     expect(busy.status).toBe(202);
-    expect((await settings(auth)).lastRun).toMatchObject({ status: "requested", error: null });
+    expect((await settings()).lastRun).toMatchObject({ status: "requested", error: null });
     expect(await settleUpdateRun({ currentVersion: NEWER })).toMatchObject({ status: "succeeded" });
 
     watchtower.updateStatus = 500;
-    const broken = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const broken = await install();
     expect(broken.status).toBe(502);
     expect(((await broken.json()) as { error: { code: string } }).error.code).toBe("updater_unreachable");
     expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).updateStatus).toBe("failed");
   });
 
   it("installs nothing when only the token is there and Watchtower is not, now or on schedule", async () => {
-    const auth = await adminAuth();
     process.env.FAMILYFI_UPDATER_URL = "http://127.0.0.1:1";
     setUpdaterTokenFileForTests(tokenFile);
-    const response = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const response = await install();
     expect(response.status).toBe(409);
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
     await prisma().household.update({ where: { id: "default" }, data: { timezone: "America/New_York", updateSchedule: "0 3 * * 0,1,2,3,4,5,6" } });
@@ -281,15 +273,14 @@ describe("installing", () => {
   });
 
   it("refuses without the updater or anything newer", async () => {
-    const auth = await adminAuth();
     setUpdaterTokenFileForTests(path.join(tokenDir, "missing"));
-    const unset = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const unset = await install();
     expect(unset.status).toBe(409);
     expect(((await unset.json()) as { error: { code: string } }).error.code).toBe("updater_not_configured");
 
     setUpdaterTokenFileForTests(tokenFile);
     await refreshUpdateCheck({ fetchImpl: releases(APP_VERSION) });
-    const current = await install(write(auth, "/api/v1/settings/update/install", "POST"));
+    const current = await install();
     expect(current.status).toBe(409);
     expect(((await current.json()) as { error: { code: string } }).error.code).toBe("no_update_available");
     expect(watchtower.seen).toEqual([]);
@@ -346,10 +337,9 @@ describe("the schedule", () => {
   });
 
   it("is armed again when the household's time zone changes", async () => {
-    const auth = await adminAuth();
     stopAutoUpdateForTests();
     expect(autoUpdateArmedForTests()).toBe(false);
-    const response = await putHousehold(write(auth, "/api/v1/settings/household", "PUT", { timezone: "America/Los_Angeles" }));
+    const response = await answered("PUT /api/v1/settings/household", () => updateHouseholdSettings({ timezone: "America/Los_Angeles" }));
     expect(response.status).toBe(200);
     await expect.poll(() => autoUpdateArmedForTests()).toBe(true);
   });
