@@ -10,11 +10,12 @@ import { readArchive, writeArchive } from "@/server/archive";
 import { createSession, hashPassword } from "@/server/auth";
 import { dumpDatabase, setDatabaseDumpForTests } from "@/server/database-dump";
 import { prisma } from "@/server/db";
-import { householdConfig, IMPORT_MAX_BYTES, type HouseholdConfig } from "@/server/household-export";
+import { exportHousehold, householdConfig, IMPORT_MAX_BYTES, importHousehold, type HouseholdConfig } from "@/server/household-export";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { stopAutoUpdateForTests } from "@/server/updater";
 import { stopUpstreamProbeForTests } from "@/server/upstream/schedule";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
+import { answered } from "../helpers/answered";
 import { ADMIN_POLICY_ID, configureConnectedHousehold, createFamilyGroup, resetDatabase, seedDevice } from "../helpers/db";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { fixtureUnifiClient } from "../helpers/unifi-world";
@@ -23,8 +24,11 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
 const FILES = { allowed: ["manifest.json", "config.json", "database.dump"], maxFileBytes: 50 * 1024 * 1024, maxTotalBytes: 50 * 1024 * 1024 };
 const SECRET_BYTES = new Uint8Array([7, 7, 7, 7]);
 
-async function recoveryAuth(): Promise<SessionAuth> {
-  return authFromLogin(
+/** A signed-in browser, and the account it acts as: who an import is recorded against. */
+type Importer = SessionAuth & { accountId: string };
+
+async function recoveryAuth(): Promise<Importer> {
+  const auth = authFromLogin(
     await login(
       request("/api/v1/auth/login", {
         method: "POST",
@@ -33,15 +37,17 @@ async function recoveryAuth(): Promise<SessionAuth> {
       }),
     ),
   );
+  return { ...auth, accountId: (await prisma().account.findUniqueOrThrow({ where: { username: "admin" } })).id };
 }
 
-async function sessionFor(username: string): Promise<SessionAuth> {
+async function sessionFor(username: string): Promise<Importer> {
   const account = await prisma().account.findUniqueOrThrow({ where: { username } });
   const issued = await createSession({ accountId: account.id, username, kind: SessionKind.cookie });
-  return { cookie: `${SESSION_COOKIE}=${issued.raw}; ${CSRF_COOKIE}=${issued.csrf}`, csrf: issued.csrf };
+  return { cookie: `${SESSION_COOKIE}=${issued.raw}; ${CSRF_COOKIE}=${issued.csrf}`, csrf: issued.csrf, accountId: account.id };
 }
 
-async function exportArchive(auth: SessionAuth): Promise<Buffer> {
+/** The export as the browser downloads it: the route's own headers and bytes. */
+async function downloadedArchive(auth: SessionAuth): Promise<Buffer> {
   const response = await exportRoute(request("/api/v1/settings/export", { auth }));
   expect(response.status).toBe(200);
   expect(response.headers.get("content-type")).toBe("application/gzip");
@@ -49,14 +55,25 @@ async function exportArchive(auth: SessionAuth): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
-function importRequest(auth: SessionAuth, mode: string, body: Buffer) {
+async function exportArchive(): Promise<Buffer> {
+  return (await exportHousehold()).archive;
+}
+
+function importRoute_(auth: SessionAuth, mode: string, body: Buffer) {
   return importRoute(
     request(`/api/v1/settings/import?mode=${mode}`, { method: "POST", auth, headers: { "content-type": "application/gzip" }, body: new Uint8Array(body) }),
   );
 }
 
-async function imported(auth: SessionAuth, body: Buffer): Promise<ImportSummary> {
-  const response = await importRequest(auth, "apply", body);
+/** Previews or applies an import as `importer`. A mode the route refuses, or a caller who is no browser, goes through the route. */
+function importRequest(importer: SessionAuth & { accountId?: string }, mode: string, body: Buffer) {
+  if ((mode !== "preview" && mode !== "apply") || !importer.accountId) return importRoute_(importer, mode, body);
+  const accountId = importer.accountId;
+  return answered("POST /api/v1/settings/import", () => importHousehold(mode, body, { accountId }));
+}
+
+async function imported(importer: SessionAuth & { accountId?: string }, body: Buffer): Promise<ImportSummary> {
+  const response = await importRequest(importer, "apply", body);
   expect(response.status).toBe(200);
   const json = (await response.json()) as { summary: ImportSummary; change: { changeId: string } };
   expect(json.change.changeId).toBeTruthy();
@@ -144,7 +161,7 @@ describe("household export", () => {
     });
     await prisma().group.update({ where: { id: built.things.id }, data: { blockButtonRuleId: video.id } });
     const auth = await recoveryAuth();
-    const files = readArchive(await exportArchive(auth), FILES);
+    const files = readArchive(await downloadedArchive(auth), FILES);
     const manifest = JSON.parse(files.get("manifest.json")!.toString()) as { format: string; appVersion: string; instanceId: string | null };
     expect(manifest).toMatchObject({ format: "familyfi-export", appVersion: APP_VERSION });
     expect(manifest.instanceId).toMatch(/^ff_/);
@@ -165,7 +182,8 @@ describe("household export", () => {
     await prisma().account.create({ data: { username: "stranger", displayName: "Stranger", kind: AccountKind.personal, isAdmin: true } });
 
     await prisma().checkupFinding.create({ data: { key: "private_addresses", check: "private_addresses", details: {}, subject: "x", firstSeenAt: new Date(), lastSeenAt: new Date() } });
-    const summary = await imported(auth, writeArchive([...files].map(([name, data]) => ({ name, data }))));
+    // Through the real upload route, as the browser sends it.
+    const summary = await imported({ cookie: auth.cookie, csrf: auth.csrf }, writeArchive([...files].map(([name, data]) => ({ name, data }))));
     // The old household's checkup goes with it.
     expect(await prisma().checkupFinding.count()).toBe(0);
     expect(summary).toMatchObject({
@@ -188,7 +206,7 @@ describe("household export", () => {
 
   it("previews without changing anything, and on a fresh install asks only for what it lacks", async () => {
     await buildHousehold();
-    const archive = await exportArchive(await recoveryAuth());
+    const archive = await exportArchive();
     await resetDatabase();
     await ensureUpstreamCategories();
     const auth = await recoveryAuth();
@@ -217,7 +235,7 @@ describe("household export", () => {
 
   it("keeps the importing administrator, and signs out an account whose password changes", async () => {
     await buildHousehold();
-    const archive = await exportArchive(await recoveryAuth());
+    const archive = await exportArchive();
     const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
     await prisma().account.update({ where: { id: parent.id }, data: { passwordHash: await hashPassword("changed-password-1") } });
     await sessionFor("parent");
@@ -231,7 +249,7 @@ describe("household export", () => {
 
   it("lets the importing administrator keep the password they changed since the export, and their session", async () => {
     await buildHousehold();
-    const archive = await exportArchive(await recoveryAuth());
+    const archive = await exportArchive();
     const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
     const changed = await hashPassword("changed-password-1");
     await prisma().account.update({ where: { id: parent.id }, data: { passwordHash: changed } });
@@ -249,7 +267,7 @@ describe("household export", () => {
     });
     const issued = await createSession({ accountId: parent.id, username: "parent", kind: SessionKind.bearer, deviceId: phone.id });
     const bearer: SessionAuth = { cookie: "", csrf: "", token: issued.raw };
-    const archive = await exportArchive(await recoveryAuth());
+    const archive = await exportArchive();
     for (const response of [
       await exportRoute(request("/api/v1/settings/export", { auth: bearer })),
       await importRequest(bearer, "apply", archive),
@@ -266,7 +284,7 @@ describe("household export", () => {
     expect(((await garbage.json()) as { error: { code: string } }).error.code).toBe("invalid_export");
 
     await buildHousehold();
-    const files = readArchive(await exportArchive(auth), FILES);
+    const files = readArchive(await exportArchive(), FILES);
     const manifest = JSON.parse(files.get("manifest.json")!.toString());
     const newer = writeArchive([
       { name: "manifest.json", data: Buffer.from(JSON.stringify({ ...manifest, appVersion: "999.0.0" })) },
@@ -301,7 +319,7 @@ describe("household export", () => {
     expect(ours.length).toBeGreaterThan(0);
 
     const auth = await recoveryAuth();
-    await imported(auth, await exportArchive(auth));
+    await imported(auth, await exportArchive());
     expect(await runReconcileOnce()).toBe(true);
     const onGateway = new Set(client.state.policies.map((policy) => policy.id));
     for (const id of ours) expect(onGateway.has(id)).toBe(false);
@@ -316,7 +334,7 @@ describe("household export", () => {
     setDatabaseDumpForTests(undefined);
     expect(await dumpDatabase("familyfi-no-such-pg-dump")).toEqual({ data: null, reason: "pg_dump is not installed here." });
     setDatabaseDumpForTests(async () => ({ data: null, reason: "pg_dump failed: server version mismatch" }));
-    const files = readArchive(await exportArchive(await recoveryAuth()), FILES);
+    const files = readArchive(await exportArchive(), FILES);
     expect(files.has("database.dump")).toBe(false);
     expect(JSON.parse(files.get("manifest.json")!.toString()).databaseDump).toEqual({ included: false, reason: "pg_dump failed: server version mismatch" });
   });
@@ -325,7 +343,7 @@ describe("household export", () => {
     await ensureUpstreamCategories();
     const seed = await prisma().upstreamCategory.findFirstOrThrow({ where: { source: "seed" }, orderBy: { slug: "asc" } });
     const auth = await recoveryAuth();
-    const files = readArchive(await exportArchive(auth), FILES);
+    const files = readArchive(await exportArchive(), FILES);
     const config = JSON.parse(files.get("config.json")!.toString());
     // As an older release that shipped no such seed would have exported it.
     config.categories.push({ slug: seed.slug, label: "Ours", monogram: "OU", source: "user", enabled: true, domains: [{ domain: "ours.example.com", source: "user", removed: false }] });
@@ -341,7 +359,7 @@ describe("household export", () => {
 
   it("imports a schedule exported with no days as off, on Sunday, since cron needs a day", async () => {
     const auth = await recoveryAuth();
-    const files = readArchive(await exportArchive(auth), FILES);
+    const files = readArchive(await exportArchive(), FILES);
     const config = JSON.parse(files.get("config.json")!.toString());
     config.household.autoUpdate = { enabled: true, days: [], time: "04:30" };
     // Import re-arms the DNS check, whose catch-up would otherwise sweep into the next test.
@@ -353,7 +371,7 @@ describe("household export", () => {
   it("imports an export from before Lock DNS with Lock DNS off, covering no group", async () => {
     const built = await buildHousehold();
     const auth = await recoveryAuth();
-    const files = readArchive(await exportArchive(auth), FILES);
+    const files = readArchive(await exportArchive(), FILES);
     const config = JSON.parse(files.get("config.json")!.toString());
     delete config.household.lockDns;
     await imported(auth, writeArchive([{ name: "manifest.json", data: files.get("manifest.json")! }, { name: "config.json", data: Buffer.from(JSON.stringify(config)) }]));
@@ -365,7 +383,7 @@ describe("household export", () => {
   it("refuses a rule or resolver the API would refuse, before changing anything", async () => {
     await buildHousehold();
     const auth = await recoveryAuth();
-    const files = readArchive(await exportArchive(auth), FILES);
+    const files = readArchive(await exportArchive(), FILES);
     type Editable = HouseholdConfig & { rules: Array<HouseholdConfig["rules"][number] & Record<string, unknown>> };
     const edited = (change: (config: Editable) => void) => {
       const config = JSON.parse(files.get("config.json")!.toString());
@@ -392,14 +410,14 @@ describe("household export", () => {
     // The groups API changes a role without touching the login linked to the group.
     await prisma().group.update({ where: { id: parent.groupId! }, data: { familyRole: FamilyRole.teen } });
     const auth = await recoveryAuth();
-    await imported(auth, await exportArchive(auth));
+    await imported(auth, await exportArchive());
     expect(await prisma().account.findUniqueOrThrow({ where: { username: "parent" } })).toMatchObject({ groupId: null, isAdmin: true });
   });
 
   it("refuses a route or a network rule the API would refuse, against what the import keeps", async () => {
     await buildHousehold();
     const auth = await recoveryAuth();
-    const files = readArchive(await exportArchive(auth), FILES);
+    const files = readArchive(await exportArchive(), FILES);
     const edited = (change: (config: HouseholdConfig) => void) => {
       const config = JSON.parse(files.get("config.json")!.toString()) as HouseholdConfig;
       change(config);
@@ -440,7 +458,7 @@ describe("household export", () => {
 
   it("leaves out a database dump that would make the export too large to import back", async () => {
     setDatabaseDumpForTests(async () => ({ data: Buffer.alloc(IMPORT_MAX_BYTES) }));
-    const archive = await exportArchive(await recoveryAuth());
+    const archive = await exportArchive();
     const files = readArchive(archive, FILES);
     expect(files.has("database.dump")).toBe(false);
     expect(JSON.parse(files.get("manifest.json")!.toString()).databaseDump).toMatchObject({ included: false });

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { encryptSecret } from "./crypto";
 import { prisma } from "./db";
 import { unifiMockEnabled } from "./env";
@@ -266,6 +267,44 @@ export function publicUnifiSettings(
     connectionError: household.connectionError,
   };
 }
+
+/** What `PUT /settings/unifi` may carry. */
+export const UnifiSettingsBody = z
+  .object({
+    apiKey: z.string().min(8).optional(),
+    baseUrl: z.string().optional(),
+    consoleId: z.string().optional(),
+    siteId: z.string().optional(),
+    tlsInsecure: z.boolean().optional(),
+    manageAllNetworks: z.boolean().optional(),
+    managedNetworkIds: z.array(z.string().min(1)).optional(),
+    forgetPrevious: z.boolean().optional(),
+  })
+  .refine((value) => !value.baseUrl || !value.consoleId, {
+    message: "Provide baseUrl or consoleId, not both.",
+  })
+  .refine((value) => Boolean(value.apiKey) || value.manageAllNetworks !== undefined || value.managedNetworkIds !== undefined, {
+    message: "Provide an API key or a network selection.",
+  })
+  .refine((value) => !value.apiKey || Boolean(value.baseUrl) !== Boolean(value.consoleId), {
+    message: "Provide baseUrl or consoleId, not both.",
+  });
+
+/** What `POST /settings/unifi/test` may carry. */
+export const UnifiTestBody = z
+  .object({
+    apiKey: z.string().min(8).optional(),
+    baseUrl: z.string().optional(),
+    consoleId: z.string().optional(),
+    siteId: z.string().optional(),
+    tlsInsecure: z.boolean().optional(),
+  })
+  .refine((value) => !value.baseUrl || !value.consoleId, {
+    message: "Provide baseUrl or consoleId, not both.",
+  })
+  .refine((value) => !value.apiKey || Boolean(value.baseUrl) !== Boolean(value.consoleId), {
+    message: "Provide baseUrl or consoleId with a new API key.",
+  });
 
 /** The saved household row with its site's networks; a console that cannot be reached lists none. */
 async function settingsWithNetworks(always: boolean) {

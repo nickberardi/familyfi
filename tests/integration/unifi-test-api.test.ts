@@ -9,6 +9,8 @@ import {
   DEV_MOCK_SITE_ID,
   resetDevMockClientForTests,
 } from "@/server/unifi/dev-mock";
+import { tryUnifiConnection, UnifiTestBody } from "@/server/unifi-settings";
+import { answered } from "../helpers/answered";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -26,7 +28,7 @@ async function signedIn(): Promise<SessionAuth> {
   return authFromLogin(response);
 }
 
-function probe(auth: SessionAuth | undefined, body: unknown) {
+function probeRoute(auth: SessionAuth | undefined, body: unknown) {
   return testConnection(
     request("/api/v1/settings/unifi/test", {
       method: "POST",
@@ -35,6 +37,13 @@ function probe(auth: SessionAuth | undefined, body: unknown) {
       body: JSON.stringify(body),
     }),
   );
+}
+
+/** Tests a connection. No caller, or a body the request schema refuses, goes through the route, whose refusal that is. */
+function probe(auth: SessionAuth | undefined, body: unknown) {
+  const parsed = UnifiTestBody.safeParse(body);
+  if (!auth || !parsed.success) return probeRoute(auth, body);
+  return answered("POST /api/v1/settings/unifi/test", async () => ({ ok: true, ...(await tryUnifiConnection(parsed.data)) }));
 }
 
 describe("POST /api/v1/settings/unifi/test", () => {

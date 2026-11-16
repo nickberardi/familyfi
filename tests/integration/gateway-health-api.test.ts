@@ -6,19 +6,19 @@
 import { DeviceScope, PairedDeviceClient, SessionKind } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as getHousehold } from "@/app/api/v1/settings/household/route";
 import { GET as getHealth } from "@/app/api/v1/health/route";
-import { GET as getUnifi } from "@/app/api/v1/settings/unifi/route";
 import { createSession } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { runReconcileOnce } from "@/server/reconciliation";
-import { saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
+import { getHouseholdSettings } from "@/server/household";
+import { getUnifiSettings, saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
 import { DEV_MOCK_API_KEY, DEV_MOCK_BASE_URL, getSharedDevMockClient, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
 import { forgetSiteNetworks } from "@/server/unifi/network-cache";
 import type { GatewayHealth, UnifiSettings } from "@/lib/types";
 import type { SiteDeviceOverview } from "@/server/unifi/types";
 import { resetDatabase } from "../helpers/db";
 import { pairingAdmin } from "../helpers/pairing";
+import { answered } from "../helpers/answered";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -35,6 +35,9 @@ async function signedIn(): Promise<SessionAuth> {
   expect(response.status).toBe(200);
   return authFromLogin(response);
 }
+
+const getUnifi = () => answered("GET /api/v1/settings/unifi", async () => ({ unifi: await getUnifiSettings() }));
+const getHousehold = () => answered("GET /api/v1/settings/household", async () => ({ household: await getHouseholdSettings() }));
 
 async function health(auth: SessionAuth): Promise<GatewayHealth> {
   const response = await getHealth(request("/api/v1/health?gateway=true", { auth }));
@@ -165,8 +168,8 @@ describe("gateway health and the console's polled load", () => {
     expect(client.calls.slice(beforePass).some((call) => call.path === "/v1/info")).toBe(false);
 
     const before = client.calls.length;
-    const unifi = await getUnifi(request("/api/v1/settings/unifi", { auth }));
-    const household = await getHousehold(request("/api/v1/settings/household", { auth }));
+    const unifi = await getUnifi();
+    const household = await getHousehold();
     expect(unifi.status).toBe(200);
     expect(household.status).toBe(200);
     expect(((await unifi.json()) as { unifi: UnifiSettings }).unifi.networks.length).toBeGreaterThan(0);
@@ -178,12 +181,12 @@ describe("gateway health and the console's polled load", () => {
     forgetSiteNetworks();
     const client = getSharedDevMockClient();
     const before = client.calls.length;
-    const first = await getUnifi(request("/api/v1/settings/unifi", { auth }));
+    const first = await getUnifi();
     expect(((await first.json()) as { unifi: UnifiSettings }).unifi.networks.length).toBeGreaterThan(0);
     const asked = client.calls.length - before;
     expect(asked).toBeGreaterThan(0);
     // The answer is kept for the next page refresh.
-    await getUnifi(request("/api/v1/settings/unifi", { auth }));
+    await getUnifi();
     expect(client.calls.length - before).toBe(asked);
   });
 

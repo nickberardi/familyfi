@@ -45,6 +45,9 @@ import { GET as tunnelStateRoute, PUT as setTunnelRoute } from "@/app/api/v1/con
 import { GET as getSyncRoute } from "@/app/api/v1/sync/route";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { createFixtureUnifiClient } from "@/server/unifi/dev-mock";
+import { GET as getHouseholdRoute, PUT as putHouseholdRoute } from "@/app/api/v1/settings/household/route";
+import { GET as getUpdateRoute } from "@/app/api/v1/settings/update/route";
+import { PUT as putScheduleRoute } from "@/app/api/v1/settings/update/schedule/route";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { prisma } from "@/server/db";
 import { createRule, RuleCreateBody } from "@/server/rules";
@@ -309,5 +312,20 @@ describe("route responses match the contract", () => {
     // Nothing listens there: the check answers with what it found, a failure to show.
     expect((await checkEndpointRoute(send(`${path}/check`, "POST"), id(endpointId))).status).toBe(200);
     expect((await deleteEndpointRoute(send(path, "DELETE"), id(endpointId))).status).toBe(200);
+  });
+
+  it("household settings and the update schedule", async () => {
+    expect((await getHouseholdRoute(send("/api/v1/settings/household"))).status).toBe(200);
+    const saved = await putHouseholdRoute(send("/api/v1/settings/household", "PUT", { timezone: "Europe/London", displayName: "The Testers", quarantineEnforced: true }));
+    expect(saved.status).toBe(200);
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({
+      timezone: "Europe/London",
+      displayName: "The Testers",
+      quarantineEnforced: true,
+    });
+
+    expect((await getUpdateRoute(send("/api/v1/settings/update"))).status).toBe(200);
+    expect((await putScheduleRoute(send("/api/v1/settings/update/schedule", "PUT", { enabled: true, days: [1, 3], time: "02:30" }))).status).toBe(200);
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ updateScheduleEnabled: true, updateSchedule: "30 2 * * 1,3" });
   });
 });

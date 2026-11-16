@@ -501,6 +501,15 @@ export function runAutoUpdateCatchUpForTests(options: UpdaterOptions = {}): Prom
   return claimAndInstallIfDue(options);
 }
 
+/** What `PUT /settings/update/schedule` may carry. */
+export const UpdateScheduleBody = z
+  .object({
+    enabled: z.boolean(),
+    days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+    time: z.string(),
+  })
+  .strict();
+
 /** Saves when updates install on their own, and answers with the update settings as they now stand. */
 export async function setUpdateSchedule(input: { enabled: boolean; days: number[]; time: string }): Promise<UpdateSettings> {
   try {
