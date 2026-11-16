@@ -7,7 +7,7 @@ import {
 } from "@/lib/companion-setup";
 
 import { Button } from "./Button";
-import { SETUP_COLORS, paletteColor } from "./palette";
+import { paletteColor } from "./palette";
 import { UIProvider, useUI } from "./UIContext";
 import { useMemo, type ComponentProps, type ReactNode } from "react";
 import {
@@ -234,7 +234,7 @@ export function SetupField({
   );
 }
 
-/** familyfi's brand tokens for setup, which do not change with the appearance (`SETUP_COLORS`). */
+/** familyfi's brand tokens for setup, which do not change with the appearance. */
 export const SETUP = {
   page: paletteColor("light", "brand-deep"),
   ink: paletteColor("light", "brand-on-deep"),
@@ -242,7 +242,12 @@ export const SETUP = {
   accent: paletteColor("light", "brand-cyan"),
   button: paletteColor("light", "accent"),
   danger: paletteColor("dark", "danger"),
-  ...SETUP_COLORS,
+  track: paletteColor("light", "brand-setup-track"),
+  disabled: paletteColor("light", "brand-setup-disabled"),
+  disabledInk: paletteColor("light", "brand-setup-disabled-ink"),
+  tint: paletteColor("light", "brand-setup-tint"),
+  well: paletteColor("light", "brand-setup-well"),
+  field: paletteColor("light", "brand-setup-field"),
   mono: Platform.select({ ios: "Menlo", default: "monospace" }),
 };
 
@@ -299,7 +304,7 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   label: { fontSize: 12, lineHeight: 16, fontWeight: "600", color: SETUP.ink2 },
   fieldBox: {
-    backgroundColor: SETUP_COLORS.field,
+    backgroundColor: SETUP.field,
     borderRadius: 7,
     padding: 10,
     minHeight: 44,
