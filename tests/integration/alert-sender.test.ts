@@ -217,6 +217,67 @@ describe("alert sender", () => {
     expect(relay.sent.map((send) => send.body.ttl)).toEqual([ALERT_TTL_SECONDS, ALERT_TTL_SECONDS, ALERT_TTL_SECONDS]);
   });
 
+  it("checks each alert again just before it goes, so one dropped mid-batch is never sent", async () => {
+    const [first, second, third] = [await registeredPhone(), await registeredPhone(), await registeredPhone()];
+    await recordNewDevices([{ hostname: null }], { firstPass: false, now });
+    // While the first alert is on its way, the second phone signs out.
+    const sends: string[] = [];
+    const midBatch = createAlertSender({
+      fetchImpl: (async (input: string | URL | Request, init?: RequestInit) => {
+        if (String(input).endsWith("/v1/send")) {
+          sends.push(String(input));
+          if (sends.length === 1) await prisma().session.updateMany({ where: { deviceId: second }, data: { revokedAt: now } });
+        }
+        return relay.fetchImpl(input, init);
+      }) as typeof fetch,
+      now: () => now,
+      relayUrl: () => "https://relay.test",
+    });
+    await midBatch.flush();
+    // The first and third went; the second phone's was dropped unsent.
+    expect(sends).toHaveLength(2);
+    expect(await prisma().alertEvent.count({ where: { deviceId: second } })).toBe(0);
+    expect((await prisma().alertEvent.findMany({ where: { sentAt: { not: null } } })).map((event) => event.deviceId).sort()).toEqual([first, third].sort());
+  });
+
+  it("stops a batch when the switch goes off before the next alert", async () => {
+    await registeredPhone();
+    await registeredPhone();
+    await recordNewDevices([{ hostname: null }], { firstPass: false, now });
+    let sends = 0;
+    const midBatch = createAlertSender({
+      fetchImpl: (async (input: string | URL | Request, init?: RequestInit) => {
+        if (String(input).endsWith("/v1/send")) {
+          sends += 1;
+          await prisma().household.update({ where: { id: "default" }, data: { alertsRelayEnabled: false } });
+        }
+        return relay.fetchImpl(input, init);
+      }) as typeof fetch,
+      now: () => now,
+      relayUrl: () => "https://relay.test",
+    });
+    await midBatch.flush();
+    expect(sends).toBe(1);
+    expect(await prisma().alertEvent.count({ where: { sentAt: null } })).toBe(1);
+  });
+
+  it("keeps an outage's delivered trouble alerts past a week, so its end is still told", async () => {
+    const phone = await registeredPhone();
+    await recordSyncOutcome(false, now);
+    now = new Date(now.getTime() + SYNC_TROUBLE_AFTER_MS);
+    await recordSyncOutcome(false, now);
+    await sender.flush();
+    await recordNewDevices([{ hostname: null }], { firstPass: false, now });
+    await sender.flush();
+    // Eight days on, the gateway is still out of reach: the new-device alert goes, the trouble alert stays.
+    now = new Date(now.getTime() + 8 * 24 * 3600_000);
+    await sender.flush();
+    expect((await prisma().alertEvent.findMany()).map((event) => event.kind)).toEqual(["sync.down"]);
+    await recordSyncOutcome(true, now);
+    await sender.flush();
+    expect((await prisma().alertEvent.findMany({ where: { kind: "sync.up" } })).map((event) => [event.deviceId, event.sentAt !== null])).toEqual([[phone, true]]);
+  });
+
   it("sends nothing while the switch is off or in demo mode", async () => {
     await registeredPhone();
     await recordNewDevices([{ hostname: null }], { firstPass: false, now });

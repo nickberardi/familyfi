@@ -17,7 +17,6 @@ export const NEW_DEVICE_ALERTS_PER_HOUR = 4;
 export const SYNC_TROUBLE_AFTER_MS = 10 * 60_000;
 const HOUR_MS = 60 * 60_000;
 
-/** The phones that take `kind` now: registered, still paired, understanding it and not muting it. */
 /**
  * A paired device still signed in: not revoked, with a session whose refresh has not ended. A
  * password change, sign-out or 90 idle days end its sessions without revoking it, and a device that
@@ -27,8 +26,12 @@ export function signedInDevice(now: Date) {
   return { revokedAt: null, sessions: { some: { revokedAt: null, refreshExpiresAt: { gt: now } } } } satisfies Prisma.PairedDeviceWhereInput;
 }
 
-async function recipients(kind: AlertKind, now = new Date()): Promise<string[]> {
-  const rows = await prisma().pushRegistration.findMany({
+/** The database, or a transaction on it. */
+type Db = Prisma.TransactionClient;
+
+/** The phones that take `kind` now: registered, still signed in, understanding it and not muting it. */
+async function recipients(kind: AlertKind, now = new Date(), db: Db = prisma()): Promise<string[]> {
+  const rows = await db.pushRegistration.findMany({
     where: { supportedKinds: { has: kind }, NOT: { mutedKinds: { has: kind } }, device: signedInDevice(now) },
     select: { deviceId: true },
   });
@@ -40,15 +43,18 @@ async function relayEnabled(): Promise<boolean> {
   return household?.alertsRelayEnabled === true;
 }
 
-/** One event for each phone, sharing an id, so a phone that gets it twice shows it once. */
-async function writeEvents(kind: AlertKind, deviceIds: string[], detail: Prisma.InputJsonObject, now: Date): Promise<number> {
+/**
+ * One event for each phone, sharing an id, so a phone that gets it twice shows it once. Inside a
+ * transaction (`db`), the caller wakes the sender once it commits.
+ */
+async function writeEvents(kind: AlertKind, deviceIds: string[], detail: Prisma.InputJsonObject, now: Date, db?: Db): Promise<number> {
   if (!deviceIds.length) return 0;
   const dedupeKey = randomToken(6);
-  const written = await prisma().alertEvent.createMany({
+  const written = await (db ?? prisma()).alertEvent.createMany({
     data: deviceIds.map((deviceId) => ({ kind, deviceId, detail, dedupeKey, createdAt: now, nextAttemptAt: now })),
     skipDuplicates: true,
   });
-  if (written.count) wakeAlertSender();
+  if (written.count && !db) wakeAlertSender();
   return written.count;
 }
 
@@ -96,22 +102,27 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
     if (!household) return;
     if (ok) {
       if (!household.syncFailingSince && !household.syncTroubleAlertedAt) return;
-      // Cleared only by the pass that finds them set, so two passes cannot both say sync is back.
-      const cleared = await prisma().household.updateMany({
-        where: { id: "default", syncFailingSince: household.syncFailingSince, syncTroubleAlertedAt: household.syncTroubleAlertedAt },
-        data: { syncFailingSince: null, syncTroubleAlertedAt: null },
+      const alerted = household.syncTroubleAlertedAt;
+      // The outage is cleared and its "back" alerts written together, so a failure leaves both as they were.
+      const written = await prisma().$transaction(async (tx) => {
+        // Cleared only by the pass that finds them set, so two passes cannot both say sync is back.
+        const cleared = await tx.household.updateMany({
+          where: { id: "default", syncFailingSince: household.syncFailingSince, syncTroubleAlertedAt: alerted },
+          data: { syncFailingSince: null, syncTroubleAlertedAt: null },
+        });
+        if (!cleared.count || !alerted || !household.alertsRelayEnabled) return 0;
+        // A phone the trouble alert never reached (the gateway is often the router too, so the relay
+        // was out of reach) hears neither: the unsent alert goes, and only phones that got it are told.
+        await tx.alertEvent.deleteMany({ where: { kind: "sync.down", sentAt: null } });
+        const told = await tx.alertEvent.findMany({
+          where: { kind: "sync.down", createdAt: { gte: alerted }, sentAt: { not: null } },
+          select: { deviceId: true },
+          distinct: ["deviceId"],
+        });
+        const phones = new Set(await recipients("sync.up", now, tx));
+        return writeEvents("sync.up", told.map((row) => row.deviceId).filter((phone) => phones.has(phone)), {}, now, tx);
       });
-      if (!cleared.count || !household.syncTroubleAlertedAt || !household.alertsRelayEnabled) return;
-      // A phone the trouble alert never reached (the gateway is often the router too, so the relay
-      // was out of reach) hears neither: the unsent alert goes, and only phones that got it are told.
-      await prisma().alertEvent.deleteMany({ where: { kind: "sync.down", sentAt: null } });
-      const told = await prisma().alertEvent.findMany({
-        where: { kind: "sync.down", createdAt: { gte: household.syncTroubleAlertedAt }, sentAt: { not: null } },
-        select: { deviceId: true },
-        distinct: ["deviceId"],
-      });
-      const phones = new Set(await recipients("sync.up", now));
-      await writeEvents("sync.up", told.map((row) => row.deviceId).filter((phone) => phones.has(phone)), {}, now);
+      if (written) wakeAlertSender();
       return;
     }
     if (!household.syncFailingSince) {
@@ -120,13 +131,17 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
     }
     if (household.syncTroubleAlertedAt || !household.alertsRelayEnabled) return;
     if (now.getTime() - household.syncFailingSince.getTime() < SYNC_TROUBLE_AFTER_MS) return;
-    // Claimed first, so one outage is told once however many passes fail at once.
-    const claimed = await prisma().household.updateMany({
-      where: { id: "default", syncTroubleAlertedAt: null },
-      data: { syncTroubleAlertedAt: now },
+    // Claimed with its alerts in one transaction: one outage is told once however many passes fail
+    // at once, and a failure to record the alerts leaves it unclaimed for the next pass.
+    const written = await prisma().$transaction(async (tx) => {
+      const claimed = await tx.household.updateMany({
+        where: { id: "default", syncTroubleAlertedAt: null },
+        data: { syncTroubleAlertedAt: now },
+      });
+      if (!claimed.count) return 0;
+      return writeEvents("sync.down", await recipients("sync.down", now, tx), {}, now, tx);
     });
-    if (!claimed.count) return;
-    await writeEvents("sync.down", await recipients("sync.down", now), {}, now);
+    if (written) wakeAlertSender();
   } catch (error) {
     warn(error);
   }

@@ -131,21 +131,28 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
   async function deliver() {
     if (demoModeEnabled()) return;
     const at = now();
+    const household = await prisma().household.findUnique({
+      where: { id: "default" },
+      select: { alertsRelayEnabled: true, syncTroubleAlertedAt: true },
+    });
+    const alerted = household?.syncTroubleAlertedAt;
     await prisma().alertEvent.deleteMany({
       where: {
         OR: [
-          { sentAt: { lt: new Date(at.getTime() - KEEP_SENT_MS) } },
+          {
+            sentAt: { lt: new Date(at.getTime() - KEEP_SENT_MS) },
+            // The trouble alerts of an outage still going on are how its "back" alert finds its phones.
+            ...(alerted ? { NOT: { kind: "sync.down", createdAt: { gte: alerted } } } : {}),
+          },
           { sentAt: null, createdAt: { lt: new Date(at.getTime() - GIVE_UP_AFTER_MS) } },
         ],
       },
     });
-    const household = await prisma().household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true } });
     if (!household?.alertsRelayEnabled) return;
     const due = await prisma().alertEvent.findMany({
       where: { sentAt: null, nextAttemptAt: { lte: at } },
       orderBy: { createdAt: "asc" },
       take: BATCH,
-      include: { device: { select: { revokedAt: true, pushRegistration: true, sessions: { where: signedInDevice(at).sessions.some, select: { id: true }, take: 1 } } } },
     });
     if (!due.length) return;
     let credential: { installId: string; secret: string };
@@ -157,8 +164,18 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
       return;
     }
     for (const [index, event] of due.entries()) {
-      const registration = event.device.pushRegistration;
-      if (!registration || event.device.revokedAt || !event.device.sessions.length) {
+      // Read again just before it goes: the batch can take a while, and in that time the switch may
+      // have gone off, the alert been dropped, or the device been signed out, revoked or re-registered.
+      const switchOn = await prisma().household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true } });
+      if (!switchOn?.alertsRelayEnabled) return;
+      const current = await prisma().alertEvent.findFirst({
+        where: { id: event.id, sentAt: null },
+        select: { device: { select: { pushRegistration: true } } },
+      });
+      if (!current) continue;
+      const registration = current.device.pushRegistration;
+      const signedIn = registration && (await prisma().pairedDevice.count({ where: { id: event.deviceId, ...signedInDevice(now()) } }));
+      if (!registration || !signedIn) {
         await prisma().alertEvent.deleteMany({ where: { id: event.id } });
         continue;
       }
