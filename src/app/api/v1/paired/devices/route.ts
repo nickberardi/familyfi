@@ -13,7 +13,7 @@ const Filter = z.object({
 /** Paired devices the caller may see: `?client=` (repeatable) and `?status=active|revoked` narrow it. */
 export async function GET(request: Request) {
   return withSession(request, async (session) => {
-    const visible = visibleDevices(session as never);
+    const visible = visibleDevices(session);
     if (!visible) return jsonError(403, "administrator_required", "A FamilyFi administrator or a paired device is required.");
     const params = new URL(request.url).searchParams;
     const filter = Filter.safeParse({ client: params.getAll("client"), status: params.get("status") ?? undefined });

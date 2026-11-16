@@ -4,11 +4,12 @@ import { AssignmentState, RuleLiftKind } from "@prisma/client";
 import { enqueueChange } from "@/server/changes";
 import { blockButtonCandidate, groupInclude, publicGroup } from "@/server/groups";
 import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { mapLimited } from "@/lib/concurrency";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
 import { GATEWAY_CONCURRENCY } from "@/server/unifi/networks";
+import { loadHousehold } from "@/server/household";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 
 const Update = z.object({
@@ -24,7 +25,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {
     const { id } = await ctx.params;
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await loadHousehold();
     const group = await prisma().group.findUnique({
       where: { id },
       include: groupInclude,
@@ -37,17 +38,15 @@ export async function GET(request: Request, ctx: Ctx) {
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Update.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Invalid group update.");
+    const parsed = await readBody(request, Update, "Invalid group update.");
+    if (!parsed.ok) return parsed.response;
     const existing = await prisma().group.findUnique({ where: { id }, include: groupInclude });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
     const { blockButtonRuleId } = parsed.data;
     if (blockButtonRuleId && !existing.rules.some((link) => link.rule.id === blockButtonRuleId && blockButtonCandidate(link.rule))) {
       return jsonError(400, "invalid_block_button_rule", "The Block button can stand for one of this group's own category, app or website rules.");
     }
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await loadHousehold();
     const group = await prisma().group.update({
       where: { id },
       data: {

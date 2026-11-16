@@ -4,8 +4,9 @@ import { enqueueChange } from "@/server/changes";
 import { groupInclude, publicGroup } from "@/server/groups";
 import { joinCountriesRule, lockHousehold } from "@/server/rules";
 import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
+import { loadHousehold } from "@/server/household";
 
 const Create = z.object({
   kind: z.enum(["family", "things"]),
@@ -16,7 +17,7 @@ const Create = z.object({
 
 export async function GET(request: Request) {
   return withSession(request, async () => {
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await loadHousehold();
     const groups = await prisma().group.findMany({ include: groupInclude, orderBy: { createdAt: "asc" } });
     return Response.json({ groups: groups.map((group) => publicGroup(group, household.timezone)) });
   });
@@ -24,14 +25,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withMutation(request, async () => {
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Create.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "kind and name are required.");
+    const parsed = await readBody(request, Create, "kind and name are required.");
+    if (!parsed.ok) return parsed.response;
     if (parsed.data.kind === "family" && !parsed.data.familyRole) {
       return jsonError(400, "invalid_request", "Family groups need a role.");
     }
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await loadHousehold();
     const created = await prisma().$transaction(async (tx) => {
       // Serialized with other group creates and Block countries saves, so "covers every group" holds.
       await lockHousehold(tx);

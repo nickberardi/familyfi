@@ -626,6 +626,11 @@
         "trust"
       ]
     },
+    "tests/integration/guard.test.ts": {
+      "categories": [
+        "sessions"
+      ]
+    },
     "tests/integration/group-detail-api.test.ts": {
       "categories": [
         "groups"

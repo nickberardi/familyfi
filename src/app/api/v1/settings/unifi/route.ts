@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { listSiteNetworks, publicUnifiSettings, saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
 import { PreviousTargetError, UnifiConfigError } from "@/server/unifi/errors";
 import { demoLocked } from "@/server/demo";
+import { loadHousehold } from "@/server/household";
 
 const UnifiBody = z
   .object({
@@ -29,7 +29,7 @@ const UnifiBody = z
 
 export async function GET(request: Request) {
   return withSession(request, async () => {
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await loadHousehold();
     let networks: Awaited<ReturnType<typeof listSiteNetworks>> = [];
     if (household.unifiKeyLastFour) {
       try {
@@ -46,12 +46,8 @@ export async function PUT(request: Request) {
   return withMutation(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = UnifiBody.safeParse(body.value);
-    if (!parsed.success) {
-      return jsonError(400, "invalid_request", "Provide an API key and UniFi target, or a managed network selection.");
-    }
+    const parsed = await readBody(request, UnifiBody, "Provide an API key and UniFi target, or a managed network selection.");
+    if (!parsed.ok) return parsed.response;
     try {
       const change = parsed.data.apiKey
         ? await saveUnifiConnection({
@@ -68,7 +64,7 @@ export async function PUT(request: Request) {
             manageAllNetworks: parsed.data.manageAllNetworks,
             managedNetworkIds: parsed.data.managedNetworkIds,
           });
-      const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+      const household = await loadHousehold();
       let networks: Awaited<ReturnType<typeof listSiteNetworks>> = [];
       try {
         networks = await listSiteNetworks(household);

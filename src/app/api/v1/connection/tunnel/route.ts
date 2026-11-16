@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { jsonError } from "@/server/http";
-import { readJson, withAdmin } from "@/server/guard";
+import { readBody, withAdmin } from "@/server/guard";
 import { RemoteAccessError, remoteAccessState, setRemoteAccess } from "@/server/tunnel/remote-access";
 import { demoLocked } from "@/server/demo";
 
@@ -21,10 +21,8 @@ export async function PUT(request: Request) {
   return withAdmin(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Mode must be off, quick, or named with a hostname or a route id.");
+    const parsed = await readBody(request, Body, "Mode must be off, quick, or named with a hostname or a route id.");
+    if (!parsed.ok) return parsed.response;
     try {
       await setRemoteAccess(parsed.data);
     } catch (error) {
