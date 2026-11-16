@@ -1,5 +1,9 @@
 import type { DpiCatalogItem } from "./types";
+import { prisma } from "../db";
+import { ApiError } from "../http";
 import type { UnifiClient } from "./client";
+import { clientForHousehold, connectionIdentity } from "./connection";
+import { UnifiConfigError } from "./errors";
 
 /**
  * The gateway's app and category catalog changes only with its firmware, yet every Family, Things,
@@ -30,4 +34,23 @@ export function dpiCatalog(identity: string, kind: Kind, client: UnifiClient, no
 
 export function forgetDpiCatalogs() {
   cache.clear();
+}
+
+/**
+ * The gateway's DPI applications or categories for a rule's picker. A filtered search asks the
+ * gateway; the whole catalog is shared between requests.
+ */
+export async function listDpi(kind: "applications" | "categories", filter: string | undefined): Promise<DpiCatalogItem[]> {
+  const household = await prisma().household.findUnique({ where: { id: "default" } });
+  if (!household || household.connectionStatus === "unconfigured") {
+    throw new ApiError(409, "unifi_unconfigured", `Configure UniFi in Settings before listing DPI ${kind}.`);
+  }
+  try {
+    const client = clientForHousehold(household);
+    if (!filter) return await dpiCatalog(connectionIdentity(household), kind, client);
+    return await (kind === "applications" ? client.listDpiApplications(filter) : client.listDpiCategories(filter));
+  } catch (error) {
+    if (error instanceof UnifiConfigError) throw new ApiError(409, "unifi_unconfigured", error.message);
+    throw error;
+  }
 }

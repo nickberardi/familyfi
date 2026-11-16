@@ -1,4 +1,5 @@
 import type { Household } from "@prisma/client";
+import { householdTimezone } from "@/lib/household-state";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { ApiError } from "./http";
@@ -52,4 +53,10 @@ export async function updateHouseholdSettings(input: { timezone?: string; displa
     rescheduleAutoUpdate();
   }
   return { household: await publicHousehold(household), change };
+}
+
+/** The household's time zone, which every caller may read, a Watch included, which may not read household settings. */
+export async function currentTimezone() {
+  const household = await prisma().household.findUnique({ where: { id: "default" }, select: { timezone: true } });
+  return householdTimezone(household);
 }
