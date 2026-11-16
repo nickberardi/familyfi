@@ -173,3 +173,24 @@ test("a rule changed in UniFi shows what changed, and Put it back only while Fam
   await expect(table).toContainText("Was on the gateway");
   await expect(note.getByTestId("checkup-put-back-gateway_drift:bedtime")).toHaveCount(0);
 });
+
+test("a link that arrives while Devices is open applies again", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string }[] };
+  await page.goto("/devices");
+  const show = page.getByTestId("private-address-show");
+  await expect(show).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByText("Living Room Apple TV")).toBeVisible();
+
+  // Followed without leaving the page, as the navigation's "needs a device" link is: the group's
+  // banner shows and the list turns to the Unassigned devices.
+  await page.evaluate((id) => window.history.pushState(null, "", `/devices?assign=${id}`), groups[0]!.id);
+  await expect(page.getByTestId("assign-needed")).toBeVisible();
+  await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
+
+  // Checkup's "Show on Devices": back to every device with a private address.
+  await page.evaluate(() => window.history.pushState(null, "", "/devices?private=1"));
+  await expect(show).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Galaxy S24")).toBeVisible();
+  await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
+});
