@@ -1,41 +1,30 @@
 "use client";
 
-import { useState } from "react";
 import { BackLink, EDITOR_PAGE } from "@/components/ui/BackLink";
 import { useRouter } from "next/navigation";
 import {
-  fromLockDnsRule,
   LOCK_DNS_COPY as COPY,
   lockDnsDirty,
   lockDnsSummary,
-  saveLockDns,
-  validateLockDnsDraft,
-  type LockDnsDraft,
 } from "@/lib/lock-dns";
 import { managedNetworks, ruleEditorBack } from "@/lib/rule-editor";
 import type { Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { LockDnsForm } from "@/ui/LockDnsForm";
+import { useLockDnsEditor } from "@/ui/use-rule-editor";
 
 /** The built-in Lock DNS rule's page on the web: the shared form under the page header and its Save. */
 export function LockDnsPage({ rule, returnGroup }: { rule: Rule; returnGroup: string | null }) {
   const router = useRouter();
   const { groups, unifi, store, busy } = useAppData();
   const { href: back, label: backLabel } = ruleEditorBack(returnGroup, groups);
-  const [draft, setDraft] = useState<LockDnsDraft>(() => fromLockDnsRule(rule));
-  const [error, setError] = useState("");
+  const editor = useLockDnsEditor({ rule, mutate: store.mutate, off: busy });
+  const { draft } = editor;
   const dirty = lockDnsDirty(rule, draft);
 
   async function save() {
-    if (busy) return;
-    const problem = validateLockDnsDraft(draft);
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    const result = await saveLockDns(store.mutate, rule, draft);
-    if (result?.rule) router.push(back);
+    if (await editor.save()) router.push(back);
   }
 
   return (
@@ -57,11 +46,8 @@ export function LockDnsPage({ rule, returnGroup }: { rule: Rule; returnGroup: st
           groups={groups}
           networks={managedNetworks(unifi)}
           draft={draft}
-          error={error}
-          edit={(next) => {
-            setError("");
-            setDraft(next);
-          }}
+          error={editor.error}
+          edit={editor.edit}
         />
       </form>
     </>
