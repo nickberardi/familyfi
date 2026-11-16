@@ -68,8 +68,8 @@ foreign key.
 
 ### Startup and reads
 
-[Instrumentation](../src/instrumentation.ts) runs server initialization in the Node runtime outside
-builds: it loads configuration, ensures recovery/household/seed data, starts reconciliation and DNS
+[Instrumentation](../src/instrumentation.ts) calls [boot](../src/server/boot.ts) in the Node runtime outside
+builds. `boot` loads configuration, ensures recovery/household/seed data, starts reconciliation and DNS
 scheduling, starts update checking, and resumes configured remote access. These are server process
 responsibilities; visiting a page is not what starts enforcement.
 
