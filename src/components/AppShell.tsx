@@ -221,12 +221,15 @@ function NavGroups({
 /**
  * The small line at the foot of the rail and the drawer: the version, which opens About, and
  * links to star the project and report an issue on GitHub. It keeps the version in sight
- * without taking a row of the nav.
+ * without taking a row of the nav. At 14px the three items need about 216px, more than the
+ * rail's padded column (207px), so the line spans the rail's full width, into its padding
+ * (the rail's scrolling end carries that padding itself, so nothing clips it), and still
+ * wraps if a longer version ever outgrows it.
  */
 function SidebarFooter({ onAbout }: { onAbout: () => void }) {
   const link = "rounded-[4px] border-0 bg-transparent p-0 text-[var(--ff-muted)] hover:text-[var(--ff-ink)] hover:underline";
   return (
-    <div className="flex flex-none flex-wrap items-center justify-center gap-x-1.5 text-[14px] leading-5 text-[var(--ff-muted)]">
+    <div className="-mx-3 flex flex-none flex-wrap items-center justify-center gap-x-1.5 text-[14px] leading-5 text-[var(--ff-muted)]">
       {/* The spoken name starts with the visible version, so voice control can say what it sees. */}
       <button type="button" onClick={onAbout} aria-label={`${appVersionLabel()}, About FamilyFi`} title="About" className={link}>
         {appVersionLabel()}
@@ -345,7 +348,7 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
               />
             </div>
           </nav>
-          <div className="ff-sidebar-end flex flex-col gap-2">
+          <div className="ff-sidebar-end -mx-3 flex flex-col gap-2 px-3">
             <SidebarStatus
               sync={sync}
               busy={busy}
