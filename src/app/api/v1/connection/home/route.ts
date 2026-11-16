@@ -2,7 +2,6 @@ import { z } from "zod";
 import { homeOrigin, isPrivateOrigin } from "@/lib/connection-routes";
 import { requestOrigin } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { demoLocked } from "@/server/demo";
 import { readBody, withAdmin } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { loadHousehold } from "@/server/household";
@@ -28,8 +27,6 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Body, "Send a url, or null to clear it.");
     if (!parsed.ok) return parsed.response;
     const blank = parsed.data.url === null || parsed.data.url.trim() === "";
@@ -37,5 +34,5 @@ export async function PUT(request: Request) {
     if (!blank && !url) return jsonError(400, "invalid_home_url", "Use an http or https address with no path, such as http://192.168.1.10:7001.");
     const household = await prisma().household.update({ where: { id: "default" }, data: { homeUrl: url } });
     return home(request, household.homeUrl);
-  });
+  }, { demoLock: true });
 }

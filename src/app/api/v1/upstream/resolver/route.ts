@@ -9,7 +9,6 @@ import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 import { DEFAULT_WEEKLY_DAYS, DEFAULT_WEEKLY_TIME, nextWeeklyRunAt } from "@/server/weekly-schedule";
 import { withUpstreamLock } from "@/server/upstream/transaction";
 import { refreshResolverContexts, type ResolverContext } from "@/server/upstream/discovery";
-import { demoLocked } from "@/server/demo";
 
 const SELECT = {
   dohUrl: true,
@@ -86,8 +85,6 @@ const PutBody = z.object({
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, PutBody, "Invalid resolver settings.");
     if (!parsed.ok) return parsed.response;
 
@@ -133,14 +130,12 @@ export async function PUT(request: Request) {
     rescheduleUpstreamProbe();
     const context = (await refreshResolverContexts()).household;
     return Response.json({ resolver: serialize(household, context) });
-  });
+  }, { demoLock: true });
 }
 
 /** Removing a DoH override returns to DHCP discovery without changing the check schedule. */
 export async function DELETE(request: Request) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     await withUpstreamLock(async (tx) => {
       await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
       await tx.household.update({
@@ -151,5 +146,5 @@ export async function DELETE(request: Request) {
     await refreshResolverContexts();
     rescheduleUpstreamProbe();
     return Response.json({ ok: true });
-  });
+  }, { demoLock: true });
 }

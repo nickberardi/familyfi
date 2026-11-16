@@ -7,7 +7,6 @@ import { removeAccountDevices } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { demoLocked } from "@/server/demo";
 
 const Update = z.object({
   displayName: z.string().min(1).optional(),
@@ -28,8 +27,6 @@ export async function GET(request: Request, ctx: Ctx) {
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await ctx.params;
     const parsed = await readBody(request, Update, "Invalid account update.");
     if (!parsed.ok) return parsed.response;
@@ -66,13 +63,11 @@ export async function PUT(request: Request, ctx: Ctx) {
     });
     const change = await enqueueChange("account");
     return Response.json({ account: publicAccount(account), change });
-  });
+  }, { demoLock: true });
 }
 
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await ctx.params;
     const existing = await prisma().account.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Account not found.");
@@ -83,5 +78,5 @@ export async function DELETE(request: Request, ctx: Ctx) {
     await prisma().account.delete({ where: { id } });
     const change = await enqueueChange("account");
     return Response.json({ ok: true, change });
-  });
+  }, { demoLock: true });
 }

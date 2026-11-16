@@ -1,4 +1,3 @@
-import { demoLocked } from "@/server/demo";
 import { withAdmin } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { getUpdateCheckSnapshot } from "@/server/update-check";
@@ -13,8 +12,6 @@ const STATUS_BY_CODE = {
 
 export async function POST(request: Request) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     try {
       const run = await requestUpdate({ update: getUpdateCheckSnapshot() });
       return Response.json({ run: publicUpdateRun(run) }, { status: 202 });
@@ -22,5 +19,5 @@ export async function POST(request: Request) {
       if (error instanceof UpdaterError) return jsonError(STATUS_BY_CODE[error.code], error.code, error.message);
       throw error;
     }
-  });
+  }, { demoLock: true });
 }

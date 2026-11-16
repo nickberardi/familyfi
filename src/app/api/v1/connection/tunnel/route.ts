@@ -2,7 +2,6 @@ import { z } from "zod";
 import { jsonError } from "@/server/http";
 import { readBody, withAdmin } from "@/server/guard";
 import { RemoteAccessError, remoteAccessState, setRemoteAccess } from "@/server/tunnel/remote-access";
-import { demoLocked } from "@/server/demo";
 
 const Body = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("off"), forget: z.boolean().optional() }).strict(),
@@ -19,8 +18,6 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const parsed = await readBody(request, Body, "Mode must be off, quick, or named with a hostname or a route id.");
     if (!parsed.ok) return parsed.response;
     try {
@@ -30,5 +27,5 @@ export async function PUT(request: Request) {
       throw error;
     }
     return Response.json({ tunnel: await remoteAccessState() });
-  });
+  }, { demoLock: true });
 }

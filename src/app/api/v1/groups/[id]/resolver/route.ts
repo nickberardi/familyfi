@@ -7,7 +7,6 @@ import { jsonError } from "@/server/http";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
 import { withUpstreamLock } from "@/server/upstream/transaction";
 import { refreshResolverContexts } from "@/server/upstream/discovery";
-import { demoLocked } from "@/server/demo";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -38,8 +37,6 @@ export async function GET(request: Request, ctx: Ctx) {
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await ctx.params;
     const parsed = await readBody(request, Body, "Paste the endpoint URL.");
     if (!parsed.ok) return parsed.response;
@@ -73,7 +70,7 @@ export async function PUT(request: Request, ctx: Ctx) {
     });
     await refreshResolverContexts();
     return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
-  });
+  }, { demoLock: true });
 }
 
 /**
@@ -83,8 +80,6 @@ export async function PUT(request: Request, ctx: Ctx) {
  */
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await ctx.params;
     const existing = await prisma().group.findUnique({ where: { id }, select: { id: true } });
     if (!existing) return jsonError(404, "not_found", "Group not found.");
@@ -99,5 +94,5 @@ export async function DELETE(request: Request, ctx: Ctx) {
     });
     await refreshResolverContexts();
     return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
-  });
+  }, { demoLock: true });
 }
