@@ -42,8 +42,12 @@ describe("Phase 2 DPI rules", () => {
     await configureConnectedHousehold();
   });
 
+  const mode = process.env.FAMILYFI_MODE;
+
   afterEach(() => {
     setReconcileClientForTests(undefined);
+    if (mode === undefined) delete process.env.FAMILYFI_MODE;
+    else process.env.FAMILYFI_MODE = mode;
   });
 
   it("requires auth for dpi and rules routes", async () => {
