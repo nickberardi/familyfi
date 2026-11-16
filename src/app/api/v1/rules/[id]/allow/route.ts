@@ -1,5 +1,5 @@
 import { withMutation } from "@/server/guard";
-import { runLift } from "@/server/rule-lifts";
+import { liftRule, readLiftBody } from "@/server/rule-lifts";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -7,6 +7,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async (session) => {
     const { id } = await ctx.params;
-    return runLift(request, session, "allow", { ruleId: id });
+    const read = await readLiftBody(request, "allow");
+    if (!read.ok) return read.response;
+    return Response.json(await liftRule(session, "allow", { ruleId: id }, read.body));
   });
 }

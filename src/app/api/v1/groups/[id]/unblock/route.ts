@@ -1,5 +1,5 @@
 import { withMutation } from "@/server/guard";
-import { runGroupUnblock } from "@/server/group-unblock";
+import { readUnblockBody, unblockGroup } from "@/server/group-unblock";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -7,6 +7,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async (session) => {
     const { id } = await ctx.params;
-    return runGroupUnblock(request, session, "unblock", id);
+    const read = await readUnblockBody(request, "unblock");
+    if (!read.ok) return read.response;
+    return Response.json(await unblockGroup(session, "unblock", id, read.body));
   });
 }
