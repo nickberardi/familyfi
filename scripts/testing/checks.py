@@ -51,7 +51,8 @@ def coverage(args, runs):
 
 def run_check(name, args, resources, report, runs, database):
     if name == "catalog":
-        tests, _ = catalog.load(resources.root)
+        # Always a fresh listing; the run after it in the same job reuses it.
+        tests, _ = catalog.load(resources.root, cache=False)
         return f"{len(tests)} categorized tests"
     preflight(resources.root, docker=name in DOCKER)
     env = database() if name in NEEDS_DATABASE else resources.test_env("checks")

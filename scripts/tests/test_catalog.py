@@ -1,6 +1,9 @@
 from pathlib import Path
+import subprocess
 import tempfile
+import threading
 import unittest
+from unittest import mock
 
 from support import DISCOVERED, ENTRIES, identity, load, write_catalog
 from testing import catalog
@@ -91,6 +94,74 @@ class SelectionTests(unittest.TestCase):
     def test_a_declared_but_unused_category_selects_nothing(self):
         with self.assertRaisesRegex(ValueError, "no applicable tests"):
             self.select(categories=["accessibility"])
+
+
+
+class DiscoveryCacheTests(unittest.TestCase):
+    """identities() lists once per state of its inputs, and never serves a listing older than them."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        for path, text in {"tests/unit/a.test.ts": "a", "src/lib/x.ts": "x", "package.json": "{}",
+                           "README.md": "readme"}.items():
+            (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / path).write_text(text)
+        (self.root / "node_modules/.bin").mkdir(parents=True)
+        for name in ("vitest", "playwright"):
+            (self.root / "node_modules/.bin" / name).write_text("")
+        git = ["git", "-c", "user.email=t@example.com", "-c", "user.name=t"]
+        subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
+        subprocess.run(["git", "add", "-A"], cwd=self.root, check=True)
+        subprocess.run([*git, "commit", "-qm", "init"], cwd=self.root, check=True)
+        self.calls, lock = 0, threading.Lock()
+
+        def runner_json(command, root, env, output_env=None):
+            with lock:  # the three listings run in parallel
+                self.calls += 1
+            if output_env:
+                return {"suites": []}
+            return [{"file": str(Path(root) / "tests/unit/a.test.ts"), "name": f"{command[3]} {self.calls}"}]
+        patcher = mock.patch.object(catalog, "runner_json", side_effect=runner_json)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def listings(self, **kwargs):
+        before = self.calls
+        found = catalog.identities(self.root, **kwargs)
+        return self.calls - before, found
+
+    def test_a_second_discovery_of_the_same_inputs_lists_nothing(self):
+        listed, first = self.listings()
+        self.assertEqual(listed, 3)
+        listed, second = self.listings()
+        self.assertEqual((listed, second), (0, first))
+
+    def test_a_changed_input_is_listed_again_and_an_unrelated_file_is_not(self):
+        self.listings()
+        (self.root / "README.md").write_text("changed")
+        self.assertEqual(self.listings()[0], 0)
+        (self.root / "src/lib/x.ts").write_text("changed, not staged")
+        self.assertEqual(self.listings()[0], 3)
+        self.assertEqual(self.listings()[0], 0)
+
+    def test_an_untracked_test_is_listed_again(self):
+        self.listings()
+        (self.root / "tests/unit/b.test.ts").write_text("new")
+        self.assertEqual(self.listings()[0], 3)
+
+    def test_a_full_listing_ignores_and_refreshes_what_is_kept(self):
+        self.listings()
+        listed, fresh = self.listings(cache=False)
+        self.assertEqual(listed, 3)
+        self.assertEqual(self.listings(), (0, fresh))
+
+    def test_outside_a_git_checkout_nothing_is_kept(self):
+        subprocess.run(["rm", "-rf", str(self.root / ".git")], check=True)
+        self.assertEqual(self.listings()[0], 3)
+        self.assertEqual(self.listings()[0], 3)
+        self.assertFalse(list((self.root / "build/test-cache").glob("discovery-*.json")))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from testing import reporting
 from testing.reporting import Report
 
 
@@ -43,6 +44,32 @@ class ReportTests(unittest.TestCase):
         self.assertIn("**tests/unit/a.test.ts > works** (host): expected 1", (self.directory / "summary.md").read_text())
         events = [json.loads(line) for line in (self.directory / "events.jsonl").read_text().splitlines()]
         self.assertEqual(events[0]["result"]["status"], "failed")
+
+    def test_a_batch_writes_its_results_once_with_every_event_streamed(self):
+        one_by_one = Report(self.directory / "one", "run", quiet=True)
+        (self.directory / "one").mkdir()
+        rows = [(f"t{i}", "failed" if i == 3 else "passed") for i in range(5)]
+        for identity, status in rows:
+            one_by_one.result(identity, status)
+        writes = []
+        real = reporting.atomic_json
+        with mock.patch.object(reporting, "atomic_json", side_effect=lambda path, value: (writes.append(Path(path).name), real(path, value))):
+            with self.report.batch():
+                for identity, status in rows:
+                    self.report.result(identity, status)
+                    with self.report.batch():  # a nested batch defers to the outer one
+                        pass
+                self.assertFalse((self.directory / "results.json").exists())
+        self.assertEqual(writes, ["results.json"])
+        self.assertEqual((self.directory / "results.json").read_text(), (self.directory / "one/results.json").read_text())
+        events = [json.loads(line)["result"] for line in (self.directory / "events.jsonl").read_text().splitlines()]
+        self.assertEqual(events, one_by_one.results)
+
+    def test_a_batch_that_fails_still_writes_what_it_recorded(self):
+        with self.assertRaises(RuntimeError), self.report.batch():
+            self.report.result("a", "passed")
+            raise RuntimeError("adapter crashed")
+        self.assertEqual([r["test"] for r in json.loads((self.directory / "results.json").read_text())["results"]], ["a"])
 
     def test_a_github_job_gets_the_summary(self):
         self.report.result("a", "passed")

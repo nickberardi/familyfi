@@ -5,12 +5,15 @@ runners themselves (`vitest list`, `playwright test --list`, unittest), so what 
 what executes.
 """
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+
+from .reporting import atomic_json
 
 ROOT = Path(__file__).resolve().parents[2]
 SEP = " > "
@@ -117,7 +120,67 @@ def python_identities(root):
     return found
 
 
-def identities(root=ROOT):
+# What discovery reads: the tests and their configs, the code they import while collected, the
+# contract and the dependencies, and the harness that turns listings into identities.
+DISCOVERY_INPUTS = ("tests/", "scripts/tests/", "scripts/testing/", "src/", "openapi/", "package.json", "pnpm-lock.yaml")
+# Settings a listing reads from the caller's environment; listing_env() fixes the rest.
+DISCOVERY_ENV = ("CI", "PLAYWRIGHT_PORT", "PLAYWRIGHT_BASE_URL")
+DISCOVERY_FORMAT = 1
+DISCOVERY_KEEP = 5
+
+
+def git(root, *args):
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, check=True, timeout=60,
+                          stdin=subprocess.DEVNULL).stdout
+
+
+def discovery_key(root):
+    """A digest of everything discovery depends on, or None outside a git checkout.
+
+    Tracked files count by their staged blob; files changed since, and untracked ones, by their
+    content, so an edit or a new test is never served an older listing.
+    """
+    try:
+        staged = git(root, "ls-files", "-s", "--", *DISCOVERY_INPUTS)
+        changed = git(root, "ls-files", "-z", "-m", "-o", "--exclude-standard", "--", *DISCOVERY_INPUTS)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    digest = hashlib.sha256(f"format {DISCOVERY_FORMAT}\n".encode())
+    digest.update(staged)
+    for name in sorted(set(filter(None, changed.split(b"\0")))):
+        path = Path(root) / os.fsdecode(name)
+        digest.update(b"\0file\0" + name + b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).digest() if path.is_file() else b"deleted")
+    for name in DISCOVERY_ENV:
+        digest.update(f"\0env\0{name}={os.environ.get(name, '')}".encode())
+    return digest.hexdigest()
+
+
+def discovery_cache(root):
+    return Path(root) / "build/test-cache"
+
+
+def identities(root=ROOT, cache=True):
+    """Every test the runners list. A listing is kept per discovery key, so a job that discovers
+    twice lists once; `cache=False` always lists, and refreshes the kept listing."""
+    key = discovery_key(root)
+    path = discovery_cache(root) / f"discovery-{key}.json" if key else None
+    if cache and path and path.is_file():
+        try:
+            return json.loads(path.read_text())
+        except ValueError:
+            pass
+    found = list_identities(root)
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_json(path, found)
+        kept = sorted(path.parent.glob("discovery-*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
+        for stale in kept[DISCOVERY_KEEP:]:
+            stale.unlink(missing_ok=True)
+    return found
+
+
+def list_identities(root=ROOT):
     with ThreadPoolExecutor() as pool:
         listings = [pool.submit(vitest_identities, root, "unit"), pool.submit(vitest_identities, root, "integration"),
                     pool.submit(playwright_identities, root)]
@@ -135,11 +198,11 @@ def matches(identity, selector):
         selector.endswith("/") and identity.startswith(selector))
 
 
-def load(root=ROOT, path=None, discovered=None):
+def load(root=ROOT, path=None, discovered=None, cache=True):
     raw = json.loads((path or Path(root) / "scripts/testing/catalog.json").read_text())
     declared = set(raw["categories"])
     tests, used = [], set()
-    for index, identity in enumerate(discovered if discovered is not None else identities(root)):
+    for index, identity in enumerate(discovered if discovered is not None else identities(root, cache)):
         entry = dict(identity, categories=[], order=index)
         for selector, metadata in raw["entries"].items():
             if matches(identity["id"], selector):

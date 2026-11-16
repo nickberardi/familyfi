@@ -82,11 +82,12 @@ def execute(plan, resources, report, args, lookup):
                         coverage = report.directory / "coverage" if key == "vitest:coverage" else None
                         actual, error, floors = adapters.vitest(resources, report, group, batch_dir, env, args,
                                                                 lookup, coverage)
-                    for step in group:
-                        row = dict(actual[step["test"]])
-                        status = row.pop("status"); row.pop("test")
-                        report.result(step["test"], status, platform, step["role"], key=step["key"], **row)
-                        outcomes[step["key"]] = status
+                    with report.batch():
+                        for step in group:
+                            row = dict(actual[step["test"]])
+                            status = row.pop("status"); row.pop("test")
+                            report.result(step["test"], status, platform, step["role"], key=step["key"], **row)
+                            outcomes[step["key"]] = status
                     if floors is not None:
                         report.result("coverage floors", "failed" if floors else "passed", platform, "check",
                                       detail=floors or "tests/vitest.coverage.config.ts thresholds met")

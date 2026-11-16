@@ -1,5 +1,6 @@
 """One event stream and result format for every execution adapter."""
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 import os
@@ -36,6 +37,7 @@ class Report:
         self.started = time.monotonic()
         self.results = []
         self.quiet = quiet
+        self.deferred = 0
 
     def emit(self, message, echo=True, **fields):
         """Record an event; `echo=False` keeps it out of the terminal and `follow`."""
@@ -50,9 +52,28 @@ class Report:
         self.results.append(row)
         # The runner already streamed each pass; a row that needs attention is printed again.
         self.emit(f"{platform:8} {status:20} {identity}", echo=status not in ("passed", "expected-failure"), result=row)
+        if not self.deferred:
+            self.save()
+        return row
+
+    def save(self):
         atomic_json(self.directory / "results.json", {"run_id": self.run_id, "complete": False,
                                                      "results": self.results})
-        return row
+
+    @contextmanager
+    def batch(self):
+        """Write results.json once, at the end, for the results recorded inside.
+
+        Rewriting it per result is quadratic over a whole suite; events.jsonl still gets each
+        result as it is recorded, so `follow` sees no difference.
+        """
+        self.deferred += 1
+        try:
+            yield
+        finally:
+            self.deferred -= 1
+            if not self.deferred:
+                self.save()
 
     def cancel_remaining(self, plan):
         recorded = {row.get("key") for row in self.results}
