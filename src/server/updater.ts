@@ -3,10 +3,12 @@ import type { UpdateStatus } from "@prisma/client";
 import { z } from "zod";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
 import { APP_VERSION } from "@/lib/version";
+import { parseHm } from "@/lib/schedule";
 import { prisma } from "./db";
+import { ApiError } from "./http";
 import { unrefTimer } from "./unref-timer";
 import { compareSemver, parseSemver, refreshUpdateCheck, type UpdateCheckSnapshot } from "./update-check";
-import { dueWeeklyRunAt, nextWeeklyRunAt, parseWeeklyCron } from "./weekly-schedule";
+import { dueWeeklyRunAt, nextWeeklyRunAt, parseWeeklyCron, weeklyCron } from "./weekly-schedule";
 
 /**
  * Installing a newer release through the Watchtower sidecar (docker/docker-compose.yml). FamilyFi
@@ -497,4 +499,19 @@ export function autoUpdateArmedForTests(): boolean {
 
 export function runAutoUpdateCatchUpForTests(options: UpdaterOptions = {}): Promise<Claim> {
   return claimAndInstallIfDue(options);
+}
+
+/** Saves when updates install on their own, and answers with the update settings as they now stand. */
+export async function setUpdateSchedule(input: { enabled: boolean; days: number[]; time: string }): Promise<UpdateSettings> {
+  try {
+    parseHm(input.time);
+  } catch (error) {
+    throw new ApiError(400, "invalid_request", (error as Error).message);
+  }
+  await prisma().household.update({
+    where: { id: "default" },
+    data: { updateScheduleEnabled: input.enabled, updateSchedule: weeklyCron(input) },
+  });
+  rescheduleAutoUpdate();
+  return updateSettings();
 }
