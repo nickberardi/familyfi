@@ -3,9 +3,6 @@
  * `src/server` (issue #392). It never reaches the database or creates a UniFi client itself, so
  * household logic is testable without HTTP and gateway calls sit in one layer.
  *
- * Route files that still do are listed below while they are converted, one area at a time. The
- * list only shrinks: a converted file that stays listed fails this test too.
- *
  * This reads import specifiers and those function names, not what the code reaches at run time.
  */
 
@@ -20,20 +17,6 @@ const FORBIDDEN = ["@/server/db", "@/server/unifi/connection"];
 
 /** Functions that hand out a UniFi client, whichever module a route takes them from. */
 const FORBIDDEN_NAMES = /\b(clientForHousehold|syncClient)\b/;
-
-const NOT_YET_CONVERTED = [
-  "auth/session/route.ts",
-  "changes/[id]/route.ts",
-  "checkup/leftover-policies/remove/route.ts",
-  "checkup/run/route.ts",
-  "devices/[mac]/assignment/route.ts",
-  "devices/[mac]/route.ts",
-  "devices/route.ts",
-  "dpi/applications/route.ts",
-  "dpi/categories/route.ts",
-  "health/route.ts",
-  "sync/route.ts",
-];
 
 function routeFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -59,11 +42,7 @@ describe("route boundary", () => {
     expect(routeFiles(apiRoot).length).toBeGreaterThan(50);
   });
 
-  it("lets no route file reach the database or a UniFi client, beyond those not yet converted", () => {
-    expect(reaching.filter((file) => !NOT_YET_CONVERTED.includes(file))).toEqual([]);
-  });
-
-  it("lists no route file that has been converted", () => {
-    expect(NOT_YET_CONVERTED.filter((file) => !reaching.includes(file))).toEqual([]);
+  it("lets no route file reach the database or a UniFi client", () => {
+    expect(reaching).toEqual([]);
   });
 });

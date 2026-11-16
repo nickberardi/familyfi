@@ -1,4 +1,9 @@
 import { AssignmentState } from "@prisma/client";
+import { enqueueChange } from "./changes";
+import { prisma } from "./db";
+import { loadHousehold } from "./household";
+import { ApiError } from "./http";
+import { normalizeMac } from "./mac";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
 
 export function deviceScope(household: {
@@ -61,4 +66,66 @@ export function publicDevice(
     unresolved: !device.zoneId,
     inScope,
   };
+}
+
+function deviceNotFound() {
+  return new ApiError(404, "not_found", "Device not found.");
+}
+
+/** The MAC address a request's path names, percent-encoded as it arrives. */
+export function deviceMac(raw: string): string {
+  try {
+    return normalizeMac(decodeURIComponent(raw));
+  } catch {
+    throw new ApiError(400, "invalid_mac", "MAC address must contain 12 hex digits.");
+  }
+}
+
+async function present(device: Parameters<typeof publicDevice>[0]) {
+  const household = await loadHousehold();
+  return publicDevice(device, deviceScope(household), new Date(), household.presenceCheckedAt);
+}
+
+/** Every device, or only the `quarantined` or `assigned` ones. */
+export async function listDevices(assignment: string | null) {
+  const household = await loadHousehold();
+  const devices = await prisma().device.findMany({
+    where:
+      assignment === "quarantined"
+        ? { assignment: AssignmentState.quarantined }
+        : assignment === "assigned"
+          ? { assignment: AssignmentState.assigned }
+          : {},
+    orderBy: { mac: "asc" },
+  });
+  return devices.map((device) => publicDevice(device, deviceScope(household), new Date(), household.presenceCheckedAt));
+}
+
+export async function getDevice(mac: string) {
+  const household = await loadHousehold();
+  const device = await prisma().device.findUnique({ where: { mac } });
+  if (!device) throw deviceNotFound();
+  return publicDevice(device, deviceScope(household), new Date(), household.presenceCheckedAt);
+}
+
+export async function forgetDevice(mac: string) {
+  const removed = await prisma().device.deleteMany({ where: { mac } });
+  if (removed.count === 0) throw deviceNotFound();
+  return { change: await enqueueChange("device", mac) };
+}
+
+/** Assigns a device to a group, or with null puts it back in quarantine. */
+export async function assignDevice(mac: string, groupId: string | null) {
+  const existing = await prisma().device.findUnique({ where: { mac } });
+  if (!existing) throw deviceNotFound();
+  if (groupId) {
+    const group = await prisma().group.findUnique({ where: { id: groupId } });
+    if (!group) throw new ApiError(404, "not_found", "Group not found.");
+  }
+  const device = await prisma().device.update({
+    where: { mac },
+    data: { groupId, assignment: groupId ? AssignmentState.assigned : AssignmentState.quarantined },
+  });
+  const change = await enqueueChange("assignment", mac);
+  return { device: await present(device), change };
 }

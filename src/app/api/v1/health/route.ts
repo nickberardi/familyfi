@@ -1,14 +1,10 @@
 import { API_VERSION, MIN_APP_API_VERSION, MIN_WATCH_API_VERSION } from "@/lib/api-compat";
-import { APP_VERSION } from "@/lib/version";
-import { prisma } from "@/server/db";
-import { ConfigurationError, demoModeEnabled, loadEnv } from "@/server/env";
 import { gatewayHealth } from "@/server/gateway-health";
 import { withSession } from "@/server/guard";
+import { readiness, type Readiness } from "@/server/readiness";
 import { getUpdateCheckSnapshot } from "@/server/update-check";
 
 export const dynamic = "force-dynamic";
-
-type Readiness = { body: Record<string, unknown>; status: number };
 
 // Every answer, degraded or not, says which contract it speaks, so a client can tell an update
 // from an outage (src/lib/api-compat.ts).
@@ -23,37 +19,6 @@ function healthResponse({ body, status }: Readiness) {
     },
     { status, headers: { "cache-control": "no-store" } },
   );
-}
-
-async function readiness(): Promise<Readiness> {
-  try {
-    loadEnv();
-  } catch (error) {
-    const message =
-      error instanceof ConfigurationError
-        ? error.message
-        : "FamilyFi is missing required settings in .env.";
-    return { body: { status: "degraded", db: "unconfigured", version: APP_VERSION, error: message }, status: 503 };
-  }
-  try {
-    await prisma().$queryRaw`SELECT 1`;
-    const household = await prisma().household.findUnique({ where: { id: "default" } });
-    // The demo seeds its household at every start, so without one it has nothing to show.
-    if (!household && demoModeEnabled()) {
-      return { body: { status: "degraded", db: "ok", version: APP_VERSION, error: "No household yet." }, status: 503 };
-    }
-    return {
-      body: {
-        status: "ok",
-        db: "ok",
-        version: APP_VERSION,
-        revision: household?.revision ?? 0,
-      },
-      status: 200,
-    };
-  } catch {
-    return { body: { status: "degraded", db: "error", version: APP_VERSION }, status: 503 };
-  }
 }
 
 export async function GET(request: Request) {
