@@ -218,15 +218,19 @@ describe("alert sender", () => {
   });
 
   it("checks each alert again just before it goes, so one dropped mid-batch is never sent", async () => {
-    const [first, second, third] = [await registeredPhone(), await registeredPhone(), await registeredPhone()];
+    await registeredPhone();
+    await registeredPhone();
+    await registeredPhone();
     await recordNewDevices([{ hostname: null }], { firstPass: false, now });
-    // While the first alert is on its way, the second phone signs out.
-    const sends: string[] = [];
+    // While the first alert is on its way, the phone whose alert goes last signs out.
+    const order = await prisma().alertEvent.findMany({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+    const last = order.at(-1)!.deviceId;
+    let sends = 0;
     const midBatch = createAlertSender({
       fetchImpl: (async (input: string | URL | Request, init?: RequestInit) => {
         if (String(input).endsWith("/v1/send")) {
-          sends.push(String(input));
-          if (sends.length === 1) await prisma().session.updateMany({ where: { deviceId: second }, data: { revokedAt: now } });
+          sends += 1;
+          if (sends === 1) await prisma().session.updateMany({ where: { deviceId: last }, data: { revokedAt: now } });
         }
         return relay.fetchImpl(input, init);
       }) as typeof fetch,
@@ -234,10 +238,10 @@ describe("alert sender", () => {
       relayUrl: () => "https://relay.test",
     });
     await midBatch.flush();
-    // The first and third went; the second phone's was dropped unsent.
-    expect(sends).toHaveLength(2);
-    expect(await prisma().alertEvent.count({ where: { deviceId: second } })).toBe(0);
-    expect((await prisma().alertEvent.findMany({ where: { sentAt: { not: null } } })).map((event) => event.deviceId).sort()).toEqual([first, third].sort());
+    // The other two went; the signed-out phone's was dropped unsent.
+    expect(sends).toBe(2);
+    expect(await prisma().alertEvent.count({ where: { deviceId: last } })).toBe(0);
+    expect(await prisma().alertEvent.count({ where: { sentAt: { not: null } } })).toBe(2);
   });
 
   it("stops a batch when the switch goes off before the next alert", async () => {

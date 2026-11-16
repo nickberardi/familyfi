@@ -20,6 +20,7 @@ export const LIGHT = {
   "brand-on-deep-2": "#7e849a",
   "card": "#ffffff",
   "card-veil": "rgba(255, 255, 255, 0.7)",
+  "caution-fill": "rgba(255, 204, 0, 0.3)",
   "chevron": "rgba(60, 60, 67, 0.3)",
   "control-line": "rgba(60, 60, 67, 0.2)",
   "danger": "#c8100a",
@@ -111,6 +112,7 @@ export const DARK: Partial<Record<ColorToken, string>> = {
   "accent-tint": "rgba(112, 181, 255, 0.12)",
   "accent-wash": "rgba(112, 181, 255, 0.1)",
   "card": "#1c1c1e",
+  "caution-fill": "rgba(255, 214, 10, 0.3)",
   // The dark card at the veil's 70%, as LIGHT's is the light card at 70%.
   "card-veil": "rgba(28, 28, 30, 0.7)",
   "chevron": "rgba(255, 255, 255, 0.3)",

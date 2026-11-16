@@ -151,7 +151,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
     if (!household?.alertsRelayEnabled) return;
     const due = await prisma().alertEvent.findMany({
       where: { sentAt: null, nextAttemptAt: { lte: at } },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: BATCH,
     });
     if (!due.length) return;

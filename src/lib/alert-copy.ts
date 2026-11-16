@@ -57,7 +57,7 @@ export const ALERTS_CARD_COPY = {
     "Each alert is locked with a key that only that device and your FamilyFi hold. The relay sees an address for the device, whether it is an Apple or Android device, the locked alert, a random number for your FamilyFi and the time. It can't read the alert, and it keeps nothing.",
     "Apple or Google see that a device got an alert and when, not what it says or what kind it is.",
   ],
-  /** Each paired app's own choice, on its access line in Pair Device. */
+  /** Each paired app's own choice, as its tag on Pair Device. */
   accessOn: "Alerts on",
   accessOff: "Alerts off",
 } as const;

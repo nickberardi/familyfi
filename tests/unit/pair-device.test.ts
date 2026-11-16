@@ -108,6 +108,12 @@ describe("pair device", () => {
     // Watches, Siri's sign-in and agents have no alerts field, and a revoked phone says nothing of them.
     expect(labels(undefined)).toEqual(["Full access", "An adult"]);
     expect(labels(true, "2026-09-10T00:00:00Z")).toEqual(["Full access", "An adult"]);
+    // Alerts on are green and off yellow; full access green, rules only blue, read only red; the adult grey.
+    const tones = (over: Partial<PairedPhone>) => phoneLines(phone(over), now).tags.map((tag) => tag.tone);
+    expect(tones({ alerts: true })).toEqual(["green", "neutral", "green"]);
+    expect(tones({ alerts: false })).toEqual(["green", "neutral", "yellow"]);
+    expect(tones({ scope: "rulesOnly" })[0]).toBe("blue");
+    expect(tones({ scope: "readOnly" })[0]).toBe("red");
   });
 
   it("offers Re-pair on any phone, active or revoked, but not the one showing the list", () => {
