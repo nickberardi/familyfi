@@ -49,7 +49,7 @@ function DevicesBody() {
     household,
     mutate: store.mutate,
     now,
-    params: { assign: searchParams.get("assign"), private: searchParams.get("private") },
+    params: { assign: searchParams.get("assign"), private: searchParams.get("private"), filter: searchParams.get("filter") },
   });
   const { rows, filter, setFilter, query, setQuery, privateMacs } = list;
   const networks = unifi?.networks ?? [];

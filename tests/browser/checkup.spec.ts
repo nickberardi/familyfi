@@ -194,6 +194,12 @@ test("a link that arrives while Devices is open applies again", { tag: "@desktop
   await expect(page.getByText("Galaxy S24")).toBeVisible();
   await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
 
+  // An alert's "Unassigned" link: the filter turns to Unassigned on the open list.
+  await page.goto("/devices");
+  await expect(page.getByText("Living Room Apple TV")).toBeVisible();
+  await page.evaluate(() => window.history.pushState(null, "", "/devices?filter=loose"));
+  await expect(page.getByText("Living Room Apple TV")).toHaveCount(0);
+
   // A group with no devices is told it needs one. Last, so no link above lands before the reload hydrates.
   const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "familyfi_csrf")?.value ?? "";
   const made = await page.request.post("/api/v1/groups", {
