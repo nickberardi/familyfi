@@ -3,39 +3,33 @@
 import { CANCEL_BUTTON, DESTRUCTIVE_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { BackLink, EDITOR_PAGE } from "@/components/ui/BackLink";
 import { NotFound } from "@/components/ui/NotFound";
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import {
   RULE_EDITOR_COPY as COPY,
   blankDraft,
-  deleteRule,
   deleteRuleCopy,
   fromRule,
   managedNetworks as managedNetworksOf,
   ruleEditorBack,
   ruleEditorParams,
   ruleEditorState,
-  saveRule,
-  validateRuleDraft,
   type EditorDraft as Draft,
 } from "@/lib/rule-editor";
 import {
   COUNTRIES_EDITOR_COPY,
   countriesEditorState,
   countriesWrites,
-  fromCountriesRule,
-  saveCountriesRule,
-  validateCountriesDraft,
-  type CountriesDraft,
 } from "@/lib/countries-editor";
-import { loadCheckup, outsideDnsNote, type CheckupState } from "@/lib/checkup";
+import { outsideDnsNote } from "@/lib/checkup";
 import type { Rule } from "@/lib/rules";
 import { useAppData } from "@/components/AppDataProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { CountriesRuleForm } from "@/ui/CountriesRuleForm";
 import { RuleEditorForm } from "@/ui/RuleEditorForm";
+import { useCheckup, useCountriesEditor, useRuleEditor } from "@/ui/use-rule-editor";
 import { LockDnsPage } from "./LockDnsPage";
 
 type Params = Promise<{ id: string }>;
@@ -85,34 +79,21 @@ export function RuleEditorPage({ params, searchParams }: { params?: Params; sear
 function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initial: Draft; returnGroup: string | null }) {
   const router = useRouter();
   const { groups, devices, unifi, store, busy } = useAppData();
-  const checkup = useCheckup();
-  const [draft, setDraft] = useState<Draft>(initial);
-  const [error, setError] = useState("");
+  const checkup = useCheckup(request);
+  const editor = useRuleEditor({ saved, initial, mutate: store.mutate, off: busy });
+  const { draft } = editor;
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const edit = (next: (current: Draft) => Draft) => {
-    setError("");
-    setDraft(next);
-  };
 
   const { href: back, label: backLabel } = ruleEditorBack(returnGroup, groups);
   const { title, summary, dirty } = ruleEditorState(draft, saved);
   const managedNetworks = managedNetworksOf(unifi);
 
   async function save() {
-    if (busy) return;
-    const problem = validateRuleDraft(draft);
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    const result = await saveRule(store.mutate, draft, saved);
-    if (result?.rule) router.push(back);
+    if (await editor.save()) router.push(back);
   }
 
   async function remove() {
-    if (!saved) return;
-    const result = await deleteRule(store.mutate, saved);
-    if (result) router.push(back);
+    if (await editor.remove()) router.push(back);
   }
 
   return (
@@ -147,10 +128,10 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
           groups={groups}
           networks={managedNetworks}
           request={request}
-          error={error}
+          error={editor.error}
           outsideDns={outsideDnsNote(draft, devices, checkup)}
-          edit={edit}
-          onError={setError}
+          edit={editor.edit}
+          onError={editor.setError}
         />
       </form>
 
@@ -188,20 +169,13 @@ function RuleEditor({ saved, initial, returnGroup }: { saved: Rule | null; initi
 function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: string | null }) {
   const router = useRouter();
   const { groups, unifi, store, busy } = useAppData();
-  const [draft, setDraft] = useState<CountriesDraft>(() => fromCountriesRule(saved, groups));
-  const [error, setError] = useState("");
+  const editor = useCountriesEditor({ rule: saved, groups, mutate: store.mutate, off: busy });
+  const { draft } = editor;
   const { href: back, label: backLabel } = ruleEditorBack(returnGroup, groups);
   const { summary, dirty } = countriesEditorState(draft, saved, groups);
 
   async function save() {
-    if (busy) return;
-    const problem = validateCountriesDraft(draft);
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    const result = await saveCountriesRule(store.mutate, draft, saved);
-    if (result?.rule) router.push(back);
+    if (await editor.save()) router.push(back);
   }
 
   return (
@@ -222,30 +196,11 @@ function CountriesEditor({ saved, returnGroup }: { saved: Rule; returnGroup: str
           draft={draft}
           groups={groups}
           networks={managedNetworksOf(unifi)}
-          error={error}
+          error={editor.error}
           writes={countriesWrites(draft, saved, groups)}
-          edit={(next) => {
-            setError("");
-            setDraft(next);
-          }}
+          edit={editor.edit}
         />
       </form>
     </>
   );
-}
-
-/** The last checkup, for the editor's note on networks that hand out their own DNS; null until it loads or when it cannot. */
-function useCheckup(): CheckupState | null {
-  const [checkup, setCheckup] = useState<CheckupState | null>(null);
-  useEffect(() => {
-    let live = true;
-    loadCheckup(request).then(
-      (next) => live && setCheckup(next),
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
-  return checkup;
 }
