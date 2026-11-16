@@ -76,7 +76,8 @@ describe("POST /api/v1/settings/unifi/test", () => {
   });
 
   it("probes a new key and target without saving either", async () => {
-    const response = await probe(auth, { apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    // Through the route: its 200 and the `ok` beside the result are the route's own.
+    const response = await probeRoute(auth, { apiKey: DEV_MOCK_API_KEY, baseUrl: DEV_MOCK_BASE_URL, tlsInsecure: false });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { ok: boolean; site: { id: string }; networks: unknown[] };
     expect(body.ok).toBe(true);

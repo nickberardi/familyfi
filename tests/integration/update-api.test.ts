@@ -6,12 +6,13 @@ import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { POST as checkNowRoute } from "@/app/api/v1/settings/update/check/route";
+import { POST as installRoute } from "@/app/api/v1/settings/update/install/route";
 import { PUT as putScheduleRoute } from "@/app/api/v1/settings/update/schedule/route";
 import { APP_VERSION } from "@/lib/version";
 import type { UpdateCheck, UpdateRun, UpdateSettings } from "@/lib/types";
 import { prisma } from "@/server/db";
 import { updateHouseholdSettings } from "@/server/household";
-import { checkForUpdateNow, getUpdateCheckSnapshot, refreshUpdateCheck } from "@/server/update-check";
+import { getUpdateCheckSnapshot, refreshUpdateCheck } from "@/server/update-check";
 import { autoUpdateArmedForTests, rescheduleAutoUpdate, runAutoUpdateCatchUpForTests, setBackupFailureFileForTests, setUpdaterTokenFileForTests, settleUpdateRun, stopAutoUpdateForTests, installUpdate, setUpdateSchedule, UpdateScheduleBody, viewUpdateSettings } from "@/server/updater";
 import { answered } from "../helpers/answered";
 import { resetDatabase } from "../helpers/db";
@@ -62,7 +63,6 @@ async function settings(): Promise<UpdateSettings> {
 }
 
 const install = () => answered("POST /api/v1/settings/update/install", async () => ({ run: await installUpdate() }), 202);
-const checkNow = () => answered("POST /api/v1/settings/update/check", async () => ({ update: await checkForUpdateNow() }));
 
 /** Saves the schedule. A body the request schema refuses goes through the route, whose refusal that is. */
 async function putSchedule(body: unknown) {
@@ -156,7 +156,8 @@ describe("update settings", () => {
 describe("checking now", () => {
   it("answers with the release check, as health reports it, and needs the CSRF token", async () => {
     const auth = await adminAuth();
-    const response = await checkNow();
+    // Through the route: its 200 and the envelope around the check are the route's own.
+    const response = await checkNowRoute(write(auth, "/api/v1/settings/update/check", "POST"));
     expect(response.status).toBe(200);
     const { update } = (await response.json()) as { update: UpdateCheck };
     expect(update).toEqual(getUpdateCheckSnapshot());
@@ -168,7 +169,8 @@ describe("checking now", () => {
 
 describe("installing", () => {
   it("asks Watchtower once with its token, and refuses a second install meanwhile", async () => {
-    const response = await install();
+    // Through the route: its 202 and the envelope around the run are the route's own.
+    const response = await installRoute(write(await adminAuth(), "/api/v1/settings/update/install", "POST"));
     expect(response.status).toBe(202);
     const { run } = (await response.json()) as { run: UpdateRun };
     expect(run).toEqual({ targetVersion: NEWER, status: "requested", requestedAt: expect.any(String), error: null });
