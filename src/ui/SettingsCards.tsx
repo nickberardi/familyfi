@@ -13,8 +13,6 @@ import type { Account, Group, SyncStatus, UnifiSettings } from "@/lib/types";
 
 import { AddMemberField } from "./AddMemberField";
 import { AdminControl } from "./AdminControl";
-import { Alert } from "./Alert";
-import { SectionLabel } from "./CategoryMarks";
 import { Disclosure } from "./Disclosure";
 import { FamilyRolePicker } from "./FamilyRolePicker";
 import { TimezoneField } from "./TimezoneField";
@@ -142,22 +140,17 @@ export function KeyCard({
 }
 
 /**
- * Alerts: the household's switch for sending them through the push relay, what the relay sees, and
- * which paired apps have turned alerts on. A device turns its own alerts on in the app. `phones` is
- * null while the list loads, and "error" when it could not be read (`onRetry` reads it again).
+ * Alerts: the household's switch for sending them through the push relay, and what the relay sees.
+ * Each device turns its own alerts on in the app; Pair Device says which have.
  */
 export function AlertsCard({
   enabled,
-  phones,
   mutate,
   disabled,
-  onRetry,
 }: {
   enabled: boolean;
-  phones: { id: string; displayName: string; alerts: boolean }[] | null | "error";
   mutate: Mutate;
   disabled?: boolean;
-  onRetry?: () => void;
 }) {
   const ui = useUI();
   const text = useText();
@@ -180,25 +173,6 @@ export function AlertsCard({
             </View>
           ))}
         </Disclosure>
-        {phones === "error" ? (
-          <View style={styles.alertsPhones}>
-            <Alert tone="danger" role="alert" action={onRetry ? { label: COPY.retry, onPress: onRetry } : undefined} testID="settings-alerts-error">
-              {COPY.loadFailed}
-            </Alert>
-          </View>
-        ) : phones ? (
-          <View style={styles.alertsPhones} testID="settings-alerts-phones">
-            <SectionLabel>{COPY.phonesTitle}</SectionLabel>
-            {!enabled && phones.length > 0 ? <Text style={text(14, 20, "muted")}>{COPY.householdOff}</Text> : null}
-            {phones.length === 0 ? <Text style={text(14, 20, "muted")}>{COPY.noPhones}</Text> : null}
-            {phones.map((phone) => (
-              <View key={phone.id} style={[styles.alertsRow, styles.alertsPhone, { borderTopColor: ui.color("hairline") }]}>
-                <Text style={[text(14, 21, "ink"), styles.grow]}>{phone.displayName}</Text>
-                <Text style={text(14, 21, phone.alerts ? "ink-2" : "muted")}>{phone.alerts ? COPY.phoneOn : COPY.phoneOff}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
       </View>
     </Card>
   );
@@ -307,8 +281,6 @@ const styles = StyleSheet.create({
   alertsBody: { paddingHorizontal: 18, paddingVertical: 14 },
   alertsLine: { marginTop: 4 },
   alertsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  alertsPhones: { marginTop: 14, gap: 4 },
-  alertsPhone: { borderTopWidth: 1, paddingVertical: 12 },
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
   cardHead: { gap: 2, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   bold: { fontWeight: "600" },
