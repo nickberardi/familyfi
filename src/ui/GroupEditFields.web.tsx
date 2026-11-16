@@ -14,6 +14,7 @@ export function EditField({ label, group, note, children }: { label: string; gro
       <label className={LABEL}>
         {label}
         <span className="mt-1 flex flex-col">{children}</span>
+        {note ? <span className="font-normal">{note}</span> : null}
       </label>
     );
   }

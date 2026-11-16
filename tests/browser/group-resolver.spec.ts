@@ -48,6 +48,8 @@ test("a group can take its own resolver and hand it back", { tag: "@desktop" }, 
   let sheet = await openFresh(page, kid.name);
   await expect(sheet.getByTestId("group-edit-dns-help")).toContainText(/Uses the household's DNS-over-HTTPS override/i);
   await sheet.getByRole("button", { name: "Own endpoint" }).click();
+  // A phone's browser shows its URL keyboard for the endpoint.
+  await expect(sheet.getByLabel("Endpoint URL")).toHaveAttribute("inputmode", "url");
   await sheet.getByLabel("Endpoint URL").fill("https://strict.example.com/dns-query/kids");
   await sheet.getByRole("button", { name: "Save" }).click();
   await expect(sheet).toHaveCount(0);
