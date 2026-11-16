@@ -186,9 +186,7 @@ class Resources:
 
         The launcher (`memory-database.mjs --serve`) is this run's process; cleanup stops it.
         """
-        owner = f"{self.directory.name}/{platform}-database"
-        self.manifest["ports"].append(owner); self.save()
-        port = reserve_port(owner, self.registry_dir)
+        port = self.port(platform, "database")
         with open(log, "ab") as output:
             process = subprocess.Popen(["node", MEMORY_LAUNCHER, "--serve"], cwd=self.root, start_new_session=True,
                                        stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
@@ -215,10 +213,16 @@ class Resources:
         self.command(["node", "scripts/runtime/with-env.mjs", tool(self.root, "prisma"), "migrate", "deploy"],
                      env=env, timeout=300, idle=120, **kwargs)
 
-    def port(self, platform):
-        owner = f"{self.directory.name}/{platform}"
+    def port(self, platform, purpose=None):
+        """A loopback port for this environment's web server, or for another `purpose` it serves."""
+        owner = f"{self.directory.name}/{platform}" + (f"-{purpose}" if purpose else "")
         self.manifest["ports"].append(owner); self.save()
         return reserve_port(owner, self.registry_dir)
+
+    def owns_port(self, owner, platform):
+        """Whether `owner` is one of `platform`'s reservations: its web server's or a suffixed one."""
+        base = f"{self.directory.name}/{platform}"
+        return owner == base or owner.startswith(base + "-")
 
     def validate(self):
         m = self.manifest
@@ -270,7 +274,7 @@ class Resources:
             except Exception as error:
                 errors.append(str(error))
         for owner in list(self.manifest["ports"]):
-            if platform and owner != f"{self.directory.name}/{platform}":
+            if platform and not self.owns_port(owner, platform):
                 continue
             release_port(owner, self.registry_dir)
             self.manifest["ports"].remove(owner); self.save()

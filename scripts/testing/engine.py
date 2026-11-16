@@ -52,6 +52,9 @@ def execute(plan, resources, report, args, lookup):
                 resources.migrate(env, log=directory / "migrate.log")
             if environment["build"]:
                 env.update(CI="1", FAMILYFI_MODE="test", PLAYWRIGHT_PORT=str(resources.port(platform)),
+                           # Every server under test opens the remote access port; a fixed 7002 collided
+                           # with other runs on the same host.
+                           FAMILYFI_REMOTE_ACCESS_PORT=str(resources.port(platform, "remote")),
                            CLOUDFLARED_BIN=str(resources.root / "tests/fixtures/cloudflared/cloudflared"),
                            # The stand-in's sign-in token must never reach Cloudflare: nothing answers here.
                            CLOUDFLARE_API_URL="http://127.0.0.1:9")

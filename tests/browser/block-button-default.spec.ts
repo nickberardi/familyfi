@@ -46,7 +46,11 @@ test("a group's Block button default is saved and the card's Unblock lifts that 
     await expect(picker).toHaveAccessibleDescription(/Choose the rule that Unblock on the card lifts for TV/);
     await picker.selectOption(ruleId);
     const label = (await picker.locator(`option[value="${ruleId}"]`).textContent())!;
+    // The card reads "Unblock" before and after the save, so wait for the save itself: a click that
+    // lands first lifts all internet instead of the chosen rule.
+    const saved = page.waitForResponse((response) => response.url().endsWith(`/api/v1/groups/${tv!.id}`) && response.request().method() === "PUT");
     await sheet.getByRole("button", { name: "Save" }).click();
+    expect((await saved).ok(), "saving the Block button default failed").toBe(true);
     await expect(sheet).toHaveCount(0);
 
     // The button keeps its plain label and lifts the chosen rule for TV from the rule's sheet.
@@ -58,9 +62,13 @@ test("a group's Block button default is saved and the card's Unblock lifts that 
     await expect(page.getByRole("dialog", { name: `Edit ${tv!.name}` }).getByLabel("Block button default")).toHaveValue(ruleId);
   } finally {
     // Deleting the rule puts TV's button back on all internet, as the seed had it.
-    await page.request.delete(`/api/v1/rules/${ruleId}`, { headers: await csrf(page) });
+    // The TV group is shared with smoke.spec.ts, so a cleanup that did not apply fails here, not there;
+    // soft, so it never hides the failure that brought the test here.
+    const removed = await page.request.delete(`/api/v1/rules/${ruleId}`, { headers: await csrf(page) });
+    expect.soft(removed.ok(), `deleting the test rule failed (${removed.status()})`).toBe(true);
     for (const rule of seeded) {
-      await page.request.post(`/api/v1/rules/${rule.id}/on`, { headers: await csrf(page) });
+      const restored = await page.request.post(`/api/v1/rules/${rule.id}/on`, { headers: await csrf(page) });
+      expect.soft(restored.ok(), `turning seeded rule ${rule.id} back on failed (${restored.status()})`).toBe(true);
     }
   }
 });

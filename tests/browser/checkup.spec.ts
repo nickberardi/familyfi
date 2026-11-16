@@ -75,8 +75,26 @@ test("Devices points out private Wi-Fi addresses and shows only them on request"
   await expect(page.getByTestId("private-address-card")).toContainText("Private Wi-Fi address");
 });
 
-test("Checkup lists a leftover FamilyFi policy and removes it only after the administrator confirms", { tag: "@desktop" }, async ({ page }) => {
+/**
+ * "FamilyFi Rogue Prefix" exists only in the mock gateway's starting state, and the next test
+ * removes it for good. Each test that needs it checks first, so a retry after the removal fails
+ * with this message rather than a locator timeout on a finding that can no longer appear.
+ */
+async function expectRoguePolicyOnGateway(page: Page) {
+  const run = await page.request.post("/api/v1/checkup/run");
+  expect(run.ok(), `checkup run failed (${run.status()})`).toBe(true);
+  const body = (await run.json()) as { checkup: { findings: { check: string }[] } };
+  if (!body.checkup.findings.some((finding) => finding.check === "leftover_policies")) {
+    throw new Error(
+      "The mock gateway no longer has \"FamilyFi Rogue Prefix\": an earlier attempt removed it, and only a fresh server restores it. " +
+        "Read the first attempt's failure; this retry cannot pass.",
+    );
+  }
+}
+
+test("Checkup lists a leftover FamilyFi policy and Cancel leaves it in place", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
+  await expectRoguePolicyOnGateway(page);
   await page.goto("/checkup");
   await page.getByTestId("checkup-run").click();
 
@@ -96,7 +114,17 @@ test("Checkup lists a leftover FamilyFi policy and removes it only after the adm
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(leftover).toBeVisible();
+  await expectRoguePolicyOnGateway(page);
+});
 
+test("Checkup removes a leftover FamilyFi policy only after the administrator confirms", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await expectRoguePolicyOnGateway(page);
+  await page.goto("/checkup");
+  await page.getByTestId("checkup-run").click();
+
+  const leftover = page.getByTestId("checkup-finding-leftover_policies");
+  await expect(leftover).toContainText("An old FamilyFi policy is still on your gateway");
   await page.getByTestId("checkup-remove-policies").click();
   await page.getByTestId("checkup-confirm-remove").click();
   await expect(page.getByRole("status")).toContainText("Removed 1 policy from your gateway.");

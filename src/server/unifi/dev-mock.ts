@@ -145,13 +145,17 @@ export function createFixtureUnifiClient(options?: { friendlyNames?: boolean }) 
   return new MockUnifiClient(createFixtureUnifiState(options));
 }
 
-let shared: MockUnifiClient | undefined;
+/**
+ * One mock gateway per process. The route handlers and instrumentation are bundled as separate
+ * copies of this module; a mock per copy let the timer's pass and a route's pass reconcile against
+ * two gateways, and each copy's policies then had no record in the other.
+ */
+const processState = globalThis as typeof globalThis & { familyfiDevMockClient?: MockUnifiClient };
 
 export function getSharedDevMockClient(): MockUnifiClient {
-  if (!shared) shared = createFixtureUnifiClient({ friendlyNames: true });
-  return shared;
+  return (processState.familyfiDevMockClient ??= createFixtureUnifiClient({ friendlyNames: true }));
 }
 
 export function resetDevMockClientForTests() {
-  shared = undefined;
+  delete processState.familyfiDevMockClient;
 }

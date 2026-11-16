@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Household } from "@prisma/client";
 import { loadEnv, unifiMockEnabled } from "@/server/env";
 import { MockUnifiClient } from "@/server/unifi/mock";
@@ -73,6 +73,19 @@ describe("UniFi mock", () => {
     const policies = await again.listPolicies("11111111-1111-4111-8111-111111111111");
     expect(policies.some((policy) => policy.id === created.id)).toBe(true);
     expect(getSharedDevMockClient().state.clients.some((client) => client.name === "Cassie's iPad")).toBe(true);
+  });
+
+  it("is one gateway per process, even across separately loaded copies of its module", async () => {
+    // Next bundles instrumentation and route handlers as separate module copies; each kept its own
+    // mock, so the timer's pass and a route's pass reconciled against two gateways.
+    vi.resetModules();
+    const first = await import("@/server/unifi/dev-mock");
+    vi.resetModules();
+    const second = await import("@/server/unifi/dev-mock");
+    expect(second).not.toBe(first);
+    expect(second.getSharedDevMockClient()).toBe(first.getSharedDevMockClient());
+    second.resetDevMockClientForTests();
+    expect(first.getSharedDevMockClient()).toBe(second.getSharedDevMockClient());
   });
 
   it("uses HttpUnifiClient in prod", () => {

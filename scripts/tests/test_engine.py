@@ -23,8 +23,9 @@ class FakeResources:
     def migrate(self, env, **_):
         pass
 
-    def port(self, platform):
-        return 20000
+    def port(self, platform, purpose=None):
+        self.ports = getattr(self, "ports", {})
+        return self.ports.setdefault((platform, purpose), 20000 + len(self.ports))
 
     def cleanup(self, platform=None):
         self.cleaned.append(platform)
@@ -72,6 +73,14 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.mocks[1].call_count, 1)
         blocked = {p for (p, t), s in self.statuses().items() if s == "blocked"}
         self.assertEqual(blocked, {"desktop", "phone"})
+
+    def test_each_browser_server_gets_its_own_remote_access_port(self):
+        self.execute(FakeResources(self.directory), layers=["ui"])
+        envs = {call.args[7]: call.args[4] for call in self.mocks[4].call_args_list}
+        self.assertEqual(set(envs), {"desktop", "phone"})
+        ports = [envs[p][key] for p in ("desktop", "phone") for key in ("PLAYWRIGHT_PORT", "FAMILYFI_REMOTE_ACCESS_PORT")]
+        self.assertEqual(len(set(ports)), 4)
+        self.assertNotIn("7002", ports)
 
     def test_a_crashing_batch_leaves_later_batches_running(self):
         self.mocks[2].side_effect = RuntimeError("python exploded")

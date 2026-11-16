@@ -91,6 +91,17 @@ class ResourceTests(unittest.TestCase):
         release_port("a/desktop", self.registry)
         self.assertEqual(reserve_port("c/desktop", self.registry), first)
 
+    def test_a_platforms_suffixed_ports_are_reserved_apart_and_released_with_it(self):
+        owned = self.owned()
+        web, remote, phone = owned.port("desktop"), owned.port("desktop", "remote"), owned.port("phone")
+        self.assertEqual(len({web, remote, phone}), 3)
+        entries = json.loads((self.registry / "ports.json").read_text())
+        self.assertEqual(entries[f"{self.run_id}/desktop-remote"], remote)
+        owned.cleanup("desktop")
+        entries = json.loads((self.registry / "ports.json").read_text())
+        self.assertEqual(entries, {f"{self.run_id}/phone": phone})
+        self.assertEqual(owned.manifest["ports"], [f"{self.run_id}/phone"])
+
     def test_a_second_invocation_in_one_worktree_is_refused_with_the_holder(self):
         with lock(self.root) as holder:
             holder.write(self.run_id); holder.flush()
