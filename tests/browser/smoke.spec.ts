@@ -549,7 +549,9 @@ test("add things group opens a sheet over Things, and the new group can be edite
 
   const edit = await openEdit(page, name);
   await expect(edit.getByRole("group", { name: "Role" })).toHaveCount(0);
-  await edit.getByLabel("Monogram").fill("TV");
+  // A monogram is capitals, in Edit as in New group.
+  await edit.getByLabel("Monogram").fill("tv");
+  await expect(edit.getByLabel("Monogram")).toHaveValue("TV");
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toHaveCount(0);
   await expect((await openEdit(page, name)).getByLabel("Monogram")).toHaveValue("TV");

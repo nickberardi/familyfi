@@ -2,7 +2,7 @@
 
 import { StyleSheet, Text, View } from "react-native";
 
-import { FAMILY_ROLES, GROUP_DETAIL_COPY, GROUP_EDIT_COPY as COPY, MONOGRAM_MAX, type FamilyRole, type GroupDohMode } from "@/lib/group-form";
+import { FAMILY_ROLES, GROUP_DETAIL_COPY, GROUP_EDIT_COPY as COPY, MONOGRAM_MAX, normalizeMonogram, type FamilyRole, type GroupDohMode } from "@/lib/group-form";
 import { GROUP_RESOLVER_COPY, groupResolverNetworkLine, groupResolverSummary } from "@/lib/group-resolver";
 
 import { Alert } from "./Alert";
@@ -55,7 +55,7 @@ export function GroupEditForm({
           <ui.TextField
             label={GROUP_DETAIL_COPY.monogram}
             value={draft.monogram}
-            onChange={(monogram) => set({ monogram })}
+            onChange={(monogram) => set({ monogram: normalizeMonogram(monogram) })}
             maxLength={MONOGRAM_MAX}
             capitals
             disabled={!enabled}
