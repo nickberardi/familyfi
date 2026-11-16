@@ -22,9 +22,6 @@ const FORBIDDEN = ["@/server/db", "@/server/unifi/connection"];
 const FORBIDDEN_NAMES = /\b(clientForHousehold|syncClient)\b/;
 
 const NOT_YET_CONVERTED = [
-  "accounts/[id]/password/route.ts",
-  "accounts/[id]/route.ts",
-  "accounts/route.ts",
   "auth/session/route.ts",
   "changes/[id]/route.ts",
   "checkup/leftover-policies/remove/route.ts",
@@ -40,11 +37,6 @@ const NOT_YET_CONVERTED = [
   "dpi/applications/route.ts",
   "dpi/categories/route.ts",
   "health/route.ts",
-  "paired/devices/[id]/route.ts",
-  "paired/devices/route.ts",
-  "paired/invites/[id]/claim/route.ts",
-  "paired/invites/[id]/route.ts",
-  "paired/invites/route.ts",
   "settings/household/route.ts",
   "settings/update/schedule/route.ts",
   "sync/route.ts",
