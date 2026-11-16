@@ -388,7 +388,10 @@ describe("Block countries", () => {
   it("stays when the groups it covers are deleted, off while other groups are left", async () => {
     const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV" } });
     const games = await prisma().group.create({ data: { kind: GroupKind.things, name: "Games" } });
-    const remove = (id: string) => answered("DELETE /api/v1/groups/{id}", async () => ({ ok: true, ...(await deleteGroupFn(id)) }));
+    const remove = (id: string) => answered("DELETE /api/v1/groups/{id}", async () => {
+        const { change } = await deleteGroupFn(id);
+        return { ok: true, change };
+      });
     expect((await patchCountries({ enabled: true, groupIds: [tv.id] })).status).toBe(200);
     await runReconcileOnce();
     expect((await remove(tv.id)).status).toBe(200);

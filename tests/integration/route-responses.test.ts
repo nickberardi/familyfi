@@ -130,8 +130,8 @@ describe("route responses match the contract", () => {
     expect((await deleteRuleRoute(send(path, "DELETE"), rule)).status).toBe(200);
   });
 
-  // Scope, networks, domains, countries and Private Relay go through these routes in the DPI,
-  // network rule and checkup cases, which still call them.
+  // Scope and networks go through these routes in the network rule cases, which still call them;
+  // a built-in rule's own fields are sent in the case after this one.
   it("a rule's create and update carry their fields through to what is stored", async () => {
     const group = await createFamilyGroup("Betsy");
     const created = await createRuleRoute(
@@ -187,6 +187,17 @@ describe("route responses match the contract", () => {
       windows: [{ id: window.id, name: "Nights", days: [0, 6], start: "21:00", end: "23:00" }],
     });
     expect(after.groups.map((link) => link.groupId).sort()).toEqual([group.id, other.id].sort());
+  });
+
+  it("a built-in rule's update carries its own fields through to what is stored", async () => {
+    const group = await createFamilyGroup("Betsy");
+    const countries = await patchRuleRoute(send("/api/v1/rules/countries", "PATCH", { enabled: true, groupIds: [group.id], countries: ["KP", "RU"] }), id("countries"));
+    expect(countries.status).toBe(200);
+    expect(((await countries.json()) as { rule: { countries: string[]; groupIds: string[] } }).rule).toMatchObject({ countries: ["KP", "RU"], groupIds: [group.id] });
+    const dns = await patchRuleRoute(send("/api/v1/rules/dns", "PATCH", { enabled: true, groupIds: [group.id], blockPrivateRelay: true }), id("dns"));
+    expect(dns.status).toBe(200);
+    expect(((await dns.json()) as { rule: { blockPrivateRelay: boolean } }).rule.blockPrivateRelay).toBe(true);
+    expect((await getRuleRoute(send("/api/v1/rules/dns"), id("dns"))).status).toBe(200);
   });
 
   it("DNS categories, their checks and the household resolver", async () => {
@@ -254,7 +265,9 @@ describe("route responses match the contract", () => {
       expect((await getCheckupRoute(send("/api/v1/checkup"))).status).toBe(200);
       expect((await getSyncRoute(send("/api/v1/sync"))).status).toBe(200);
       // A policy that is not on the gateway is skipped, never an error.
-      expect((await removeLeftoversRoute(send("/api/v1/checkup/leftover-policies/remove", "POST", { policyIds: ["no-such-policy"] }))).status).toBe(200);
+      const removal = await removeLeftoversRoute(send("/api/v1/checkup/leftover-policies/remove", "POST", { policyIds: ["no-such-policy"] }));
+      expect(removal.status).toBe(200);
+      expect(JSON.stringify(await removal.json())).toContain("no-such-policy");
     } finally {
       setReconcileClientForTests(undefined);
     }
@@ -287,6 +300,12 @@ describe("route responses match the contract", () => {
       priority: 7,
       enabled: true,
     });
+    // A LAN route pinned to a certificate, then back to the system's trust with the pin cleared.
+    const pin = "A".repeat(43);
+    expect((await updateEndpointRoute(send(path, "PUT", { transport: "lan", trustMode: "pinned", spkiSha256: pin }), id(endpointId))).status).toBe(200);
+    expect(await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: endpointId } })).toMatchObject({ transport: "lan", trustMode: "pinned", spkiSha256: pin });
+    expect((await updateEndpointRoute(send(path, "PUT", { trustMode: "system", spkiSha256: null }), id(endpointId))).status).toBe(200);
+    expect(await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: endpointId } })).toMatchObject({ trustMode: "system", spkiSha256: null });
     // Nothing listens there: the check answers with what it found, a failure to show.
     expect((await checkEndpointRoute(send(`${path}/check`, "POST"), id(endpointId))).status).toBe(200);
     expect((await deleteEndpointRoute(send(path, "DELETE"), id(endpointId))).status).toBe(200);
