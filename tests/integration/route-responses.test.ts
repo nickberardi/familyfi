@@ -35,6 +35,10 @@ import { GET as listChecksRoute } from "@/app/api/v1/upstream/checks/route";
 import { POST as runChecksRoute } from "@/app/api/v1/upstream/checks/run/route";
 import { DELETE as clearHouseholdResolver, GET as getHouseholdResolver, PUT as setHouseholdResolver } from "@/app/api/v1/upstream/resolver/route";
 import { GET as getCheckupRoute } from "@/app/api/v1/checkup/route";
+import { POST as removeLeftoversRoute } from "@/app/api/v1/checkup/leftover-policies/remove/route";
+import { GET as listEndpointsRoute, POST as createEndpointRoute } from "@/app/api/v1/connection/endpoints/route";
+import { DELETE as deleteEndpointRoute, PUT as updateEndpointRoute } from "@/app/api/v1/connection/endpoints/[id]/route";
+import { POST as checkEndpointRoute } from "@/app/api/v1/connection/endpoints/[id]/check/route";
 import { PATCH as patchFindingRoute } from "@/app/api/v1/checkup/findings/[id]/route";
 import { POST as runCheckupRoute } from "@/app/api/v1/checkup/run/route";
 import { GET as tunnelStateRoute, PUT as setTunnelRoute } from "@/app/api/v1/connection/tunnel/route";
@@ -249,6 +253,8 @@ describe("route responses match the contract", () => {
       }
       expect((await getCheckupRoute(send("/api/v1/checkup"))).status).toBe(200);
       expect((await getSyncRoute(send("/api/v1/sync"))).status).toBe(200);
+      // A policy that is not on the gateway is skipped, never an error.
+      expect((await removeLeftoversRoute(send("/api/v1/checkup/leftover-policies/remove", "POST", { policyIds: ["no-such-policy"] }))).status).toBe(200);
     } finally {
       setReconcileClientForTests(undefined);
     }
@@ -257,5 +263,32 @@ describe("route responses match the contract", () => {
   it("remote access, read and switched off", async () => {
     expect((await tunnelStateRoute(send("/api/v1/connection/tunnel"))).status).toBe(200);
     expect((await setTunnelRoute(send("/api/v1/connection/tunnel", "PUT", { mode: "off", forget: true }))).status).toBe(200);
+  });
+
+  it("the household's own routes: listed, created, changed, checked and deleted", async () => {
+    const created = await createEndpointRoute(
+      send("/api/v1/connection/endpoints", "POST", { url: "https://127.0.0.1:9", transport: "lan", trustMode: "system", priority: 5, enabled: false }),
+    );
+    expect(created.status).toBe(201);
+    const endpointId = ((await created.json()) as { endpoint: { id: string } }).endpoint.id;
+    const path = `/api/v1/connection/endpoints/${endpointId}`;
+    expect(await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: endpointId } })).toMatchObject({
+      url: "https://127.0.0.1:9",
+      transport: "lan",
+      trustMode: "system",
+      priority: 5,
+      enabled: false,
+    });
+    expect((await listEndpointsRoute(send("/api/v1/connection/endpoints"))).status).toBe(200);
+    expect((await updateEndpointRoute(send(path, "PUT", { url: "https://127.0.0.1:10", transport: "tailscale", trustMode: "system", priority: 7, enabled: true }), id(endpointId))).status).toBe(200);
+    expect(await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: endpointId } })).toMatchObject({
+      url: "https://127.0.0.1:10",
+      transport: "tailscale",
+      priority: 7,
+      enabled: true,
+    });
+    // Nothing listens there: the check answers with what it found, a failure to show.
+    expect((await checkEndpointRoute(send(`${path}/check`, "POST"), id(endpointId))).status).toBe(200);
+    expect((await deleteEndpointRoute(send(path, "DELETE"), id(endpointId))).status).toBe(200);
   });
 });

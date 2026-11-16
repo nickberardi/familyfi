@@ -1,4 +1,5 @@
 import type { Household } from "@prisma/client";
+import { z } from "zod";
 import { checkupState, runCheckup } from "./checkup";
 import { loadHousehold } from "./household";
 import { ApiError } from "./http";
@@ -6,6 +7,9 @@ import { removeLeftoverPolicies } from "./leftover-policies";
 import { LockLostError, syncClient, withReconcileLock } from "./reconciliation";
 
 class SyncRunning extends Error {}
+
+/** What `POST /checkup/leftover-policies/remove` may carry. */
+export const LeftoverRemovalBody = z.object({ policyIds: z.array(z.string().min(1).max(200)).min(1).max(200) });
 
 async function connectedHousehold(): Promise<Household & { unifiSiteId: string }> {
   const household = await loadHousehold();
