@@ -15,8 +15,11 @@ const apiRoot = path.resolve(__dirname, "../../src/app/api/v1");
 /** The database, and the module that creates UniFi clients. */
 const FORBIDDEN = ["@/server/db", "@/server/unifi/connection"];
 
-/** Functions that hand out a UniFi client, whichever module a route takes them from. */
-const FORBIDDEN_NAMES = /\b(clientForHousehold|syncClient)\b/;
+/**
+ * Functions that hand out a UniFi client, call the gateway or read the household row: each is a
+ * step of household logic, whichever module a route takes it from.
+ */
+const FORBIDDEN_NAMES = /\b(clientForHousehold|syncClient|listSiteNetworks|loadHousehold)\b/;
 
 function routeFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

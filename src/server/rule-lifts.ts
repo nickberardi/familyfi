@@ -107,7 +107,7 @@ export async function runLift(
 }
 
 /** What editing or deleting a built-in rule answers, beyond what that rule lets change. */
-export function builtInRefusal(which: BuiltInRule = "quarantine"): Response {
+function builtInRefusal(which: BuiltInRule = "quarantine"): Response {
   if (which === "dns") return lockDnsRefusal();
   return jsonError(
     409,
@@ -129,7 +129,7 @@ export function lockDnsRefusal(): Response {
  * The guard checked the device's scope against the path as sent, where the id may be
  * percent-encoded; the scope is checked again here against the rule it names.
  */
-export async function switchQuarantineRule(
+async function switchQuarantineRule(
   request: Request,
   session: Parameters<typeof sessionActor>[0] & { device: { id: string; client: PairedDeviceClient; scope: DeviceScope } | null },
   enabled: boolean,

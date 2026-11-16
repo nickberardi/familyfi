@@ -11,14 +11,14 @@ type Viewer = Parameters<typeof isAdministrator>[0];
  * Which paired devices a caller may see and manage: an administrator sees them all; a paired device
  * sees itself and the devices it paired: a phone's Watches, and the phones and agents its invites paired. Anyone else sees none.
  */
-export function visibleDevices(session: Viewer): Prisma.PairedDeviceWhereInput | null {
+function visibleDevices(session: Viewer): Prisma.PairedDeviceWhereInput | null {
   if (isAdministrator(session)) return {};
   if (session.deviceId) return { OR: [{ id: session.deviceId }, { parentDeviceId: session.deviceId }] };
   return null;
 }
 
 /** What a listed device carries, with the sessions still able to call or renew: a live bearer or refresh token. */
-export function deviceInclude(now = new Date()) {
+function deviceInclude(now = new Date()) {
   return {
     account: { select: { username: true, displayName: true } },
     edgeTokens: { select: { endpointId: true, version: true } },
@@ -32,7 +32,7 @@ export function deviceInclude(now = new Date()) {
 
 type Listed = Prisma.PairedDeviceGetPayload<{ include: ReturnType<typeof deviceInclude> }>;
 
-export function publicPairedDevice(device: Listed) {
+function publicPairedDevice(device: Listed) {
   const route = device.pairings[0]?.endpoint ?? null;
   return {
     id: device.id,

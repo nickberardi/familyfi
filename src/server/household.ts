@@ -13,7 +13,7 @@ export function loadHousehold(): Promise<Household> {
   return prisma().household.findUniqueOrThrow({ where: { id: "default" } });
 }
 
-export async function publicHousehold(household: Household) {
+async function publicHousehold(household: Household) {
   const live = await storedQuarantineBlocking();
   return {
     timezone: household.timezone,

@@ -28,7 +28,10 @@ import { assertManagedNetworkIds, ensureCountriesRule, normalizeCountries, norma
 import { normalizeResolverUrl, ResolverConfigError } from "./upstream/resolver-settings";
 import { customSlugFor } from "./upstream-seed";
 import { prisma } from "./db";
-import { jsonError } from "./http";
+import { enqueueChange } from "./changes";
+import { ApiError, jsonError } from "./http";
+import { rescheduleAutoUpdate } from "./updater";
+import { rescheduleUpstreamProbe } from "./upstream/schedule";
 import { NO_EVIDENCE } from "./tunnel/route-check";
 import { compareSemver, parseSemver } from "./update-check";
 import { parseWeeklyCron, weeklyCron } from "./weekly-schedule";
@@ -816,5 +819,23 @@ async function importCategories(tx: Prisma.TransactionClient, categories: Househ
         });
       }
     }
+  }
+}
+
+/**
+ * Previews an uploaded export, or applies it: the household then syncs, and the checks and updates
+ * are rescheduled, since the import may have changed the time zone and both schedules.
+ */
+export async function importHousehold(mode: "preview" | "apply", upload: Buffer, importer: { accountId: string | null }) {
+  try {
+    if (mode === "preview") return { summary: await previewImport(upload), change: null };
+    const summary = await applyImport(upload, importer);
+    const change = await enqueueChange("import");
+    rescheduleUpstreamProbe();
+    rescheduleAutoUpdate();
+    return { summary, change };
+  } catch (error) {
+    if (error instanceof HouseholdImportError) throw new ApiError(error.code === "export_too_new" ? 409 : 400, error.code, error.message);
+    throw error;
   }
 }

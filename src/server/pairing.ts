@@ -33,13 +33,13 @@ type Db = Parameters<Parameters<ReturnType<typeof prisma>["$transaction"]>[0]>[0
 
 export type InviteStatus = "pending" | "claimed" | "expired";
 
-export function inviteStatus(invite: { claimedAt: Date | null; expiresAt: Date }, now = new Date()): InviteStatus {
+function inviteStatus(invite: { claimedAt: Date | null; expiresAt: Date }, now = new Date()): InviteStatus {
   if (invite.claimedAt) return "claimed";
   return invite.expiresAt <= now ? "expired" : "pending";
 }
 
 /** A phone invite, over the published route the phone pairs through. */
-export async function invitePhone(input: { endpointId: string; displayName: string; accountId: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null }) {
+async function invitePhone(input: { endpointId: string; displayName: string; accountId: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null }) {
   const token = randomToken();
   const invite = await prisma().pairing.create({
     data: {
@@ -97,7 +97,7 @@ export async function inviteAgent(input: { url: string; displayName: string; sco
 }
 
 /** The `clientId` belongs to another kind of device. */
-export class ClientIdInUseError extends Error {
+class ClientIdInUseError extends Error {
   constructor() {
     super("That identifier belongs to another kind of device.");
   }
@@ -208,7 +208,7 @@ function isCompanion(client: PairedDeviceClient, scope: DeviceScope): boolean {
  * makes a network call to join: the app hands it the tokens and manifest. Re-enrolling the same
  * `clientId` retires the old record.
  */
-export async function inviteAndClaimCompanion(input: { client: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
+async function inviteAndClaimCompanion(input: { client: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const invite = await db.pairing.create({
