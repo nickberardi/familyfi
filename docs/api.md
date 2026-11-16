@@ -197,6 +197,10 @@ and never sent by the server.
   push token, the platform and channel, the ciphertext, the install id and the time, and keeps
   nothing. `ttl` is the same for every kind (12 hours), and `collapse` is a random id, so neither
   says which kind an alert is.
+- Only a device still signed in gets alerts: one revoked, or whose sessions a password change,
+  sign-out or 90 idle days ended, gets nothing, though its registration stays until it is removed.
+- "Gateway reached" goes only to a device that got "Can't reach your gateway"; an unsent trouble
+  alert is dropped when the gateway is reached again.
 - New-device alerts are one per sync pass, never on the household's first pass, and at most four an
   hour for each phone.
 

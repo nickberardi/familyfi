@@ -163,6 +163,46 @@ describe("alert sender", () => {
     expect(await prisma().alertEvent.findFirstOrThrow()).toMatchObject({ sentAt: null, attempts: 1 });
   });
 
+  it("says sync is back to a phone whose trouble alert reached the relay while the outage was being cleared", async () => {
+    const phone = await registeredPhone();
+    await recordSyncOutcome(false, now);
+    now = new Date(now.getTime() + SYNC_TROUBLE_AFTER_MS);
+    await recordSyncOutcome(false, now);
+    // The pass that reaches the gateway clears the outage while the relay is taking the trouble alert.
+    const racing = createAlertSender({
+      fetchImpl: (async (input: string | URL | Request, init?: RequestInit) => {
+        if (String(input).endsWith("/v1/send")) await recordSyncOutcome(true, now);
+        return relay.fetchImpl(input, init);
+      }) as typeof fetch,
+      now: () => now,
+      relayUrl: () => "https://relay.test",
+    });
+    await racing.flush();
+    expect((await prisma().alertEvent.findMany()).map((event) => [event.kind, event.deviceId, event.sentAt === null])).toEqual([["sync.up", phone, true]]);
+  });
+
+  it("sends nothing to a phone whose sign-in has ended, though it was never revoked", async () => {
+    const phone = await registeredPhone();
+    await recordNewDevices([{ hostname: "Kids-iPad" }], { firstPass: false, now });
+    // A password change or sign-out ends every session and leaves the device paired.
+    await prisma().session.updateMany({ where: { deviceId: phone }, data: { revokedAt: now } });
+    await sender.flush();
+    expect(relay.sent).toHaveLength(0);
+    expect(await prisma().alertEvent.count()).toBe(0);
+    await recordNewDevices([{ hostname: "Other" }], { firstPass: false, now });
+    expect(await prisma().alertEvent.count()).toBe(0);
+  });
+
+  it("asks once more for an install when an id was kept without its secret", async () => {
+    await registeredPhone();
+    await prisma().household.update({ where: { id: "default" }, data: { alertsInstallId: "half-install" } });
+    await recordNewDevices([{ hostname: null }], { firstPass: false, now });
+    await sender.flush();
+    expect(relay.installs()).toBe(1);
+    expect(relay.sent).toHaveLength(1);
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).alertsInstallId).toBe("install-1");
+  });
+
   it("gives every kind the same lifetime, so nothing in clear says which kind an alert is", async () => {
     await registeredPhone();
     await recordNewDevices([{ hostname: null }], { firstPass: false, now });

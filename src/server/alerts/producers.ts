@@ -18,9 +18,18 @@ export const SYNC_TROUBLE_AFTER_MS = 10 * 60_000;
 const HOUR_MS = 60 * 60_000;
 
 /** The phones that take `kind` now: registered, still paired, understanding it and not muting it. */
-async function recipients(kind: AlertKind): Promise<string[]> {
+/**
+ * A paired device still signed in: not revoked, with a session whose refresh has not ended. A
+ * password change, sign-out or 90 idle days end its sessions without revoking it, and a device that
+ * can no longer sign in is never told anything about the household.
+ */
+export function signedInDevice(now: Date) {
+  return { revokedAt: null, sessions: { some: { revokedAt: null, refreshExpiresAt: { gt: now } } } } satisfies Prisma.PairedDeviceWhereInput;
+}
+
+async function recipients(kind: AlertKind, now = new Date()): Promise<string[]> {
   const rows = await prisma().pushRegistration.findMany({
-    where: { supportedKinds: { has: kind }, NOT: { mutedKinds: { has: kind } }, device: { revokedAt: null } },
+    where: { supportedKinds: { has: kind }, NOT: { mutedKinds: { has: kind } }, device: signedInDevice(now) },
     select: { deviceId: true },
   });
   return rows.map((row) => row.deviceId);
@@ -57,7 +66,7 @@ export async function recordNewDevices(found: { hostname: string | null }[], opt
   const now = options.now ?? new Date();
   try {
     if (!(await relayEnabled())) return;
-    const phones = await recipients("device.new");
+    const phones = await recipients("device.new", now);
     if (!phones.length) return;
     const recent = await prisma().alertEvent.groupBy({
       by: ["deviceId"],
@@ -101,7 +110,7 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
         select: { deviceId: true },
         distinct: ["deviceId"],
       });
-      const phones = new Set(await recipients("sync.up"));
+      const phones = new Set(await recipients("sync.up", now));
       await writeEvents("sync.up", told.map((row) => row.deviceId).filter((phone) => phones.has(phone)), {}, now);
       return;
     }
@@ -117,7 +126,23 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
       data: { syncTroubleAlertedAt: now },
     });
     if (!claimed.count) return;
-    await writeEvents("sync.down", await recipients("sync.down"), {}, now);
+    await writeEvents("sync.down", await recipients("sync.down", now), {}, now);
+  } catch (error) {
+    warn(error);
+  }
+}
+
+/**
+ * The relay took a phone's trouble alert while a pass that reached the gateway was clearing the
+ * outage, and so deleting that alert as never sent: the phone heard sync was down, so it hears it is
+ * back, unless a new outage has already been told.
+ */
+export async function recordSyncBackFor(deviceId: string, now = new Date()): Promise<void> {
+  try {
+    const household = await prisma().household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true, syncTroubleAlertedAt: true } });
+    if (!household?.alertsRelayEnabled || household.syncTroubleAlertedAt) return;
+    if (!(await recipients("sync.up", now)).includes(deviceId)) return;
+    await writeEvents("sync.up", [deviceId], {}, now);
   } catch (error) {
     warn(error);
   }

@@ -53,7 +53,7 @@
       "ciphertext": "ARgZGhscHR4fICEiI2g9NjLheEltaCGH6yLit3Z1zthquSbXPlJAGbS7B_paQl8C-ciqHv7ViIdAi7skopMVwnS8TjHXBkORBnOIzx6U519sj9eecePS",
       "text": {
         "title": "Can't reach your gateway",
-        "body": "FamilyFi can't reach your gateway. Rules may not be applied."
+        "body": "Your rules may not apply until FamilyFi reaches it again."
       }
     },
     {
@@ -69,8 +69,8 @@
       },
       "ciphertext": "ASQlJicoKSorLC0uL4it1fwZf3ELUMVfN2-kPyy7rlmGdHnwAusBUHOmzudeJdqwSsF2v-TgOV5byaaxGxqT9O1LvdoqzQBeDMbM7xR4L9TNlyraYJC_4DQoL-QyNNu2h4zK",
       "text": {
-        "title": "Back in touch",
-        "body": "FamilyFi is syncing again."
+        "title": "Gateway reached",
+        "body": "FamilyFi can reach your gateway again, and your rules apply."
       }
     }
   ]

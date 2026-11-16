@@ -13,8 +13,8 @@ describe("alert copy", () => {
   });
 
   it("says when sync is in trouble and when it is back", () => {
-    expect(alertText("sync.down", {})?.body).toBe("FamilyFi can't reach your gateway. Rules may not be applied.");
-    expect(alertText("sync.up", {})?.body).toBe("FamilyFi is syncing again.");
+    expect(alertText("sync.down", {})?.body).toBe("Your rules may not apply until FamilyFi reaches it again.");
+    expect(alertText("sync.up", {})?.body).toBe("FamilyFi can reach your gateway again, and your rules apply.");
   });
 
   it("has words for every kind, and none for a kind it does not know", () => {

@@ -30,9 +30,9 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
       return { title: "New device", body: name ? `${name} is waiting in Unassigned.` : "A new device is waiting in Unassigned." };
     }
     case "sync.down":
-      return { title: "Can't reach your gateway", body: "FamilyFi can't reach your gateway. Rules may not be applied." };
+      return { title: "Can't reach your gateway", body: "Your rules may not apply until FamilyFi reaches it again." };
     case "sync.up":
-      return { title: "Back in touch", body: "FamilyFi is syncing again." };
+      return { title: "Gateway reached", body: "FamilyFi can reach your gateway again, and your rules apply." };
     default:
       return null;
   }
@@ -41,24 +41,30 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
 /** The name of each kind on an Alerts screen or card, where a parent turns it on or off. */
 export const ALERT_KIND_LABELS: Record<string, string> = {
   "device.new": "New devices",
-  "sync.down": "Can't reach the gateway",
-  "sync.up": "Back in touch",
+  "sync.down": "Can't reach your gateway",
+  "sync.up": "Gateway reached",
 };
 
 /** The Alerts card in Settings. */
 export const ALERTS_CARD_COPY = {
-  title: "Phone alerts",
-  switchLabel: "Send alerts to phones",
+  title: "Alerts",
+  switchLabel: "Send alerts to the FamilyFi app",
   description:
-    "Tells your phones when a new device is waiting in Unassigned, or when FamilyFi can't reach your gateway.",
+    "Tells the FamilyFi app on your phones and tablets when a new device is waiting in Unassigned, or when FamilyFi can't reach your gateway.",
   disclosureTitle: "What leaves your home",
   disclosure: [
     "Alerts go through FamilyFi's push relay, which hands them to Apple or Google.",
-    "Each alert is locked with a key only that phone and this server hold. The relay sees the phone's push address, whether it is an iPhone or Android phone, the locked alert, this server's relay id and the time. It can't read the alert, and it keeps nothing.",
-    "Apple or Google see that a phone got an alert and when, not what it says or what kind it is.",
+    "Each alert is locked with a key that only that device and your FamilyFi hold. The relay sees an address for the device, whether it is an Apple or Android device, the locked alert, a random number for your FamilyFi and the time. It can't read the alert, and it keeps nothing.",
+    "Apple or Google see that a device got an alert and when, not what it says or what kind it is.",
   ],
-  phonesTitle: "Phones getting alerts",
-  noPhones: "No phone has turned on alerts yet. Turn them on in the FamilyFi app.",
+  phonesTitle: "Devices with the FamilyFi app",
+  noPhones: "No device with the FamilyFi app is paired yet. Pair one in Pair Device to get alerts.",
+  householdOff: "Alerts are off for the household, so no device gets them.",
+  loadFailed: "Couldn't load the devices with the FamilyFi app.",
+  retry: "Try again",
   phoneOn: "Alerts on",
   phoneOff: "Alerts off",
+  /** The same, later on a paired app's access line in Pair Device. */
+  accessOn: "alerts on",
+  accessOff: "alerts off",
 } as const;

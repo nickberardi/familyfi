@@ -1461,24 +1461,32 @@ test("Settings turns phone alerts on for the household and lists which phones ge
     sessions: [],
     alerts,
   });
+  // The first read fails, and Try again reads the list.
+  let reads = 0;
   await page.route("**/api/v1/paired/devices?client=app&status=active", (route) =>
-    route.fulfill({ contentType: "application/json", body: JSON.stringify({ devices: [phone("p1", "Mia's iPhone", true), phone("p2", "Kitchen iPad", false)] }) }),
+    ++reads === 1
+      ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "internal", message: "Something went wrong." } }) })
+      : route.fulfill({ contentType: "application/json", body: JSON.stringify({ devices: [phone("p1", "Mia's iPhone", true), phone("p2", "Kitchen iPad", false)] }) }),
   );
   await page.goto("/settings");
   const card = page.getByRole("region", { name: "Page content" }).getByTestId("settings-alerts");
+  await expect(card.getByTestId("settings-alerts-error")).toContainText("Couldn't load the devices with the FamilyFi app.");
+  await card.getByRole("button", { name: "Try again" }).click();
+  await expect(card.getByTestId("settings-alerts-phones")).toContainText("Alerts are off for the household, so no device gets them.");
   await expect(card.getByTestId("settings-alerts-phones")).toContainText("Mia's iPhoneAlerts on");
   await expect(card.getByTestId("settings-alerts-phones")).toContainText("Kitchen iPadAlerts off");
 
-  const toggle = card.getByRole("switch", { name: "Send alerts to phones" });
+  const toggle = card.getByRole("switch", { name: "Send alerts to the FamilyFi app" });
   await expect(toggle).toHaveAttribute("aria-checked", "false");
   const saved = page.waitForRequest((request) => request.url().endsWith("/api/v1/settings/household") && request.method() === "PUT");
   await toggle.click();
   expect((await saved).postDataJSON()).toEqual({ alertsRelay: true });
   await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await expect(card.getByTestId("settings-alerts-phones")).not.toContainText("Alerts are off for the household");
   await page.reload();
-  await expect(page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to phones" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to the FamilyFi app" })).toHaveAttribute("aria-checked", "true");
 
   // Back off, so the shared household is as the other tests expect.
-  await page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to phones" }).click();
-  await expect(page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to phones" })).toHaveAttribute("aria-checked", "false");
+  await page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to the FamilyFi app" }).click();
+  await expect(page.getByRole("region", { name: "Page content" }).getByRole("switch", { name: "Send alerts to the FamilyFi app" })).toHaveAttribute("aria-checked", "false");
 });
