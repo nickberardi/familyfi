@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { originAllowed, refreshSession, toPublicSession } from "@/server/auth";
+import { readBody } from "@/server/guard";
 import { jsonCaughtError, jsonError } from "@/server/http";
 
 const Body = z.object({ refreshToken: z.string().min(1) });
@@ -8,14 +9,8 @@ const Body = z.object({ refreshToken: z.string().min(1) });
 /** A paired device trades its refresh token for a new access token and refresh token. */
 export async function POST(request: Request) {
   if (!originAllowed(request)) return jsonError(403, "forbidden_origin", "Request origin is not allowed.");
-  let json: unknown;
-  try {
-    json = await request.json();
-  } catch {
-    return jsonError(400, "invalid_json", "Request body must be JSON.");
-  }
-  const parsed = Body.safeParse(json);
-  if (!parsed.success) return jsonError(400, "invalid_request", "A refresh token is required.");
+  const parsed = await readBody(request, Body, "A refresh token is required.");
+  if (!parsed.ok) return parsed.response;
   try {
     const result = await refreshSession(parsed.data.refreshToken, { tunnelled: request.headers.get(TUNNEL_HEADER) === "tunnel" });
     if (!result.ok) return jsonError(403, result.code, result.message);

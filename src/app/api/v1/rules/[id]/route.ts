@@ -1,6 +1,6 @@
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { mapLimited } from "@/lib/concurrency";
 import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
@@ -38,10 +38,8 @@ export async function GET(request: Request, ctx: Ctx) {
 export async function PATCH(request: Request, ctx: Ctx) {
   return withMutation(request, async (session) => {
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = RuleUpdateBody.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Invalid rule update.");
+    const parsed = await readBody(request, RuleUpdateBody, "Invalid rule update.");
+    if (!parsed.ok) return parsed.response;
     const existing = await prisma().rule.findUnique({ where: { id }, include: ruleInclude });
     if (!existing || existing.systemGroupId) return jsonError(404, "not_found", "Rule not found.");
     const patch = parsed.data;

@@ -4,7 +4,7 @@ import { hashPassword, revokeAccountSessions } from "@/server/auth";
 import { enqueueChange } from "@/server/changes";
 import { publicAccount } from "@/server/accounts";
 import { prisma } from "@/server/db";
-import { readJson, withMutation } from "@/server/guard";
+import { readBody, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { demoLocked } from "@/server/demo";
 
@@ -19,10 +19,8 @@ export async function PUT(request: Request, ctx: Ctx) {
     const locked = demoLocked();
     if (locked) return locked;
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "password must be at least 8 characters.");
+    const parsed = await readBody(request, Body, "password must be at least 8 characters.");
+    if (!parsed.ok) return parsed.response;
     const existing = await prisma().account.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Account not found.");
     if (existing.kind === AccountKind.recovery) {

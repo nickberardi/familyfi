@@ -3,10 +3,11 @@ import { z } from "zod";
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { isAdministratorAccount, mayPairAs, requestOrigin } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { readJson, withAdmin, withMutation } from "@/server/guard";
+import { readBody, readJson, withAdmin, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { isFullApp } from "@/server/device-scope";
 import { ClientIdInUseError, inviteAgent, inviteAndClaimCompanion, invitePhone } from "@/server/pairing";
+import { loadHousehold } from "@/server/household";
 
 const Name = z.string().trim().min(1).max(80);
 const Invite = z.discriminatedUnion("client", [
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
       if (!mayPairAs(session.account)) return jsonError(403, "personal_account_required", "An agent acts as whoever connects it, and nothing acts as the recovery admin. Sign in as yourself to connect one.");
       // The code carries the home network address, or else the one it was made at: the browser's
       // address can be a proxy with its own sign-in page, which an agent cannot get past.
-      const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+      const household = await loadHousehold();
       const url = household.homeUrl ?? requestOrigin(request);
       const { invite, code } = await inviteAgent({ url, displayName: input.displayName, scope: input.scope, createdByAccountId: session.accountId, parentDeviceId });
       const body = inviteBody(invite, code);
@@ -87,10 +88,8 @@ async function claimCompanion(request: Request) {
       return jsonError(403, "paired_phone_required", "Only a signed-in paired phone can invite and claim its Watch or its Siri and shortcuts.");
     }
     if (!mayPairAs(session.account)) return jsonError(403, "personal_account_required", RECOVERY_REFUSED);
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Companion.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "An identifier and optional name are required; only a Watch, or an app with the rulesOnly scope, is claimed this way.");
+    const parsed = await readBody(request, Companion, "An identifier and optional name are required; only a Watch, or an app with the rulesOnly scope, is claimed this way.");
+    if (!parsed.ok) return parsed.response;
     let joined: Awaited<ReturnType<typeof inviteAndClaimCompanion>>;
     try {
       joined = await inviteAndClaimCompanion({

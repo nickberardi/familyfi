@@ -4,7 +4,7 @@ import { assertAdultFamilyGroup, assertPersonalUsername, normalizeUsername, publ
 import { enqueueChange } from "@/server/changes";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { demoLocked } from "@/server/demo";
 
@@ -27,10 +27,8 @@ export async function POST(request: Request) {
   return withMutation(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Create.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "username, displayName, password, and groupId are required.");
+    const parsed = await readBody(request, Create, "username, displayName, password, and groupId are required.");
+    if (!parsed.ok) return parsed.response;
     const username = normalizeUsername(parsed.data.username);
     try {
       assertPersonalUsername(username);

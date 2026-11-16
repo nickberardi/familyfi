@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { groupInclude, publicGroup } from "@/server/groups";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
 import { withUpstreamLock } from "@/server/upstream/transaction";
@@ -41,10 +41,8 @@ export async function PUT(request: Request, ctx: Ctx) {
     const locked = demoLocked();
     if (locked) return locked;
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Paste the endpoint URL.");
+    const parsed = await readBody(request, Body, "Paste the endpoint URL.");
+    if (!parsed.ok) return parsed.response;
 
     let url: string;
     try {

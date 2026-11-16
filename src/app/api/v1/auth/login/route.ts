@@ -12,6 +12,7 @@ import {
   sessionCookieOptions,
   toPublicSession,
 } from "@/server/auth";
+import { readBody } from "@/server/guard";
 import { clientIp, jsonCaughtError, jsonError } from "@/server/http";
 import { TUNNEL_HEADER } from "@/lib/constants";
 
@@ -27,16 +28,8 @@ export async function POST(request: Request) {
     return jsonError(403, "forbidden_origin", "Request origin is not allowed.");
   }
 
-  let json: unknown;
-  try {
-    json = await request.json();
-  } catch {
-    return jsonError(400, "invalid_json", "Request body must be JSON.");
-  }
-  const parsed = Body.safeParse(json);
-  if (!parsed.success) {
-    return jsonError(400, "invalid_request", "Username and password are required.");
-  }
+  const parsed = await readBody(request, Body, "Username and password are required.");
+  if (!parsed.ok) return parsed.response;
 
   try {
     // A paired device signs in by pairing, never here. Through remote access nobody signs in here,

@@ -8,6 +8,7 @@ import { prisma } from "./db";
 import { demoLocked } from "./demo";
 import { sessionActor } from "./groups";
 import { readJson } from "./guard";
+import { loadHousehold } from "./household";
 import { jsonError } from "./http";
 import {
   activeWindowsEnd,
@@ -56,7 +57,7 @@ export async function runLift(
     const kind = action === "resume" ? RuleLiftKind.pause : RuleLiftKind.allow;
     if (state.pauseActive && state.pauseKind === kind) data = CLEARED;
   } else {
-    const enabled = quarantine ? (await household()).quarantineEnforced : rule.enabled;
+    const enabled = quarantine ? (await loadHousehold()).quarantineEnforced : rule.enabled;
     if (!enabled) return jsonError(409, "rule_off", "This rule is off.");
     if (action === "extend") {
       if (!state.pauseActive || state.pauseKind !== RuleLiftKind.pause) return jsonError(409, "not_paused", "Extend requires an active pause.");
@@ -67,7 +68,7 @@ export async function runLift(
       let until: Date | null;
       if (action === "allow" && requested === undefined) {
         // Until the windows active now end; an always-on rule never does, so until disallowed.
-        const ends = activeWindowsEnd(ruleInternetWindows(rule), now, (await household()).timezone);
+        const ends = activeWindowsEnd(ruleInternetWindows(rule), now, (await loadHousehold()).timezone);
         if (ends === undefined) return jsonError(409, "not_in_window", "This rule is not blocking now.");
         until = ends;
       } else {
@@ -133,10 +134,6 @@ export async function switchQuarantineRule(
   const change = await enqueueChange("quarantine");
   const rule = await prisma().rule.findUniqueOrThrow({ where: { id: QUARANTINE_RULE_ID }, include: ruleInclude });
   return Response.json({ rule: await presentRule(rule), change });
-}
-
-async function household() {
-  return prisma().household.findUniqueOrThrow({ where: { id: "default" } });
 }
 
 /** The request body a verb takes: `minutes` for extend, an optional `until` for pause and allow. */

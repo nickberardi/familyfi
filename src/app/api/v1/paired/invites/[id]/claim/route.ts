@@ -2,7 +2,7 @@ import { PairedDeviceClient } from "@prisma/client";
 import { z } from "zod";
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { prisma } from "@/server/db";
-import { readJson } from "@/server/guard";
+import { readBody } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { claimInvite } from "@/server/pairing";
 
@@ -11,10 +11,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** Joins with an invite's single-use code. Every client gets the same answer: its device, bearer and refresh token. */
 export async function POST(request: Request, context: Ctx) {
-  const body = await readJson(request);
-  if (!body.ok) return body.response;
-  const parsed = Body.safeParse(body.value);
-  if (!parsed.success) return jsonError(400, "invalid_request", "The invite's token and a device name are required.");
+  const parsed = await readBody(request, Body, "The invite's token and a device name are required.");
+  if (!parsed.ok) return parsed.response;
   const { id } = await context.params;
   if (request.headers.get(TUNNEL_HEADER) === "tunnel") {
     const invite = await prisma().pairing.findUnique({ where: { id }, select: { client: true } });

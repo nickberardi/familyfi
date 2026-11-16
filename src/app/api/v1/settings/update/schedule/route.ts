@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parseHm } from "@/lib/schedule";
 import { demoLocked } from "@/server/demo";
 import { prisma } from "@/server/db";
-import { readJson, withAdmin } from "@/server/guard";
+import { readBody, withAdmin } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { rescheduleAutoUpdate, updateSettings } from "@/server/updater";
 import { weeklyCron } from "@/server/weekly-schedule";
@@ -19,12 +19,8 @@ export async function PUT(request: Request) {
   return withAdmin(request, async () => {
     const locked = demoLocked();
     if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) {
-      return jsonError(400, "invalid_request", "Send enabled, at least one day (0 Sunday to 6 Saturday) and an HH:MM time.");
-    }
+    const parsed = await readBody(request, Body, "Send enabled, at least one day (0 Sunday to 6 Saturday) and an HH:MM time.");
+    if (!parsed.ok) return parsed.response;
     try {
       parseHm(parsed.data.time);
     } catch (error) {

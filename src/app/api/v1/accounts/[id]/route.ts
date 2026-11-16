@@ -5,7 +5,7 @@ import { enqueueChange } from "@/server/changes";
 import { revokeAccountSessions } from "@/server/auth";
 import { removeAccountDevices } from "@/server/connection";
 import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
+import { readBody, withMutation, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { demoLocked } from "@/server/demo";
 
@@ -31,10 +31,8 @@ export async function PUT(request: Request, ctx: Ctx) {
     const locked = demoLocked();
     if (locked) return locked;
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Update.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Invalid account update.");
+    const parsed = await readBody(request, Update, "Invalid account update.");
+    if (!parsed.ok) return parsed.response;
     const existing = await prisma().account.findUnique({ where: { id } });
     if (!existing) return jsonError(404, "not_found", "Account not found.");
     if (existing.kind === AccountKind.recovery) {
