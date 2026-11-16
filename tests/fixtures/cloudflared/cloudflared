@@ -20,8 +20,13 @@ case " $* " in
     echo "https://dash.cloudflare.com/argotunnel?aud=&callback=https%3A%2F%2Flogin.cloudflareaccess.org%2Ffake" >&2
     echo "" >&2
     echo "Leave cloudflared running to download the cert automatically." >&2
-    # A person takes a while to authorize; long enough for the page to poll and show the link.
-    sleep 4
+    # A person takes a while to authorize: by default long enough for the browser tests' page to
+    # poll and show the link. A `login-delay` file sets another number of seconds, and while a
+    # `login-hold` file exists the sign-in waits for it to go (or to be stopped).
+    while [ -e "$state/login-hold" ]; do sleep 0.05; done
+    delay=4
+    [ -e "$state/login-delay" ] && delay=$(cat "$state/login-delay")
+    sleep "$delay"
     if [ -e "$state/login-fails" ]; then echo "2026-09-23T00:00:00Z ERR Failed to fetch resource" >&2; exit 1; fi
     mkdir -p "$HOME/.cloudflared"
     if [ -e "$state/legacy-cert" ]; then

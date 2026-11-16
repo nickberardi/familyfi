@@ -227,8 +227,9 @@ describe("household rules", () => {
     await ruleOf(await postRule({ name: "Hers", kind: "internet", groupIds: [emma.id], mode: "scheduled", windows }));
     await runReconcileOnce();
 
-    // In test mode the server reaches the console through the shared mock, once a key is stored;
-    // each delete is held so overlap shows.
+    // In test mode the server reaches the console through the shared mock, once a key is stored.
+    // Each delete is held until a second one is in flight, so overlap shows however fast the
+    // ownership queries are; deletes made one after another wait out the fallback and fail on peak.
     process.env.FAMILYFI_MODE = "test";
     await prisma().household.update({
       where: { id: "default" },
@@ -238,10 +239,17 @@ describe("household rules", () => {
     const deleted: string[] = [];
     let inFlight = 0;
     let peak = 0;
+    let open = () => {};
+    let overlap = Promise.resolve();
+    const hold = () => {
+      overlap = new Promise<void>((done) => (open = done));
+    };
+    hold();
     gateway.deletePolicy = async (_siteId: string, id: string) => {
       inFlight += 1;
       peak = Math.max(peak, inFlight);
-      await new Promise((done) => setTimeout(done, 10));
+      if (inFlight >= 2) open();
+      await Promise.race([overlap, new Promise((done) => setTimeout(done, 5_000))]);
       inFlight -= 1;
       deleted.push(id);
     };
@@ -254,6 +262,7 @@ describe("household rules", () => {
 
     deleted.length = 0;
     peak = 0;
+    hold();
     expect(await prisma().rulePolicy.count()).toBe(3);
     await deleteGroup(emma.id);
     expect(deleted).toHaveLength(3);

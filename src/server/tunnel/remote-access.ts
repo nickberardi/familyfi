@@ -105,12 +105,20 @@ const runtime: Runtime = ((globalThis as { familyfiRemoteAccess?: Runtime }).fam
  * row in the same table reconciliation uses, under its own id.
  */
 const LEASE_ID = "tunnel";
-const LEASE_MS = 60_000;
-const LEASE_RENEW_MS = 20_000;
+const TIMING = { leaseMs: 60_000, leaseRenewMs: 20_000, restartBaseMs: 5_000 };
+let leaseMs = TIMING.leaseMs;
+let leaseRenewMs = TIMING.leaseRenewMs;
+/** The first restart's delay; each one after doubles it, up to a minute. */
+let restartBaseMs = TIMING.restartBaseMs;
+
+/** Shorter lease and restart timings, so a test sees a lost lease or a restart in well under a second. */
+export function setRemoteAccessTimingForTests(timing?: { leaseMs: number; leaseRenewMs: number; restartBaseMs: number }) {
+  ({ leaseMs, leaseRenewMs, restartBaseMs } = timing ?? TIMING);
+}
 
 async function acquireLease(): Promise<boolean> {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + LEASE_MS);
+  const expiresAt = new Date(now.getTime() + leaseMs);
   const existing = await prisma().reconciliationLock.findUnique({ where: { id: LEASE_ID } });
   if (!existing) {
     try {
@@ -148,7 +156,7 @@ function keepLease() {
         runtime.error = ANOTHER_PROCESS;
       })
       .catch(() => undefined);
-  }, LEASE_RENEW_MS);
+  }, leaseRenewMs);
 }
 
 const ANOTHER_PROCESS = "Another FamilyFi process using this database is running remote access. Only one may; this one will take over if that one stops.";
@@ -295,7 +303,7 @@ function supervise(child: ChildProcess, onChunk: (text: string) => void) {
     if (!runtime.wanted) return;
     runtime.status = "error";
     runtime.error ??= "The tunnel stopped. Retrying.";
-    const delay = Math.min(60_000, 5_000 * 2 ** runtime.attempts++);
+    const delay = Math.min(60_000, restartBaseMs * 2 ** runtime.attempts++);
     runtime.restartTimer = setTimeout(() => void launch(), delay);
   });
 }
@@ -311,7 +319,7 @@ async function launch() {
     runtime.status = "error";
     runtime.error = ANOTHER_PROCESS;
     // Try again later: the other process may stop, and its lease then expires.
-    runtime.restartTimer = setTimeout(() => void launch(), LEASE_MS);
+    runtime.restartTimer = setTimeout(() => void launch(), leaseMs);
     return;
   }
   keepLease();

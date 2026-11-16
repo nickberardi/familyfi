@@ -10,7 +10,7 @@ import { encryptSecret } from "@/server/crypto";
 import { prisma } from "@/server/db";
 import { remoteStatus } from "@/lib/connection-routes";
 import type { RemoteAccess } from "@/lib/types";
-import { changeRemoteAccess, householdRoutePublished, noteRouteReached, RemoteAccessBody, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, setRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
+import { changeRemoteAccess, householdRoutePublished, noteRouteReached, RemoteAccessBody, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, setRemoteAccess, setRemoteAccessTimingForTests, startRemoteAccessPort } from "@/server/tunnel/remote-access";
 import { answered } from "../helpers/answered";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
@@ -45,6 +45,10 @@ describe("remote access", () => {
     writeFileSync(wrapper, `#!/bin/sh\nFAKE_CLOUDFLARED_LOG='${log}' exec '${FAKE}' "$@"\n`);
     chmodSync(wrapper, 0o755);
     process.env.CLOUDFLARED_BIN = wrapper;
+    // No one authorizes here: a sign-in finishes at once, and a test that watches it wait holds it with `login-hold`.
+    writeFileSync(path.join(dir, "login-delay"), "0");
+    // A lost lease shows within a renewal, and a stopped tunnel restarts after a second rather than five.
+    setRemoteAccessTimingForTests({ leaseMs: 60_000, leaseRenewMs: 250, restartBaseMs: 1_000 });
 
     dns = createServer((req, res) => {
       const url = new URL(req.url!, "http://dns.test");
@@ -70,6 +74,7 @@ describe("remote access", () => {
   });
 
   afterAll(async () => {
+    setRemoteAccessTimingForTests();
     process.env.CLOUDFLARED_BIN = saved;
     if (savedApi === undefined) delete process.env.CLOUDFLARE_API_URL;
     else process.env.CLOUDFLARE_API_URL = savedApi;
@@ -80,7 +85,7 @@ describe("remote access", () => {
   beforeEach(async () => {
     await resetDatabase();
     rmSync(log, { force: true });
-    for (const file of ["dns", "quick-hold", "tunnels", "created", "legacy-cert", "list-broken", "delete-fails", "login-fails"]) rmSync(path.join(dir, file), { force: true, recursive: true });
+    for (const file of ["dns", "quick-hold", "login-hold", "tunnels", "created", "legacy-cert", "list-broken", "delete-fails", "login-fails"]) rmSync(path.join(dir, file), { force: true, recursive: true });
     records = [];
     dnsFailure = null;
     dnsCalls = [];
@@ -123,22 +128,39 @@ describe("remote access", () => {
     return (existsSync(log) ? readFileSync(log, "utf8") : "").split("\n").filter((line) => line.startsWith("argv: tunnel")).join("\n");
   }
 
-  async function waitFor(check: (tunnel: Tunnel) => boolean, label: string, tries = 80): Promise<Tunnel> {
-    for (let i = 0; i < tries; i++) {
+  /** Holds the stand-in's next Cloudflare sign-in at its link until the returned function lets it finish. */
+  function holdLogin(): () => void {
+    const hold = path.join(dir, "login-hold");
+    writeFileSync(hold, "");
+    return () => rmSync(hold, { force: true });
+  }
+
+  /**
+   * Polls until `check` holds, for at most `timeoutMs` of wall-clock time however long each read takes
+   * under load. The timeout names what the stand-in cloudflared was asked to do, so it can be read.
+   */
+  async function waitFor(check: (tunnel: Tunnel) => boolean, label: string, timeoutMs = 8_000): Promise<Tunnel> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
       const current = await state();
       if (check(current)) return current;
+      if (Date.now() >= deadline) {
+        const calls = existsSync(log) ? readFileSync(log, "utf8") : "(nothing logged)";
+        throw new Error(`timed out after ${timeoutMs} ms waiting for ${label}: ${JSON.stringify(current)}\nstand-in cloudflared log:\n${calls}`);
+      }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    throw new Error(`timed out waiting for ${label}: ${JSON.stringify(await state())}`);
   }
 
   it("signs in once, keeps only the tunnel key, and runs on the permanent address", async () => {
+    const release = holdLogin();
     const started = await put({ mode: "named", hostname: "FamilyFi.Example.com" });
     expect(started.status).toBe(200);
 
     const signingIn = await waitFor((t) => t.loginUrl !== null, "the Cloudflare link");
     expect(signingIn.status).toBe("signing-in");
     expect(signingIn.loginUrl).toMatch(/^https:\/\/dash\.cloudflare\.com\/argotunnel/);
+    release();
 
     // Between the sign-in and the tunnel running, setup is never reported as off.
     const seen = new Set<string>();
@@ -178,6 +200,7 @@ describe("remote access", () => {
     expect(readFileSync(log, "utf8")).not.toContain("tunnel login");
 
     addRecord(tunnelRecord("our-record", "familyfi.example.com", FIRST_TUNNEL));
+    const release = holdLogin();
     await put({ mode: "off", forget: true });
     // Forgetting deletes the domain route, and its tunnel key with it, straight away.
     expect(await prisma().connectionEndpoint.count({ where: { kind: "domain" } })).toBe(0);
@@ -185,7 +208,8 @@ describe("remote access", () => {
     // Then one more Cloudflare sign-in lets FamilyFi delete its tunnel and DNS record there.
     const signingIn = await waitFor((t) => t.loginUrl !== null, "the Cloudflare link for Forget");
     expect(signingIn).toMatchObject({ mode: "off", status: "signing-in", hostname: null, endpointId: null });
-    expect(await waitFor((t) => t.status === "off", "the cleanup", 150)).toMatchObject({ mode: "off", error: null, loginUrl: null });
+    release();
+    expect(await waitFor((t) => t.status === "off", "the cleanup", 15_000)).toMatchObject({ mode: "off", error: null, loginUrl: null });
     expect(records).toEqual([]);
     expect(accountTunnels()).toEqual([]);
     expect(readFileSync(log, "utf8")).toMatch(new RegExp(`argv: tunnel --origincert \\S+ delete -f ${FIRST_TUNNEL}`));
@@ -207,6 +231,8 @@ describe("remote access", () => {
 
   it("leaves Cloudflare alone when Forget's sign-in is cancelled", async () => {
     await connect("familyfi.example.com");
+    // Held at its link until cancelled, as a person who never authorizes it.
+    holdLogin();
     await put({ mode: "off", forget: true });
     await waitFor((t) => t.loginUrl !== null, "the Cloudflare link for Forget");
     // Cancel: the domain stays forgotten, and nothing is touched in Cloudflare.
@@ -220,7 +246,7 @@ describe("remote access", () => {
     addRecord(tunnelRecord("our-record", "familyfi.example.com", FIRST_TUNNEL));
     await unreadableCredential();
     await put({ mode: "off", forget: true });
-    expect(await waitFor((t) => t.status === "off", "the cleanup", 150)).toMatchObject({ error: null });
+    expect(await waitFor((t) => t.status === "off", "the cleanup", 15_000)).toMatchObject({ error: null });
     expect(accountTunnels()).toEqual([]);
     expect(records).toEqual([]);
     // Found by name, so not forced: a tunnel someone else still runs would not be deleted.
@@ -231,7 +257,7 @@ describe("remote access", () => {
     await connect("familyfi.example.com");
     writeFileSync(path.join(dir, "login-fails"), "");
     await put({ mode: "off", forget: true });
-    const left = await waitFor((t) => t.status === "off" && t.error !== null, "the leftover note", 150);
+    const left = await waitFor((t) => t.status === "off" && t.error !== null, "the leftover note", 15_000);
     expect(left.error).toBe("Cloudflare sign-in did not finish. The tunnel and DNS record for familyfi.example.com stay in your Cloudflare account; delete them there.");
   });
 
@@ -276,9 +302,11 @@ describe("remote access", () => {
     expect(await publishedIds()).toEqual([home.id]);
     expect(cloudflaredRuns()).toBe("");
 
-    // A quick tunnel's route waits for the tunnel, then is the only one on.
-    await put({ mode: "quick" });
+    // A quick tunnel's route waits for the tunnel, then is the only one on. The stand-in holds its
+    // address back until signalled, so the route cannot be published before it is checked.
+    const pid = await heldQuickTunnel();
     expect(await publishedIds()).toEqual([]);
+    process.kill(pid, "SIGUSR1");
     const quick = await waitFor((t) => t.status === "running", "the quick tunnel");
     expect(quick).toMatchObject({ mode: "quick", url: "https://fake-quick-tunnel-demo.trycloudflare.com" });
     const quickRoute = await prisma().connectionEndpoint.findUniqueOrThrow({ where: { id: quick.endpointId! } });
@@ -469,7 +497,7 @@ describe("remote access", () => {
     expect(stopped.error).toContain("stopped");
     // The route stays published: phones keep its address while the tunnel comes back.
     expect(stopped.endpointId).toBe(first.endpointId);
-    const back = await waitFor((t) => t.status === "running", "the restarted tunnel", 150);
+    const back = await waitFor((t) => t.status === "running", "the restarted tunnel", 15_000);
     expect(lastTunnelPid()).not.toBe(pid);
     expect(back).toMatchObject({ mode: "quick", endpointId: first.endpointId });
   });
@@ -559,11 +587,11 @@ describe("remote access", () => {
     await waitFor((t) => t.status === "running", "the quick tunnel");
     await prisma().reconciliationLock.update({ where: { id: "tunnel" }, data: { owner: "some-other-process", expiresAt: new Date(Date.now() + 60_000) } });
 
-    // The lease is renewed every 20 seconds; the renewal that finds it taken stops this tunnel.
-    const lost = await waitFor((t) => t.status === "error", "the lost lease", 260);
+    // The renewal that finds the lease taken stops this tunnel (every 20 seconds in production; a quarter second here).
+    const lost = await waitFor((t) => t.status === "error", "the lost lease");
     expect(lost.error).toContain("Another FamilyFi process");
     expect(lost.url).toBeNull();
-  }, 30_000);
+  });
 
   it("refuses a hostname another route already uses", async () => {
     const taken = await ownRoute("https://familyfi.example.com", "cloudflare", false);
@@ -597,7 +625,7 @@ describe("remote access", () => {
 
   async function connect(hostname: string, label = hostname) {
     await put({ mode: "named", hostname });
-    return waitFor((t) => t.status === "running" && t.url === `https://${hostname}`, label, 150);
+    return waitFor((t) => t.status === "running" && t.url === `https://${hostname}`, label, 15_000);
   }
 
   it("removes the old hostname's DNS record and tunnel once a new hostname is live", async () => {
@@ -655,7 +683,7 @@ describe("remote access", () => {
     addRecord(tunnelRecord("old-record", "familyfi.example.com", FIRST_TUNNEL));
 
     await put({ mode: "named", hostname: "taken.example.com" });
-    const kept = await waitFor((t) => t.status === "running" && t.error !== null, "the old domain again", 150);
+    const kept = await waitFor((t) => t.status === "running" && t.error !== null, "the old domain again", 15_000);
     expect(kept).toMatchObject({ url: "https://familyfi.example.com", hostname: "familyfi.example.com", endpointId: first.endpointId });
     expect(kept.error).toContain("taken.example.com already has a DNS record");
     expect(await publishedIds()).toEqual([first.endpointId]);
