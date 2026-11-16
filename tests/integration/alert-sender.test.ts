@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { decryptAlert } from "@/server/alerts/payload";
-import { recordNewDevices } from "@/server/alerts/producers";
+import { recordNewDevices, recordSyncOutcome, SYNC_TROUBLE_AFTER_MS } from "@/server/alerts/producers";
 import { registerPush } from "@/server/alerts/registrations";
-import { createAlertSender, GIVE_UP_AFTER_MS } from "@/server/alerts/sender";
+import { ALERT_TTL_SECONDS, createAlertSender, GIVE_UP_AFTER_MS } from "@/server/alerts/sender";
 import { prisma } from "@/server/db";
 import { resetDatabase } from "../helpers/db";
 import { pairingAdminAuth, pairPhone } from "../helpers/pairing";
@@ -70,7 +70,7 @@ describe("alert sender", () => {
     expect(send.url).toBe("https://relay.test/v1/send");
     expect(send.headers.authorization).toBe("Bearer secret-1");
     expect(Object.keys(send.body).sort()).toEqual(["channel", "ciphertext", "collapse", "installId", "platform", "token", "ttl"]);
-    expect(send.body).toMatchObject({ installId: "install-1", platform: "ios", channel: "development", token: TOKEN });
+    expect(send.body).toMatchObject({ installId: "install-1", platform: "ios", channel: "development", token: TOKEN, ttl: ALERT_TTL_SECONDS });
     const clear = JSON.stringify({ ...send.body, ciphertext: undefined });
     for (const detail of ["Kids-iPad", "02:00:00:00:09:01", "192.0.2.44", "device.new"]) expect(clear).not.toContain(detail);
 
@@ -161,6 +161,20 @@ describe("alert sender", () => {
     });
     await expect(failing.flush()).resolves.toBeUndefined();
     expect(await prisma().alertEvent.findFirstOrThrow()).toMatchObject({ sentAt: null, attempts: 1 });
+  });
+
+  it("gives every kind the same lifetime, so nothing in clear says which kind an alert is", async () => {
+    await registeredPhone();
+    await recordNewDevices([{ hostname: null }], { firstPass: false, now });
+    await recordSyncOutcome(false, now);
+    now = new Date(now.getTime() + SYNC_TROUBLE_AFTER_MS);
+    await recordSyncOutcome(false, now);
+    await sender.flush();
+    now = new Date(now.getTime() + 60_000);
+    await recordSyncOutcome(true, now);
+    await sender.flush();
+    expect((await prisma().alertEvent.findMany({ orderBy: { createdAt: "asc" } })).map((event) => event.kind)).toEqual(["device.new", "sync.down", "sync.up"]);
+    expect(relay.sent.map((send) => send.body.ttl)).toEqual([ALERT_TTL_SECONDS, ALERT_TTL_SECONDS, ALERT_TTL_SECONDS]);
   });
 
   it("sends nothing while the switch is off or in demo mode", async () => {

@@ -194,7 +194,9 @@ and never sent by the server.
   from `POST /v1/installs` on the first send and are kept encrypted. The relay answers 2xx (sent),
   410 (the token is dead: FamilyFi drops the registration), 401 (unknown install: FamilyFi asks for a
   new one), 429 or 5xx (FamilyFi retries with backoff, and gives up after a day). The relay sees the
-  push token, the ciphertext, the install id and the time, and keeps nothing.
+  push token, the platform and channel, the ciphertext, the install id and the time, and keeps
+  nothing. `ttl` is the same for every kind (12 hours), and `collapse` is a random id, so neither
+  says which kind an alert is.
 - New-device alerts are one per sync pass, never on the household's first pass, and at most four an
   hour for each phone.
 

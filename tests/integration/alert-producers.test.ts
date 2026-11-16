@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/server/db";
 import { recordNewDevices, recordSyncOutcome, SYNC_TROUBLE_AFTER_MS } from "@/server/alerts/producers";
 import { registerPush, setAlertChoices } from "@/server/alerts/registrations";
@@ -26,6 +26,9 @@ function joinNetwork(client: MockUnifiClient, name: string) {
   const suffix = (serial++).toString(16).padStart(2, "0");
   client.state.clients.push({ ...template, id: `aaaaaaaa-aaaa-4aaa-8aaa-0000000000${suffix}`, macAddress: `02:00:00:00:01:${suffix}`, name });
 }
+
+/** As the sender marks an alert the relay took. */
+const markSent = () => prisma().alertEvent.updateMany({ where: { sentAt: null }, data: { sentAt: new Date() } });
 
 const events = (kind?: string) => prisma().alertEvent.findMany({ where: kind ? { kind } : {}, orderBy: { createdAt: "asc" } });
 
@@ -110,6 +113,7 @@ describe("alert producers", () => {
     await recordSyncOutcome(false, at(SYNC_TROUBLE_AFTER_MS));
     await recordSyncOutcome(false, at(SYNC_TROUBLE_AFTER_MS + 60_000));
     expect((await events()).map((event) => [event.kind, event.deviceId])).toEqual([["sync.down", phone]]);
+    await markSent();
 
     // A phone that registers mid-outage hears neither.
     const late = await registeredPhone("Late");
@@ -118,6 +122,35 @@ describe("alert producers", () => {
     expect((await events()).map((event) => [event.kind, event.deviceId])).toEqual([["sync.down", phone], ["sync.up", phone]]);
     expect(await prisma().alertEvent.count({ where: { deviceId: late } })).toBe(0);
     expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ syncFailingSince: null, syncTroubleAlertedAt: null });
+  });
+
+  it("tells a phone the trouble alert never reached neither that sync was down nor that it is back", async () => {
+    const [reached, missed] = [await registeredPhone(), await registeredPhone("iPad")];
+    const start = new Date("2026-11-16T12:00:00Z");
+    await recordSyncOutcome(false, start);
+    await recordSyncOutcome(false, new Date(start.getTime() + SYNC_TROUBLE_AFTER_MS));
+    // The relay took one phone's alert; the other's was still waiting when the gateway came back.
+    await prisma().alertEvent.updateMany({ where: { deviceId: reached }, data: { sentAt: new Date() } });
+    await recordSyncOutcome(true, new Date(start.getTime() + SYNC_TROUBLE_AFTER_MS + 60_000));
+    expect((await events()).map((event) => [event.kind, event.deviceId])).toEqual([["sync.down", reached], ["sync.up", reached]]);
+    expect(await prisma().alertEvent.count({ where: { deviceId: missed } })).toBe(0);
+  });
+
+  it("never fails a sync pass when an alert cannot be recorded", async () => {
+    await registeredPhone();
+    await runReconcileOnce();
+    joinNetwork(client, "Kids-iPad");
+    const createMany = vi.spyOn(prisma().alertEvent, "createMany").mockRejectedValue(new Error("database restarting"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await runReconcileOnce();
+      expect(createMany).toHaveBeenCalled();
+      expect(await prisma().device.count({ where: { hostname: "Kids-iPad" } })).toBe(1);
+      expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).connectionStatus).toBe("ok");
+    } finally {
+      createMany.mockRestore();
+      warn.mockRestore();
+    }
   });
 
   it("does not say sync is back when it never said it was in trouble", async () => {
@@ -142,6 +175,7 @@ describe("alert producers", () => {
     await prisma().household.update({ where: { id: "default" }, data: { syncFailingSince: new Date(failing!.getTime() - SYNC_TROUBLE_AFTER_MS) } });
     await runReconcileOnce();
     expect((await events()).map((event) => [event.kind, event.deviceId])).toEqual([["sync.down", phone]]);
+    await markSent();
 
     client.listClients = listClients;
     await runReconcileOnce();

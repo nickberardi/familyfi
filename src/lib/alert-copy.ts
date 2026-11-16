@@ -54,8 +54,8 @@ export const ALERTS_CARD_COPY = {
   disclosureTitle: "What leaves your home",
   disclosure: [
     "Alerts go through FamilyFi's push relay, which hands them to Apple or Google.",
-    "Each alert is locked with a key only that phone holds. The relay sees the phone's push address, the locked alert, this server's relay id and the time. It can't read the alert, and it keeps nothing.",
-    "Apple or Google see that a phone got an alert and when, not what it says.",
+    "Each alert is locked with a key only that phone and this server hold. The relay sees the phone's push address, whether it is an iPhone or Android phone, the locked alert, this server's relay id and the time. It can't read the alert, and it keeps nothing.",
+    "Apple or Google see that a phone got an alert and when, not what it says or what kind it is.",
   ],
   phonesTitle: "Phones getting alerts",
   noPhones: "No phone has turned on alerts yet. Turn them on in the FamilyFi app.",

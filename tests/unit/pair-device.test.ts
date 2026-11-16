@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_STORES,
+  alertPhones,
   PAIR_COPY,
   PLAY_BETA,
   canRepair,
@@ -96,6 +97,26 @@ describe("pair device", () => {
     expect(PAIR_COPY.expired).toBe("Expired. Re-pair it to sign it in again.");
     expect(PAIR_COPY.expiredPairAgain).toBe("Expired. Revoke it and pair again.");
     expect(phoneLines(phone({ pairedVia: null }), now).origin).toBe("via a route that was removed");
+  });
+
+  it("says whether a phone gets alerts, and lists only active apps that can for the Alerts card", () => {
+    const now = new Date("2026-09-14T20:00:00Z");
+    expect(phoneLines(phone({ alerts: true }), now).access).toMatch(/ · Alerts on$/);
+    expect(phoneLines(phone({ alerts: false }), now).access).toMatch(/ · Alerts off$/);
+    // Watches, Siri's sign-in and agents have no alerts field, and a revoked phone says nothing of them.
+    expect(phoneLines(phone(), now).access).not.toMatch(/Alerts/);
+    expect(phoneLines(phone({ alerts: true, revokedAt: "2026-09-10T00:00:00Z" }), now).access).not.toMatch(/Alerts/);
+    expect(
+      alertPhones([
+        phone({ id: "a", displayName: "Mia's iPhone", alerts: true }),
+        phone({ id: "b", displayName: "iPad", alerts: false }),
+        phone({ id: "c", displayName: "Watch" }),
+        phone({ id: "d", displayName: "Old phone", alerts: true, revokedAt: "2026-09-10T00:00:00Z" }),
+      ]),
+    ).toEqual([
+      { id: "a", displayName: "Mia's iPhone", alerts: true },
+      { id: "b", displayName: "iPad", alerts: false },
+    ]);
   });
 
   it("offers Re-pair on any phone, active or revoked, but not the one showing the list", () => {
