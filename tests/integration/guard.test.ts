@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { enqueueChange } from "@/server/changes";
 import { prisma } from "@/server/db";
@@ -149,6 +149,11 @@ describe("readBody", () => {
 
 describe("loadHousehold", () => {
   beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  // The last case removes the household; put it back for whichever file runs next.
+  afterAll(async () => {
     await resetDatabase();
   });
 
