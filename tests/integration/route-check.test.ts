@@ -5,20 +5,16 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { POST as login } from "@/app/api/v1/auth/login/route";
-import { POST as checkEndpoint } from "@/app/api/v1/connection/endpoints/[id]/check/route";
-import { PUT as updateEndpoint } from "@/app/api/v1/connection/endpoints/[id]/route";
-import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
+import { checkEndpoint, updateEndpoint } from "@/server/connection-endpoints";
 import { ensureConnectionIdentity } from "@/server/connection";
 import { prisma } from "@/server/db";
 import { encryptSecret } from "@/server/crypto";
 import { pinFromCertificate } from "@/server/spki";
-import { publishCheckForTests } from "@/server/tunnel/remote-access";
+import { changeRemoteAccess, publishCheckForTests, remoteAccessState } from "@/server/tunnel/remote-access";
 import { reachRoute } from "@/server/tunnel/route-check";
-import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { answered } from "../helpers/answered";
 import { resetDatabase } from "../helpers/db";
 
-const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
 /** A stand-in for whatever a route the household runs points at: it answers the identity call as told. */
 type Answer = { status: number; body?: unknown; headers?: Record<string, string> };
@@ -31,7 +27,6 @@ describe("checking a route the household runs", () => {
   let server: Server;
   let origin: string;
   let answer: (headers: Record<string, string | string[] | undefined>) => Promise<Answer>;
-  let auth: SessionAuth;
   let seen: Record<string, string | string[] | undefined>[];
 
   beforeAll(async () => {
@@ -63,18 +58,16 @@ describe("checking a route the household runs", () => {
     seen = [];
     const { instanceId } = await ensureConnectionIdentity();
     answer = async () => ({ status: 200, body: { protocolVersion: 1, instanceId } });
-    const response = await login(request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }) }));
-    auth = authFromLogin(response);
   });
 
   const pinned = (spkiSha256 = pin) => ({ url: origin, trustMode: "pinned" as const, spkiSha256, edgeAuth: "none" as const, edgeTokenCiphertext: null, edgeTokenIv: null, edgeTokenAuthTag: null, edgeTokenVersion: 0, edgeTokenRotatedAt: null });
 
   async function check(id: string) {
-    return checkEndpoint(request(`/api/v1/connection/endpoints/${id}/check`, { method: "POST", auth }), { params: Promise.resolve({ id }) });
+    return answered("POST /api/v1/connection/endpoints/{id}/check", async () => ({ reachability: await checkEndpoint(id) }));
   }
 
   async function state() {
-    return ((await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: { status: string; reachability: unknown } }).tunnel;
+    return ((await (await answered("GET /api/v1/connection/tunnel", async () => ({ tunnel: await remoteAccessState() }))).json()) as { tunnel: { status: string; reachability: unknown } }).tunnel;
   }
 
   it("counts a route reached only when it answers as this household", async () => {
@@ -125,7 +118,7 @@ describe("checking a route the household runs", () => {
 
   it("checks a published route on publish and on request, and shows what it found until the route changes", async () => {
     const route = await prisma().connectionEndpoint.create({ data: { url: origin, transport: "lan", trustMode: "pinned", spkiSha256: pin, enabled: false } });
-    expect((await setTunnel(request("/api/v1/connection/tunnel", { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "named", endpointId: route.id }) }))).status).toBe(200);
+    expect((await answered("PUT /api/v1/connection/tunnel", async () => ({ tunnel: await changeRemoteAccess({ mode: "named", endpointId: route.id }) }))).status).toBe(200);
     await publishCheckForTests();
     const published = await state();
     expect(published.status).toBe("running");
@@ -139,10 +132,7 @@ describe("checking a route the household runs", () => {
     expect((await state()).reachability).toEqual(reachability);
 
     // Changing the route clears what was known about the old one.
-    const changed = await updateEndpoint(
-      request(`/api/v1/connection/endpoints/${route.id}`, { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify({ priority: 3 }) }),
-      { params: Promise.resolve({ id: route.id }) },
-    );
+    const changed = await answered("PUT /api/v1/connection/endpoints/{id}", async () => ({ endpoint: await updateEndpoint(route.id, { priority: 3 }) }));
     expect(changed.status).toBe(200);
     expect((await state()).reachability).toEqual({ reachedAt: null, checkedAt: null, result: null, message: null });
   });
