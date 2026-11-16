@@ -21,7 +21,7 @@ import type { Rule } from "@/lib/rules";
 import { getSharedDevMockClient, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
 import { setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
 import type { FirewallPolicy } from "@/server/unifi/types";
-import { answered } from "../helpers/answered";
+import { answered, documented } from "../helpers/answered";
 import { authFromLogin, request } from "../helpers/http";
 import { adminSession } from "../helpers/session";
 import { INTERNAL_ZONE, configureConnectedHousehold, resetDatabase, seedDevice } from "../helpers/db";
@@ -108,14 +108,14 @@ async function groupAction(action: LiftAction, id: string, body = "{}") {
 
 async function groupRuleBody(action: LiftAction, groupId: string, ruleId: string, body: string | undefined) {
   const read = await readLiftBody(sent(body), action);
-  if (!read.ok) return read.response;
+  if (!read.ok) return documented(`POST /api/v1/groups/{id}/rules/{ruleId}/${action}`, read.response);
   return answered(`POST /api/v1/groups/{id}/rules/{ruleId}/${action}`, () => liftGroupRule(session, action, { groupId, ruleId }, read.body));
 }
 
 async function ruleAction(action: LiftAction | "on" | "off", id: string, body: object | null = {}) {
   if (action === "on" || action === "off") return answered(`POST /api/v1/rules/{id}/${action}`, () => switchRule(session, id, action === "on"));
   const read = await readLiftBody(sent(body === null ? undefined : JSON.stringify(body)), action);
-  if (!read.ok) return read.response;
+  if (!read.ok) return documented(`POST /api/v1/rules/{id}/${action}`, read.response);
   return answered(`POST /api/v1/rules/{id}/${action}`, () => liftRule(session, action, { ruleId: id }, read.body));
 }
 
@@ -125,8 +125,9 @@ async function groupRuleAction(action: LiftAction, groupId: string, ruleId: stri
 
 async function unblockAction(action: UnblockAction, id: string, body: object | null = null) {
   const read = await readUnblockBody(sent(body === null ? undefined : JSON.stringify(body)), action);
-  if (!read.ok) return read.response;
-  return answered(`POST /api/v1/groups/{id}/unblock${action === "unblock" ? "" : `/${action}`}`, () => unblockGroupFn(session, action, id, read.body));
+  const operation = `POST /api/v1/groups/{id}/unblock${action === "unblock" ? "" : `/${action}`}` as const;
+  if (!read.ok) return documented(operation, read.response);
+  return answered(operation, () => unblockGroupFn(session, action, id, read.body));
 }
 
 const listRules = (groupId?: string) => answered("GET /api/v1/rules", async () => ({ rules: await listRulesFn(groupId) }));

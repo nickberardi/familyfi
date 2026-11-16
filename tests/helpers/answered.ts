@@ -22,6 +22,11 @@ export async function answered(operation: `${Method} /api/v1/${string}`, work: (
     else if (error instanceof ResponseRefusal) response = error.response;
     else throw error;
   }
+  return documented(operation, response);
+}
+
+/** Checks an answer a case built another way, such as a body reader's refusal, against its operation. */
+export async function documented(operation: `${Method} /api/v1/${string}`, response: Response): Promise<Response> {
   const space = operation.indexOf(" ");
   await assertDocumentedResponse(operation.slice(0, space), operation.slice(space + 1), response);
   return response;
