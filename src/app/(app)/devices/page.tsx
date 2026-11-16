@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { DeviceLink } from "@/components/DeviceLink";
 import { useSearchParams } from "next/navigation";
 import { DeviceAssignSelect } from "@/components/DeviceAssign";
@@ -11,23 +11,15 @@ import {
   deviceAddressSuffix,
   deviceFilterLabel,
   deviceRemoveCopy,
-  filterDevices,
-  type DeviceFilterId,
 } from "@/lib/device-list";
-import { deleteDevice, setQuarantineEnforced } from "@/lib/device-writes";
-import { privateAddressDevices } from "@/lib/checkup";
-import { runRuleAction } from "@/lib/group-writes";
-import { ruleStateLine } from "@/lib/rule-actions";
-import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { PageHeader } from "@/components/PageHeader";
 import { useAppData } from "@/components/AppDataProvider";
 import { deviceKindLabel } from "@/lib/display";
-import { AssignNeededBanner } from "@/ui/AssignNeededBanner";
 import { DeviceIdentity } from "@/ui/DeviceIdentity";
 import { DeviceMark } from "@/ui/DeviceMark";
-import { PrivateAddressMark, PrivateAddressNotice } from "@/ui/PrivateAddress";
-import { QuarantineCard } from "@/ui/QuarantineCard";
-import { askConfirm } from "@/components/ui/ConfirmHost";
+import { DevicesHeader } from "@/ui/DevicesHeader";
+import { PrivateAddressMark } from "@/ui/PrivateAddress";
+import { useDeviceList } from "@/ui/use-device-list";
 
 export default function DevicesPage() {
   return (
@@ -40,12 +32,6 @@ export default function DevicesPage() {
 function DevicesBody() {
   const { devices, groups, rules, unifi, household, store, busy } = useAppData();
   const searchParams = useSearchParams();
-  const assignGroupId = searchParams.get("assign");
-  const assignGroup = groups.find((group) => group.id === assignGroupId) ?? null;
-  const [filter, setFilter] = useState<DeviceFilterId>(assignGroup ? "loose" : "all");
-  // Checkup's "Show on Devices" arrives with `?private=1`.
-  const [privateOnly, setPrivateOnly] = useState(searchParams.get("private") === "1");
-  const [query, setQuery] = useState("");
   const [now, setNow] = useState(() => new Date(0));
   useEffect(() => {
     const first = window.setTimeout(() => setNow(new Date()), 0);
@@ -55,69 +41,63 @@ function DevicesBody() {
       window.clearInterval(timer);
     };
   }, []);
+  // Checkup's "Show on Devices" arrives with `?private=1`, and a group with no devices with `?assign=`.
+  const list = useDeviceList({
+    devices,
+    groups,
+    rules,
+    household,
+    mutate: store.mutate,
+    now,
+    params: { assign: searchParams.get("assign"), private: searchParams.get("private") },
+  });
+  const { rows, filter, setFilter, query, setQuery, privateMacs } = list;
   const networks = unifi?.networks ?? [];
-  const enforced = household?.quarantineEnforced === true;
-  const quarantineRule = rules.find((rule) => rule.id === QUARANTINE_RULE_ID);
-  const pausedLine = quarantineRule && enforced ? ruleStateLine(quarantineRule, household?.timezone ?? "UTC", now) : null;
-
-  const privates = useMemo(() => privateAddressDevices(devices), [devices]);
-  const privateMacs = useMemo(() => new Set(privates.map((device) => device.mac)), [privates]);
-  const rows = useMemo(() => {
-    const listed = filterDevices(devices, groups, filter, query);
-    // The filter needs the notice that clears it: with no private addresses it does nothing.
-    return privateOnly && privates.length ? listed.filter((device) => privates.includes(device)) : listed;
-  }, [devices, filter, groups, query, privateOnly, privates]);
 
   return (
     <>
       <PageHeader title={COPY.title} sub={COPY.subtitle} />
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        {assignGroup ? <AssignNeededBanner group={assignGroup} /> : null}
-        {household ? (
-          <QuarantineCard
-            enforced={enforced}
-            disabled={busy}
-            onToggle={() => void setQuarantineEnforced(store.mutate, !enforced)}
-            pausedLine={pausedLine}
-            onResume={quarantineRule ? () => void runRuleAction(store.mutate, quarantineRule, "resume") : undefined}
-          />
-        ) : null}
-        {privates.length ? <PrivateAddressNotice count={privates.length} showing={privateOnly} onShow={() => setPrivateOnly(!privateOnly)} /> : null}
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
-            {DEVICE_FILTERS.map((item) => {
-              const on = filter === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setFilter(item.id)}
-                  className="rounded-md px-2.5 py-1.5 text-[14px] md:px-3.5"
-                  style={{
-                    fontWeight: on ? 600 : 500,
-                    background: on ? "var(--ff-ink-on-fill)" : "transparent",
-                    color: on ? "var(--ff-ink)" : "var(--ff-muted)",
-                    boxShadow: on ? "var(--ff-shadow-knob)" : "none",
-                  }}
-                >
-                  {deviceFilterLabel(item, devices)}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex-1" />
-          <input
-            className="w-full max-w-[260px] rounded-[7px] border border-[var(--ff-input-line)] px-2.5 py-2 text-[16px] md:text-[14px]"
-            placeholder={COPY.search}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
+        <DevicesHeader
+          list={list}
+          disabled={busy}
+          filter={
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex gap-0.5 rounded-lg bg-[var(--ff-field)] p-0.5">
+                  {DEVICE_FILTERS.map((item) => {
+                    const on = filter === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setFilter(item.id)}
+                        className="rounded-md px-2.5 py-1.5 text-[14px] md:px-3.5"
+                        style={{
+                          fontWeight: on ? 600 : 500,
+                          background: on ? "var(--ff-ink-on-fill)" : "transparent",
+                          color: on ? "var(--ff-ink)" : "var(--ff-muted)",
+                          boxShadow: on ? "var(--ff-shadow-knob)" : "none",
+                        }}
+                      >
+                        {deviceFilterLabel(item, devices)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex-1" />
+                <input
+                  className="w-full max-w-[260px] rounded-[7px] border border-[var(--ff-input-line)] px-2.5 py-2 text-[16px] md:text-[14px]"
+                  placeholder={COPY.search}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
+          }
+        />
 
         {rows.length === 0 ? (
           <p className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)] p-[18px] text-[14px] text-[var(--ff-muted)]">
-            {devices.length === 0 ? COPY.noDevices : COPY.noMatch}
+            {list.emptyText}
           </p>
         ) : (
           <div className="overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
@@ -168,11 +148,7 @@ function DevicesBody() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={async () => {
-                        const ask = deviceRemoveCopy(device, enforced && !pausedLine);
-                        if (!(await askConfirm({ title: ask.title, message: ask.message, confirmLabel: ask.confirm, destructive: true }))) return;
-                        void deleteDevice(store.mutate, device);
-                      }}
+                      onClick={() => void list.remove(device)}
                       aria-label={deviceRemoveCopy(device).label}
                       className="flex h-5 w-5 items-center justify-center rounded-md text-[14px] leading-none disabled:opacity-40"
                       style={{ color: "var(--ff-danger)" }}
