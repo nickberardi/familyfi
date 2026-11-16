@@ -5,6 +5,7 @@ import { prisma } from "../db";
 import { demoModeEnabled } from "../env";
 import { unrefTimer } from "../unref-timer";
 import { AlertTooLargeError, encryptAlert } from "./payload";
+import { recordSyncBackFor, signedInDevice } from "./producers";
 
 /**
  * Delivers the alert outbox through the project relay (`push.getfamilyfi.com`), which holds the
@@ -106,7 +107,8 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
     const sealed = encryptSecret(issued.secret);
     // Kept only if no other process stored one first; then that one is used.
     await prisma().household.updateMany({
-      where: { id: "default", alertsInstallId: null },
+      // An install id kept without its secret is replaced too, so this never asks again forever.
+      where: { id: "default", OR: [{ alertsInstallId: null }, { alertsInstallSecretCiphertext: null }, { alertsInstallSecretIv: null }, { alertsInstallSecretAuthTag: null }] },
       data: { alertsInstallId: issued.installId, alertsInstallSecretCiphertext: Uint8Array.from(sealed.ciphertext), alertsInstallSecretIv: Uint8Array.from(sealed.iv), alertsInstallSecretAuthTag: Uint8Array.from(sealed.authTag) },
     });
     return install();
@@ -143,7 +145,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
       where: { sentAt: null, nextAttemptAt: { lte: at } },
       orderBy: { createdAt: "asc" },
       take: BATCH,
-      include: { device: { select: { revokedAt: true, pushRegistration: true } } },
+      include: { device: { select: { revokedAt: true, pushRegistration: true, sessions: { where: signedInDevice(at).sessions.some, select: { id: true }, take: 1 } } } },
     });
     if (!due.length) return;
     let credential: { installId: string; secret: string };
@@ -156,7 +158,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
     }
     for (const [index, event] of due.entries()) {
       const registration = event.device.pushRegistration;
-      if (!registration || event.device.revokedAt) {
+      if (!registration || event.device.revokedAt || !event.device.sessions.length) {
         await prisma().alertEvent.deleteMany({ where: { id: event.id } });
         continue;
       }
@@ -193,7 +195,9 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
         continue;
       }
       if (response.ok) {
-        await prisma().alertEvent.updateMany({ where: { id: event.id }, data: { sentAt: now() } });
+        const marked = await prisma().alertEvent.updateMany({ where: { id: event.id }, data: { sentAt: now() } });
+        // Deleted while it was on its way: a recovering pass dropped it as never sent.
+        if (!marked.count && event.kind === "sync.down") await recordSyncBackFor(event.deviceId, now());
       } else if (response.status === 410) {
         // Apple or Google no longer know this token: the phone registers again when it next opens.
         await prisma().alertEvent.deleteMany({ where: { deviceId: event.deviceId, sentAt: null } });

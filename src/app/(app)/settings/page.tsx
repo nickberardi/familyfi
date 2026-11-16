@@ -35,21 +35,29 @@ export default function SettingsPage() {
   );
 }
 
-/** The paired apps the Alerts card lists, read once when the household tab opens; null until then or if it cannot be read. */
+/**
+ * The paired apps the Alerts card lists, read when the household tab opens and again on `retry`:
+ * null while loading, "error" when it could not be read.
+ */
 function useAlertPhones(active: boolean) {
-  const [phones, setPhones] = useState<ReturnType<typeof alertPhones> | null>(null);
+  const [phones, setPhones] = useState<ReturnType<typeof alertPhones> | null | "error">(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
     request<{ devices: PairedPhone[] }>("/api/v1/paired/devices?client=app&status=active").then(
       ({ devices }) => !cancelled && setPhones(alertPhones(devices)),
-      () => !cancelled && setPhones(null),
+      () => !cancelled && setPhones("error"),
     );
     return () => {
       cancelled = true;
     };
-  }, [active]);
-  return phones;
+  }, [active, attempt]);
+  const retry = () => {
+    setPhones(null);
+    setAttempt((count) => count + 1);
+  };
+  return { phones, retry };
 }
 
 function Settings() {
@@ -165,7 +173,7 @@ function Settings() {
         </div>
 
         {tab === "household" ? (
-          <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[3fr_2fr]">
             <HouseholdCard
               groups={groups}
               accounts={accounts}
@@ -177,7 +185,13 @@ function Settings() {
                 setPw2("");
               }}
             />
-            <AlertsCard enabled={household?.alertsRelay === true} phones={alertPhonesList} mutate={store.mutate} disabled={household?.alertsRelay === undefined} />
+            <AlertsCard
+              enabled={household?.alertsRelay === true}
+              phones={alertPhonesList.phones}
+              onRetry={alertPhonesList.retry}
+              mutate={store.mutate}
+              disabled={household?.alertsRelay === undefined}
+            />
           </div>
         ) : null}
 

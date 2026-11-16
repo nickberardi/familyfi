@@ -46,4 +46,16 @@ describe("stored UniFi API key", () => {
     expect(settings.status).toBe(200);
     expect(await settings.text()).not.toContain(API_KEY);
   });
+
+  it("starts sync trouble over when a gateway answers, unless phones were already told", async () => {
+    const failing = new Date(Date.now() - 60 * 60_000);
+    await prisma().household.update({ where: { id: "default" }, data: { syncFailingSince: failing } });
+    await saveUnifiConnection({ apiKey: API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).syncFailingSince).toBeNull();
+
+    // Once phones heard sync was down, the next pass that reaches the gateway tells them it is back.
+    await prisma().household.update({ where: { id: "default" }, data: { syncFailingSince: failing, syncTroubleAlertedAt: failing } });
+    await saveUnifiConnection({ apiKey: API_KEY, baseUrl: DEV_MOCK_BASE_URL });
+    expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ syncFailingSince: failing, syncTroubleAlertedAt: failing });
+  });
 });

@@ -162,7 +162,7 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt, now) : "never";
   const actsAs = phone.actsAs ? ` · acts as ${phone.actsAs.displayName}` : "";
   const ends = phone.sessions.map((session) => session.expiresAt).sort()[0];
-  const alerts = phone.alerts === undefined || phone.revokedAt ? "" : ` · ${phone.alerts ? ALERTS_CARD_COPY.phoneOn : ALERTS_CARD_COPY.phoneOff}`;
+  const alerts = phone.alerts === undefined || phone.revokedAt ? "" : ` · ${phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff}`;
   return {
     access: `${scopeLabel(phone.scope)}${actsAs} · ${
       phone.revokedAt ? `revoked ${pairedDate(phone.revokedAt)}` : `last seen ${seen === "now" || seen === "never" ? seen : `${seen} ago`}`

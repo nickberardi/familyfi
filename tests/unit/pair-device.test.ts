@@ -101,11 +101,11 @@ describe("pair device", () => {
 
   it("says whether a phone gets alerts, and lists only active apps that can for the Alerts card", () => {
     const now = new Date("2026-09-14T20:00:00Z");
-    expect(phoneLines(phone({ alerts: true }), now).access).toMatch(/ · Alerts on$/);
-    expect(phoneLines(phone({ alerts: false }), now).access).toMatch(/ · Alerts off$/);
+    expect(phoneLines(phone({ alerts: true }), now).access).toMatch(/ · alerts on$/);
+    expect(phoneLines(phone({ alerts: false }), now).access).toMatch(/ · alerts off$/);
     // Watches, Siri's sign-in and agents have no alerts field, and a revoked phone says nothing of them.
-    expect(phoneLines(phone(), now).access).not.toMatch(/Alerts/);
-    expect(phoneLines(phone({ alerts: true, revokedAt: "2026-09-10T00:00:00Z" }), now).access).not.toMatch(/Alerts/);
+    expect(phoneLines(phone(), now).access).not.toMatch(/alerts/);
+    expect(phoneLines(phone({ alerts: true, revokedAt: "2026-09-10T00:00:00Z" }), now).access).not.toMatch(/alerts/);
     expect(
       alertPhones([
         phone({ id: "a", displayName: "Mia's iPhone", alerts: true }),
