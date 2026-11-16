@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALERT_FALLBACK_TEXT, ALERT_KIND_LABELS, ALERTS_CARD_COPY, alertText } from "@/lib/alert-copy";
+import { ALERT_ACTIONS, ALERT_FALLBACK_TEXT, ALERT_KIND_LABELS, ALERTS_CARD_COPY, alertText } from "@/lib/alert-copy";
 import { ALERT_KINDS, isAlertKind } from "@/lib/alert-kinds";
 
 describe("alert copy", () => {
@@ -23,11 +23,12 @@ describe("alert copy", () => {
       expect(ALERT_KIND_LABELS[kind], kind).toBeTruthy();
     }
     expect(alertText("pause.ending", {})).toBeNull();
+    for (const kind of Object.keys(ALERT_ACTIONS)) expect(ALERT_KINDS, kind).toContain(kind);
     expect(isAlertKind("pause.ending")).toBe(false);
   });
 
   it("says Unassigned to parents, never quarantined", () => {
-    const words = JSON.stringify([ALERT_FALLBACK_TEXT, ALERT_KIND_LABELS, ALERTS_CARD_COPY, ...ALERT_KINDS.map((kind) => alertText(kind, { n: 2 }))]);
+    const words = JSON.stringify([ALERT_FALLBACK_TEXT, ALERT_ACTIONS, ALERT_KIND_LABELS, ALERTS_CARD_COPY, ...ALERT_KINDS.map((kind) => alertText(kind, { n: 2 }))]);
     expect(words.toLowerCase()).not.toContain("quarantin");
   });
 });

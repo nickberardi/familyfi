@@ -38,6 +38,14 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
   }
 }
 
+/**
+ * The button an alert of a kind carries beside a tap, by kind. Each opens the app where the tap does,
+ * so nothing changes the household from outside the app: Assign opens Unassigned.
+ */
+export const ALERT_ACTIONS: Partial<Record<string, string>> = {
+  "device.new": "Assign",
+};
+
 /** The name of each kind on an Alerts screen or card, where a parent turns it on or off. */
 export const ALERT_KIND_LABELS: Record<string, string> = {
   "device.new": "New devices",
