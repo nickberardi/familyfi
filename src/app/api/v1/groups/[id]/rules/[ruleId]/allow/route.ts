@@ -1,5 +1,6 @@
 import { withMutation } from "@/server/guard";
-import { runGroupRuleLift } from "@/server/group-internet";
+import { liftGroupRule } from "@/server/group-internet";
+import { readLiftBody } from "@/server/rule-lifts";
 
 type Ctx = { params: Promise<{ id: string; ruleId: string }> };
 
@@ -7,6 +8,8 @@ type Ctx = { params: Promise<{ id: string; ruleId: string }> };
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async (session) => {
     const { id, ruleId } = await ctx.params;
-    return runGroupRuleLift(request, session, "allow", { groupId: id, ruleId });
+    const read = await readLiftBody(request, "allow");
+    if (!read.ok) return read.response;
+    return Response.json(await liftGroupRule(session, "allow", { groupId: id, ruleId }, read.body));
   });
 }

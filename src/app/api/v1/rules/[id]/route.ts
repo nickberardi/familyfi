@@ -16,13 +16,13 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const parsed = await readBody(request, RuleUpdateBody, "Invalid rule update.");
     if (!parsed.ok) return parsed.response;
-    return updateRule(request, session, id, parsed.data);
+    return Response.json(await updateRule(session, id, parsed.data));
   });
 }
 
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    return deleteRule(id);
+    return Response.json(await deleteRule(id));
   });
 }

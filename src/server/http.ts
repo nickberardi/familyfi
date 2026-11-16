@@ -30,8 +30,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * A refusal a helper already built as a response, thrown so a guard answers with it as it is.
+ * For the helpers that answer with a response (a device's scope, the demo lock); anything new throws `ApiError`.
+ */
+export class ResponseRefusal extends Error {
+  constructor(readonly response: Response) {
+    super("Refused.");
+  }
+}
+
 export function jsonCaughtError(error: unknown): NextResponse<ApiErrorBody> {
   if (error instanceof ApiError) return jsonError(error.status, error.code, error.message);
+  if (error instanceof ResponseRefusal) return error.response as NextResponse<ApiErrorBody>;
   console.error(error);
   if (error instanceof ConfigurationError) {
     return jsonError(

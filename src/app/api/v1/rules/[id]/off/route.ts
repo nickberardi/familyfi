@@ -7,6 +7,6 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(request: Request, ctx: Ctx) {
   return withMutation(request, async (session) => {
     const { id } = await ctx.params;
-    return switchRule(request, session, id, false);
+    return Response.json(await switchRule(session, id, false));
   });
 }
