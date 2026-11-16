@@ -5,12 +5,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as tunnelState, PUT as setTunnel } from "@/app/api/v1/connection/tunnel/route";
+import { PUT as setTunnelRoute } from "@/app/api/v1/connection/tunnel/route";
 import { encryptSecret } from "@/server/crypto";
 import { prisma } from "@/server/db";
 import { remoteStatus } from "@/lib/connection-routes";
 import type { RemoteAccess } from "@/lib/types";
-import { householdRoutePublished, noteRouteReached, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, setRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
+import { changeRemoteAccess, householdRoutePublished, noteRouteReached, RemoteAccessBody, remoteAccessState, resetRouteCheckForTests, resumeRemoteAccess, setRemoteAccess, startRemoteAccessPort } from "@/server/tunnel/remote-access";
+import { answered } from "../helpers/answered";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -92,11 +93,14 @@ describe("remote access", () => {
   });
 
   async function put(body: unknown) {
-    return setTunnel(request("/api/v1/connection/tunnel", { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
+    // A body the request schema refuses goes through the route, whose refusal that is.
+    const parsed = RemoteAccessBody.safeParse(body);
+    if (parsed.success) return answered("PUT /api/v1/connection/tunnel", async () => ({ tunnel: await changeRemoteAccess(parsed.data) }));
+    return setTunnelRoute(request("/api/v1/connection/tunnel", { method: "PUT", auth, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
   }
 
   async function state(): Promise<Tunnel> {
-    return ((await (await tunnelState(request("/api/v1/connection/tunnel", { auth }))).json()) as { tunnel: Tunnel }).tunnel;
+    return ((await (await answered("GET /api/v1/connection/tunnel", async () => ({ tunnel: await remoteAccessState() }))).json()) as { tunnel: Tunnel }).tunnel;
   }
 
   /** The routes phones are handed: every enabled one, which must be the published one or none. */

@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
+import { z } from "zod";
 import path from "node:path";
 import { ConnectionTransport, ConnectionTrustMode, RouteKind, type ConnectionEndpoint } from "@prisma/client";
 import { ensureConnectionIdentity, isUniqueViolation } from "../connection";
@@ -610,6 +611,16 @@ export type RemoteAccessChange =
   | { mode: "off"; forget?: boolean }
   | { mode: "quick" }
   | { mode: "named"; hostname?: string; endpointId?: string };
+
+/** What `PUT /connection/tunnel` may carry. */
+export const RemoteAccessBody = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("off"), forget: z.boolean().optional() }).strict(),
+  z.object({ mode: z.literal("quick") }).strict(),
+  z
+    .object({ mode: z.literal("named"), hostname: z.string().max(253).optional(), endpointId: z.string().min(1).optional() })
+    .strict()
+    .refine((body) => !(body.hostname && body.endpointId), "Send a hostname or a route, not both."),
+]);
 
 async function stopTunnel() {
   runtime.wanted = null;

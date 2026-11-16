@@ -34,10 +34,17 @@ import { POST as checkCategoryRoute } from "@/app/api/v1/upstream/categories/[id
 import { GET as listChecksRoute } from "@/app/api/v1/upstream/checks/route";
 import { POST as runChecksRoute } from "@/app/api/v1/upstream/checks/run/route";
 import { DELETE as clearHouseholdResolver, GET as getHouseholdResolver, PUT as setHouseholdResolver } from "@/app/api/v1/upstream/resolver/route";
+import { GET as getCheckupRoute } from "@/app/api/v1/checkup/route";
+import { PATCH as patchFindingRoute } from "@/app/api/v1/checkup/findings/[id]/route";
+import { POST as runCheckupRoute } from "@/app/api/v1/checkup/run/route";
+import { GET as tunnelStateRoute, PUT as setTunnelRoute } from "@/app/api/v1/connection/tunnel/route";
+import { GET as getSyncRoute } from "@/app/api/v1/sync/route";
+import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
+import { createFixtureUnifiClient } from "@/server/unifi/dev-mock";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { prisma } from "@/server/db";
 import { createRule, RuleCreateBody } from "@/server/rules";
-import { createFamilyGroup, resetDatabase } from "../helpers/db";
+import { configureConnectedHousehold, createFamilyGroup, resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const json = { "content-type": "application/json" };
@@ -225,5 +232,30 @@ describe("route responses match the contract", () => {
     });
     expect((await getHouseholdResolver(send(resolver))).status).toBe(200);
     expect((await clearHouseholdResolver(send(resolver, "DELETE"))).status).toBe(200);
+  });
+
+  it("the checkup, a finding dismissed and shown again, and the sync summary", async () => {
+    await configureConnectedHousehold();
+    setReconcileClientForTests(createFixtureUnifiClient({ friendlyNames: true }));
+    try {
+      expect((await getCheckupRoute(send("/api/v1/checkup"))).status).toBe(200);
+      // After a sync against the fixture gateway, the checkup has findings to dismiss.
+      await runReconcileOnce();
+      expect((await runCheckupRoute(send("/api/v1/checkup/run", "POST", {}))).status).toBe(200);
+      const finding = { params: Promise.resolve({ id: "private_addresses" }) };
+      for (const dismissed of [true, false]) {
+        expect((await patchFindingRoute(send("/api/v1/checkup/findings/private_addresses", "PATCH", { dismissed }), finding)).status).toBe(200);
+        expect((await prisma().checkupFinding.findFirstOrThrow({ where: { key: "private_addresses" } })).dismissedAt === null).toBe(!dismissed);
+      }
+      expect((await getCheckupRoute(send("/api/v1/checkup"))).status).toBe(200);
+      expect((await getSyncRoute(send("/api/v1/sync"))).status).toBe(200);
+    } finally {
+      setReconcileClientForTests(undefined);
+    }
+  });
+
+  it("remote access, read and switched off", async () => {
+    expect((await tunnelStateRoute(send("/api/v1/connection/tunnel"))).status).toBe(200);
+    expect((await setTunnelRoute(send("/api/v1/connection/tunnel", "PUT", { mode: "off", forget: true }))).status).toBe(200);
   });
 });
