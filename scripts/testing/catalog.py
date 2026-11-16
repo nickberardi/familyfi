@@ -120,9 +120,6 @@ def python_identities(root):
     return found
 
 
-# What discovery reads: the tests and their configs, the code they import while collected, the
-# contract and the dependencies, and the harness that turns listings into identities.
-DISCOVERY_INPUTS = ("tests/", "scripts/tests/", "scripts/testing/", "src/", "openapi/", "package.json", "pnpm-lock.yaml")
 # Settings a listing reads from the caller's environment; listing_env() fixes the rest.
 DISCOVERY_ENV = ("CI", "PLAYWRIGHT_PORT", "PLAYWRIGHT_BASE_URL")
 DISCOVERY_FORMAT = 1
@@ -137,12 +134,14 @@ def git(root, *args):
 def discovery_key(root):
     """A digest of everything discovery depends on, or None outside a git checkout.
 
-    Tracked files count by their staged blob; files changed since, and untracked ones, by their
-    content, so an edit or a new test is never served an older listing.
+    The whole checkout counts, since test names come from more than the tests (AGENTS.md's
+    invariants, .claude/agents): tracked files by their staged blob, files changed since and
+    untracked ones by their content, so an edit or a new test is never served an older listing.
     """
     try:
-        staged = git(root, "ls-files", "-s", "--", *DISCOVERY_INPUTS)
-        changed = git(root, "ls-files", "-z", "-m", "-o", "--exclude-standard", "--", *DISCOVERY_INPUTS)
+        staged = git(root, "ls-files", "-s")
+        # The kept listings themselves never count, even in a checkout that does not ignore build/.
+        changed = git(root, "ls-files", "-z", "-m", "-o", "--exclude-standard", "--", ".", ":(exclude)build/test-cache")
     except (OSError, subprocess.SubprocessError):
         return None
     digest = hashlib.sha256(f"format {DISCOVERY_FORMAT}\n".encode())

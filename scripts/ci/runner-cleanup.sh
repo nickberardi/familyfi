@@ -2,7 +2,9 @@
 # Return a self-hosted runner's disk to its resting state. Every self-hosted job runs it
 # right after checkout (.github/actions/runner-cleanup), so a job starts on a clean disk
 # whatever the last one left, even if that job crashed. Everything removed here is
-# restored from the GitHub Actions cache or downloaded again by the step that needs it.
+# downloaded again by the step that needs it. Each runner service is expected to set its own
+# npm_config_store_dir: the workflows turn the pnpm Actions cache off on self-hosted runners,
+# and that store is what an install links from instead.
 set -u
 
 # Free space only: job logs are public, and device names and mounts describe the host.

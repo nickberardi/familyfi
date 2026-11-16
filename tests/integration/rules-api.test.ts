@@ -249,7 +249,7 @@ describe("household rules", () => {
       inFlight += 1;
       peak = Math.max(peak, inFlight);
       if (inFlight >= 2) open();
-      await Promise.race([overlap, new Promise((done) => setTimeout(done, 5_000))]);
+      await Promise.race([overlap, new Promise((done) => setTimeout(done, 1_000))]);
       inFlight -= 1;
       deleted.push(id);
     };

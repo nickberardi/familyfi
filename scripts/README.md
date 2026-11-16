@@ -83,6 +83,9 @@ Every test belongs to at least one category. A new test file needs an entry in
 adds categories to part of a file. Every run and `check catalog` fail on an uncategorized test
 or an entry that names none. Tests are discovered by the runners themselves (`vitest list`,
 `playwright test --list` under CI settings, and unittest), so what is listed is what runs.
+A listing is kept in `build/test-cache/discovery-<key>.json`, keyed on the checkout's staged files,
+the content of any file changed since or untracked, and the settings a listing reads, so a second
+run of the same tree lists nothing; `check catalog` always lists afresh and refreshes it.
 A browser file in serial mode (`pair.spec.ts`) is a chain: selecting a later test adds the
 earlier ones on that platform, reported as prerequisites, and a failed prerequisite blocks
 what follows.

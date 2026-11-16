@@ -220,9 +220,13 @@ class Resources:
         return reserve_port(owner, self.registry_dir)
 
     def owns_port(self, owner, platform):
-        """Whether `owner` is one of `platform`'s reservations: its web server's or a suffixed one."""
+        """Whether `owner` is one of `platform`'s reservations: its web server's or a suffixed one.
+
+        The in-memory database's port is not: its launcher stops only with the whole run, and the
+        port stays reserved until then.
+        """
         base = f"{self.directory.name}/{platform}"
-        return owner == base or owner.startswith(base + "-")
+        return owner == base or (owner.startswith(base + "-") and owner != base + "-database")
 
     def validate(self):
         m = self.manifest

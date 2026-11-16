@@ -1,7 +1,7 @@
 /**
  * `scripts/ci/check-openapi-floors.mjs` decides from oasdiff's findings whether `info.x-min-app`
  * and `info.x-min-server` had to rise (docs/api.md, "Versioning the contract"). The findings
- * are given here; CI's `contract` job runs the pinned oasdiff for them.
+ * are given here; CI's `verify` job runs the pinned oasdiff for them first (`check api-floors`).
  */
 import { describe, expect, it } from "vitest";
 import { checkFloors, SERVER_FLOOR_IDS } from "../../scripts/ci/check-openapi-floors.mjs";

@@ -105,7 +105,7 @@ class DiscoveryCacheTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         for path, text in {"tests/unit/a.test.ts": "a", "src/lib/x.ts": "x", "package.json": "{}",
-                           "README.md": "readme"}.items():
+                           "README.md": "readme", ".gitignore": "/node_modules\n"}.items():
             (self.root / path).parent.mkdir(parents=True, exist_ok=True)
             (self.root / path).write_text(text)
         (self.root / "node_modules/.bin").mkdir(parents=True)
@@ -138,11 +138,13 @@ class DiscoveryCacheTests(unittest.TestCase):
         listed, second = self.listings()
         self.assertEqual((listed, second), (0, first))
 
-    def test_a_changed_input_is_listed_again_and_an_unrelated_file_is_not(self):
+    def test_a_changed_file_is_listed_again(self):
         self.listings()
-        (self.root / "README.md").write_text("changed")
-        self.assertEqual(self.listings()[0], 0)
         (self.root / "src/lib/x.ts").write_text("changed, not staged")
+        self.assertEqual(self.listings()[0], 3)
+        self.assertEqual(self.listings()[0], 0)
+        # Test names come from outside the tests too (AGENTS.md's invariants name theirs).
+        (self.root / "README.md").write_text("an invariant reworded")
         self.assertEqual(self.listings()[0], 3)
         self.assertEqual(self.listings()[0], 0)
 
