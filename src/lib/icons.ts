@@ -36,6 +36,7 @@ export type IconName =
   | "caret-down"
   | "caret-right"
   | "x"
+  | "check"
   | "check-circle"
   | "warning"
   // About
