@@ -48,11 +48,6 @@ const NOT_YET_CONVERTED = [
   "settings/household/route.ts",
   "settings/update/schedule/route.ts",
   "sync/route.ts",
-  "upstream/categories/[id]/check/route.ts",
-  "upstream/categories/[id]/route.ts",
-  "upstream/categories/route.ts",
-  "upstream/checks/route.ts",
-  "upstream/resolver/route.ts",
 ];
 
 function routeFiles(dir: string): string[] {
