@@ -38,6 +38,27 @@ describe("retryOnNetworkChange", () => {
     expect(calls).toHaveLength(2);
   });
 
+  it("loads the page again when the network change shows as Chromium's error page interrupting the load", async () => {
+    const interrupted = () =>
+      new Error('page.goto: Navigation to "http://127.0.0.1:20005/rules" is interrupted by another navigation to "chrome-error://chromewebdata/"');
+    const { page, calls } = fakePage([interrupted()]);
+    await expect(page.goto("/rules")).resolves.toBeNull();
+    expect(calls).toEqual(["/rules", "/rules"]);
+
+    // Still one extra load: a second one fails.
+    const again = fakePage([interrupted(), interrupted()]);
+    await expect(again.page.goto("/rules")).rejects.toThrow("chrome-error://chromewebdata/");
+    expect(again.calls).toHaveLength(2);
+  });
+
+  it("fails at once when another page of the app interrupts the load", async () => {
+    const { page, calls } = fakePage([
+      new Error('page.goto: Navigation to "http://127.0.0.1:20005/rules" is interrupted by another navigation to "http://127.0.0.1:20005/login"'),
+    ]);
+    await expect(page.goto("/rules")).rejects.toThrow("interrupted by another navigation");
+    expect(calls).toHaveLength(1);
+  });
+
   it("fails at once on any other error", async () => {
     const { page, calls } = fakePage([new Error("page.goto: net::ERR_CONNECTION_REFUSED")]);
     await expect(page.goto("/rules")).rejects.toThrow("ERR_CONNECTION_REFUSED");

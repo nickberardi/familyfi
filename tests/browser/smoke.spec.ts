@@ -652,7 +652,11 @@ test("a device opened from its group returns to that group", async ({ page }) =>
 test("a device's modal keeps its place on refresh and Done closes it", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   await page.goto("/devices");
-  const link = page.locator('a[href^="/devices/"]').first();
+  const first = page.locator('a[href^="/devices/"]').first();
+  // The list can reorder as devices are seen, so after the reload the row is found by its device,
+  // not its place.
+  const href = (await first.getAttribute("href"))!;
+  const link = page.locator(`a[href="${href}"]`);
   await link.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
@@ -678,7 +682,7 @@ test("a device's modal keeps its place on refresh and Done closes it", { tag: "@
   // The keyboard stays in the modal: Tab past its last control comes back to its first.
   for (let i = 0; i < 8; i++) {
     await page.keyboard.press("Tab");
-    expect(await dialog.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+    await expect(dialog.locator(":focus")).toBeFocused();
   }
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
