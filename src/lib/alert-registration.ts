@@ -90,7 +90,8 @@ export const ALERTS_SCREEN_COPY = {
   openSettings: "Open Settings",
   /** The household's switch (the Alerts card in FamilyFi's Settings, Household tab) is off. */
   householdOff: "Alerts are off for your household. Turn on “Send alerts to the FamilyFi app” in FamilyFi's Settings.",
-  householdSettings: "Open Settings",
+  /** Names its place, beside the system settings action ("Open Settings") the blocked notice may show. */
+  householdSettings: "Open household settings",
   /** The server is older than 1.4.0. */
   unsupported: "Your FamilyFi server is too old to send alerts. Update it to get them.",
   kindsTitle: "Send alerts about",
