@@ -5,6 +5,8 @@
  *
  * Route files that still do are listed below while they are converted, one area at a time. The
  * list only shrinks: a converted file that stays listed fails this test too.
+ *
+ * This reads import specifiers and those function names, not what the code reaches at run time.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -16,12 +18,17 @@ const apiRoot = path.resolve(__dirname, "../../src/app/api/v1");
 /** The database, and the module that creates UniFi clients. */
 const FORBIDDEN = ["@/server/db", "@/server/unifi/connection"];
 
+/** Functions that hand out a UniFi client, whichever module a route takes them from. */
+const FORBIDDEN_NAMES = /\b(clientForHousehold|syncClient)\b/;
+
 const NOT_YET_CONVERTED = [
   "accounts/[id]/password/route.ts",
   "accounts/[id]/route.ts",
   "accounts/route.ts",
   "auth/session/route.ts",
   "changes/[id]/route.ts",
+  "checkup/leftover-policies/remove/route.ts",
+  "checkup/run/route.ts",
   "connection/endpoints/[id]/check/route.ts",
   "connection/endpoints/[id]/route.ts",
   "connection/endpoints/route.ts",
@@ -38,10 +45,6 @@ const NOT_YET_CONVERTED = [
   "paired/invites/[id]/claim/route.ts",
   "paired/invites/[id]/route.ts",
   "paired/invites/route.ts",
-  "rules/[id]/off/route.ts",
-  "rules/[id]/on/route.ts",
-  "rules/[id]/route.ts",
-  "rules/route.ts",
   "settings/household/route.ts",
   "settings/update/schedule/route.ts",
   "sync/route.ts",
@@ -62,6 +65,7 @@ function routeFiles(dir: string): string[] {
 
 function reaches(file: string): boolean {
   const source = readFileSync(file, "utf8");
+  if (FORBIDDEN_NAMES.test(source)) return true;
   return FORBIDDEN.some((module) => new RegExp(`from\\s+["']${module}["']|import\\(\\s*["']${module}["']`).test(source));
 }
 
