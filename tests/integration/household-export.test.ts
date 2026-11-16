@@ -65,7 +65,7 @@ function uploadedImport(auth: SessionAuth, mode: string, body: Buffer) {
   );
 }
 
-/** Previews or applies an import as `importer`. A mode the route refuses, or a caller who is no browser, goes through the route. */
+/** Previews or applies an import as `importer`. A mode the route refuses, or a caller with no account given (the paired phone), goes through the route. */
 function importRequest(importer: SessionAuth & { accountId?: string }, mode: string, body: Buffer) {
   if ((mode !== "preview" && mode !== "apply") || !importer.accountId) return uploadedImport(importer, mode, body);
   const accountId = importer.accountId;
@@ -244,7 +244,8 @@ describe("household export", () => {
     await prisma().account.update({ where: { id: parent.id }, data: { passwordHash: await hashPassword("changed-password-1") } });
     await sessionFor("parent");
     await prisma().account.create({ data: { username: "importer", displayName: "Importer", kind: AccountKind.personal, isAdmin: true, passwordHash: await hashPassword("importer-password-1") } });
-    await imported(await sessionFor("importer"), archive);
+    // Through the real upload: the route hands on who is signed in as the importer.
+    expect((await uploadedImport(await sessionFor("importer"), "apply", archive)).status).toBe(200);
     expect(await prisma().account.findUniqueOrThrow({ where: { username: "importer" } })).toMatchObject({ isAdmin: true });
     const sessions = await prisma().session.findMany({ where: { accountId: parent.id } });
     expect(sessions.length).toBeGreaterThan(0);
