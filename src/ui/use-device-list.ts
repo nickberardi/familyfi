@@ -24,8 +24,9 @@ const isFilter = (value: string | null | undefined): value is DeviceFilterId => 
  * Checkup's private-address filter), the group a link asked devices for, quarantine's switch and
  * its paused line, and removing a device after asking. The page's parameters are the web's:
  * `?assign=<group>` shows the Unassigned devices for a group with none, `?private=1` those with a
- * private Wi-Fi address, and `?filter=` opens on one filter. A link that arrives while the list is
- * already showing applies again.
+ * private Wi-Fi address, and `?filter=` opens on one filter. They are read as the list first shows;
+ * a client whose list stays open behind other screens applies a later link itself (`setFilter`,
+ * `setPrivateOnly`).
  */
 export function useDeviceList({
   devices,
@@ -47,22 +48,7 @@ export function useDeviceList({
   const ui = useUI();
   const assignGroup = groups.find((group) => group.id === params.assign) ?? null;
   const [filter, setFilter] = useState<DeviceFilterId>(isFilter(params.filter) ? params.filter : assignGroup ? "loose" : "all");
-  const [shownAssign, setShownAssign] = useState(params.assign);
-  if (params.assign !== shownAssign) {
-    setShownAssign(params.assign);
-    if (params.assign) setFilter("loose");
-  }
-  // Back to All too (a group's assign link may have left it on Unassigned), so every device the
-  // notice counts is listed. A search stays, since its text shows in the search field.
   const [privateOnly, setPrivateOnly] = useState(params.private === "1");
-  const [shownPrivate, setShownPrivate] = useState(params.private);
-  if (params.private !== shownPrivate) {
-    setShownPrivate(params.private);
-    if (params.private === "1") {
-      setPrivateOnly(true);
-      setFilter("all");
-    }
-  }
   const [query, setQuery] = useState("");
 
   const privates = useMemo(() => privateAddressDevices(devices), [devices]);
@@ -88,6 +74,7 @@ export function useDeviceList({
     privates,
     privateMacs,
     privateOnly,
+    setPrivateOnly,
     togglePrivateOnly: () => setPrivateOnly((showing) => !showing),
     rows,
     /** Why the list is empty: no devices at all, or none that match. */
