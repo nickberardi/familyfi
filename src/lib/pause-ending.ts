@@ -1,8 +1,8 @@
 import type { Group } from "./types";
 
 /**
- * The notice a device shows shortly before a timed block it made ends, so the person can give it
- * more time. Each client schedules it locally; nothing is sent from the server.
+ * The notice a device shows shortly before a timed block or unblock it made ends, so the person can
+ * give it more time. Each client schedules it locally; nothing is sent from the server.
  */
 
 /** How long before the end the notice shows. */
@@ -23,5 +23,16 @@ export function pauseEndingNotice(group: Pick<Group, "name">, until: number, now
     at,
     title: `Block for ${group.name} ends in ${PAUSE_ENDING_LEAD_MS / 60_000} minutes`,
     body: "Internet comes back then. Choose More time to keep it blocked.",
+  };
+}
+
+/** The notice for an unblock (the group's allowance) ending at `until`, or null when it ends too soon for one. */
+export function allowanceEndingNotice(group: Pick<Group, "name">, until: number, now: number): PauseEndingNotice | null {
+  const at = until - PAUSE_ENDING_LEAD_MS;
+  if (at <= now) return null;
+  return {
+    at,
+    title: `Unblock for ${group.name} ends in ${PAUSE_ENDING_LEAD_MS / 60_000} minutes`,
+    body: "Its rules apply again then. Choose More time to keep it unblocked.",
   };
 }
