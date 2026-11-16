@@ -21,6 +21,14 @@ test("a group's Block button default is saved and the card's Unblock lifts that 
   const groups = (await (await page.request.get("/api/v1/groups")).json()) as { groups: { id: string; name: string; kind: string }[] };
   const tv = groups.groups.find((group) => group.kind === "things" && group.name === "TV");
   expect(tv, "seed must include the TV group").toBeTruthy();
+  // The seed's own TV rules block in the evening and overnight, and with two rules blocking, Unblock
+  // opens the group's sheet instead of the rule's. Turn them off so this test's rule is the only one
+  // blocking TV whatever the time, and back on at the end.
+  const { rules } = (await (await page.request.get("/api/v1/rules")).json()) as { rules: { id: string; enabled: boolean; groupIds?: string[] }[] };
+  const seeded = rules.filter((rule) => rule.enabled && rule.groupIds?.includes(tv!.id));
+  for (const rule of seeded) {
+    expect((await page.request.post(`/api/v1/rules/${rule.id}/off`, { headers: await csrf(page) })).ok()).toBeTruthy();
+  }
   // A rule of this test's own, always on, so the button reads "Unblock …" at once.
   const created = await page.request.post("/api/v1/rules", {
     headers: await csrf(page),
@@ -51,5 +59,8 @@ test("a group's Block button default is saved and the card's Unblock lifts that 
   } finally {
     // Deleting the rule puts TV's button back on all internet, as the seed had it.
     await page.request.delete(`/api/v1/rules/${ruleId}`, { headers: await csrf(page) });
+    for (const rule of seeded) {
+      await page.request.post(`/api/v1/rules/${rule.id}/on`, { headers: await csrf(page) });
+    }
   }
 });
