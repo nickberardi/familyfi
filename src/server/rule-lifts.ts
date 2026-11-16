@@ -50,7 +50,7 @@ export async function liftRule(
   session: Parameters<typeof sessionActor>[0],
   action: LiftAction,
   target: { ruleId: string; groupId?: string },
-  body: LiftBody = {},
+  body: LiftBody,
 ) {
   const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: ruleInclude });
   if (!rule || rule.systemGroupId) throw new ApiError(404, "not_found", "Rule not found.");

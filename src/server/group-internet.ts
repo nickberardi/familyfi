@@ -25,7 +25,7 @@ export async function liftGroupInternet(
   session: Parameters<typeof sessionActor>[0],
   action: LiftAction,
   groupId: string,
-  body: LiftBody = {},
+  body: LiftBody,
 ) {
   const existing = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
   if (!existing) throw new ApiError(404, "not_found", "Group not found.");
@@ -116,7 +116,7 @@ export async function liftGroupRule(
   session: Parameters<typeof liftRule>[0],
   action: LiftAction,
   target: { groupId: string; ruleId: string },
-  body: LiftBody = {},
+  body: LiftBody,
 ) {
   if (target.ruleId === INTERNET_RULE_ID) return liftGroupInternet(session, action, target.groupId, body);
   return liftRule(session, action, target, body);

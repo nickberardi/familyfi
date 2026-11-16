@@ -25,7 +25,7 @@ export async function unblockGroup(
   session: Parameters<typeof sessionActor>[0],
   action: UnblockAction,
   groupId: string,
-  body: LiftBody = {},
+  body: LiftBody,
 ) {
   const existing = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
   if (!existing) throw new ApiError(404, "not_found", "Group not found.");
