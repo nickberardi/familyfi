@@ -7,6 +7,7 @@ import { SYNC_COPY as COPY, syncLogRows, syncLogWhoLine, syncProblem, syncStats 
 import type { SyncStatus } from "@/lib/types";
 
 import { SyncTiles } from "./SyncTiles";
+import { useLargeText } from "./use-large-text";
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
@@ -41,7 +42,9 @@ export function SyncContent({
   // column, and wide on the web, whose server render has no window (as UpdateContent starts).
   const screen = useWindowDimensions();
   const [logWidth, setLogWidth] = useState<number | null>(null);
-  const whoColumn = (logWidth ?? (Platform.OS === "web" ? WHO_COLUMN_AT : screen.width)) >= WHO_COLUMN_AT;
+  // At large text the column would squeeze the action, so the line takes its place at any width.
+  const large = useLargeText();
+  const whoColumn = !large && (logWidth ?? (Platform.OS === "web" ? WHO_COLUMN_AT : screen.width)) >= WHO_COLUMN_AT;
   const problem = syncProblem(sync);
 
   return (
