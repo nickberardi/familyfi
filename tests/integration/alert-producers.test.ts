@@ -153,6 +153,37 @@ describe("alert producers", () => {
     }
   });
 
+  it("leaves an outage unclaimed when its trouble alerts cannot be recorded, so the next pass tells it", async () => {
+    const phone = await registeredPhone();
+    const start = new Date("2026-11-16T12:00:00Z");
+    await recordSyncOutcome(false, start);
+    // The claim and its alerts are one transaction: an alert write that fails takes the claim with it.
+    const db = prisma();
+    const realTransaction = db.$transaction.bind(db) as (fn: (tx: unknown) => Promise<unknown>) => Promise<unknown>;
+    const failing = vi.spyOn(db, "$transaction").mockImplementation(((fn: (tx: unknown) => Promise<unknown>) =>
+      realTransaction((tx) =>
+        fn(new Proxy(tx as object, {
+          get: (target, key) => {
+            const value = Reflect.get(target, key);
+            if (key !== "alertEvent") return value;
+            return new Proxy(value as object, { get: (events, name) => (name === "createMany" ? () => Promise.reject(new Error("database restarting")) : Reflect.get(events, name)) });
+          },
+        })),
+      )) as never);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await recordSyncOutcome(false, new Date(start.getTime() + SYNC_TROUBLE_AFTER_MS));
+    } finally {
+      failing.mockRestore();
+      warn.mockRestore();
+    }
+    expect((await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).syncTroubleAlertedAt).toBeNull();
+    expect(await events()).toEqual([]);
+
+    await recordSyncOutcome(false, new Date(start.getTime() + SYNC_TROUBLE_AFTER_MS + 60_000));
+    expect((await events()).map((event) => [event.kind, event.deviceId])).toEqual([["sync.down", phone]]);
+  });
+
   it("does not say sync is back when it never said it was in trouble", async () => {
     await registeredPhone();
     const start = new Date("2026-11-16T12:00:00Z");
