@@ -89,7 +89,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
     <label className="block">
       <span
         className="mb-1.5 block text-[14px] font-semibold"
-        style={{ color: "var(--ff-ink-3)" }}
+        style={{ color: "var(--ff-muted)" }}
       >
         {label}
       </span>

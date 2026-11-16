@@ -129,7 +129,7 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 
 ## Forms
 
-- **Fields** use `.ff-input` (in `globals.css`): 16px text, the input line, and an accent border with a 3px focus ring. Labels over a field are 14px semibold in `ink-3`.
+- **Fields** use `.ff-input` (in `globals.css`): 16px text, the input line, and an accent border with a 3px focus ring. Labels over a field are 14px semibold in `--ff-muted`, on the web and in the app (`FieldLabel`, `FormField`, and the sheets' own label markup).
 
 - `Field`, `TextField`, `TimeField` and `TogglePill` are in `src/components/ui/Controls.tsx`; shared forms get their fields through `useUI()`. `Field` stacks the label over its control in every sheet. Never `outline: none` without a replacement focus style.
 - **Segmented** (`src/components/ui/Segmented.tsx`; Always | Scheduled, Person | Network) is a white chip on the field trough, 14px at every size.
@@ -238,6 +238,7 @@ Places where the code and the design project disagree and the operator has not y
 | Toast | Bottom-centre, about 4 seconds, never the only copy of an error | Top-centre (`AppShell.tsx`), 6 seconds (`NOTICE_MS`), and it shows the store's error itself (`src/ui/Toast.tsx`) with a Dismiss button, and that error's link when it has one |
 | Editors | Leaving with unsaved changes asks first | Editors show "Unsaved" but don't ask on leaving |
 | Back link position | Above the title | Below the page header (`BackLink.tsx`, `RuleEditor.tsx`, `LockDnsPage.tsx`) |
+| Field label colour | 14px semibold in `ink-3` | The operator chose `--ff-muted` for every label over a field; the design project needs it |
 | Write preview colours | KEEP in `--ff-ink-2` | KEEP in `ink-3` and CHANGE in the accent (`src/ui/RuleEditorForm.tsx`) |
 | `quiet` button on web | One of five roles on both platforms | Only `src/ui/Button.tsx` has it; `src/components/ui/buttons.ts` does not |
 | Day timeline hours | 12 AM, 6 AM, Noon, 6 PM | "NOON" in uppercase (`src/lib/day-timeline.ts`, `RULE_BAR_TICKS` in `src/lib/rule-list.ts`) |
