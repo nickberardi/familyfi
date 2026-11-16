@@ -49,6 +49,13 @@ export function useDeviceList({
   const [filter, setFilter] = useState<DeviceFilterId>(isFilter(params.filter) ? params.filter : assignGroup ? "loose" : "all");
   // The list can stay open while a link arrives (the navigation's "needs a device" link on the
   // web, a tab behind another screen in the app): a group's link shows the Unassigned devices again.
+  // A filter link does the same: an alert's "familyfi://devices?filter=loose" shows Unassigned
+  // even when the list was already open on Everything.
+  const [shownFilter, setShownFilter] = useState(params.filter);
+  if (params.filter !== shownFilter) {
+    setShownFilter(params.filter);
+    if (isFilter(params.filter)) setFilter(params.filter);
+  }
   const [shownAssign, setShownAssign] = useState(params.assign);
   if (params.assign !== shownAssign) {
     setShownAssign(params.assign);
