@@ -134,7 +134,7 @@ A mark's state word renders even when blank (as a non-breaking space) so a row o
 - `Field`, `TextField`, `TimeField` and `TogglePill` are in `src/components/ui/Controls.tsx`; shared forms get their fields through `useUI()`. `Field` stacks the label over its control in every sheet. Never `outline: none` without a replacement focus style.
 - **Segmented** (`src/components/ui/Segmented.tsx`; Always | Scheduled, Person | Network) is a white chip on the field trough, 14px at every size.
 - **DayPicker** (`src/components/ui/DayPicker.tsx`) is seven 32px day toggles with 14px letters, accent fill when selected; it wraps on very narrow screens (about 320px).
-- **TimeField** ("Offline", "Back on") has its 14px label inline to the left and a 14px value.
+- **TimeField** ("Offline", "Back on") has its 14px label inline to the left, in `--ff-muted` like a label over a field, and a 14px value.
 - **Every switch is the On/Off pill** (14px). A control that turns something on or off is a real switch, never a button labelled with its state. Quarantine's pill reads Enforced / Off.
 - Disabled is 0.4, or 0.6 on filled buttons, and nothing else.
 
@@ -238,7 +238,7 @@ Places where the code and the design project disagree and the operator has not y
 | Toast | Bottom-centre, about 4 seconds, never the only copy of an error | Top-centre (`AppShell.tsx`), 6 seconds (`NOTICE_MS`), and it shows the store's error itself (`src/ui/Toast.tsx`) with a Dismiss button, and that error's link when it has one |
 | Editors | Leaving with unsaved changes asks first | Editors show "Unsaved" but don't ask on leaving |
 | Back link position | Above the title | Below the page header (`BackLink.tsx`, `RuleEditor.tsx`, `LockDnsPage.tsx`) |
-| Field label colour | 14px semibold in `ink-3` | The operator chose `--ff-muted` for every label over a field; the design project needs it |
+| Field label colour | 14px semibold in `ink-3` | The operator chose `--ff-muted` for every label over a field and the time fields' inline labels; the design project needs it |
 | Write preview colours | KEEP in `--ff-ink-2` | KEEP in `ink-3` and CHANGE in the accent (`src/ui/RuleEditorForm.tsx`) |
 | `quiet` button on web | One of five roles on both platforms | Only `src/ui/Button.tsx` has it; `src/components/ui/buttons.ts` does not |
 | Day timeline hours | 12 AM, 6 AM, Noon, 6 PM | "NOON" in uppercase (`src/lib/day-timeline.ts`, `RULE_BAR_TICKS` in `src/lib/rule-list.ts`) |

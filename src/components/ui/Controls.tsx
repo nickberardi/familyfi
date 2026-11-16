@@ -19,7 +19,7 @@ export function TimeField({
 }) {
   return (
     <label className="flex flex-none items-center gap-1.5">
-      <span className="text-[14px]" style={{ color: "var(--ff-ink-3)" }}>
+      <span className="text-[14px]" style={{ color: "var(--ff-muted)" }}>
         {label}
       </span>
       <input
