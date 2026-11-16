@@ -1281,6 +1281,34 @@
       "categories": [
         "runtime"
       ]
+    },
+    "tests/unit/alert-payload.test.ts": {
+      "categories": [
+        "trust"
+      ]
+    },
+    "tests/unit/alert-copy.test.ts": {
+      "categories": [
+        "display"
+      ]
+    },
+    "tests/integration/alert-producers.test.ts": {
+      "categories": [
+        "sync",
+        "devices"
+      ]
+    },
+    "tests/integration/alert-sender.test.ts": {
+      "categories": [
+        "runtime",
+        "trust"
+      ]
+    },
+    "tests/integration/push-registration-api.test.ts": {
+      "categories": [
+        "pairing",
+        "settings"
+      ]
     }
   }
 }

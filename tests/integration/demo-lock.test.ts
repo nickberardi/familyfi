@@ -22,6 +22,8 @@ import { POST as turnOffRule } from "@/app/api/v1/rules/[id]/off/route";
 import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
 import { POST as pauseRule } from "@/app/api/v1/rules/[id]/pause/route";
 import { PUT as setHousehold } from "@/app/api/v1/settings/household/route";
+import { DELETE as removePush, PUT as registerPush } from "@/app/api/v1/paired/devices/[id]/push/route";
+import { PUT as setAlerts } from "@/app/api/v1/paired/devices/[id]/alerts/route";
 import { GET as exportHousehold } from "@/app/api/v1/settings/export/route";
 import { POST as importHousehold } from "@/app/api/v1/settings/import/route";
 import { PUT as setUnifi } from "@/app/api/v1/settings/unifi/route";
@@ -82,6 +84,11 @@ describe("demo mode", () => {
 
     const responses = [
       await setHousehold(write(auth, "/api/v1/settings/household", "PUT", { timezone: "Europe/London" })),
+      await setHousehold(write(auth, "/api/v1/settings/household", "PUT", { alertsRelay: true })),
+      // Phone alerts never leave the shared demo.
+      await registerPush(write(auth, "/api/v1/paired/devices/phone/push", "PUT", {}), params({ id: "phone" })),
+      await removePush(write(auth, "/api/v1/paired/devices/phone/push", "DELETE"), params({ id: "phone" })),
+      await setAlerts(write(auth, "/api/v1/paired/devices/phone/alerts", "PUT", { kinds: {} }), params({ id: "phone" })),
       await setUnifi(write(auth, "/api/v1/settings/unifi", "PUT", { baseUrl: "https://192.0.2.1/proxy/network/integration", apiKey: "a-real-looking-key" })),
       await createAccount(write(auth, "/api/v1/accounts", "POST", { username: "visitor", displayName: "Visitor", password: "visitor-password", isAdmin: true })),
       await updateAccount(write(auth, `/api/v1/accounts/${admin.id}`, "PUT", { displayName: "Mine now" }), params({ id: admin.id })),

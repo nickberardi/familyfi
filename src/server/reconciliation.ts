@@ -20,6 +20,7 @@ import { networkInScope, publicUnifiNetwork } from "./unifi/scope";
 import { rememberSiteNetworks } from "./unifi/network-cache";
 import { recordQuarantineObservation } from "./quarantine";
 import { checkupAfterSync, recordDriftFindings } from "./checkup";
+import { recordNewDevices, recordSyncOutcome } from "./alerts/producers";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { planPolicies, plannedKey } from "./unifi/plan";
 import { planRulePolicies, plannedRuleKey, rulePolicyWrite, type PlannedRulePolicy } from "./unifi/plan-rules";
@@ -310,6 +311,7 @@ async function tick(owner: string): Promise<boolean> {
       (await prisma().device.findMany({ where: { mac: { in: [...listed.keys()] } } })).map((device) => [device.mac, device]),
     );
     const seenMacs: string[] = [];
+    const discovered: { hostname: string | null }[] = [];
     for (const [mac, clientRow] of listed) {
       const mapped = mappingByMac.get(mac);
       const existing = known.get(mac);
@@ -351,6 +353,7 @@ async function tick(owner: string): Promise<boolean> {
           },
           update: { ...observed, lastSeenAt: now, presenceOnline: true, presenceCheckedAt: now },
         });
+        discovered.push({ hostname: clientRow.name || null });
         continue;
       }
       seenMacs.push(mac);
@@ -377,6 +380,8 @@ async function tick(owner: string): Promise<boolean> {
       },
     });
     await prisma().household.update({ where: { id: "default" }, data: { presenceCheckedAt: now } });
+    // Phones hear about new devices, except on the household's first pass, when every device is new.
+    await recordNewDevices(discovered, { firstPass: !household.presenceCheckedAt, now });
     // An unassigned device unseen for a month is forgotten, so rotating private addresses do not grow
     // the list forever; one that comes back is discovered again. A device in a group stays.
     const forgetBefore = new Date(now.getTime() - UNASSIGNED_DEVICE_MS);
@@ -659,6 +664,7 @@ async function tick(owner: string): Promise<boolean> {
     // The checkup reads what this pass read, at most once an interval; it never fails the pass.
     stillHeld();
     await checkupAfterSync(household, client, { zones, networks, clients, networkClientIds });
+    await recordSyncOutcome(true, now);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await prisma().syncRun.update({
@@ -671,6 +677,7 @@ async function tick(owner: string): Promise<boolean> {
       where: { id: "default" },
       data: { connectionStatus: "error", connectionError: message },
     });
+    await recordSyncOutcome(false, now);
     await prisma().changeResult.updateMany({
       where: { status: ChangeStatus.pending, requestedRevision: { lte: revision } },
       data: { status: ChangeStatus.failed, error: message, syncRunId: run.id },

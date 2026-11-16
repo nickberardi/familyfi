@@ -2,7 +2,7 @@ import { PairedDeviceClient, type Prisma } from "@prisma/client";
 import { z } from "zod";
 import { isAdministrator, removeDevice, revokeDevice } from "./connection";
 import { prisma } from "./db";
-import { isValidScope } from "./device-scope";
+import { isFullApp, isValidScope } from "./device-scope";
 import { ApiError } from "./http";
 
 type Viewer = Parameters<typeof isAdministrator>[0];
@@ -22,6 +22,7 @@ function deviceInclude(now = new Date()) {
   return {
     account: { select: { username: true, displayName: true } },
     edgeTokens: { select: { endpointId: true, version: true } },
+    pushRegistration: { select: { deviceId: true } },
     pairings: { include: { endpoint: true }, take: 1 },
     sessions: {
       where: { revokedAt: null, OR: [{ expiresAt: { gt: now } }, { refreshExpiresAt: { gt: now } }] },
@@ -46,6 +47,8 @@ function publicPairedDevice(device: Listed) {
     revokedAt: device.revokedAt?.toISOString() ?? null,
     pairedVia: route ? { endpointId: route.id, url: route.url, transport: route.transport } : null,
     edgeTokens: device.edgeTokens,
+    // Whether the app gets phone alerts; only the app itself registers, so other devices leave it out.
+    ...(isFullApp(device) ? { alerts: Boolean(device.pushRegistration) } : {}),
     // A paired device's sign-in ends when its refresh token does, not its one-hour bearer.
     sessions: device.sessions.map((session) => ({
       id: session.id,

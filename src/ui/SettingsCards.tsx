@@ -6,12 +6,14 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { initials } from "@/lib/display";
 import type { HouseholdStore } from "@/lib/household-store";
 import { SETTINGS_COPY as COPY, gatewayFacts, householdMemberNote, keyState, keyStatusLine, recoveryNote, removeAdminConfirm, removeLoginConfirm } from "@/lib/settings-copy";
-import { addFamilyMember, removeLogin, saveTimezone, setAdmin, setFamilyRole } from "@/lib/settings-writes";
+import { ALERTS_CARD_COPY } from "@/lib/alert-copy";
+import { addFamilyMember, removeLogin, saveTimezone, setAdmin, setAlertsRelay, setFamilyRole } from "@/lib/settings-writes";
 import { lastSweepAt, relativeSweep } from "@/lib/sync-copy";
 import type { Account, Group, SyncStatus, UnifiSettings } from "@/lib/types";
 
 import { AddMemberField } from "./AddMemberField";
 import { AdminControl } from "./AdminControl";
+import { Disclosure } from "./Disclosure";
 import { FamilyRolePicker } from "./FamilyRolePicker";
 import { TimezoneField } from "./TimezoneField";
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
@@ -138,6 +140,59 @@ export function KeyCard({
 }
 
 /**
+ * Phone alerts: the household's switch for sending them through the push relay, what the relay
+ * sees, and which paired apps have turned alerts on. A phone turns its own alerts on in the app;
+ * `phones` is null while the list is loading or cannot be read.
+ */
+export function AlertsCard({
+  enabled,
+  phones,
+  mutate,
+  disabled,
+}: {
+  enabled: boolean;
+  phones: { id: string; displayName: string; alerts: boolean }[] | null;
+  mutate: Mutate;
+  disabled?: boolean;
+}) {
+  const ui = useUI();
+  const text = useText();
+  const COPY = ALERTS_CARD_COPY;
+  return (
+    <Card title={COPY.title} testID="settings-alerts">
+      <View style={styles.alertsBody}>
+        <View style={styles.row}>
+          <View style={styles.grow}>
+            <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.switchLabel}</Text>
+            <Text style={text(14, 20, "muted")}>{COPY.description}</Text>
+          </View>
+          <ui.Toggle label={COPY.switchLabel} on={enabled} disabled={disabled} onToggle={() => void setAlertsRelay(mutate, !enabled)} testID="settings-alerts-toggle" />
+        </View>
+        <Disclosure title={COPY.disclosureTitle} testID="settings-alerts-disclosure">
+          {COPY.disclosure.map((line) => (
+            <Text key={line} style={[text(14, 20, "ink-2"), styles.alertsLine]}>
+              {line}
+            </Text>
+          ))}
+        </Disclosure>
+        {phones ? (
+          <View style={styles.alertsPhones} testID="settings-alerts-phones">
+            <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.phonesTitle}</Text>
+            {phones.length === 0 ? <Text style={text(14, 20, "muted")}>{COPY.noPhones}</Text> : null}
+            {phones.map((phone) => (
+              <View key={phone.id} style={[styles.row, styles.alertsPhone, { borderTopColor: ui.color("hairline") }]}>
+                <Text style={[text(14, 21, "ink"), styles.grow]}>{phone.displayName}</Text>
+                <Text style={text(14, 21, phone.alerts ? "ink-2" : "muted")}>{phone.alerts ? COPY.phoneOn : COPY.phoneOff}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+/**
  * Who is in the household: the recovery admin, each family member with their role, admin and login,
  * and a row to add one. `onCreateLogin` opens the platform's new-login form for an adult without one.
  */
@@ -237,6 +292,10 @@ export function HouseholdCard({
 }
 
 const styles = StyleSheet.create({
+  alertsBody: { paddingHorizontal: 18, paddingVertical: 14 },
+  alertsLine: { marginTop: 4 },
+  alertsPhones: { marginTop: 14, gap: 6 },
+  alertsPhone: { borderTopWidth: 1, paddingTop: 8 },
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
   cardHead: { gap: 2, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   bold: { fontWeight: "600" },

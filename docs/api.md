@@ -26,7 +26,8 @@ A server in [demo mode](operations.md#demo-mode) refuses configuration writes wi
 `demo_locked`: `PUT /settings/household`, `PUT /settings/unifi`, account and password writes,
 `PUT`/`DELETE` on `/upstream/resolver` and `/groups/{id}/resolver`, route writes under
 `/connection/endpoints`, `POST /connection/pins`, `PUT /connection/tunnel`, `PUT /settings/update/schedule`,
-`POST /settings/update/install`, and `GET /settings/export` and `POST /settings/import`. The error carries a `link`
+`POST /settings/update/install`, `GET /settings/export` and `POST /settings/import`, and a phone's alert
+registration and choices (`PUT`/`DELETE /paired/devices/{id}/push`, `PUT /paired/devices/{id}/alerts`). The error carries a `link`
 to installing FamilyFi at home ("Set up your own"). Clients show the message, and an error's `link` (https only) as a link
 under it; the household itself (groups, rules, pauses, devices) and pairing are unchanged.
 
@@ -53,7 +54,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/accounts` | Personal adult accounts; recovery `admin` is listed and cannot be created here |
 | GET/PUT/DELETE | `/api/v1/accounts/{id}` | Recovery admin cannot be edited or deleted; an adult who stops being an administrator (`isAdmin: false`) is signed out everywhere: their sessions end, every phone, Watch and agent acting as them is removed, and their pending invites are cancelled |
 | PUT | `/api/v1/accounts/{id}/password` | Revokes that account's sessions; recovery uses `.env` |
-| GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false (a new household's default) keeps quarantine policies on UniFi with `enabled: false`. It is the built-in quarantine rule's switch, and turning it off ends a pause on that rule |
+| GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false (a new household's default) keeps quarantine policies on UniFi with `enabled: false`. It is the built-in quarantine rule's switch, and turning it off ends a pause on that rule. `alertsRelay` turns [phone alerts](#phone-alerts) on or off (off by default) |
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |
 | GET | `/api/v1/connection` | Authenticated endpoint manifest, FamilyFi-to-UniFi status, and the account's last attributed change |
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
@@ -67,6 +68,8 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/paired/invites/{id}/claim` | Join with the code: every client is signed in at once (bearer and refresh token, never a password or device credential); a phone also gets its route and signed manifest |
 | GET | `/api/v1/paired/devices` | Paired devices with each one's `scope`, the account it acts as (`actsAs`) and its parent: all of them for an administrator, itself and what it set up for a paired device; `?client=` and `?status=` narrow it; the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
 | GET/PATCH/DELETE | `/api/v1/paired/devices/{id}` | Read one; an administrator renames it or changes an agent's scope (no other kind changes scope: 400 `invalid_scope`); an administrator, the device itself or its parent phone revokes it and its sessions. Only an administrator may use `?remove=true` to delete its record |
+| PUT/DELETE | `/api/v1/paired/devices/{id}/push` | The app on that device (`app:full`, its own id only: 403 `own_device_required` for anyone else, a browser included) stores or forgets its push token and alert key; see [Phone alerts](#phone-alerts) |
+| GET/PUT | `/api/v1/paired/devices/{id}/alerts` | The same app reads or sets which alert kinds it gets (`{ "kinds": { "device.new": true } }`); 404 `push_not_registered` before it registered |
 | DELETE | `/api/v1/paired/devices?status=revoked` | Administrator removes every revoked device's record; active ones are untouched |
 | GET/PUT | `/api/v1/settings/unifi` | Masked key; PUT probes then encrypts. Network allowlist: `manageAllNetworks` or `managedNetworkIds`. A key for a different console or site first removes FamilyFi's policies from the old one; if that fails, 409 `previous_gateway_unreachable` saves nothing, and `forgetPrevious: true` switches anyway, leaving those policies there |
 | GET | `/api/v1/settings/export` | Administrator, in a browser (a paired device gets 403 `browser_session_required`), downloads the household as `.tar.gz`: `manifest.json`, `config.json` (no secrets) and, where `pg_dump` reaches the database, `database.dump` ([backup and restore](operations.md#backup-and-restore)) |
@@ -162,6 +165,38 @@ route is limited to `lan` and carries an SHA-256 SPKI pin in the pairing code; a
 rejects every other public key. FamilyFi does not distribute a household CA.
 
 Administrators do all of this from **System → Pair Device** in the web app. Administrator reads need only the session; writes also need the CSRF header.
+
+### Phone alerts
+
+FamilyFi can tell administrators' phones when devices join a managed network and wait in
+Unassigned (`device.new`), when no sync pass has reached the gateway for 10 minutes (`sync.down`),
+and when one does again (`sync.up`, only to phones told `sync.down`). Kinds are listed once in
+`src/lib/alert-kinds.ts`. Reminders that a pause or allowance is ending are scheduled on the phone
+and never sent by the server.
+
+- An administrator turns alerts on with `alertsRelay` on `PUT /settings/household`; it is off by
+  default and in every new household. While it is off, and always in demo mode, nothing is sent.
+- The app registers itself with `PUT /paired/devices/{id}/push`: platform, channel, its push token,
+  a 32-byte key it generated, the envelope version it reads (`format`) and the kinds it understands.
+  Only the app on that device may (403 `own_device_required`); Watches, Siri's `rulesOnly`
+  sign-in and agents are refused by their scope. Revoking or removing the device deletes the
+  registration.
+- Each alert is a short JSON envelope, `{"v":1,"i":"<event id>","t":<unix seconds>,"k":"<kind>","d":{...}}`,
+  with no sentence in it: the phone writes the words from `k` and `d` (`src/lib/alert-copy.ts`).
+  `device.new` carries `n`, the number of new devices, and `h`, the hostname when `n` is 1. Readers
+  ignore keys they do not know; `v` rises only for an incompatible envelope.
+- FamilyFi encrypts the envelope for each phone with its key: base64url of
+  `0x01 || 12-byte nonce || AES-256-GCM ciphertext || 16-byte tag`, additional data
+  `familyfi-alert-v1` (`src/server/alerts/payload.ts`, vectors in `tests/fixtures/alert-vectors.json`).
+- It posts the ciphertext to the project relay, `https://push.getfamilyfi.com` (or
+  `FAMILYFI_ALERTS_RELAY_URL`), at `POST /v1/send` with `Authorization: Bearer <install secret>` and
+  `{ installId, platform, channel, token, ciphertext, collapse, ttl }`. The install id and secret come
+  from `POST /v1/installs` on the first send and are kept encrypted. The relay answers 2xx (sent),
+  410 (the token is dead: FamilyFi drops the registration), 401 (unknown install: FamilyFi asks for a
+  new one), 429 or 5xx (FamilyFi retries with backoff, and gives up after a day). The relay sees the
+  push token, the ciphertext, the install id and the time, and keeps nothing.
+- New-device alerts are one per sync pass, never on the household's first pass, and at most four an
+  hour for each phone.
 
 ### Pairing
 

@@ -316,12 +316,13 @@ describe("route responses match the contract", () => {
 
   it("household settings and the update schedule", async () => {
     expect((await getHouseholdRoute(send("/api/v1/settings/household"))).status).toBe(200);
-    const saved = await putHouseholdRoute(send("/api/v1/settings/household", "PUT", { timezone: "Europe/London", displayName: "The Testers", quarantineEnforced: true }));
+    const saved = await putHouseholdRoute(send("/api/v1/settings/household", "PUT", { timezone: "Europe/London", displayName: "The Testers", quarantineEnforced: true, alertsRelay: true }));
     expect(saved.status).toBe(200);
     expect(await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({
       timezone: "Europe/London",
       displayName: "The Testers",
       quarantineEnforced: true,
+      alertsRelayEnabled: true,
     });
 
     expect((await getUpdateRoute(send("/api/v1/settings/update"))).status).toBe(200);

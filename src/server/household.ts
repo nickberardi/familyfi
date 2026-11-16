@@ -22,6 +22,7 @@ async function publicHousehold(household: Household) {
     quarantineObservedEnabled: live.observedEnabled,
     quarantinePolicyCount: live.policyCount,
     displayName: household.displayName,
+    alertsRelay: household.alertsRelayEnabled,
   };
 }
 
@@ -29,7 +30,7 @@ export async function getHouseholdSettings() {
   return publicHousehold(await loadHousehold());
 }
 
-export async function updateHouseholdSettings(input: { timezone?: string; displayName?: string; quarantineEnforced?: boolean }) {
+export async function updateHouseholdSettings(input: { timezone?: string; displayName?: string; quarantineEnforced?: boolean; alertsRelay?: boolean }) {
   if (input.timezone) {
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: input.timezone });
@@ -40,12 +41,15 @@ export async function updateHouseholdSettings(input: { timezone?: string; displa
   const data = {
     ...(input.timezone ? { timezone: input.timezone } : {}),
     ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+    ...(input.alertsRelay !== undefined ? { alertsRelayEnabled: input.alertsRelay } : {}),
   };
   // The same switch as the built-in quarantine rule's: turning it off ends a pause on it.
   const household =
     input.quarantineEnforced !== undefined
       ? await setQuarantineEnforced(input.quarantineEnforced, data)
       : await prisma().household.update({ where: { id: "default" }, data });
+  // Turned off, nothing more leaves for the relay, including alerts already waiting.
+  if (input.alertsRelay === false) await prisma().alertEvent.deleteMany({ where: { sentAt: null } });
   const change = await enqueueChange(input.quarantineEnforced !== undefined ? "quarantine" : "household");
   // Both schedules are kept in the household's time zone.
   if (input.timezone) {

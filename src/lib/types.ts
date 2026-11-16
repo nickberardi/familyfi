@@ -259,6 +259,8 @@ export type PairedPhone = {
   pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
   /** The Access token version FamilyFi last handed this device, per protected route. */
   edgeTokens: { endpointId: string; version: number }[];
+  /** Whether this app has turned on phone alerts; only `app:full` devices carry it. */
+  alerts?: boolean;
   sessions: { id: string; username: string; client: PairedClient; expiresAt: string; createdAt: string }[];
 };
 

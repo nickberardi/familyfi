@@ -12,6 +12,11 @@ export function saveTimezone(mutate: Mutate, timezone: string) {
   return mutate((send) => send("/api/v1/settings/household", { method: "PUT", body: { timezone } }));
 }
 
+/** Turns phone alerts through the push relay on or off for the household. */
+export function setAlertsRelay(mutate: Mutate, alertsRelay: boolean) {
+  return mutate((send) => send("/api/v1/settings/household", { method: "PUT", body: { alertsRelay } }));
+}
+
 export function setFamilyRole(mutate: Mutate, group: Pick<Group, "id">, familyRole: NonNullable<Group["familyRole"]>) {
   return mutate((send) => send(`/api/v1/groups/${group.id}`, { method: "PUT", body: { familyRole } }));
 }

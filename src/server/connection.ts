@@ -138,8 +138,18 @@ async function revokeCompanions(id: string, db: Db, now: Date) {
     for (const companion of ids) seen.add(companion);
     await db.session.updateMany({ where: { deviceId: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
     await db.pairedDevice.updateMany({ where: { id: { in: ids }, revokedAt: null }, data: { revokedAt: now } });
+    await forgetAlerts(ids, db);
     parents = ids;
   }
+}
+
+/**
+ * A revoked device gets no more alerts: revoking keeps its record, so its push registration and
+ * waiting alerts are deleted here rather than by the record's cascade.
+ */
+async function forgetAlerts(ids: string[], db: Db) {
+  await db.alertEvent.deleteMany({ where: { deviceId: { in: ids } } });
+  await db.pushRegistration.deleteMany({ where: { deviceId: { in: ids } } });
 }
 
 /** Hands what a device paired to the device that paired it, so deleting its record keeps them under their ancestors. */
@@ -156,6 +166,7 @@ export async function revokeDevice(id: string, db: Db = prisma() as unknown as D
   const updated = await db.pairedDevice.updateMany({ where: { id, revokedAt: null }, data: { revokedAt: now } });
   if (!updated.count) return false;
   await db.session.updateMany({ where: { deviceId: id, revokedAt: null }, data: { revokedAt: now } });
+  await forgetAlerts([id], db);
   await revokeCompanions(id, db, now);
   return true;
 }

@@ -159,6 +159,12 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/paired/devices/{id}": { access: "administrator" },
   "PATCH /api/v1/paired/devices/{id}": { access: "administrator" },
   "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["watch:rulesOnly", "app:rulesOnly"] },
+  // Only the app on that device: the own-id rule is in the route's function and its own test
+  // (push-registration-api), since this table has no app:full caller.
+  "PUT /api/v1/paired/devices/{id}/push": { access: "session" },
+  "DELETE /api/v1/paired/devices/{id}/push": { access: "session" },
+  "GET /api/v1/paired/devices/{id}/alerts": { access: "session" },
+  "PUT /api/v1/paired/devices/{id}/alerts": { access: "session" },
   "GET /api/v1/checkup": { access: "session", devices: READERS },
   "POST /api/v1/checkup/run": { access: "session", devices: CONTROLLERS },
   "PATCH /api/v1/checkup/findings/{id}": { access: "session", devices: CONTROLLERS },

@@ -33,6 +33,10 @@ const NEVER_FOR_AGENTS: [string, string][] = [
   ["PATCH", "/api/v1/paired/devices/someone-else"],
   ["PUT", "/api/v1/connection/tunnel"],
   ["DELETE", "/api/v1/paired/devices/someone-else"],
+  ["PUT", "/api/v1/paired/devices/device-1/push"],
+  ["DELETE", "/api/v1/paired/devices/device-1/push"],
+  ["GET", "/api/v1/paired/devices/device-1/alerts"],
+  ["PUT", "/api/v1/paired/devices/device-1/alerts"],
 ];
 
 describe("device scopes", () => {
