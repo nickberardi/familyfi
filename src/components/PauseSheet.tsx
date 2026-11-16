@@ -240,7 +240,7 @@ function CustomPausePicker({
     >
       {picker === "for" ? (
         <>
-          <label className="flex items-center gap-1.5 text-[14px]">
+          <label className="flex items-center gap-1.5 text-[14px] text-[var(--ff-muted)]">
             <input
               type="number"
               inputMode="numeric"
@@ -253,7 +253,7 @@ function CustomPausePicker({
             />
             hr
           </label>
-          <label className="flex items-center gap-1.5 text-[14px]">
+          <label className="flex items-center gap-1.5 text-[14px] text-[var(--ff-muted)]">
             <input
               type="number"
               inputMode="numeric"
@@ -267,7 +267,7 @@ function CustomPausePicker({
           </label>
         </>
       ) : (
-        <label className="flex items-center gap-1.5 text-[14px]">
+        <label className="flex items-center gap-1.5 text-[14px] text-[var(--ff-muted)]">
           Until
           <input
             type="time"
