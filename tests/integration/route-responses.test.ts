@@ -119,7 +119,9 @@ describe("route responses match the contract", () => {
     expect((await deleteRuleRoute(send(path, "DELETE"), rule)).status).toBe(200);
   });
 
-  it("a rule's create and update carry every field through to what is stored", async () => {
+  // Scope, networks, domains, countries and Private Relay go through these routes in the DPI,
+  // network rule and checkup cases, which still call them.
+  it("a rule's create and update carry their fields through to what is stored", async () => {
     const group = await createFamilyGroup("Betsy");
     const created = await createRuleRoute(
       send("/api/v1/rules", "POST", {
@@ -180,19 +182,26 @@ describe("route responses match the contract", () => {
     // A run on record a day ahead, so saving the resolver starts no sweep of its own.
     await prisma().household.update({ where: { id: "default" }, data: { dohProbeLastRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } });
     const created = await createCategoryRoute(
-      send("/api/v1/upstream/categories", "POST", { label: "Homework", monogram: "HW", domains: ["chegg.com"], enabled: true }),
+      send("/api/v1/upstream/categories", "POST", { label: "Homework", monogram: "HW", domains: ["chegg.com"], enabled: false }),
     );
     expect(created.status).toBe(201);
     const categoryId = ((await created.json()) as { category: { id: string } }).category.id;
+    // Checking off is not the default, so a create that dropped `enabled` would show here.
+    expect(await prisma().upstreamCategory.findUniqueOrThrow({ where: { id: categoryId }, include: { domains: true } })).toMatchObject({
+      label: "Homework",
+      monogram: "HW",
+      enabled: false,
+      domains: [{ domain: "chegg.com" }],
+    });
     const path = `/api/v1/upstream/categories/${categoryId}`;
     expect((await listCategoriesRoute(send("/api/v1/upstream/categories"))).status).toBe(200);
     expect((await getCategoryRoute(send(path), id(categoryId))).status).toBe(200);
-    const patched = await patchCategoryRoute(send(path, "PATCH", { label: "Study", monogram: "ST", enabled: false, domains: ["quizlet.com"] }), id(categoryId));
+    const patched = await patchCategoryRoute(send(path, "PATCH", { label: "Study", monogram: "ST", enabled: true, domains: ["quizlet.com"] }), id(categoryId));
     expect(patched.status).toBe(200);
     expect(await prisma().upstreamCategory.findUniqueOrThrow({ where: { id: categoryId }, include: { domains: true } })).toMatchObject({
       label: "Study",
       monogram: "ST",
-      enabled: false,
+      enabled: true,
       domains: [{ domain: "quizlet.com" }],
     });
     // With no resolver set the check answers unknown: a result to show, never an error.

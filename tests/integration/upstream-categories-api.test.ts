@@ -50,6 +50,7 @@ const json = { "content-type": "application/json" };
 
 async function categories() {
   const response = await answered("GET /api/v1/upstream/categories", async () => ({ categories: await listUpstreamCategories() }));
+  expect(response.status).toBe(200);
   return ((await response.json()) as { categories: PublicCategory[] }).categories;
 }
 
