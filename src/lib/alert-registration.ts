@@ -83,16 +83,17 @@ export function alertDestination(kind: string): string {
 export const ALERTS_SCREEN_COPY = {
   title: "Alerts",
   intro: "Get an alert on this device when a new device is waiting in Unassigned, or when FamilyFi can't reach your gateway.",
-  turnOn: "Turn on alerts",
-  turnOff: "Turn off alerts on this device",
+  /** The one switch for this device's alerts; turning it on asks to send notifications. */
+  deviceSwitch: "Alerts on this device",
   /** The system's notification permission was refused. */
   blocked: "Notifications are off for FamilyFi. Turn them on in this device's Settings to get alerts.",
   openSettings: "Open Settings",
-  /** The household's switch (Settings on the web) is off. */
-  householdOff: "Alerts are off for your household. Turn on Send alerts to the FamilyFi app in Settings.",
+  /** The household's switch (the Alerts card in FamilyFi's Settings, Household tab) is off. */
+  householdOff: "Alerts are off for your household. Turn on “Send alerts to the FamilyFi app” in FamilyFi's Settings.",
+  householdSettings: "Open Settings",
   /** The server is older than 1.4.0. */
   unsupported: "Your FamilyFi server is too old to send alerts. Update it to get them.",
-  kindsTitle: "Alert me about",
+  kindsTitle: "Send alerts about",
   failed: "Couldn't change alerts. Try again.",
   /** This device's alerts could not be read from the server. */
   unreadable: "Couldn't read this device's alerts.",

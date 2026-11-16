@@ -42,7 +42,7 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
 export const ALERT_KIND_LABELS: Record<string, string> = {
   "device.new": "New devices",
   "sync.down": "Can't reach your gateway",
-  "sync.up": "Gateway reached",
+  "sync.up": "Gateway back",
 };
 
 /** The Alerts card in Settings. */
