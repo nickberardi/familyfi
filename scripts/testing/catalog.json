@@ -568,6 +568,12 @@
         "contracts"
       ]
     },
+    "tests/integration/change-actor.test.ts": {
+      "categories": [
+        "contracts",
+        "pairing"
+      ]
+    },
     "tests/integration/min-app.test.ts": {
       "categories": [
         "contracts"

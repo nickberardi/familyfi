@@ -99,6 +99,7 @@ export const SYNC_COPY = {
   sub: "App-owned policy state, sweeps and failures",
   when: "When",
   action: "Action",
+  who: "Who",
   result: "Result",
   now: "Now",
   empty: "No changes yet. Reconcile writes desired state to UniFi.",
@@ -149,6 +150,10 @@ export type SyncLogRow = {
   detail: string | null;
   detailInk: string;
   detailMono: boolean;
+  /** Who acted: the adult who asked, or FamilyFi for what its own sync found; null when no longer known. */
+  who: string | null;
+  /** The paired device they used: the app, its Siri and Shortcuts, a Watch or an agent; null for the web. */
+  whoDevice: string | null;
   result: string;
   resultInk: string;
 };
@@ -169,6 +174,8 @@ function flaggedRow(sync: SyncStatus | null | undefined, sweepAt: string | null,
     detail,
     detailInk: "var(--ff-danger)",
     detailMono: false,
+    who: FAMILYFI,
+    whoDevice: null,
     result: changeResultLabel(status),
     resultInk: changeResultColor(status),
   });
@@ -182,6 +189,15 @@ function flaggedRow(sync: SyncStatus | null | undefined, sweepAt: string | null,
   return row("failing", changeActionLabel("retry"), failing, "failed");
 }
 
+/** What the log's Who says for what FamilyFi's own sync found, rather than someone asked for. */
+const FAMILYFI = "FamilyFi";
+
+/** Who acted, on one line under the action where the log is too narrow for its Who column. */
+export function syncLogWhoLine(row: Pick<SyncLogRow, "who" | "whoDevice">): string | null {
+  if (!row.who) return null;
+  return `By ${row.who}${row.whoDevice ? ` · ${row.whoDevice}` : ""}`;
+}
+
 /** The log, as the Sync page lists it: why sync is flagged, the current issues at the last sweep, then every change, newest first. */
 export function syncLogRows(sync: SyncStatus | null | undefined, timezone: string): SyncLogRow[] {
   const sweepAt = lastSweepAt(sync);
@@ -193,6 +209,8 @@ export function syncLogRows(sync: SyncStatus | null | undefined, timezone: strin
     detail: issue.message,
     detailInk: issueResultColor(issue.kind),
     detailMono: false,
+    who: FAMILYFI,
+    whoDevice: null,
     result: issueResultLabel(issue.kind),
     resultInk: issueResultColor(issue.kind),
   }));
@@ -203,6 +221,8 @@ export function syncLogRows(sync: SyncStatus | null | undefined, timezone: strin
     detail: change.error || (change.deviceMac ? changePolicyLabel(change.deviceMac) : null),
     detailInk: change.error ? "var(--ff-danger)" : "var(--ff-muted)",
     detailMono: !change.error && Boolean(change.deviceMac),
+    who: change.actor?.displayName ?? null,
+    whoDevice: change.actor?.device?.displayName ?? null,
     result: changeResultLabel(change.status),
     resultInk: changeResultColor(change.status),
   }));

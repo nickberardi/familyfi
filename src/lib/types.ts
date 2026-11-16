@@ -55,6 +55,8 @@ export type Change = {
   status: "pending" | "applied" | "partial" | "failed" | "superseded";
   scope: string;
   deviceMac: string | null;
+  /** Who asked: the adult, and the paired device they used. Left out when unknown, and by servers before API 1.5.0. */
+  actor?: { displayName: string; device?: { displayName: string } };
   error: string | null;
   updatedAt: string;
 };

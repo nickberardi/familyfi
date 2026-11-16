@@ -95,9 +95,9 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET | `/api/v1/devices` | `?assignment=assigned` or `quarantined` |
 | GET/DELETE | `/api/v1/devices/{mac}` | GET includes `unresolved` when zone is unknown; DELETE removes the record and assignment, then sync rediscovers a still-present in-scope device as quarantined |
 | PUT | `/api/v1/devices/{mac}/assignment` | `{ "groupId": "…" }` or `null` for quarantine |
-| GET | `/api/v1/sync` | Revision, last run, app-owned policy counts, recent changes, and `checkupProblems` for the Checkup badge (a newer FamilyFi release counts as one) |
+| GET | `/api/v1/sync` | Revision, last run, app-owned policy counts, recent changes (each with `actor`, who asked: the adult and the paired device they used; never served to an agent), and `checkupProblems` for the Checkup badge (a newer FamilyFi release counts as one) |
 | POST | `/api/v1/sync/retry` | Enqueue another run |
-| GET | `/api/v1/changes/{id}` | Per-action status |
+| GET | `/api/v1/changes/{id}` | Per-action status, with `actor` as on `/sync` |
 | GET | `/api/v1/checkup` | The network checkup's last findings (problems, then notes that may be on purpose), each with a `message` (see [Values that grow](#values-that-grow)), and the checks that passed. Sync runs it at most hourly from what it already read plus the Wi-Fi networks and firewall policies; it only reads the gateway. The `gateway_drift` note (a FamilyFi rule changed in UniFi, which sync changes back) is updated after every sync pass; while changing it back fails, `POST /api/v1/sync/retry` tries again. The `update_available` problem (a newer FamilyFi release) comes from the hourly release check instead: reading this or `GET /api/v1/sync` records it when the check's answer changed, so it can show before the first run, and dismissing it lasts until a newer release |
 | POST | `/api/v1/checkup/run` | Check now; 409 `unifi_not_configured` before UniFi is set up |
 | PATCH | `/api/v1/checkup/findings/{id}` | `{ "dismissed": true }` dismisses a problem or marks a note intended until what it is about changes; `false` shows it again |

@@ -1,14 +1,18 @@
 "use client";
 
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
-import { SYNC_COPY as COPY, syncLogRows, syncProblem, syncStats } from "@/lib/sync-copy";
+import { SYNC_COPY as COPY, syncLogRows, syncLogWhoLine, syncProblem, syncStats } from "@/lib/sync-copy";
 import type { SyncStatus } from "@/lib/types";
 
 import { SyncTiles } from "./SyncTiles";
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
+
+/** The log's width from which Who has its own column; narrower, it is a line under the action. */
+const WHO_COLUMN_AT = 560;
 
 /**
  * The Sync page below its header: why sync stopped and what to do when it could not reach the
@@ -33,6 +37,10 @@ export function SyncContent({
   const text = (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
   const card = { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") };
   const rows = syncLogRows(sync, timezone);
+  // The window's width until the log has measured itself, so a phone starts without the column.
+  const screen = useWindowDimensions();
+  const [logWidth, setLogWidth] = useState<number | null>(null);
+  const whoColumn = (logWidth ?? screen.width) >= WHO_COLUMN_AT;
   const problem = syncProblem(sync);
 
   return (
@@ -71,17 +79,19 @@ export function SyncContent({
         ))}
       </SyncTiles>
 
-      <View style={[styles.card, styles.log, card]} testID="sync-log">
+      <View style={[styles.card, styles.log, card]} testID="sync-log" onLayout={(event) => setLogWidth(event.nativeEvent.layout.width)}>
         <View style={[styles.row, styles.head, { backgroundColor: ui.color("field-soft") }]}>
           <Text style={[text(14, 21, "muted"), styles.when, styles.bold]}>{COPY.when}</Text>
           <Text style={[text(14, 21, "muted"), styles.action, styles.bold]}>{COPY.action}</Text>
+          {whoColumn ? <Text style={[text(14, 21, "muted"), styles.who, styles.bold]}>{COPY.who}</Text> : null}
           <Text style={[text(14, 21, "muted"), styles.result, styles.bold]}>{COPY.result}</Text>
         </View>
         {rows.length === 0 ? (
           <Text style={[text(14, 21, "muted"), styles.empty]}>{COPY.empty}</Text>
         ) : (
           rows.map((row) => (
-            <View key={row.key} style={[styles.row, styles.entry, { borderTopColor: ui.color("hairline") }]} testID={`sync-row-${row.key}`}>
+            <View key={row.key} style={[styles.entry, { borderTopColor: ui.color("hairline") }]} testID={`sync-row-${row.key}`}>
+              <View style={[styles.row, styles.entryRow]}>
               <Text style={[text(14, 21, "muted"), styles.when]}>{row.when}</Text>
               <View style={styles.action}>
                 <Text style={text(14, 21, "ink")}>{row.action}</Text>
@@ -89,7 +99,19 @@ export function SyncContent({
                   <Text style={[text(14, 20, tokenOf(row.detailInk)), styles.detail, row.detailMono && { fontFamily: MONO }]}>{row.detail}</Text>
                 ) : null}
               </View>
+              {whoColumn ? (
+                <View style={styles.who} testID={`sync-who-${row.key}`}>
+                  {row.who ? <Text style={text(14, 21, "ink")}>{row.who}</Text> : null}
+                  {row.whoDevice ? <Text style={[text(14, 20, "muted"), styles.detail]}>{row.whoDevice}</Text> : null}
+                </View>
+              ) : null}
               <Text style={[text(14, 21, tokenOf(row.resultInk)), styles.result, styles.bold]}>{row.result}</Text>
+              </View>
+              {!whoColumn && row.who ? (
+                <Text style={[text(14, 20, "muted"), styles.whoLine]} testID={`sync-who-${row.key}`}>
+                  {syncLogWhoLine(row)}
+                </Text>
+              ) : null}
             </View>
           ))
         )}
@@ -114,10 +136,15 @@ const styles = StyleSheet.create({
   log: { overflow: "hidden" },
   row: { flexDirection: "row", gap: 14, paddingHorizontal: 18 },
   head: { alignItems: "center", paddingVertical: 10 },
-  entry: { alignItems: "flex-start", paddingVertical: 12, borderTopWidth: 1 },
+  entry: { paddingVertical: 12, borderTopWidth: 1 },
+  entryRow: { alignItems: "flex-start" },
+  // Under the whole row where the log is too narrow for a Who column, so it never squeezes the action.
+  whoLine: { marginTop: 4, paddingHorizontal: 18 },
   // The web's grid columns minmax(92px, 128px) and minmax(80px, 96px): their widest unless the row is narrow.
   when: { flexBasis: 128, flexGrow: 0, flexShrink: 1, minWidth: 92 },
   action: { flex: 1, minWidth: 0 },
+  // Wide enough for "Siri and Shortcuts on" a device's name over two lines.
+  who: { flexBasis: 200, flexGrow: 0, flexShrink: 1, minWidth: 120 },
   result: { flexBasis: 96, flexGrow: 0, flexShrink: 1, minWidth: 80, textAlign: "right" },
   bold: { fontWeight: "600" },
   detail: { marginTop: 2 },
