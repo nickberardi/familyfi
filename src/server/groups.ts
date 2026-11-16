@@ -1,7 +1,15 @@
-import { FamilyRole, GroupKind, Prisma } from "@prisma/client";
+import { AssignmentState, FamilyRole, GroupKind, Prisma, RuleLiftKind } from "@prisma/client";
+import { mapLimited } from "@/lib/concurrency";
 import { internetState, isWindowActive, type InternetWindow } from "@/lib/rule-windows";
+import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
-import { builtInRule, ruleInternetWindows } from "./rules";
+import { enqueueChange } from "./changes";
+import { prisma } from "./db";
+import { loadHousehold } from "./household";
+import { ApiError } from "./http";
+import { builtInRule, joinCountriesRule, lockHousehold, ruleInternetWindows } from "./rules";
+import { clientForHousehold, connectionIdentity } from "./unifi/connection";
+import { GATEWAY_CONCURRENCY } from "./unifi/networks";
 
 export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
@@ -126,4 +134,110 @@ export function publicGroup(group: GroupWithRules, timezone: string, now = new D
     /** The rule the group's Block button blocks and unblocks; absent for all internet. */
     ...(blockButton ? { blockButtonRuleId: blockButton.id } : {}),
   };
+}
+
+function groupNotFound() {
+  return new ApiError(404, "not_found", "Group not found.");
+}
+
+export async function listGroups() {
+  const household = await loadHousehold();
+  const groups = await prisma().group.findMany({ include: groupInclude, orderBy: { createdAt: "asc" } });
+  return groups.map((group) => publicGroup(group, household.timezone));
+}
+
+export async function getGroup(id: string) {
+  const household = await loadHousehold();
+  const group = await prisma().group.findUnique({ where: { id }, include: groupInclude });
+  if (!group) throw groupNotFound();
+  return publicGroup(group, household.timezone);
+}
+
+export async function createGroup(input: { kind: GroupKind; name: string; monogram?: string; familyRole?: FamilyRole }) {
+  const household = await loadHousehold();
+  const created = await prisma().$transaction(async (tx) => {
+    // Serialized with other group creates and Block countries saves, so "covers every group" holds.
+    await lockHousehold(tx);
+    const group = await tx.group.create({ data: { kind: input.kind, name: input.name, monogram: input.monogram, familyRole: input.familyRole } });
+    await joinCountriesRule(tx, group.id);
+    return group;
+  });
+  const group = await prisma().group.findUniqueOrThrow({ where: { id: created.id }, include: groupInclude });
+  const change = await enqueueChange("group");
+  return { group: publicGroup(group, household.timezone), change };
+}
+
+/** A field left out stays as it is; `blockButtonRuleId` null puts the Block button back on all internet. */
+export async function updateGroup(
+  id: string,
+  input: { name?: string; monogram?: string | null; familyRole?: FamilyRole | null; blockButtonRuleId?: string | null },
+) {
+  const existing = await prisma().group.findUnique({ where: { id }, include: groupInclude });
+  if (!existing) throw groupNotFound();
+  const { blockButtonRuleId } = input;
+  if (blockButtonRuleId && !existing.rules.some((link) => link.rule.id === blockButtonRuleId && blockButtonCandidate(link.rule))) {
+    throw new ApiError(400, "invalid_block_button_rule", "The Block button can stand for one of this group's own category, app or website rules.");
+  }
+  const household = await loadHousehold();
+  const group = await prisma().group.update({
+    where: { id },
+    data: { name: input.name, monogram: input.monogram, familyRole: input.familyRole, blockButtonRuleId },
+    include: groupInclude,
+  });
+  const change = await enqueueChange("group");
+  return { group: publicGroup(group, household.timezone), change };
+}
+
+/**
+ * Deletes a group: its devices go to quarantine, and a rule that covered only this group goes with
+ * it, its gateway policies deleted here rather than left to the next sync pass.
+ */
+export async function deleteGroup(id: string) {
+  const existing = await prisma().group.findUnique({ where: { id } });
+  if (!existing) throw groupNotFound();
+  await prisma().device.updateMany({
+    where: { groupId: id },
+    data: { groupId: null, assignment: AssignmentState.quarantined },
+  });
+  // A rule that covered only this group goes with it. Delete its recorded UniFi
+  // policies before the Rule rows cascade (D3). Rules shared with other groups stay, and
+  // so do Lock DNS and Block countries: they are built in, and only lose the group.
+  const rules = await prisma().rule.findMany({
+    where: { scope: "group", id: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, groups: { some: { groupId: id }, every: { groupId: id } } },
+    include: { policies: true },
+  });
+  const household = await prisma().household.findUnique({ where: { id: "default" } });
+  if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
+    try {
+      const client = clientForHousehold(household);
+      const identity = connectionIdentity(household);
+      const siteId = household.unifiSiteId;
+      const ids = rules
+        .flatMap((rule) => rule.policies)
+        .filter((policy) => policy.connectionIdentity === identity && policy.siteId === siteId && policy.unifiPolicyId)
+        .map((policy) => policy.unifiPolicyId!);
+      // A few at a time, so a group with many rule windows does not hold the request for each in turn.
+      await mapLimited(ids, GATEWAY_CONCURRENCY, async (unifiPolicyId) => {
+        try {
+          await client.deletePolicy(siteId, unifiPolicyId);
+        } catch {
+          // Its applied creation record outlives the rule, so the next pass's orphan sweep deletes it.
+        }
+      });
+    } catch {
+      // Proceed with desired-state delete.
+    }
+  }
+  await prisma().rulePolicy.deleteMany({ where: { ruleId: { in: rules.map((r) => r.id) } } });
+  await prisma().rule.deleteMany({ where: { id: { in: rules.map((r) => r.id) } } });
+  await prisma().group.delete({ where: { id } });
+  // Block countries on with no group means every group, so it keeps going when the last group goes. While other
+  // groups are left it can't cover none of them, so it turns off, as it does when it loses its last network.
+  if (await prisma().group.count()) {
+    await prisma().rule.updateMany({
+      where: { id: COUNTRIES_RULE_ID, scope: "group", groups: { none: {} } },
+      data: { enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
+    });
+  }
+  return { change: await enqueueChange("group") };
 }

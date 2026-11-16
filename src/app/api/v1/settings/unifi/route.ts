@@ -1,10 +1,6 @@
 import { z } from "zod";
-import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
-import { jsonError } from "@/server/http";
-import { listSiteNetworks, publicUnifiSettings, saveManagedNetworks, saveUnifiConnection } from "@/server/unifi-settings";
-import { PreviousTargetError, UnifiConfigError } from "@/server/unifi/errors";
-import { demoLocked } from "@/server/demo";
+import { readBody, withMutation, withSession } from "@/server/guard";
+import { getUnifiSettings, updateUnifiSettings } from "@/server/unifi-settings";
 
 const UnifiBody = z
   .object({
@@ -28,58 +24,13 @@ const UnifiBody = z
   });
 
 export async function GET(request: Request) {
-  return withSession(request, async () => {
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    let networks: Awaited<ReturnType<typeof listSiteNetworks>> = [];
-    if (household.unifiKeyLastFour) {
-      try {
-        networks = await listSiteNetworks(household);
-      } catch {
-        networks = [];
-      }
-    }
-    return Response.json({ unifi: publicUnifiSettings(household, networks) });
-  });
+  return withSession(request, async () => Response.json({ unifi: await getUnifiSettings() }));
 }
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = UnifiBody.safeParse(body.value);
-    if (!parsed.success) {
-      return jsonError(400, "invalid_request", "Provide an API key and UniFi target, or a managed network selection.");
-    }
-    try {
-      const change = parsed.data.apiKey
-        ? await saveUnifiConnection({
-            apiKey: parsed.data.apiKey,
-            baseUrl: parsed.data.baseUrl,
-            consoleId: parsed.data.consoleId,
-            siteId: parsed.data.siteId,
-            tlsInsecure: parsed.data.tlsInsecure,
-            manageAllNetworks: parsed.data.manageAllNetworks,
-            managedNetworkIds: parsed.data.managedNetworkIds,
-            forgetPrevious: parsed.data.forgetPrevious,
-          })
-        : await saveManagedNetworks({
-            manageAllNetworks: parsed.data.manageAllNetworks,
-            managedNetworkIds: parsed.data.managedNetworkIds,
-          });
-      const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-      let networks: Awaited<ReturnType<typeof listSiteNetworks>> = [];
-      try {
-        networks = await listSiteNetworks(household);
-      } catch {
-        networks = [];
-      }
-      return Response.json({ unifi: publicUnifiSettings(household, networks), change });
-    } catch (error) {
-      if (error instanceof PreviousTargetError) return jsonError(409, "previous_gateway_unreachable", error.message);
-      const message = error instanceof UnifiConfigError || error instanceof Error ? error.message : "UniFi probe failed.";
-      return jsonError(400, "unifi_invalid", message);
-    }
-  });
+    const parsed = await readBody(request, UnifiBody, "Provide an API key and UniFi target, or a managed network selection.");
+    if (!parsed.ok) return parsed.response;
+    return Response.json(await updateUnifiSettings(parsed.data));
+  }, { demoLock: true });
 }

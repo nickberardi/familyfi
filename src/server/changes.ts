@@ -1,6 +1,7 @@
 import { ChangeStatus } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { prisma } from "./db";
+import { ApiError } from "./http";
 
 type ChangeActor = { accountId: string | null; deviceId: string | null };
 const changeActor = new AsyncLocalStorage<ChangeActor>();
@@ -60,4 +61,10 @@ export function publicChange(change: {
     error: change.error,
     updatedAt: change.updatedAt.toISOString(),
   };
+}
+
+export async function getChange(id: string) {
+  const change = await prisma().changeResult.findUnique({ where: { id } });
+  if (!change) throw new ApiError(404, "not_found", "Change not found.");
+  return publicChange(change);
 }

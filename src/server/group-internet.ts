@@ -3,8 +3,8 @@ import { extendSuspensionUntil } from "@/lib/schedule";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, internetLinks, lifted, publicGroup, sessionActor } from "./groups";
-import { jsonError } from "./http";
-import { CLEARED, readLiftBody, type LiftAction } from "./rule-lifts";
+import { ApiError } from "./http";
+import { CLEARED, liftRule, type LiftAction, type LiftBody } from "./rule-lifts";
 import { activeWindowsEnd, ruleInternetWindows } from "./rules";
 import { pauseRuleName } from "./unifi/names";
 
@@ -19,20 +19,16 @@ const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: nul
  * the rule's polarity differs. Pausing "has internet" blocks all internet, through the
  * group's hidden always-on block rule, enabled until `until` or until resumed. Allowing
  * overrides the group's own internet rules, one lift each. Pause and allow replace each
- * other. Returns `{ group, change }`.
+ * other. `body` is what `readLiftBody` read.
  */
-export async function runGroupInternet(
-  request: Request,
+export async function liftGroupInternet(
   session: Parameters<typeof sessionActor>[0],
   action: LiftAction,
   groupId: string,
-): Promise<Response> {
-  const read = await readLiftBody(request, action);
-  if (!read.ok) return read.response;
-  const body = read.body as { until?: string | null; minutes?: number };
-
+  body: LiftBody,
+) {
   const existing = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
-  if (!existing) return jsonError(404, "not_found", "Group not found.");
+  if (!existing) throw new ApiError(404, "not_found", "Group not found.");
   const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
   const now = new Date();
   const actor = sessionActor(session);
@@ -42,14 +38,14 @@ export async function runGroupInternet(
   const clearAllowances = () =>
     prisma().ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
 
-  const until = (requested: string | null | undefined): Date | null | Response => {
+  const until = (requested: string | null | undefined): Date | null => {
     const value = requested ? new Date(requested) : null;
-    return value && value.getTime() <= now.getTime() ? jsonError(400, "invalid_request", "until must be in the future.") : value;
+    if (value && value.getTime() <= now.getTime()) throw new ApiError(400, "invalid_request", "until must be in the future.");
+    return value;
   };
 
   if (action === "pause") {
     const end = until(body.until);
-    if (end instanceof Response) return end;
     const fields = { enabled: true, expiresAt: end, blockedByAccountId: actor.accountId, blockedByName: actor.name };
     await prisma().$transaction(async (tx) => {
       const data = { ...fields, name: pauseRuleName(existing) };
@@ -71,15 +67,14 @@ export async function runGroupInternet(
   } else if (action === "resume") {
     await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
   } else if (action === "extend") {
-    if (!block || !blocking) return jsonError(409, "not_paused", "Extend requires an active pause.");
-    if (!block.expiresAt) return jsonError(409, "indefinite", "An indefinite pause has no expiry to extend.");
+    if (!block || !blocking) throw new ApiError(409, "not_paused", "Extend requires an active pause.");
+    if (!block.expiresAt) throw new ApiError(409, "indefinite", "An indefinite pause has no expiry to extend.");
     await prisma().rule.update({
       where: { id: block.id },
       data: { expiresAt: extendSuspensionUntil(block.expiresAt, now, body.minutes! * 60_000) },
     });
   } else if (action === "allow") {
     const requested = until(body.until);
-    if (requested instanceof Response) return requested;
     // A rule already paused, or paused for this group, is not blocking it. One this group is
     // already allowed is included, so an allowance can be given a new time.
     const rules = internetLinks(existing).filter(
@@ -90,7 +85,7 @@ export async function runGroupInternet(
     );
     // By default each rule is lifted until its own active windows end; only those blocking now.
     const targets = rules.filter(({ rule }) => body.until !== undefined || ends.get(rule.id) !== undefined);
-    if (targets.length === 0 && body.until === undefined) return jsonError(409, "not_in_window", "No internet rule is blocking this group now.");
+    if (targets.length === 0 && body.until === undefined) throw new ApiError(409, "not_in_window", "No internet rule is blocking this group now.");
     await prisma().$transaction(async (tx) => {
       for (const { rule } of targets) {
         await tx.ruleGroup.update({
@@ -113,5 +108,16 @@ export async function runGroupInternet(
 
   const fresh = await prisma().group.findUniqueOrThrow({ where: { id: groupId }, include: groupInclude });
   const change = await enqueueChange(action === "disallow" ? "allow" : action);
-  return Response.json({ group: publicGroup(fresh, household.timezone, now), change });
+  return { group: publicGroup(fresh, household.timezone, now), change };
+}
+
+/** A verb on one of a group's rules, for that group alone: on `internet`, the group's own pause or allowance. */
+export async function liftGroupRule(
+  session: Parameters<typeof liftRule>[0],
+  action: LiftAction,
+  target: { groupId: string; ruleId: string },
+  body: LiftBody,
+) {
+  if (target.ruleId === INTERNET_RULE_ID) return liftGroupInternet(session, action, target.groupId, body);
+  return liftRule(session, action, target, body);
 }

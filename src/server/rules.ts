@@ -19,7 +19,9 @@ import {
 } from "@/lib/rules";
 import type { InternetWindow } from "@/lib/rule-windows";
 import { assertSchedule } from "@/lib/schedule";
+import { enqueueChange } from "./changes";
 import { prisma } from "./db";
+import { ApiError } from "./http";
 import { quarantinePolicyName } from "./unifi/names";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
 
@@ -565,4 +567,62 @@ export async function householdNetworkScope(): Promise<{ scope: NetworkScope; kn
   // A rule names networks as they are on the console now, not as the last reconcile pass listed them.
   const networks = await listSiteNetworks(household, { fresh: true });
   return { scope, known: new Set(networks.map((network) => network.id)) };
+}
+
+export function ruleNotFound() {
+  return new ApiError(404, "not_found", "Rule not found.");
+}
+
+/** Runs a rule write, turning a RuleInputError into the refusal the API answers with. */
+export async function refusingRuleInput<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof RuleInputError) throw new ApiError(error.status, error.code, error.message);
+    throw error;
+  }
+}
+
+/** Every rule, or one group's, built-in rules first. A group's hidden pause rule is never listed. */
+export async function listRules(groupId?: string) {
+  const rules = await prisma().rule.findMany({
+    where: { systemGroupId: null, ...(groupId ? { scope: RuleScope.group, groups: { some: { groupId } } } : {}) },
+    include: ruleInclude,
+    orderBy: [{ scope: "asc" }, { createdAt: "asc" }],
+  });
+  // The built-in rules lead: quarantine, which covers no group so a group's list leaves it out, then
+  // Lock DNS, then Block countries.
+  const lead = (id: string) => (id === QUARANTINE_RULE_ID ? 3 : id === LOCK_DNS_RULE_ID ? 2 : id === COUNTRIES_RULE_ID ? 1 : 0);
+  rules.sort((a, b) => lead(b.id) - lead(a.id));
+  return presentRules(rules);
+}
+
+export async function getRule(id: string) {
+  const rule = await prisma().rule.findUnique({ where: { id }, include: ruleInclude });
+  if (!rule || rule.systemGroupId) throw ruleNotFound();
+  return presentRule(rule);
+}
+
+export async function createRule(body: z.infer<typeof RuleCreateBody>) {
+  return refusingRuleInput(async () => {
+    const input = await validateRule(
+      {
+        name: body.name,
+        kind: body.kind as RuleKind,
+        scope: (body.scope ?? "group") as RuleScope,
+        groupIds: body.groupIds ?? [],
+        networkIds: body.networkIds ?? [],
+        targetIds: body.targetIds ?? [],
+        domains: body.domains ?? [],
+        enabled: body.enabled ?? true,
+        mode: body.mode as RuleMode,
+        windows: (body.windows ?? []).map((window) => ({ ...window, id: undefined, name: window.name ?? "" })),
+        useGeneratedName: body.useGeneratedName ?? false,
+      },
+      householdNetworkScope,
+    );
+    const rule = await saveRule(input);
+    const change = await enqueueChange("rule");
+    return { rule: await presentRule(rule), change };
+  });
 }

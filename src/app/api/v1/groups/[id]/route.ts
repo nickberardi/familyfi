@@ -1,15 +1,6 @@
-import { FamilyRole } from "@prisma/client";
 import { z } from "zod";
-import { AssignmentState, RuleLiftKind } from "@prisma/client";
-import { enqueueChange } from "@/server/changes";
-import { blockButtonCandidate, groupInclude, publicGroup } from "@/server/groups";
-import { prisma } from "@/server/db";
-import { readJson, withMutation, withSession } from "@/server/guard";
-import { jsonError } from "@/server/http";
-import { mapLimited } from "@/lib/concurrency";
-import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
-import { GATEWAY_CONCURRENCY } from "@/server/unifi/networks";
-import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
+import { deleteGroup, getGroup, updateGroup } from "@/server/groups";
+import { readBody, withMutation, withSession } from "@/server/guard";
 
 const Update = z.object({
   name: z.string().min(1).optional(),
@@ -24,95 +15,23 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {
     const { id } = await ctx.params;
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    const group = await prisma().group.findUnique({
-      where: { id },
-      include: groupInclude,
-    });
-    if (!group) return jsonError(404, "not_found", "Group not found.");
-    return Response.json({ group: publicGroup(group, household.timezone) });
+    return Response.json({ group: await getGroup(id) });
   });
 }
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Update.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Invalid group update.");
-    const existing = await prisma().group.findUnique({ where: { id }, include: groupInclude });
-    if (!existing) return jsonError(404, "not_found", "Group not found.");
-    const { blockButtonRuleId } = parsed.data;
-    if (blockButtonRuleId && !existing.rules.some((link) => link.rule.id === blockButtonRuleId && blockButtonCandidate(link.rule))) {
-      return jsonError(400, "invalid_block_button_rule", "The Block button can stand for one of this group's own category, app or website rules.");
-    }
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    const group = await prisma().group.update({
-      where: { id },
-      data: {
-        name: parsed.data.name,
-        monogram: parsed.data.monogram === undefined ? undefined : parsed.data.monogram,
-        familyRole: parsed.data.familyRole === undefined ? undefined : (parsed.data.familyRole as FamilyRole | null),
-        blockButtonRuleId,
-      },
-      include: groupInclude,
-    });
-    const change = await enqueueChange("group");
-    return Response.json({ group: publicGroup(group, household.timezone), change });
+    const parsed = await readBody(request, Update, "Invalid group update.");
+    if (!parsed.ok) return parsed.response;
+    return Response.json(await updateGroup(id, parsed.data));
   });
 }
 
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
     const { id } = await ctx.params;
-    const existing = await prisma().group.findUnique({ where: { id } });
-    if (!existing) return jsonError(404, "not_found", "Group not found.");
-    await prisma().device.updateMany({
-      where: { groupId: id },
-      data: { groupId: null, assignment: AssignmentState.quarantined },
-    });
-    // A rule that covered only this group goes with it. Delete its recorded UniFi
-    // policies before the Rule rows cascade (D3). Rules shared with other groups stay, and
-    // so do Lock DNS and Block countries: they are built in, and only lose the group.
-    const rules = await prisma().rule.findMany({
-      where: { scope: "group", id: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, groups: { some: { groupId: id }, every: { groupId: id } } },
-      include: { policies: true },
-    });
-    const household = await prisma().household.findUnique({ where: { id: "default" } });
-    if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
-      try {
-        const client = clientForHousehold(household);
-        const identity = connectionIdentity(household);
-        const siteId = household.unifiSiteId;
-        const ids = rules
-          .flatMap((rule) => rule.policies)
-          .filter((policy) => policy.connectionIdentity === identity && policy.siteId === siteId && policy.unifiPolicyId)
-          .map((policy) => policy.unifiPolicyId!);
-        // A few at a time, so a group with many rule windows does not hold the request for each in turn.
-        await mapLimited(ids, GATEWAY_CONCURRENCY, async (unifiPolicyId) => {
-          try {
-            await client.deletePolicy(siteId, unifiPolicyId);
-          } catch {
-            // Its applied creation record outlives the rule, so the next pass's orphan sweep deletes it.
-          }
-        });
-      } catch {
-        // Proceed with desired-state delete.
-      }
-    }
-    await prisma().rulePolicy.deleteMany({ where: { ruleId: { in: rules.map((r) => r.id) } } });
-    await prisma().rule.deleteMany({ where: { id: { in: rules.map((r) => r.id) } } });
-    await prisma().group.delete({ where: { id } });
-    // Block countries on with no group means every group, so it keeps going when the last group goes. While other
-    // groups are left it can't cover none of them, so it turns off, as it does when it loses its last network.
-    if (await prisma().group.count()) {
-      await prisma().rule.updateMany({
-        where: { id: COUNTRIES_RULE_ID, scope: "group", groups: { none: {} } },
-        data: { enabled: false, pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
-      });
-    }
-    const change = await enqueueChange("group");
+    const { change } = await deleteGroup(id);
     return Response.json({ ok: true, change });
   });
 }

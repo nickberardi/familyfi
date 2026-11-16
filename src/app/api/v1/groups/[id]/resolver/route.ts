@@ -1,105 +1,30 @@
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/server/db";
-import { groupInclude, publicGroup } from "@/server/groups";
-import { readJson, withMutation, withSession } from "@/server/guard";
-import { jsonError } from "@/server/http";
-import { ResolverConfigError, normalizeResolverUrl } from "@/server/upstream/resolver-settings";
-import { withUpstreamLock } from "@/server/upstream/transaction";
-import { refreshResolverContexts } from "@/server/upstream/discovery";
-import { demoLocked } from "@/server/demo";
+import { readBody, withMutation, withSession } from "@/server/guard";
+import { clearGroupResolver, getGroupResolver, setGroupResolver } from "@/server/upstream/group-resolver";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/**
- * A group's own DNS-over-HTTPS endpoint — "Own endpoint" in the web's Edit sheet, "Override for this group" in the app.
- *
- * Reporting only, like everything upstream: this changes which resolver FamilyFi
- * *asks about* this group, never what reaches its devices. Pointing the devices
- * themselves at that resolver is a DHCP or client-side job, outside this app.
- *
- * No `enqueueChange`: nothing here reaches UniFi.
- */
 const Body = z.object({ url: z.string().min(1) });
 
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async () => {
     const { id } = await ctx.params;
-    const group = await prisma().group.findUnique({ where: { id }, select: { id: true } });
-    if (!group) return jsonError(404, "not_found", "Group not found.");
-    const contexts = await refreshResolverContexts();
-    const context = contexts.groups.get(id)!;
-    return Response.json({ resolver: {
-      configured: context.source !== "unknown" && !context.reason,
-      source: context.source, url: context.url, networks: context.networks, reason: context.reason,
-    } });
+    return Response.json({ resolver: await getGroupResolver(id) });
   });
 }
 
 export async function PUT(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await ctx.params;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Paste the endpoint URL.");
-
-    let url: string;
-    try {
-      url = normalizeResolverUrl(parsed.data.url);
-    } catch (error) {
-      if (error instanceof ResolverConfigError) {
-        return jsonError(400, "invalid_resolver", error.message);
-      }
-      throw error;
-    }
-
-    const existing = await prisma().group.findUnique({ where: { id }, select: { id: true } });
-    if (!existing) return jsonError(404, "not_found", "Group not found.");
-
-    const household = await prisma().household.findUnique({
-      where: { id: "default" },
-      select: { timezone: true },
-    });
-    const group = await withUpstreamLock(async (tx) => {
-      const current = await tx.group.findUniqueOrThrow({ where: { id } });
-      if (current.dohOverrideUrl !== url) {
-        await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
-      }
-      return tx.group.update({ where: { id }, include: groupInclude, data: {
-        dohOverrideUrl: url,
-        ...(current.dohOverrideUrl !== url ? { upstreamResolverSnapshot: Prisma.DbNull } : {}),
-      } });
-    });
-    await refreshResolverContexts();
-    return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
-  });
+    const parsed = await readBody(request, Body, "Paste the endpoint URL.");
+    if (!parsed.ok) return parsed.response;
+    return Response.json({ group: await setGroupResolver(id, parsed.data.url) });
+  }, { demoLock: true });
 }
 
-/**
- * Back to the household default. The group's own verdicts are dropped with it — they
- * describe an endpoint this group no longer uses, and keeping them would report a
- * stale answer on its card until the next sweep.
- */
 export async function DELETE(request: Request, ctx: Ctx) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
     const { id } = await ctx.params;
-    const existing = await prisma().group.findUnique({ where: { id }, select: { id: true } });
-    if (!existing) return jsonError(404, "not_found", "Group not found.");
-
-    const household = await prisma().household.findUnique({
-      where: { id: "default" },
-      select: { timezone: true },
-    });
-    const group = await withUpstreamLock(async (tx) => {
-      await tx.upstreamCheck.deleteMany({ where: { groupId: id } });
-      return tx.group.update({ where: { id }, include: groupInclude, data: { dohOverrideUrl: null, upstreamResolverSnapshot: Prisma.DbNull } });
-    });
-    await refreshResolverContexts();
-    return Response.json({ group: publicGroup(group, household?.timezone ?? "UTC") });
-  });
+    return Response.json({ group: await clearGroupResolver(id) });
+  }, { demoLock: true });
 }

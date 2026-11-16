@@ -361,6 +361,11 @@
         "repository"
       ]
     },
+    "tests/unit/route-boundary.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
     "tests/unit/rules.test.ts": {
       "categories": [
         "rules"
@@ -619,6 +624,11 @@
         "groups"
       ]
     },
+    "tests/integration/route-responses.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
     "tests/integration/rules-api.test.ts": {
       "categories": [
         "rules",
@@ -629,6 +639,11 @@
     "tests/integration/edge-auth.test.ts": {
       "categories": [
         "trust"
+      ]
+    },
+    "tests/integration/guard.test.ts": {
+      "categories": [
+        "sessions"
       ]
     },
     "tests/integration/group-detail-api.test.ts": {

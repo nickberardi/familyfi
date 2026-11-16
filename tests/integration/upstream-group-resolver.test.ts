@@ -1,52 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { UpstreamVerdict } from "@prisma/client";
-import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as listGroups } from "@/app/api/v1/groups/route";
-import {
-  GET as getResolver,
-  DELETE as clearResolver,
-  PUT as setResolver,
-} from "@/app/api/v1/groups/[id]/resolver/route";
+import { PUT as setResolverRoute } from "@/app/api/v1/groups/[id]/resolver/route";
 import { prisma } from "@/server/db";
+import { listGroups } from "@/server/groups";
+import { clearGroupResolver, getGroupResolver, setGroupResolver } from "@/server/upstream/group-resolver";
 import { ensureUpstreamCategories } from "@/server/upstream-seed";
 import { effectiveCheck, type UpstreamCheckRow } from "@/lib/upstream";
-import { authFromLogin, request } from "../helpers/http";
+import { request } from "../helpers/http";
 import { createFamilyGroup, resetDatabase } from "../helpers/db";
+import { refusal } from "../helpers/refusal";
 
-const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 const STRICT_URL = "https://strict.example.com/dns-query/kids";
-
-async function signedIn() {
-  const response = await login(
-    request("/api/v1/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "admin", password: PASSWORD, client: "browser" }),
-    }),
-  );
-  expect(response.status).toBe(200);
-  return authFromLogin(response);
-}
-
-type PublicGroup = { id: string; name: string; dohOverrideUrl: string | null };
-
-async function groups(auth: Awaited<ReturnType<typeof signedIn>>) {
-  const response = await listGroups(request("/api/v1/groups", { auth }));
-  expect(response.status).toBe(200);
-  return ((await response.json()) as { groups: PublicGroup[] }).groups;
-}
-
-function put(auth: Awaited<ReturnType<typeof signedIn>>, id: string, body: unknown) {
-  return setResolver(
-    request(`/api/v1/groups/${id}/resolver`, {
-      method: "PUT",
-      auth,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-    { params: Promise.resolve({ id }) },
-  );
-}
 
 describe("group resolver override", () => {
   beforeEach(async () => {
@@ -59,25 +23,16 @@ describe("group resolver override", () => {
   });
 
   it("sets and clears an override, and reports it on the group", async () => {
-    const auth = await signedIn();
     const betsy = await createFamilyGroup("Betsy");
 
-    expect((await groups(auth)).find((g) => g.id === betsy.id)?.dohOverrideUrl).toBeNull();
+    expect((await listGroups()).find((g) => g.id === betsy.id)?.dohOverrideUrl).toBeNull();
 
-    const saved = await put(auth, betsy.id, { url: STRICT_URL });
-    expect(saved.status).toBe(200);
-    expect((await groups(auth)).find((g) => g.id === betsy.id)?.dohOverrideUrl).toBe(STRICT_URL);
-    const effective = await getResolver(request(`/api/v1/groups/${betsy.id}/resolver`, { auth }),
-      { params: Promise.resolve({ id: betsy.id }) });
-    expect(effective.status).toBe(200);
-    expect((await effective.json()).resolver).toMatchObject({ source: "doh", url: STRICT_URL, networks: [] });
+    expect((await setGroupResolver(betsy.id, STRICT_URL)).dohOverrideUrl).toBe(STRICT_URL);
+    expect((await listGroups()).find((g) => g.id === betsy.id)?.dohOverrideUrl).toBe(STRICT_URL);
+    expect(await getGroupResolver(betsy.id)).toMatchObject({ source: "doh", url: STRICT_URL, networks: [] });
 
-    const cleared = await clearResolver(
-      request(`/api/v1/groups/${betsy.id}/resolver`, { method: "DELETE", auth }),
-      { params: Promise.resolve({ id: betsy.id }) },
-    );
-    expect(cleared.status).toBe(200);
-    expect((await groups(auth)).find((g) => g.id === betsy.id)?.dohOverrideUrl).toBeNull();
+    expect((await clearGroupResolver(betsy.id)).dohOverrideUrl).toBeNull();
+    expect((await listGroups()).find((g) => g.id === betsy.id)?.dohOverrideUrl).toBeNull();
   });
 
   /**
@@ -85,9 +40,8 @@ describe("group resolver override", () => {
    * verdict: the card would keep showing it, confidently, until the next sweep.
    */
   it("drops the group's own verdicts when the override is removed", async () => {
-    const auth = await signedIn();
     const betsy = await createFamilyGroup("Betsy");
-    await put(auth, betsy.id, { url: STRICT_URL });
+    await setGroupResolver(betsy.id, STRICT_URL);
     const category = await prisma().upstreamCategory.findUniqueOrThrow({ where: { slug: "adult" } });
     await prisma().upstreamCheck.createMany({
       data: [
@@ -112,9 +66,7 @@ describe("group resolver override", () => {
       ],
     });
 
-    await clearResolver(request(`/api/v1/groups/${betsy.id}/resolver`, { method: "DELETE", auth }), {
-      params: Promise.resolve({ id: betsy.id }),
-    });
+    await clearGroupResolver(betsy.id);
 
     expect(await prisma().upstreamCheck.count({ where: { groupId: betsy.id } })).toBe(0);
     // The household row is untouched, and Betsy now reads it.
@@ -125,10 +77,9 @@ describe("group resolver override", () => {
   });
 
   it("resolves each card against its own endpoint", async () => {
-    const auth = await signedIn();
     const betsy = await createFamilyGroup("Betsy");
     const nick = await createFamilyGroup("Nick");
-    await put(auth, betsy.id, { url: STRICT_URL });
+    await setGroupResolver(betsy.id, STRICT_URL);
     const category = await prisma().upstreamCategory.findUniqueOrThrow({ where: { slug: "adult" } });
     await prisma().upstreamCheck.createMany({
       data: [
@@ -164,7 +115,7 @@ describe("group resolver override", () => {
         results: [],
       }),
     );
-    const all = await groups(auth);
+    const all = await listGroups();
     const betsyCard = all.find((g) => g.id === betsy.id)!;
     const nickCard = all.find((g) => g.id === nick.id)!;
 
@@ -174,19 +125,19 @@ describe("group resolver override", () => {
   });
 
   it("rejects a non-https endpoint and an unknown group", async () => {
-    const auth = await signedIn();
     const betsy = await createFamilyGroup("Betsy");
 
-    const plain = await put(auth, betsy.id, { url: "http://dns.example.com/dns-query" });
-    expect(plain.status).toBe(400);
-    expect((await plain.json()).error.code).toBe("invalid_resolver");
-
-    const missing = await put(auth, "nope", { url: STRICT_URL });
-    expect(missing.status).toBe(404);
+    expect(await refusal(setGroupResolver(betsy.id, "http://dns.example.com/dns-query"))).toEqual([400, "invalid_resolver"]);
+    expect(await refusal(setGroupResolver("nope", STRICT_URL))).toEqual([404, "not_found"]);
+    expect(await refusal(getGroupResolver("nope"))).toEqual([404, "not_found"]);
+    expect(await refusal(clearGroupResolver("nope"))).toEqual([404, "not_found"]);
   });
+});
 
+/** What only the route decides: who may call it. */
+describe("PUT /api/v1/groups/{id}/resolver", () => {
   it("requires a session", async () => {
-    const response = await setResolver(
+    const response = await setResolverRoute(
       request("/api/v1/groups/whatever/resolver", {
         method: "PUT",
         headers: { "content-type": "application/json" },

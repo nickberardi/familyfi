@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as listChecks } from "@/app/api/v1/upstream/checks/route";
-import { POST as runChecks } from "@/app/api/v1/upstream/checks/run/route";
-import { POST as checkCategory } from "@/app/api/v1/upstream/categories/[id]/check/route";
+import { GET as listChecksRoute } from "@/app/api/v1/upstream/checks/route";
+import { POST as runChecksRoute } from "@/app/api/v1/upstream/checks/run/route";
+import { POST as checkCategoryRoute } from "@/app/api/v1/upstream/categories/[id]/check/route";
 import { prisma } from "@/server/db";
+import { checkUpstreamCategory, listUpstreamChecks, runUpstreamChecks } from "@/server/upstream/categories";
+import { answered } from "../helpers/answered";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
 import { resetDatabase } from "../helpers/db";
 
@@ -21,6 +23,10 @@ async function signedIn(): Promise<SessionAuth> {
   expect(response.status).toBe(200);
   return authFromLogin(response);
 }
+
+const listChecks = () => answered("GET /api/v1/upstream/checks", async () => ({ checks: await listUpstreamChecks() }));
+const runChecks = () => answered("POST /api/v1/upstream/checks/run", async () => ({ outcomes: await runUpstreamChecks() }));
+const checkCategory = (id: string) => answered("POST /api/v1/upstream/categories/{id}/check", async () => ({ category: await checkUpstreamCategory(id) }));
 
 async function seedCategory(domains: string[]) {
   return prisma().upstreamCategory.create({
@@ -79,40 +85,34 @@ describe("upstream check routes", () => {
 
   it("need a session, and the two that run a probe also need the CSRF header", async () => {
     const category = await seedCategory(["one.example"]);
-    expect((await listChecks(request("/api/v1/upstream/checks"))).status).toBe(401);
-    expect((await runChecks(request("/api/v1/upstream/checks/run", { method: "POST" }))).status).toBe(401);
+    expect((await listChecksRoute(request("/api/v1/upstream/checks"))).status).toBe(401);
+    expect((await runChecksRoute(request("/api/v1/upstream/checks/run", { method: "POST" }))).status).toBe(401);
     const checkPath = `/api/v1/upstream/categories/${category.id}/check`;
-    expect((await checkCategory(request(checkPath, { method: "POST" }), categoryCtx(category.id))).status).toBe(401);
+    expect((await checkCategoryRoute(request(checkPath, { method: "POST" }), categoryCtx(category.id))).status).toBe(401);
 
     const withoutCsrf = { headers: { cookie: auth.cookie }, method: "POST" };
-    expect((await runChecks(request("/api/v1/upstream/checks/run", withoutCsrf))).status).toBe(403);
-    expect((await checkCategory(request(checkPath, withoutCsrf), categoryCtx(category.id))).status).toBe(403);
+    expect((await runChecksRoute(request("/api/v1/upstream/checks/run", withoutCsrf))).status).toBe(403);
+    expect((await checkCategoryRoute(request(checkPath, withoutCsrf), categoryCtx(category.id))).status).toBe(403);
     expect(await prisma().upstreamCheck.count()).toBe(0);
   });
 
   it("reports an unknown category as not found", async () => {
-    const response = await checkCategory(
-      request("/api/v1/upstream/categories/missing/check", { method: "POST", auth }),
-      categoryCtx("missing"),
-    );
+    const response = await checkCategory("missing");
     expect(response.status).toBe(404);
   });
 
   it("records unknown, never open, when no resolver is set", async () => {
     const category = await seedCategory(["one.example", "two.example"]);
-    const checked = await checkCategory(
-      request(`/api/v1/upstream/categories/${category.id}/check`, { method: "POST", auth }),
-      categoryCtx(category.id),
-    );
+    const checked = await checkCategory(category.id);
     expect(checked.status).toBe(200);
     const { category: body } = (await checked.json()) as { category: { checks: { verdict: string }[] } };
     expect(body.checks.map((check) => check.verdict)).toEqual(["unknown"]);
 
-    const run = await runChecks(request("/api/v1/upstream/checks/run", { method: "POST", auth }));
+    const run = await runChecks();
     const { outcomes } = (await run.json()) as { outcomes: { verdict: string }[] };
     expect(outcomes.map((outcome) => outcome.verdict)).toEqual(["unknown"]);
 
-    const listed = (await (await listChecks(request("/api/v1/upstream/checks", { auth }))).json()) as {
+    const listed = (await (await listChecks()).json()) as {
       checks: { slug: string; verdict: string }[];
     };
     expect(listed.checks).toEqual([expect.objectContaining({ slug: "test-category", verdict: "unknown" })]);
@@ -124,10 +124,7 @@ describe("upstream check routes", () => {
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new TypeError("fetch failed");
     }));
-    const checked = await checkCategory(
-      request(`/api/v1/upstream/categories/${category.id}/check`, { method: "POST", auth }),
-      categoryCtx(category.id),
-    );
+    const checked = await checkCategory(category.id);
     const { category: body } = (await checked.json()) as { category: { checks: { verdict: string }[] } };
     expect(body.checks.map((check) => check.verdict)).toEqual(["unknown"]);
   });
@@ -137,10 +134,7 @@ describe("upstream check routes", () => {
     await prisma().household.update({ where: { id: "default" }, data: { dohUrl: RESOLVER } });
     const resolver = stubResolver(new Set(["blocked.example"]));
 
-    const checked = await checkCategory(
-      request(`/api/v1/upstream/categories/${category.id}/check`, { method: "POST", auth }),
-      categoryCtx(category.id),
-    );
+    const checked = await checkCategory(category.id);
     expect(checked.status).toBe(200);
     const { category: body } = (await checked.json()) as {
       category: { checks: { verdict: string; blockedCount: number; totalCount: number }[] };
@@ -148,13 +142,13 @@ describe("upstream check routes", () => {
     expect(body.checks).toEqual([expect.objectContaining({ verdict: "partial", blockedCount: 1, totalCount: 2 })]);
     expect(resolver.asked).toEqual(expect.arrayContaining(["blocked.example", "open.example"]));
 
-    const run = await runChecks(request("/api/v1/upstream/checks/run", { method: "POST", auth }));
+    const run = await runChecks();
     expect(run.status).toBe(200);
     expect(((await run.json()) as { outcomes: unknown[] }).outcomes).toEqual([
       { categoryId: category.id, slug: "test-category", verdict: "partial", blockedCount: 1, totalCount: 2 },
     ]);
 
-    const listed = (await (await listChecks(request("/api/v1/upstream/checks", { auth }))).json()) as {
+    const listed = (await (await listChecks()).json()) as {
       checks: { categoryId: string; verdict: string }[];
     };
     expect(listed.checks).toEqual([expect.objectContaining({ categoryId: category.id, verdict: "partial" })]);
@@ -163,7 +157,7 @@ describe("upstream check routes", () => {
   it("leaves a disabled category's last result alone on a full run", async () => {
     const category = await seedCategory(["one.example"]);
     await prisma().upstreamCategory.update({ where: { id: category.id }, data: { enabled: false } });
-    const run = await runChecks(request("/api/v1/upstream/checks/run", { method: "POST", auth }));
+    const run = await runChecks();
     expect(((await run.json()) as { outcomes: unknown[] }).outcomes).toEqual([]);
     expect(await prisma().upstreamCheck.count()).toBe(0);
   });

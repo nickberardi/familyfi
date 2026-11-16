@@ -4,6 +4,7 @@ import { unifiMockEnabled } from "./env";
 import { PreviousTargetError, UnifiConfigError, UnifiHttpError } from "./unifi/errors";
 import { clientForHousehold, connectionIdentity, probeClient } from "./unifi/connection";
 import { enqueueChange } from "./changes";
+import { ApiError } from "./http";
 import { pruneNetworkScopedRulesForScope } from "./network-rules";
 import { publicUnifiNetwork, resolveNetworkScope, type NetworkScope, type PublicUnifiNetwork } from "./unifi/scope";
 import { loadNetworkDetails } from "./unifi/networks";
@@ -264,4 +265,62 @@ export function publicUnifiSettings(
     connectionStatus: household.connectionStatus,
     connectionError: household.connectionError,
   };
+}
+
+/** The saved household row with its site's networks; a console that cannot be reached lists none. */
+async function settingsWithNetworks(always: boolean) {
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  let networks: PublicUnifiNetwork[] = [];
+  if (always || household.unifiKeyLastFour) {
+    try {
+      networks = await listSiteNetworks(household);
+    } catch {
+      networks = [];
+    }
+  }
+  return publicUnifiSettings(household, networks);
+}
+
+function unifiInvalid(error: unknown) {
+  const message = error instanceof UnifiConfigError || error instanceof Error ? error.message : "UniFi probe failed.";
+  return new ApiError(400, "unifi_invalid", message);
+}
+
+export async function getUnifiSettings() {
+  return settingsWithNetworks(false);
+}
+
+/** Saves a new connection when an API key is sent, otherwise the managed network selection. Whatever fails is the caller's 400. */
+export async function updateUnifiSettings(
+  input: Partial<Parameters<typeof saveUnifiConnection>[0]> & Parameters<typeof saveManagedNetworks>[0],
+) {
+  try {
+    const change = input.apiKey
+      ? await saveUnifiConnection({
+          apiKey: input.apiKey,
+          baseUrl: input.baseUrl,
+          consoleId: input.consoleId,
+          siteId: input.siteId,
+          tlsInsecure: input.tlsInsecure,
+          manageAllNetworks: input.manageAllNetworks,
+          managedNetworkIds: input.managedNetworkIds,
+          forgetPrevious: input.forgetPrevious,
+        })
+      : await saveManagedNetworks({ manageAllNetworks: input.manageAllNetworks, managedNetworkIds: input.managedNetworkIds });
+    return { unifi: await settingsWithNetworks(true), change };
+  } catch (error) {
+    if (error instanceof PreviousTargetError) throw new ApiError(409, "previous_gateway_unreachable", error.message);
+    throw unifiInvalid(error);
+  }
+}
+
+/** Tests the connection sent, or with no API key the saved one. Whatever fails is the caller's 400. */
+export async function tryUnifiConnection(input: Partial<Parameters<typeof testUnifiConnection>[0]>) {
+  try {
+    return input.apiKey
+      ? await testUnifiConnection({ apiKey: input.apiKey, baseUrl: input.baseUrl, consoleId: input.consoleId, siteId: input.siteId, tlsInsecure: input.tlsInsecure })
+      : await testStoredUnifiConnection();
+  } catch (error) {
+    throw unifiInvalid(error);
+  }
 }

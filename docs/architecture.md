@@ -58,7 +58,7 @@ foreign key.
 
 ### Code boundaries
 
-- [Route handlers](../src/app/api/v1) validate requests and apply [authentication guards](../src/server/guard.ts). Authorization is specified per method in the [authorization matrix](../tests/integration/authorization-matrix.test.ts).
+- [Route handlers](../src/app/api/v1) validate requests and apply [authentication guards](../src/server/guard.ts). Household logic lives in `src/server`, never in a route file: a route calls one function there, which returns a plain result and throws `ApiError` for a refusal. The [route boundary test](../tests/unit/route-boundary.test.ts) fails when a route file imports the database or a UniFi client, reads the household row or lists the site's networks. Routes read a JSON body with `readBody` from the guards' file. Authorization is specified per method in the [authorization matrix](../tests/integration/authorization-matrix.test.ts).
 - [src/server](../src/server) owns database access, secrets and external effects. [src/lib](../src/lib) holds client-safe types and logic; the [boundary test](../tests/unit/client-boundary.test.ts) checks transitive imports.
 - The [household store](../src/lib/household-store.ts) owns shared household state and mutation feedback for every client; [AppDataProvider](../src/components/AppDataProvider.tsx) wraps it for the browser, and the native app wraps it in its own provider. Pages compose it with domain components; feature-specific data may have a page-owned lifecycle.
 - [Reconciliation](../src/server/reconciliation.ts) coordinates enforcement. [Policy ownership](../src/server/unifi/policy-ownership.ts) guards all updates and deletes; planners and the UniFi client live under [src/server/unifi](../src/server/unifi).
@@ -68,8 +68,8 @@ foreign key.
 
 ### Startup and reads
 
-[Instrumentation](../src/instrumentation.ts) runs server initialization in the Node runtime outside
-builds: it loads configuration, ensures recovery/household/seed data, starts reconciliation and DNS
+[Instrumentation](../src/instrumentation.ts) calls [boot](../src/server/boot.ts) in the Node runtime outside
+builds. `boot` loads configuration, ensures recovery/household/seed data, starts reconciliation and DNS
 scheduling, starts update checking, and resumes configured remote access. These are server process
 responsibilities; visiting a page is not what starts enforcement.
 

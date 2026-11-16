@@ -3,10 +3,12 @@ import type { UpdateStatus } from "@prisma/client";
 import { z } from "zod";
 import type { UpdateRun, UpdateSettings } from "@/lib/types";
 import { APP_VERSION } from "@/lib/version";
+import { parseHm } from "@/lib/schedule";
 import { prisma } from "./db";
+import { ApiError } from "./http";
 import { unrefTimer } from "./unref-timer";
-import { compareSemver, parseSemver, refreshUpdateCheck, type UpdateCheckSnapshot } from "./update-check";
-import { dueWeeklyRunAt, nextWeeklyRunAt, parseWeeklyCron } from "./weekly-schedule";
+import { compareSemver, getUpdateCheckSnapshot, parseSemver, refreshStaleUpdateCheck, refreshUpdateCheck, type UpdateCheckSnapshot } from "./update-check";
+import { dueWeeklyRunAt, nextWeeklyRunAt, parseWeeklyCron, weeklyCron } from "./weekly-schedule";
 
 /**
  * Installing a newer release through the Watchtower sidecar (docker/docker-compose.yml). FamilyFi
@@ -497,4 +499,46 @@ export function autoUpdateArmedForTests(): boolean {
 
 export function runAutoUpdateCatchUpForTests(options: UpdaterOptions = {}): Promise<Claim> {
   return claimAndInstallIfDue(options);
+}
+
+/** Saves when updates install on their own, and answers with the update settings as they now stand. */
+export async function setUpdateSchedule(input: { enabled: boolean; days: number[]; time: string }): Promise<UpdateSettings> {
+  try {
+    parseHm(input.time);
+  } catch (error) {
+    throw new ApiError(400, "invalid_request", (error as Error).message);
+  }
+  await prisma().household.update({
+    where: { id: "default" },
+    data: { updateScheduleEnabled: input.enabled, updateSchedule: weeklyCron(input) },
+  });
+  rescheduleAutoUpdate();
+  return updateSettings();
+}
+
+const INSTALL_STATUS = {
+  updater_not_configured: 409,
+  no_update_available: 409,
+  update_in_progress: 409,
+  updater_unreachable: 502,
+} as const;
+
+/** Asks the updater to install the release the last check found. */
+export async function installUpdate() {
+  try {
+    return publicUpdateRun(await requestUpdate({ update: getUpdateCheckSnapshot() }));
+  } catch (error) {
+    if (error instanceof UpdaterError) throw new ApiError(INSTALL_STATUS[error.code], error.code, error.message);
+    throw error;
+  }
+}
+
+/**
+ * The update settings for an administrator looking at them, who sees a release published or promoted
+ * since the hourly check. Not while an install is under way: its five-second polls must not wait on GitHub.
+ */
+export async function viewUpdateSettings(): Promise<UpdateSettings> {
+  const settings = await updateSettings();
+  if (settings.lastRun?.status !== "requested") await refreshStaleUpdateCheck();
+  return settings;
 }

@@ -1,10 +1,12 @@
 import { ConnectionTrustMode, DeviceScope, PairedDeviceClient, SessionKind, type Account, type Pairing } from "@prisma/client";
-import { bearerSessionData, mayPairAs, toPublicSession } from "./auth";
+import { bearerSessionData, isAdministratorAccount, mayPairAs, toPublicSession, type SignedInSession } from "./auth";
 import { ensureConnectionIdentity, instanceFingerprint, publicEndpoint, removeDevice, signedEndpointManifest } from "./connection";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
-import { isValidScope } from "./device-scope";
+import { isFullApp, isValidScope } from "./device-scope";
 import { storedServiceToken } from "./edge-auth";
+import { loadHousehold } from "./household";
+import { ApiError } from "./http";
 import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
 
 /**
@@ -31,13 +33,13 @@ type Db = Parameters<Parameters<ReturnType<typeof prisma>["$transaction"]>[0]>[0
 
 export type InviteStatus = "pending" | "claimed" | "expired";
 
-export function inviteStatus(invite: { claimedAt: Date | null; expiresAt: Date }, now = new Date()): InviteStatus {
+function inviteStatus(invite: { claimedAt: Date | null; expiresAt: Date }, now = new Date()): InviteStatus {
   if (invite.claimedAt) return "claimed";
   return invite.expiresAt <= now ? "expired" : "pending";
 }
 
 /** A phone invite, over the published route the phone pairs through. */
-export async function invitePhone(input: { endpointId: string; displayName: string; accountId: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null }) {
+async function invitePhone(input: { endpointId: string; displayName: string; accountId: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null }) {
   const token = randomToken();
   const invite = await prisma().pairing.create({
     data: {
@@ -95,7 +97,7 @@ export async function inviteAgent(input: { url: string; displayName: string; sco
 }
 
 /** The `clientId` belongs to another kind of device. */
-export class ClientIdInUseError extends Error {
+class ClientIdInUseError extends Error {
   constructor() {
     super("That identifier belongs to another kind of device.");
   }
@@ -206,7 +208,7 @@ function isCompanion(client: PairedDeviceClient, scope: DeviceScope): boolean {
  * makes a network call to join: the app hands it the tokens and manifest. Re-enrolling the same
  * `clientId` retires the old record.
  */
-export async function inviteAndClaimCompanion(input: { client: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
+async function inviteAndClaimCompanion(input: { client: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const invite = await db.pairing.create({
@@ -232,4 +234,125 @@ export async function cancelInvite(id: string): Promise<boolean> {
   const now = new Date();
   const cancelled = await prisma().pairing.updateMany({ where: { id, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
   return cancelled.count === 1;
+}
+
+/** What every refusal to pair as the recovery account says. */
+const RECOVERY_REFUSED = "No device signs in as the recovery admin. Choose a personal administrator, or sign in as one.";
+
+/** What a companion is called when its app names none. */
+const COMPANION_NAME = { watch: "Apple Watch", app: "Shortcuts and controls" } as const;
+
+function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
+  return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), code } };
+}
+
+type InviteInput =
+  | { client: "app" | "phone"; displayName: string; endpointId: string; accountId?: string; replacesDeviceId?: string }
+  | { client: "agent"; displayName: string; scope: "full" | "readOnly" };
+
+/**
+ * An administrator invites a phone or an agent and gets a single-use code. An invite a paired phone
+ * makes names it as the device's parent, so revoking the phone revokes that device too.
+ * `from` is how the request came in: through the tunnel or not, and the address it was made at.
+ */
+export async function inviteDevice(session: SignedInSession, input: InviteInput, from: { tunnelled: boolean; origin: string }) {
+  if (!session.accountId) throw new ApiError(403, "administrator_required", "Sign in with an account to invite a device.");
+  const parentDeviceId = session.deviceId ?? null;
+  if (input.client === PairedDeviceClient.agent) {
+    if (from.tunnelled) throw new ApiError(403, "agent_remote", "Connect an agent from the FamilyFi web app on the home network.");
+    // An agent acts as whoever invites it.
+    if (!mayPairAs(session.account)) throw new ApiError(403, "personal_account_required", "An agent acts as whoever connects it, and nothing acts as the recovery admin. Sign in as yourself to connect one.");
+    // The code carries the home network address, or else the one it was made at: the browser's
+    // address can be a proxy with its own sign-in page, which an agent cannot get past.
+    const household = await loadHousehold();
+    const url = household.homeUrl ?? from.origin;
+    const { invite, code } = await inviteAgent({ url, displayName: input.displayName, scope: input.scope, createdByAccountId: session.accountId, parentDeviceId });
+    const body = inviteBody(invite, code);
+    return { invite: { ...body.invite, url } };
+  }
+  const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: input.endpointId, householdId: "default", enabled: true } });
+  if (!endpoint) throw new ApiError(404, "not_found", "Connection endpoint not found.");
+  const accountId = input.accountId ?? session.accountId;
+  const account = await prisma().account.findUnique({ where: { id: accountId } });
+  if (!account) throw new ApiError(404, "not_found", "The account to sign the phone in as no longer exists.");
+  // Only administrators have paired phones: a phone controls the household and its agents.
+  if (!isAdministratorAccount(account)) {
+    throw new ApiError(400, "administrator_account_required", "A phone signs in only as an administrator.");
+  }
+  if (!mayPairAs(account)) throw new ApiError(400, "personal_account_required", RECOVERY_REFUSED);
+  // Only a phone is re-paired as a phone: a Watch or agent is never replaced, and so never removed, this way.
+  if (input.replacesDeviceId && !isFullApp(await prisma().pairedDevice.findUnique({ where: { id: input.replacesDeviceId } }))) {
+    throw new ApiError(404, "not_found", "The phone to re-pair no longer exists.");
+  }
+  const { invite, code } = await invitePhone({ endpointId: endpoint.id, displayName: input.displayName, accountId, createdByAccountId: session.accountId, parentDeviceId, replacesDeviceId: input.replacesDeviceId });
+  return inviteBody(invite, code);
+}
+
+/**
+ * The paired app a companion is claimed by. Only a signed-in paired app (`app:full`) claims its Watch
+ * or its own `rulesOnly` sign-in: no browser ever receives another device's tokens.
+ */
+export function companionHost(session: SignedInSession) {
+  if (session.kind !== SessionKind.bearer || !isFullApp(session.device) || !session.account) {
+    throw new ApiError(403, "paired_phone_required", "Only a signed-in paired phone can invite and claim its Watch or its Siri and shortcuts.");
+  }
+  if (!mayPairAs(session.account)) throw new ApiError(403, "personal_account_required", RECOVERY_REFUSED);
+  return { deviceId: session.device.id, account: session.account };
+}
+
+/** A paired app invites its Watch, or its own `rulesOnly` sign-in, and claims it at once. */
+export async function claimCompanion(
+  host: ReturnType<typeof companionHost>,
+  input: { client: CompanionClient; clientId: string; displayName?: string },
+  userAgent: string | null,
+) {
+  let joined: Awaited<ReturnType<typeof inviteAndClaimCompanion>>;
+  try {
+    joined = await inviteAndClaimCompanion({
+      client: input.client,
+      parentDeviceId: host.deviceId,
+      account: host.account,
+      clientId: input.clientId,
+      displayName: input.displayName ?? COMPANION_NAME[input.client],
+      userAgent,
+    });
+  } catch (caught) {
+    if (caught instanceof ClientIdInUseError) throw new ApiError(409, "client_id_in_use", caught.message);
+    throw caught;
+  }
+  const { invite, claim } = joined;
+  return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), status: "claimed" }, ...claim };
+}
+
+/** An invite's status, so the screen that made it can tell when it was claimed. */
+export async function getInvite(id: string) {
+  const invite = await prisma().pairing.findUnique({ where: { id }, include: { claimedDevice: true } });
+  if (!invite) throw new ApiError(404, "not_found", "Invite not found.");
+  return {
+    id: invite.id,
+    status: inviteStatus(invite),
+    expiresAt: invite.expiresAt.toISOString(),
+    device: invite.claimedDevice ? { id: invite.claimedDevice.id, displayName: invite.claimedDevice.displayName } : null,
+  };
+}
+
+/**
+ * Joins with an invite's single-use code, the way every device does. An agent never joins through
+ * the tunnel. A refusal comes back as a result, not a throw: the claim route has no guard to answer one.
+ */
+export async function claimInviteFrom(input: Parameters<typeof claimInvite>[0] & { tunnelled: boolean }) {
+  if (input.tunnelled) {
+    const invite = await prisma().pairing.findUnique({ where: { id: input.id }, select: { client: true } });
+    if (invite?.client === PairedDeviceClient.agent) {
+      return { ok: false as const, status: 403, code: "agent_remote", message: "Agents connect from the home network only." };
+    }
+  }
+  const claim = await claimInvite(input);
+  if (!claim) return { ok: false as const, status: 403, code: "invalid_pairing", message: "This invite is invalid, expired, or already used." };
+  return { ok: true as const, claim };
+}
+
+/** Cancels an invite nobody has claimed yet. */
+export async function cancelPendingInvite(id: string) {
+  if (!(await cancelInvite(id))) throw new ApiError(404, "not_found", "No pending invite with that id.");
 }

@@ -3,11 +3,13 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
+import { z } from "zod";
 import path from "node:path";
 import { ConnectionTransport, ConnectionTrustMode, RouteKind, type ConnectionEndpoint } from "@prisma/client";
 import { ensureConnectionIdentity, isUniqueViolation } from "../connection";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { prisma } from "../db";
+import { ApiError } from "../http";
 import { demoModeEnabled } from "../env";
 import {
   findCloudflared,
@@ -610,6 +612,16 @@ export type RemoteAccessChange =
   | { mode: "quick" }
   | { mode: "named"; hostname?: string; endpointId?: string };
 
+/** What `PUT /connection/tunnel` may carry. */
+export const RemoteAccessBody = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("off"), forget: z.boolean().optional() }).strict(),
+  z.object({ mode: z.literal("quick") }).strict(),
+  z
+    .object({ mode: z.literal("named"), hostname: z.string().max(253).optional(), endpointId: z.string().min(1).optional() })
+    .strict()
+    .refine((body) => !(body.hostname && body.endpointId), "Send a hostname or a route, not both."),
+]);
+
 async function stopTunnel() {
   runtime.wanted = null;
   runtime.status = "off";
@@ -808,4 +820,16 @@ export async function resumeRemoteAccess() {
   if (!route || route.kind === RouteKind.own) return;
   runtime.wanted = route.kind;
   if (!runtime.child) await launch();
+}
+
+/** Switches remote access and answers with its state as it now stands. */
+export async function changeRemoteAccess(change: RemoteAccessChange): Promise<RemoteAccessState> {
+  try {
+    await setRemoteAccess(change);
+  } catch (error) {
+    if (error instanceof RemoteAccessError) throw new ApiError(400, "invalid_tunnel", error.message);
+    // coverage-exempt: only a database or process failure reaches here.
+    throw error;
+  }
+  return remoteAccessState();
 }

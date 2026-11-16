@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as getHousehold, PUT as setHousehold, DELETE as clearHousehold } from "@/app/api/v1/upstream/resolver/route";
-import { PUT as setGroup, DELETE as clearGroup } from "@/app/api/v1/groups/[id]/resolver/route";
+import { PUT as setHouseholdRoute } from "@/app/api/v1/upstream/resolver/route";
 import { prisma } from "@/server/db";
+import { clearGroupResolver, setGroupResolver } from "@/server/upstream/group-resolver";
+import { clearHouseholdResolver, getHouseholdResolver, HouseholdResolverBody, setHouseholdResolver } from "@/server/upstream/household-resolver";
 import { probeCategory } from "@/server/upstream/probe";
 import { refreshResolverContexts } from "@/server/upstream/discovery";
 import { publicUpstreamCategory } from "@/server/upstream-categories";
+import { answered } from "../helpers/answered";
 import { authFromLogin, request } from "../helpers/http";
 import { createFamilyGroup, resetDatabase } from "../helpers/db";
 
@@ -13,12 +15,6 @@ const OLD_URL = "https://old.example/dns-query";
 const NEW_URL = "https://new.example/dns-query";
 
 async function setup() {
-  const response = await login(request("/api/v1/auth/login", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD, client: "browser" }),
-  }));
-  expect(response.status).toBe(200);
-  const auth = authFromLogin(response);
   const group = await createFamilyGroup();
   // Every resolver change re-arms the schedule and sweeps if a run is due. With no run on
   // record one always is, and that background sweep's real DNS request rewrites the
@@ -39,16 +35,9 @@ async function setup() {
     categoryId: category.id, groupId, verdict: "blocked", blockedCount: 1,
     totalCount: 1, results: [], durationMs: 1,
   })) });
-  async function change(owner: "household" | "group", method: "PUT" | "DELETE", body?: unknown) {
-    const path = owner === "household" ? "/api/v1/upstream/resolver" : `/api/v1/groups/${group.id}/resolver`;
-    const req = request(path, {
-      auth, method,
-      ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}),
-    });
-    const res = owner === "household"
-      ? await (method === "PUT" ? setHousehold : clearHousehold)(req)
-      : await (method === "PUT" ? setGroup : clearGroup)(req, { params: Promise.resolve({ id: group.id }) });
-    expect(res.status).toBe(200);
+  async function change(owner: "household" | "group", method: "PUT" | "DELETE", body?: { url?: string; probeEnabled?: boolean }) {
+    if (owner === "household") await (method === "PUT" ? setHouseholdResolver(HouseholdResolverBody.parse(body)) : clearHouseholdResolver());
+    else await (method === "PUT" ? setGroupResolver(group.id, body!.url!) : clearGroupResolver(group.id));
   }
   return { category, group, change };
 }
@@ -125,22 +114,24 @@ describe("resolver verdict invalidation", () => {
 describe("resolver check schedule", () => {
   beforeEach(resetDatabase);
 
-  async function login_() {
-    const response = await login(request("/api/v1/auth/login", {
+  /** Saves resolver settings. A body the request schema refuses goes through the route, whose refusal that is. */
+  async function setHousehold(body: Record<string, unknown>) {
+    const parsed = HouseholdResolverBody.safeParse(body);
+    if (parsed.success) return answered("PUT /api/v1/upstream/resolver", async () => ({ resolver: await setHouseholdResolver(parsed.data) }));
+    const signedIn = await login(request("/api/v1/auth/login", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ username: "admin", password: process.env.FAMILYFI_DEFAULT_PASSWORD, client: "browser" }),
     }));
-    expect(response.status).toBe(200);
-    return authFromLogin(response);
+    expect(signedIn.status).toBe(200);
+    return setHouseholdRoute(request("/api/v1/upstream/resolver", {
+      auth: authFromLogin(signedIn), method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    }));
   }
+  const getHousehold = () => answered("GET /api/v1/upstream/resolver", async () => ({ resolver: await getHouseholdResolver() }));
 
   it("round-trips probeTime and probeDays", async () => {
-    const auth = await login_();
     await prisma().household.update({ where: { id: "default" }, data: { dohUrl: OLD_URL } });
-    const res = await setHousehold(request("/api/v1/upstream/resolver", {
-      auth, method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ probeTime: "09:30", probeDays: [1, 3, 5] }),
-    }));
+    const res = await setHousehold({ probeTime: "09:30", probeDays: [1, 3, 5] });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.resolver.probeTime).toBe("09:30");
@@ -151,35 +142,26 @@ describe("resolver check schedule", () => {
   });
 
   it("rejects a malformed probeTime", async () => {
-    const auth = await login_();
-    const res = await setHousehold(request("/api/v1/upstream/resolver", {
-      auth, method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ probeTime: "25:99" }),
-    }));
+    const res = await setHousehold({ probeTime: "25:99" });
     expect(res.status).toBe(400);
     expect((await res.json()).error?.code).toBe("invalid_probe_time");
   });
 
   it("rejects an out-of-range day", async () => {
-    const auth = await login_();
-    const res = await setHousehold(request("/api/v1/upstream/resolver", {
-      auth, method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ probeDays: [0, 7] }),
-    }));
+    const res = await setHousehold({ probeDays: [0, 7] });
     expect(res.status).toBe(400);
   });
 
   it("carries nextRunAt on GET when checking is on, and null when off", async () => {
-    const auth = await login_();
     await prisma().household.update({
       where: { id: "default" },
       data: { dohUrl: OLD_URL, dohProbeEnabled: true, dohProbeTime: "12:00", dohProbeDays: [0, 1, 2, 3, 4, 5, 6] },
     });
-    const on = await getHousehold(request("/api/v1/upstream/resolver", { auth }));
+    const on = await getHousehold();
     expect((await on.json()).resolver.nextRunAt).not.toBeNull();
 
     await prisma().household.update({ where: { id: "default" }, data: { dohProbeEnabled: false } });
-    const off = await getHousehold(request("/api/v1/upstream/resolver", { auth }));
+    const off = await getHousehold();
     expect((await off.json()).resolver.nextRunAt).toBeNull();
   });
 });

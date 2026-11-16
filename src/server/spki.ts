@@ -2,6 +2,7 @@ import { createHash, X509Certificate } from "node:crypto";
 import { isIP } from "node:net";
 import { connect } from "node:tls";
 import { httpsOrigin } from "./connection";
+import { ApiError } from "./http";
 
 export type CertificatePin = {
   spkiSha256: string;
@@ -74,4 +75,15 @@ export async function probeCertificate(value: string, { timeoutMs = 5000 }: { ti
       resolve(describe(certificate, trusted, "probe"));
     });
   });
+}
+
+/** The SPKI pin for a pinned LAN route, from the live address or a pasted certificate. */
+export async function computePin(source: { url: string } | { certificate: string }): Promise<CertificatePin> {
+  try {
+    return "url" in source ? await probeCertificate(source.url) : pinFromCertificate(source.certificate);
+  } catch (error) {
+    if (error instanceof ProbeError) throw new ApiError(422, "probe_failed", error.message);
+    if (error instanceof Error && /HTTPS origin/.test(error.message)) throw new ApiError(400, "invalid_endpoint", error.message);
+    throw error;
+  }
 }

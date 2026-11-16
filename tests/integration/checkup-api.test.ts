@@ -6,16 +6,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
-import { GET as getCheckup } from "@/app/api/v1/checkup/route";
-import { POST as runCheckup } from "@/app/api/v1/checkup/run/route";
-import { PATCH as patchFinding } from "@/app/api/v1/checkup/findings/[id]/route";
-import { POST as createGroup } from "@/app/api/v1/groups/route";
-import { DELETE as deleteGroup } from "@/app/api/v1/groups/[id]/route";
-import { POST as unblockGroup } from "@/app/api/v1/groups/[id]/unblock/route";
-import { GET as listRules } from "@/app/api/v1/rules/route";
-import { DELETE as deleteRule, PATCH as patchRule } from "@/app/api/v1/rules/[id]/route";
-import { POST as turnOnRule } from "@/app/api/v1/rules/[id]/on/route";
-import { GET as getSync } from "@/app/api/v1/sync/route";
+import { PATCH as patchRuleRoute } from "@/app/api/v1/rules/[id]/route";
+import { checkupState, dismissFinding } from "@/server/checkup";
+import { runCheckupNow } from "@/server/checkup-run";
+import { unblockGroup as unblockGroupFn } from "@/server/group-unblock";
+import { createGroup as createGroupFn, deleteGroup as deleteGroupFn } from "@/server/groups";
+import { deleteRule as deleteRuleFn, switchRule, updateRule } from "@/server/rule-lifts";
+import { listRules, RuleUpdateBody } from "@/server/rules";
+import { syncStatus } from "@/server/sync-status";
 import { checkupMessage, type CheckupState } from "@/lib/checkup";
 import type { Rule } from "@/lib/rules";
 import { APP_VERSION } from "@/lib/version";
@@ -24,7 +22,9 @@ import { refreshUpdateCheck } from "@/server/update-check";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
 import { createFixtureUnifiClient } from "@/server/unifi/dev-mock";
 import type { MockUnifiClient } from "@/server/unifi/mock";
+import { answered } from "../helpers/answered";
 import { authFromLogin, request, type SessionAuth } from "../helpers/http";
+import { adminSession } from "../helpers/session";
 import { configureConnectedHousehold, resetDatabase } from "../helpers/db";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
@@ -43,35 +43,40 @@ async function signedIn(): Promise<SessionAuth> {
 
 const json = { "content-type": "application/json" };
 
-async function checkup(auth: SessionAuth): Promise<CheckupState> {
-  const response = await getCheckup(request("/api/v1/checkup", { auth }));
+/** Who the cases act as: set for each test, once the database is reset. */
+let session: Awaited<ReturnType<typeof adminSession>>;
+
+async function checkup(): Promise<CheckupState> {
+  const response = await answered("GET /api/v1/checkup", async () => ({ checkup: await checkupState() }));
   expect(response.status).toBe(200);
   return ((await response.json()) as { checkup: CheckupState }).checkup;
 }
 
-async function checkNow(auth: SessionAuth): Promise<Response> {
-  return runCheckup(request("/api/v1/checkup/run", { method: "POST", auth, headers: json, body: "{}" }));
+const checkNow = () => answered("POST /api/v1/checkup/run", async () => ({ checkup: await runCheckupNow() }));
+
+const dismiss = (id: string, dismissed: boolean) =>
+  answered("PATCH /api/v1/checkup/findings/{id}", async () => ({ checkup: await dismissFinding(id, dismissed) }));
+
+async function problems(): Promise<number> {
+  return ((await (await answered("GET /api/v1/sync", () => syncStatus())).json()) as { checkupProblems: number }).checkupProblems;
 }
 
-async function dismiss(auth: SessionAuth, id: string, dismissed: boolean): Promise<Response> {
-  return patchFinding(request(`/api/v1/checkup/findings/${id}`, { method: "PATCH", auth, headers: json, body: JSON.stringify({ dismissed }) }), {
+async function rules(): Promise<Rule[]> {
+  return ((await (await answered("GET /api/v1/rules", async () => ({ rules: await listRules() }))).json()) as { rules: Rule[] }).rules;
+}
+
+/** Changes a rule. A body the request schema refuses goes through the route, whose refusal that is. */
+async function patchRule(id: string, body: object): Promise<Response> {
+  const parsed = RuleUpdateBody.safeParse(body);
+  if (parsed.success) return answered("PATCH /api/v1/rules/{id}", () => updateRule(session, id, parsed.data));
+  return patchRuleRoute(request(`/api/v1/rules/${id}`, { method: "PATCH", auth: await signedIn(), headers: json, body: JSON.stringify(body) }), {
     params: Promise.resolve({ id }),
   });
 }
 
-async function problems(auth: SessionAuth): Promise<number> {
-  return ((await (await getSync(request("/api/v1/sync", { auth }))).json()) as { checkupProblems: number }).checkupProblems;
-}
-
-async function rules(auth: SessionAuth): Promise<Rule[]> {
-  return ((await (await listRules(request("/api/v1/rules", { auth }))).json()) as { rules: Rule[] }).rules;
-}
-
-async function patchCountries(auth: SessionAuth, body: object): Promise<Response> {
-  return patchRule(request("/api/v1/rules/countries", { method: "PATCH", auth, headers: json, body: JSON.stringify(body) }), {
-    params: Promise.resolve({ id: "countries" }),
-  });
-}
+const patchCountries = (body: object) => patchRule("countries", body);
+const createGroup = (name: string) =>
+  answered("POST /api/v1/groups", () => createGroupFn({ kind: GroupKind.things, name }), 201);
 
 const checks = (state: CheckupState) => state.findings.map((finding) => finding.check);
 
@@ -81,6 +86,7 @@ describe("network checkup", () => {
   beforeEach(async () => {
     await resetDatabase();
     await configureConnectedHousehold();
+    session = await adminSession();
     // The mock household's gateway: Sonos wired and on Wi-Fi, two private addresses, mDNS off on IoT.
     client = createFixtureUnifiClient({ friendlyNames: true });
     setReconcileClientForTests(client);
@@ -92,10 +98,9 @@ describe("network checkup", () => {
   });
 
   it("runs after a sync, from what it read and the Wi-Fi networks, and writes nothing to the gateway", async () => {
-    const auth = await signedIn();
-    expect((await checkup(auth)).ranAt).toBeNull();
+    expect((await checkup()).ranAt).toBeNull();
     await runReconcileOnce();
-    const state = await checkup(auth);
+    const state = await checkup();
     expect(state.ranAt).not.toBeNull();
     expect(state.error).toBeNull();
     expect(checks(state)).toEqual(["leftover_policies", "private_addresses", "wifi_multicast", "sonos_mdns", "sonos_mixed", "casting_mdns", "dns_override"]);
@@ -108,92 +113,86 @@ describe("network checkup", () => {
     expect(privates.message.key).toBe("checkup.private_addresses");
     // Sonos wired and on Wi-Fi, DNS and casting are notes, which the badge never counts. The fixture
     // gateway carries one policy named like FamilyFi's that no record claims: a leftover.
-    expect(await problems(auth)).toBe(4);
+    expect(await problems()).toBe(4);
     // The checkup's reads are GETs; every write of the pass is a firewall policy.
     expect(client.calls.filter((call) => call.method !== "GET").every((call) => call.path.includes("/firewall/policies"))).toBe(true);
     expect(client.calls.some((call) => call.path.endsWith("/wifi/broadcasts"))).toBe(true);
   });
 
   it("runs at most once an interval from sync, and at once on Check now", async () => {
-    const auth = await signedIn();
     await runReconcileOnce();
-    const first = (await checkup(auth)).ranAt;
+    const first = (await checkup()).ranAt;
     await runReconcileOnce();
-    expect((await checkup(auth)).ranAt).toBe(first);
-    const response = await checkNow(auth);
+    expect((await checkup()).ranAt).toBe(first);
+    const response = await checkNow();
     expect(response.status).toBe(200);
     expect(((await response.json()) as { checkup: CheckupState }).checkup.ranAt).not.toBe(first);
   });
 
   it("keeps a dismissal while the finding is about the same devices, and brings it back when they change", async () => {
-    const auth = await signedIn();
     await runReconcileOnce();
-    const response = await dismiss(auth, "private_addresses", true);
+    const response = await dismiss("private_addresses", true);
     expect(response.status).toBe(200);
     expect(((await response.json()) as { checkup: CheckupState }).checkup.findings.find((finding) => finding.id === "private_addresses")?.dismissed).toBe(true);
-    expect(await problems(auth)).toBe(3);
+    expect(await problems()).toBe(3);
 
-    await checkNow(auth);
-    expect((await checkup(auth)).findings.find((finding) => finding.id === "private_addresses")?.dismissed).toBe(true);
+    await checkNow();
+    expect((await checkup()).findings.find((finding) => finding.id === "private_addresses")?.dismissed).toBe(true);
 
     // A new phone with a private address: the finding is about something new, so it shows again.
     client.state.clients.push({ id: "44444444-4444-4444-8444-000000000999", name: "New Pixel", type: "WIRELESS", macAddress: "0a:00:00:00:0f:01", ipAddress: "192.0.2.199" });
     await runReconcileOnce();
-    await checkNow(auth);
-    const again = (await checkup(auth)).findings.find((finding) => finding.id === "private_addresses");
+    await checkNow();
+    const again = (await checkup()).findings.find((finding) => finding.id === "private_addresses");
     expect(again?.dismissed).toBe(false);
     expect(again?.details.devices?.map((device) => device.name)).toContain("New Pixel");
 
     // The phone goes again: the finding is back to what was dismissed, but it changed since, so it stays shown.
     client.state.clients.pop();
     await prisma().device.delete({ where: { mac: "0a:00:00:00:0f:01" } });
-    await checkNow(auth);
-    expect((await checkup(auth)).findings.find((finding) => finding.id === "private_addresses")?.dismissed).toBe(false);
+    await checkNow();
+    expect((await checkup()).findings.find((finding) => finding.id === "private_addresses")?.dismissed).toBe(false);
 
-    expect((await dismiss(auth, "private_addresses", false)).status).toBe(200);
-    expect((await dismiss(auth, "missing", true)).status).toBe(404);
+    expect((await dismiss("private_addresses", false)).status).toBe(200);
+    expect((await dismiss("missing", true)).status).toBe(404);
   });
 
   it("keeps the Wi-Fi findings, and passes neither, when Wi-Fi cannot be read", async () => {
-    const auth = await signedIn();
     await runReconcileOnce();
     client.listWifiBroadcasts = async () => {
       throw new Error("Wi-Fi unavailable");
     };
-    await checkNow(auth);
-    const state = await checkup(auth);
+    await checkNow();
+    const state = await checkup();
     expect(checks(state)).toContain("wifi_multicast");
     expect(state.passed).not.toContain("wifi_multicast");
     expect(state.passed).not.toContain("smart_home_wifi");
   });
 
   it("keeps the last findings and passes nothing when the network cannot be read", async () => {
-    const auth = await signedIn();
     await runReconcileOnce();
-    const before = checks(await checkup(auth));
+    const before = checks(await checkup());
     client.listClients = async () => {
       throw new Error("Gateway unavailable");
     };
-    await checkNow(auth);
-    const state = await checkup(auth);
+    await checkNow();
+    const state = await checkup();
     expect(state.error).toBe("Gateway unavailable");
     expect(checks(state)).toEqual(before);
     expect(state.passed).toEqual([]);
   });
 
   it("drops a finding once it is no longer seen", async () => {
-    const auth = await signedIn();
     await runReconcileOnce();
     const iot = client.state.wifiBroadcasts.find((wifi) => wifi.name === "Home IoT")!;
     iot.multicastToUnicastConversionEnabled = false;
-    await checkNow(auth);
-    const state = await checkup(auth);
+    await checkNow();
+    const state = await checkup();
     expect(checks(state)).not.toContain("wifi_multicast");
     expect(state.passed).toContain("wifi_multicast");
   });
 
   it("notes a FamilyFi policy changed in UniFi after the next sync, and whether it was changed back", async () => {
-    const auth = await signedIn();
     await runReconcileOnce();
     const [recorded] = await prisma().appPolicy.findMany();
     const onGateway = () => client.state.policies.find((policy) => policy.id === recorded!.unifiPolicyId)!;
@@ -203,26 +202,26 @@ describe("network checkup", () => {
 
     // Within the checkup's interval: sync records the note on its own.
     await runReconcileOnce();
-    let note = (await checkup(auth)).findings.find((finding) => finding.check === "gateway_drift")!;
+    let note = (await checkup()).findings.find((finding) => finding.check === "gateway_drift")!;
     expect(note).toMatchObject({ id: "gateway_drift:quarantine", kind: "note", message: { key: "checkup.gateway_drift", text: "Quarantine was changed in UniFi" } });
     expect(note.details.drift).toMatchObject({ rule: { id: "quarantine", name: "Quarantine" }, changes: [{ field: "switch", familyfi: enabled, gateway: !enabled }], putBack: false });
-    expect(await problems(auth)).toBe(4);
+    expect(await problems()).toBe(4);
 
     await runReconcileOnce();
-    note = (await checkup(auth)).findings.find((finding) => finding.check === "gateway_drift")!;
+    note = (await checkup()).findings.find((finding) => finding.check === "gateway_drift")!;
     expect(note.details.drift?.putBack).toBe(true);
     expect(onGateway().enabled).toBe(enabled);
     // A full checkup keeps it too.
-    await checkNow(auth);
-    expect(checks(await checkup(auth))).toContain("gateway_drift");
+    await checkNow();
+    expect(checks(await checkup())).toContain("gateway_drift");
 
     // Dismissed, it stays dismissed until UniFi changes it again.
-    expect((await dismiss(auth, note.id, true)).status).toBe(200);
+    expect((await dismiss(note.id, true)).status).toBe(200);
     await runReconcileOnce();
-    expect((await checkup(auth)).findings.find((finding) => finding.id === note.id)?.dismissed).toBe(true);
+    expect((await checkup()).findings.find((finding) => finding.id === note.id)?.dismissed).toBe(true);
     onGateway().name = "Renamed in UniFi";
     await runReconcileOnce();
-    const again = (await checkup(auth)).findings.find((finding) => finding.id === note.id)!;
+    const again = (await checkup()).findings.find((finding) => finding.id === note.id)!;
     expect(again.dismissed).toBe(false);
     expect(again.details.drift?.changes).toEqual([{ field: "name", familyfi: expect.any(String), gateway: "Renamed in UniFi" }]);
 
@@ -230,7 +229,7 @@ describe("network checkup", () => {
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
     await prisma().household.update({ where: { id: "default" }, data: { quarantineEnforced: !household.quarantineEnforced } });
     await runReconcileOnce();
-    expect(checks(await checkup(auth))).not.toContain("gateway_drift");
+    expect(checks(await checkup())).not.toContain("gateway_drift");
   });
 
   it("shows a newer release as a problem until it is installed, and a dismissal until the next one", async () => {
@@ -240,47 +239,46 @@ describe("network checkup", () => {
     const newer = `${major}.${minor! + 1}.0`;
     const newest = `${major}.${minor! + 2}.0`;
     try {
-      const auth = await signedIn();
       await runReconcileOnce();
-      const before = await problems(auth);
+      const before = await problems();
       await offering(newer);
-      let found = (await checkup(auth)).findings.find((finding) => finding.check === "update_available");
+      let found = (await checkup()).findings.find((finding) => finding.check === "update_available");
       expect(found).toMatchObject({ id: "update_available", kind: "problem", details: { currentVersion: APP_VERSION, latestVersion: newer }, dismissed: false });
       expect(found!.message).toEqual({ key: "checkup.update_available", text: `FamilyFi v${newer} is ready` });
-      expect(await problems(auth)).toBe(before + 1);
+      expect(await problems()).toBe(before + 1);
       // Reads write only when the check's answer changed.
       const seen = async () => (await prisma().checkupFinding.findUniqueOrThrow({ where: { key: "update_available" } })).lastSeenAt.getTime();
       const first = await seen();
       await new Promise((resolve) => setTimeout(resolve, 5));
-      await checkup(auth);
-      await problems(auth);
+      await checkup();
+      await problems();
       expect(await seen()).toBe(first);
       // A checkup run leaves it to the update check.
-      expect((await checkNow(auth)).status).toBe(200);
-      expect(checks(await checkup(auth))).toContain("update_available");
+      expect((await checkNow()).status).toBe(200);
+      expect(checks(await checkup())).toContain("update_available");
 
-      expect((await dismiss(auth, "update_available", true)).status).toBe(200);
-      expect(await problems(auth)).toBe(before);
+      expect((await dismiss("update_available", true)).status).toBe(200);
+      expect(await problems()).toBe(before);
       // A check that could not answer changes nothing.
       await failing();
-      expect((await checkup(auth)).findings.find((finding) => finding.check === "update_available")?.dismissed).toBe(true);
+      expect((await checkup()).findings.find((finding) => finding.check === "update_available")?.dismissed).toBe(true);
       await offering(newest);
-      found = (await checkup(auth)).findings.find((finding) => finding.check === "update_available");
+      found = (await checkup()).findings.find((finding) => finding.check === "update_available");
       expect(found).toMatchObject({ details: { latestVersion: newest }, dismissed: false });
 
       // Once FamilyFi runs another release, a row from before goes while the check has no answer.
       await failing();
       await prisma().checkupFinding.update({ where: { key: "update_available" }, data: { details: { currentVersion: "0.0.1", latestVersion: newest } } });
-      expect(checks(await checkup(auth))).not.toContain("update_available");
-      expect(await problems(auth)).toBe(before);
+      expect(checks(await checkup())).not.toContain("update_available");
+      expect(await problems()).toBe(before);
 
       await offering(newest);
-      expect(checks(await checkup(auth))).toContain("update_available");
+      expect(checks(await checkup())).toContain("update_available");
       await offering(APP_VERSION);
-      const state = await checkup(auth);
+      const state = await checkup();
       expect(checks(state)).not.toContain("update_available");
       expect(state.passed).toContain("update_available");
-      expect(await problems(auth)).toBe(before);
+      expect(await problems()).toBe(before);
     } finally {
       await failing();
     }
@@ -288,8 +286,7 @@ describe("network checkup", () => {
 
   it("answers 409 on Check now before UniFi is set up", async () => {
     await prisma().household.update({ where: { id: "default" }, data: { connectionStatus: "unconfigured", unifiSiteId: null } });
-    const auth = await signedIn();
-    expect((await checkNow(auth)).status).toBe(409);
+    expect((await checkNow()).status).toBe(409);
   });
 });
 
@@ -308,8 +305,7 @@ describe("Block countries", () => {
   });
 
   it("is a built-in rule, off, with the recommended countries, after quarantine and Lock DNS", async () => {
-    const auth = await signedIn();
-    const list = await rules(auth);
+    const list = await rules();
     expect(list.map((rule) => rule.id)).toEqual(["quarantine", "dns", "countries"]);
     const countries = list[2]!;
     expect(countries).toMatchObject({ builtIn: "countries", enabled: false, groupIds: [], countries: ["CN", "CU", "IR", "KP", "RU", "SY"] });
@@ -317,7 +313,6 @@ describe("Block countries", () => {
   });
 
   it("covers every group when switched on, and blocks their devices by region through one policy", async () => {
-    const auth = await signedIn();
     await runReconcileOnce();
     const groups = await prisma().group.findMany();
     expect(groups).toEqual([]);
@@ -327,7 +322,7 @@ describe("Block countries", () => {
     await prisma().device.update({ where: { mac: phone!.mac }, data: { groupId: kid.id, assignment: "assigned" } });
     await prisma().device.update({ where: { mac: tv!.mac }, data: { groupId: things.id, assignment: "assigned" } });
 
-    const on = await turnOnRule(request("/api/v1/rules/countries/on", { method: "POST", auth, headers: json, body: "{}" }), { params: Promise.resolve({ id: "countries" }) });
+    const on = await answered("POST /api/v1/rules/{id}/on", () => switchRule(session, "countries", true));
     expect(on.status).toBe(200);
     expect(((await on.json()) as { rule: Rule }).rule.groupIds!.sort()).toEqual([kid.id, things.id].sort());
 
@@ -342,7 +337,7 @@ describe("Block countries", () => {
     expect(macs.sort()).toEqual([phone!.mac, tv!.mac].sort());
 
     // Its list changes in place; FamilyFi owns the policy by id.
-    expect((await patchCountries(auth, { countries: ["kp", "IR"] })).status).toBe(200);
+    expect((await patchCountries({ countries: ["kp", "IR"] })).status).toBe(200);
     await runReconcileOnce();
     const after = client.state.policies.filter((policy) => policy.destination?.trafficFilter?.type === "REGION");
     expect(after.map((policy) => policy.id).sort()).toEqual(policies.map((policy) => policy.id).sort());
@@ -350,77 +345,72 @@ describe("Block countries", () => {
   });
 
   it("takes only its switch, groups and countries, and is never deleted", async () => {
-    const auth = await signedIn();
-    expect((await patchCountries(auth, { name: "Mine" })).status).toBe(409);
-    expect((await patchCountries(auth, { countries: ["ZZ"] })).status).toBe(400);
-    expect((await patchCountries(auth, { countries: [] })).status).toBe(400);
-    expect((await patchCountries(auth, { groupIds: [] })).status).toBe(400);
-    expect((await deleteRule(request("/api/v1/rules/countries", { method: "DELETE", auth }), { params: Promise.resolve({ id: "countries" }) })).status).toBe(409);
-    const quarantine = await patchRule(request("/api/v1/rules/quarantine", { method: "PATCH", auth, headers: json, body: JSON.stringify({ countries: ["KP"] }) }), {
-      params: Promise.resolve({ id: "quarantine" }),
-    });
+    expect((await patchCountries({ name: "Mine" })).status).toBe(409);
+    expect((await patchCountries({ countries: ["ZZ"] })).status).toBe(400);
+    expect((await patchCountries({ countries: [] })).status).toBe(400);
+    expect((await patchCountries({ groupIds: [] })).status).toBe(400);
+    expect((await answered("DELETE /api/v1/rules/{id}", () => deleteRuleFn("countries"))).status).toBe(409);
+    const quarantine = await patchRule("quarantine", { countries: ["KP"] });
     expect(quarantine.status).toBe(409);
   });
 
   it("takes in a new group while it covers every group, and not once it is narrowed", async () => {
-    const auth = await signedIn();
     const first = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV" } });
     const second = await prisma().group.create({ data: { kind: GroupKind.things, name: "Games" } });
-    expect((await patchCountries(auth, { enabled: true })).status).toBe(200);
+    expect((await patchCountries({ enabled: true })).status).toBe(200);
     const add = (name: string) =>
-      createGroup(request("/api/v1/groups", { method: "POST", auth, headers: json, body: JSON.stringify({ kind: "things", name }) }));
+      createGroup(name);
     const joined = ((await (await add("Printers")).json()) as { group: { id: string } }).group.id;
-    expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds!.sort()).toEqual([first.id, second.id, joined].sort());
+    expect((await rules()).find((rule) => rule.id === "countries")!.groupIds!.sort()).toEqual([first.id, second.id, joined].sort());
 
-    expect((await patchCountries(auth, { groupIds: [first.id] })).status).toBe(200);
+    expect((await patchCountries({ groupIds: [first.id] })).status).toBe(200);
     await add("Cameras");
-    expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds).toEqual([first.id]);
+    expect((await rules()).find((rule) => rule.id === "countries")!.groupIds).toEqual([first.id]);
   });
 
   it("takes in every group created at once while it covers every group", async () => {
-    const auth = await signedIn();
     await prisma().group.create({ data: { kind: GroupKind.things, name: "TV" } });
-    expect((await patchCountries(auth, { enabled: true })).status).toBe(200);
+    expect((await patchCountries({ enabled: true })).status).toBe(200);
     const add = (name: string) =>
-      createGroup(request("/api/v1/groups", { method: "POST", auth, headers: json, body: JSON.stringify({ kind: "things", name }) }));
+      createGroup(name);
     await Promise.all(["Printers", "Cameras", "Speakers"].map(add));
-    expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds).toHaveLength(4);
+    expect((await rules()).find((rule) => rule.id === "countries")!.groupIds).toHaveLength(4);
   });
 
   it("switched on before there are groups, takes in the first one", async () => {
-    const auth = await signedIn();
-    expect((await patchCountries(auth, { enabled: true })).status).toBe(200);
-    expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds).toEqual([]);
-    const created = await createGroup(request("/api/v1/groups", { method: "POST", auth, headers: json, body: JSON.stringify({ kind: "things", name: "TV" }) }));
+    expect((await patchCountries({ enabled: true })).status).toBe(200);
+    expect((await rules()).find((rule) => rule.id === "countries")!.groupIds).toEqual([]);
+    const created = await createGroup("TV");
     const id = ((await created.json()) as { group: { id: string } }).group.id;
-    expect((await rules(auth)).find((rule) => rule.id === "countries")!.groupIds).toEqual([id]);
+    expect((await rules()).find((rule) => rule.id === "countries")!.groupIds).toEqual([id]);
   });
 
   it("stays when the groups it covers are deleted, off while other groups are left", async () => {
-    const auth = await signedIn();
     const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV" } });
     const games = await prisma().group.create({ data: { kind: GroupKind.things, name: "Games" } });
-    const remove = (id: string) => deleteGroup(request(`/api/v1/groups/${id}`, { method: "DELETE", auth }), { params: Promise.resolve({ id }) });
-    expect((await patchCountries(auth, { enabled: true, groupIds: [tv.id] })).status).toBe(200);
+    const remove = (id: string) => answered("DELETE /api/v1/groups/{id}", async () => {
+        const { change } = await deleteGroupFn(id);
+        return { ok: true, change };
+      });
+    expect((await patchCountries({ enabled: true, groupIds: [tv.id] })).status).toBe(200);
     await runReconcileOnce();
     expect((await remove(tv.id)).status).toBe(200);
-    const countries = async () => (await rules(auth)).find((rule) => rule.id === "countries");
+    const countries = async () => (await rules()).find((rule) => rule.id === "countries");
     expect(await countries()).toMatchObject({ enabled: false, groupIds: [] });
     await runReconcileOnce();
     expect(client.state.policies.filter((policy) => policy.destination?.trafficFilter?.type === "REGION")).toEqual([]);
 
     // Covering the last group, it stays on, which means every group, and takes in the next one.
-    expect((await patchCountries(auth, { enabled: true, groupIds: [games.id] })).status).toBe(200);
+    expect((await patchCountries({ enabled: true, groupIds: [games.id] })).status).toBe(200);
     expect((await remove(games.id)).status).toBe(200);
     expect(await countries()).toMatchObject({ enabled: true, groupIds: [] });
   });
 
   it("never makes a group blocked, so an unblock leaves it alone", async () => {
-    const auth = await signedIn();
     const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV" } });
-    expect((await patchCountries(auth, { enabled: true })).status).toBe(200);
-    const unblock = (body: object) =>
-      unblockGroup(request(`/api/v1/groups/${tv.id}/unblock`, { method: "POST", auth, headers: json, body: JSON.stringify(body) }), { params: Promise.resolve({ id: tv.id }) });
+    expect((await patchCountries({ enabled: true })).status).toBe(200);
+    const unblock = (body: { until?: string }) =>
+      answered("POST /api/v1/groups/{id}/unblock", () => unblockGroupFn(session, "unblock", tv.id, body));
     expect((await unblock({})).status).toBe(409);
     // Even given a time, Block countries is not one of the rules an unblock allows.
     await unblock({ until: new Date(Date.now() + 3_600_000).toISOString() });

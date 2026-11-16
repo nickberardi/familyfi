@@ -1,14 +1,6 @@
 import { z } from "zod";
-import { prisma } from "@/server/db";
-import { enqueueChange } from "@/server/changes";
-import { readJson, withMutation, withSession } from "@/server/guard";
-import { jsonError } from "@/server/http";
-import { storedQuarantineBlocking } from "@/server/quarantine";
-import { setQuarantineEnforced } from "@/server/rules";
-import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
-import { rescheduleAutoUpdate } from "@/server/updater";
-import type { Household } from "@prisma/client";
-import { demoLocked } from "@/server/demo";
+import { readBody, withMutation, withSession } from "@/server/guard";
+import { getHouseholdSettings, updateHouseholdSettings } from "@/server/household";
 
 const Body = z
   .object({
@@ -20,58 +12,14 @@ const Body = z
     message: "timezone, displayName, or quarantineEnforced is required.",
   });
 
-export async function publicHousehold(household: Household) {
-  const live = await storedQuarantineBlocking();
-  return {
-    timezone: household.timezone,
-    revision: household.revision,
-    quarantineEnforced: household.quarantineEnforced,
-    quarantineObservedEnabled: live.observedEnabled,
-    quarantinePolicyCount: live.policyCount,
-    displayName: household.displayName,
-  };
-}
-
 export async function GET(request: Request) {
-  return withSession(request, async () => {
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    return Response.json({ household: await publicHousehold(household) });
-  });
+  return withSession(request, async () => Response.json({ household: await getHouseholdSettings() }));
 }
 
 export async function PUT(request: Request) {
   return withMutation(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "timezone or quarantineEnforced is required.");
-    if (parsed.data.timezone) {
-      try {
-        new Intl.DateTimeFormat("en-US", { timeZone: parsed.data.timezone });
-      } catch {
-        return jsonError(400, "invalid_timezone", "Use an IANA timezone name.");
-      }
-    }
-    const data = {
-      ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
-      ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
-    };
-    // The same switch as the built-in quarantine rule's: turning it off ends a pause on it.
-    const household =
-      parsed.data.quarantineEnforced !== undefined
-        ? await setQuarantineEnforced(parsed.data.quarantineEnforced, data)
-        : await prisma().household.update({ where: { id: "default" }, data });
-    const change = await enqueueChange(parsed.data.quarantineEnforced !== undefined ? "quarantine" : "household");
-    // Both schedules are kept in the household's time zone.
-    if (parsed.data.timezone) {
-      rescheduleUpstreamProbe();
-      rescheduleAutoUpdate();
-    }
-    return Response.json({
-      household: await publicHousehold(household),
-      change,
-    });
-  });
+    const parsed = await readBody(request, Body, "timezone or quarantineEnforced is required.");
+    if (!parsed.ok) return parsed.response;
+    return Response.json(await updateHouseholdSettings(parsed.data));
+  }, { demoLock: true });
 }

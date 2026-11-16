@@ -1,10 +1,7 @@
-import { enqueueChange } from "@/server/changes";
 import { demoLocked } from "@/server/demo";
 import { withAdmin } from "@/server/guard";
-import { applyImport, browserOnly, HouseholdImportError, IMPORT_MAX_BYTES, previewImport } from "@/server/household-export";
+import { browserOnly, IMPORT_MAX_BYTES, importHousehold } from "@/server/household-export";
 import { jsonError } from "@/server/http";
-import { rescheduleAutoUpdate } from "@/server/updater";
-import { rescheduleUpstreamProbe } from "@/server/upstream/schedule";
 
 /** The upload, refused as soon as it passes the cap rather than after it is all in memory. */
 async function readUpload(request: Request): Promise<Buffer | null> {
@@ -30,18 +27,6 @@ export async function POST(request: Request) {
     if (mode !== "preview" && mode !== "apply") return jsonError(400, "invalid_request", "Send mode=preview or mode=apply.");
     const upload = await readUpload(request);
     if (!upload) return jsonError(413, "export_too_large", "A FamilyFi export is at most 50 MB.");
-    try {
-      if (mode === "preview") return Response.json({ summary: await previewImport(upload), change: null });
-      const summary = await applyImport(upload, { accountId: session.accountId });
-      const change = await enqueueChange("import");
-      rescheduleUpstreamProbe();
-      rescheduleAutoUpdate();
-      return Response.json({ summary, change });
-    } catch (error) {
-      if (error instanceof HouseholdImportError) {
-        return jsonError(error.code === "export_too_new" ? 409 : 400, error.code, error.message);
-      }
-      throw error;
-    }
+    return Response.json(await importHousehold(mode, upload, { accountId: session.accountId }));
   });
 }

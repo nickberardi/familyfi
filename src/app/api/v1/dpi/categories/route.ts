@@ -1,35 +1,16 @@
-import { prisma } from "@/server/db";
 import { withSession } from "@/server/guard";
-import { jsonError } from "@/server/http";
-import { clientForHousehold, connectionIdentity } from "@/server/unifi/connection";
-import { dpiCatalog } from "@/server/unifi/dpi-catalog";
 import { CURATED_CATEGORY_CANDIDATES, CURATED_MAP_STATUS } from "@/server/unifi/curated-categories";
-import { UnifiConfigError } from "@/server/unifi/errors";
+import { listDpi } from "@/server/unifi/dpi-catalog";
 
 export async function GET(request: Request) {
   return withSession(request, async () => {
-    const household = await prisma().household.findUnique({ where: { id: "default" } });
-    if (!household || household.connectionStatus === "unconfigured") {
-      return jsonError(409, "unifi_unconfigured", "Configure UniFi in Settings before listing DPI categories.");
-    }
-    try {
-      const client = clientForHousehold(household);
-      const url = new URL(request.url);
-      const filter = url.searchParams.get("filter") ?? undefined;
-      // A filtered search asks the gateway; the whole catalog is shared.
-      const categories = filter ? await client.listDpiCategories(filter) : await dpiCatalog(connectionIdentity(household), "categories", client);
-      return Response.json({
-        categories,
-        curated: {
-          status: CURATED_MAP_STATUS,
-          candidates: CURATED_CATEGORY_CANDIDATES,
-        },
-      });
-    } catch (error) {
-      if (error instanceof UnifiConfigError) {
-        return jsonError(409, "unifi_unconfigured", error.message);
-      }
-      throw error;
-    }
+    const filter = new URL(request.url).searchParams.get("filter") ?? undefined;
+    return Response.json({
+      categories: await listDpi("categories", filter),
+      curated: {
+        status: CURATED_MAP_STATUS,
+        candidates: CURATED_CATEGORY_CANDIDATES,
+      },
+    });
   });
 }

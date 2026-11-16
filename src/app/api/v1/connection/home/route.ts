@@ -1,10 +1,8 @@
 import { z } from "zod";
-import { homeOrigin, isPrivateOrigin } from "@/lib/connection-routes";
+import { isPrivateOrigin } from "@/lib/connection-routes";
 import { requestOrigin } from "@/server/auth";
-import { prisma } from "@/server/db";
-import { demoLocked } from "@/server/demo";
-import { readJson, withAdmin } from "@/server/guard";
-import { jsonError } from "@/server/http";
+import { getHomeUrl, setHomeUrl } from "@/server/connection-endpoints";
+import { readBody, withAdmin } from "@/server/guard";
 
 const Body = z.object({ url: z.string().max(2048).nullable() }).strict();
 
@@ -19,24 +17,13 @@ function home(request: Request, url: string | null) {
 }
 
 export async function GET(request: Request) {
-  return withAdmin(request, async () => {
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    return home(request, household.homeUrl);
-  });
+  return withAdmin(request, async () => home(request, await getHomeUrl()));
 }
 
 export async function PUT(request: Request) {
   return withAdmin(request, async () => {
-    const locked = demoLocked();
-    if (locked) return locked;
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const parsed = Body.safeParse(body.value);
-    if (!parsed.success) return jsonError(400, "invalid_request", "Send a url, or null to clear it.");
-    const blank = parsed.data.url === null || parsed.data.url.trim() === "";
-    const url = blank ? null : homeOrigin(parsed.data.url!);
-    if (!blank && !url) return jsonError(400, "invalid_home_url", "Use an http or https address with no path, such as http://192.168.1.10:7001.");
-    const household = await prisma().household.update({ where: { id: "default" }, data: { homeUrl: url } });
-    return home(request, household.homeUrl);
-  });
+    const parsed = await readBody(request, Body, "Send a url, or null to clear it.");
+    if (!parsed.ok) return parsed.response;
+    return home(request, await setHomeUrl(parsed.data.url));
+  }, { demoLock: true });
 }
