@@ -72,19 +72,21 @@ describe("editing a group", () => {
     expect(groupEditBody(group(), { ...groupEditDraft(group()), blockButtonRuleId: "r-social" })).toEqual({ name: "Sam", familyRole: "child", blockButtonRuleId: "r-social" });
   });
 
-  it("offers all internet, then each of the group's own category, app or website rules by its button name", () => {
+  it("offers all internet, then each of the group's own category, app or website rules by its own name", () => {
     const rule = (id: string, name: string, kind: string, extra: object = {}) =>
       ({ id, name, kind, scope: "group", groupIds: ["g1"], targetIds: [], domains: [], builtIn: null, ...extra }) as never;
     const rules = [
       rule("r-downtime", "Downtime", "internet"),
       rule("r-video", "TV video", "category", { targetIds: [4] }),
+      rule("r-screens", "Screens", "category", { targetIds: [4, 9] }),
       rule("r-tiktok", "No TikTok", "domain"),
       rule("r-other", "Other", "category", { groupIds: ["g2"], targetIds: [4] }),
       rule("countries", "Block countries", "domain", { builtIn: "countries" }),
     ];
-    expect(blockButtonChoices(group(), rules, "UTC", new Date())).toEqual([
+    expect(blockButtonChoices(group(), rules)).toEqual([
       { value: "", label: GROUP_EDIT_COPY.blockButtonAll },
-      { value: "r-video", label: "Video" },
+      { value: "r-video", label: "TV video" },
+      { value: "r-screens", label: "Screens" },
       { value: "r-tiktok", label: "No TikTok" },
     ]);
     expect(GROUP_EDIT_COPY.blockButton).toBe("Block button default");

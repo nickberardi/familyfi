@@ -34,7 +34,6 @@ export function useGroupEdit({
   request,
   accounts,
   rules,
-  timezone,
   demo = false,
 }: {
   group: Group;
@@ -42,8 +41,6 @@ export function useGroupEdit({
   request: ApiRequest;
   accounts: readonly Pick<Account, "recovery" | "groupId">[];
   rules: Rule[];
-  /** The household's time zone, which names the Block button's choices; null until it is known. */
-  timezone: string | null;
   /** The demo's one household keeps its DNS settings, so the resolver is never sent. */
   demo?: boolean;
 }) {
@@ -111,7 +108,7 @@ export function useGroupEdit({
     /** A family member with their own login stays an adult. */
     roleLocked: group.kind === "family" && roleLocked(group, accounts),
     /** The Block button default's choices; the setting shows only when there is more than one. */
-    blockButtonChoices: timezone ? blockButtonChoices(group, rules, timezone, new Date()) : [],
+    blockButtonChoices: blockButtonChoices(group, rules),
     demo,
     save,
   };
