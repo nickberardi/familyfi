@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AssignmentState, RuleKind, RuleMode, FamilyRole, GroupKind } from "@prisma/client";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as listCategories } from "@/app/api/v1/dpi/categories/route";
@@ -20,6 +20,7 @@ import {
 import { fixtureUnifiClient, policyMacs } from "../helpers/unifi-world";
 import { CURATED_CATEGORY_CANDIDATES } from "@/server/unifi/curated-categories";
 import { getSharedDevMockClient } from "@/server/unifi/dev-mock";
+import { listDpi } from "@/server/unifi/dpi-catalog";
 
 const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password";
 
@@ -102,6 +103,24 @@ describe("Phase 2 DPI rules", () => {
     await listApplications(request("/api/v1/dpi/applications?filter=Fixture", { auth }));
     await listApplications(request("/api/v1/dpi/applications?filter=Fixture", { auth }));
     expect(reads()).toBe(3);
+  });
+
+  it("passes on a gateway failure that is not its configuration, for the guard to answer", async () => {
+    await prisma().household.update({
+      where: { id: "default" },
+      data: { unifiKeyCiphertext: Buffer.from("x"), unifiKeyIv: Buffer.from("y"), unifiKeyAuthTag: Buffer.from("z") },
+    });
+    process.env.FAMILYFI_MODE = "dev";
+    const gateway = getSharedDevMockClient();
+    const failure = new Error("gateway unreachable");
+    vi.spyOn(gateway, "listDpiApplications").mockRejectedValue(failure);
+    vi.spyOn(gateway, "listDpiCategories").mockRejectedValue(failure);
+    try {
+      await expect(listDpi("applications", "Fixture")).rejects.toBe(failure);
+      await expect(listDpi("categories", "Fixture")).rejects.toBe(failure);
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("lists mock DPI catalog and creates a category rule for an adult", async () => {
