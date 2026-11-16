@@ -4,7 +4,7 @@ import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, internetLinks, lifted, publicGroup, sessionActor } from "./groups";
 import { jsonError } from "./http";
-import { CLEARED, readLiftBody, type LiftAction } from "./rule-lifts";
+import { CLEARED, readLiftBody, runLift, type LiftAction } from "./rule-lifts";
 import { activeWindowsEnd, ruleInternetWindows } from "./rules";
 import { pauseRuleName } from "./unifi/names";
 
@@ -114,4 +114,15 @@ export async function runGroupInternet(
   const fresh = await prisma().group.findUniqueOrThrow({ where: { id: groupId }, include: groupInclude });
   const change = await enqueueChange(action === "disallow" ? "allow" : action);
   return Response.json({ group: publicGroup(fresh, household.timezone, now), change });
+}
+
+/** A verb on one of a group's rules, for that group alone: on `internet`, the group's own pause or allowance. */
+export function runGroupRuleLift(
+  request: Request,
+  session: Parameters<typeof runLift>[1],
+  action: LiftAction,
+  target: { groupId: string; ruleId: string },
+): Promise<Response> {
+  if (target.ruleId === INTERNET_RULE_ID) return runGroupInternet(request, session, action, target.groupId);
+  return runLift(request, session, action, target);
 }

@@ -19,6 +19,7 @@ import {
 } from "@/lib/checkup";
 import { QUARANTINE_RULE_ID } from "@/lib/rules";
 import { prisma } from "./db";
+import { ApiError } from "./http";
 import type { GatewayDriftChange } from "./unifi/drift";
 import { normalizeMac } from "./mac";
 import type { UnifiClient } from "./unifi/client";
@@ -313,4 +314,10 @@ export async function setFindingDismissed(key: string, value: boolean): Promise<
     data: value ? { dismissedAt: new Date(), dismissedSubject: row.subject } : { dismissedAt: null, dismissedSubject: null },
   });
   return true;
+}
+
+/** Dismiss a finding ("Dismiss", or "This is intended" for a note), or show it again, and answer with the checkup as it now stands. */
+export async function dismissFinding(id: string, dismissed: boolean) {
+  if (!(await setFindingDismissed(id, dismissed))) throw new ApiError(404, "not_found", "Finding not found.");
+  return checkupState();
 }
