@@ -1325,6 +1325,13 @@
         "pairing",
         "settings"
       ]
+    },
+    "tests/unit/child-day.test.ts": {
+      "categories": [
+        "schedules",
+        "rules",
+        "display"
+      ]
     }
   }
 }
