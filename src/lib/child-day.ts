@@ -387,8 +387,21 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     (ask.about === "pause"
       ? Boolean(me.pause)
       : me.windows.some((window) => window.ruleId === ask.ruleId && !window.allowed && isWindowActive(window, now, me.timezone)));
-  const ask = me.ask && stillOn(me.ask) ? dayAsk(me.ask, minutesOf) : undefined;
+  const ask = me.ask && stillOn(me.ask) ? answerNow(me.ask) : undefined;
   return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}), ...(ask ? { ask } : {}) }, now: minutes, clock };
+
+  // A yes is told only while what it gave is still so, and as long as it is now: the group's pause
+  // and its rules' lifts are what hold, not what was asked for. A pause set again after a yes is a
+  // new pause; a rule's lift for less, or more, than was asked is told as given, and once it is
+  // over, or a parent took it back, the yes is not told.
+  function answerNow(ask: NonNullable<GroupDay["ask"]>): DayAsk | undefined {
+    if (ask.state !== "yes") return dayAsk(ask, minutesOf);
+    if (ask.about === "pause") return me.pause ? undefined : dayAsk(ask, minutesOf);
+    const allowed = me.windows.find((window) => window.ruleId === ask.ruleId && window.allowed)?.allowed;
+    if (!allowed || !ask.answeredAt) return undefined;
+    const given = Math.round((new Date(allowed.until).getTime() - new Date(ask.answeredAt).getTime()) / 60_000);
+    return given > 0 ? dayAsk({ ...ask, minutes: given }, minutesOf) : undefined;
+  }
 }
 
 /** FamilyFi's ask as the day tells it; a parent FamilyFi has no name for goes unnamed. */
