@@ -9,6 +9,7 @@ import {
   noMembersAttention,
   syncFailed,
   syncLogRows,
+  syncLogWhoLine,
   syncProblem,
   syncStats,
   syncStatusCard,
@@ -114,6 +115,32 @@ describe("sync copy", () => {
     expect(rows[2]!.detailInk).toBe("var(--ff-danger)");
     expect(syncLogRows(sync({ lastRun: null, issues: [{ kind: "missing_policy", groupId: "g2", groupName: "A teen", message: "m" }] }), "UTC")[0]!.when).toBe("Now");
     expect(syncLogRows(null, "UTC")).toEqual([]);
+  });
+
+  it("says who acted: the adult, the paired device they used, or FamilyFi for what its sync found", () => {
+    const base = { revision: 4, appliedRevision: 4, status: "applied" as const, scope: "rule", deviceMac: null, error: null, updatedAt: "2026-09-14T19:58:00Z" };
+    const rows = syncLogRows(
+      sync({
+        issues: [{ kind: "no_members", groupId: "g1", groupName: "A child", message: "needs a device" }],
+        changes: [
+          { ...base, id: "web", actor: { displayName: "Nick" } },
+          { ...base, id: "siri", scope: "pause", actor: { displayName: "Nick", device: { displayName: "Siri and Shortcuts on Nick's iPhone" } } },
+          { ...base, id: "watch", scope: "extend", actor: { displayName: "Sam", device: { displayName: "Apple Watch" } } },
+          // An account removed since, or a server before API 1.5.0.
+          { ...base, id: "gone" },
+        ],
+      }),
+      "UTC",
+    );
+    expect(rows.map((row) => [row.key, row.who, row.whoDevice, syncLogWhoLine(row)])).toEqual([
+      ["issue-g1", "FamilyFi", null, "By FamilyFi"],
+      ["web", "Nick", null, "By Nick"],
+      ["siri", "Nick", "Siri and Shortcuts on Nick's iPhone", "By Nick · Siri and Shortcuts on Nick's iPhone"],
+      ["watch", "Sam", "Apple Watch", "By Sam · Apple Watch"],
+      ["gone", null, null, null],
+    ]);
+    const flagged = syncLogRows(sync({ lastRun: { ...sync().lastRun!, status: "failed", error: "timed out" } }), "UTC")[0]!;
+    expect([flagged.who, flagged.whoDevice]).toEqual(["FamilyFi", null]);
   });
 
   it("lists a failed sweep first, since no change row may carry its error", () => {

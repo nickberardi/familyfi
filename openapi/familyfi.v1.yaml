@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 1.4.0
+  version: 1.5.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 0.36.0
@@ -4402,6 +4402,24 @@ components:
         deviceMac: { type: [string, "null"] }
         actorAccountId: { type: [string, "null"] }
         actorDeviceId: { type: [string, "null"] }
+        actor:
+          type: object
+          additionalProperties: false
+          description: |
+            Who asked for the change: the adult, and the paired device they used (the app, its Siri
+            and Shortcuts, a Watch or an agent), which is left out for a web sign-in and once that
+            device has been removed. Left out when
+            that adult's account has since been removed, and always for an agent reading it, which
+            never sees the household's adults. Servers before API 1.5.0 leave it out.
+          required: [displayName]
+          properties:
+            displayName: { type: string, description: The adult's name. }
+            device:
+              type: object
+              additionalProperties: false
+              required: [displayName]
+              properties:
+                displayName: { type: string, description: "The paired device's name, as Pair Device lists it." }
         error: { type: [string, "null"] }
         updatedAt: { type: string, format: date-time }
     SyncStatus:

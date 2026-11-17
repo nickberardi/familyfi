@@ -1,5 +1,5 @@
 import { ChangeStatus } from "@prisma/client";
-import { publicChange } from "./changes";
+import { CHANGE_ACTOR_INCLUDE, publicChange } from "./changes";
 import { checkupProblemCount } from "./checkup";
 import { prisma } from "./db";
 import { deviceScope } from "./devices";
@@ -7,8 +7,11 @@ import { loadHousehold } from "./household";
 import { isWriteFailure, storedCoverage } from "./policy-coverage";
 import { networkInScope } from "./unifi/scope";
 
-/** What Sync shows: the last pass, how many policies FamilyFi owns and how many are failing, and the recent changes. */
-export async function syncStatus() {
+/**
+ * What Sync shows: the last pass, how many policies FamilyFi owns and how many are failing, and the
+ * recent changes, each with who asked for it when `withActors` is set.
+ */
+export async function syncStatus({ withActors = false }: { withActors?: boolean } = {}) {
   const household = await loadHousehold();
   const scope = deviceScope(household);
   // Every policy FamilyFi owns: pause and quarantine policies, and one per rule window. Counted, not
@@ -19,7 +22,7 @@ export async function syncStatus() {
     prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } }),
     Promise.all([prisma().appPolicy.count({ where: live }), prisma().rulePolicy.count({ where: live })]),
     Promise.all([prisma().appPolicy.count({ where: failing }), prisma().rulePolicy.count({ where: failing })]),
-    prisma().changeResult.findMany({ orderBy: { updatedAt: "desc" }, take: 30 }),
+    prisma().changeResult.findMany({ orderBy: { updatedAt: "desc" }, take: 30, include: CHANGE_ACTOR_INCLUDE }),
     storedCoverage({ now: new Date(), deviceInScope: (networkId) => networkInScope(scope, networkId) }),
     checkupProblemCount(),
   ]);
@@ -60,7 +63,7 @@ export async function syncStatus() {
           error: runError,
         }
       : null,
-    changes: changeRows.map(publicChange),
+    changes: changeRows.map((change) => publicChange(change, withActors)),
     checkupProblems,
   };
 }
