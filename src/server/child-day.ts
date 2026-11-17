@@ -30,6 +30,8 @@ export async function childDay(groupId: string | null, now = new Date()): Promis
     group: { id: group.id, name: group.name },
     timezone,
     pause: shown.suspension.active && block
+      // Only starting, extending and ending a pause write the block rule's row (group-internet.ts,
+      // group-unblock.ts), so its last update is when the pause was last set.
       ? { by: shown.suspension.by?.name ?? null, since: block.updatedAt.toISOString(), until: shown.suspension.until }
       : null,
     allowance: shown.allowance.active ? { by: shown.allowance.by?.name ?? null, until: shown.allowance.until } : null,
