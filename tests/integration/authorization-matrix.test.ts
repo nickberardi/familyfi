@@ -11,7 +11,7 @@
 
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import { AccountKind, DeviceScope, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { AccountKind, SessionKind } from "@prisma/client";
 import { beforeAll, describe, expect, it } from "vitest";
 import { CSRF_COOKIE, RECOVERY_USERNAME, SESSION_COOKIE } from "@/lib/constants";
 import { createSession, hashPassword } from "@/server/auth";
@@ -38,10 +38,17 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
  * - `tunnel-bearer`: the same browser's session token sent as a bearer through the tunnel,
  *   which keeps `Authorization`. A browser's session counts only from its cookie, so it fares
  *   no better than `tunnel`.
- * - `agent:full`, `agent:readOnly`, `watch:rulesOnly` and `app:rulesOnly`: a paired device on the home network,
- *   signed in as the administrator, with that scope. Its scope bounds it, not the account.
+ * - `agent:full`, `agent:readOnly`, `app-watch` and `app-controls`: a paired device on the home network,
+ *   signed in as the administrator: an agent with that scope, the app's Watch, or its Siri, Shortcuts
+ *   and system controls, both `app:rulesOnly`. Its scope bounds it, not the account.
  */
-const DEVICES = ["agent:full", "agent:readOnly", "watch:rulesOnly", "app:rulesOnly"] as const;
+const DEVICE_KINDS = {
+  "agent:full": { clientType: "agent", scope: "agent:full" },
+  "agent:readOnly": { clientType: "agent", scope: "agent:readOnly" },
+  "app-watch": { clientType: "app-watch", scope: "app:rulesOnly" },
+  "app-controls": { clientType: "app-controls", scope: "app:rulesOnly" },
+} as const;
+const DEVICES = Object.keys(DEVICE_KINDS) as (keyof typeof DEVICE_KINDS)[];
 type Device = (typeof DEVICES)[number];
 const CALLERS = ["anonymous", "member", "administrator", "recovery", "tunnel", "tunnel-bearer", ...DEVICES] as const;
 type Caller = (typeof CALLERS)[number];
@@ -104,9 +111,9 @@ function expected(entry: Entry): Record<Caller, Outcome> {
 type Entry = { access: Access; devices?: readonly Device[]; question?: string };
 
 const READERS: readonly Device[] = ["agent:full", "agent:readOnly"];
-const READERS_AND_WATCH: readonly Device[] = ["agent:full", "agent:readOnly", "watch:rulesOnly", "app:rulesOnly"];
+const READERS_AND_WATCH: readonly Device[] = ["agent:full", "agent:readOnly", "app-watch", "app-controls"];
 const CONTROLLERS: readonly Device[] = ["agent:full"];
-const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "watch:rulesOnly", "app:rulesOnly"];
+const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "app-watch", "app-controls"];
 
 /**
  * Only administrators use FamilyFi: an adult without administrator access has no sign-in, session
@@ -134,7 +141,7 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/auth/refresh": { access: "refresh-token" },
   "GET /api/v1/auth/session": { access: "session", devices: READERS_AND_WATCH },
   "GET /api/v1/changes/{id}": { access: "session", devices: READERS_AND_WATCH },
-  "GET /api/v1/connection": { access: "session", devices: ["watch:rulesOnly", "app:rulesOnly"] },
+  "GET /api/v1/connection": { access: "session", devices: ["app-watch", "app-controls"] },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
   "POST /api/v1/connection/endpoints": { access: "administrator" },
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
@@ -158,7 +165,7 @@ const ACCESS: Record<string, Entry> = {
   "DELETE /api/v1/paired/devices": { access: "administrator" },
   "GET /api/v1/paired/devices/{id}": { access: "administrator" },
   "PATCH /api/v1/paired/devices/{id}": { access: "administrator" },
-  "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["watch:rulesOnly", "app:rulesOnly"] },
+  "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["app-watch", "app-controls"] },
   // Only the app on that device: the own-id rule is in the route's function and its own test
   // (push-registration-api), since this table has no app:full caller.
   "PUT /api/v1/paired/devices/{id}/push": { access: "session" },
@@ -313,8 +320,8 @@ describe("authorization matrix", () => {
     const administrator = await prisma().account.create({ data: { username: "matrix-admin", displayName: "Administrator", kind: AccountKind.personal, isAdmin: true, passwordHash } });
     Object.assign(accounts, { member: member.id, administrator: administrator.id, recovery: recovery.id });
     for (const device of DEVICES) {
-      const [client, scope] = device.split(":") as [PairedDeviceClient, DeviceScope];
-      const created = await prisma().pairedDevice.create({ data: { displayName: device, client, scope, accountId: client === PairedDeviceClient.agent ? administrator.id : null } });
+      const { clientType, scope } = DEVICE_KINDS[device];
+      const created = await prisma().pairedDevice.create({ data: { displayName: device, clientType, scope, accountId: clientType === "agent" ? administrator.id : null } });
       devices[device] = created.id;
     }
   });

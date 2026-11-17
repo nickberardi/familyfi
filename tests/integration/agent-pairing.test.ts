@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { AccountKind, DeviceScope, PairedDeviceClient } from "@prisma/client";
+import { AccountKind } from "@prisma/client";
 import { TUNNEL_HEADER } from "@/lib/constants";
 import { hashPassword } from "@/server/auth";
 import { prisma } from "@/server/db";
@@ -73,7 +73,8 @@ describe("paired agents", () => {
   it("pairs at the claim, signed in at once with a bearer and refresh token and no password or credential", async () => {
     const auth = await adult();
     const { issued, claimed } = await connectedAgent(auth, "full");
-    expect(Object.keys(issued.payload).sort()).toEqual(["code", "fingerprint", "url", "version"]);
+    expect(Object.keys(issued.payload).sort()).toEqual(["clientType", "code", "fingerprint", "url", "version"]);
+    expect(issued.payload.clientType).toBe("agent");
     // The address the adult made it from, where browser sign-in is only on the home network.
     expect(issued.payload.url).toBe(TEST_ORIGIN);
     expect(new Date((await prisma().pairing.findUniqueOrThrow({ where: { id: issued.id } })).expiresAt).getTime() - Date.now()).toBeGreaterThan(14 * 60 * 1000);
@@ -85,7 +86,7 @@ describe("paired agents", () => {
     expect(new Date(claimed.refreshExpiresAt).getTime() - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
     expect(claimed.device).toMatchObject({ displayName: "Claude Code on a MacBook", scope: "full" });
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: claimed.device.id } });
-    expect(device.client).toBe(PairedDeviceClient.agent);
+    expect(device.clientType).toBe("agent");
     expect(device.accountId).toBe((await prisma().account.findUniqueOrThrow({ where: { username: "parent" } })).id);
 
     const status = await inviteStatus(request(`/api/v1/paired/invites/${issued.id}`, { auth }), { params: Promise.resolve({ id: issued.id }) });
@@ -139,7 +140,7 @@ describe("paired agents", () => {
     expect(claimed.device).toMatchObject({ client: "agent", scope: "readOnly" });
 
     const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
-    await expect(inviteAgent({ url: TEST_ORIGIN, displayName: "Agent", scope: DeviceScope.rulesOnly, createdByAccountId: parent.id })).rejects.toThrow(/cannot hold/);
+    await expect(inviteAgent({ url: TEST_ORIGIN, displayName: "Agent", scope: "app:rulesOnly", createdByAccountId: parent.id })).rejects.toThrow(/cannot hold/);
   });
 
   it("refuses an expired code", async () => {
@@ -281,7 +282,7 @@ describe("paired agents", () => {
 
     // An invite left over from before the rule cannot be claimed either.
     const account = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
-    const left = await inviteAgent({ createdByAccountId: account.id, displayName: "Claude Code", scope: DeviceScope.readOnly, url: TEST_ORIGIN });
+    const left = await inviteAgent({ createdByAccountId: account.id, displayName: "Claude Code", scope: "agent:readOnly", url: TEST_ORIGIN });
     expect((await claim(decodePairingCode(left.code))).status).toBe(403);
     expect(await prisma().pairedDevice.count()).toBe(0);
   });

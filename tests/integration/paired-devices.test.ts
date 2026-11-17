@@ -109,8 +109,8 @@ describe("/paired/devices", () => {
     expect(promoted.status).toBe(400);
     expect(((await promoted.json()) as { error: { code: string } }).error.code).toBe("invalid_scope");
     expect((await patch(phone.device.id, { scope: "rulesOnly" })).status).toBe(400);
-    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: controls.device.id } })).scope).toBe("rulesOnly");
-    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: phone.device.id } })).scope).toBe("full");
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: controls.device.id } })).scope).toBe("app:rulesOnly");
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: phone.device.id } })).scope).toBe("app:full");
     // Renaming it is still allowed.
     expect((await patch(controls.device.id, { displayName: "Siri and Shortcuts on Den iPad" })).status).toBe(200);
     expect((await patch(phone.device.id, {})).status).toBe(400);
@@ -235,10 +235,10 @@ describe("/paired/devices", () => {
     const recovery = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
     // Paired before the rule: a phone and its Watch acting as the recovery admin, and an invite still waiting.
     const phone = await prisma().pairedDevice.create({ data: { displayName: "Old iPhone", accountId: recovery.id } });
-    const watch = await prisma().pairedDevice.create({ data: { displayName: "Old Watch", client: "watch", scope: "rulesOnly", accountId: recovery.id, parentDeviceId: phone.id } });
+    const watch = await prisma().pairedDevice.create({ data: { displayName: "Old Watch", clientType: "app-watch", scope: "app:rulesOnly", accountId: recovery.id, parentDeviceId: phone.id } });
     for (const device of [phone, watch]) await createSession({ accountId: recovery.id, username: recovery.username, kind: SessionKind.bearer, deviceId: device.id });
     const sessionIds = (await prisma().session.findMany({ where: { deviceId: { in: [phone.id, watch.id] } } })).map((session) => session.id);
-    const waiting = await prisma().pairing.create({ data: { client: "app", scope: "full", displayName: "Spare", accountId: recovery.id, createdByAccountId: recovery.id, tokenHash: "unused", expiresAt: new Date(Date.now() + 60_000) } });
+    const waiting = await prisma().pairing.create({ data: { clientType: "app", scope: "app:full", displayName: "Spare", accountId: recovery.id, createdByAccountId: recovery.id, tokenHash: "unused", expiresAt: new Date(Date.now() + 60_000) } });
 
     const sql = readFileSync(path.join(__dirname, "../../prisma/migrations/20261026170000_no_devices_as_recovery/migration.sql"), "utf8");
     for (const statement of sql.split(/;\s*$/m).map((part) => part.replace(/^--.*$/gm, "").trim()).filter(Boolean)) await prisma().$executeRawUnsafe(statement);
@@ -248,5 +248,47 @@ describe("/paired/devices", () => {
     expect(await prisma().session.count({ where: { id: { in: sessionIds }, revokedAt: null } })).toBe(0);
     expect((await prisma().pairing.findUniqueOrThrow({ where: { id: waiting.id } })).expiresAt.getTime()).toBeLessThanOrEqual(Date.now());
     expect((await list(auth, "?status=active")).map((device) => device.id)).toEqual([kept.device.id]);
+  });
+
+  it("moves every device and invite to its client type and full scope, so nothing pairs again", async () => {
+    // The tables as they were, in a schema of their own, then the migration over them.
+    const schema = "client_type_migration";
+    const db = prisma();
+    await db.$executeRawUnsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    await db.$executeRawUnsafe(`CREATE SCHEMA ${schema}`);
+    try {
+      await db.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL search_path TO ${schema}`);
+        await tx.$executeRawUnsafe(`CREATE TYPE "PairedDeviceClient" AS ENUM ('app', 'watch', 'agent')`);
+        await tx.$executeRawUnsafe(`CREATE TYPE "DeviceScope" AS ENUM ('full', 'rulesOnly', 'readOnly')`);
+        await tx.$executeRawUnsafe(`CREATE TABLE "PairedDevice" ("id" TEXT PRIMARY KEY, "client" "PairedDeviceClient" NOT NULL DEFAULT 'app', "scope" "DeviceScope" NOT NULL DEFAULT 'full')`);
+        await tx.$executeRawUnsafe(`CREATE TABLE "Pairing" ("id" TEXT PRIMARY KEY, "client" "PairedDeviceClient" NOT NULL DEFAULT 'app', "scope" "DeviceScope")`);
+        await tx.$executeRawUnsafe(`INSERT INTO "PairedDevice" ("id", "client", "scope") VALUES ('phone', 'app', 'full'), ('controls', 'app', 'rulesOnly'), ('watch', 'watch', 'rulesOnly'), ('agent-full', 'agent', 'full'), ('agent-read', 'agent', 'readOnly')`);
+        await tx.$executeRawUnsafe(`INSERT INTO "Pairing" ("id", "client", "scope") VALUES ('phone', 'app', 'full'), ('old-phone', 'app', NULL), ('controls', 'app', 'rulesOnly'), ('watch', 'watch', 'rulesOnly'), ('agent-read', 'agent', 'readOnly')`);
+        const sql = readFileSync(path.join(__dirname, "../../prisma/migrations/20261117130000_client_type/migration.sql"), "utf8");
+        for (const statement of sql.split(/;\s*$/m).map((part) => part.replace(/^--.*$/gm, "").trim()).filter(Boolean)) await tx.$executeRawUnsafe(statement);
+        const devices = await tx.$queryRawUnsafe<{ id: string; clientType: string; scope: string }[]>(`SELECT "id", "clientType", "scope" FROM "PairedDevice" ORDER BY "id"`);
+        expect(devices).toEqual([
+          { id: "agent-full", clientType: "agent", scope: "agent:full" },
+          { id: "agent-read", clientType: "agent", scope: "agent:readOnly" },
+          { id: "controls", clientType: "app-controls", scope: "app:rulesOnly" },
+          { id: "phone", clientType: "app", scope: "app:full" },
+          { id: "watch", clientType: "app-watch", scope: "app:rulesOnly" },
+        ]);
+        const invites = await tx.$queryRawUnsafe<{ id: string; clientType: string; scope: string | null }[]>(`SELECT "id", "clientType", "scope" FROM "Pairing" ORDER BY "id"`);
+        expect(invites).toEqual([
+          { id: "agent-read", clientType: "agent", scope: "agent:readOnly" },
+          { id: "controls", clientType: "app-controls", scope: "app:rulesOnly" },
+          { id: "old-phone", clientType: "app", scope: null },
+          { id: "phone", clientType: "app", scope: "app:full" },
+          { id: "watch", clientType: "app-watch", scope: "app:rulesOnly" },
+        ]);
+      });
+      // Only the known values are stored: an older word is refused.
+      await expect(db.$executeRawUnsafe(`INSERT INTO ${schema}."PairedDevice" ("id", "clientType", "scope") VALUES ('bad', 'app', 'full')`)).rejects.toThrow(/PairedDevice_scope_check/);
+      await expect(db.$executeRawUnsafe(`INSERT INTO ${schema}."PairedDevice" ("id", "clientType", "scope") VALUES ('bad', 'watch', 'app:rulesOnly')`)).rejects.toThrow(/PairedDevice_clientType_check/);
+    } finally {
+      await db.$executeRawUnsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    }
   });
 });

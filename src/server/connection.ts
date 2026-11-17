@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { isServerOrigin } from "@/lib/pairing-code";
-import { AccountKind, ConnectionTransport, ConnectionTrustMode, type DeviceScope, EdgeAuth, type PairedDeviceClient, RouteKind, type Session } from "@prisma/client";
+import { AccountKind, ConnectionTransport, ConnectionTrustMode, EdgeAuth, RouteKind, type Session } from "@prisma/client";
 import { decryptSecret, encryptSecret, randomToken } from "./crypto";
 import { prisma } from "./db";
 import { isFullApp } from "./device-scope";
@@ -8,7 +8,7 @@ import { edgeCredentials, recordDelivered } from "./edge-auth";
 
 const SPKI_SHA256 = /^[A-Za-z0-9_-]{43}$/;
 
-type ConnectionSession = Session & { account: { kind: AccountKind; isAdmin: boolean } | null; device?: { client: PairedDeviceClient; scope: DeviceScope } | null };
+type ConnectionSession = Session & { account: { kind: AccountKind; isAdmin: boolean } | null; device?: { clientType: string; scope: string } | null };
 
 /**
  * Only a person in a browser, or their app (`app:full`), may administer. A Watch, an agent or the

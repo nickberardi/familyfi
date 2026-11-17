@@ -1,21 +1,23 @@
-import { DeviceScope, PairedDeviceClient } from "@prisma/client";
+import { mayHoldScope, type DeviceScope } from "@/lib/client-type";
 
 /**
- * What a paired device may call. Every paired device has a scope, and each (client, scope) pair is
- * one explicit allowlist, never a ladder: an agent's `full` is the agent list, not an app's minus
- * exceptions. Only administrators use FamilyFi, so every device acts as one, and the scope bounds the
- * device whatever its account may do. A pair not named here allows nothing.
+ * What a paired device may call. Every paired device has a scope, and each scope is one explicit
+ * allowlist, never a ladder: an agent's `full` is the agent list, not an app's minus exceptions. Only
+ * administrators use FamilyFi, so every device acts as one, and the scope bounds the device whatever
+ * its account may do. A scope not named here, or one its client type may not hold
+ * (`CLIENT_SCOPES` in src/lib/client-type.ts), allows nothing.
  *
- * - `app:full`: the app on a phone, tablet or Mac: everything its account may do.
- * - `app:rulesOnly`: the Watch's list, for the app's Siri, Shortcuts and system controls, which run
- *   outside the app and so sign in as their own device, never with the app's tokens.
- * - `watch:rulesOnly`: lists, the rule verbs, a group's unblock, and `GET /connection` for the manifest it needs away from home.
+ * - `app:full`: the app (`app`) on a phone, tablet or Mac: everything its account may do.
+ * - `app:rulesOnly`: the app's Watch (`app-watch`), and its Siri, Shortcuts and system controls
+ *   (`app-controls`), which run outside the app and so sign in as their own device, never with the
+ *   app's tokens: lists, the rule verbs, a group's unblock, and `GET /connection` for the manifest
+ *   they need away from home.
  * - `agent:full`: household reads and controls; never accounts, UniFi settings, resolvers, household
  *   settings changes or connection management, including `GET /connection`, whose manifest carries
  *   Cloudflare Access tokens.
  * - `agent:readOnly`: household reads.
  *
- * The built-in quarantine rule's switch is the household's quarantine setting, so a Watch, an `app:rulesOnly` device or an
+ * The built-in quarantine rule's switch is the household's quarantine setting, so an `app:rulesOnly` device or an
  * agent may pause, extend and resume it, never switch, edit or delete it.
  */
 
@@ -35,7 +37,7 @@ function changesQuarantineSetting({ method, path }: ScopedCall): boolean {
   return method !== "GET" && method !== "HEAD" && QUARANTINE_SWITCH.test(path);
 }
 
-/** The one list a Watch and an app's `rulesOnly` sign-in share. */
+/** `app:rulesOnly`: the one list a Watch and an app's Siri, Shortcuts and controls share. */
 function rulesOnly({ method, path }: ScopedCall): boolean {
   if (method === "GET") {
     return path === "/api/v1/auth/session"
@@ -94,27 +96,32 @@ function agentFull(request: ScopedCall): boolean {
   return agentReadOnly(request) || (AGENT_WRITES[request.method] ?? []).some((pattern) => pattern.test(request.path));
 }
 
-const ALLOWLISTS: Partial<Record<PairedDeviceClient, Partial<Record<DeviceScope, (request: ScopedCall) => boolean>>>> = {
-  [PairedDeviceClient.app]: { [DeviceScope.full]: () => true, [DeviceScope.rulesOnly]: rulesOnly },
-  [PairedDeviceClient.watch]: { [DeviceScope.rulesOnly]: rulesOnly },
-  [PairedDeviceClient.agent]: { [DeviceScope.full]: agentFull, [DeviceScope.readOnly]: agentReadOnly },
+const ALLOWLISTS: Record<DeviceScope, ((request: ScopedCall) => boolean) | null> = {
+  "app:full": () => true,
+  "app:rulesOnly": rulesOnly,
+  "agent:full": agentFull,
+  "agent:readOnly": agentReadOnly,
+  // FamilyFi Me's list comes with its routes; until then it may call nothing.
+  "me:askOnly": null,
 };
 
-/** Whether a device of this client may hold this scope: exactly the five pairs above. */
-export function isValidScope(client: PairedDeviceClient, scope: DeviceScope): boolean {
-  return Boolean(ALLOWLISTS[client]?.[scope]);
+type Held = { clientType: string; scope: string };
+
+/** Whether a device of this client type may hold this scope (`CLIENT_SCOPES`). */
+export function isValidScope(clientType: string, scope: string | null | undefined): scope is DeviceScope {
+  return mayHoldScope(clientType, scope);
 }
 
 /**
  * Whether a device is the app itself, with everything its account may do: the only device that may
- * administer, set up a Watch or its own `rulesOnly` sign-in, or be re-paired. Never ask for the
- * client alone: an `app:rulesOnly` device is the same client.
+ * administer, set up a Watch or its own Siri and shortcuts, or be re-paired.
  */
-export function isFullApp<T extends { client: PairedDeviceClient; scope: DeviceScope }>(device: T | null | undefined): device is T {
-  return device?.client === PairedDeviceClient.app && device.scope === DeviceScope.full;
+export function isFullApp<T extends Held>(device: T | null | undefined): device is T {
+  return device?.clientType === "app" && device.scope === "app:full";
 }
 
-export function deviceRouteAllowed(input: { client: PairedDeviceClient; scope: DeviceScope } & ScopedCall): boolean {
-  const allowed = ALLOWLISTS[input.client]?.[input.scope];
+export function deviceRouteAllowed(input: Held & ScopedCall): boolean {
+  if (!isValidScope(input.clientType, input.scope)) return false;
+  const allowed = ALLOWLISTS[input.scope];
   return allowed ? allowed(input) : false;
 }

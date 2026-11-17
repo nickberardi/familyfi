@@ -1,4 +1,5 @@
-import { ConnectionTrustMode, DeviceScope, PairedDeviceClient, SessionKind, type Account, type Pairing } from "@prisma/client";
+import { ConnectionTrustMode, SessionKind, type Account, type Pairing } from "@prisma/client";
+import { legacyClient, scopeWord, type ClientType, type DeviceScope } from "@/lib/client-type";
 import { bearerSessionData, isAdministratorAccount, mayPairAs, toPublicSession, type SignedInSession } from "./auth";
 import { ensureConnectionIdentity, instanceFingerprint, publicEndpoint, removeDevice, signedEndpointManifest } from "./connection";
 import { randomToken, safeEqual, sha256 } from "./crypto";
@@ -43,8 +44,8 @@ async function invitePhone(input: { endpointId: string; displayName: string; acc
   const token = randomToken();
   const invite = await prisma().pairing.create({
     data: {
-      client: PairedDeviceClient.app,
-      scope: DeviceScope.full,
+      clientType: "app",
+      scope: "app:full",
       endpointId: input.endpointId,
       displayName: input.displayName,
       accountId: input.accountId,
@@ -63,6 +64,7 @@ async function invitePhone(input: { endpointId: string; displayName: string; acc
   const edgeToken = storedServiceToken(endpoint);
   const code = encodePairingCode({
     version: PAIRING_CODE_VERSION,
+    clientType: "app",
     url: endpoint.url,
     code: `${invite.id}.${token}`,
     fingerprint: instanceFingerprint(household.instancePublicKey!),
@@ -77,11 +79,11 @@ async function invitePhone(input: { endpointId: string; displayName: string; acc
  * is on the home network because browser sign-in is. It never carries a pin or an Access token.
  */
 export async function inviteAgent(input: { url: string; displayName: string; scope: DeviceScope; createdByAccountId: string; parentDeviceId?: string | null }) {
-  if (!isValidScope(PairedDeviceClient.agent, input.scope)) throw new Error(`An agent cannot hold the ${input.scope} scope.`);
+  if (!isValidScope("agent", input.scope)) throw new Error(`An agent cannot hold the ${input.scope} scope.`);
   const token = randomToken();
   const invite = await prisma().pairing.create({
     data: {
-      client: PairedDeviceClient.agent,
+      clientType: "agent",
       scope: input.scope,
       displayName: input.displayName,
       accountId: input.createdByAccountId,
@@ -92,7 +94,7 @@ export async function inviteAgent(input: { url: string; displayName: string; sco
     },
   });
   const household = await ensureConnectionIdentity();
-  const code = encodePairingCode({ version: PAIRING_CODE_VERSION, url: input.url, code: `${invite.id}.${token}`, fingerprint: instanceFingerprint(household.instancePublicKey!) });
+  const code = encodePairingCode({ version: PAIRING_CODE_VERSION, clientType: "agent", url: input.url, code: `${invite.id}.${token}`, fingerprint: instanceFingerprint(household.instancePublicKey!) });
   return { invite, code };
 }
 
@@ -103,7 +105,7 @@ class ClientIdInUseError extends Error {
   }
 }
 
-type Joined = { invite: Pairing; device: { id: string; displayName: string; client: PairedDeviceClient; scope: DeviceScope }; account: Account; bearer: ReturnType<typeof bearerSessionData> };
+type Joined = { invite: Pairing; device: { id: string; displayName: string; clientType: string; scope: string }; account: Account; bearer: ReturnType<typeof bearerSessionData> };
 
 /** Creates the device and signs it in, inside the caller's transaction. */
 async function join(db: Db, input: {
@@ -115,13 +117,13 @@ async function join(db: Db, input: {
   now: Date;
 }): Promise<Omit<Joined, "invite" | "account">> {
   const { invite, account, now } = input;
-  if (!invite.scope || !isValidScope(invite.client, invite.scope)) throw new Error(`A ${invite.client} cannot hold the ${invite.scope} scope.`);
+  if (!isValidScope(invite.clientType, invite.scope)) throw new Error(`A ${invite.clientType} cannot hold the ${invite.scope} scope.`);
   // A re-paired phone or a re-enrolled companion retires the record it replaces, so it is never listed twice.
   const replaces = invite.replacesDeviceId;
   if (input.clientId) {
     const previous = await db.pairedDevice.findUnique({ where: { clientId: input.clientId } });
-    // Only the same kind of device is replaced: an app's rulesOnly sign-in never retires a Watch, nor a Watch it.
-    if (previous && (previous.client !== invite.client || previous.scope !== invite.scope)) throw new ClientIdInUseError();
+    // Only the same client type is replaced: an app's Siri and shortcuts never retire a Watch, nor a Watch them.
+    if (previous && (previous.clientType !== invite.clientType || previous.scope !== invite.scope)) throw new ClientIdInUseError();
     if (previous) {
       await db.session.updateMany({ where: { deviceId: previous.id, revokedAt: null }, data: { revokedAt: now } });
       await db.pairedDevice.update({ where: { id: previous.id }, data: { revokedAt: now, clientId: null } });
@@ -133,7 +135,7 @@ async function join(db: Db, input: {
   const device = await db.pairedDevice.create({
     data: {
       displayName: input.displayName,
-      client: invite.client,
+      clientType: invite.clientType,
       scope: invite.scope,
       clientId: input.clientId ?? null,
       accountId: account.id,
@@ -155,12 +157,20 @@ async function join(db: Db, input: {
   return { device, bearer };
 }
 
+/**
+ * A device's kind as the API names it: its client type, and the older `client` and `scope` words
+ * installed apps read (src/lib/client-type.ts).
+ */
+export function publicDeviceKind(device: { id: string; displayName: string; clientType: string; scope: string }) {
+  return { id: device.id, displayName: device.displayName, client: legacyClient(device.clientType), clientType: device.clientType, scope: scopeWord(device.scope) };
+}
+
 /** What a claim answers, the same for every client. Apps and Watches, which may work away from home, also get their manifest. */
 export async function claimResponse(joined: Joined, endpoint: Parameters<typeof publicEndpoint>[0] | null) {
   const { invite, device, account, bearer } = joined;
-  const remote = invite.client !== PairedDeviceClient.agent;
+  const remote = invite.clientType !== "agent";
   return {
-    device: { id: device.id, displayName: device.displayName, client: device.client, scope: device.scope },
+    device: publicDeviceKind(device),
     session: toPublicSession({ username: account.username, expiresAt: bearer.expiresAt, account }),
     token: bearer.token,
     tokenType: "Bearer" as const,
@@ -175,8 +185,8 @@ export async function claimResponse(joined: Joined, endpoint: Parameters<typeof 
 /** Claims an invite with its single-use token; a phone takes its invite's name. A companion's invite is never claimable here: its phone claimed it already. */
 export async function claimInvite(input: { id: string; token: string; displayName: string; userAgent?: string | null }) {
   const invite = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true, account: true } });
-  if (!invite || !invite.scope || isCompanion(invite.client, invite.scope) || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
-  if (invite.client === PairedDeviceClient.app && !invite.endpoint) return null;
+  if (!invite || !invite.scope || isCompanion(invite.clientType) || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
+  if (invite.clientType === "app" && !invite.endpoint) return null;
   const account = invite.account;
   // Only administrators' own accounts have paired devices: an invite for an adult who has since lost
   // that, or one made before the recovery account was refused, is void.
@@ -186,7 +196,7 @@ export async function claimInvite(input: { id: string; token: string; displayNam
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
     // A phone is called what the administrator named it when inviting it; what it calls itself is often just "iPhone".
-    const displayName = invite.client === PairedDeviceClient.app ? invite.displayName : input.displayName;
+    const displayName = invite.clientType === "app" ? invite.displayName : input.displayName;
     return join(db, { invite, account, displayName, userAgent: input.userAgent, now });
   });
   if (!joined) return null;
@@ -194,13 +204,13 @@ export async function claimInvite(input: { id: string; token: string; displayNam
 }
 
 /**
- * What an app sets up for itself: its Watch, and its own `rulesOnly` sign-in for Siri, Shortcuts and
- * system controls. Both hold `rulesOnly`.
+ * What an app sets up for itself: its Watch (`app-watch`), and its own sign-in for Siri, Shortcuts and
+ * system controls (`app-controls`). Both hold `app:rulesOnly`.
  */
-export type CompanionClient = typeof PairedDeviceClient.watch | typeof PairedDeviceClient.app;
+export type CompanionClient = Extract<ClientType, "app-watch" | "app-controls">;
 
-function isCompanion(client: PairedDeviceClient, scope: DeviceScope): boolean {
-  return scope === DeviceScope.rulesOnly && (client === PairedDeviceClient.watch || client === PairedDeviceClient.app);
+function isCompanion(clientType: string): clientType is CompanionClient {
+  return clientType === "app-watch" || clientType === "app-controls";
 }
 
 /**
@@ -208,13 +218,13 @@ function isCompanion(client: PairedDeviceClient, scope: DeviceScope): boolean {
  * makes a network call to join: the app hands it the tokens and manifest. Re-enrolling the same
  * `clientId` retires the old record.
  */
-async function inviteAndClaimCompanion(input: { client: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
+async function inviteAndClaimCompanion(input: { clientType: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const invite = await db.pairing.create({
       data: {
-        client: input.client,
-        scope: DeviceScope.rulesOnly,
+        clientType: input.clientType,
+        scope: "app:rulesOnly",
         displayName: input.displayName,
         accountId: input.account.id,
         createdByAccountId: input.account.id,
@@ -240,15 +250,15 @@ export async function cancelInvite(id: string): Promise<boolean> {
 const RECOVERY_REFUSED = "No device signs in as the recovery admin. Choose a personal administrator, or sign in as one.";
 
 /** What a companion is called when its app names none. */
-const COMPANION_NAME = { watch: "Apple Watch", app: "Shortcuts and controls" } as const;
+const COMPANION_NAME = { "app-watch": "Apple Watch", "app-controls": "Shortcuts and controls" } as const;
 
 function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
   return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), code } };
 }
 
-type InviteInput =
-  | { client: "app" | "phone"; displayName: string; endpointId: string; accountId?: string; replacesDeviceId?: string }
-  | { client: "agent"; displayName: string; scope: "full" | "readOnly" };
+export type InviteInput =
+  | { clientType: "app"; displayName: string; endpointId: string; accountId?: string; replacesDeviceId?: string }
+  | { clientType: "agent"; displayName: string; scope: DeviceScope };
 
 /**
  * An administrator invites a phone or an agent and gets a single-use code. An invite a paired phone
@@ -258,7 +268,7 @@ type InviteInput =
 export async function inviteDevice(session: SignedInSession, input: InviteInput, from: { tunnelled: boolean; origin: string }) {
   if (!session.accountId) throw new ApiError(403, "administrator_required", "Sign in with an account to invite a device.");
   const parentDeviceId = session.deviceId ?? null;
-  if (input.client === PairedDeviceClient.agent) {
+  if (input.clientType === "agent") {
     if (from.tunnelled) throw new ApiError(403, "agent_remote", "Connect an agent from the FamilyFi web app on the home network.");
     // An agent acts as whoever invites it.
     if (!mayPairAs(session.account)) throw new ApiError(403, "personal_account_required", "An agent acts as whoever connects it, and nothing acts as the recovery admin. Sign in as yourself to connect one.");
@@ -303,17 +313,17 @@ export function companionHost(session: SignedInSession) {
 /** A paired app invites its Watch, or its own `rulesOnly` sign-in, and claims it at once. */
 export async function claimCompanion(
   host: ReturnType<typeof companionHost>,
-  input: { client: CompanionClient; clientId: string; displayName?: string },
+  input: { clientType: CompanionClient; clientId: string; displayName?: string },
   userAgent: string | null,
 ) {
   let joined: Awaited<ReturnType<typeof inviteAndClaimCompanion>>;
   try {
     joined = await inviteAndClaimCompanion({
-      client: input.client,
+      clientType: input.clientType,
       parentDeviceId: host.deviceId,
       account: host.account,
       clientId: input.clientId,
-      displayName: input.displayName ?? COMPANION_NAME[input.client],
+      displayName: input.displayName ?? COMPANION_NAME[input.clientType],
       userAgent,
     });
   } catch (caught) {
@@ -342,8 +352,8 @@ export async function getInvite(id: string) {
  */
 export async function claimInviteFrom(input: Parameters<typeof claimInvite>[0] & { tunnelled: boolean }) {
   if (input.tunnelled) {
-    const invite = await prisma().pairing.findUnique({ where: { id: input.id }, select: { client: true } });
-    if (invite?.client === PairedDeviceClient.agent) {
+    const invite = await prisma().pairing.findUnique({ where: { id: input.id }, select: { clientType: true } });
+    if (invite?.clientType === "agent") {
       return { ok: false as const, status: 403, code: "agent_remote", message: "Agents connect from the home network only." };
     }
   }

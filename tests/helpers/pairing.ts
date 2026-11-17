@@ -26,7 +26,7 @@ export async function issuedInvite(response: Response) {
 
 /** What every claim answers. */
 export type Claim = {
-  device: { id: string; displayName: string; client: string; scope: string };
+  device: { id: string; displayName: string; client: string; clientType?: string; scope: string };
   session: { username: string; expiresAt: string };
   token: string;
   tokenType: "Bearer";

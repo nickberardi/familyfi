@@ -12,11 +12,13 @@ import {
   apiCompatibility,
   MIN_APP_API_VERSION,
   MIN_SERVER_API_VERSION,
+  MIN_API_VERSION_BY_CLIENT,
+  MIN_ME_API_VERSION,
   MIN_WATCH_API_VERSION,
 } from "@/lib/api-compat";
 
 const info = (YAML.parse(readFileSync(path.resolve(__dirname, "../../openapi/familyfi.v1.yaml"), "utf8")) as {
-  info: { version: string; "x-min-app": string; "x-min-server": string; "x-min-watch": string };
+  info: { version: string; "x-min-app": string; "x-min-server": string; "x-min-watch": string; "x-min-me": string };
 }).info;
 
 const client = { apiVersion: "0.41.0", minServerApi: "0.36.0" };
@@ -27,6 +29,8 @@ describe("API compatibility", () => {
     expect(MIN_APP_API_VERSION).toBe(info["x-min-app"]);
     expect(MIN_SERVER_API_VERSION).toBe(info["x-min-server"]);
     expect(MIN_WATCH_API_VERSION).toBe(info["x-min-watch"]);
+    expect(MIN_ME_API_VERSION).toBe(info["x-min-me"]);
+    expect(MIN_API_VERSION_BY_CLIENT).toEqual({ app: info["x-min-app"], agent: info["x-min-app"], "app-watch": info["x-min-watch"], "app-controls": info["x-min-watch"], me: info["x-min-me"] });
   });
 
   it("asks for an app update when the app is older than the server's oldest client", () => {
