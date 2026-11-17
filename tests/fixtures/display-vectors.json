@@ -23625,7 +23625,7 @@
       },
       "expected": {
         "badge": "blocked",
-        "detail": "Video blocked",
+        "detail": "TV video blocked",
         "change": "none"
       }
     },
