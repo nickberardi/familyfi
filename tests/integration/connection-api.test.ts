@@ -77,6 +77,7 @@ describe("companion connection API", () => {
     // A pinned route carries its pin and the household's key fingerprint — nothing else about the route.
     expect(pairing.pairing.payload).toEqual({
       version: 1,
+      clientType: "app",
       url: "https://familyfi.local",
       code: `${pairing.pairing.id}.${pairing.pairing.token}`,
       fingerprint: keyFingerprint,

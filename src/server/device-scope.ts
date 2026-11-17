@@ -1,4 +1,4 @@
-import { mayHoldScope, type DeviceScope } from "@/lib/client-type";
+import { mayHoldScope, type ClientScope } from "@/lib/client-type";
 
 /**
  * What a paired device may call. Every paired device has a scope, and each scope is one explicit
@@ -96,7 +96,7 @@ function agentFull(request: ScopedCall): boolean {
   return agentReadOnly(request) || (AGENT_WRITES[request.method] ?? []).some((pattern) => pattern.test(request.path));
 }
 
-const ALLOWLISTS: Record<DeviceScope, ((request: ScopedCall) => boolean) | null> = {
+const ALLOWLISTS: Record<ClientScope, ((request: ScopedCall) => boolean) | null> = {
   "app:full": () => true,
   "app:rulesOnly": rulesOnly,
   "agent:full": agentFull,
@@ -108,7 +108,7 @@ const ALLOWLISTS: Record<DeviceScope, ((request: ScopedCall) => boolean) | null>
 type Held = { clientType: string; scope: string };
 
 /** Whether a device of this client type may hold this scope (`CLIENT_SCOPES`). */
-export function isValidScope(clientType: string, scope: string | null | undefined): scope is DeviceScope {
+export function isValidScope(clientType: string, scope: string | null | undefined): scope is ClientScope {
   return mayHoldScope(clientType, scope);
 }
 

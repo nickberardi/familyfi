@@ -17,11 +17,11 @@
 export const CLIENT_TYPES = ["app", "app-watch", "app-controls", "me", "agent"] as const;
 export type ClientType = (typeof CLIENT_TYPES)[number];
 
-export const DEVICE_SCOPES = ["app:full", "app:rulesOnly", "agent:full", "agent:readOnly", "me:askOnly"] as const;
-export type DeviceScope = (typeof DEVICE_SCOPES)[number];
+export const CLIENT_SCOPE_VALUES = ["app:full", "app:rulesOnly", "agent:full", "agent:readOnly", "me:askOnly"] as const;
+export type ClientScope = (typeof CLIENT_SCOPE_VALUES)[number];
 
 /** The scopes each client type may hold. Its first is the one it pairs with unless the invite names another. */
-export const CLIENT_SCOPES: Record<ClientType, readonly DeviceScope[]> = {
+export const CLIENT_SCOPES: Record<ClientType, readonly ClientScope[]> = {
   app: ["app:full"],
   "app-watch": ["app:rulesOnly"],
   "app-controls": ["app:rulesOnly"],
@@ -33,13 +33,13 @@ export function isClientType(value: unknown): value is ClientType {
   return typeof value === "string" && (CLIENT_TYPES as readonly string[]).includes(value);
 }
 
-export function isDeviceScope(value: unknown): value is DeviceScope {
-  return typeof value === "string" && (DEVICE_SCOPES as readonly string[]).includes(value);
+export function isClientScope(value: unknown): value is ClientScope {
+  return typeof value === "string" && (CLIENT_SCOPE_VALUES as readonly string[]).includes(value);
 }
 
 /** Whether a client type may hold a scope. */
 export function mayHoldScope(clientType: string, scope: string | null | undefined): boolean {
-  return isClientType(clientType) && Boolean(scope) && CLIENT_SCOPES[clientType].includes(scope as DeviceScope);
+  return isClientType(clientType) && Boolean(scope) && CLIENT_SCOPES[clientType].includes(scope as ClientScope);
 }
 
 /** The API's older `client` word: `watch` for a Watch, `app` for the app and its controls. */
@@ -56,7 +56,7 @@ export function scopeWord(scope: string): string {
 }
 
 /** The full scope a client type holds for an older request's scope word, or null when it may not hold it. */
-export function scopeFor(clientType: ClientType, word: string): DeviceScope | null {
+export function scopeFor(clientType: ClientType, word: string): ClientScope | null {
   return CLIENT_SCOPES[clientType].find((scope) => scopeWord(scope) === word) ?? null;
 }
 

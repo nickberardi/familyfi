@@ -3,7 +3,7 @@ import { TUNNEL_HEADER } from "@/lib/constants";
 import { requestOrigin } from "@/server/auth";
 import { readBody, readJson, withAdmin, withMutation } from "@/server/guard";
 import { jsonError } from "@/server/http";
-import { clientTypeFrom, type DeviceScope } from "@/lib/client-type";
+import { clientTypeFrom, type ClientScope } from "@/lib/client-type";
 import { claimCompanion, companionHost, inviteDevice, type CompanionClient, type InviteInput } from "@/server/pairing";
 
 const Name = z.string().trim().min(1).max(80);
@@ -19,14 +19,17 @@ const Invite = z.union([
   z.object({ client: z.literal("agent"), clientType: z.undefined().optional(), ...AgentInvite }),
 ]);
 const Companion = z.union([
-  z.object({ clientType: z.enum(["app-watch", "app-controls"]), client: z.enum(["watch", "app"]).optional(), scope: z.enum(["rulesOnly", "app:rulesOnly"]).optional(), clientId: z.string().uuid(), displayName: Name.optional() }),
+  z
+    .object({ clientType: z.enum(["app-watch", "app-controls"]), client: z.enum(["watch", "app"]).optional(), scope: z.enum(["rulesOnly", "app:rulesOnly"]).optional(), clientId: z.string().uuid(), displayName: Name.optional() })
+    // The older words, when sent too, must name the same client type.
+    .refine((body) => !body.client || clientTypeFrom(body.client, body.client === "app" ? "rulesOnly" : null) === body.clientType),
   z.object({ client: z.literal("watch"), clientType: z.undefined().optional(), clientId: z.string().uuid(), displayName: Name.optional() }),
   z.object({ client: z.literal("app"), clientType: z.undefined().optional(), scope: z.literal("rulesOnly"), clientId: z.string().uuid(), displayName: Name.optional() }),
 ]);
 
 /** An invite in the server's terms: its client type, and an agent's full scope. */
 function inviteInput(body: z.infer<typeof Invite>): InviteInput {
-  if ("scope" in body) return { clientType: "agent", displayName: body.displayName, scope: body.scope.startsWith("agent:") ? (body.scope as DeviceScope) : (`agent:${body.scope}` as DeviceScope) };
+  if ("scope" in body) return { clientType: "agent", displayName: body.displayName, scope: body.scope.startsWith("agent:") ? (body.scope as ClientScope) : (`agent:${body.scope}` as ClientScope) };
   const { displayName, endpointId, accountId, replacesDeviceId } = body;
   return { clientType: "app", displayName, endpointId, accountId, replacesDeviceId };
 }

@@ -5,7 +5,7 @@ import { getPairedDevice, revokePairedDevice, updatePairedDevice } from "@/serve
 type Ctx = { params: Promise<{ id: string }> };
 
 const Update = z
-  .object({ displayName: z.string().trim().min(1).max(80).optional(), scope: z.enum(["full", "rulesOnly", "readOnly"]).optional() })
+  .object({ displayName: z.string().trim().min(1).max(80).optional(), scope: z.enum(["full", "rulesOnly", "readOnly", "agent:full", "agent:readOnly"]).optional() })
   .refine((body) => body.displayName !== undefined || body.scope !== undefined, "Nothing to change.");
 
 export async function GET(request: Request, context: Ctx) {

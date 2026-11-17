@@ -83,6 +83,7 @@ describe("OpenAPI floors", () => {
       'info.x-min-app "" is not semver MAJOR.MINOR.PATCH.',
       'info.x-min-server "" is not semver MAJOR.MINOR.PATCH.',
       'info.x-min-watch "" is not semver MAJOR.MINOR.PATCH.',
+      'info.x-min-me "" is not semver MAJOR.MINOR.PATCH.',
     ]);
     expect(checkFloors({ baseSpec: { info: { version: "0.40.0" } }, headSpec: spec("0.41.0", "0.36.0", "0.36.0"), ...none }).ok).toBe(true);
   });

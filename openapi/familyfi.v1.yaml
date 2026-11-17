@@ -3891,7 +3891,7 @@ components:
       minProperties: 1
       properties:
         displayName: { type: string, minLength: 1, maxLength: 80 }
-        scope: { type: string, enum: [full, rulesOnly, readOnly], description: "An agent's new scope: `full` or `readOnly`. No other device changes scope." }
+        scope: { type: string, enum: [full, rulesOnly, readOnly, "agent:full", "agent:readOnly"], description: "An agent's new scope: `full` or `readOnly`, with or without its group. No other device changes scope." }
     ConnectionStatus:
       type: object
       additionalProperties: false
