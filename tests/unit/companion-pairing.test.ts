@@ -20,7 +20,14 @@ import {
   verifyHousehold,
 } from "@/lib/companion-pairing";
 import { COMPANION_OFFLINE_GUARD } from "@/lib/household-store";
-import { createCompanionRequest, type Transport, type TransportRequest, type TransportResponse } from "@/lib/companion-request";
+import {
+  createCompanionRequest,
+  LAN_CONNECT_TIMEOUT_MS,
+  orderRoutes,
+  type Transport,
+  type TransportRequest,
+  type TransportResponse,
+} from "@/lib/companion-request";
 import { REFRESH_REUSE_GRACE_MS } from "@/lib/constants";
 import { createCompanionSession, type SecureStorage } from "@/lib/companion-session";
 import { IDENTITY_MISMATCH, MANIFEST_MISSING_ENDPOINT, MANIFEST_SIGNATURE_INVALID, type EndpointCredential } from "@/lib/companion-trust";
@@ -319,6 +326,43 @@ describe("companion requests", () => {
     expect(read!.timeoutMs).toBeGreaterThan(REFRESH_REUSE_GRACE_MS);
   });
 
+  it("tries a home-network route last on cellular, unless it last answered there", () => {
+    const order = (...args: Parameters<typeof orderRoutes>) => orderRoutes(...args).map((route) => route.id);
+    expect(order(routes, null, { kind: "cellular" })).toEqual([EDGE.id, LAN.id]);
+    expect(order(routes, null, { kind: "wifi", key: "192.168.1.0/24" })).toEqual([LAN.id, EDGE.id]);
+    expect(order(routes, null, null)).toEqual([LAN.id, EDGE.id]);
+    // A phone that reached home over a VPN on cellular starts there again.
+    expect(order(routes, LAN.id, { kind: "cellular" })).toEqual([LAN.id, EDGE.id]);
+    expect(order([LAN, { ...EDGE, enabled: false }], null, { kind: "cellular" })).toEqual([LAN.id]);
+  });
+
+  it("gives a home-network route a short connect limit only where another route can answer instead", async () => {
+    const calls: TransportRequest[] = [];
+    const transport: Transport = async (request) => {
+      calls.push(request);
+      return request.url.startsWith(LAN.url) ? unreachable() : json(200, { ok: true });
+    };
+    const over = (list: typeof routes, network: "wifi" | "cellular" = "wifi") =>
+      createCompanionRequest(transport, { routes: () => list, edgeCredentials: () => [CREDENTIAL], network: () => ({ kind: network }) });
+
+    await over(routes)("/api/v1/groups");
+    expect(calls.map((call) => call.connectTimeoutMs)).toEqual([LAN_CONNECT_TIMEOUT_MS, undefined]);
+
+    // A write may have landed once it was sent, so it is never cut short to try another route.
+    calls.length = 0;
+    await expect(over(routes)("/api/v1/groups/g/rules/internet/pause", { method: "POST", body: {} })).rejects.toBeInstanceOf(TransportError);
+    expect(calls.map((call) => call.connectTimeoutMs)).toEqual([undefined]);
+
+    // A lone home route, or one tried last, keeps the whole timeout.
+    calls.length = 0;
+    await expect(over([LAN])("/api/v1/groups")).rejects.toBeInstanceOf(TransportError);
+    await over(routes, "cellular")("/api/v1/groups");
+    expect(calls.map((call) => [new URL(call.url).origin, call.connectTimeoutMs])).toEqual([
+      [LAN.url, undefined],
+      [EDGE.url, undefined],
+    ]);
+  });
+
   it("refuses any path outside /api/v1", async () => {
     const request = createCompanionRequest(household().transport, { routes: () => routes, edgeCredentials: () => [] });
     await expect(request("/openapi")).rejects.toThrow("Not an /api/v1 path");
@@ -363,6 +407,44 @@ describe("a companion session", () => {
       url: expect.stringMatching(/\/api\/v1\/paired\/devices\/dev-1$/),
       headers: { Authorization: "Bearer bearer-1" },
     });
+  });
+
+  it("starts each launch at the route that last answered on its network, and forgets them when unpaired", async () => {
+    const home = household();
+    let lanUp = false;
+    const transport: Transport = async (request) =>
+      !lanUp && request.url.startsWith(LAN.url) && new URL(request.url).pathname === "/api/v1/connection"
+        ? Promise.reject(new TransportError(new Error("unreachable")))
+        : home.transport(request);
+    const storage = memory();
+    const CAFE = { kind: "wifi", key: "10.0.0.0/24" } as const;
+    const HOME = { kind: "wifi", key: "192.168.1.0/24" } as const;
+    const session = createCompanionSession({ transport, storage, deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+
+    session.setNetwork(CAFE);
+    await session.request("/api/v1/connection");
+    expect(session.getState().activeRouteId).toBe(EDGE.id);
+    // Home again: the café's route is not where it starts.
+    session.setNetwork(HOME);
+    expect(session.getState().activeRouteId).toBeNull();
+    lanUp = true;
+    await session.request("/api/v1/connection");
+    expect(session.getState().activeRouteId).toBe(LAN.id);
+
+    const relaunch = createCompanionSession({ transport, storage, deviceName: () => "A phone" });
+    relaunch.setNetwork(CAFE);
+    await relaunch.load();
+    expect(relaunch.getState().activeRouteId).toBe(EDGE.id);
+    relaunch.setNetwork(HOME);
+    expect(relaunch.getState().activeRouteId).toBe(LAN.id);
+    relaunch.setNetwork(null);
+    expect(relaunch.getState().activeRouteId).toBeNull();
+
+    await relaunch.unpair();
+    expect(storage.keys()).toEqual([]);
   });
 
   it("keeps a refreshed route list, and neither saves nor announces an unchanged one", async () => {
