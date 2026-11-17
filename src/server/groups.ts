@@ -7,6 +7,7 @@ import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { loadHousehold } from "./household";
 import { ApiError } from "./http";
+import { revokeGroupDevices } from "./connection";
 import { builtInRule, joinCountriesRule, lockHousehold, ruleInternetWindows } from "./rules";
 import { clientForHousehold, connectionIdentity } from "./unifi/connection";
 import { GATEWAY_CONCURRENCY } from "./unifi/networks";
@@ -230,7 +231,12 @@ export async function deleteGroup(id: string) {
   }
   await prisma().rulePolicy.deleteMany({ where: { ruleId: { in: rules.map((r) => r.id) } } });
   await prisma().rule.deleteMany({ where: { id: { in: rules.map((r) => r.id) } } });
-  await prisma().group.delete({ where: { id } });
+  await prisma().$transaction(async (db) => {
+    // A child's phone signs in for this group alone, so it is signed out with it. Revoked, not
+    // deleted, so its record and history stay; the group link then clears.
+    await revokeGroupDevices(id, db as never);
+    await db.group.delete({ where: { id } });
+  });
   // Block countries on with no group means every group, so it keeps going when the last group goes. While other
   // groups are left it can't cover none of them, so it turns off, as it does when it loses its last network.
   if (await prisma().group.count()) {

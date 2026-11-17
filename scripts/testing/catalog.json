@@ -792,6 +792,12 @@
         "sessions"
       ]
     },
+    "tests/integration/me-device.test.ts": {
+      "categories": [
+        "pairing",
+        "sessions"
+      ]
+    },
     "tests/integration/paired-devices.test.ts": {
       "categories": [
         "pairing",

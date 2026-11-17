@@ -33,7 +33,8 @@ const ARGON2 = {
 export type PublicSession = {
   username: string;
   displayName: string;
-  kind: "recovery" | "personal";
+  /** `me`: a child's phone (FamilyFi Me), signed in for its family group rather than as an account. */
+  kind: "recovery" | "personal" | "me";
   expiresAt: string;
 };
 
@@ -173,6 +174,24 @@ export function mayPairAs<T extends Pick<Account, "kind" | "isAdmin">>(account: 
   return account?.kind === AccountKind.personal && account.isAdmin;
 }
 
+/**
+ * Whether a paired device's session may still sign in: one acting as a personal administrator, or a
+ * child's phone (`me`) signed in for its family group, which acts as no account. A child's phone whose
+ * group is gone has nothing to sign in for.
+ */
+export function deviceMaySignIn(session: {
+  account: Pick<Account, "kind" | "isAdmin"> | null;
+  device: { clientType: string; accountId: string | null; groupId: string | null } | null;
+}): boolean {
+  if (session.device?.clientType === "me") return !session.account && !session.device.accountId && Boolean(session.device.groupId);
+  return mayPairAs(session.account);
+}
+
+/** The username a child's phone's session carries: it has no account, so the device names it. */
+export function meSessionUsername(deviceId: string): string {
+  return `device:${deviceId}`;
+}
+
 export async function authenticate(usernameRaw: string, password: string, ip: string) {
   const username = usernameRaw.trim().toLowerCase();
   if (!username || !password) {
@@ -212,7 +231,8 @@ export async function authenticate(usernameRaw: string, password: string, ip: st
 }
 
 export async function createSession(input: {
-  accountId: string;
+  /** Null only for a child's phone (`me`), which signs in for its group. */
+  accountId: string | null;
   username: string;
   kind: SessionKind;
   userAgent?: string | null;
@@ -260,7 +280,7 @@ export function bearerSessionData(now = new Date()) {
 }
 
 export type RefreshResult =
-  | { ok: true; session: { username: string; expiresAt: Date; account: { displayName: string; kind: AccountKind } | null }; token: string; refreshToken: string; refreshExpiresAt: Date }
+  | { ok: true; session: SessionView; token: string; refreshToken: string; refreshExpiresAt: Date }
   | { ok: false; code: "invalid_refresh" | "refresh_reused" | "agent_remote"; message: string };
 
 const INVALID_REFRESH = { ok: false as const, code: "invalid_refresh" as const, message: "This refresh token is invalid or expired. Sign in again." };
@@ -286,7 +306,7 @@ function awaitingUse(previousRefreshUntil: Date | null, now: Date) {
 export async function refreshSession(refreshToken: string, options: { tunnelled?: boolean; now?: Date; reread?: boolean } = {}): Promise<RefreshResult> {
   const now = options.now ?? new Date();
   const presented = sha256(refreshToken);
-  const include = { account: true, device: true } as const;
+  const include = { account: true, device: { include: { group: { select: { name: true } } } } } as const;
   let session = await prisma().session.findUnique({ where: { refreshTokenHash: presented }, include });
   let current = presented;
   // Whether the replaced token's pair was never used, so the device may simply have lost it.
@@ -305,8 +325,9 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
     unconfirmed = awaitingUse(replaced.previousRefreshUntil, now);
   }
   if (session.revokedAt || session.kind !== SessionKind.bearer || !session.refreshExpiresAt || session.refreshExpiresAt <= now || !session.device || session.device.revokedAt) return INVALID_REFRESH;
-  // A device acting as an adult who is no longer an administrator, or as the recovery account, has no sign-in to renew.
-  if (!mayPairAs(session.account)) return INVALID_REFRESH;
+  // A device acting as an adult who is no longer an administrator, or as the recovery account, or a
+  // child's phone whose group is gone, has no sign-in to renew.
+  if (!deviceMaySignIn(session)) return INVALID_REFRESH;
   // Remote access is for the household's phones; an agent renews from the home network or not at all.
   if (options.tunnelled && session.device.clientType === "agent") return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
@@ -334,7 +355,7 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
     return INVALID_REFRESH;
   }
   await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: now } });
-  return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
+  return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account, device: session.device }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
 }
 
 /** The session token a request carries, and whether it came as a bearer: its bearer, or else its session cookie. */
@@ -358,15 +379,16 @@ export async function readSessionFromRequest(request: Request) {
   const { raw } = presented;
   const session = await prisma().session.findUnique({
     where: { tokenHash: sha256(raw) },
-    include: { account: true, device: true },
+    include: { account: true, device: { include: { group: { select: { name: true } } } } },
   });
   if (!session || session.revokedAt || session.expiresAt <= new Date() || (session.kind === SessionKind.bearer && (!session.device || session.device.revokedAt))) return null;
   // A browser's session lives in its cookie. Sent as a bearer it would pass the tunnel, which strips cookies only.
   if (presented.bearer && session.kind !== SessionKind.bearer) return null;
   // Only administrators use FamilyFi; demotion ends their sessions, and this refuses any left over.
   if (session.account && !isAdministratorAccount(session.account)) return null;
-  // No paired device acts as the recovery account; one left over from before that rule is refused.
-  if (session.device && !mayPairAs(session.account)) return null;
+  // No paired device acts as the recovery account; one left over from before that rule is refused. A
+  // child's phone acts as no account, and is refused once its group is gone.
+  if (session.device && !deviceMaySignIn(session)) return null;
   if (session.kind === SessionKind.bearer && awaitingUse(session.previousRefreshUntil, new Date())) {
     // The device received the pair its last refresh issued, so the token that refresh replaced is spent.
     // Only while the row still holds this bearer: a refresh committed meanwhile has a pair not yet used.
@@ -379,11 +401,19 @@ export async function readSessionFromRequest(request: Request) {
   return session;
 }
 
-export function toPublicSession(session: {
+/** What `toPublicSession` reads: the session, its account, and for a child's phone its group. */
+export type SessionView = {
   username: string;
   expiresAt: Date;
   account: { displayName: string; kind: AccountKind } | null;
-}): PublicSession {
+  device?: { clientType: string; group?: { name: string } | null } | null;
+};
+
+export function toPublicSession(session: SessionView): PublicSession {
+  // A child's phone has no account: it is named for the group it signs in for.
+  if (session.device?.clientType === "me" && !session.account) {
+    return { username: session.username, displayName: session.device.group?.name ?? "", kind: "me", expiresAt: session.expiresAt.toISOString() };
+  }
   return {
     username: session.username,
     displayName: session.account?.displayName ?? "Recovery admin",
@@ -419,6 +449,9 @@ export function deviceScopeRefusal(
   // Signed in but not allowed: 403, never 401, which clients read as "renew or sign in again".
   if (device.clientType === "agent") {
     return jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.");
+  }
+  if (device.clientType === "me") {
+    return jsonError(403, "me_scope", "FamilyFi Me cannot use that endpoint.");
   }
   if (device.clientType === "app-controls") {
     return jsonError(403, "app_scope", "Siri, Shortcuts and system controls cannot use that endpoint.");

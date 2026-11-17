@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 2.0.0
+  version: 2.1.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 2.0.0
@@ -62,6 +62,8 @@ tags:
     description: What FamilyFi can see about the network that is worth changing. It only reads the gateway.
   - name: Paired
     description: Phones, Watches and agents that call the API. Invites join them; devices manage them.
+  - name: Me
+    description: What FamilyFi Me reads on a child's phone, for the family group it signs in for.
   - name: Connection
     description: |
       Paired native devices, trusted HTTPS endpoints, and connection status.
@@ -262,6 +264,22 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403": { $ref: "#/components/responses/Error" }
+  /api/v1/me/day:
+    get:
+      operationId: getMeDay
+      tags: [Me]
+      summary: A child's own day, for FamilyFi Me
+      description: |
+        The family group a child's phone (`me:askOnly`) signs in for, and nothing else in the
+        household: its pause and allowance now, the windows of its internet rules, and the rules
+        that block something all the time. A rule paused for everyone or for this group is left out
+        while it is paused. Any other caller gets 403 `me_required`.
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: The child's day, content: { application/json: { schema: { $ref: "#/components/schemas/MeDay" } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/v1/accounts:
     get:
       operationId: listAccounts
@@ -2723,7 +2741,13 @@ paths:
         acts as the recovery account: a phone invite for it answers 400 `personal_account_required`,
         and an agent invite made while signed in as it 403 `personal_account_required`.
 
-        An invite a paired phone makes names that phone as the device's `parentDeviceId`.
+        A child's phone (`me`, FamilyFi Me) is invited like a phone, over a route, for five minutes,
+        and its code carries the same route, pin and Cloudflare Access token. Its invite names a
+        family group instead of an account: the device signs in for that group, never as an
+        account, and deleting the group revokes it.
+
+        An invite a paired phone makes names that phone as the device's `parentDeviceId`, except a
+        child's phone's, which belongs to its group.
         Revoking or removing a device revokes everything paired from it, and everything those
         paired in turn, and cancels the invites they left waiting. A phone that re-pairs another
         takes the replaced record's place instead, keeping its parent.
@@ -3376,10 +3400,69 @@ components:
         displayName: { type: string }
         kind:
           type: string
-          enum: [recovery, personal]
+          x-extensible-enum: [recovery, personal, me]
+          description: |
+            `recovery` or `personal`: the account the session signs in as. `me`: FamilyFi Me on a
+            child's phone, which signs in for its family group and never as an account; its
+            `displayName` is the group's name and its `username` names the device. New kinds may be added.
         expiresAt:
           type: string
           format: date-time
+    MeDay:
+      type: object
+      additionalProperties: false
+      required: [group, timezone, pause, allowance, windows, alwaysOn]
+      properties:
+        group:
+          type: object
+          additionalProperties: false
+          required: [id, name]
+          properties:
+            id: { type: string }
+            name: { type: string }
+        timezone: { type: string, description: The household's IANA time zone; window times are its wall clock. }
+        pause:
+          type: [object, "null"]
+          description: The group's pause, while it is on.
+          additionalProperties: false
+          required: [by, since, until]
+          properties:
+            by: { type: [string, "null"], description: "Who paused it, as they were named then." }
+            since: { type: string, format: date-time, description: "When the pause was last set: started, or extended." }
+            until: { type: [string, "null"], format: date-time, description: Null until a parent ends it. }
+        allowance:
+          type: [object, "null"]
+          description: The group's allowance, while it lifts its internet windows.
+          additionalProperties: false
+          required: [by, until]
+          properties:
+            by: { type: [string, "null"] }
+            until: { type: [string, "null"], format: date-time }
+        windows:
+          type: array
+          description: The windows of the group's scheduled internet rules that are on, in rule then window order.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ruleId, ruleName, name, days, start, end]
+            properties:
+              ruleId: { type: string }
+              ruleName: { type: string }
+              name: { type: string, description: The window's own name; empty when it has none. }
+              days: { type: array, items: { type: integer, minimum: 0, maximum: 6 }, description: "The days it starts on, 0 = Sunday." }
+              start: { type: string, description: "HH:mm, household time." }
+              end: { type: string, description: "HH:mm, household time; at or before `start`, the next morning." }
+        alwaysOn:
+          type: array
+          description: The group's rules that block all the time.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ruleId, name, kind]
+            properties:
+              ruleId: { type: string }
+              name: { type: string }
+              kind: { type: string, enum: [internet, category, app, domain] }
     LoginResponse:
       type: object
       additionalProperties: false
@@ -3604,8 +3687,9 @@ components:
         Mac, may do whatever its account may. `app:rulesOnly`, held by a Watch and by an app's Siri,
         Shortcuts and system controls, reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
         extends, allows, disallows and turns rules on and off (403 `watch_scope` for a Watch beyond
-        that, 403 `app_scope` for the app's controls). `me:askOnly` is reserved for FamilyFi Me and
-        allows nothing yet. New scopes may be added.
+        that, 403 `app_scope` for the app's controls). `me:askOnly`, held by FamilyFi Me on a child's
+        phone, reads its session, connection manifest and its own group's day (`GET /me/day`), and
+        un-pairs itself; beyond that 403 `me_scope`. New scopes may be added.
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
@@ -3618,16 +3702,19 @@ components:
       description: |
         An administrator's invite for the client type `clientType` names. A phone (`app`) needs the
         route it pairs over (`endpointId`) and may name the administrator it signs in as
-        (`accountId`, default: whoever makes it), and `replacesDeviceId` to re-pair a phone. An
-        agent needs a `scope` of `agent:full` or `agent:readOnly`.
+        (`accountId`, default: whoever makes it), and `replacesDeviceId` to re-pair a phone. A
+        child's phone (`me`, FamilyFi Me) needs the route it pairs over (`endpointId`) and the family
+        group it signs in for (`groupId`; 400 `family_group_required` for a group of things); it acts
+        as no account. An agent needs a `scope` of `agent:full` or `agent:readOnly`.
       required: [clientType, displayName]
       properties:
-        clientType: { type: string, enum: [app, agent], description: The client type to invite. }
+        clientType: { type: string, enum: [app, me, agent], description: The client type to invite. }
         displayName: { type: string, minLength: 1, maxLength: 80 }
         endpointId: { type: string }
         accountId: { type: string }
         replacesDeviceId: { type: string, description: "Re-pair: when this invite is claimed, the phone with this id is revoked and its record removed, so it is not listed twice. 404 if it no longer exists." }
         scope: { type: string, enum: ["agent:full", "agent:readOnly"], description: An agent's scope. }
+        groupId: { type: string, description: "The family group a child's phone (`me`) signs in for." }
     PairedWatchCreate:
       type: object
       additionalProperties: false
@@ -3804,7 +3891,15 @@ components:
           properties:
             username: { type: string }
             displayName: { type: string }
-        parentDeviceId: { type: [string, "null"], description: "The paired device whose invite this one joined with: a Watch's phone, or the phone that paired a phone or agent. Revoking it revokes this device." }
+        group:
+          type: [object, "null"]
+          description: "A child's phone (`me`) only: the family group it signs in for instead of an account. Null once the group is deleted, which revokes it."
+          additionalProperties: false
+          required: [id, name]
+          properties:
+            id: { type: string }
+            name: { type: string }
+        parentDeviceId: { type: [string, "null"], description: "The paired device whose invite this one joined with: a Watch's phone, or the phone that paired a phone or agent. Revoking it revokes this device. A child's phone has none: it belongs to its group." }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
         revokedAt: { type: [string, "null"], format: date-time }

@@ -3,8 +3,8 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
 /**
  * What a paired device may call. Every paired device has a scope, and each scope is one explicit
  * allowlist, never a ladder: an agent's `full` is the agent list, not an app's minus exceptions. Only
- * administrators use FamilyFi, so every device acts as one, and the scope bounds the device whatever
- * its account may do. A scope not named here, or one its client type may not hold
+ * administrators use FamilyFi, so every device but a child's acts as one, and the scope bounds the
+ * device whatever its account may do; a child's phone acts as no account at all. A scope not named here, or one its client type may not hold
  * (`CLIENT_SCOPES` in src/lib/client-type.ts), allows nothing.
  *
  * - `app:full`: the app (`app`) on a phone, tablet or Mac: everything its account may do.
@@ -16,6 +16,9 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
  *   settings changes or connection management, including `GET /connection`, whose manifest carries
  *   Cloudflare Access tokens.
  * - `agent:readOnly`: household reads.
+ * - `me:askOnly`: FamilyFi Me on a child's phone (`me`), which signs in for its family group and
+ *   never as an account: its session, `GET /connection` for the manifest it needs away from home, its
+ *   own group's day (`GET /me/day`), and un-pairing itself. It reads nothing else in the household.
  *
  * The built-in quarantine rule's switch is the household's quarantine setting, so an `app:rulesOnly` device or an
  * agent may pause, extend and resume it, never switch, edit or delete it.
@@ -96,13 +99,18 @@ function agentFull(request: ScopedCall): boolean {
   return agentReadOnly(request) || (AGENT_WRITES[request.method] ?? []).some((pattern) => pattern.test(request.path));
 }
 
-const ALLOWLISTS: Record<ClientScope, ((request: ScopedCall) => boolean) | null> = {
+/** `me:askOnly`: the child's own day, and the calls every paired device needs to stay signed in. */
+function meAskOnly({ method, path, deviceId }: ScopedCall): boolean {
+  if (method === "GET") return path === "/api/v1/auth/session" || path === "/api/v1/connection" || path === "/api/v1/me/day";
+  return method === "DELETE" && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;
+}
+
+const ALLOWLISTS: Record<ClientScope, (request: ScopedCall) => boolean> = {
   "app:full": () => true,
   "app:rulesOnly": rulesOnly,
   "agent:full": agentFull,
   "agent:readOnly": agentReadOnly,
-  // FamilyFi Me's list comes with its routes; until then it may call nothing.
-  "me:askOnly": null,
+  "me:askOnly": meAskOnly,
 };
 
 type Held = { clientType: string; scope: string };
@@ -122,6 +130,5 @@ export function isFullApp<T extends Held>(device: T | null | undefined): device 
 
 export function deviceRouteAllowed(input: Held & ScopedCall): boolean {
   if (!isValidScope(input.clientType, input.scope)) return false;
-  const allowed = ALLOWLISTS[input.scope];
-  return allowed ? allowed(input) : false;
+  return ALLOWLISTS[input.scope](input);
 }

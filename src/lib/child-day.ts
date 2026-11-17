@@ -1,6 +1,13 @@
 import type { TimelineBand } from "@/lib/day-timeline";
 import { formatHhmm } from "@/lib/display";
-import { isWindowActive, nextWindowStart, windowDayBands, windowEndsAt, type RuleWindowSpec } from "@/lib/rule-windows";
+import {
+  isWindowActive,
+  localWeekday,
+  nextWindowStart,
+  windowDayBands,
+  windowEndsAt,
+  type RuleWindowSpec,
+} from "@/lib/rule-windows";
 
 /**
  * A child's day, as FamilyFi Me tells it on the child's phone: what blocks this phone or a Thing now, what comes later
@@ -10,11 +17,12 @@ import { isWindowActive, nextWindowStart, windowDayBands, windowEndsAt, type Rul
  * before the window carries on.
  *
  * Times are minutes after the household's midnight. A window that runs past midnight ends after
- * 1440 ("9 PM until 7 AM" is 1260 to 1860).
+ * 1440 ("9 PM until 7 AM" is 1260 to 1860). A window runs on its `days` (0 = Sunday, the days it
+ * starts on), every day when it names none, and is read on the household's own day (`DayClock`).
  */
 export type Clock = number;
 
-export type DayWindow = { label: string; from: Clock; to: Clock };
+export type DayWindow = { label: string; from: Clock; to: Clock; days?: number[] };
 
 /**
  * What a line of the day shows beside it; each app draws its own symbol for it. `window` is the
@@ -118,16 +126,44 @@ export function lengthText(minutes: AskLength): string {
 }
 
 /*
- * Windows are familyfi's rule windows (`RuleWindowSpec`, every day), read with familyfi's helpers on a
- * sample day in UTC, so FamilyFi Me tells a window's start, end and bands exactly as the parent's
- * apps do. TODO(K2): replace the sample day with the household's clock and time zone; `sampleDate`
- * is for FamilyFi Me's sample household only.
+ * Windows are familyfi's rule windows (`RuleWindowSpec`), read with familyfi's helpers on the
+ * household's day, so FamilyFi Me tells a window's start, end and bands exactly as the parent's apps do.
  */
-const ZONE = "UTC";
+
+/**
+ * The day a story is told on: the household's time zone and the moment its day began. `Clock`
+ * minutes count from `midnight`, so on the day the clocks change a time after the change is told an
+ * hour off; every other day it is the household's wall clock.
+ */
+export type DayClock = { timeZone: string; midnight: Date };
+
 const DAY_START = Date.UTC(2026, 10, 16);
 
+/** FamilyFi Me's sample household: one fixed Monday in UTC. */
+export const SAMPLE_CLOCK: DayClock = { timeZone: "UTC", midnight: new Date(DAY_START) };
+
 /** The sample day's `minutes` as a Date, for DayTimeline. */
-export const sampleDate = (minutes: Clock) => new Date(DAY_START + minutes * 60_000);
+export const sampleDate = (minutes: Clock) => dayDate(SAMPLE_CLOCK, minutes);
+
+/** `minutes` on a day as a Date, for DayTimeline. */
+export function dayDate(day: DayClock, minutes: Clock): Date {
+  return new Date(day.midnight.getTime() + minutes * 60_000);
+}
+
+/** Minutes after the household's midnight at `now`, by its wall clock. */
+function wallMinutes(now: Date, timeZone: string): Clock {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return get("hour") * 60 + get("minute");
+}
+
+/** The household's day `now` falls on, and how far into it `now` is. */
+export function householdDay(now: Date, timeZone: string): { clock: DayClock; now: Clock } {
+  const minutes = wallMinutes(now, timeZone);
+  const startOfMinute = now.getTime() - (now.getTime() % 60_000);
+  return { clock: { timeZone, midnight: new Date(startOfMinute - minutes * 60_000) }, now: minutes };
+}
+
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 
 function hhmm(minutes: Clock): string {
@@ -138,52 +174,93 @@ function hhmm(minutes: Clock): string {
 function spec(window: DayWindow): RuleWindowSpec {
   return {
     name: window.label,
-    days: EVERY_DAY,
+    days: window.days ?? EVERY_DAY,
     start: hhmm(window.from),
     end: hhmm(window.to),
   };
 }
 
-const at = sampleDate;
-const minutesOf = (date: Date): Clock => Math.round((date.getTime() - DAY_START) / 60_000);
-
-/** Whether a window covers `now`, including a window that started last night. */
-function inWindow(window: DayWindow, now: Clock): boolean {
-  return isWindowActive(spec(window), at(now), ZONE);
+/** The window helpers, read on one household day. */
+function onDay(day: DayClock) {
+  const at = (minutes: Clock) => dayDate(day, minutes);
+  const minutesOf = (date: Date): Clock => Math.round((date.getTime() - day.midnight.getTime()) / 60_000);
+  /** Whether a window covers `now`, including a window that started last night. */
+  const inWindow = (window: DayWindow, now: Clock): boolean => isWindowActive(spec(window), at(now), day.timeZone);
+  /** When the occurrence of `window` covering `now` ends: 7 AM today in its morning tail, 7 AM tomorrow at night. */
+  const endOf = (window: DayWindow, now: Clock): Clock => {
+    const end = windowEndsAt(spec(window), at(now), day.timeZone);
+    return end ? minutesOf(end) : window.to;
+  };
+  const windowBands = (windows: DayWindow[]): TimelineBand[] => {
+    const weekday = localWeekday(at(12 * 60), day.timeZone);
+    return windows.flatMap((window) =>
+      windowDayBands(spec(window), weekday).map(({ from, to }): TimelineBand => ({
+        kind: "window",
+        from,
+        to,
+        label: window.label,
+        source: window.days && window.days.length < 7 ? "Some days" : "Every day",
+      })),
+    );
+  };
+  /** The first window that starts at or after `after` and before midnight. */
+  const firstWindowFrom = (windows: DayWindow[], after: Clock): DayWindow | undefined =>
+    windows
+      .map((window) => {
+        const start = nextWindowStart(spec(window), at(after - 1 / 60_000), day.timeZone);
+        return start ? { window, from: minutesOf(start) } : undefined;
+      })
+      .filter((found): found is { window: DayWindow; from: Clock } => !!found && found.from < 1440)
+      .sort((a, b) => a.from - b.from)[0]?.window;
+  return { inWindow, endOf, windowBands, firstWindowFrom };
 }
 
-/** When the occurrence of `window` covering `now` ends: 7 AM today in its morning tail, 7 AM tomorrow at night. */
-function endOf(window: DayWindow, now: Clock): Clock {
-  const end = windowEndsAt(spec(window), at(now), ZONE);
-  return end ? minutesOf(end) : window.to;
+/**
+ * A child's own day as FamilyFi reads it (`GET /api/v1/me/day`): the group the phone signs in for,
+ * the household's time zone, the group's pause and allowance now, the windows of its internet rules
+ * (`days` are the days a window starts on, 0 = Sunday; `start` and `end` are the household's
+ * HH:mm, and an end at or before the start is the next morning), and the rules that block
+ * something all the time.
+ */
+export type MeDay = {
+  group: { id: string; name: string };
+  timezone: string;
+  /** `since` is when the pause was last set: started, or extended. `until` null: until a parent ends it. */
+  pause: { by: string | null; since: string; until: string | null } | null;
+  allowance: { by: string | null; until: string | null } | null;
+  windows: { ruleId: string; ruleName: string; name: string; days: number[]; start: string; end: string }[];
+  alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain" }[];
+};
+
+/** What a parent is called when FamilyFi did not record who it was. */
+export const SOMEONE = "A parent";
+
+function minutesOfHhmm(value: string): Clock {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
 }
 
-function windowBands(windows: DayWindow[]): TimelineBand[] {
-  const weekday = new Date(DAY_START).getUTCDay();
-  return windows.flatMap((window) =>
-    windowDayBands(spec(window), weekday).map(({ from, to }): TimelineBand => ({
-      kind: "window",
-      from,
-      to,
-      label: window.label,
-      source: "Every day",
-    })),
-  );
+/**
+ * The child's phone's day from FamilyFi's answer, on the household's day: what `tellDay` tells.
+ * A pause with no end is drawn to the end of today.
+ */
+export function meDaySubject(me: MeDay, now: Date): { subject: DaySubject; now: Clock; clock: DayClock } {
+  const { clock, now: minutes } = householdDay(now, me.timezone);
+  const minutesOf = (iso: string) => Math.round((new Date(iso).getTime() - clock.midnight.getTime()) / 60_000);
+  const windows = me.windows.map((window): DayWindow => {
+    const from = minutesOfHhmm(window.start);
+    const end = minutesOfHhmm(window.end);
+    return { label: window.name || window.ruleName, from, to: end <= from ? end + 1440 : end, days: window.days };
+  });
+  const pause = me.pause
+    ? { by: me.pause.by ?? SOMEONE, from: Math.min(minutesOf(me.pause.since), minutes), to: me.pause.until ? minutesOf(me.pause.until) : 1440 }
+    : undefined;
+  return { subject: { windows, ...(pause ? { pause } : {}) }, now: minutes, clock };
 }
 
-/** The first window that starts at or after `after` and before midnight. */
-function firstWindowFrom(windows: DayWindow[], after: Clock): DayWindow | undefined {
-  return windows
-    .map((window) => {
-      const start = nextWindowStart(spec(window), at(after - 1 / 60_000), ZONE);
-      return start ? { window, from: minutesOf(start) } : undefined;
-    })
-    .filter((found): found is { window: DayWindow; from: Clock } => !!found && found.from < 1440)
-    .sort((a, b) => a.from - b.from)[0]?.window;
-}
-
-/** Tells a day from what blocks it, the time now, and the child's request. */
-export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice): DayStory {
+/** Tells a day from what blocks it, the time now, and the child's request, on the household's day (the sample's by default). */
+export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: DayClock = SAMPLE_CLOCK): DayStory {
+  const { inWindow, endOf, windowBands, firstWindowFrom } = onDay(on);
   // A no stands until the child can ask again; after that the Now block is askable again.
   const ask = subject.ask?.state === "no" && now >= subject.ask.answeredAt + ASK_AGAIN_AFTER ? undefined : subject.ask;
   const pause = subject.pause && now >= subject.pause.from && now < subject.pause.to ? subject.pause : undefined;

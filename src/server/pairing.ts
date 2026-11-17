@@ -1,6 +1,6 @@
-import { ConnectionTrustMode, SessionKind, type Account, type Pairing } from "@prisma/client";
+import { ConnectionTrustMode, GroupKind, SessionKind, type Account, type Pairing } from "@prisma/client";
 import type { ClientScope, ClientType } from "@/lib/client-type";
-import { bearerSessionData, isAdministratorAccount, mayPairAs, toPublicSession, type SignedInSession } from "./auth";
+import { bearerSessionData, isAdministratorAccount, mayPairAs, meSessionUsername, toPublicSession, type SignedInSession } from "./auth";
 import { ensureConnectionIdentity, instanceFingerprint, publicEndpoint, removeDevice, signedEndpointManifest } from "./connection";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -21,6 +21,10 @@ import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
  *   home network address, or the address it was made at when none is set, and nothing for remote
  *   access. The agent acts as whoever made it.
  * - A Watch is invited and claimed at once by its phone, its parent; it acts as the phone's account.
+ * - A child's phone (FamilyFi Me, `me`) is invited by an administrator over a route, as a phone is,
+ *   and its code carries the same: route, pin or Cloudflare Access token. It signs in for the family
+ *   group the invite names, never as an account, and has no parent device: it belongs to its group,
+ *   so re-pairing or revoking the phone that invited it leaves it alone.
  *
  * An invite a paired phone makes names that phone as the new device's parent, as a Watch's does:
  * revoking a phone revokes everything paired from it. No device ever acts as the recovery account.
@@ -39,16 +43,21 @@ function inviteStatus(invite: { claimedAt: Date | null; expiresAt: Date }, now =
   return invite.expiresAt <= now ? "expired" : "pending";
 }
 
-/** A phone invite, over the published route the phone pairs through. */
-async function invitePhone(input: { endpointId: string; displayName: string; accountId: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null }) {
+/**
+ * A phone invite, over the published route the phone pairs through: the app's, acting as an account,
+ * or a child's (`me`), signing in for a family group.
+ */
+async function invitePhone(input: { endpointId: string; displayName: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null } & ({ clientType: "app"; accountId: string } | { clientType: "me"; groupId: string })) {
   const token = randomToken();
+  const clientType = input.clientType;
   const invite = await prisma().pairing.create({
     data: {
-      clientType: "app",
-      scope: "app:full",
+      clientType,
+      scope: clientType === "me" ? "me:askOnly" : "app:full",
       endpointId: input.endpointId,
       displayName: input.displayName,
-      accountId: input.accountId,
+      accountId: input.clientType === "app" ? input.accountId : null,
+      groupId: input.clientType === "me" ? input.groupId : null,
       createdByAccountId: input.createdByAccountId,
       parentDeviceId: input.parentDeviceId ?? null,
       replacesDeviceId: input.replacesDeviceId ?? null,
@@ -64,7 +73,7 @@ async function invitePhone(input: { endpointId: string; displayName: string; acc
   const edgeToken = storedServiceToken(endpoint);
   const code = encodePairingCode({
     version: PAIRING_CODE_VERSION,
-    clientType: "app",
+    clientType,
     url: endpoint.url,
     code: `${invite.id}.${token}`,
     fingerprint: instanceFingerprint(household.instancePublicKey!),
@@ -105,18 +114,22 @@ class ClientIdInUseError extends Error {
   }
 }
 
-type Joined = { invite: Pairing; device: { id: string; displayName: string; clientType: string; scope: string }; account: Account; bearer: ReturnType<typeof bearerSessionData> };
+/** Who a device signs in as: an account, or for a child's phone (`me`) its family group. */
+type Signer = { account: Account; group?: undefined } | { account: null; group: { id: string; name: string } };
+
+type Joined = { invite: Pairing; device: { id: string; displayName: string; clientType: string; scope: string }; bearer: ReturnType<typeof bearerSessionData> } & Signer;
 
 /** Creates the device and signs it in, inside the caller's transaction. */
 async function join(db: Db, input: {
   invite: Pairing;
-  account: Account;
+  signer: Signer;
   displayName: string;
   clientId?: string | null;
   userAgent?: string | null;
   now: Date;
-}): Promise<Omit<Joined, "invite" | "account">> {
-  const { invite, account, now } = input;
+}): Promise<Pick<Joined, "device" | "bearer">> {
+  const { invite, signer, now } = input;
+  const account = signer.account;
   if (!isValidScope(invite.clientType, invite.scope)) throw new Error(`A ${invite.clientType} cannot hold the ${invite.scope} scope.`);
   // A re-paired phone or a re-enrolled companion retires the record it replaces, so it is never listed twice.
   const replaces = invite.replacesDeviceId;
@@ -138,13 +151,14 @@ async function join(db: Db, input: {
       clientType: invite.clientType,
       scope: invite.scope,
       clientId: input.clientId ?? null,
-      accountId: account.id,
+      accountId: account?.id ?? null,
+      groupId: signer.group?.id ?? null,
       parentDeviceId,
       lastSeenAt: now,
     },
   });
   await db.pairing.update({ where: { id: invite.id }, data: { claimedDeviceId: device.id } });
-  if (replaces) {
+  if (replaces && account) {
     // The new phone keeps what the old one paired when it acts as the same account: its Watch is
     // still its to manage. Anything acting as another account is revoked with the old phone below.
     await db.pairedDevice.updateMany({ where: { parentDeviceId: replaces, accountId: account.id }, data: { parentDeviceId: device.id } });
@@ -152,7 +166,7 @@ async function join(db: Db, input: {
   }
   const bearer = bearerSessionData(now);
   await db.session.create({
-    data: { ...bearer.data, kind: SessionKind.bearer, accountId: account.id, username: account.username, deviceId: device.id, userAgent: input.userAgent ?? undefined },
+    data: { ...bearer.data, kind: SessionKind.bearer, accountId: account?.id ?? null, username: account ? account.username : meSessionUsername(device.id), deviceId: device.id, userAgent: input.userAgent ?? undefined },
   });
   return { device, bearer };
 }
@@ -164,11 +178,14 @@ export function publicDeviceKind(device: { id: string; displayName: string; clie
 
 /** What a claim answers, the same for every client. Apps and Watches, which may work away from home, also get their manifest. */
 export async function claimResponse(joined: Joined, endpoint: Parameters<typeof publicEndpoint>[0] | null) {
-  const { invite, device, account, bearer } = joined;
+  const { invite, device, bearer } = joined;
   const remote = invite.clientType !== "agent";
+  const session = joined.account
+    ? toPublicSession({ username: joined.account.username, expiresAt: bearer.expiresAt, account: joined.account })
+    : toPublicSession({ username: meSessionUsername(device.id), expiresAt: bearer.expiresAt, account: null, device: { clientType: device.clientType, group: joined.group } });
   return {
     device: publicDeviceKind(device),
-    session: toPublicSession({ username: account.username, expiresAt: bearer.expiresAt, account }),
+    session,
     token: bearer.token,
     tokenType: "Bearer" as const,
     refreshToken: bearer.refreshToken,
@@ -181,23 +198,30 @@ export async function claimResponse(joined: Joined, endpoint: Parameters<typeof 
 
 /** Claims an invite with its single-use token; a phone takes its invite's name. A companion's invite is never claimable here: its phone claimed it already. */
 export async function claimInvite(input: { id: string; token: string; displayName: string; userAgent?: string | null }) {
-  const invite = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true, account: true } });
+  const invite = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true, account: true, group: { select: { id: true, name: true, kind: true } } } });
   if (!invite || !invite.scope || isCompanion(invite.clientType) || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
-  if (invite.clientType === "app" && !invite.endpoint) return null;
-  const account = invite.account;
-  // Only administrators' own accounts have paired devices: an invite for an adult who has since lost
-  // that, or one made before the recovery account was refused, is void.
-  if (!mayPairAs(account)) return null;
+  if ((invite.clientType === "app" || invite.clientType === "me") && !invite.endpoint) return null;
+  let signer: Signer;
+  if (invite.clientType === "me") {
+    // A child's phone signs in for its family group, never as an account; one whose group is gone is void.
+    if (invite.accountId || !invite.group || invite.group.kind !== GroupKind.family) return null;
+    signer = { account: null, group: { id: invite.group.id, name: invite.group.name } };
+  } else {
+    // Only administrators' own accounts have paired devices: an invite for an adult who has since lost
+    // that, or one made before the recovery account was refused, is void.
+    if (!mayPairAs(invite.account)) return null;
+    signer = { account: invite.account };
+  }
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
     // A phone is called what the administrator named it when inviting it; what it calls itself is often just "iPhone".
-    const displayName = invite.clientType === "app" ? invite.displayName : input.displayName;
-    return join(db, { invite, account, displayName, userAgent: input.userAgent, now });
+    const displayName = invite.clientType === "app" || invite.clientType === "me" ? invite.displayName : input.displayName;
+    return join(db, { invite, signer, displayName, userAgent: input.userAgent, now });
   });
   if (!joined) return null;
-  return claimResponse({ invite, account, ...joined }, invite.endpoint);
+  return claimResponse({ invite, ...signer, ...joined }, invite.endpoint);
 }
 
 /**
@@ -231,7 +255,7 @@ async function inviteAndClaimCompanion(input: { clientType: CompanionClient; par
         claimedAt: now,
       },
     });
-    return { invite, ...(await join(db, { invite, account: input.account, displayName: input.displayName, clientId: input.clientId, userAgent: input.userAgent, now })) };
+    return { invite, ...(await join(db, { invite, signer: { account: input.account }, displayName: input.displayName, clientId: input.clientId, userAgent: input.userAgent, now })) };
   });
   return { invite: joined.invite, claim: await claimResponse({ ...joined, account: input.account }, null) };
 }
@@ -255,11 +279,13 @@ function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
 
 type InviteInput =
   | { clientType: "app"; displayName: string; endpointId: string; accountId?: string; replacesDeviceId?: string }
+  | { clientType: "me"; displayName: string; endpointId: string; groupId: string }
   | { clientType: "agent"; displayName: string; scope: ClientScope };
 
 /**
- * An administrator invites a phone or an agent and gets a single-use code. An invite a paired phone
- * makes names it as the device's parent, so revoking the phone revokes that device too.
+ * An administrator invites a phone, a child's phone or an agent and gets a single-use code. An invite
+ * a paired phone makes for its own kind of device names it as the device's parent, so revoking the
+ * phone revokes that device too; a child's phone belongs to its group instead.
  * `from` is how the request came in: through the tunnel or not, and the address it was made at.
  */
 export async function inviteDevice(session: SignedInSession, input: InviteInput, from: { tunnelled: boolean; origin: string }) {
@@ -279,6 +305,13 @@ export async function inviteDevice(session: SignedInSession, input: InviteInput,
   }
   const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: input.endpointId, householdId: "default", enabled: true } });
   if (!endpoint) throw new ApiError(404, "not_found", "Connection endpoint not found.");
+  if (input.clientType === "me") {
+    const group = await prisma().group.findUnique({ where: { id: input.groupId }, select: { id: true, kind: true } });
+    if (!group) throw new ApiError(404, "not_found", "Group not found.");
+    if (group.kind !== GroupKind.family) throw new ApiError(400, "family_group_required", "FamilyFi Me signs in for a person's group, not a group of things.");
+    const { invite, code } = await invitePhone({ clientType: "me", endpointId: endpoint.id, displayName: input.displayName, groupId: group.id, createdByAccountId: session.accountId });
+    return inviteBody(invite, code);
+  }
   const accountId = input.accountId ?? session.accountId;
   const account = await prisma().account.findUnique({ where: { id: accountId } });
   if (!account) throw new ApiError(404, "not_found", "The account to sign the phone in as no longer exists.");
@@ -291,7 +324,7 @@ export async function inviteDevice(session: SignedInSession, input: InviteInput,
   if (input.replacesDeviceId && !isFullApp(await prisma().pairedDevice.findUnique({ where: { id: input.replacesDeviceId } }))) {
     throw new ApiError(404, "not_found", "The phone to re-pair no longer exists.");
   }
-  const { invite, code } = await invitePhone({ endpointId: endpoint.id, displayName: input.displayName, accountId, createdByAccountId: session.accountId, parentDeviceId, replacesDeviceId: input.replacesDeviceId });
+  const { invite, code } = await invitePhone({ clientType: "app", endpointId: endpoint.id, displayName: input.displayName, accountId, createdByAccountId: session.accountId, parentDeviceId, replacesDeviceId: input.replacesDeviceId });
   return inviteBody(invite, code);
 }
 

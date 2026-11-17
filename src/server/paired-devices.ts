@@ -22,6 +22,7 @@ function visibleDevices(session: Viewer): Prisma.PairedDeviceWhereInput | null {
 function deviceInclude(now = new Date()) {
   return {
     account: { select: { username: true, displayName: true } },
+    group: { select: { id: true, name: true } },
     edgeTokens: { select: { endpointId: true, version: true } },
     pushRegistration: { select: { deviceId: true } },
     pairings: { include: { endpoint: true }, take: 1 },
@@ -42,6 +43,8 @@ function publicPairedDevice(device: Listed) {
     clientType: device.clientType,
     scope: device.scope,
     actsAs: device.account ? { username: device.account.username, displayName: device.account.displayName } : null,
+    // A child's phone (FamilyFi Me) signs in for its family group instead of an account.
+    ...(device.clientType === "me" ? { group: device.group ? { id: device.group.id, name: device.group.name } : null } : {}),
     parentDeviceId: device.parentDeviceId,
     enrolledAt: device.createdAt.toISOString(),
     lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
