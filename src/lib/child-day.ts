@@ -353,20 +353,26 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       title: next.label,
       detail: `Until ${clock(next.to)}`,
     });
-  const notBlocked = (at: Clock, next: DayWindow | undefined) =>
+  const notBlocked = (at: Clock, next: DayWindow | undefined, until = next?.label) =>
     later({
       time: clock(at),
       tone: "on",
       sign: "allowed",
       title: "Not blocked",
-      detail: next ? `Until ${next.label}` : "For the rest of today",
+      detail: until ? `Until ${until}` : "For the rest of today",
     });
+  // An always-on internet rule a parent lifted until `back`: from then it blocks for the rest of today.
+  const back = liftedAlways?.allowed?.until;
+  const alwaysAgain = (at: Clock) =>
+    later({ time: clock(at), tone: "window", sign: "window", title: `${liftedAlways!.label} again`, detail: "For the rest of today" });
   // What comes from `start` on: a window on then carries on to its end (and any window overlapping
   // it after that), then nothing blocks until the next window or tomorrow morning.
   const onwards = (start: Clock, again?: DayWindow): DayItem[] => {
     const items: DayItem[] = [];
     let at = start;
-    const morning = () => [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
+    // Past midnight: tomorrow morning is free, unless a lifted always-on rule has come back by then.
+    const morning = () =>
+      liftedAlways ? items : [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
     for (let step = 0; step <= 3 * subject.windows.length; step++) {
       const covering = subject.windows.find((candidate) => inWindow(candidate, at) && !(candidate.allowed && at < candidate.allowed.until));
       if (!covering) {
@@ -409,7 +415,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       at = end;
     }
     if (at >= 1440) return morning();
+    if (back !== undefined && back <= at) return [...items, alwaysAgain(at)];
     const next = nextWindow(at);
+    if (back !== undefined && (!next || back < next.from)) return [...items, notBlocked(at, undefined, liftedAlways!.label), alwaysAgain(back)];
     return [...items, notBlocked(at, next), ...(next ? [windowItem(next)] : [])];
   };
   const afterWindow = () => onwards(windowEnd);
@@ -533,16 +541,18 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     day = { kind: "always", label };
     story = undefined;
   } else if (liftedAlways && !(window && !(window.allowed && now < window.allowed.until))) {
-    // Lifted for now: allowed until then, and no internet from then on.
+    // Lifted for now: allowed until then, or until a window starts first, and no internet from then on.
     const { label, allowed } = liftedAlways;
-    const until = allowed!.until;
     const by = allowed!.by;
-    bands.splice(0, bands.length, { kind: "window", from: until, to: 1440, label, source: "No internet", times: `from ${clock(until)}` });
+    const sooner = nextWindow(now);
+    const then = sooner && sooner.from < back! ? sooner : undefined;
+    const until = then ? then.from : back!;
+    bands.push({ kind: "window", from: back!, to: 1440, label, source: "No internet", times: `from ${clock(back!)}` });
     items = [
       { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : `${label} is off for now` },
-      later({ time: clock(until), tone: "window", sign: "window", title: `${label} again`, detail: "For the rest of today" }),
+      ...(then ? onwards(then.from) : [alwaysAgain(back!)]),
     ];
-    day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}) };
+    day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}), ...(then ? { then } : {}) };
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
     const asked = ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil ? { ...ask, minutes: ask.minutes } : undefined;
     const allowedTo = asked ? allowedUntil! : Math.min(lift!.until, windowEnd);

@@ -494,6 +494,23 @@ describe("a child's day on the household's clock", () => {
     // Read after 5 PM it blocks again.
     const evening = meDaySubject(lifted, new Date("2026-11-16T23:00:00Z"));
     expect(tellDay(evening.subject, evening.now, PHONE_VOICE, evening.clock).day.kind).toBe("always");
+    // Lifted until 10 PM with Bedtime from 9 PM, read at 8 PM: allowed only until Bedtime.
+    const grounded = me({ windows: [bedtime([1])], alwaysOn: [{ ruleId: "r2", name: "Grounded", kind: "internet", allowed: { by: "Dad", until: "2026-11-17T03:00:00Z" } }] });
+    const eight = meDaySubject(grounded, new Date("2026-11-17T01:00:00Z"));
+    const atEight = tellDay(eight.subject, eight.now, PHONE_VOICE, eight.clock);
+    expect(topAnswer(atEight)).toMatchObject({ title: "Allowed until 9 PM", sentence: "Dad said yes. Bedtime starts at 9 PM." });
+    expect(atEight.items.map((item) => [item.time, item.title])).toEqual([
+      ["Now", "Allowed until 9 PM"],
+      ["9 PM", "Bedtime"],
+    ]);
+    // Inside Homework (4 to 6 PM) with the rule lifted until 5 PM: after Homework, the rule again, never "Not blocked".
+    const study = { ruleId: "r1", ruleName: "Homework", name: "", days: [1], start: "16:00", end: "18:00", allowed: null };
+    const inside = meDaySubject(me({ windows: [study], alwaysOn: [{ ruleId: "r2", name: "Grounded", kind: "internet", allowed: { by: "Dad", until: "2026-11-16T22:00:00Z" } }] }), new Date("2026-11-16T21:30:00Z"));
+    const told = tellDay(inside.subject, inside.now, PHONE_VOICE, inside.clock);
+    expect(told.items.map((item) => [item.time, item.title])).toEqual([
+      ["Now", "Homework"],
+      ["6 PM", "Grounded again"],
+    ]);
     // A category rule alone leaves the internet on.
     const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category", allowed: null }] }), MONDAY_NIGHT);
     expect(games.subject.always).toBeUndefined();
