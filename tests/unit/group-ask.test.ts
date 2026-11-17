@@ -114,7 +114,7 @@ describe("a child's ask, as a parent answers it", () => {
 
 describe("Settings' waits for asks", () => {
   it("lists each wait, with one set elsewhere among them", () => {
-    expect(askWaitChoices("wait", 30).map((choice) => choice.label)).toEqual(["Right away", "For 15 minutes", "For 30 minutes", "For an hour", "For 2 hours"]);
+    expect(askWaitChoices("wait", 30).map((choice) => choice.label)).toEqual(["Right away", "After 15 minutes", "After 30 minutes", "After an hour", "After 2 hours"]);
     expect(askWaitChoices("timeout", 45).map((choice) => choice.value)).toEqual([5, 15, 30, 45, 60, 120, 240, 1440]);
     expect(askWaitLabel(1440, "timeout")).toBe("For a day");
     expect(askWaitLabel(90, "timeout")).toBe("For 1 hour 30 minutes");

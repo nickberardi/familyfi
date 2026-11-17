@@ -200,9 +200,11 @@ export const ASK_WAIT_CHOICES = [0, 15, 30, 60, 120] as const;
  */
 export function askWaitLabel(minutes: number, kind: "timeout" | "wait"): string {
   if (minutes === 0) return kind === "wait" ? "Right away" : "Never";
-  if (minutes === 1440) return "For a day";
-  if (minutes === 60) return "For an hour";
-  return `For ${minutesText(minutes)}`;
+  // The wait reads with its label: "After Not now, they can ask again after 30 minutes".
+  const lead = kind === "wait" ? "After" : "For";
+  if (minutes === 1440) return `${lead} a day`;
+  if (minutes === 60) return `${lead} an hour`;
+  return `${lead} ${minutesText(minutes)}`;
 }
 
 /** Settings' choices for one of the waits, with the value set now among them. */

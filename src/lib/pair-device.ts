@@ -205,7 +205,7 @@ export function pairingSheetCopy({
     name: child
       ? {
           title: PAIR_COPY.pairMe,
-          sub: "Makes a single-use code that pairs FamilyFi Me on a child's phone. It shows them their own rules and lets them ask you for more time. It expires in five minutes.",
+          sub: "Makes a single-use code that pairs FamilyFi Me on a family member's phone. It shows them their own rules and lets them ask you for more time. It expires in five minutes.",
         }
       : {
           title: replacing ? `Re-pair ${replacing.displayName}` : PAIR_COPY.pairPhone,
