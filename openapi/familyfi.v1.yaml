@@ -3622,7 +3622,7 @@ components:
       additionalProperties: false
       description: |
         An administrator's invite, for the client type `clientType` names (or, as installed apps send
-        it, `client`; one of the two is required, and `clientType` wins). A phone needs the route it
+        it, `client`; one of the two is required, and when both are sent they must name the same client type, or the request is refused with 400). A phone needs the route it
         pairs over (`endpointId`) and may name
         the administrator it signs in as (`accountId`, default: whoever makes it), and
         `replacesDeviceId` to re-pair a phone. An agent needs a `scope` of `full` or `readOnly`.
@@ -3642,7 +3642,7 @@ components:
         An app's Watch (`clientType: app-watch`, or `client: watch`), or its own sign-in for Siri,
         Shortcuts and system controls (`clientType: app-controls`, or `client: app` with
         `scope: rulesOnly`), invited and claimed at once with `?claim=true`. One of `clientType` and
-        `client` is required, and `clientType` wins.
+        `client` is required; when both are sent they must name the same client type, or the request is refused with 400.
       required: [clientId]
       properties:
         clientType: { type: string, enum: [app-watch, app-controls], description: "The client type to set up. Servers before 1.6.0 need `client` instead." }

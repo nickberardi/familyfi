@@ -43,7 +43,7 @@ describe("device scopes", () => {
   });
 
   it("refuses everything for a scope its client type may not hold, or one it does not know", () => {
-    for (const [clientType, scope] of [["app-watch", "app:full"], ["agent", "app:rulesOnly"], ["app", "agent:readOnly"], ["app-controls", "app:full"], ["app", "full"], ["watch", "app:rulesOnly"], ["me", "app:full"]] as const) {
+    for (const [clientType, scope] of [["app-watch", "app:full"], ["agent", "app:rulesOnly"], ["app", "agent:readOnly"], ["app-controls", "app:full"], ["app", "full"], ["watch", "app:rulesOnly"], ["me", "app:full"], ["app-watch", "app:full"], ["agent", "me:askOnly"]] as const) {
       expect(allowed(clientType, scope, "GET", "/api/v1/groups"), `${clientType} ${scope}`).toBe(false);
     }
   });
