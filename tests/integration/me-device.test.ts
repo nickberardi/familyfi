@@ -142,7 +142,7 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(tellDay(subject, now, PHONE_VOICE, clock).day.kind).toBe("paused");
   });
 
-  it("marks a window whose rule is lifted until a time, and leaves out a rule lifted with no end or always on", async () => {
+  it("marks a window or always-on rule lifted until a time, and leaves out a rule lifted with no end", async () => {
     const group = await childGroup();
     const later = new Date(Date.now() + 60 * 60_000);
     const window = { create: [{ position: 0, name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }] };
@@ -165,7 +165,7 @@ describe("FamilyFi Me on a child's phone", () => {
       ["Bedtime", { by: "Mom", until: latest.toISOString() }],
       ["Homework", null],
     ]);
-    expect(day.alwaysOn).toEqual([]);
+    expect(day.alwaysOn).toEqual([expect.objectContaining({ name: "Games", allowed: { by: null, until: later.toISOString() } })]);
   });
 
   it("names no one for a pause the recovery account made", async () => {

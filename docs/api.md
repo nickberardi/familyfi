@@ -267,8 +267,7 @@ revoking the phone that invited it leaves it alone.
 It reads `GET /me/day`, which tells the group's own pause and allowance, the windows of its
 internet rules (each with the days it starts on, its household-time start and end, and `allowed`
 while its rule is lifted for the group until a time), and the rules that block something all the
-time; nothing else in the household. A rule lifted with no end, and an always-on rule while lifted,
-are left out. A `by` is `null` where FamilyFi recorded no person, or the recovery account acted.
+time (with `allowed` too); nothing else in the household. A rule lifted with no end is left out. A `by` is `null` where FamilyFi recorded no person, or the recovery account acted.
 `meDaySubject` tells an always-on internet rule as blocking all day, and an allowance through the
 windows it marks `allowed`; it does not read `allowance` itself, or always-on category, app and
 website rules, which an app lists on its own. An invite for a child's phone is cancelled while it
