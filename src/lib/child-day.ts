@@ -407,10 +407,11 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
 
 /** An ask whose `about` and `state` are ones this build knows; the API may add others. */
 type KnownAsk = NonNullable<GroupDay["ask"]> & { about: "pause" | "rule"; state: DayAsk["state"] };
-const ASK_STATES: readonly string[] = ["waiting", "yes", "no", "timedOut", "ended"] satisfies DayAsk["state"][];
+// A record, so a state DayAsk gains must be added here too.
+const ASK_STATES: Record<DayAsk["state"], true> = { waiting: true, yes: true, no: true, timedOut: true, ended: true };
 
 function knownAsk(ask: NonNullable<GroupDay["ask"]>): ask is KnownAsk {
-  return (ask.about === "pause" || ask.about === "rule") && ASK_STATES.includes(ask.state);
+  return (ask.about === "pause" || ask.about === "rule") && Object.hasOwn(ASK_STATES, ask.state);
 }
 
 /** FamilyFi's ask as the day tells it; a parent FamilyFi has no name for goes unnamed. */
