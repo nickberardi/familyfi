@@ -303,6 +303,11 @@ export function withCustomChoices(options: PauseSheetOption[], recent: PauseShee
   ];
 }
 
+/** An answer to a child's ask for a time of the parent's own (`askSheetCustom`): the rule is lifted until then. */
+export function askSheetCustomOption(custom: CustomPause, timezone: string, now: Date): PauseSheetOption | null {
+  return customOption(custom, null, "until", timezone, now);
+}
+
 /** The custom choice a device kept, or null when it kept none or kept something unreadable. */
 export function parseCustomPause(stored: string | null): CustomPause | null {
   if (!stored) return null;

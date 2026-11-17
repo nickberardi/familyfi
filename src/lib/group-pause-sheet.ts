@@ -23,12 +23,17 @@ import type { Device, Group } from "./types";
 /**
  * Which sheet a group card opens: its block (all internet off), its unblock, or a pause of one of
  * its rule areas for it alone (`ruleIds`, called `name` in the copy). Each comes in `pause` (the
- * first time) and `extend` (More time).
+ * first time) and `extend` (More time). A child's waiting ask opens its answer sheet (`ask`).
  */
 export type GroupSheetTarget =
   | { kind: "block"; mode: PauseSheetMode }
   | { kind: "unblock"; mode: PauseSheetMode }
-  | { kind: "rule"; ruleIds: string[]; name: string; mode: PauseSheetMode; wording?: "unblock" };
+  | { kind: "rule"; ruleIds: string[]; name: string; mode: PauseSheetMode; wording?: "unblock" }
+  /** The answer sheet for a child's waiting ask (`askSheetChoices` in `group-ask.ts`). */
+  | { kind: "ask" };
+
+/** A sheet that blocks or lifts with times (`groupSheet`); the ask's answer sheet is its own. */
+export type GroupPauseSheetTarget = Exclude<GroupSheetTarget, { kind: "ask" }>;
 
 /**
  * A group sheet as every client shows it: its title and body, the choices from the group's rules
@@ -40,7 +45,7 @@ export function groupSheet(
   group: Group,
   rules: Rule[],
   devices: Pick<Device, "groupId" | "hostname">[],
-  target: GroupSheetTarget,
+  target: GroupPauseSheetTarget,
   timezone: string,
   now: Date,
   recent: CustomPause | null = null,

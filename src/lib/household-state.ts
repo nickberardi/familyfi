@@ -15,6 +15,9 @@ export type HouseholdPublic = {
   quarantinePolicyCount: number;
   /** Phone alerts through the push relay; servers before API 1.4.0 leave it out. */
   alertsRelay?: boolean;
+  /** How long a child's ask waits for an answer, and how long after Not now before they can ask again; servers before asks leave them out. */
+  askTimeoutMinutes?: number;
+  askWaitMinutes?: number;
 };
 
 export type MutationPayload = {

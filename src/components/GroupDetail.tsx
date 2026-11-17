@@ -21,6 +21,7 @@ import { InternetPresets } from "@/ui/InternetPresets";
 import { GroupEditSheet } from "@/components/GroupEditSheet";
 import { PageHeader } from "@/components/PageHeader";
 import { GroupDevicesCard } from "@/ui/GroupDevicesCard";
+import { GroupChildPhones } from "@/components/GroupChildPhones";
 import { PRIMARY_BUTTON } from "@/components/ui/buttons";
 import { BackLink } from "@/components/ui/BackLink";
 import { NotFound } from "@/components/ui/NotFound";
@@ -65,6 +66,17 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
                 {status.detail ? <span style={{ color: groupDetailColor(status.change) }}>{status.detail}</span> : null}
               </h2>
               <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
+              {header.ask ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={header.ask.onPress}
+                  data-testid={header.ask.testID}
+                  className="mt-1 block text-left text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
+                >
+                  {header.ask.label}
+                </button>
+              ) : null}
               {header.more ? (
                 <button
                   type="button"
@@ -122,6 +134,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
           />
         </section>
         <GroupDevicesCard group={group} members={members} />
+        {group.kind === "family" && !demo ? <GroupChildPhones group={group} /> : null}
       </div>
       {sheet ? <PauseSheet group={group} target={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
       {editing ? (

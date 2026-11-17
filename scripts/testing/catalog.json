@@ -224,6 +224,12 @@
         "display"
       ]
     },
+    "tests/unit/group-ask.test.ts": {
+      "categories": [
+        "groups",
+        "display"
+      ]
+    },
     "tests/unit/household-state.test.ts": {
       "categories": [
         "groups",
@@ -852,6 +858,12 @@
       "categories": [
         "groups",
         "rules"
+      ]
+    },
+    "tests/browser/asks.spec.ts": {
+      "categories": [
+        "groups",
+        "settings"
       ]
     },
     "tests/browser/dialogs.spec.ts": {

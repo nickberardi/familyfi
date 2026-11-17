@@ -13,7 +13,7 @@ import type { Group } from "@/lib/types";
 import { installedVersion } from "@/lib/update-copy";
 import { APP_VERSION } from "@/lib/version";
 import { NewLoginFields } from "@/ui/NewLoginFields";
-import { AlertsCard, GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
+import { AlertsCard, AsksCard, GatewayCard, HouseholdCard, KeyCard } from "@/ui/SettingsCards";
 import { SettingsTabs } from "@/ui/SettingsTabs";
 import { UpdateContent } from "@/ui/UpdateContent";
 import { UpdateScheduleCard } from "@/ui/UpdateScheduleCard";
@@ -158,7 +158,12 @@ function Settings() {
                 setPw2("");
               }}
             />
-            <AlertsCard enabled={household?.alertsRelay === true} mutate={store.mutate} disabled={household?.alertsRelay === undefined} />
+            <div className="flex flex-col gap-[18px]">
+              <AlertsCard enabled={household?.alertsRelay === true} mutate={store.mutate} disabled={household?.alertsRelay === undefined} />
+              {household?.askTimeoutMinutes !== undefined && household.askWaitMinutes !== undefined ? (
+                <AsksCard timeout={household.askTimeoutMinutes} wait={household.askWaitMinutes} mutate={store.mutate} />
+              ) : null}
+            </div>
           </div>
         ) : null}
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { groupSheet, type GroupSheetTarget } from "@/lib/group-pause-sheet";
-import { applyGroupSheet, applyRulePause } from "@/lib/group-writes";
+import { groupSheet, type GroupPauseSheetTarget, type GroupSheetTarget } from "@/lib/group-pause-sheet";
+import { askSheetBody, askSheetChoices, askSheetCustom, askSheetTitle, waitingAsk } from "@/lib/group-ask";
+import { answerAsk, applyGroupSheet, applyRulePause } from "@/lib/group-writes";
 import {
   CUSTOM_PAUSE_MAX_MINUTES,
   RECENT_CUSTOM_PAUSE_KEY,
@@ -13,19 +14,17 @@ import {
   rulePauseSheetTitle,
   withCustomChoices,
   type CustomPause,
-  type PauseSheetChoice,
-  type PauseSheetOption,
   type PauseSheetPicker,
   type PauseSheetRequest,
 } from "@/lib/pause-sheet";
 import { ruleInternetWindows, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppData } from "./AppDataProvider";
 import { CANCEL_BUTTON, PRIMARY_BUTTON } from "@/components/ui/buttons";
 import { Modal } from "@/components/ui/Modal";
 
-/** A group card's sheet: its block, its unblock, or a rule area's pause for it alone (`groupSheet`). */
+/** A group card's sheet: its block, its unblock, a rule area's pause for it alone (`groupSheet`), or the answer to a child's ask. */
 export function PauseSheet({
   group,
   target,
@@ -34,6 +33,21 @@ export function PauseSheet({
 }: {
   group: Group;
   target: GroupSheetTarget;
+  timezone: string;
+  onClose: () => void;
+}) {
+  if (target.kind === "ask") return <AskSheet group={group} timezone={timezone} onClose={onClose} />;
+  return <GroupPauseSheet group={group} target={target} timezone={timezone} onClose={onClose} />;
+}
+
+function GroupPauseSheet({
+  group,
+  target,
+  timezone,
+  onClose,
+}: {
+  group: Group;
+  target: GroupPauseSheetTarget;
   timezone: string;
   onClose: () => void;
 }) {
@@ -54,8 +68,38 @@ export function PauseSheet({
       recent={recent}
       // Resolved when it is tapped, so a sheet left open never sends an end already passed.
       custom={(choice) => sheet.custom(choice, new Date())}
-      onPick={(request) => run(request)}
+      onPick={(option) => run(option.request)}
       onCustom={remember}
+      onClose={onClose}
+    />
+  );
+}
+
+/**
+ * The answer to a child's waiting ask: yes as asked, yes for a time of the parent's own, or Not now
+ * (`askSheetChoices`). An ask answered or closed while the sheet is open closes it.
+ */
+function AskSheet({ group, timezone, onClose }: { group: Group; timezone: string; onClose: () => void }) {
+  const { store, rules, household } = useAppData();
+  const now = new Date();
+  const ask = waitingAsk(group, now);
+  const closed = ask === null;
+  useEffect(() => {
+    if (closed) onClose();
+  }, [closed, onClose]);
+  if (!ask) return null;
+  const ruleName = ask.about === "rule" ? rules.find((rule) => rule.id === ask.ruleId)?.name : undefined;
+  return (
+    <PauseSheetView
+      title={askSheetTitle(group, ask, rules)}
+      body={askSheetBody(ask, timezone)}
+      confirm="Allow"
+      choices={askSheetChoices(ask, rules, timezone, now, household?.askWaitMinutes)}
+      recent={null}
+      // Resolved when it is tapped, so a sheet left open never sends an end already passed.
+      custom={(choice) => askSheetCustom(choice, ask, rules, timezone, new Date())}
+      onPick={(option) => answerAsk(store.mutate, group, ask, option, ruleName).then(() => undefined)}
+      onCustom={() => undefined}
       onClose={onClose}
     />
   );
@@ -92,7 +136,7 @@ export function RulePauseSheet({
       choices={withCustomChoices(options, recent && custom(recent))}
       recent={recent}
       custom={custom}
-      onPick={(request) => run(request)}
+      onPick={(option) => run(option.request)}
       onCustom={remember}
       onClose={onClose}
     />
@@ -122,11 +166,14 @@ function useRecentCustomPause(): [CustomPause | null, (choice: CustomPause) => v
   return [recent, remember];
 }
 
-function isPicker(choice: PauseSheetChoice): choice is PauseSheetPicker {
+/** A choice on a sheet: what it says, and what it does when tapped. */
+type SheetOption<R> = { label: string; note: string; request: R };
+
+function isPicker<R>(choice: SheetOption<R> | PauseSheetPicker): choice is PauseSheetPicker {
   return "picker" in choice;
 }
 
-function PauseSheetView({
+function PauseSheetView<R>({
   title,
   body,
   confirm,
@@ -139,18 +186,18 @@ function PauseSheetView({
 }: {
   title: string;
   body: string;
-  /** The picker's button: Block, Unblock, Pause or Add time. */
+  /** The picker's button: Block, Unblock, Pause, Add time or Allow. */
   confirm: string;
-  choices: PauseSheetChoice[];
+  choices: (SheetOption<R> | PauseSheetPicker)[];
   recent: CustomPause | null;
-  custom: (choice: CustomPause) => PauseSheetOption | null;
-  onPick: (request: PauseSheetRequest) => Promise<void>;
+  custom: (choice: CustomPause) => SheetOption<R> | null;
+  onPick: (option: SheetOption<R>) => Promise<void>;
   onCustom: (choice: CustomPause) => void;
   onClose: () => void;
 }) {
   const [open, setOpen] = useState<PauseSheetPicker["picker"] | null>(null);
   // The last custom choice is worked out again at the tap, like the picker's.
-  const resolve = (option: PauseSheetOption) =>
+  const resolve = (option: SheetOption<R>) =>
     (recent && option.label === customPauseLabel(recent) && custom(recent)) || option;
   return (
     <Modal labelledBy="pause-sheet-title" size="confirm" onClose={onClose}>
@@ -168,7 +215,7 @@ function PauseSheetView({
             className="flex w-full items-baseline gap-2.5 border-t border-[var(--ff-line)] px-[18px] py-3 text-left"
             onClick={() => {
               if (isPicker(choice)) setOpen(open === choice.picker ? null : choice.picker);
-              else void onPick(resolve(choice).request).then(onClose);
+              else void onPick(resolve(choice)).then(onClose);
             }}
           >
             <span className="flex-1 text-[15px] font-semibold text-[var(--ff-accent)]">{choice.label}</span>
@@ -181,7 +228,7 @@ function PauseSheetView({
               confirm={confirm}
               custom={custom}
               onDone={(picked, option) => {
-                void onPick(option.request).then(() => {
+                void onPick(option).then(() => {
                   onCustom(picked);
                   onClose();
                 });
@@ -200,7 +247,7 @@ function PauseSheetView({
 }
 
 /** For…: hours and minutes. Until…: a time of day, the next time the clock reads it. */
-function CustomPausePicker({
+function CustomPausePicker<R>({
   picker,
   recent,
   confirm,
@@ -210,8 +257,8 @@ function CustomPausePicker({
   picker: PauseSheetPicker["picker"];
   recent: CustomPause | null;
   confirm: string;
-  custom: (choice: CustomPause) => PauseSheetOption | null;
-  onDone: (choice: CustomPause, option: PauseSheetOption) => void;
+  custom: (choice: CustomPause) => SheetOption<R> | null;
+  onDone: (choice: CustomPause, option: SheetOption<R>) => void;
 }) {
   // Starts from the last custom choice of the same kind.
   const last = recent?.kind === "for" ? recent.minutes : 120;

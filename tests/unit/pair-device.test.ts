@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_STORES,
+  CHILD_PHONES_COPY,
   PAIR_COPY,
   PLAY_BETA,
   canRepair,
+  childPhoneName,
+  childPhonesOf,
   defaultPairingAccount,
+  inviteChildPhone,
   invitePhone,
   isApp,
   isAppControls,
   pairingAccounts,
+  pairingChildGroups,
   pairingExpired,
   pairingSheetCopy,
   phoneLines,
@@ -23,7 +28,7 @@ import {
   showAllLabel,
   splitPhones,
 } from "@/lib/pair-device";
-import type { Account, ConnectionRoute, PairedPhone } from "@/lib/types";
+import type { Account, ConnectionRoute, Group, PairedPhone } from "@/lib/types";
 
 const phone = (over: Partial<PairedPhone> = {}): PairedPhone => ({
   id: "p1",
@@ -230,5 +235,49 @@ describe("pair device", () => {
     expect(defaultPairingAccount(accounts, "member")).toBe("admin");
     expect(defaultPairingAccount(accounts, "recovery")).toBe("admin");
     expect(defaultPairingAccount([], "admin")).toBe("");
+  });
+});
+
+describe("FamilyFi Me on a child's phone", () => {
+  const child = (over: Partial<PairedPhone> = {}) =>
+    phone({ id: "m1", displayName: "Emma's phone", clientType: "me", scope: "me:askOnly", actsAs: null, group: { id: "g1", name: "Emma" }, ...over });
+
+  it("is tagged for its family member, never as an account", () => {
+    const { tags } = phoneLines(child(), new Date("2026-09-15T12:00:00Z"));
+    expect(tags).toEqual([
+      { label: "FamilyFi Me", name: "FamilyFi Me", tone: "neutral" },
+      { label: "Emma", name: "For Emma", tone: "neutral" },
+    ]);
+  });
+
+  it("lists a family member's own phones that are still paired", () => {
+    const phones = [child(), child({ id: "m2", revokedAt: "2026-09-10T12:00:00Z" }), child({ id: "m3", group: { id: "g2", name: "Max" } }), phone()];
+    expect(childPhonesOf(phones, "g1").map((item) => item.id)).toEqual(["m1"]);
+  });
+
+  it("is paired for a family member, named for them until someone renames it", () => {
+    const groups = [{ id: "g1", kind: "family", name: "Emma" }, { id: "t1", kind: "things", name: "TV" }] as Group[];
+    expect(pairingChildGroups(groups).map((group) => group.id)).toEqual(["g1"]);
+    expect(childPhoneName({ name: "Emma" })).toBe("Emma's phone");
+    expect(childPhoneName(undefined)).toBe("Phone");
+  });
+
+  it("says what the code is for at each step", () => {
+    const copy = pairingSheetCopy({ child: true });
+    expect(copy.name.title).toBe(PAIR_COPY.pairMe);
+    expect(copy.code.title).toBe("Scan with FamilyFi Me");
+    expect(copy.phone).toBe("Phone name");
+    expect(pairingSheetCopy({ child: true, claimed: true, claimedName: "Emma's phone" }).code).toEqual({ title: "Phone paired", sub: "Emma's phone is paired and signed in." });
+    expect(CHILD_PHONES_COPY.empty("Emma")).toBe("Pair FamilyFi Me on Emma's phone so they can see their rules and ask you for more time.");
+  });
+
+  it("invites with its family group and no account", async () => {
+    const sent: { path: string; init?: { method?: string; body?: unknown } }[] = [];
+    const request = (async (path: string, init?: { method?: string; body?: unknown }) => {
+      sent.push({ path, init });
+      return {};
+    }) as never;
+    await inviteChildPhone(request, { endpointId: "r1", displayName: "Emma's phone", groupId: "g1" });
+    expect(sent).toEqual([{ path: "/api/v1/paired/invites", init: { method: "POST", body: { clientType: "me", endpointId: "r1", displayName: "Emma's phone", groupId: "g1" } } }]);
   });
 });

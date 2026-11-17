@@ -7,6 +7,7 @@ import * as apiCompat from "./api-compat";
 import * as blockSwitchModule from "./block-switch";
 import * as groupActionsModule from "./group-actions";
 import * as display from "./display";
+import * as groupAsk from "./group-ask";
 import * as groupSchedule from "./group-schedule";
 import * as pauseSheet from "./pause-sheet";
 import * as ruleActions from "./rule-actions";
@@ -90,6 +91,16 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   internetState: (i) => ruleWindows.internetState(i.group, i.windows, at(i.now), i.timeZone),
   internetDayBands: (i) => ruleWindows.internetDayBands(i.group, i.windows, at(i.now), i.timeZone),
   localWeekday: (i) => ruleWindows.localWeekday(at(i.now), i.timeZone),
+  // A child's ask, as a parent answers it: the card's line and the answer sheet.
+  waitingAsk: (i) => groupAsk.waitingAsk(i.group, at(i.now)),
+  groupAskLine: (i) => groupAsk.groupAskLine(i.group, i.rules, at(i.now)),
+  askSheetTitle: (i) => groupAsk.askSheetTitle(i.group, i.ask, i.rules),
+  askSheetBody: (i) => groupAsk.askSheetBody(i.ask, i.timeZone),
+  askSheetOptions: (i) => groupAsk.askSheetOptions(i.ask, i.rules as Rule[], i.timeZone, at(i.now)),
+  askSheetCustom: (i) => groupAsk.askSheetCustom(i.custom, i.ask, i.rules as Rule[], i.timeZone, at(i.now)),
+  askDeclineOption: (i) => groupAsk.askDeclineOption(i.timeZone, at(i.now), i.waitMinutes),
+  askSheetChoices: (i) => groupAsk.askSheetChoices(i.ask, i.rules as Rule[], i.timeZone, at(i.now), i.waitMinutes),
+  askSheetCustomOption: (i) => pauseSheet.askSheetCustomOption(i.custom, i.timeZone, at(i.now)),
   watchNoun: (i) => watchApp.watchNoun(i.platform),
   watchPhoneNoun: (i) => watchApp.watchPhoneNoun(i.platform),
   watchAppCopy: (i) => watchApp.watchAppCopy(i.platform),
@@ -105,7 +116,7 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
 };
 
 /** The modules whose every exported function must have a vector, or a reason in `EXCLUDED`. */
-export const MODULES = { apiCompat, blockSwitch: blockSwitchModule, display, groupActions: groupActionsModule, groupSchedule, pauseSheet, ruleActions, ruleWindows, watchApp };
+export const MODULES = { apiCompat, blockSwitch: blockSwitchModule, display, groupActions: groupActionsModule, groupAsk, groupSchedule, pauseSheet, ruleActions, ruleWindows, watchApp };
 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {

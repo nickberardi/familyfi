@@ -1,3 +1,4 @@
+import { minutesText } from "./alert-copy";
 import type { Account, Group, UnifiSettings } from "./types";
 import { consoleHostFromBaseUrl } from "./unifi-host";
 
@@ -177,4 +178,36 @@ export function removeLoginConfirm(account: Pick<Account, "username">, group: Pi
     message: `${account.username} is signed out and can no longer sign in, and the phones, Watches and agents acting as ${group.name} are removed. ${group.name} stays in the household.`,
     confirmLabel: "Remove login",
   };
+}
+
+/** Settings' card for asks: how long one waits for an answer, and how long after Not now before a child can ask again. */
+export const ASKS_CARD_COPY = {
+  title: "Asking for more time",
+  sub: "How long a child's ask from FamilyFi Me waits for you",
+  timeout: "An ask waits for an answer",
+  timeoutNote: "Then it closes, and they can ask again.",
+  wait: "After Not now, they can ask again",
+} as const;
+
+/** The waits Settings offers for an unanswered ask, in minutes (the server takes 5 to 1440). */
+export const ASK_TIMEOUT_CHOICES = [5, 15, 30, 60, 120, 240, 1440] as const;
+/** The waits Settings offers after Not now, in minutes (the server takes 0 to 1440). */
+export const ASK_WAIT_CHOICES = [0, 15, 30, 60, 120] as const;
+
+/**
+ * A wait as Settings lists it: "Right away", "For 15 minutes", "For an hour", "For a day". A value
+ * set elsewhere that is not a choice is listed too, so the menu shows what is set.
+ */
+export function askWaitLabel(minutes: number, kind: "timeout" | "wait"): string {
+  if (minutes === 0) return kind === "wait" ? "Right away" : "Never";
+  if (minutes === 1440) return "For a day";
+  if (minutes === 60) return "For an hour";
+  return `For ${minutesText(minutes)}`;
+}
+
+/** Settings' choices for one of the waits, with the value set now among them. */
+export function askWaitChoices(kind: "timeout" | "wait", current: number | undefined): { value: number; label: string }[] {
+  const values: number[] = [...(kind === "timeout" ? ASK_TIMEOUT_CHOICES : ASK_WAIT_CHOICES)];
+  if (current !== undefined && !values.includes(current)) values.push(current);
+  return values.sort((a, b) => a - b).map((value) => ({ value, label: askWaitLabel(value, kind) }));
 }

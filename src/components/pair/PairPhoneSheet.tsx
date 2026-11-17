@@ -9,13 +9,14 @@ import { SheetFrame } from "./SheetFrame";
 
 /**
  * Pair a device through the published route: name the device and choose the administrator it signs in
- * as, then show the single-use pairing code,
+ * as (or, for FamilyFi Me on a child's phone, the family member it is for), then show the single-use pairing code,
  * as a QR and as text to copy. Both are the same string, the only one the app accepts. Closing the sheet or
  * regenerating cancels a code nobody claimed, so a QR left on screen dies with it.
  */
 export function PairPhoneSheet({
   route,
   replacing,
+  child,
   onClose,
   onPaired,
 }: {
@@ -23,11 +24,13 @@ export function PairPhoneSheet({
   route: ConnectionRoute;
   /** Re-pairing: the phone, active or revoked, this pairing replaces once it is claimed. */
   replacing?: PairedPhone | null;
+  /** FamilyFi Me on a child's phone, first for this family member when given. */
+  child?: { groupId?: string };
   onClose: () => void;
   onPaired: () => void;
 }) {
-  const { session } = useAppData();
-  const pairing = usePairing({ request, route, replacing, username: session?.username ?? null, onPaired });
+  const { session, groups } = useAppData();
+  const pairing = usePairing({ request, route, replacing, username: session?.username ?? null, onPaired, ...(child ? { child: { groups, groupId: child.groupId } } : {}) });
   return (
     <SheetFrame size="form" title={pairing.heading.title} sub={pairing.heading.sub} onClose={onClose} footer={<PairingActions pairing={pairing} onClose={onClose} />}>
       <PairingBody pairing={pairing} />

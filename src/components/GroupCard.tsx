@@ -66,6 +66,7 @@ export function GroupCard({
       onToggle={() => setOpen(!open)}
       action={header.action}
       more={header.more}
+      ask={header.ask}
       menu={header.menu}
     >
 

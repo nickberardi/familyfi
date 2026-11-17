@@ -7,6 +7,7 @@ import { countdown, transportLabel } from "@/lib/connection-routes";
 import { expiresLine } from "@/lib/pair-device";
 import { PAIRING_LINK_LABEL, PAIRING_LINK_NOTE, pairingLink, pairingLinkAllowed, runsFamilyFiApp } from "@/lib/pairing-link";
 
+import { FormField } from "./FormField";
 import { PairingAccountField } from "./PairingAccountField";
 import { PairingNameField } from "./PairingNameField";
 import { QrCode } from "./QrCode";
@@ -81,8 +82,9 @@ function AppLink({ code }: { code: string }) {
 }
 
 /**
- * What the pairing sheet shows: the route, the phone's name and the administrator it signs in as,
- * then the code as a QR and text, then the phone that used it.
+ * What the pairing sheet shows: the route, the phone's name and the administrator it signs in as (or,
+ * for FamilyFi Me on a child's phone, the family member it is for), then the code as a QR and text,
+ * then the phone that used it.
  */
 export function PairingBody({ pairing }: { pairing: Pairing }) {
   const ui = useUI();
@@ -105,7 +107,24 @@ export function PairingBody({ pairing }: { pairing: Pairing }) {
           <Text style={[text(14, 21, "muted"), styles.routeLine]}>{copy.routeNote}</Text>
         </View>
         <PairingNameField label={copy.phone} value={pairing.name} onChange={pairing.setName} />
-        {pairing.noAccounts ? (
+        {pairing.child ? (
+          pairing.child.groups.length ? (
+            <FormField label={copy.forGroup}>
+              <ui.Select
+                label={copy.forGroup}
+                value={pairing.child.groupId}
+                options={pairing.child.groups.map((group) => ({ value: group.id, label: group.name }))}
+                onChange={pairing.child.setGroupId}
+                variant="field"
+                testID="pairing-group"
+              />
+            </FormField>
+          ) : (
+            <View role="status" style={[styles.note, { backgroundColor: ui.color("note-fill") }]} testID="pairing-no-groups">
+              <Text style={text(14, 21, "ink")}>{copy.noGroups}</Text>
+            </View>
+          )
+        ) : pairing.noAccounts ? (
           // The link sits on its own line: a link inside running text does not lay out on every platform.
           <View role="status" style={[styles.note, { backgroundColor: ui.color("note-fill") }]} testID="pairing-no-accounts">
             <Text style={text(14, 21, "ink")}>{copy.noAccounts}</Text>
@@ -178,7 +197,7 @@ export function PairingActions({ pairing, onClose, disabled }: { pairing: Pairin
     return (
       <>
         <SheetButton label={copy.cancel} onPress={onClose} testID="pairing-cancel" />
-        <SheetButton label={copy.show} primary disabled={disabled || pairing.busy || !pairing.name.trim() || !pairing.accountId} onPress={() => void pairing.generate()} testID="pairing-show" />
+        <SheetButton label={copy.show} primary disabled={disabled || pairing.busy || !pairing.ready} onPress={() => void pairing.generate()} testID="pairing-show" />
       </>
     );
   }

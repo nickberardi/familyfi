@@ -17,6 +17,11 @@ export function setAlertsRelay(mutate: Mutate, alertsRelay: boolean) {
   return mutate((send) => send("/api/v1/settings/household", { method: "PUT", body: { alertsRelay } }));
 }
 
+/** How long a child's ask waits for an answer, or how long after Not now before they can ask again. */
+export function setAskWait(mutate: Mutate, wait: { askTimeoutMinutes: number } | { askWaitMinutes: number }) {
+  return mutate((send) => send("/api/v1/settings/household", { method: "PUT", body: wait }));
+}
+
 export function setFamilyRole(mutate: Mutate, group: Pick<Group, "id">, familyRole: NonNullable<Group["familyRole"]>) {
   return mutate((send) => send(`/api/v1/groups/${group.id}`, { method: "PUT", body: { familyRole } }));
 }
