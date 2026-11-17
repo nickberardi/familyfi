@@ -15,15 +15,15 @@ import { compareSemver, parseSemver } from "./semver";
  * A literal rather than package.json's, so a client that vendors this module, such as the companion
  * app, never bundles familyfi's package.json; `tests/unit/api-compat.test.ts` fails when it drifts.
  */
-export const API_VERSION: string = "1.6.0";
+export const API_VERSION: string = "2.0.0";
 /** The oldest client API version this server still serves (`info.x-min-app`). */
-export const MIN_APP_API_VERSION = "1.6.0";
+export const MIN_APP_API_VERSION = "2.0.0";
 /** The oldest server API version a client built from this contract can read (`info.x-min-server`). */
-export const MIN_SERVER_API_VERSION = "1.6.0";
+export const MIN_SERVER_API_VERSION = "2.0.0";
 /** The oldest watch app API version this server still serves (`info.x-min-app-watch`), set by hand. */
 export const MIN_WATCH_API_VERSION = "0.30.0";
 /** The oldest FamilyFi Me API version this server still serves (`info.x-min-me`), set by hand. */
-export const MIN_ME_API_VERSION = "1.6.0";
+export const MIN_ME_API_VERSION = "2.0.0";
 
 /**
  * The oldest API version this server serves each client type, which `GET /api/v1/health?clientType=`
