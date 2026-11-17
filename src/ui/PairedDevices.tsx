@@ -8,6 +8,7 @@ import { canRepair, isApp, isAppControls, PAIR_COPY as COPY, PHONES_SHOWN, phone
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 import { Tag } from "./Tag";
+import { useLargeText } from "./use-large-text";
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
 
 const MONO = Platform.select({ web: "var(--font-mono)", ios: "Menlo", default: "monospace" });
@@ -108,6 +109,7 @@ export function PairedDevicesCard({
   onRepair,
   onRemove,
   onRemoveAllRevoked,
+  onPairMe,
   disabled,
 }: {
   phones: PairedPhone[];
@@ -121,6 +123,8 @@ export function PairedDevicesCard({
   onRepair: (phone: PairedPhone) => void;
   onRemove: (phone: PairedPhone) => void;
   onRemoveAllRevoked: (count: number) => void;
+  /** Pair FamilyFi Me on a child's phone, in the card's head, where a client offers it. */
+  onPairMe?: () => void;
 }) {
   const ui = useUI();
   const text = useText();
@@ -130,11 +134,16 @@ export function PairedDevicesCard({
   const nameOf = (id: string | null) => phones.find((phone) => phone.id === id)?.displayName ?? null;
   const repair = (phone: PairedPhone) => (canRepair(phone, { canPair, selfId }) ? () => onRepair(phone) : undefined);
   const rule = { borderTopWidth: 1, borderTopColor: ui.color("hairline") };
+  // At large text Pair FamilyFi Me goes under the heading, as the devices card's action does.
+  const large = useLargeText();
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="paired-devices">
-      <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
-        <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
-        <Text style={text(14, 21, "ink-2")}>{COPY.pairedSub}</Text>
+      <View style={[styles.head, onPairMe && !large && styles.headBeside, { borderBottomColor: ui.color("hairline-card") }]}>
+        <View style={onPairMe && !large ? styles.headText : undefined}>
+          <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
+          <Text style={text(14, 21, "ink-2")}>{COPY.pairedSub}</Text>
+        </View>
+        {onPairMe ? <TextButton label={COPY.pairMe} token="accent" onPress={onPairMe} disabled={disabled || !canPair} testID="pair-me" /> : null}
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>
@@ -231,6 +240,8 @@ export function RemoteAccessSummary({ tunnel, published }: { tunnel: RemoteAcces
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
   head: { gap: 2, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
+  headBeside: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headText: { flex: 1, gap: 2 },
   remoteHead: { alignItems: "center", gap: 12 },
   bold: { fontWeight: "600" },
   regular: { fontWeight: "400" },

@@ -68,10 +68,15 @@ export function ChildPhonesCard({
         </View>
       ) : status === "loading" ? (
         <Text style={[text, styles.empty, { color: ui.color("muted") }]}>{COPY.loading}</Text>
-      ) : phones.length === 0 ? (
-        <Text style={[text, styles.empty, { color: ui.color("muted") }]}>{canPair ? COPY.empty(group.name) : COPY.remoteFirst}</Text>
       ) : (
-        phones.map((phone) => <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />)
+        <>
+          {/* Why Pair FamilyFi Me is off, with phones listed or not. */}
+          {!canPair ? <Text style={[text, styles.empty, { color: ui.color("muted") }]}>{COPY.remoteFirst}</Text> : null}
+          {phones.length === 0 && canPair ? <Text style={[text, styles.empty, { color: ui.color("muted") }]}>{COPY.empty(group.name)}</Text> : null}
+          {phones.map((phone) => (
+            <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />
+          ))}
+        </>
       )}
     </View>
   );

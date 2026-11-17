@@ -160,7 +160,8 @@ export function PairingBody({ pairing }: { pairing: Pairing }) {
             {pairing.expired ? copy.expiredLine : expiresLine(countdown(new Date(issued.expiresAt).getTime() - pairing.now))}
           </Text>
           <CopyRow label={copy.codeLabel} value={issued.code} copyLabel={copy.copy} copiedLabel={copy.copied} />
-          {pairing.expired || !pairingLinkAllowed(issued.code) ? null : <AppLink code={issued.code} />}
+          {/* The link opens the parent's FamilyFi app, never FamilyFi Me. */}
+          {pairing.expired || pairing.child || !pairingLinkAllowed(issued.code) ? null : <AppLink code={issued.code} />}
         </>
       )}
       {error}

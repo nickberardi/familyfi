@@ -17,7 +17,9 @@ export function usePairDevice(request: ApiRequest) {
   const [routes, setRoutes] = useState<ConnectionRoute[] | null>(null);
   const [phones, setPhones] = useState<PairedPhone[]>([]);
   const [forbidden, setForbidden] = useState(false);
-  const [error, setError] = useState("");
+  // A failed load clears once a load works; a failed change stays until the next change.
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   /** Whether a load has finished, so a view can tell loading from nothing published. */
   const [loaded, setLoaded] = useState(false);
 
@@ -32,10 +34,10 @@ export function usePairDevice(request: ApiRequest) {
       setRoutes(endpoints.endpoints);
       setPhones(devices.devices);
       setLoaded(true);
-      setError("");
+      setLoadError("");
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === "administrator_required") setForbidden(true);
-      else setError(caught instanceof Error ? caught.message : PAIR_COPY.loadFailed);
+      else setLoadError(caught instanceof Error ? caught.message : PAIR_COPY.loadFailed);
     }
   }, [request]);
 
@@ -50,11 +52,11 @@ export function usePairDevice(request: ApiRequest) {
   /** Runs a change, says why it failed if it did, and reloads either way. */
   const run = useCallback(
     async (action: () => Promise<unknown>) => {
-      setError("");
+      setActionError("");
       try {
         await action();
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : PAIR_COPY.actionFailed);
+        setActionError(caught instanceof Error ? caught.message : PAIR_COPY.actionFailed);
       }
       await load();
     },
@@ -73,7 +75,7 @@ export function usePairDevice(request: ApiRequest) {
     phones,
     remote,
     forbidden,
-    error,
+    error: actionError || loadError,
     loaded,
     load,
     run,
