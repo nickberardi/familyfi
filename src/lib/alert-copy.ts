@@ -82,7 +82,7 @@ export const ALERTS_CARD_COPY = {
   title: "Alerts",
   switchLabel: "Send alerts to the FamilyFi app",
   description:
-    "Tells the FamilyFi app on your phones and tablets when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway or when a child asks for more time.",
+    "Tells the FamilyFi app on your devices when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway or when a child asks for more time.",
   disclosureTitle: "What leaves your home",
   disclosure: [
     "Alerts go through FamilyFi's push relay, which hands them to Apple or Google.",

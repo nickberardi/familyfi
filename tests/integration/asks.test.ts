@@ -233,6 +233,9 @@ describe("asking for more time", () => {
     expect((await readGroup(admin, emma.id)).ask).toMatchObject({ id: open.id, state: "timedOut" });
     await closeLapsedAsks(new Date());
     expect((await prisma().ask.findMany({ orderBy: { createdAt: "asc" } })).map((row) => row.state)).toEqual(["ended", "timedOut"]);
+    // A week on, both are gone.
+    await closeLapsedAsks(new Date(Date.now() + 8 * 24 * 60 * MINUTE));
+    expect(await prisma().ask.count()).toBe(0);
   });
 
   it("names no one to the child when the recovery account answers", async () => {
