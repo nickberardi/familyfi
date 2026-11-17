@@ -227,6 +227,8 @@
    * disabled prominent button and its ink, the cyan wash behind a tinted button, a
    * faint well and the white entry field.
    */
+  --ff-brand-setup-button: var(--ff-accent);
+  --ff-brand-setup-danger: rgb(255, 128, 120);
   --ff-brand-setup-track: rgba(255, 255, 255, 0.18);
   --ff-brand-setup-disabled: rgba(118, 118, 128, 0.24);
   --ff-brand-setup-disabled-ink: rgba(235, 235, 245, 0.3);
