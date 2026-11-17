@@ -214,11 +214,13 @@ export function pairingSheetCopy({
             : "Makes a single-use code that pairs one device and signs it in as the adult you choose. It expires in five minutes.",
         },
     code: claimed
-      ? { title: child ? "Phone paired" : "Device paired", sub: `${claimedName ?? (child ? "The phone" : "The device")} is paired and signed in${replacing ? "; its old entry is gone" : ""}.` }
+      ? child
+        ? { title: "Phone paired", sub: `${claimedName ?? "The phone"} is paired.` }
+        : { title: "Device paired", sub: `${claimedName ?? "The device"} is paired and signed in${replacing ? "; its old entry is gone" : ""}.` }
       : child
         ? {
             title: "Scan with FamilyFi Me",
-            sub: "Open FamilyFi Me on the child's phone and scan the QR, or copy the pairing code and paste it in the app.",
+            sub: "Open FamilyFi Me on their phone and scan the QR, or copy the pairing code and paste it in the app.",
           }
         : {
             title: "Scan with the FamilyFi app",
