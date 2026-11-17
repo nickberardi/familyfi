@@ -6,9 +6,8 @@ import { prisma } from "./db";
 /*
  * What a child's phone (FamilyFi Me) reads of its own group, through the routes every client uses:
  * `GET /groups/{id}` and `GET /rules`. It builds its day from them with `groupDayOf`
- * (src/lib/child-day.ts). These trim the answers to that group and its people: no account id, no
- * resolver address, and no name for the recovery account, which is no person, so FamilyFi Me
- * tells the pause without a name.
+ * (src/lib/child-day.ts). These trim the answers to that group, and name no one for the recovery
+ * account, which is no person, so FamilyFi Me tells the pause without a name.
  */
 
 async function recoveryAccountIds(): Promise<Set<string>> {
@@ -17,13 +16,13 @@ async function recoveryAccountIds(): Promise<Set<string>> {
 }
 
 function unnamed(recovery: Set<string>) {
-  return (by: Actor): Actor => (!by || (by.accountId && recovery.has(by.accountId)) ? null : { accountId: null, name: by.name });
+  return (by: Actor): Actor => (by?.accountId && recovery.has(by.accountId) ? null : by);
 }
 
 /** The group as a child's phone reads it. */
 export async function groupForChild(group: Group): Promise<Group> {
   const actor = unnamed(await recoveryAccountIds());
-  return { ...group, dohOverrideUrl: null, suspension: { ...group.suspension, by: actor(group.suspension.by) }, allowance: { ...group.allowance, by: actor(group.allowance.by) } };
+  return { ...group, suspension: { ...group.suspension, by: actor(group.suspension.by) }, allowance: { ...group.allowance, by: actor(group.allowance.by) } };
 }
 
 /**
