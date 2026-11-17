@@ -14,6 +14,7 @@ import { POST as invite } from "@/app/api/v1/paired/invites/route";
 import { DELETE as unpair, GET as pairedDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { meDaySubject, tellDay, PHONE_VOICE, type MeDay } from "@/lib/child-day";
 import { prisma } from "@/server/db";
+import { deleteAccount } from "@/server/accounts";
 import { removeAccountDevices, revokeDevice } from "@/server/connection";
 import { deleteGroup } from "@/server/groups";
 import { exportHousehold, importHousehold } from "@/server/household-export";
@@ -227,6 +228,13 @@ describe("FamilyFi Me on a child's phone", () => {
     expect((await claimInvite(fromPhone, "iPhone")).status).toBe(403);
     await removeAccountDevices((await pairingAdmin()).id);
     expect((await claimInvite(fromBrowser, "iPhone")).status).toBe(403);
+  });
+
+  it("is never claimed once the administrator who invited it is deleted", async () => {
+    const group = await childGroup();
+    const issued = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId: group.id }));
+    await deleteAccount((await pairingAdmin()).id);
+    expect((await claimInvite(issued, "iPhone")).status).toBe(403);
   });
 
   it("stays paired when the phone that invited it is revoked: it belongs to its group", async () => {

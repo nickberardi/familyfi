@@ -272,7 +272,7 @@ are left out. A `by` is `null` where FamilyFi recorded no person, or the recover
 `meDaySubject` tells an always-on internet rule as blocking all day, and an allowance through the
 windows it marks `allowed`; it does not read `allowance` itself, or always-on category, app and
 website rules, which an app lists on its own. An invite for a child's phone is cancelled while it
-waits when the phone that made it is revoked, or its administrator is demoted. `src/lib/child-day.ts`
+waits when the phone that made it is revoked, or its administrator is demoted or deleted. `src/lib/child-day.ts`
 (`meDaySubject`, `tellDay`) turns that answer into the day FamilyFi Me shows. It renews like any
 paired device, and may revoke itself. Deleting its group revokes it and cancels invites still
 waiting for the group, keeping the record; an import keeps it where its group comes back with the
