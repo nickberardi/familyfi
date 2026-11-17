@@ -12,6 +12,7 @@ import { DELETE as deleteRuleRoute, GET as getRuleRoute, PATCH as patchRuleRoute
 import { prisma } from "@/server/db";
 import { liftGroupRule } from "@/server/group-internet";
 import { readUnblockBody, unblockGroup as unblockGroupFn, type UnblockAction } from "@/server/group-unblock";
+import { childDay } from "@/server/child-day";
 import { deleteGroup as deleteGroupFn, getGroup as getGroupFn } from "@/server/groups";
 import { getHouseholdSettings, updateHouseholdSettings } from "@/server/household";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
@@ -144,7 +145,7 @@ async function errorCode(response: Response): Promise<[number, string]> {
 }
 
 async function readGroup(id: string): Promise<PublicGroup> {
-  return ((await (await answered("GET /api/v1/groups/{id}", async () => ({ group: await getGroupFn(id) }))).json()) as { group: PublicGroup }).group;
+  return ((await (await answered("GET /api/v1/groups/{id}", async () => ({ group: await getGroupFn(id), day: await childDay(id) }))).json()) as { group: PublicGroup }).group;
 }
 
 /** HH:MM in UTC, `minutes` from now: a window around now, whatever time the test runs. */

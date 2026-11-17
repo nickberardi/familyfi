@@ -1,5 +1,5 @@
 import { AccountKind, RuleMode } from "@prisma/client";
-import type { MeDay } from "@/lib/child-day";
+import type { GroupDay } from "@/lib/child-day";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, lifted, publicGroup } from "./groups";
 import { currentTimezone } from "./household";
@@ -20,14 +20,14 @@ async function childFacingName(by: { accountId: string | null; name: string } | 
 }
 
 /**
- * A child's own day, for FamilyFi Me (`GET /api/v1/me/day`): the group its phone signs in for, and
+ * A child's own day, for FamilyFi Me (`day` in `GET /api/v1/groups/{id}`): the group its phone signs in for, and
  * nothing else in the household. Its pause, its allowance, the windows of its internet rules that
  * are on, and the rules that block something all the time. A rule paused or allowed, for everyone or
  * for this group, blocks nothing while it is lifted: a scheduled internet rule lifted until a time
  * keeps its windows, marked `allowed` until then, so the child is told when they come back, and an
  * always-on rule lifted until a time is marked the same way; one lifted with no end is left out.
  */
-export async function childDay(groupId: string | null, now = new Date()): Promise<MeDay> {
+export async function childDay(groupId: string | null, now = new Date()): Promise<GroupDay> {
   const group = groupId ? await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude }) : null;
   // The guard refuses a child's phone whose group is gone, so this is only a race with its deletion.
   if (!group) throw new ApiError(404, "not_found", "Group not found.");

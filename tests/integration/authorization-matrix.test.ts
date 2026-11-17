@@ -68,9 +68,8 @@ type Outcome = "allowed" | "401" | "403";
  *   without it.
  * - `refresh-token`: a paired device's refresh token is the credential; no session helps
  *   without it.
- * - `me`: only a child's phone (FamilyFi Me) has one; every signed-in person gets 403.
  */
-type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token" | "me";
+type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token";
 
 type Person = Exclude<Caller, Device>;
 
@@ -87,7 +86,6 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403", "tunnel-bearer": "allowed" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
   "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
-  me: { anonymous: "401", member: "401", administrator: "403", recovery: "403", tunnel: "401", "tunnel-bearer": "401" },
 };
 
 /**
@@ -97,7 +95,7 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
 function deviceOutcome(entry: Entry, device: Device): Outcome {
   if (entry.access === "public" || entry.access === "home-network" || entry.access === "csrf") return "allowed";
   if (entry.access === "pairing-token" || entry.access === "refresh-token") return "403";
-  if (entry.devices?.includes(device)) return entry.access === "session" || entry.access === "me" ? "allowed" : "403";
+  if (entry.devices?.includes(device)) return entry.access === "session" ? "allowed" : "403";
   return "403";
 }
 
@@ -187,13 +185,12 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/groups": { access: "session", devices: READERS_AND_WATCH },
   "GET /api/v1/groups/{id}/resolver": { access: "session" },
   "POST /api/v1/groups": { access: "session", devices: CONTROLLERS },
-  "GET /api/v1/groups/{id}": { access: "session", devices: READERS },
+  "GET /api/v1/groups/{id}": { access: "session", devices: [...READERS, "me"] },
   "PUT /api/v1/groups/{id}": { access: "session", devices: CONTROLLERS },
   "DELETE /api/v1/groups/{id}": { access: "session", devices: CONTROLLERS },
   "PUT /api/v1/groups/{id}/resolver": { access: "session" },
   "DELETE /api/v1/groups/{id}/resolver": { access: "session" },
   "GET /api/v1/health": { access: "public" },
-  "GET /api/v1/me/day": { access: "me", devices: ["me"] },
   "GET /api/v1/rules": { access: "session", devices: READERS_AND_WATCH },
   "POST /api/v1/rules": { access: "session", devices: CONTROLLERS },
   "GET /api/v1/rules/{id}": { access: "session", devices: READERS },

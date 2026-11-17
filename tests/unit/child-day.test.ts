@@ -14,7 +14,7 @@ import {
   householdDay,
   meDaySubject,
   type DaySubject,
-  type MeDay,
+  type GroupDay,
 } from "@/lib/child-day";
 
 const BEDTIME = { label: "Bedtime", from: 21 * 60, to: 31 * 60 };
@@ -378,7 +378,7 @@ describe("a child's day on the household's clock", () => {
   const MONDAY_NIGHT = new Date("2026-11-17T03:30:00Z");
   // Tuesday 17 November 2026, 6 AM in New York.
   const TUESDAY_MORNING = new Date("2026-11-17T11:00:00Z");
-  const me = (patch: Partial<MeDay> = {}): MeDay => ({
+  const me = (patch: Partial<GroupDay> = {}): GroupDay => ({
     group: { id: "g1", name: "Emma" },
     timezone: ZONE,
     pause: null,

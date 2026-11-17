@@ -9,10 +9,10 @@ import { POST as refresh } from "@/app/api/v1/auth/refresh/route";
 import { GET as currentSession } from "@/app/api/v1/auth/session/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
 import { GET as groups } from "@/app/api/v1/groups/route";
-import { GET as meDay } from "@/app/api/v1/me/day/route";
+import { GET as oneGroup } from "@/app/api/v1/groups/[id]/route";
 import { POST as invite } from "@/app/api/v1/paired/invites/route";
 import { DELETE as unpair, GET as pairedDevice } from "@/app/api/v1/paired/devices/[id]/route";
-import { meDaySubject, tellDay, PHONE_VOICE, type MeDay } from "@/lib/child-day";
+import { meDaySubject, tellDay, PHONE_VOICE, type GroupDay } from "@/lib/child-day";
 import { prisma } from "@/server/db";
 import { deleteAccount } from "@/server/accounts";
 import { removeAccountDevices, revokeDevice } from "@/server/connection";
@@ -48,6 +48,11 @@ async function pairMe(admin: SessionAuth, groupId: string): Promise<Claim & { se
 }
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
+
+/** A group and its day, as the phone reads them. */
+function meDay(auth: SessionAuth, groupId: string) {
+  return oneGroup(request(`/api/v1/groups/${groupId}`, { auth }), params(groupId));
+}
 
 describe("FamilyFi Me on a child's phone", () => {
   let admin: SessionAuth;
@@ -88,28 +93,31 @@ describe("FamilyFi Me on a child's phone", () => {
   });
 
   it("renews with its refresh token", async () => {
-    const claim = await pairMe(admin, (await childGroup()).id);
+    const emma = await childGroup();
+    const claim = await pairMe(admin, emma.id);
     const renewed = await refresh(request("/api/v1/auth/refresh", { method: "POST", headers: json, body: JSON.stringify({ refreshToken: claim.refreshToken }) }));
     expect(renewed.status).toBe(200);
     const body = (await renewed.json()) as { token: string; session: { kind: string; displayName: string } };
     expect(body.session).toMatchObject({ kind: "me", displayName: "Emma" });
-    expect((await meDay(request("/api/v1/me/day", { auth: bearer(body.token) }))).status).toBe(200);
+    expect((await meDay(bearer(body.token), emma.id)).status).toBe(200);
   });
 
   it("reads its own group's day and nothing else in the household", async () => {
     const group = await childGroup();
-    await prisma().group.create({ data: { kind: GroupKind.family, name: "Sam" } });
+    const sam = await prisma().group.create({ data: { kind: GroupKind.family, name: "Sam" } });
     const claim = await pairMe(admin, group.id);
+    // Another group is not there for it.
+    const other = await meDay(bearer(claim.token), sam.id);
+    expect(other.status).toBe(404);
     const refused = await groups(request("/api/v1/groups", { auth: bearer(claim.token) }));
     expect(refused.status).toBe(403);
     expect(await errorCode(refused)).toBe("me_scope");
-    const read = await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }));
+    const read = await meDay(bearer(claim.token), group.id);
     expect(read.status).toBe(200);
-    expect(((await read.json()) as MeDay).group).toEqual({ id: group.id, name: "Emma" });
-    // A person in a browser has no day of their own.
-    const browser = await meDay(request("/api/v1/me/day", { auth: admin }));
-    expect(browser.status).toBe(403);
-    expect(await errorCode(browser)).toBe("me_required");
+    expect(((await read.json()) as { day: GroupDay }).day.group).toEqual({ id: group.id, name: "Emma" });
+    // A parent reads the same day.
+    const parent = await meDay(admin, group.id);
+    expect(((await parent.json()) as { day: GroupDay }).day.group).toEqual({ id: group.id, name: "Emma" });
   });
 
   it("tells the group's pause, windows and always-on rules, and leaves out a paused rule", async () => {
@@ -132,7 +140,7 @@ describe("FamilyFi Me on a child's phone", () => {
       data: { name: "Emma paused", kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: group.id, enabled: true, expiresAt: until, blockedByName: "Dad", groups: { create: { groupId: group.id } } },
     });
     const claim = await pairMe(admin, group.id);
-    const day = (await (await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }))).json()) as MeDay;
+    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
     expect(day.pause).toMatchObject({ by: "Dad", until: until.toISOString() });
     expect(day.allowance).toBeNull();
     expect(day.windows).toEqual([expect.objectContaining({ ruleName: "Bedtime", name: "", days: [0, 1, 5], start: "21:00", end: "07:00" })]);
@@ -160,7 +168,7 @@ describe("FamilyFi Me on a child's phone", () => {
     const latest = new Date(Date.now() + 2 * 60 * 60_000);
     await prisma().ruleGroup.updateMany({ where: { groupId: group.id, rule: { name: "Bedtime" } }, data: { pauseActive: true, pauseUntil: latest, pauseKind: "allow", pausedByName: "Mom" } });
     const claim = await pairMe(admin, group.id);
-    const day = (await (await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }))).json()) as MeDay;
+    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
     expect(day.windows.map((entry) => [entry.ruleName, entry.allowed])).toEqual([
       ["Bedtime", { by: "Mom", until: latest.toISOString() }],
       ["Homework", null],
@@ -175,7 +183,7 @@ describe("FamilyFi Me on a child's phone", () => {
       data: { name: "Emma paused", kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: group.id, enabled: true, blockedByAccountId: recovery.id, blockedByName: "Recovery admin", groups: { create: { groupId: group.id } } },
     });
     const claim = await pairMe(admin, group.id);
-    const day = (await (await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }))).json()) as MeDay;
+    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
     expect(day.pause).toMatchObject({ by: null, until: null });
   });
 
@@ -191,7 +199,7 @@ describe("FamilyFi Me on a child's phone", () => {
       },
     });
     const claim = await pairMe(admin, group.id);
-    const day = (await (await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }))).json()) as MeDay;
+    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
     expect(day.allowance).toMatchObject({ by: null });
   });
 
@@ -263,7 +271,7 @@ describe("FamilyFi Me on a child's phone", () => {
     await importHousehold("apply", archive, { accountId: (await pairingAdmin()).id });
     const keptDevice = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: keptPhone.device.id } });
     expect(keptDevice).toMatchObject({ groupId: kept.id, revokedAt: null });
-    expect((await meDay(request("/api/v1/me/day", { auth: bearer(keptPhone.token) }))).status).toBe(200);
+    expect((await meDay(bearer(keptPhone.token), kept.id)).status).toBe(200);
     const goneDevice = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: gonePhone.device.id } });
     expect(goneDevice.revokedAt).not.toBeNull();
     // An invite still waiting for a group that came back can still be claimed.

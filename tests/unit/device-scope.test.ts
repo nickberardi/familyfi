@@ -48,11 +48,11 @@ describe("device scopes", () => {
     }
   });
 
-  it("me:askOnly reads its session, connection and own day, and un-pairs only itself", () => {
-    for (const [method, path] of [["GET", "/api/v1/auth/session"], ["GET", "/api/v1/connection"], ["GET", "/api/v1/me/day"], ["DELETE", "/api/v1/paired/devices/device-1"]]) {
+  it("me:askOnly reads its session, connection and own group, and un-pairs only itself", () => {
+    for (const [method, path] of [["GET", "/api/v1/auth/session"], ["GET", "/api/v1/connection"], ["GET", "/api/v1/groups/g1"], ["DELETE", "/api/v1/paired/devices/device-1"]]) {
       expect(allowed("me", "me:askOnly", method, path), `${method} ${path}`).toBe(true);
     }
-    const household: [string, string][] = [["GET", "/api/v1/groups"], ["GET", "/api/v1/rules"], ["GET", "/api/v1/changes/c1"], ["GET", "/api/v1/paired/devices"], ["DELETE", "/api/v1/paired/devices/someone-else"], ["POST", "/api/v1/me/day"]];
+    const household: [string, string][] = [["GET", "/api/v1/groups"], ["GET", "/api/v1/rules"], ["GET", "/api/v1/changes/c1"], ["GET", "/api/v1/paired/devices"], ["DELETE", "/api/v1/paired/devices/someone-else"], ["PUT", "/api/v1/groups/g1"], ["DELETE", "/api/v1/groups/g1"], ["GET", "/api/v1/groups/g1/devices"]];
     // `GET /connection` is the one call it shares with the agents' never-list: it needs the manifest away from home.
     const never = NEVER_FOR_AGENTS.filter(([method, path]) => !(method === "GET" && path === "/api/v1/connection"));
     for (const [method, path] of [...household, ...RULE_VERBS, ...HOUSEHOLD_WRITES, ...never]) expect(allowed("me", "me:askOnly", method, path), `${method} ${path}`).toBe(false);
