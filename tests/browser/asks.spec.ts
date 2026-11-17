@@ -251,7 +251,7 @@ test("a family member's FamilyFi Me phone is listed on their page and can be rev
   await card.getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
   await shot(page, "child-phone-revoke");
-  expect(await answerConfirm(page)).toBe("Revoke Cassie's phone? FamilyFi Me on it signs out now and stops showing Cassie's rules or asking for more time until it is paired again.");
+  expect(await answerConfirm(page)).toBe("Revoke Cassie's phone? FamilyFi Me on it signs out now and can't show Cassie's rules or ask for more time until it is paired again.");
   expect(revoked).toEqual(["DELETE"]);
   await expect(card).not.toContainText("Cassie's phone");
 });

@@ -143,7 +143,12 @@ export function PairedDevicesCard({
           <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
           <Text style={text(14, 21, "ink-2")}>{COPY.pairedSub}</Text>
         </View>
-        {onPairMe ? <TextButton label={COPY.pairMe} token="accent" onPress={onPairMe} disabled={disabled || !canPair} testID="pair-me" /> : null}
+        {onPairMe ? (
+          // A 44pt tap area around the one-line link, as ChildPhonesCard's Pair FamilyFi Me.
+          <View style={styles.touch}>
+            <TextButton label={COPY.pairMe} token="accent" onPress={onPairMe} disabled={disabled || !canPair} testID="pair-me" />
+          </View>
+        ) : null}
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>
@@ -242,6 +247,7 @@ const styles = StyleSheet.create({
   head: { gap: 2, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
   headBeside: { flexDirection: "row", alignItems: "center", gap: 12 },
   headText: { flex: 1, gap: 2 },
+  touch: { minHeight: 44, justifyContent: "center" },
   remoteHead: { alignItems: "center", gap: 12 },
   bold: { fontWeight: "600" },
   regular: { fontWeight: "400" },

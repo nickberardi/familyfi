@@ -26,7 +26,7 @@ export const PAIR_COPY = {
   actionFailed: "That didn't work.",
   paired: "Paired devices",
   pairedSub: "Apps, Watches, agents, FamilyFi Me and what they set up; revoke any one of them",
-  noPhones: "No paired devices yet. Pair a device or connect an agent to add one.",
+  noPhones: "No paired devices yet. Pair a device, pair FamilyFi Me or connect an agent to add one.",
   remoteFirst: "Turn on remote access, then pair a device. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a device.",
   expired: "Expired. Re-pair it to sign it in again.",
@@ -126,7 +126,7 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   if (phone.clientType === "me") {
     return {
       title: `Revoke ${phone.displayName}?`,
-      message: `FamilyFi Me on it signs out now and stops showing ${phone.group ? `${phone.group.name}'s` : "their"} rules or asking for more time until it is paired again.`,
+      message: `FamilyFi Me on it signs out now and can't show ${phone.group ? `${phone.group.name}'s` : "their"} rules or ask for more time until it is paired again.`,
       confirmLabel: PAIR_COPY.revoke,
     };
   }
