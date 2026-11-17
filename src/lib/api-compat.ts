@@ -3,7 +3,7 @@ import { compareSemver, parseSemver } from "./semver";
 
 /**
  * Whether a client and a server can read each other, decided before the client reads the
- * household. The floors are `info.x-min-app`, `info.x-min-server`, `info.x-min-watch` and
+ * household. The floors are `info.x-min-app`, `info.x-min-server`, `info.x-min-app-watch` and
  * `info.x-min-me` in `openapi/familyfi.v1.yaml`; CI raises the first two from the spec diff, and the
  * watches' and FamilyFi Me's are set by hand (docs/api.md, "Versioning the contract"). `tests/unit/api-compat.test.ts` keeps these
  * constants equal to them. The native watch
@@ -20,7 +20,7 @@ export const API_VERSION: string = "1.6.0";
 export const MIN_APP_API_VERSION = "0.36.0";
 /** The oldest server API version a client built from this contract can read (`info.x-min-server`). */
 export const MIN_SERVER_API_VERSION = "0.36.0";
-/** The oldest watch app API version this server still serves (`info.x-min-watch`), set by hand. */
+/** The oldest watch app API version this server still serves (`info.x-min-app-watch`), set by hand. */
 export const MIN_WATCH_API_VERSION = "0.30.0";
 /** The oldest FamilyFi Me API version this server still serves (`info.x-min-me`), set by hand. */
 export const MIN_ME_API_VERSION = "1.6.0";

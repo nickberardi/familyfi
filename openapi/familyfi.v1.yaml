@@ -11,8 +11,8 @@ info:
   # The oldest watch app API version this server still serves. The watches read only a few routes,
   # so this is set by hand until CI can tell which changes reach them. GET /api/v1/health reports it
   # as `minWatchApiVersion`.
-  x-min-watch: 0.30.0
-  # The oldest FamilyFi Me API version this server still serves. Set by hand, like x-min-watch.
+  x-min-app-watch: 0.30.0
+  # The oldest FamilyFi Me API version this server still serves. Set by hand, like x-min-app-watch.
   # GET /api/v1/health?client=me reports it as `minApiVersion`.
   x-min-me: 1.6.0
   # scripts/ci/check-openapi-floors.mjs enforces all three (docs/api.md, "Versioning the contract"):
@@ -94,7 +94,7 @@ paths:
           required: false
           description: |
             The caller's client type. The response then adds `minApiVersion`, the oldest API version this
-            server serves that client type: `x-min-app` for `app` and `agent`, `x-min-watch` for
+            server serves that client type: `x-min-app` for `app` and `agent`, `x-min-app-watch` for
             `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know
             gets no `minApiVersion`, and neither does a server before 1.6.0.
           schema: { $ref: "#/components/schemas/ClientType" }
@@ -3197,7 +3197,7 @@ components:
         minWatchApiVersion:
           type: string
           description: |
-            The oldest watch app API version this server still serves (`info.x-min-watch`). A watch
+            The oldest watch app API version this server still serves (`info.x-min-app-watch`). A watch
             app whose API version is older must ask to be updated once a read it needs fails.
         minApiVersion:
           type: string
