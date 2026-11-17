@@ -272,8 +272,9 @@ paths:
       description: |
         The family group a child's phone (`me:askOnly`) signs in for, and nothing else in the
         household: its pause and allowance now, the windows of its internet rules, and the rules
-        that block something all the time. A rule paused for everyone or for this group is left out
-        while it is paused. Any other caller gets 403 `me_required`.
+        that block something all the time. A rule paused or allowed, for everyone or for this group,
+        blocks nothing and is left out while it is lifted. Scheduled category, app and website
+        rules are not listed yet. Any other caller gets 403 `me_required`.
       security: [{ bearerAuth: [] }]
       responses:
         "200": { description: The child's day, content: { application/json: { schema: { $ref: "#/components/schemas/MeDay" } } } }

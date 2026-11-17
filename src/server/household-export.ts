@@ -636,6 +636,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       // A child's phone signs in for its group: read which before the groups go, and after they are
       // made again keep it where its group came back with the same id, and sign it out where it did not.
       const childPhones = await tx.pairedDevice.findMany({ where: { clientType: "me", revokedAt: null, groupId: { not: null } }, select: { id: true, groupId: true } });
+      const childInvites = await tx.pairing.findMany({ where: { clientType: "me", claimedAt: null, expiresAt: { gt: now }, groupId: { not: null } }, select: { id: true, groupId: true } });
       await tx.group.deleteMany({});
       // A group's Block button default names one of its rules, made below: it is set once they are.
       for (const { blockButtonRuleId: _rule, ...group } of config.groups) await tx.group.create({ data: group });
@@ -643,6 +644,10 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       for (const phone of childPhones) {
         if (family.has(phone.groupId!)) await tx.pairedDevice.update({ where: { id: phone.id }, data: { groupId: phone.groupId } });
         else await revokeDevice(phone.id, tx as never);
+      }
+      // An invite still waiting keeps its group where it came back; otherwise it can never be claimed.
+      for (const invite of childInvites) {
+        if (family.has(invite.groupId!)) await tx.pairing.update({ where: { id: invite.id }, data: { groupId: invite.groupId } });
       }
 
       // A login links only to an adult in the family. A group's role can change after its login was
