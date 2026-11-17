@@ -1,4 +1,4 @@
-import { AccountKind, AssignmentState, DeviceScope, FamilyRole, GroupKind, PairedDeviceClient, RuleKind, RuleMode, SessionKind } from "@prisma/client";
+import { AccountKind, AssignmentState, FamilyRole, GroupKind, RuleKind, RuleMode, SessionKind } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as exportRoute } from "@/app/api/v1/settings/export/route";
@@ -271,7 +271,7 @@ describe("household export", () => {
     await buildHousehold();
     const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
     const phone = await prisma().pairedDevice.create({
-      data: { displayName: "Parent's iPhone", client: PairedDeviceClient.app, scope: DeviceScope.full, accountId: parent.id },
+      data: { displayName: "Parent's iPhone", clientType: "app", scope: "app:full", accountId: parent.id },
     });
     const issued = await createSession({ accountId: parent.id, username: "parent", kind: SessionKind.bearer, deviceId: phone.id });
     const bearer: SessionAuth = { cookie: "", csrf: "", token: issued.raw };

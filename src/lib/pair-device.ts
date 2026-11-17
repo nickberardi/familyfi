@@ -95,17 +95,22 @@ export function splitPhones(phones: readonly PairedPhone[]) {
  * Whether a device's row offers Re-pair: any phone, active or revoked, while a route is published,
  * except the phone showing the list, which would sign itself out mid-flow.
  */
-export function canRepair(phone: Pick<PairedPhone, "id" | "client" | "scope">, { canPair, selfId }: { canPair: boolean; selfId?: string | null }): boolean {
+export function canRepair(phone: Pick<PairedPhone, "id" | "client" | "scope" | "clientType">, { canPair, selfId }: { canPair: boolean; selfId?: string | null }): boolean {
   return canPair && isApp(phone) && phone.id !== selfId;
 }
 
-/** Whether a paired device is the app itself, on a phone, tablet or Mac. A server older than 1.1.0 calls it `phone`. */
-export function isApp(device: Pick<PairedPhone, "client" | "scope">): boolean {
+/**
+ * Whether a paired device is the app itself, on a phone, tablet or Mac: client type `app`. A server
+ * before API 1.6.0 sends no client type, and one older than 1.1.0 calls the app `phone`.
+ */
+export function isApp(device: Pick<PairedPhone, "client" | "scope" | "clientType">): boolean {
+  if (device.clientType) return device.clientType === "app";
   return (device.client === "app" || device.client === "phone") && device.scope === "full";
 }
 
-/** Whether a paired device is an app's Siri, Shortcuts and system controls: the app's own `rulesOnly` sign-in. */
-export function isAppControls(device: Pick<PairedPhone, "client" | "scope">): boolean {
+/** Whether a paired device is an app's Siri, Shortcuts and system controls: client type `app-controls`. */
+export function isAppControls(device: Pick<PairedPhone, "client" | "scope" | "clientType">): boolean {
+  if (device.clientType) return device.clientType === "app-controls";
   return device.client === "app" && device.scope === "rulesOnly";
 }
 
@@ -115,8 +120,8 @@ export function publishedRoute(tunnel: Pick<RemoteAccess, "endpointId"> | null, 
 }
 
 /** Revoking a phone also revokes the Watches, phones and agents it paired. */
-export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope">>) {
-  const kind = phone.client && phone.scope ? { client: phone.client, scope: phone.scope } : null;
+export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope" | "clientType">>) {
+  const kind = phone.client && phone.scope ? { client: phone.client, scope: phone.scope, clientType: phone.clientType } : null;
   // Nothing pairs an app's Siri and shortcuts again: the app sets them up itself when it next opens.
   if (kind && isAppControls(kind)) {
     return { title: `Revoke ${phone.displayName}?`, message: "They stop working now, until you next open FamilyFi on that device. The app itself stays paired.", confirmLabel: PAIR_COPY.revoke };
@@ -125,9 +130,9 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
 }
 
-export function removeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope">>) {
+export function removeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope" | "clientType">>) {
   // An app sets its own Siri and shortcuts up again, so there is no setup to warn about.
-  const controls = phone.client && phone.scope && isAppControls({ client: phone.client, scope: phone.scope });
+  const controls = phone.client && phone.scope && isAppControls({ client: phone.client, scope: phone.scope, clientType: phone.clientType });
   return { title: `Remove ${phone.displayName} from the list?`, message: controls ? "This can't be undone." : "This can't be undone; setup would be needed again.", confirmLabel: PAIR_COPY.remove };
 }
 
@@ -140,7 +145,7 @@ function pairedDate(iso: string) {
 }
 
 /** Where a device came from when it paired through no listed route: the phone that set it up, the home network, or a removed route. */
-function origin(device: Pick<PairedPhone, "client" | "scope">, parentName: string | null): string {
+function origin(device: Pick<PairedPhone, "client" | "scope" | "clientType">, parentName: string | null): string {
   if (device.client === "watch") return `Paired automatically from ${parentName ?? "an iPhone"}`;
   if (isAppControls(device)) return `Set up automatically by ${parentName ?? "the FamilyFi app"}`;
   if (device.client === "agent") return "On the home network";
@@ -162,7 +167,7 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
   const seen = phone.lastSeenAt ? relativeSweep(phone.lastSeenAt, now) : "never";
   const ends = phone.sessions.map((session) => session.expiresAt).sort()[0];
   const tags: { label: string; name: string; tone: TagTone }[] = [
-    { label: scopeLabel(phone.scope), name: scopeLabel(phone.scope), tone: SCOPE_TONES[phone.scope] },
+    { label: scopeLabel(phone.scope), name: scopeLabel(phone.scope), tone: SCOPE_TONES[phone.scope] ?? "neutral" },
   ];
   if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}`, tone: "neutral" });
   if (phone.alerts !== undefined && !phone.revokedAt) {

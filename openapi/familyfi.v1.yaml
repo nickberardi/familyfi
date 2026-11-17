@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 1.5.0
+  version: 1.6.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 0.36.0
@@ -12,6 +12,9 @@ info:
   # so this is set by hand until CI can tell which changes reach them. GET /api/v1/health reports it
   # as `minWatchApiVersion`.
   x-min-watch: 0.30.0
+  # The oldest FamilyFi Me API version this server still serves. Set by hand, like x-min-watch.
+  # GET /api/v1/health?client=me reports it as `minApiVersion`.
+  x-min-me: 1.6.0
   # scripts/ci/check-openapi-floors.mjs enforces all three (docs/api.md, "Versioning the contract"):
   # none falls or passes `version`, and CI raises x-min-app and x-min-server where a change needs it.
   description: |
@@ -86,6 +89,15 @@ paths:
           required: false
           description: "`true` adds the UniFi devices' latest load and FamilyFi's requests to the console. Needs a session."
           schema: { type: string, enum: ["true", "false"] }
+        - name: client
+          in: query
+          required: false
+          description: |
+            The caller's client type. The response then adds `minApiVersion`, the oldest API version this
+            server serves that client type: `x-min-app` for `app` and `agent`, `x-min-watch` for
+            `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know
+            gets no `minApiVersion`, and neither does a server before 1.6.0.
+          schema: { $ref: "#/components/schemas/ClientType" }
       responses:
         "200":
           description: Application and database are reachable.
@@ -2805,7 +2817,7 @@ paths:
       description: An administrator sees every paired device; a paired device sees itself and the companions it vouched for (an app's Watch and its `rulesOnly` sign-in). Anyone else is refused.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
-        - { name: client, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [app, phone, watch, agent] } }, description: "`phone` is deprecated: it is read as `app`." }
+        - { name: client, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [app, phone, watch, agent, app-watch, app-controls, me] } }, description: "A client type, or an older word: `app` lists the app and its Siri, Shortcuts and system controls, as it did before 1.6.0, `watch` is `app-watch`, and `phone` is deprecated and read as `app`." }
         - { name: status, in: query, required: false, schema: { type: string, enum: [active, revoked] } }
       responses:
         "200": { description: Devices, content: { application/json: { schema: { type: object, additionalProperties: false, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/PairedDevice" } } } } } } }
@@ -3187,6 +3199,12 @@ components:
           description: |
             The oldest watch app API version this server still serves (`info.x-min-watch`). A watch
             app whose API version is older must ask to be updated once a read it needs fails.
+        minApiVersion:
+          type: string
+          description: |
+            Only with `?client=`: the oldest API version this server serves that client type. A client
+            whose API version is older must ask to be updated. Absent for a client type the server does
+            not know, and from servers before 1.6.0; read `minAppApiVersion` or `minWatchApiVersion` then.
         revision:
           type: integer
           minimum: 0
@@ -3559,26 +3577,40 @@ components:
         validTo: { type: string, format: date-time }
         systemTrusted: { type: [boolean, "null"], description: "Whether FamilyFi's CA store trusts the chain for this host; null for a pasted certificate. True means a pin is unnecessary." }
         source: { type: string, enum: [probe, certificate] }
+    ClientType:
+      type: string
+      x-extensible-enum: [app, app-watch, app-controls, me, agent]
+      description: |
+        Which client a paired device or invite is. `app` is the FamilyFi app on a phone, tablet or
+        Mac; `app-watch` its Watch; `app-controls` its Siri, Shortcuts and system controls, which run
+        outside the app, so the app sets them up as their own device; `me` is FamilyFi Me on a child's
+        phone; `agent` an AI agent. `me-watch` is reserved. The invite sets it, the device keeps it,
+        and the server reads it from the device on every signed-in call. Each client type holds only
+        its own scopes: `app` `full`, `app-watch` and `app-controls` `rulesOnly`, `me` `askOnly`,
+        `agent` `full` or `readOnly`. New client types may be added; a client lists one it does not
+        know as a paired device like any other.
     PairedClient:
       type: string
-      x-extensible-enum: [app, watch, agent]
+      x-extensible-enum: [app, watch, agent, me]
       description: |
-        What kind of paired device this is. `app` is the FamilyFi app on a phone, tablet or Mac
-        (`full`), or that app's Siri, Shortcuts and system controls (`rulesOnly`), which run
-        outside the app, so the app sets them up as their own device. A server older than 1.1.0
-        calls the app `phone`. New kinds may be added; a client lists a kind it does not know as a
-        paired device like any other.
+        The older name for a device's kind, kept for installed apps; read `clientType` where a server
+        sends it. `app` is the FamilyFi app (`full`), or that app's Siri, Shortcuts and system
+        controls (`rulesOnly`); `watch` is its Watch. A server older than 1.1.0 calls the app
+        `phone`. New kinds may be added; a client lists a kind it does not know as a paired device
+        like any other.
     DeviceScope:
       type: string
-      enum: [full, rulesOnly, readOnly]
+      x-extensible-enum: [full, rulesOnly, readOnly, askOnly]
       description: |
-        What a paired device may call. Each (client, scope) pair is one explicit allowlist, not a
-        ladder, and only five exist. `app:full`, the app on a phone, tablet or Mac, may do whatever
-        its account may. `watch:rulesOnly`
+        What a paired device may call, without its group: the server stores the scope as one value,
+        `group:scope` (`app:full`, `app:rulesOnly`, `agent:full`, `agent:readOnly`, `me:askOnly`),
+        and each is one explicit allowlist, not a ladder. `app:full`, the app on a phone, tablet or
+        Mac, may do whatever its account may. `app:rulesOnly`, held by a Watch and by an app's Siri,
+        Shortcuts and system controls,
         reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
-        extends, allows, disallows and turns rules on and off (403 `watch_scope` beyond that).
-        `app:rulesOnly` is the same list for an app's Siri, Shortcuts and system controls
-        (403 `app_scope` beyond that).
+        extends, allows, disallows and turns rules on and off (403 `watch_scope` for a Watch beyond
+        that, 403 `app_scope` for the app's controls). `me:askOnly` is reserved for FamilyFi Me and
+        allows nothing yet. New scopes may be added.
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
@@ -3589,27 +3621,33 @@ components:
       type: object
       additionalProperties: false
       description: |
-        An administrator's invite. A phone needs the route it pairs over (`endpointId`) and may name
+        An administrator's invite, for the client type `clientType` names (or, as installed apps send
+        it, `client`; one of the two is required, and `clientType` wins). A phone needs the route it
+        pairs over (`endpointId`) and may name
         the administrator it signs in as (`accountId`, default: whoever makes it), and
         `replacesDeviceId` to re-pair a phone. An agent needs a `scope` of `full` or `readOnly`.
-      required: [client, displayName]
+      required: [displayName]
       properties:
-        client: { type: string, enum: [app, phone, agent], description: "`app` is the FamilyFi app on a phone, tablet or Mac. `phone` is deprecated: apps built before 1.1.0 send it, and it is read as `app`." }
+        clientType: { type: string, enum: [app, agent], description: "The client type to invite. Servers before 1.6.0 need `client` instead." }
+        client: { type: string, enum: [app, phone, agent], description: "The older name for `clientType`. `phone` is deprecated: apps built before 1.1.0 send it, and it is read as `app`." }
         displayName: { type: string, minLength: 1, maxLength: 80 }
         endpointId: { type: string }
         accountId: { type: string }
         replacesDeviceId: { type: string, description: "Re-pair: when this invite is claimed, the phone with this id is revoked and its record removed, so it is not listed twice. 404 if it no longer exists." }
-        scope: { type: string, enum: [full, readOnly], description: "An agent's DeviceScope; agents hold only these two." }
+        scope: { type: string, enum: [full, readOnly, "agent:full", "agent:readOnly"], description: "An agent's scope, with or without its group; agents hold only these two." }
     PairedWatchCreate:
       type: object
       additionalProperties: false
       description: |
-        An app's Watch (`client: watch`), or its own sign-in for Siri, Shortcuts and system
-        controls (`client: app` with `scope: rulesOnly`), invited and claimed at once with `?claim=true`.
-      required: [client, clientId]
+        An app's Watch (`clientType: app-watch`, or `client: watch`), or its own sign-in for Siri,
+        Shortcuts and system controls (`clientType: app-controls`, or `client: app` with
+        `scope: rulesOnly`), invited and claimed at once with `?claim=true`. One of `clientType` and
+        `client` is required, and `clientType` wins.
+      required: [clientId]
       properties:
-        client: { type: string, enum: [watch, app] }
-        scope: { type: string, enum: [rulesOnly], description: "Required with `client: app`." }
+        clientType: { type: string, enum: [app-watch, app-controls], description: "The client type to set up. Servers before 1.6.0 need `client` instead." }
+        client: { type: string, enum: [watch, app], description: The older name for `clientType`. }
+        scope: { type: string, enum: [rulesOnly, "app:rulesOnly"], description: "Required with `client: app`; both hold `app:rulesOnly`." }
         clientId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 80 }
     HomeAddressResponse:
@@ -3708,6 +3746,7 @@ components:
             id: { type: string }
             displayName: { type: string }
             client: { $ref: "#/components/schemas/PairedClient" }
+            clientType: { $ref: "#/components/schemas/ClientType", description: "Absent from servers before 1.6.0." }
             scope: { $ref: "#/components/schemas/DeviceScope" }
         session: { $ref: "#/components/schemas/Session" }
         token: { type: string, description: The one-hour bearer. }
@@ -3767,6 +3806,7 @@ components:
         id: { type: string }
         displayName: { type: string }
         client: { $ref: "#/components/schemas/PairedClient" }
+        clientType: { $ref: "#/components/schemas/ClientType", description: "Absent from servers before 1.6.0." }
         scope: { $ref: "#/components/schemas/DeviceScope" }
         actsAs:
           type: [object, "null"]
@@ -3851,7 +3891,7 @@ components:
       minProperties: 1
       properties:
         displayName: { type: string, minLength: 1, maxLength: 80 }
-        scope: { $ref: "#/components/schemas/DeviceScope" }
+        scope: { type: string, enum: [full, rulesOnly, readOnly], description: "An agent's new scope: `full` or `readOnly`. No other device changes scope." }
     ConnectionStatus:
       type: object
       additionalProperties: false

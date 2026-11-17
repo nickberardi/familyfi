@@ -1,6 +1,6 @@
 import { hash, verify } from "@node-rs/argon2";
 import { cookies } from "next/headers";
-import { type Account, AccountKind, type DeviceScope, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { type Account, AccountKind, SessionKind } from "@prisma/client";
 import { cookieValue } from "@/lib/cookie";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
@@ -308,7 +308,7 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
   // A device acting as an adult who is no longer an administrator, or as the recovery account, has no sign-in to renew.
   if (!mayPairAs(session.account)) return INVALID_REFRESH;
   // Remote access is for the household's phones; an agent renews from the home network or not at all.
-  if (options.tunnelled && session.device.client === PairedDeviceClient.agent) return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
+  if (options.tunnelled && session.device.clientType === "agent") return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
   const next = bearerSessionData(now);
   const rotated = await prisma().session.updateMany({
@@ -397,7 +397,7 @@ export async function requireSession(request: Request) {
   if (!session) return { session: null, error: jsonError(401, "unauthenticated", "Sign in required.") };
   const device = session.device;
   if (device) {
-    if (device.client === PairedDeviceClient.agent && request.headers.get(TUNNEL_HEADER) === "tunnel") {
+    if (device.clientType === "agent" && request.headers.get(TUNNEL_HEADER) === "tunnel") {
       return { session: null, error: jsonError(403, "agent_remote", "Agents connect from the home network only.") };
     }
     const refused = deviceScopeRefusal(device, request.method, new URL(request.url).pathname);
@@ -411,16 +411,16 @@ export type SignedInSession = NonNullable<Awaited<ReturnType<typeof requireSessi
 
 /** The 403 a paired device gets for a call its scope does not cover, or null when it may make it. */
 export function deviceScopeRefusal(
-  device: { id: string; client: PairedDeviceClient; scope: DeviceScope },
+  device: { id: string; clientType: string; scope: string },
   method: string,
   path: string,
 ): Response | null {
-  if (deviceRouteAllowed({ client: device.client, scope: device.scope, deviceId: device.id, method, path })) return null;
+  if (deviceRouteAllowed({ clientType: device.clientType, scope: device.scope, deviceId: device.id, method, path })) return null;
   // Signed in but not allowed: 403, never 401, which clients read as "renew or sign in again".
-  if (device.client === PairedDeviceClient.agent) {
+  if (device.clientType === "agent") {
     return jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.");
   }
-  if (device.client === PairedDeviceClient.app) {
+  if (device.clientType === "app-controls") {
     return jsonError(403, "app_scope", "Siri, Shortcuts and system controls cannot use that endpoint.");
   }
   return jsonError(403, "watch_scope", "This Watch session cannot use that endpoint.");

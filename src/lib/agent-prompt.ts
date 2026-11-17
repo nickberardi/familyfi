@@ -13,6 +13,7 @@ export const AGENT_SCOPES: readonly { value: "full" | "readOnly"; label: string;
 
 const SCOPE_LABELS: Record<DeviceScope, string> = { full: "Full access", rulesOnly: "Rules only", readOnly: "Read only" };
 
+/** A scope's name; one this client does not know, from a newer server, is shown as sent. */
 export function scopeLabel(scope: DeviceScope): string {
-  return SCOPE_LABELS[scope];
+  return SCOPE_LABELS[scope] ?? scope;
 }

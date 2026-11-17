@@ -6,14 +6,22 @@
 import { describe, expect, it } from "vitest";
 import { checkFloors, SERVER_FLOOR_IDS } from "../../scripts/ci/check-openapi-floors.mjs";
 
-const spec = (version: string, client: string, server: string, watch = "0.30.0") => ({
-  info: { version, "x-min-app": client, "x-min-server": server, "x-min-watch": watch },
+const spec = (version: string, client: string, server: string, watch = "0.30.0", me = "0.30.0") => ({
+  info: { version, "x-min-app": client, "x-min-server": server, "x-min-watch": watch, "x-min-me": me },
 });
 
 const base = spec("0.41.0", "0.36.0", "0.36.0");
 const none = { breaking: [] as string[], requiredAdded: [] as string[] };
 
 describe("OpenAPI floors", () => {
+  it("hold FamilyFi Me's hand-set floor like the watches': valid, never falling or passing the version", () => {
+    expect(checkFloors({ baseSpec: { info: { ...base.info, "x-min-me": undefined } }, headSpec: spec("0.42.0", "0.36.0", "0.36.0", "0.30.0", "0.42.0"), ...none }).ok).toBe(true);
+    expect(checkFloors({ baseSpec: spec("0.41.0", "0.36.0", "0.36.0", "0.30.0", "0.41.0"), headSpec: spec("0.42.0", "0.36.0", "0.36.0", "0.30.0", "0.40.0"), ...none }).problems).toEqual([
+      "info.x-min-me went backwards, from 0.41.0 to 0.40.0: a floor only rises.",
+    ]);
+    expect(checkFloors({ baseSpec: base, headSpec: spec("0.42.0", "0.36.0", "0.36.0", "0.30.0", "0.43.0"), ...none }).problems).toEqual(["info.x-min-me 0.43.0 is newer than info.version 0.42.0."]);
+  });
+
   it("leave both floors alone for an additive change", () => {
     expect(checkFloors({ baseSpec: base, headSpec: spec("0.42.0", "0.36.0", "0.36.0"), ...none })).toEqual({ ok: true, problems: [] });
   });

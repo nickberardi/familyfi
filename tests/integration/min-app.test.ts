@@ -250,4 +250,23 @@ describe("the versions GET /api/v1/health reports", () => {
       });
     }
   });
+
+  it("answers a client that names its type with that type's floor, and none for a type it does not know", async () => {
+    const info = YAML.parse(readFileSync(path.join(repoRoot, SPEC), "utf8")).info as Record<string, string>;
+    const floors: Record<string, string | undefined> = {
+      app: info["x-min-app"],
+      agent: info["x-min-app"],
+      "app-watch": info["x-min-watch"],
+      "app-controls": info["x-min-watch"],
+      me: info["x-min-me"],
+    };
+    for (const [client, floor] of Object.entries(floors)) {
+      const body = (await (await getHealth(request(`/api/v1/health?client=${client}`))).json()) as Record<string, unknown>;
+      expect(body.minApiVersion, client).toBe(floor);
+      expect(body.minAppApiVersion).toBe(info["x-min-app"]);
+    }
+    for (const url of ["/api/v1/health", "/api/v1/health?client=me-watch", "/api/v1/health?client=watch"]) {
+      expect(await (await getHealth(request(url))).json(), url).not.toHaveProperty("minApiVersion");
+    }
+  });
 });

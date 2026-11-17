@@ -1,4 +1,4 @@
-import { type DeviceScope, type PairedDeviceClient, RuleLiftKind } from "@prisma/client";
+import { RuleLiftKind } from "@prisma/client";
 import { z } from "zod";
 import { mapLimited } from "@/lib/concurrency";
 import { QUARANTINE_RULE_ID, type BuiltInRule } from "@/lib/rules";
@@ -126,7 +126,7 @@ function builtInError(which: BuiltInRule = "quarantine"): ApiError {
  * request's: POST from the on and off verbs, PATCH from an update.
  */
 async function switchQuarantineRule(
-  session: Parameters<typeof sessionActor>[0] & { device: { id: string; client: PairedDeviceClient; scope: DeviceScope } | null },
+  session: Parameters<typeof sessionActor>[0] & { device: { id: string; clientType: string; scope: string } | null },
   enabled: boolean,
   method: "POST" | "PATCH",
 ) {

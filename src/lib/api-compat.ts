@@ -1,10 +1,11 @@
+import type { ClientType } from "./client-type";
 import { compareSemver, parseSemver } from "./semver";
 
 /**
  * Whether a client and a server can read each other, decided before the client reads the
- * household. The floors are `info.x-min-app`, `info.x-min-server` and `info.x-min-watch` in
- * `openapi/familyfi.v1.yaml`; CI raises the first two from the spec diff, and the watches' is set by
- * hand (docs/api.md, "Versioning the contract"). `tests/unit/api-compat.test.ts` keeps these
+ * household. The floors are `info.x-min-app`, `info.x-min-server`, `info.x-min-watch` and
+ * `info.x-min-me` in `openapi/familyfi.v1.yaml`; CI raises the first two from the spec diff, and the
+ * watches' and FamilyFi Me's are set by hand (docs/api.md, "Versioning the contract"). `tests/unit/api-compat.test.ts` keeps these
  * constants equal to them. The native watch
  * apps port `apiCompatibility`, which `tests/fixtures/display-vectors.json` pins.
  */
@@ -14,16 +15,31 @@ import { compareSemver, parseSemver } from "./semver";
  * A literal rather than package.json's, so a client that vendors this module, such as the companion
  * app, never bundles familyfi's package.json; `tests/unit/api-compat.test.ts` fails when it drifts.
  */
-export const API_VERSION: string = "1.5.0";
+export const API_VERSION: string = "1.6.0";
 /** The oldest client API version this server still serves (`info.x-min-app`). */
 export const MIN_APP_API_VERSION = "0.36.0";
 /** The oldest server API version a client built from this contract can read (`info.x-min-server`). */
 export const MIN_SERVER_API_VERSION = "0.36.0";
 /** The oldest watch app API version this server still serves (`info.x-min-watch`), set by hand. */
 export const MIN_WATCH_API_VERSION = "0.30.0";
+/** The oldest FamilyFi Me API version this server still serves (`info.x-min-me`), set by hand. */
+export const MIN_ME_API_VERSION = "1.6.0";
+
+/**
+ * The oldest API version this server serves each client type, which `GET /api/v1/health?client=`
+ * answers as `minApiVersion`. The app and agents read the whole API; the Watch and the app's Siri,
+ * Shortcuts and controls share the Watch's few calls; FamilyFi Me has its own floor.
+ */
+export const MIN_API_VERSION_BY_CLIENT: Record<ClientType, string> = {
+  app: MIN_APP_API_VERSION,
+  agent: MIN_APP_API_VERSION,
+  "app-watch": MIN_WATCH_API_VERSION,
+  "app-controls": MIN_WATCH_API_VERSION,
+  me: MIN_ME_API_VERSION,
+};
 
 /** The versions `GET /api/v1/health` reports. A server from before API 0.41.0 sends only `version`. */
-export type HealthVersions = { version?: string; apiVersion?: string; minAppApiVersion?: string; minWatchApiVersion?: string };
+export type HealthVersions = { version?: string; apiVersion?: string; minAppApiVersion?: string; minWatchApiVersion?: string; minApiVersion?: string };
 
 /**
  * Which client asks: its API version, the oldest server it reads, and whether it is a watch app,
@@ -49,7 +65,8 @@ export function apiCompatibility(
   // A version that can't be read decides nothing: the household load reports whatever goes wrong.
   if (!server || !app) return { status: "ok" };
   const mismatch = { appApiVersion: app.version, serverApiVersion: server.version };
-  const served = client.watch ? health.minWatchApiVersion : health.minAppApiVersion;
+  // A client that named its type to `/health?client=` gets its own floor; otherwise the app's or the watches'.
+  const served = health.minApiVersion ?? (client.watch ? health.minWatchApiVersion : health.minAppApiVersion);
   const minAppApi = served ? parseSemver(served) : null;
   if (minAppApi && compareSemver(app, minAppApi) < 0) return { status: "update_app", ...mismatch };
   const minServerApi = parseSemver(client.minServerApi);

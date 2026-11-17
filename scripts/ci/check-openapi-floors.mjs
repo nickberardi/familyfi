@@ -39,6 +39,8 @@ export function checkFloors({ baseSpec, headSpec, breaking, requiredAdded }) {
     { key: "x-min-server", raise: requiredAdded, why: "adds required response fields, which older servers don't send" },
     // The watches read only a few routes; until CI can tell which changes reach them, theirs is set by hand.
     { key: "x-min-watch", raise: [], why: "" },
+    // FamilyFi Me's floor is set by hand too. A base from before it existed has none to compare.
+    { key: "x-min-me", raise: [], why: "" },
   ];
   for (const { key, raise, why } of floors) {
     const text = String(headSpec?.info?.[key] ?? "");
@@ -120,7 +122,7 @@ function main() {
         [
           "### OpenAPI floors",
           "",
-          `x-min-app \`${info["x-min-app"]}\`, x-min-server \`${info["x-min-server"]}\`, x-min-watch \`${info["x-min-watch"]}\`, version \`${info.version}\`.`,
+          `x-min-app \`${info["x-min-app"]}\`, x-min-server \`${info["x-min-server"]}\`, x-min-watch \`${info["x-min-watch"]}\`, x-min-me \`${info["x-min-me"]}\`, version \`${info.version}\`.`,
           "",
           outcome.ok ? "Passed." : ["```", ...outcome.problems, "```"].join("\n"),
           "",
@@ -131,7 +133,7 @@ function main() {
       for (const problem of outcome.problems) console.error(problem);
       return 1;
     }
-    console.log(`Floors hold against ${baseName}: x-min-app ${info["x-min-app"]}, x-min-server ${info["x-min-server"]}, x-min-watch ${info["x-min-watch"]}.`);
+    console.log(`Floors hold against ${baseName}: x-min-app ${info["x-min-app"]}, x-min-server ${info["x-min-server"]}, x-min-watch ${info["x-min-watch"]}, x-min-me ${info["x-min-me"]}.`);
     return 0;
   } finally {
     rmSync(work, { recursive: true, force: true });

@@ -1,4 +1,4 @@
-import { ChangeStatus, PairedDeviceClient } from "@prisma/client";
+import { ChangeStatus } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { prisma } from "./db";
 import { ApiError } from "./http";
@@ -41,8 +41,8 @@ export async function enqueueChange(scope: string, deviceMac?: string) {
 export type ChangeActorView = { displayName: string; device?: { displayName: string } };
 
 /** Whether a reader is told who asked for each change: everyone but an agent, which never reaches the household's adults. */
-export function readsChangeActors(session: { device?: { client: PairedDeviceClient } | null }): boolean {
-  return session.device?.client !== PairedDeviceClient.agent;
+export function readsChangeActors(session: { device?: { clientType: string } | null }): boolean {
+  return session.device?.clientType !== "agent";
 }
 
 /** What a change row needs loaded to say who asked for it. */

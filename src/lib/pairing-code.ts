@@ -13,6 +13,12 @@ import type { ConnectionRoute } from "./types";
  */
 export type PairingPayload = {
   version: 1;
+  /**
+   * The client type the invite admits (src/lib/client-type.ts), such as `app` or `agent`, so a
+   * client can tell a code meant for another before it spends it. Codes from servers before API
+   * 1.6.0 leave it out; readers ignore fields they do not know, so adding it kept `version` 1.
+   */
+  clientType?: string;
   /** The HTTPS origin the phone pairs over. */
   url: string;
   /** The single-use claim: `pairingId.token`. */
@@ -42,6 +48,8 @@ export type PairingCode = {
   keyFingerprint: string;
   /** The code's Access token, which only bootstraps pairing; the manifest delivers the one kept. */
   edgeCredential: EdgeCredential | null;
+  /** The client type the code admits, or null from a server before API 1.6.0. */
+  clientType?: string | null;
 };
 
 export class PairingCodeError extends Error {
@@ -128,11 +136,13 @@ export function parsePairingCode(value: string): PairingCode {
   }
 
   const url = new URL(payload.url.trim()).origin;
+  const clientType = typeof payload.clientType === "string" ? payload.clientType : null;
   const base = { id: "pairing", url, kind: "own" as const, priority: 0, enabled: true };
   if (typeof pin === "string") {
     return {
       pairingId,
       token,
+      clientType,
       keyFingerprint: payload.fingerprint,
       edgeCredential: null,
       endpoint: { ...base, transport: "lan", trustMode: "pinned", spkiSha256: pin, edgeAuth: "none", edgeTokenVersion: null },
@@ -144,6 +154,7 @@ export function parsePairingCode(value: string): PairingCode {
     return {
       pairingId,
       token,
+      clientType,
       keyFingerprint: payload.fingerprint,
       edgeCredential: { version: 1, clientId: access.clientId as string, clientSecret: access.clientSecret as string },
       endpoint: { ...base, transport: "cloudflare", trustMode: "system", spkiSha256: null, edgeAuth: "serviceToken", edgeTokenVersion: 1 },
@@ -152,6 +163,7 @@ export function parsePairingCode(value: string): PairingCode {
   return {
     pairingId,
     token,
+    clientType,
     keyFingerprint: payload.fingerprint,
     edgeCredential: null,
     endpoint: { ...base, transport: "lan", trustMode: "system", spkiSha256: null, edgeAuth: "none", edgeTokenVersion: null },

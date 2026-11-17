@@ -3,7 +3,7 @@
  * console only when called, and only for a session; the plain `/health` never asks it; the routes every open page polls must not ask it at all once a
  * reconcile pass has read what they show.
  */
-import { DeviceScope, PairedDeviceClient, SessionKind } from "@prisma/client";
+import { SessionKind } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/v1/auth/login/route";
 import { GET as getHealth } from "@/app/api/v1/health/route";
@@ -79,14 +79,14 @@ describe("gateway health and the console's polled load", () => {
     // No device acts as the recovery admin, so these act as a personal administrator.
     const account = await pairingAdmin();
     for (const [client, scope] of [
-      [PairedDeviceClient.watch, DeviceScope.rulesOnly],
-      [PairedDeviceClient.agent, DeviceScope.full],
-      [PairedDeviceClient.agent, DeviceScope.readOnly],
+      ["app-watch", "app:rulesOnly"],
+      ["agent", "agent:full"],
+      ["agent", "agent:readOnly"],
     ] as const) {
-      const device = await prisma().pairedDevice.create({ data: { displayName: `${client} ${scope}`, client, scope, accountId: client === PairedDeviceClient.agent ? account.id : null } });
+      const device = await prisma().pairedDevice.create({ data: { displayName: `${client} ${scope}`, clientType: client, scope, accountId: client === "agent" ? account.id : null } });
       const issued = await createSession({ accountId: account.id, username: account.username, kind: SessionKind.bearer, deviceId: device.id });
       const response = await getHealth(request("/api/v1/health?gateway=true", { auth: { cookie: "", csrf: "", token: issued.raw } }));
-      expect(response.status, `${client}:${scope}`).toBe(403);
+      expect(response.status, `${client} ${scope}`).toBe(403);
     }
   });
 

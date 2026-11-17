@@ -32,22 +32,6 @@ enum SessionKind {
   bearer
 }
 
-/// What a paired device is. `app` is the FamilyFi app on a phone, tablet or Mac; with the
-/// rulesOnly scope it is that app's Siri, Shortcuts and system controls, which sign in on their own.
-enum PairedDeviceClient {
-  app
-  watch
-  agent
-}
-
-/// What a paired device may call. Each (client, scope) pair is one allowlist in src/server/device-scope.ts:
-/// app:full, app:rulesOnly, watch:rulesOnly, agent:full, agent:readOnly. It bounds the device whatever its account may do.
-enum DeviceScope {
-  full
-  rulesOnly
-  readOnly
-}
-
 /// What FamilyFi's own check of a route found: its identity answered as this household, or not.
 enum RouteCheckResult {
   reached
@@ -230,9 +214,12 @@ model ConnectionEndpoint {
 model PairedDevice {
   id              String         @id @default(cuid())
   displayName     String
-  client          PairedDeviceClient @default(app)
+  /// Which client this is: app, app-watch, app-controls, me or agent (src/lib/client-type.ts).
+  clientType      String         @default("app")
   clientId        String?        @unique
-  scope           DeviceScope    @default(full)
+  /// What it may call, as one value: app:full, app:rulesOnly, agent:full, agent:readOnly or me:askOnly.
+  /// Each is one allowlist in src/server/device-scope.ts; CLIENT_SCOPES says which client type holds which.
+  scope           String         @default("app:full")
   /// The account this device acts as, fixed by the invite it was paired with.
   accountId       String?
   account         Account?       @relation("pairedDeviceAccount", fields: [accountId], references: [id], onDelete: Cascade)
@@ -340,10 +327,10 @@ model Pairing {
   parentDevice       PairedDevice?       @relation("pairingParentDevice", fields: [parentDeviceId], references: [id], onDelete: SetNull)
   /// A phone this pairing re-pairs: when the pairing is claimed, that old record is revoked and removed.
   replacesDeviceId   String?
-  /// The kind of client this pairing admits. An agent pairing has no route: its code carries the address it was made from.
-  client             PairedDeviceClient  @default(app)
-  /// The scope an agent pairing grants; a phone pairing always gives `full`.
-  scope              DeviceScope?
+  /// The client type this pairing admits (src/lib/client-type.ts). An agent pairing has no route: its code carries the address it was made from.
+  clientType         String              @default("app")
+  /// The scope the device gets, such as `app:full` or `agent:readOnly`. A pairing without one is never claimed.
+  scope              String?
   createdAt          DateTime            @default(now()) @db.Timestamptz(3)
 
   @@index([expiresAt])

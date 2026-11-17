@@ -250,6 +250,9 @@ export type PairedPhone = {
   id: string;
   displayName: string;
   client: PairedClient;
+  /** Which client it is (src/lib/client-type.ts). Servers before API 1.6.0 leave it out: read `client` and `scope` then. */
+  clientType?: string;
+  /** Its scope without the group. A newer server may send one this client does not know. */
   scope: DeviceScope;
   /** The account this device acts as. */
   actsAs: { username: string; displayName: string } | null;

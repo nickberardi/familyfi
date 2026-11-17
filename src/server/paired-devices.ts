@@ -1,8 +1,9 @@
-import { PairedDeviceClient, type Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { CLIENT_TYPES, legacyClient, scopeFor, scopeWord } from "@/lib/client-type";
 import { z } from "zod";
 import { isAdministrator, removeDevice, revokeDevice } from "./connection";
 import { prisma } from "./db";
-import { isFullApp, isValidScope } from "./device-scope";
+import { isFullApp } from "./device-scope";
 import { ApiError } from "./http";
 
 type Viewer = Parameters<typeof isAdministrator>[0];
@@ -38,8 +39,9 @@ function publicPairedDevice(device: Listed) {
   return {
     id: device.id,
     displayName: device.displayName,
-    client: device.client,
-    scope: device.scope,
+    client: legacyClient(device.clientType),
+    clientType: device.clientType,
+    scope: scopeWord(device.scope),
     actsAs: device.account ? { username: device.account.username, displayName: device.account.displayName } : null,
     parentDeviceId: device.parentDeviceId,
     enrolledAt: device.createdAt.toISOString(),
@@ -53,7 +55,7 @@ function publicPairedDevice(device: Listed) {
     sessions: device.sessions.map((session) => ({
       id: session.id,
       username: session.username,
-      client: device.client,
+      client: legacyClient(device.clientType),
       expiresAt: (session.refreshExpiresAt ?? session.expiresAt).toISOString(),
       createdAt: session.createdAt.toISOString(),
     })),
@@ -61,7 +63,7 @@ function publicPairedDevice(device: Listed) {
 }
 
 const Filter = z.object({
-  client: z.array(z.enum(["app", "phone", "watch", "agent"])),
+  client: z.array(z.enum(["app", "phone", "watch", "agent", ...CLIENT_TYPES])),
   status: z.enum(["active", "revoked"]).optional(),
 });
 
@@ -79,15 +81,15 @@ function requireVisible(session: Viewer) {
 export async function listPairedDevices(session: Viewer, query: { client: string[]; status?: string }) {
   const visible = requireVisible(session);
   const filter = Filter.safeParse(query);
-  if (!filter.success) throw new ApiError(400, "invalid_request", "client must be app, watch or agent, and status active or revoked.");
+  if (!filter.success) throw new ApiError(400, "invalid_request", "client must be a client type (app, app-watch, app-controls, me or agent) or watch, and status active or revoked.");
   const { status } = filter.data;
-  // `phone` is the deprecated name for `app`.
-  const client = filter.data.client.map((kind) => (kind === "phone" ? "app" : kind));
+  // The older words: `app` is the app and its Siri and shortcuts, `watch` its Watch, and `phone` the deprecated name for `app`.
+  const clientTypes = [...new Set(filter.data.client.flatMap((kind) => (kind === "phone" || kind === "app" ? ["app", "app-controls"] : kind === "watch" ? ["app-watch"] : [kind])))];
   const devices = await prisma().pairedDevice.findMany({
     where: {
       AND: [
         visible,
-        client.length ? { client: { in: client } } : {},
+        clientTypes.length ? { clientType: { in: clientTypes } } : {},
         status === "active" ? { revokedAt: null } : status === "revoked" ? { revokedAt: { not: null } } : {},
       ],
     },
@@ -111,10 +113,9 @@ export async function getPairedDevice(session: Viewer, id: string) {
 export async function updatePairedDevice(id: string, input: { displayName?: string; scope?: "full" | "rulesOnly" | "readOnly" }) {
   const device = await prisma().pairedDevice.findUnique({ where: { id } });
   if (!device) throw deviceNotFound();
-  if (input.scope && input.scope !== device.scope && (device.client !== PairedDeviceClient.agent || !isValidScope(device.client, input.scope))) {
-    throw new ApiError(400, "invalid_scope", `A ${device.client} cannot hold the ${input.scope} scope.`);
-  }
-  await prisma().pairedDevice.update({ where: { id }, data: input });
+  const scope = input.scope && input.scope !== scopeWord(device.scope) ? (device.clientType === "agent" ? scopeFor("agent", input.scope) : null) : undefined;
+  if (scope === null) throw new ApiError(400, "invalid_scope", `A ${legacyClient(device.clientType)} cannot hold the ${input.scope} scope.`);
+  await prisma().pairedDevice.update({ where: { id }, data: { displayName: input.displayName, ...(scope ? { scope } : {}) } });
   const updated = await prisma().pairedDevice.findUniqueOrThrow({ where: { id }, include: deviceInclude() });
   return publicPairedDevice(updated);
 }

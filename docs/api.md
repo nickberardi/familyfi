@@ -290,21 +290,42 @@ administrator or by themselves. The
 [authorization matrix](../tests/integration/authorization-matrix.test.ts) names, for each route,
 which device scopes may call it.
 
-### Device scopes
+### Client types and device scopes
 
-Every paired device has a `scope` (`DeviceScope`), and each (client, scope) pair is one explicit
+Every invite and paired device holds two separate values ([`src/lib/client-type.ts`](../src/lib/client-type.ts)):
+its **client type**, which says who is talking, and its **scope**, which says what it may call. The
+invite sets both, the claim copies them onto the device, and every signed-in call reads them from the
+session's device; no header carries them. The pairing code carries the client type too, so a client
+can tell a code meant for another before spending it.
+
+| Client type | What it is | Scope |
+| --- | --- | --- |
+| `app` | The FamilyFi app on a phone, tablet or Mac | `app:full` |
+| `app-watch` | That app's Watch | `app:rulesOnly` |
+| `app-controls` | That app's Siri, Shortcuts and system controls, which run outside the app | `app:rulesOnly` |
+| `me` | FamilyFi Me on a child's phone (reserved: nothing pairs it yet) | `me:askOnly` |
+| `agent` | An AI agent | `agent:full` or `agent:readOnly` |
+
+`me-watch` is reserved. The scope is stored as one value, `group:scope`, and each is one explicit
 allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not a ladder:
 
-| Pair | May call |
+| Scope | May call |
 | --- | --- |
-| `app:full` | The app on a phone, tablet or Mac: whatever its account may |
-| `watch:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` beyond that) |
-| `app:rulesOnly` | The Watch's list, for an app's Siri, Shortcuts and system controls (403 `app_scope` beyond that) |
+| `app:full` | Whatever its account may |
+| `app:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` for a Watch, `app_scope` for the app's controls, beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
+| `me:askOnly` | Nothing yet: FamilyFi Me's routes come with it |
 
-No other pair is valid. A phone, tablet or Mac always pairs as `app` with `full`, and a Watch and an app's Siri and shortcuts enroll as `rulesOnly`; an
-administrator chooses an agent's scope when connecting it.
+A client type holds only the scopes in its row, and a device holding any other allows nothing. A
+phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with
+`app:rulesOnly`; an administrator chooses an agent's scope when connecting it.
+
+The API answers both in the fields installed apps already read, unchanged: `client` (`app`,
+`watch`, `agent`; `app-controls` is `app`) and `scope` without its group (`full`, `rulesOnly`,
+`readOnly`). Since API 1.6.0 it adds `clientType`. Requests take `clientType`, or the older `client`
+words (`watch` is `app-watch`, `app` with `scope: rulesOnly` is `app-controls`, `phone` is `app`),
+which stay accepted.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity
@@ -336,14 +357,15 @@ An app and a server on different contract versions can each send something the o
 - **`x-min-app`**: the oldest client API version this server still serves. It rises to the new `info.version` whenever oasdiff's `breaking` check finds a change that breaks old clients, such as a response field removed or made optional. The `breaking_api` label approves such a change; the floor records which apps it leaves behind.
 - **`x-min-server`**: the oldest server an app built from this document can read. It rises to the new `info.version` whenever `oasdiff changelog` reports `response-required-property-added` or `response-property-became-required`. A new endpoint does not raise it: an old server answers it with 404, which a client already reports as an error.
 - **`x-min-watch`**: the oldest watch app API version this server still serves. The watches read only a few routes, so most breaking changes never reach them; until CI can tell which do, it is set by hand (0.30.0).
+- **`x-min-me`**: the oldest FamilyFi Me API version this server still serves, set by hand like `x-min-watch` (it started at 1.6.0).
 
 Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both start at 0.36.0. `x-min-watch` started at 0.30.0, set by hand.
 
-`GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-watch`) to anyone, in every answer. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
+`GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-watch`) to anyone, in every answer. A client that names its client type, `GET /api/v1/health?client=me`, also gets `minApiVersion`, its own floor from the server's table (`MIN_API_VERSION_BY_CLIENT` in `src/lib/api-compat.ts`): `x-min-app` for `app` and `agent`, `x-min-watch` for `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know, or a server before 1.6.0, sends none, and the client falls back to the two fields above. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
 
 | Condition | The client shows |
 | --- | --- |
-| Its own API version < the server's `minAppApiVersion` (a watch: `minWatchApiVersion`) | Update the app |
+| Its own API version < the server's `minApiVersion`, when it named its type, else `minAppApiVersion` (a watch: `minWatchApiVersion`) | Update the app |
 | The server's `apiVersion` < its own `x-min-server` | Update the server |
 | Otherwise | The household |
 
