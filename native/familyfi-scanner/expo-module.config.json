@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["FamilyfiScannerModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.familyfiscanner.FamilyfiScannerModule"]
+  }
+}

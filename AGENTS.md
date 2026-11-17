@@ -80,7 +80,7 @@ Subagents are defined twice, in `.claude/agents/<name>.md` for Claude and `.code
 
 ## Stack and layout
 
-Next.js App Router + TypeScript, React, Tailwind, Prisma/PostgreSQL. `src/app` holds pages and routes; `src/components` web UI; `src/ui` components shared with the native app (React Native primitives, rendered on the web through react-native-web); `src/server` database, authentication and enforcement; `src/lib` client-safe types and pure logic. `prisma` owns schema and migrations, `openapi` the HTTP contract, `tests` validation, `scripts` tooling and startup, and `docker` deployment.
+Next.js App Router + TypeScript, React, Tailwind, Prisma/PostgreSQL. `src/app` holds pages and routes; `src/components` web UI; `src/ui` components shared with the native app (React Native primitives, rendered on the web through react-native-web); `src/server` database, authentication and enforcement; `src/lib` client-safe types and pure logic. `native` holds the Expo native modules both apps link (the pinned transport and the QR scanner), which only the apps build and check; `prisma` owns schema and migrations, `openapi` the HTTP contract, `tests` validation, `scripts` tooling and startup, and `docker` deployment.
 
 Use `make setup` for a new development environment, `make dev` to run it, and `make lint typecheck test-unit` for fast code checks. Tests and checks run through `scripts/test.py` (Python 3.11+), which the `make` test targets alias; it selects by test, category, layer or platform and owns a fresh database per run. Setup and dev can migrate the development database; tests never do. The complete [command reference](docs/development.md#commands) explains side effects; [testing.md](docs/testing.md) selects checks by change.
 

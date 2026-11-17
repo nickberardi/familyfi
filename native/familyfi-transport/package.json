@@ -1,0 +1,10 @@
+{
+  "name": "familyfi-transport",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned and system-trusted HTTPS for FamilyFi's household routes.",
+  "main": "index.ts",
+  "license": "BUSL-1.1",
+  "author": "FamilyFi",
+  "homepage": "https://github.com/nickberardi/familyfi"
+}

@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.getfamilyfi'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.familyfiscanner"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+    // Keep rules the app's release build applies (proguard-rules.pro).
+    consumerProguardFiles 'proguard-rules.pro'
+  }
+}
+
+dependencies {
+  implementation "com.google.android.gms:play-services-code-scanner:16.1.0"
+}
