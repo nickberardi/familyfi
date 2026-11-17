@@ -87,12 +87,12 @@ function Row({
 
 const styles = StyleSheet.create({
   well: { gap: 10, padding: 14, borderRadius: 12, backgroundColor: SETUP.well },
-  label: { fontSize: 12, lineHeight: 16, fontWeight: "600", color: SETUP.ink2 },
+  label: { fontSize: 14, lineHeight: 20, fontWeight: "600", color: SETUP.ink2 },
   rowText: { flex: 1, gap: 2 },
   value: { fontSize: 14, lineHeight: 20, color: SETUP.ink },
   mono: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     color: SETUP.ink,
     fontFamily: SETUP.mono,
   },
@@ -104,5 +104,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   revealText: { fontSize: 14, lineHeight: 20, color: SETUP.accent },
-  note: { fontSize: 12.5, lineHeight: 18, color: SETUP.ink2 },
+  note: { fontSize: 14, lineHeight: 20, color: SETUP.ink2 },
 });

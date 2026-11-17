@@ -8,7 +8,7 @@ import {
 
 import { Button } from "./Button";
 import { paletteColor } from "./palette";
-import { UIProvider, useUI } from "./UIContext";
+import { PRESS_OPACITY, UIProvider, useUI } from "./UIContext";
 import { useMemo, type ComponentProps, type ReactNode } from "react";
 import {
   Platform,
@@ -126,7 +126,7 @@ function SetupHeader({
           accessibilityLabel={SETUP_ACTIONS.back}
           onPress={onBack}
           testID="setup-back"
-          style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.back, pressed && { opacity: PRESS_OPACITY }]}
         >
           <ui.Icon name="caret-left" size={15} color={SETUP.ink} />
           <Text style={[styles.body, { color: SETUP.ink }]}>
@@ -251,7 +251,7 @@ export const SETUP = {
   mono: Platform.select({ ios: "Menlo", default: "monospace" }),
 };
 
-/** Sizes from familyfi-ios's type scale (`Typography.swift`): body 14, dense 12.5, label 12. */
+/** Sizes on familyfi's ramp, at its 14 pt floor: body and dense notes 14, labels 14/600. */
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: SETUP.page },
   header: {
@@ -298,11 +298,11 @@ const styles = StyleSheet.create({
     color: SETUP.ink,
   },
   body: { fontSize: 14, lineHeight: 20, color: SETUP.ink2 },
-  dense: { fontSize: 12.5, lineHeight: 18, color: SETUP.ink2 },
+  dense: { fontSize: 14, lineHeight: 20, color: SETUP.ink2 },
   welcomeBody: { maxWidth: 300 },
   center: { textAlign: "center" },
   field: { gap: 6 },
-  label: { fontSize: 12, lineHeight: 16, fontWeight: "600", color: SETUP.ink2 },
+  label: { fontSize: 14, lineHeight: 20, fontWeight: "600", color: SETUP.ink2 },
   fieldBox: {
     backgroundColor: SETUP.field,
     borderRadius: 7,
