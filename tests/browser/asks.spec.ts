@@ -1,4 +1,8 @@
+import AxeBuilder from "@axe-core/playwright";
+
 import { expect, test, type Page } from "./fixtures";
+
+import { answerConfirm } from "./confirm-dialog";
 
 const password = process.env.FAMILYFI_DEFAULT_PASSWORD;
 const shots = process.env.ASKS_SCREENSHOT_DIR;
@@ -23,6 +27,17 @@ async function shot(page: Page, name: string) {
   if (shots) await page.screenshot({ path: `${shots}/${name}-${test.info().project.name}.png`, fullPage: true });
 }
 
+/**
+ * WCAG 2.1 A and AA with axe, as tests/browser/accessibility.spec.ts holds every page; only within
+ * `within` when it is given, such as an open sheet.
+ */
+async function expectAccessible(page: Page, what: string, within?: string) {
+  const builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]);
+  const result = await (within ? builder.include(within) : builder).analyze();
+  const problems = result.violations.flatMap((violation) => violation.nodes.map((node) => `${violation.id} at ${node.target.join(" ")}: ${violation.help}`));
+  expect(problems, `${what} accessibility`).toEqual([]);
+}
+
 type Group = { id: string; name: string; kind: string; ask?: unknown };
 
 async function cassie(page: Page): Promise<Group> {
@@ -36,10 +51,10 @@ async function cassie(page: Page): Promise<Group> {
  * Cassie's phone asked to be unpaused a few minutes ago. A child's phone can't pair in a browser
  * test, so the household's answer carries the ask as FamilyFi sends it (`Group.ask`).
  */
-async function withWaitingAsk(page: Page, group: Group) {
+async function withWaitingAsk(page: Page, group: Group, about: { about: "pause" } | { about: "rule"; ruleId: string; minutes: number } = { about: "pause" }) {
   const at = new Date(Date.now() - 5 * 60_000).toISOString();
   const expiresAt = new Date(Date.now() + 55 * 60_000).toISOString();
-  const ask = { id: "ask-browser", about: "pause", state: "waiting", at, expiresAt };
+  const ask = { id: "ask-browser", ...about, state: "waiting", at, expiresAt };
   const declined: string[] = [];
   await page.route(/\/api\/v1\/groups(\?.*)?$/, async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
@@ -66,6 +81,7 @@ test("a child's ask shows on their card and page, and Not now answers it", async
   const line = page.getByTestId(`group-ask-${group.id}`);
   await expect(line).toHaveText("Asked to be unpaused");
   await shot(page, "family-ask-line");
+  await expectAccessible(page, "the family card with an ask");
 
   await page.goto(`/family/${group.id}`);
   await page.getByTestId(`group-ask-${group.id}`).click();
@@ -74,6 +90,7 @@ test("a child's ask shows on their card and page, and Not now answers it", async
   await expect(sheet).toContainText(/Asked at \d{1,2}:\d\d [AP]M\. It closes at \d{1,2}:\d\d [AP]M if no one answers\./);
   await expect(sheet.getByRole("button", { name: /^Unpause/ })).toBeVisible();
   await shot(page, "ask-sheet");
+  await expectAccessible(page, "the answer sheet", "[role=dialog]");
 
   await sheet.getByRole("button", { name: /^Not now/ }).click();
   await expect(sheet).toHaveCount(0);
@@ -131,6 +148,112 @@ test("pairs FamilyFi Me for a family member from their page", { tag: "@desktop" 
     await expect(code.getByTestId("pairing-code")).not.toBeEmpty();
     await shot(page, "pair-me-code");
     await code.getByRole("button", { name: "Cancel" }).click();
+  } finally {
+    await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "off" } });
+    await page.request.delete(`/api/v1/connection/endpoints/${route}`, { headers });
+  }
+});
+
+test("a child's ask for time off a rule offers what they asked, the window's end, a time of your own and Not now", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const group = await cassie(page);
+  const headers = await csrf(page);
+  // A window that is on whenever the test runs.
+  const created = await page.request.post("/api/v1/rules", {
+    headers,
+    data: { name: "Browser bedtime", kind: "internet", groupIds: [group.id], mode: "scheduled", windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] },
+  });
+  expect(created.status()).toBe(201);
+  const ruleId = ((await created.json()) as { rule: { id: string } }).rule.id;
+  try {
+    await withWaitingAsk(page, group, { about: "rule", ruleId, minutes: 30 });
+    await page.goto(`/family/${group.id}`);
+    await expect(page.getByTestId(`group-ask-${group.id}`)).toHaveText("Asked for 30 minutes off Browser bedtime");
+    await page.getByTestId(`group-ask-${group.id}`).click();
+    const sheet = page.getByRole("dialog", { name: "Cassie asked for 30 minutes off Browser bedtime" });
+    await expect(sheet.getByRole("button", { name: /^Allow 30 minutes/ })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: /^Until Browser bedtime ends/ })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: /^Not now/ })).toBeVisible();
+    await shot(page, "rule-ask-sheet");
+    await sheet.getByRole("button", { name: /^For…/ }).click();
+    await expect(sheet.getByRole("button", { name: "Allow", exact: true })).toBeVisible();
+    await shot(page, "rule-ask-sheet-for");
+    await page.emulateMedia({ colorScheme: "dark" });
+    await shot(page, "rule-ask-sheet-dark");
+    await page.emulateMedia({ colorScheme: "light" });
+    await sheet.getByRole("button", { name: "Cancel" }).click();
+  } finally {
+    await page.request.delete(`/api/v1/rules/${ruleId}`, { headers });
+  }
+});
+
+test("a family member's FamilyFi Me phone is listed on their page and can be revoked", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const group = await cassie(page);
+  const phone = {
+    id: "me-browser",
+    displayName: "Cassie's phone",
+    clientType: "me",
+    scope: "me:askOnly",
+    actsAs: null,
+    group: { id: group.id, name: group.name },
+    parentDeviceId: null,
+    enrolledAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    lastSeenAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+    revokedAt: null,
+    pairedVia: null,
+    edgeTokens: [],
+    sessions: [{ id: "s1", username: "device:me-browser", expiresAt: new Date(Date.now() + 80 * 86_400_000).toISOString(), createdAt: new Date().toISOString() }],
+  };
+  // A child's phone can't pair in a browser test, so the list carries one as FamilyFi sends it.
+  const revoked: string[] = [];
+  await page.route(/\/api\/v1\/paired\/devices(\?.*)?$/, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    const response = await route.fetch();
+    const body = (await response.json()) as { devices: unknown[] };
+    await route.fulfill({ response, json: { devices: revoked.length ? body.devices : [phone, ...body.devices] } });
+  });
+  await page.route(`**/api/v1/paired/devices/${phone.id}`, async (route) => {
+    revoked.push(route.request().method());
+    await route.fulfill({ json: {} });
+  });
+  await page.goto(`/family/${group.id}`);
+  const card = page.getByTestId("child-phones");
+  await expect(card).toContainText("Cassie's phone");
+  await expect(card).toContainText("Asks only");
+  await expect(card).toContainText("For Cassie");
+  await card.scrollIntoViewIfNeeded();
+  await shot(page, "child-phones-listed");
+  await expectAccessible(page, "a family member's FamilyFi Me phones");
+  await card.getByRole("button", { name: "Revoke" }).click();
+  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+  await shot(page, "child-phone-revoke");
+  expect(await answerConfirm(page)).toBe("Revoke Cassie's phone? FamilyFi Me on it is signed out now. It stops showing their rules and can't ask for more time until it is paired again.");
+  expect(revoked).toEqual(["DELETE"]);
+  await expect(card).not.toContainText("Cassie's phone");
+});
+
+test("Pair Device, the pairing sheet and Settings fit a phone", { tag: "@phone" }, async ({ page }) => {
+  await signIn(page);
+  const headers = await csrf(page);
+  const url = `https://me-phone-${Date.now()}.tail1234.ts.net`;
+  const route = ((await (await page.request.post("/api/v1/connection/endpoints", { headers, data: { url, transport: "tailscale", trustMode: "system", priority: 0 } })).json()) as { endpoint: { id: string } }).endpoint.id;
+  await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
+  try {
+    await page.goto("/pair");
+    await expect(page.getByTestId("pair-me")).toBeEnabled();
+    await shot(page, "pair-page");
+    await page.getByTestId("pair-me").click();
+    const sheet = page.getByRole("dialog", { name: "Pair FamilyFi Me" });
+    // Children first: the phone is most likely for one of them.
+    await expect(sheet.getByLabel("Phone name")).toHaveValue("Cassie's phone");
+    await shot(page, "pair-me-sheet");
+    await expectAccessible(page, "the Pair FamilyFi Me sheet", "[role=dialog]");
+    await sheet.getByRole("button", { name: "Cancel" }).click();
+    await page.goto("/settings");
+    await page.getByTestId("settings-asks").scrollIntoViewIfNeeded();
+    await shot(page, "settings-asks");
+    await expectAccessible(page, "Settings with asking for more time");
   } finally {
     await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "off" } });
     await page.request.delete(`/api/v1/connection/endpoints/${route}`, { headers });

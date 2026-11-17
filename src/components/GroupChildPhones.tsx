@@ -13,11 +13,12 @@ import { usePairDevice } from "@/ui/use-pair-device";
 
 /** A family member's FamilyFi Me phones on their page, with Pair FamilyFi Me for them and Revoke. */
 export function GroupChildPhones({ group }: { group: Group }) {
-  const { phones, error, load, run, published, canPair } = usePairDevice(request);
+  const { phones, error, loaded, load, run, published, canPair } = usePairDevice(request);
   const [pairing, setPairing] = useState(false);
   return (
     <>
-      {error ? (
+      {/* A change that failed; a failed load is the card's own. */}
+      {error && loaded ? (
         <Alert tone="danger" role="alert">
           {error}
         </Alert>
@@ -26,6 +27,8 @@ export function GroupChildPhones({ group }: { group: Group }) {
         group={group}
         phones={childPhonesOf(phones, group.id)}
         canPair={canPair}
+        status={loaded ? "ready" : error ? "failed" : "loading"}
+        onRetry={() => void load()}
         onPair={() => setPairing(true)}
         onRevoke={async (phone) => {
           if (!(await askConfirm({ ...revokeConfirm(phone), destructive: true }))) return;

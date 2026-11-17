@@ -18,6 +18,8 @@ export function usePairDevice(request: ApiRequest) {
   const [phones, setPhones] = useState<PairedPhone[]>([]);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState("");
+  /** Whether a load has finished, so a view can tell loading from nothing published. */
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -29,6 +31,8 @@ export function usePairDevice(request: ApiRequest) {
       setTunnel(state.tunnel);
       setRoutes(endpoints.endpoints);
       setPhones(devices.devices);
+      setLoaded(true);
+      setError("");
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === "administrator_required") setForbidden(true);
       else setError(caught instanceof Error ? caught.message : PAIR_COPY.loadFailed);
@@ -70,6 +74,7 @@ export function usePairDevice(request: ApiRequest) {
     remote,
     forbidden,
     error,
+    loaded,
     load,
     run,
     published,

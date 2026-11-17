@@ -92,7 +92,7 @@ function AskSheet({ group, timezone, onClose }: { group: Group; timezone: string
   return (
     <PauseSheetView
       title={askSheetTitle(group, ask, rules)}
-      body={askSheetBody(ask, timezone)}
+      body={askSheetBody(ask, rules, timezone, now)}
       confirm="Allow"
       choices={askSheetChoices(ask, rules, timezone, now, household?.askWaitMinutes)}
       recent={null}

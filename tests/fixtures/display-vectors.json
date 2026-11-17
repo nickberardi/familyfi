@@ -31927,7 +31927,49 @@
           "at": "2026-11-17T03:25:00Z",
           "expiresAt": "2026-11-17T04:00:00Z"
         },
-        "timeZone": "America/New_York"
+        "timeZone": "America/New_York",
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "23:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "now": "2026-11-17T03:30:00Z"
       },
       "expected": "Asked at 10:25 PM. It closes at 11:00 PM if no one answers."
     },
@@ -31941,9 +31983,154 @@
           "state": "waiting",
           "at": "2026-11-17T03:25:00Z"
         },
-        "timeZone": "America/New_York"
+        "timeZone": "America/New_York",
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "23:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "now": "2026-11-17T03:30:00Z"
       },
       "expected": "Asked at 10:25 PM."
+    },
+    {
+      "fn": "askSheetBody",
+      "name": "the rule's window is no longer on, so there is nothing to allow",
+      "input": {
+        "ask": {
+          "id": "a1",
+          "about": "rule",
+          "ruleId": "r1",
+          "minutes": 30,
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:00:00Z"
+        },
+        "timeZone": "America/New_York",
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "23:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "now": "2026-11-17T04:10:00Z"
+      },
+      "expected": "Asked at 10:25 PM. It closes at 11:00 PM if no one answers. Bedtime isn't on now, so there's nothing to allow."
+    },
+    {
+      "fn": "askSheetBody",
+      "name": "an always-on rule says so",
+      "input": {
+        "ask": {
+          "id": "a1",
+          "about": "rule",
+          "ruleId": "r1",
+          "minutes": 30,
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:00:00Z"
+        },
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T03:30:00Z"
+      },
+      "expected": "Asked at 10:25 PM. It closes at 11:00 PM if no one answers. Bedtime is always on, so there's nothing to allow."
     },
     {
       "fn": "askSheetOptions",
@@ -32240,6 +32427,50 @@
       "expected": []
     },
     {
+      "fn": "askSheetOptions",
+      "name": "an always-on rule has no window to lift time off",
+      "input": {
+        "ask": {
+          "id": "a1",
+          "about": "rule",
+          "ruleId": "r1",
+          "minutes": 30,
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:00:00Z"
+        },
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T03:30:00Z"
+      },
+      "expected": []
+    },
+    {
       "fn": "askSheetCustom",
       "name": "for a time inside the window",
       "input": {
@@ -32452,7 +32683,7 @@
       },
       "expected": {
         "label": "Not now",
-        "note": "can ask again at 11:00 PM",
+        "note": "they can ask again at 11:00 PM",
         "request": {
           "kind": "decline"
         }
@@ -32468,7 +32699,7 @@
       },
       "expected": {
         "label": "Not now",
-        "note": "can ask again now",
+        "note": "they can ask again now",
         "request": {
           "kind": "decline"
         }
@@ -32567,7 +32798,7 @@
         },
         {
           "label": "Not now",
-          "note": "can ask again at 11:00 PM",
+          "note": "they can ask again at 11:00 PM",
           "request": {
             "kind": "decline"
           }
@@ -32600,7 +32831,7 @@
         },
         {
           "label": "Not now",
-          "note": "can ask again at 11:00 PM",
+          "note": "they can ask again at 11:00 PM",
           "request": {
             "kind": "decline"
           }

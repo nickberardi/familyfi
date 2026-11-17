@@ -42,6 +42,10 @@ export function usePairing({
     if (name === childPhoneName(familyGroups.find((group) => group.id === groupId))) setName(childPhoneName(familyGroups.find((group) => group.id === next)));
     setGroupIdState(next);
   };
+  // Opened before the household's groups loaded: choose the first family member once they arrive,
+  // adjusting state while rendering rather than in an effect.
+  const firstGroupId = (familyGroups.find((group) => group.id === child?.groupId) ?? familyGroups[0])?.id ?? "";
+  if (child && !groupId && firstGroupId) setGroupId(firstGroupId);
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [accountId, setAccountId] = useState("");
   const [issued, setIssued] = useState<IssuedPairing | null>(null);

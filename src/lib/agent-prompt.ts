@@ -11,7 +11,7 @@ export const AGENT_SCOPES: readonly { value: "agent:full" | "agent:readOnly"; la
   { value: "agent:readOnly", label: "Read only", detail: "Read groups, rules, devices and sync status. It cannot change anything." },
 ];
 
-const SCOPE_LABELS: Record<string, string> = { "app:full": "Full access", "agent:full": "Full access", "app:rulesOnly": "Rules only", "agent:readOnly": "Read only", "me:askOnly": "FamilyFi Me" };
+const SCOPE_LABELS: Record<string, string> = { "app:full": "Full access", "agent:full": "Full access", "app:rulesOnly": "Rules only", "agent:readOnly": "Read only", "me:askOnly": "Asks only" };
 
 /** A scope's name; one this client does not know, from a newer server, is shown as sent. */
 export function scopeLabel(scope: PairedScope): string {
