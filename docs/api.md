@@ -166,6 +166,13 @@ valid LAN certificate, VPN, public reverse proxy, Tailscale Serve, or Cloudflare
 route is limited to `lan` and carries an SHA-256 SPKI pin in the pairing code; a phone
 rejects every other public key. FamilyFi does not distribute a household CA.
 
+A phone tries the enabled routes in manifest order (`src/lib/companion-request.ts`
+`orderRoutes`), except that on cellular a `lan` route goes last, since it answers there only over
+a VPN. It starts at the route that last answered on the network it is on (Wi-Fi networks told apart
+by subnet where the platform reports one), kept between launches. A read gives a `lan` route
+`LAN_CONNECT_TIMEOUT_MS` to connect when another route could answer instead; a household write
+keeps the whole timeout, since it never moves to another route.
+
 Administrators do all of this from **System → Pair Device** in the web app. Administrator reads need only the session; writes also need the CSRF header.
 
 ### Phone alerts

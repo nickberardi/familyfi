@@ -9,7 +9,7 @@ import {
   type PendingEnrollment,
   type StoredSession,
 } from "./companion-pairing";
-import { createCompanionRequest, type Transport } from "./companion-request";
+import { createCompanionRequest, networkKey, type DeviceNetwork, type Transport } from "./companion-request";
 
 /**
  * A paired phone's session: what it keeps between launches, and the steps that change it. Plain
@@ -29,6 +29,7 @@ export type SecureStorage = {
 const PROFILE = "connectionProfile";
 const EDGE = "edgeCredentials";
 const SESSION = "bearerSession";
+const ANSWERED = "routesAnswered";
 
 export type SessionVault = ReturnType<typeof createSessionVault>;
 
@@ -58,9 +59,12 @@ export function createSessionVault(storage: SecureStorage) {
       await storage.set(EDGE, JSON.stringify(edgeCredentials));
     },
     saveSession: (session: StoredSession) => storage.set(SESSION, JSON.stringify(session)),
+    /** The route that last answered on each network (`networkKey`), so a launch starts there. */
+    routesAnswered: async () => (await read<Record<string, string>>(ANSWERED)) ?? {},
+    saveRoutesAnswered: (answered: Record<string, string>) => storage.set(ANSWERED, JSON.stringify(answered)),
     /** Forgetting the household removes everything; the phone must pair again. */
     async forget() {
-      await Promise.all([storage.delete(SESSION), storage.delete(EDGE), storage.delete(PROFILE)]);
+      await Promise.all([storage.delete(SESSION), storage.delete(EDGE), storage.delete(PROFILE), storage.delete(ANSWERED)]);
     },
   };
 }
@@ -74,7 +78,7 @@ export type CompanionSessionState = {
   session: StoredSession | null;
   /** A household that verified and awaits the person's decision; it holds the unspent code, so it is never stored. */
   pending: PendingEnrollment | null;
-  /** The route that last answered. */
+  /** The route that last answered on the network the device is on now. */
   activeRouteId: string | null;
 };
 
@@ -85,6 +89,9 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
   const vault = createSessionVault(deps.storage);
   let state: CompanionSessionState = { status: "loading", profile: null, session: null, pending: null, activeRouteId: null };
   let credentials: EndpointCredential[] = [];
+  /** The network the device is on, and the route that last answered on each network it has been on. */
+  let network: DeviceNetwork | null = null;
+  let answered: Record<string, string> = {};
   const listeners = new Set<() => void>();
   const set = (patch: Partial<CompanionSessionState>) => {
     state = { ...state, ...patch };
@@ -95,8 +102,15 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     routes: () => state.profile?.endpoints ?? [],
     edgeCredentials: () => credentials,
     activeRouteId: () => state.activeRouteId,
+    network: () => network,
     onRoute: (route: { id: string }) => {
       if (state.activeRouteId !== route.id) set({ activeRouteId: route.id });
+      // Kept for the next launch on this network; a phone that can't store it just starts in manifest order.
+      if (!network || !state.profile) return;
+      const key = networkKey(network);
+      if (answered[key] === route.id) return;
+      answered = { ...answered, [key]: route.id };
+      void vault.saveRoutesAnswered(answered).catch(() => undefined);
     },
   };
   /** One request over the trusted routes with the bearer held at the moment it is sent. */
@@ -193,6 +207,7 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
    */
   const lose = async () => {
     credentials = [];
+    answered = {};
     set({ profile: null, session: null, pending: null, activeRouteId: null, status: "unpaired" });
     await vault.forget().catch(() => undefined);
   };
@@ -217,13 +232,24 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
         return;
       }
       const [profile, session, edge] = stored;
+      answered = profile && session ? await vault.routesAnswered().catch(() => ({})) : {};
       // A pairing without its session (one kept from before pairing signed in) is no pairing at all.
       if (!profile || !session) {
         await lose();
         return;
       }
       credentials = edge;
-      set({ profile, session, status: "signedIn" });
+      set({ profile, session, status: "signedIn", activeRouteId: network ? (answered[networkKey(network)] ?? null) : null });
+    },
+    /**
+     * The device moved to another network (or reports the one it is on at launch): requests start at
+     * the route that last answered on it, else in that network's order (`orderRoutes`), rather than at
+     * a route that answered on the network it just left.
+     */
+    setNetwork(next: DeviceNetwork | null) {
+      const changed = (network ? networkKey(network) : null) !== (next ? networkKey(next) : null);
+      network = next;
+      if (changed) set({ activeRouteId: next ? (answered[networkKey(next)] ?? null) : null });
     },
     /** Reads a pairing code and verifies the household it names. Throws; `pairingErrorMessage` words it. */
     async verify(code: string) {

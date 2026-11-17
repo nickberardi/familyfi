@@ -18,6 +18,11 @@ export type TransportRequest = {
   /** The route's pin, for a pinned route. A pinned route with none fails closed. */
   pin: string | null;
   timeoutMs: number;
+  /**
+   * How long to wait for the connection itself (TCP and TLS), when shorter than `timeoutMs`. Set only
+   * for a request that can move to another route, so giving up early never leaves a write's fate unknown.
+   */
+  connectTimeoutMs?: number;
 };
 
 export type TransportResponse = { status: number; headers: Record<string, string>; body: string };
@@ -57,9 +62,42 @@ const REFRESH_PATH = "/api/v1/auth/refresh";
  * the companion request tests hold the two together).
  */
 const REFRESH_TIMEOUT_MS = 5_000;
+/**
+ * A home-network route gets this long to connect when another route could answer instead. Away from
+ * home its address reaches nothing, and a phone otherwise waits out the whole `TIMEOUT_MS` there
+ * before moving on; at home the connection is made well within it.
+ */
+export const LAN_CONNECT_TIMEOUT_MS = 3_000;
 const SAFE_METHODS = new Set(["GET", "HEAD"]);
 /** Writes that change nothing in the household, so any route may take them. */
 const FAILOVER_WRITES = new Set(["/api/v1/auth/login", "/api/v1/auth/logout", REFRESH_PATH]);
+
+/**
+ * The network a device is on, as its platform reports it: `wifi` (or wired), `cellular`, or `other`
+ * when it can't tell. `key` names the network more closely where the platform can (a Wi-Fi subnet),
+ * so a route remembered at home is not the one tried first at a café.
+ */
+export type DeviceNetwork = { kind: "wifi" | "cellular" | "other"; key?: string };
+
+/** Where a remembered route is kept for a network: its own key, else its kind. */
+export function networkKey(network: DeviceNetwork): string {
+  return network.key ? `${network.kind}:${network.key}` : network.kind;
+}
+
+/**
+ * The order a request tries routes in: the enabled routes in manifest order, but on cellular a
+ * home-network (`lan`) route last, since it answers there only over a VPN; then the route that last
+ * answered on this network first, whatever its kind, so a phone that reached home over a VPN keeps
+ * doing so.
+ */
+export function orderRoutes(routes: ConnectionRoute[], activeId: string | null, network: DeviceNetwork | null): ConnectionRoute[] {
+  const candidates = candidateRoutes(routes);
+  const byNetwork =
+    network?.kind === "cellular"
+      ? [...candidates.filter((route) => route.transport !== "lan"), ...candidates.filter((route) => route.transport === "lan")]
+      : candidates;
+  return [...byNetwork.filter((route) => route.id === activeId), ...byNetwork.filter((route) => route.id !== activeId)];
+}
 
 export type CompanionConnection = {
   /** The trusted routes, from the last verified manifest (or a pairing code's stand-in). */
@@ -71,6 +109,8 @@ export type CompanionConnection = {
   activeRouteId?: () => string | null;
   /** Told which route answered, so the Connection screen can show it and the next request starts there. */
   onRoute?: (route: ConnectionRoute) => void;
+  /** The network the device is on now, which orders the routes (`orderRoutes`); unknown when absent. */
+  network?: () => DeviceNetwork | null;
 };
 
 export function createCompanionRequest(transport: Transport, connection: CompanionConnection): ApiRequest {
@@ -82,13 +122,8 @@ export function createCompanionRequest(transport: Transport, connection: Compani
     const token = connection.token?.() ?? null;
     let lastFailure: unknown = new Error("FamilyFi has no route to try.");
 
-    const candidates = candidateRoutes(connection.routes());
-    const active = connection.activeRouteId?.() ?? null;
-    const ordered = [
-      ...candidates.filter((route) => route.id === active),
-      ...candidates.filter((route) => route.id !== active),
-    ];
-    for (const route of ordered) {
+    const ordered = orderRoutes(connection.routes(), connection.activeRouteId?.() ?? null, connection.network?.() ?? null);
+    for (const [index, route] of ordered.entries()) {
       const headers: Record<string, string> = {
         Accept: "application/json",
         ...edgeHeaders(route, connection.edgeCredentials()),
@@ -105,6 +140,8 @@ export function createCompanionRequest(transport: Transport, connection: Compani
           trustMode: route.trustMode,
           pin: route.trustMode === "pinned" ? route.spkiSha256 : null,
           timeoutMs: path === REFRESH_PATH ? REFRESH_TIMEOUT_MS : TIMEOUT_MS,
+          // Only where a next route could answer: a lone home route keeps the whole timeout.
+          ...(retryable && route.transport === "lan" && index < ordered.length - 1 ? { connectTimeoutMs: LAN_CONNECT_TIMEOUT_MS } : {}),
         });
       } catch (error) {
         lastFailure = error;
