@@ -16464,6 +16464,18 @@
       }
     },
     {
+      "fn": "groupBadge",
+      "name": "unblocked",
+      "input": {
+        "badge": "unblocked"
+      },
+      "expected": {
+        "label": "Unblocked",
+        "ink": "var(--ff-status-online-ink)",
+        "fill": "var(--ff-status-online-fill)"
+      }
+    },
+    {
       "fn": "groupDetailColor",
       "name": "the rules as set",
       "input": {
@@ -23612,7 +23624,7 @@
         "now": "2026-10-15T15:00:00.000Z"
       },
       "expected": {
-        "badge": "online",
+        "badge": "blocked",
         "detail": "Video blocked",
         "change": "none"
       }
@@ -23863,7 +23875,7 @@
         "now": "2026-10-15T15:00:00.000Z"
       },
       "expected": {
-        "badge": "online",
+        "badge": "unblocked",
         "detail": "Unblocked until 1:00 PM by Nick",
         "change": "unblocked"
       }
@@ -23967,9 +23979,153 @@
         "now": "2026-10-15T15:00:00.000Z"
       },
       "expected": {
-        "badge": "online",
+        "badge": "unblocked",
         "detail": "TV video unblocked until 12:00 PM by Nick",
         "change": "unblocked"
+      }
+    },
+    {
+      "fn": "groupStatusParts",
+      "name": "Block button default unblocked while a scheduled rule blocks",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null,
+          "blockButtonRuleId": "r-video"
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "TV video",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g1",
+                "pause": {
+                  "active": true,
+                  "until": "2026-10-15T16:00:00.000Z",
+                  "kind": "pause",
+                  "by": null
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "Social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-gaming",
+            "name": "Gaming",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              8
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w1",
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "10:00",
+                "end": "12:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T15:00:00.000Z"
+      },
+      "expected": {
+        "badge": "unblocked",
+        "detail": "Gaming blocked until 12:00 PM",
+        "change": "none"
       }
     },
     {
@@ -27679,6 +27835,96 @@
         ],
         "timeZone": "America/New_York",
         "now": "2026-10-15T20:30:00.000Z"
+      },
+      "expected": {
+        "on": false,
+        "state": "Online"
+      }
+    },
+    {
+      "fn": "blockSwitch",
+      "name": "a Block button default blocking leaves the switch on all internet",
+      "input": {
+        "group": {
+          "id": "g1",
+          "kind": "things",
+          "name": "TV",
+          "monogram": "TV",
+          "familyRole": null,
+          "deviceCount": 3,
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "allowance": {
+            "active": false,
+            "until": null,
+            "by": null
+          },
+          "internetRuleIds": [],
+          "access": "available",
+          "dohOverrideUrl": null,
+          "blockButtonRuleId": "r-video"
+        },
+        "rules": [
+          {
+            "id": "r-video",
+            "name": "TV video",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              4
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          },
+          {
+            "id": "r-social",
+            "name": "Social",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              24
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-10-15T15:00:00.000Z"
       },
       "expected": {
         "on": false,

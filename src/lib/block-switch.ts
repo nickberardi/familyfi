@@ -1,7 +1,7 @@
 import { formatClock } from "./display";
 import {
   groupBadge,
-  groupStatusParts,
+  groupStatus,
   internetRulePath,
   rulesBlockingGroup,
   rulesToUnblock,
@@ -11,23 +11,25 @@ import type { Group } from "./types";
 
 /**
  * A group's one-tap Block switch outside the app: a Quick Settings tile on Android, a Control Center
- * control on iPhone. It is on while the group's card badge reads Blocked, so a switch and a card
- * never disagree, and it has no timed choices: those stay in the app. Native code cannot run this
+ * control on iPhone. It is on while the group's internet is blocked, which the card's badge says
+ * unless a Block button default gives the badge to that rule (then the switch, like Siri, still
+ * means all internet), and it has no timed choices: those stay in the app. Native code cannot run this
  * TypeScript, so each platform keeps a copy and replays `tests/fixtures/display-vectors.json`.
  */
 
 /** How many Quick Settings tiles an Android phone offers: Android has one tile per service, so the number is fixed. */
 export const QUICK_SETTINGS_TILES = 3;
 
-/** Whether the switch is on, and the word under the group's name (the card badge's own). */
+/** Whether the switch is on, and the word under the group's name: Blocked or Online. */
 export function blockSwitch(
   group: Group,
   rules: Rule[],
   timezone: string,
   now: Date,
 ): { on: boolean; state: string } {
-  const { badge } = groupStatusParts(group, rules, timezone, now);
-  return { on: badge === "blocked", state: groupBadge(badge).label };
+  const { tone } = groupStatus(group, rules, timezone, now);
+  const on = tone === "paused" || tone === "off";
+  return { on, state: groupBadge(on ? "blocked" : "online").label };
 }
 
 /**

@@ -7,7 +7,7 @@ import { groupBadge, type GroupStatusParts } from "@/lib/group-actions";
 import { tokenOf, useUI } from "./UIContext";
 
 /**
- * A group's state beside its name: green "Online" or red "Blocked" (`groupBadge`), round and
+ * A group's state beside its name: green "Online" or "Unblocked", or red "Blocked" (`groupBadge`), round and
  * tinted. A state badge, so never the grey square `Tag`, which names a kind of thing.
  */
 export function StatusBadge({ badge, testID }: { badge: GroupStatusParts["badge"]; testID?: string }) {
